@@ -1,0 +1,714 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "PTC RESET FUSE 6V 500MA 1206",
+    "DetailedDescription": "Polymeric PTC Resettable Fuse 6V 500 mA Ih Surface Mount 1206 (3216 Metric), Concave"
+   },
+   "Manufacturer": {
+    "Id": 18,
+    "Name": "Littelfuse Inc."
+   },
+   "ManufacturerProductNumber": "1206L050YR",
+   "UnitPrice": 0.64,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/littelfuse-inc/1206L050YR/455698",
+   "DatasheetUrl": "https://www.littelfuse.com/assetdocs/resettable-ptcs-1206l-datasheet?assetguid=2b6a1515-d4ee-4c83-8bd4-152b4901b8f5",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/202/POLYFUSE-1206L.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "F2112TR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.20782,
+       "TotalPrice": 831.28
+      },
+      {
+       "BreakQuantity": 8000,
+       "UnitPrice": 0.19963,
+       "TotalPrice": 1597.04
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 18,
+      "Name": "Littelfuse Inc."
+     },
+     "QuantityAvailableforPackageType": 16000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "F2112CT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.64,
+       "TotalPrice": 0.64
+      },
+      {
+       "BreakQuantity": 5,
+       "UnitPrice": 0.528,
+       "TotalPrice": 2.64
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.488,
+       "TotalPrice": 4.88
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.4048,
+       "TotalPrice": 20.24
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3734,
+       "TotalPrice": 37.34
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.33572,
+       "TotalPrice": 83.93
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.30966,
+       "TotalPrice": 154.83
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28553,
+       "TotalPrice": 285.53
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 18,
+      "Name": "Littelfuse Inc."
+     },
+     "QuantityAvailableforPackageType": 19888,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "F2112DKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.64,
+       "TotalPrice": 0.64
+      },
+      {
+       "BreakQuantity": 5,
+       "UnitPrice": 0.528,
+       "TotalPrice": 2.64
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.488,
+       "TotalPrice": 4.88
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.4048,
+       "TotalPrice": 20.24
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3734,
+       "TotalPrice": 37.34
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.33572,
+       "TotalPrice": 83.93
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.30966,
+       "TotalPrice": 154.83
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28553,
+       "TotalPrice": 285.53
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 18,
+      "Name": "Littelfuse Inc."
+     },
+     "QuantityAvailableforPackageType": 19888,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 19888,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/6024336442001",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "388650",
+     "ValueText": "Polymeric"
+    },
+    {
+     "ParameterId": 686,
+     "ParameterText": "Voltage - Max",
+     "ParameterType": "String",
+     "ValueId": "267452",
+     "ValueText": "6V"
+    },
+    {
+     "ParameterId": 682,
+     "ParameterText": "Current - Hold (Ih) (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "500 mA",
+     "ValueText": "500 mA"
+    },
+    {
+     "ParameterId": 683,
+     "ParameterText": "Current - Trip (It)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 A",
+     "ValueText": "1 A"
+    },
+    {
+     "ParameterId": 2072,
+     "ParameterText": "Current - Max",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "100 A",
+     "ValueText": "100 A"
+    },
+    {
+     "ParameterId": 2073,
+     "ParameterText": "Time to Trip",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "100 ms",
+     "ValueText": "100 ms"
+    },
+    {
+     "ParameterId": 2074,
+     "ParameterText": "Resistance - Initial (Ri) (Min)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "150 mOhms",
+     "ValueText": "150 mOhms"
+    },
+    {
+     "ParameterId": 2075,
+     "ParameterText": "Resistance - Post Trip (R1) (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "700 mOhms",
+     "ValueText": "700 mOhms"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212617",
+     "ValueText": "-40°C ~ 85°C"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "83721",
+     "ValueText": "1206 (3216 Metric), Concave"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "10954",
+     "ValueText": "0.126\" L x 0.065\" W (3.20mm x 1.65mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "5744",
+     "ValueText": "0.030\" (0.75mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 9,
+    "ParentId": 0,
+    "Name": "Circuit Protection",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/180/750/FHAC0001ZXJ_tmb.jpg",
+    "SeoDescription": "Circuit protection devices include products used to protect electrical circuits from damage caused by hazards such as static discharge (such as Transient Voltage Suppression diodes and gas discharge tubes) as well as products designed to reduce the risk of fire caused by electrical overload or circuit failure, such as fuses and circuit breakers. Related accessories designed for use with such products are also included, such as fuse holders, fuse pullers, and mounting bases for circuit breakers.",
+    "ChildCategories": [
+     {
+      "CategoryId": 150,
+      "ParentId": 9,
+      "Name": "PTC Resettable Fuses",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/014/532/MFG_MF-GSMF_tmb.jpg",
+      "SeoDescription": "PTC Resettable Fuses are designed to stop current flow when it exceeds a certain limit (overcurrent protection). The Fuses work by increasing its resistance as its temperature rises due to the current increase. The trip current ranges from 14 mA to 50 A with the Time to trip ranging from 8 ms to 90 s. PTC = Positive Temperature Coefficient.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "13",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 15692,
+    "Name": "POLY-FUSE®, 1206L"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8533.40.8070"
+   },
+   "OtherNames": [
+    "F2112TR",
+    "F2112DKR",
+    "1206L050WRT",
+    "F2112CT",
+    "1206L050C",
+    "1206L050-C"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "PTC RESET FUSE 6V 500MA 1206",
+    "DetailedDescription": "Polymeric PTC Resettable Fuse 6V 500 mA Ih Surface Mount 1206 (3216 Metric), Concave"
+   },
+   "Manufacturer": {
+    "Id": 18,
+    "Name": "Littelfuse Inc."
+   },
+   "ManufacturerProductNumber": "1206L050YR",
+   "UnitPrice": 0.64,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/littelfuse-inc/1206L050YR/455698",
+   "DatasheetUrl": "https://www.littelfuse.com/assetdocs/resettable-ptcs-1206l-datasheet?assetguid=2b6a1515-d4ee-4c83-8bd4-152b4901b8f5",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/202/POLYFUSE-1206L.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "F2112TR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.20782,
+       "TotalPrice": 831.28
+      },
+      {
+       "BreakQuantity": 8000,
+       "UnitPrice": 0.19963,
+       "TotalPrice": 1597.04
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 18,
+      "Name": "Littelfuse Inc."
+     },
+     "QuantityAvailableforPackageType": 16000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "F2112CT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.64,
+       "TotalPrice": 0.64
+      },
+      {
+       "BreakQuantity": 5,
+       "UnitPrice": 0.528,
+       "TotalPrice": 2.64
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.488,
+       "TotalPrice": 4.88
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.4048,
+       "TotalPrice": 20.24
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3734,
+       "TotalPrice": 37.34
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.33572,
+       "TotalPrice": 83.93
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.30966,
+       "TotalPrice": 154.83
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28553,
+       "TotalPrice": 285.53
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 18,
+      "Name": "Littelfuse Inc."
+     },
+     "QuantityAvailableforPackageType": 19888,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "F2112DKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.64,
+       "TotalPrice": 0.64
+      },
+      {
+       "BreakQuantity": 5,
+       "UnitPrice": 0.528,
+       "TotalPrice": 2.64
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.488,
+       "TotalPrice": 4.88
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.4048,
+       "TotalPrice": 20.24
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3734,
+       "TotalPrice": 37.34
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.33572,
+       "TotalPrice": 83.93
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.30966,
+       "TotalPrice": 154.83
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28553,
+       "TotalPrice": 285.53
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 18,
+      "Name": "Littelfuse Inc."
+     },
+     "QuantityAvailableforPackageType": 19888,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 19888,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/6024336442001",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "388650",
+     "ValueText": "Polymeric"
+    },
+    {
+     "ParameterId": 686,
+     "ParameterText": "Voltage - Max",
+     "ParameterType": "String",
+     "ValueId": "267452",
+     "ValueText": "6V"
+    },
+    {
+     "ParameterId": 682,
+     "ParameterText": "Current - Hold (Ih) (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "500 mA",
+     "ValueText": "500 mA"
+    },
+    {
+     "ParameterId": 683,
+     "ParameterText": "Current - Trip (It)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 A",
+     "ValueText": "1 A"
+    },
+    {
+     "ParameterId": 2072,
+     "ParameterText": "Current - Max",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "100 A",
+     "ValueText": "100 A"
+    },
+    {
+     "ParameterId": 2073,
+     "ParameterText": "Time to Trip",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "100 ms",
+     "ValueText": "100 ms"
+    },
+    {
+     "ParameterId": 2074,
+     "ParameterText": "Resistance - Initial (Ri) (Min)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "150 mOhms",
+     "ValueText": "150 mOhms"
+    },
+    {
+     "ParameterId": 2075,
+     "ParameterText": "Resistance - Post Trip (R1) (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "700 mOhms",
+     "ValueText": "700 mOhms"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212617",
+     "ValueText": "-40°C ~ 85°C"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "83721",
+     "ValueText": "1206 (3216 Metric), Concave"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "10954",
+     "ValueText": "0.126\" L x 0.065\" W (3.20mm x 1.65mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "5744",
+     "ValueText": "0.030\" (0.75mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 9,
+    "ParentId": 0,
+    "Name": "Circuit Protection",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/180/750/FHAC0001ZXJ_tmb.jpg",
+    "SeoDescription": "Circuit protection devices include products used to protect electrical circuits from damage caused by hazards such as static discharge (such as Transient Voltage Suppression diodes and gas discharge tubes) as well as products designed to reduce the risk of fire caused by electrical overload or circuit failure, such as fuses and circuit breakers. Related accessories designed for use with such products are also included, such as fuse holders, fuse pullers, and mounting bases for circuit breakers.",
+    "ChildCategories": [
+     {
+      "CategoryId": 150,
+      "ParentId": 9,
+      "Name": "PTC Resettable Fuses",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/014/532/MFG_MF-GSMF_tmb.jpg",
+      "SeoDescription": "PTC Resettable Fuses are designed to stop current flow when it exceeds a certain limit (overcurrent protection). The Fuses work by increasing its resistance as its temperature rises due to the current increase. The trip current ranges from 14 mA to 50 A with the Time to trip ranging from 8 ms to 90 s. PTC = Positive Temperature Coefficient.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "13",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 15692,
+    "Name": "POLY-FUSE®, 1206L"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8533.40.8070"
+   },
+   "OtherNames": [
+    "F2112TR",
+    "F2112DKR",
+    "1206L050WRT",
+    "F2112CT",
+    "1206L050C",
+    "1206L050-C"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 18,
+    "Value": "Littelfuse Inc.",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

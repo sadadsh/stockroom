@@ -1,0 +1,626 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "LED GREEN CLEAR 0603 SMD",
+    "DetailedDescription": "Green 570nm LED Indication - Discrete 2V 0603 (1608 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 732,
+    "Name": "Würth Elektronik"
+   },
+   "ManufacturerProductNumber": "150060VS75000",
+   "UnitPrice": 0.15,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/würth-elektronik/150060VS75000/4489906",
+   "DatasheetUrl": "https://www.we-online.com/components/products/datasheet/150060VS75000.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2958/WL-SMCW%20Series%200603.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "732-4980-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.11745,
+       "TotalPrice": 469.8
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 732,
+      "Name": "Würth Elektronik"
+     },
+     "QuantityAvailableforPackageType": 214897,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "732-4980-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.15,
+       "TotalPrice": 0.15
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.142,
+       "TotalPrice": 7.1
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1239,
+       "TotalPrice": 12.39
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 732,
+      "Name": "Würth Elektronik"
+     },
+     "QuantityAvailableforPackageType": 214897,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "732-4980-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.15,
+       "TotalPrice": 0.15
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.142,
+       "TotalPrice": 7.1
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1239,
+       "TotalPrice": 12.39
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 732,
+      "Name": "Würth Elektronik"
+     },
+     "QuantityAvailableforPackageType": 214897,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 214897,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/5335790906001",
+   "Parameters": [
+    {
+     "ParameterId": 37,
+     "ParameterText": "Color",
+     "ParameterType": "String",
+     "ValueId": "351158",
+     "ValueText": "Green"
+    },
+    {
+     "ParameterId": 207,
+     "ParameterText": "Configuration",
+     "ParameterType": "String",
+     "ValueId": "407938",
+     "ValueText": "Standard"
+    },
+    {
+     "ParameterId": 525,
+     "ParameterText": "Lens Color",
+     "ParameterType": "String",
+     "ValueId": "332225",
+     "ValueText": "Colorless"
+    },
+    {
+     "ParameterId": 1843,
+     "ParameterText": "Lens Transparency",
+     "ParameterType": "String",
+     "ValueId": "330893",
+     "ValueText": "Clear"
+    },
+    {
+     "ParameterId": 206,
+     "ParameterText": "Millicandela Rating",
+     "ParameterType": "String",
+     "ValueId": "214849",
+     "ValueText": "40mcd"
+    },
+    {
+     "ParameterId": 2028,
+     "ParameterText": "Lens Style",
+     "ParameterType": "String",
+     "ValueId": "393133",
+     "ValueText": "Rectangle with Flat Top"
+    },
+    {
+     "ParameterId": 2029,
+     "ParameterText": "Lens Size",
+     "ParameterType": "String",
+     "ValueId": "43570",
+     "ValueText": "1.10mm x 0.70mm"
+    },
+    {
+     "ParameterId": 319,
+     "ParameterText": "Voltage - Forward (Vf) (Typ)",
+     "ParameterType": "String",
+     "ValueId": "168722",
+     "ValueText": "2V"
+    },
+    {
+     "ParameterId": 543,
+     "ParameterText": "Current - Test",
+     "ParameterType": "String",
+     "ValueId": "143056",
+     "ValueText": "20mA"
+    },
+    {
+     "ParameterId": 551,
+     "ParameterText": "Viewing Angle",
+     "ParameterType": "String",
+     "ValueId": "94338",
+     "ValueText": "140°"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 969,
+     "ParameterText": "Wavelength - Dominant",
+     "ParameterType": "String",
+     "ValueId": "245569",
+     "ValueText": "570nm"
+    },
+    {
+     "ParameterId": 968,
+     "ParameterText": "Wavelength - Peak",
+     "ParameterType": "String",
+     "ValueId": "245698",
+     "ValueText": "572nm"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39246",
+     "ValueText": "0603 (1608 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "39245",
+     "ValueText": "0603"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "56082",
+     "ValueText": "1.60mm L x 0.80mm W"
+    },
+    {
+     "ParameterId": 966,
+     "ParameterText": "Height (Max)",
+     "ParameterType": "String",
+     "ValueId": "34583",
+     "ValueText": "0.80mm"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 632187,
+    "Name": "150060"
+   },
+   "Category": {
+    "CategoryId": 7,
+    "ParentId": 0,
+    "Name": "Optoelectronics",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/388/510/MFG_ELI70-CR_tmb%2864x64%29.jpg",
+    "SeoDescription": "Broadly defined, optoelectronic products are devices that convert electricity to light, and accessory or supporting items such as reflectors or mounting hardware designed for use with such products. It is a diverse product category, including LEDs, fiber optic transmitters and receivers, LCD, OLED, and VFD displays, EL wire, incandescent lamps, lasers, light pipes and xenon flash tubes, among many other product types.",
+    "ChildCategories": [
+     {
+      "CategoryId": 105,
+      "ParentId": 7,
+      "Name": "LED Indication - Discrete",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/626/HLMP-3507%2CHLMP-3680%2CHLMP-3962_tmb%2864x64%29.jpg",
+      "SeoDescription": "Light emitting diodes are semiconductor devices that emit light when conducting current. LEDs in this family are single or array configuration for status indication on printed circuit boards. They are differentiated by package/case, wavelength, viewing angle, forward voltage, current rating, millicandela rating, color, and mounting type. Configurations include common anode or cathode and bidirectional.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "13",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 43095,
+    "Name": "WL-SMCW"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "3  (168 Hours)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8541.41.0000"
+   },
+   "OtherNames": [
+    "732-4980-6",
+    "732-4980-1",
+    "732-4980-2"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "LED GREEN CLEAR 0603 SMD",
+    "DetailedDescription": "Green 570nm LED Indication - Discrete 2V 0603 (1608 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 732,
+    "Name": "Würth Elektronik"
+   },
+   "ManufacturerProductNumber": "150060VS75000",
+   "UnitPrice": 0.15,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/würth-elektronik/150060VS75000/4489906",
+   "DatasheetUrl": "https://www.we-online.com/components/products/datasheet/150060VS75000.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2958/WL-SMCW%20Series%200603.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "732-4980-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.11745,
+       "TotalPrice": 469.8
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 732,
+      "Name": "Würth Elektronik"
+     },
+     "QuantityAvailableforPackageType": 214897,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "732-4980-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.15,
+       "TotalPrice": 0.15
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.142,
+       "TotalPrice": 7.1
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1239,
+       "TotalPrice": 12.39
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 732,
+      "Name": "Würth Elektronik"
+     },
+     "QuantityAvailableforPackageType": 214897,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "732-4980-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.15,
+       "TotalPrice": 0.15
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.142,
+       "TotalPrice": 7.1
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1239,
+       "TotalPrice": 12.39
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 732,
+      "Name": "Würth Elektronik"
+     },
+     "QuantityAvailableforPackageType": 214897,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 214897,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/5335790906001",
+   "Parameters": [
+    {
+     "ParameterId": 37,
+     "ParameterText": "Color",
+     "ParameterType": "String",
+     "ValueId": "351158",
+     "ValueText": "Green"
+    },
+    {
+     "ParameterId": 207,
+     "ParameterText": "Configuration",
+     "ParameterType": "String",
+     "ValueId": "407938",
+     "ValueText": "Standard"
+    },
+    {
+     "ParameterId": 525,
+     "ParameterText": "Lens Color",
+     "ParameterType": "String",
+     "ValueId": "332225",
+     "ValueText": "Colorless"
+    },
+    {
+     "ParameterId": 1843,
+     "ParameterText": "Lens Transparency",
+     "ParameterType": "String",
+     "ValueId": "330893",
+     "ValueText": "Clear"
+    },
+    {
+     "ParameterId": 206,
+     "ParameterText": "Millicandela Rating",
+     "ParameterType": "String",
+     "ValueId": "214849",
+     "ValueText": "40mcd"
+    },
+    {
+     "ParameterId": 2028,
+     "ParameterText": "Lens Style",
+     "ParameterType": "String",
+     "ValueId": "393133",
+     "ValueText": "Rectangle with Flat Top"
+    },
+    {
+     "ParameterId": 2029,
+     "ParameterText": "Lens Size",
+     "ParameterType": "String",
+     "ValueId": "43570",
+     "ValueText": "1.10mm x 0.70mm"
+    },
+    {
+     "ParameterId": 319,
+     "ParameterText": "Voltage - Forward (Vf) (Typ)",
+     "ParameterType": "String",
+     "ValueId": "168722",
+     "ValueText": "2V"
+    },
+    {
+     "ParameterId": 543,
+     "ParameterText": "Current - Test",
+     "ParameterType": "String",
+     "ValueId": "143056",
+     "ValueText": "20mA"
+    },
+    {
+     "ParameterId": 551,
+     "ParameterText": "Viewing Angle",
+     "ParameterType": "String",
+     "ValueId": "94338",
+     "ValueText": "140°"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 969,
+     "ParameterText": "Wavelength - Dominant",
+     "ParameterType": "String",
+     "ValueId": "245569",
+     "ValueText": "570nm"
+    },
+    {
+     "ParameterId": 968,
+     "ParameterText": "Wavelength - Peak",
+     "ParameterType": "String",
+     "ValueId": "245698",
+     "ValueText": "572nm"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39246",
+     "ValueText": "0603 (1608 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "39245",
+     "ValueText": "0603"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "56082",
+     "ValueText": "1.60mm L x 0.80mm W"
+    },
+    {
+     "ParameterId": 966,
+     "ParameterText": "Height (Max)",
+     "ParameterType": "String",
+     "ValueId": "34583",
+     "ValueText": "0.80mm"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 632187,
+    "Name": "150060"
+   },
+   "Category": {
+    "CategoryId": 7,
+    "ParentId": 0,
+    "Name": "Optoelectronics",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/388/510/MFG_ELI70-CR_tmb%2864x64%29.jpg",
+    "SeoDescription": "Broadly defined, optoelectronic products are devices that convert electricity to light, and accessory or supporting items such as reflectors or mounting hardware designed for use with such products. It is a diverse product category, including LEDs, fiber optic transmitters and receivers, LCD, OLED, and VFD displays, EL wire, incandescent lamps, lasers, light pipes and xenon flash tubes, among many other product types.",
+    "ChildCategories": [
+     {
+      "CategoryId": 105,
+      "ParentId": 7,
+      "Name": "LED Indication - Discrete",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/626/HLMP-3507%2CHLMP-3680%2CHLMP-3962_tmb%2864x64%29.jpg",
+      "SeoDescription": "Light emitting diodes are semiconductor devices that emit light when conducting current. LEDs in this family are single or array configuration for status indication on printed circuit boards. They are differentiated by package/case, wavelength, viewing angle, forward voltage, current rating, millicandela rating, color, and mounting type. Configurations include common anode or cathode and bidirectional.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "13",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 43095,
+    "Name": "WL-SMCW"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "3  (168 Hours)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8541.41.0000"
+   },
+   "OtherNames": [
+    "732-4980-6",
+    "732-4980-1",
+    "732-4980-2"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 732,
+    "Value": "Würth Elektronik",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

@@ -1,0 +1,1446 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "TVS DIODE 5.5VWM 14VC 2X1SON",
+    "DetailedDescription": "14V Clamp 5A (8/20µs) Ipp Tvs Diode Surface Mount 2-X1SON (1x.60)"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "TPD1E10B06DPYR",
+   "UnitPrice": 0.35,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/TPD1E10B06DPYR/3197744",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Ftpd1e10b06",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6222/296%7E4211012%7EDPY%7E2.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-30406-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 10000,
+       "UnitPrice": 0.06152,
+       "TotalPrice": 615.2
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.05613,
+       "TotalPrice": 1122.6
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.05338,
+       "TotalPrice": 1601.4
+      },
+      {
+       "BreakQuantity": 50000,
+       "UnitPrice": 0.0503,
+       "TotalPrice": 2515.0
+      },
+      {
+       "BreakQuantity": 70000,
+       "UnitPrice": 0.04847,
+       "TotalPrice": 3392.9
+      },
+      {
+       "BreakQuantity": 100000,
+       "UnitPrice": 0.0467,
+       "TotalPrice": 4670.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 910000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 10000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-30406-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.35,
+       "TotalPrice": 0.35
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.214,
+       "TotalPrice": 2.14
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.134,
+       "TotalPrice": 13.4
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.09908,
+       "TotalPrice": 49.54
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.08778,
+       "TotalPrice": 87.78
+      },
+      {
+       "BreakQuantity": 2000,
+       "UnitPrice": 0.07826,
+       "TotalPrice": 156.52
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.06792,
+       "TotalPrice": 339.6
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 910269,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-30406-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.35,
+       "TotalPrice": 0.35
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.214,
+       "TotalPrice": 2.14
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.134,
+       "TotalPrice": 13.4
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.09908,
+       "TotalPrice": 49.54
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.08778,
+       "TotalPrice": 87.78
+      },
+      {
+       "BreakQuantity": 2000,
+       "UnitPrice": 0.07826,
+       "TotalPrice": 156.52
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.06792,
+       "TotalPrice": 339.6
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 910269,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 910269,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "423536",
+     "ValueText": "Zener"
+    },
+    {
+     "ParameterId": 1730,
+     "ParameterText": "Bidirectional Channels",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 761,
+     "ParameterText": "Voltage - Reverse Standoff (Typ)",
+     "ParameterType": "String",
+     "ValueId": "233089",
+     "ValueText": "5.5V (Max)"
+    },
+    {
+     "ParameterId": 1731,
+     "ParameterText": "Voltage - Breakdown (Min)",
+     "ParameterType": "String",
+     "ValueId": "267452",
+     "ValueText": "6V"
+    },
+    {
+     "ParameterId": 1732,
+     "ParameterText": "Voltage - Clamping (Max) @ Ipp",
+     "ParameterType": "String",
+     "ValueId": "97403",
+     "ValueText": "14V"
+    },
+    {
+     "ParameterId": 714,
+     "ParameterText": "Current - Peak Pulse (10/1000µs)",
+     "ParameterType": "String",
+     "ValueId": "247716",
+     "ValueText": "5A (8/20µs)"
+    },
+    {
+     "ParameterId": 1733,
+     "ParameterText": "Power - Peak Pulse",
+     "ParameterType": "String",
+     "ValueId": "299942",
+     "ValueText": "90W"
+    },
+    {
+     "ParameterId": 1734,
+     "ParameterText": "Power Line Protection",
+     "ParameterType": "String",
+     "ValueId": "380240",
+     "ValueText": "No"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "350483",
+     "ValueText": "General Purpose"
+    },
+    {
+     "ParameterId": 566,
+     "ParameterText": "Capacitance @ Frequency",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39162",
+     "ValueText": "0402 (1006 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "169267",
+     "ValueText": "2-X1SON (1x.60)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 92036,
+    "Name": "TPD1E10B06"
+   },
+   "Category": {
+    "CategoryId": 9,
+    "ParentId": 0,
+    "Name": "Circuit Protection",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/180/750/FHAC0001ZXJ_tmb.jpg",
+    "SeoDescription": "Circuit protection devices include products used to protect electrical circuits from damage caused by hazards such as static discharge (such as Transient Voltage Suppression diodes and gas discharge tubes) as well as products designed to reduce the risk of fire caused by electrical overload or circuit failure, such as fuses and circuit breakers. Related accessories designed for use with such products are also included, such as fuse holders, fuse pullers, and mounting bases for circuit breakers.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2040,
+      "ParentId": 9,
+      "Name": "Transient Voltage Suppressors (TVS)",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/256/835/DO-214AA_SMB_tmb%2864x64%29.jpg",
+      "SeoDescription": "TVS, or Transient Voltage Suppressors are devices designed to limit or prevent temporary surges or spikes within a specific voltage level.",
+      "ChildCategories": [
+       {
+        "CategoryId": 144,
+        "ParentId": 2040,
+        "Name": "TVS Diodes",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/332/776/112%3BDO214AA%28SMBJ%29%3B%3B2_tmb%2864x64%29.jpg",
+        "SeoDescription": "TVS Diodes are a semiconductor device designed to limit or stop surges in a specific voltage level. The items in this family are designed using diodes (a component that conducts in just one direction). TVS is an acronym for Transient Voltage Suppression (Suppressor). The types are steering (rail to rail) or Zener with the characteristics of unidirectional channels, bidirectional channels, voltage – reverse standoff, voltage – breakdown, voltage – clamping, current – peak pulse, power – peak pulse, and power line protection.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8541.10.0080"
+   },
+   "OtherNames": [
+    "296-30406-1",
+    "296-30406-2",
+    "TPD1E10B06DPYR-ND",
+    "296-30406-6",
+    "-296-30406-1",
+    "-TPD1E10B06DPYR-NDR",
+    "-296-30406-1-ND"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "TVS DIODE 5.5VWM 14VC 2X1SON",
+    "DetailedDescription": "14V Clamp 6A (8/20µs) Ipp Tvs Diode Surface Mount 2-X1SON (1x0.6)"
+   },
+   "Manufacturer": {
+    "Id": 5272,
+    "Name": "EVVO"
+   },
+   "ManufacturerProductNumber": "TPD1E10B06DPYR-EV",
+   "UnitPrice": 0.27,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/evvo/TPD1E10B06DPYR-EV/24370224",
+   "DatasheetUrl": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7158/5272_TPD1E10B06DPYR-EV.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8910/MFG_5272%7E2X1SON-.55-1X.6%7E%7E2.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "5272-TPD1E10B06DPYR-EVTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 10000,
+       "UnitPrice": 0.04592,
+       "TotalPrice": 459.2
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.04168,
+       "TotalPrice": 833.6
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.03952,
+       "TotalPrice": 1185.6
+      },
+      {
+       "BreakQuantity": 50000,
+       "UnitPrice": 0.0371,
+       "TotalPrice": 1855.0
+      },
+      {
+       "BreakQuantity": 70000,
+       "UnitPrice": 0.03566,
+       "TotalPrice": 2496.2
+      },
+      {
+       "BreakQuantity": 100000,
+       "UnitPrice": 0.03426,
+       "TotalPrice": 3426.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 5272,
+      "Name": "EVVO"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 10000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "5272-TPD1E10B06DPYR-EVCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.27,
+       "TotalPrice": 0.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.165,
+       "TotalPrice": 1.65
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1028,
+       "TotalPrice": 10.28
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.07542,
+       "TotalPrice": 37.71
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.06656,
+       "TotalPrice": 66.56
+      },
+      {
+       "BreakQuantity": 2000,
+       "UnitPrice": 0.05908,
+       "TotalPrice": 118.16
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.05095,
+       "TotalPrice": 254.75
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 5272,
+      "Name": "EVVO"
+     },
+     "QuantityAvailableforPackageType": 2646,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "5272-TPD1E10B06DPYR-EVDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.27,
+       "TotalPrice": 0.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.165,
+       "TotalPrice": 1.65
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1028,
+       "TotalPrice": 10.28
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.07542,
+       "TotalPrice": 37.71
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.06656,
+       "TotalPrice": 66.56
+      },
+      {
+       "BreakQuantity": 2000,
+       "UnitPrice": 0.05908,
+       "TotalPrice": 118.16
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.05095,
+       "TotalPrice": 254.75
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 5272,
+      "Name": "EVVO"
+     },
+     "QuantityAvailableforPackageType": 2646,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 2646,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "423536",
+     "ValueText": "Zener"
+    },
+    {
+     "ParameterId": 1730,
+     "ParameterText": "Bidirectional Channels",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 761,
+     "ParameterText": "Voltage - Reverse Standoff (Typ)",
+     "ParameterType": "String",
+     "ValueId": "233089",
+     "ValueText": "5.5V (Max)"
+    },
+    {
+     "ParameterId": 1731,
+     "ParameterText": "Voltage - Breakdown (Min)",
+     "ParameterType": "String",
+     "ValueId": "267452",
+     "ValueText": "6V"
+    },
+    {
+     "ParameterId": 1732,
+     "ParameterText": "Voltage - Clamping (Max) @ Ipp",
+     "ParameterType": "String",
+     "ValueId": "97403",
+     "ValueText": "14V"
+    },
+    {
+     "ParameterId": 714,
+     "ParameterText": "Current - Peak Pulse (10/1000µs)",
+     "ParameterType": "String",
+     "ValueId": "266265",
+     "ValueText": "6A (8/20µs)"
+    },
+    {
+     "ParameterId": 1733,
+     "ParameterText": "Power - Peak Pulse",
+     "ParameterType": "String",
+     "ValueId": "299942",
+     "ValueText": "90W"
+    },
+    {
+     "ParameterId": 1734,
+     "ParameterText": "Power Line Protection",
+     "ParameterType": "String",
+     "ValueId": "380240",
+     "ValueText": "No"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "418344",
+     "ValueText": "USB"
+    },
+    {
+     "ParameterId": 566,
+     "ParameterText": "Capacitance @ Frequency",
+     "ParameterType": "String",
+     "ValueId": "87520",
+     "ValueText": "12pF @ 1MHz"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 1977,
+     "ParameterText": "Grade",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 2700,
+     "ParameterText": "Qualification",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39158",
+     "ValueText": "0402 (1005 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "443964",
+     "ValueText": "2-X1SON (1x0.6)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 9,
+    "ParentId": 0,
+    "Name": "Circuit Protection",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/180/750/FHAC0001ZXJ_tmb.jpg",
+    "SeoDescription": "Circuit protection devices include products used to protect electrical circuits from damage caused by hazards such as static discharge (such as Transient Voltage Suppression diodes and gas discharge tubes) as well as products designed to reduce the risk of fire caused by electrical overload or circuit failure, such as fuses and circuit breakers. Related accessories designed for use with such products are also included, such as fuse holders, fuse pullers, and mounting bases for circuit breakers.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2040,
+      "ParentId": 9,
+      "Name": "Transient Voltage Suppressors (TVS)",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/256/835/DO-214AA_SMB_tmb%2864x64%29.jpg",
+      "SeoDescription": "TVS, or Transient Voltage Suppressors are devices designed to limit or prevent temporary surges or spikes within a specific voltage level.",
+      "ChildCategories": [
+       {
+        "CategoryId": 144,
+        "ParentId": 2040,
+        "Name": "TVS Diodes",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/332/776/112%3BDO214AA%28SMBJ%29%3B%3B2_tmb%2864x64%29.jpg",
+        "SeoDescription": "TVS Diodes are a semiconductor device designed to limit or stop surges in a specific voltage level. The items in this family are designed using diodes (a component that conducts in just one direction). TVS is an acronym for Transient Voltage Suppression (Suppressor). The types are steering (rail to rail) or Zener with the characteristics of unidirectional channels, bidirectional channels, voltage – reverse standoff, voltage – breakdown, voltage – clamping, current – peak pulse, power – peak pulse, and power line protection.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "3",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8541.10.0080"
+   },
+   "OtherNames": [
+    "5272-TPD1E10B06DPYRCT",
+    "5272-TPD1E10B06DPYR-EVCT",
+    "5272-TPD1E10B06DPYRDKR",
+    "5272-TPD1E10B06DPYRTR",
+    "5272-TPD1E10B06DPYR-EVTR",
+    "5272-TPD1E10B06DPYR-EVDKR"
+   ]
+  }
+ ],
+ "ProductsCount": 2,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "TVS DIODE 5.5VWM 14VC 2X1SON",
+    "DetailedDescription": "14V Clamp 5A (8/20µs) Ipp Tvs Diode Surface Mount 2-X1SON (1x.60)"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "TPD1E10B06DPYR",
+   "UnitPrice": 0.35,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/TPD1E10B06DPYR/3197744",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Ftpd1e10b06",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6222/296%7E4211012%7EDPY%7E2.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-30406-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 10000,
+       "UnitPrice": 0.06152,
+       "TotalPrice": 615.2
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.05613,
+       "TotalPrice": 1122.6
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.05338,
+       "TotalPrice": 1601.4
+      },
+      {
+       "BreakQuantity": 50000,
+       "UnitPrice": 0.0503,
+       "TotalPrice": 2515.0
+      },
+      {
+       "BreakQuantity": 70000,
+       "UnitPrice": 0.04847,
+       "TotalPrice": 3392.9
+      },
+      {
+       "BreakQuantity": 100000,
+       "UnitPrice": 0.0467,
+       "TotalPrice": 4670.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 910000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 10000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-30406-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.35,
+       "TotalPrice": 0.35
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.214,
+       "TotalPrice": 2.14
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.134,
+       "TotalPrice": 13.4
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.09908,
+       "TotalPrice": 49.54
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.08778,
+       "TotalPrice": 87.78
+      },
+      {
+       "BreakQuantity": 2000,
+       "UnitPrice": 0.07826,
+       "TotalPrice": 156.52
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.06792,
+       "TotalPrice": 339.6
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 910269,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-30406-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.35,
+       "TotalPrice": 0.35
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.214,
+       "TotalPrice": 2.14
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.134,
+       "TotalPrice": 13.4
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.09908,
+       "TotalPrice": 49.54
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.08778,
+       "TotalPrice": 87.78
+      },
+      {
+       "BreakQuantity": 2000,
+       "UnitPrice": 0.07826,
+       "TotalPrice": 156.52
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.06792,
+       "TotalPrice": 339.6
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 910269,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 910269,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "423536",
+     "ValueText": "Zener"
+    },
+    {
+     "ParameterId": 1730,
+     "ParameterText": "Bidirectional Channels",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 761,
+     "ParameterText": "Voltage - Reverse Standoff (Typ)",
+     "ParameterType": "String",
+     "ValueId": "233089",
+     "ValueText": "5.5V (Max)"
+    },
+    {
+     "ParameterId": 1731,
+     "ParameterText": "Voltage - Breakdown (Min)",
+     "ParameterType": "String",
+     "ValueId": "267452",
+     "ValueText": "6V"
+    },
+    {
+     "ParameterId": 1732,
+     "ParameterText": "Voltage - Clamping (Max) @ Ipp",
+     "ParameterType": "String",
+     "ValueId": "97403",
+     "ValueText": "14V"
+    },
+    {
+     "ParameterId": 714,
+     "ParameterText": "Current - Peak Pulse (10/1000µs)",
+     "ParameterType": "String",
+     "ValueId": "247716",
+     "ValueText": "5A (8/20µs)"
+    },
+    {
+     "ParameterId": 1733,
+     "ParameterText": "Power - Peak Pulse",
+     "ParameterType": "String",
+     "ValueId": "299942",
+     "ValueText": "90W"
+    },
+    {
+     "ParameterId": 1734,
+     "ParameterText": "Power Line Protection",
+     "ParameterType": "String",
+     "ValueId": "380240",
+     "ValueText": "No"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "350483",
+     "ValueText": "General Purpose"
+    },
+    {
+     "ParameterId": 566,
+     "ParameterText": "Capacitance @ Frequency",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39162",
+     "ValueText": "0402 (1006 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "169267",
+     "ValueText": "2-X1SON (1x.60)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 92036,
+    "Name": "TPD1E10B06"
+   },
+   "Category": {
+    "CategoryId": 9,
+    "ParentId": 0,
+    "Name": "Circuit Protection",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/180/750/FHAC0001ZXJ_tmb.jpg",
+    "SeoDescription": "Circuit protection devices include products used to protect electrical circuits from damage caused by hazards such as static discharge (such as Transient Voltage Suppression diodes and gas discharge tubes) as well as products designed to reduce the risk of fire caused by electrical overload or circuit failure, such as fuses and circuit breakers. Related accessories designed for use with such products are also included, such as fuse holders, fuse pullers, and mounting bases for circuit breakers.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2040,
+      "ParentId": 9,
+      "Name": "Transient Voltage Suppressors (TVS)",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/256/835/DO-214AA_SMB_tmb%2864x64%29.jpg",
+      "SeoDescription": "TVS, or Transient Voltage Suppressors are devices designed to limit or prevent temporary surges or spikes within a specific voltage level.",
+      "ChildCategories": [
+       {
+        "CategoryId": 144,
+        "ParentId": 2040,
+        "Name": "TVS Diodes",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/332/776/112%3BDO214AA%28SMBJ%29%3B%3B2_tmb%2864x64%29.jpg",
+        "SeoDescription": "TVS Diodes are a semiconductor device designed to limit or stop surges in a specific voltage level. The items in this family are designed using diodes (a component that conducts in just one direction). TVS is an acronym for Transient Voltage Suppression (Suppressor). The types are steering (rail to rail) or Zener with the characteristics of unidirectional channels, bidirectional channels, voltage – reverse standoff, voltage – breakdown, voltage – clamping, current – peak pulse, power – peak pulse, and power line protection.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8541.10.0080"
+   },
+   "OtherNames": [
+    "296-30406-1",
+    "296-30406-2",
+    "TPD1E10B06DPYR-ND",
+    "296-30406-6",
+    "-296-30406-1",
+    "-TPD1E10B06DPYR-NDR",
+    "-296-30406-1-ND"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 5272,
+    "Value": "EVVO",
+    "ProductCount": 1
+   },
+   {
+    "Id": 296,
+    "Value": "Texas Instruments",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": [
+   {
+    "Id": 2,
+    "Value": "Cut Tape (CT)",
+    "ProductCount": 2
+   },
+   {
+    "Id": 243,
+    "Value": "Digi-Reel®",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1,
+    "Value": "Tape & Reel (TR)",
+    "ProductCount": 2
+   }
+  ],
+  "Status": [
+   {
+    "Id": 0,
+    "Value": "Active",
+    "ProductCount": 2
+   }
+  ],
+  "Series": [
+   {
+    "Id": 818,
+    "Value": "-",
+    "ProductCount": 2
+   }
+  ],
+  "ParametricFilters": [
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 183,
+    "ParameterName": "Type",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "423536",
+      "ValueName": "Zener",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1730,
+    "ParameterName": "Bidirectional Channels",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "1",
+      "ValueName": "1",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 761,
+    "ParameterName": "Voltage - Reverse Standoff (Typ)",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "233089",
+      "ValueName": "5.5V (Max)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1731,
+    "ParameterName": "Voltage - Breakdown (Min)",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "267452",
+      "ValueName": "6V",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1732,
+    "ParameterName": "Voltage - Clamping (Max) @ Ipp",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "97403",
+      "ValueName": "14V",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 714,
+    "ParameterName": "Current - Peak Pulse (10/1000µs)",
+    "FilterValues": [
+     {
+      "ProductCount": 1,
+      "ValueId": "247716",
+      "ValueName": "5A (8/20µs)",
+      "RangeFilterType": null
+     },
+     {
+      "ProductCount": 1,
+      "ValueId": "266265",
+      "ValueName": "6A (8/20µs)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1733,
+    "ParameterName": "Power - Peak Pulse",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "299942",
+      "ValueName": "90W",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1734,
+    "ParameterName": "Power Line Protection",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "380240",
+      "ValueName": "No",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 405,
+    "ParameterName": "Applications",
+    "FilterValues": [
+     {
+      "ProductCount": 1,
+      "ValueId": "350483",
+      "ValueName": "General Purpose",
+      "RangeFilterType": null
+     },
+     {
+      "ProductCount": 1,
+      "ValueId": "418344",
+      "ValueName": "USB",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 566,
+    "ParameterName": "Capacitance @ Frequency",
+    "FilterValues": [
+     {
+      "ProductCount": 1,
+      "ValueId": "87520",
+      "ValueName": "12pF @ 1MHz",
+      "RangeFilterType": null
+     },
+     {
+      "ProductCount": 1,
+      "ValueId": "1",
+      "ValueName": "-",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 252,
+    "ParameterName": "Operating Temperature",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "212479",
+      "ValueName": "-40°C ~ 125°C (TA)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1977,
+    "ParameterName": "Grade",
+    "FilterValues": [
+     {
+      "ProductCount": 1,
+      "ValueId": "1",
+      "ValueName": "-",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 2700,
+    "ParameterName": "Qualification",
+    "FilterValues": [
+     {
+      "ProductCount": 1,
+      "ValueId": "1",
+      "ValueName": "-",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 69,
+    "ParameterName": "Mounting Type",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "409393",
+      "ValueName": "Surface Mount",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 16,
+    "ParameterName": "Package / Case",
+    "FilterValues": [
+     {
+      "ProductCount": 1,
+      "ValueId": "39158",
+      "ValueName": "0402 (1005 Metric)",
+      "RangeFilterType": null
+     },
+     {
+      "ProductCount": 1,
+      "ValueId": "39162",
+      "ValueName": "0402 (1006 Metric)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 144,
+     "Value": "TVS Diodes",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1291,
+    "ParameterName": "Supplier Device Package",
+    "FilterValues": [
+     {
+      "ProductCount": 1,
+      "ValueId": "169267",
+      "ValueName": "2-X1SON (1x.60)",
+      "RangeFilterType": null
+     },
+     {
+      "ProductCount": 1,
+      "ValueId": "443964",
+      "ValueName": "2-X1SON (1x0.6)",
+      "RangeFilterType": null
+     }
+    ]
+   }
+  ],
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

@@ -117,8 +117,8 @@
   },
   "derived": {
     "category": "Crystals & Oscillators",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Crystals Xtal 3225 4-SMD 25MHz Tol 30ppm Stab 30ppm -40C - 85C 10pF 60 Ohms",
     "display_name": "25MHz Crystal 10pF 4-SMD",
     "specs": {
@@ -140,8 +140,6 @@
       "Height - Seated (Max)": "0.039\" (1.00mm)",
       "Image": "https://www.mouser.com/images/abracon/images/ABM8G_series_DSL.jpg",
       "KRHTS": "8541609000",
-      "Lead Time": "112 Days",
-      "Lifecycle": "Active",
       "Load Capacitance": "10pF",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "Not Applicable",
@@ -162,7 +160,7 @@
       "Supplier Device Package": "4-SMD (3.2x2.5)",
       "Type": "MHz Crystal"
     },
-    "value": ""
+    "value": "ABM8G-25.000MHZ-D4Y-T"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -374,6 +372,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/abm8g-25-000mhz-d4y-t-8f5c/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/abm8g-25-000mhz-d4y-t-8f5c/mouser.json"
+    }
+  },
   "tags": []
 }

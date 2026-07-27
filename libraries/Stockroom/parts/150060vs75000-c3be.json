@@ -141,10 +141,10 @@
   },
   "derived": {
     "category": "Diodes",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Single Color LEDs WL-SMCW SMDMono TpVw Waterclr 0603 BrtGrn",
-    "display_name": "Single Color LED SMD",
+    "display_name": "Single Color LED 0603",
     "specs": {
       "Assembly Country of Origin": "China",
       "BRHTS": "85414011",
@@ -162,18 +162,15 @@
       "HTS Code (US)": "8541410000",
       "Height (Max)": "0.80mm",
       "Image": "https://www.mouser.com/images/wurthelectronics/images/WL-SMCW.JPG",
-      "Lead Time": "77 Days",
       "Lens Color": "Colorless",
       "Lens Size": "1.10mm x 0.70mm",
       "Lens Style": "Rectangle with Flat Top",
       "Lens Transparency": "Clear",
-      "Lifecycle": "Active",
       "Millicandela Rating": "40mcd",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "3 (168 Hours)",
       "Mounting Type": "Surface Mount",
       "Order Multiple": "1",
-      "Package": "SMD,1.6x0.8mm",
       "Package / Case": "0603 (1608 Metric)",
       "Package Type": "Tape & Reel (TR)",
       "Packaging": "Reel, Cut Tape, MouseReel",
@@ -190,7 +187,7 @@
       "Wavelength - Dominant": "570nm",
       "Wavelength - Peak": "572nm"
     },
-    "value": ""
+    "value": "150060VS75000"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -410,6 +407,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/150060vs75000-c3be/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/150060vs75000-c3be/mouser.json"
+    }
+  },
   "tags": []
 }

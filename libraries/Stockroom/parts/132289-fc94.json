@@ -105,8 +105,8 @@
   },
   "derived": {
     "category": "Connectors",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "RF Connectors / Coaxial Connectors SMA END LAUNCH PCB MNT JACK .062 GOLD",
     "display_name": "Connector",
     "specs": {
@@ -131,8 +131,6 @@
       "Image": "https://www.mouser.com/images/amphenol/images/132289_SPL.jpg",
       "Impedance": "50 Ohms",
       "KRHTS": "8536691000",
-      "Lead Time": "98 Days",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "1 (Unlimited)",
       "Mounting Feature": "Bulkhead - Front Side Nut",
@@ -148,7 +146,7 @@
       "Standard Pack Qty": "1",
       "Unit Weight (kg)": "0.00285"
     },
-    "value": ""
+    "value": "132289"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -352,6 +350,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/132289-fc94/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/132289-fc94/mouser.json"
+    }
+  },
   "tags": []
 }

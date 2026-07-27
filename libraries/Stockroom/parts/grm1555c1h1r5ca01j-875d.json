@@ -116,12 +116,11 @@
   },
   "derived": {
     "category": "Capacitors",
-    "derived_at": "",
-    "derived_by": "",
-    "description": "Capacitor, 1.5 pF, 0.25%, 0402",
-    "display_name": "1.5 pF 0.25% 0402 Capacitor",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
+    "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 1.5 pF 50 VDC 0.25 pF 0402 C0G (NP0)",
+    "display_name": "1.5pF ±0.25pF 0402",
     "specs": {
-      "3D Model": "Capacitor_SMD.3dshapes/C_0402_1005Metric.wrl",
       "Applications": "General Purpose",
       "Assembly Country of Origin": "Not available",
       "BRHTS": "85322410",
@@ -129,7 +128,6 @@
       "Country of Diffusion": "Not available",
       "Country of Origin": "Japan",
       "ECCN": "EAR99",
-      "Footprint": "Capacitor_SMD:C_0402_1005Metric",
       "HTS Code (CA)": "8532240010",
       "HTS Code (CN)": "8532241000",
       "HTS Code (EU TARIC)": "8532240000",
@@ -137,14 +135,11 @@
       "HTS Code (US)": "8532240020",
       "Image": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
       "KRHTS": "8532240000",
-      "Lead Time": "17",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "1 (Unlimited)",
       "Mounting Type": "Surface Mount, MLCC",
       "Operating Temperature": "-55°C ~ 125°C",
       "Order Multiple": "1",
-      "Package": "0402",
       "Package / Case": "0402 (1005 Metric)",
       "Package Type": "Tape & Reel (TR)",
       "Packaging": "Reel, Cut Tape, MouseReel",
@@ -155,14 +150,13 @@
       "Size / Dimension": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)",
       "Standard Pack Qty": "50000",
       "Standard Package": "50000",
-      "Symbol": "Device:C",
       "Temperature Coefficient": "C0G, NP0",
       "Thickness (Max)": "0.022\" (0.55mm)",
-      "Tolerance": "0.25%",
+      "Tolerance": "±0.25pF",
       "Unit Weight (kg)": "1.5e-06",
       "Voltage - Rated": "50V"
     },
-    "value": ""
+    "value": "1.5pF"
   },
   "enrichment": {
     "Lead Time": {
@@ -269,6 +263,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/grm1555c1h1r5ca01j-875d/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/grm1555c1h1r5ca01j-875d/mouser.json"
+    }
+  },
   "tags": []
 }

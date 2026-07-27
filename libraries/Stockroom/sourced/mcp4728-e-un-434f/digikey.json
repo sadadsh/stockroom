@@ -1,0 +1,478 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "IC DAC 12BIT 10-MSOP",
+    "DetailedDescription": "12 Bit Digital to Analog Converter 4 10-MSOP"
+   },
+   "Manufacturer": {
+    "Id": 150,
+    "Name": "Microchip Technology"
+   },
+   "ManufacturerProductNumber": "MCP4728-E/UN",
+   "UnitPrice": 2.5,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/microchip-technology/MCP4728-E-UN/2125526",
+   "DatasheetUrl": "https://ww1.microchip.com/downloads/en/DeviceDoc/22187E.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8924/MFG_150%7EC04-021%7EUN%7E10.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "MCP4728-E/UN-ND",
+     "PackageType": {
+      "Id": 6,
+      "Name": "Tube"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.5,
+       "TotalPrice": 2.5
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 2.09,
+       "TotalPrice": 52.25
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.91,
+       "TotalPrice": 191.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 150,
+      "Name": "Microchip Technology"
+     },
+     "QuantityAvailableforPackageType": 6242,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 6242,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/5566805959001",
+   "Parameters": [
+    {
+     "ParameterId": 153,
+     "ParameterText": "Number of Bits",
+     "ParameterType": "String",
+     "ValueId": "80383",
+     "ValueText": "12"
+    },
+    {
+     "ParameterId": 1973,
+     "ParameterText": "Number of D/A Converters",
+     "ParameterType": "String",
+     "ValueId": "203167",
+     "ValueText": "4"
+    },
+    {
+     "ParameterId": 997,
+     "ParameterText": "Settling Time",
+     "ParameterType": "String",
+     "ValueId": "254909",
+     "ValueText": "6µs (Typ)"
+    },
+    {
+     "ParameterId": 41,
+     "ParameterText": "Output Type",
+     "ParameterType": "String",
+     "ValueId": "420138",
+     "ValueText": "Voltage - Buffered"
+    },
+    {
+     "ParameterId": 1975,
+     "ParameterText": "Differential Output",
+     "ParameterType": "String",
+     "ValueId": "380240",
+     "ValueText": "No"
+    },
+    {
+     "ParameterId": 243,
+     "ParameterText": "Data Interface",
+     "ParameterType": "String",
+     "ValueId": "356918",
+     "ValueText": "I2C"
+    },
+    {
+     "ParameterId": 245,
+     "ParameterText": "Reference Type",
+     "ParameterType": "String",
+     "ValueId": "359741",
+     "ValueText": "Internal, Supply"
+    },
+    {
+     "ParameterId": 346,
+     "ParameterText": "Voltage - Supply, Analog",
+     "ParameterType": "String",
+     "ValueId": "134947",
+     "ValueText": "2.7V ~ 5.5V"
+    },
+    {
+     "ParameterId": 347,
+     "ParameterText": "Voltage - Supply, Digital",
+     "ParameterType": "String",
+     "ValueId": "134947",
+     "ValueText": "2.7V ~ 5.5V"
+    },
+    {
+     "ParameterId": 1974,
+     "ParameterText": "INL/DNL (LSB)",
+     "ParameterType": "String",
+     "ValueId": "1691",
+     "ValueText": "±2, ±0.2"
+    },
+    {
+     "ParameterId": 1523,
+     "ParameterText": "Architecture",
+     "ParameterType": "String",
+     "ValueId": "409064",
+     "ValueText": "String DAC"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212478",
+     "ValueText": "-40°C ~ 125°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "74447",
+     "ValueText": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "73980",
+     "ValueText": "10-MSOP"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 72877,
+    "Name": "MCP4728"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2009,
+      "ParentId": 32,
+      "Name": "Data Acquisition",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/030/130/296%7E4221009%7EDW%7E16_tmb.jpg",
+      "SeoDescription": "Data Acquisition is technology used to convert real-world data into digital information. Products in this category include analog-to-digital converters (ADCs), digital-to-analog converters (DACs), special purpose, analog front end (AFE), digital potentiometers, touchscreen controllers, and more.",
+      "ChildCategories": [
+       {
+        "CategoryId": 701,
+        "ParentId": 2009,
+        "Name": "Digital to Analog Converters (DAC)",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/149/429/505-SOT-23-8_1_tmb%2864x64%29.jpg",
+        "SeoDescription": "Digital-to-analog converters (DAC, D/A, D2A, or D-to-A) convert a digital signal into an analog buffered or unbuffered voltage or current. The suitability of a DACs architecture for a particular application is determined by resolution and sampling frequency. DACs are commonly used in music players to convert digital data streams into analog audio signals. They are also used in televisions and mobile phones to convert digital video data into analog video signals which connect to the screen drivers to display monochrome or color images.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "18",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0040"
+   },
+   "OtherNames": [
+    "MCP4728EUN"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "IC DAC 12BIT 10-MSOP",
+    "DetailedDescription": "12 Bit Digital to Analog Converter 4 10-MSOP"
+   },
+   "Manufacturer": {
+    "Id": 150,
+    "Name": "Microchip Technology"
+   },
+   "ManufacturerProductNumber": "MCP4728-E/UN",
+   "UnitPrice": 2.5,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/microchip-technology/MCP4728-E-UN/2125526",
+   "DatasheetUrl": "https://ww1.microchip.com/downloads/en/DeviceDoc/22187E.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8924/MFG_150%7EC04-021%7EUN%7E10.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "MCP4728-E/UN-ND",
+     "PackageType": {
+      "Id": 6,
+      "Name": "Tube"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.5,
+       "TotalPrice": 2.5
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 2.09,
+       "TotalPrice": 52.25
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.91,
+       "TotalPrice": 191.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 150,
+      "Name": "Microchip Technology"
+     },
+     "QuantityAvailableforPackageType": 6242,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 6242,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/5566805959001",
+   "Parameters": [
+    {
+     "ParameterId": 153,
+     "ParameterText": "Number of Bits",
+     "ParameterType": "String",
+     "ValueId": "80383",
+     "ValueText": "12"
+    },
+    {
+     "ParameterId": 1973,
+     "ParameterText": "Number of D/A Converters",
+     "ParameterType": "String",
+     "ValueId": "203167",
+     "ValueText": "4"
+    },
+    {
+     "ParameterId": 997,
+     "ParameterText": "Settling Time",
+     "ParameterType": "String",
+     "ValueId": "254909",
+     "ValueText": "6µs (Typ)"
+    },
+    {
+     "ParameterId": 41,
+     "ParameterText": "Output Type",
+     "ParameterType": "String",
+     "ValueId": "420138",
+     "ValueText": "Voltage - Buffered"
+    },
+    {
+     "ParameterId": 1975,
+     "ParameterText": "Differential Output",
+     "ParameterType": "String",
+     "ValueId": "380240",
+     "ValueText": "No"
+    },
+    {
+     "ParameterId": 243,
+     "ParameterText": "Data Interface",
+     "ParameterType": "String",
+     "ValueId": "356918",
+     "ValueText": "I2C"
+    },
+    {
+     "ParameterId": 245,
+     "ParameterText": "Reference Type",
+     "ParameterType": "String",
+     "ValueId": "359741",
+     "ValueText": "Internal, Supply"
+    },
+    {
+     "ParameterId": 346,
+     "ParameterText": "Voltage - Supply, Analog",
+     "ParameterType": "String",
+     "ValueId": "134947",
+     "ValueText": "2.7V ~ 5.5V"
+    },
+    {
+     "ParameterId": 347,
+     "ParameterText": "Voltage - Supply, Digital",
+     "ParameterType": "String",
+     "ValueId": "134947",
+     "ValueText": "2.7V ~ 5.5V"
+    },
+    {
+     "ParameterId": 1974,
+     "ParameterText": "INL/DNL (LSB)",
+     "ParameterType": "String",
+     "ValueId": "1691",
+     "ValueText": "±2, ±0.2"
+    },
+    {
+     "ParameterId": 1523,
+     "ParameterText": "Architecture",
+     "ParameterType": "String",
+     "ValueId": "409064",
+     "ValueText": "String DAC"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212478",
+     "ValueText": "-40°C ~ 125°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "74447",
+     "ValueText": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "73980",
+     "ValueText": "10-MSOP"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 72877,
+    "Name": "MCP4728"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2009,
+      "ParentId": 32,
+      "Name": "Data Acquisition",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/030/130/296%7E4221009%7EDW%7E16_tmb.jpg",
+      "SeoDescription": "Data Acquisition is technology used to convert real-world data into digital information. Products in this category include analog-to-digital converters (ADCs), digital-to-analog converters (DACs), special purpose, analog front end (AFE), digital potentiometers, touchscreen controllers, and more.",
+      "ChildCategories": [
+       {
+        "CategoryId": 701,
+        "ParentId": 2009,
+        "Name": "Digital to Analog Converters (DAC)",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/149/429/505-SOT-23-8_1_tmb%2864x64%29.jpg",
+        "SeoDescription": "Digital-to-analog converters (DAC, D/A, D2A, or D-to-A) convert a digital signal into an analog buffered or unbuffered voltage or current. The suitability of a DACs architecture for a particular application is determined by resolution and sampling frequency. DACs are commonly used in music players to convert digital data streams into analog audio signals. They are also used in televisions and mobile phones to convert digital video data into analog video signals which connect to the screen drivers to display monochrome or color images.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "18",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0040"
+   },
+   "OtherNames": [
+    "MCP4728EUN"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 150,
+    "Value": "Microchip Technology",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

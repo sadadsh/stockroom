@@ -7,27 +7,42 @@
   },
   "derived": {
     "category": "Inductors",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Ferrite Beads 0402 600ohm 25% 5A AEC-Q200 DC PWR Line",
-    "display_name": "Power Inductor",
+    "display_name": "Power Inductor 0402",
     "specs": {
       "Assembly Country of Origin": "Japan",
       "Country of Diffusion": "Not available",
       "Country of Origin": "Japan",
+      "Current Rating (Max)": "900mA",
+      "DC Resistance (DCR) (Max)": "230mOhm",
       "ECCN": "EAR99",
+      "Features": "Automotive",
+      "Filter Type": "Power, Signal Line",
       "HTS Code (CA)": "8548000000",
       "HTS Code (CN)": "8548000001",
       "HTS Code (EU TARIC)": "8504509590",
       "HTS Code (JP)": "854800000",
       "HTS Code (US)": "8548000000",
+      "Height (Max)": "0.022\" (0.55mm)",
       "Image": "https://www.mouser.com/images/murata/images/BLM15PX-series_SPL.jpg",
-      "Lead Time": "112 Days",
+      "Impedance @ Frequency": "600 Ohms @ 100 MHz",
       "Minimum Order Quantity": "1",
+      "Moisture Sensitivity Level": "1 (Unlimited)",
+      "Mounting Type": "Surface Mount",
+      "Number of Lines": "1",
+      "Operating Temperature": "-55°C ~ 125°C",
       "Order Multiple": "1",
+      "Package / Case": "0402 (1005 Metric)",
+      "Package Type": "Tape & Reel (TR)",
       "Packaging": "Reel, Cut Tape, MouseReel",
       "Product Category": "Ferrite Beads",
+      "REACH": "REACH Unaffected",
+      "Ratings": "AEC-Q200",
       "RoHS": "RoHS Compliant",
+      "Series": "BLM15PX",
+      "Size / Dimension": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)",
       "Standard Pack Qty": "10000"
     },
     "value": ""
@@ -106,7 +121,7 @@
   "id": "blm15px601sh1d-0357",
   "manufacturer": "Murata Electronics",
   "mpn": "BLM15PX601SH1D",
-  "part_class": "component",
+  "part_class": "passive",
   "provenance": null,
   "purchase": [
     {
@@ -162,6 +177,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/blm15px601sh1d-0357/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/blm15px601sh1d-0357/mouser.json"
+    }
+  },
   "tags": []
 }

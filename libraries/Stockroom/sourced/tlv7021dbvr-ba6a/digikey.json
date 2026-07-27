@@ -1,0 +1,736 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "IC COMPARATOR 1CH SOT-23-5",
+    "DetailedDescription": "Comparator Standard (General Purpose) Open-Drain SOT-23-5"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "TLV7021DBVR",
+   "UnitPrice": 0.55,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/TLV7021DBVR/10434670",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Ftlv7011",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8897/MFG_296%7E4214839%7EDBV%7E5.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-TLV7021DBVRTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.24235,
+       "TotalPrice": 727.05
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.23593,
+       "TotalPrice": 1415.58
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.23271,
+       "TotalPrice": 2094.39
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.22915,
+       "TotalPrice": 3437.25
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.22707,
+       "TotalPrice": 4768.47
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.22506,
+       "TotalPrice": 6751.8
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 9000,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 3000,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TLV7021DBVRCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.55,
+       "TotalPrice": 0.55
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.386,
+       "TotalPrice": 3.86
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.3452,
+       "TotalPrice": 8.63
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3004,
+       "TotalPrice": 30.04
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.279,
+       "TotalPrice": 69.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.2661,
+       "TotalPrice": 133.05
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.25548,
+       "TotalPrice": 255.48
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 9511,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TLV7021DBVRDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.55,
+       "TotalPrice": 0.55
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.386,
+       "TotalPrice": 3.86
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.3452,
+       "TotalPrice": 8.63
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3004,
+       "TotalPrice": 30.04
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.279,
+       "TotalPrice": 69.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.2661,
+       "TotalPrice": 133.05
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.25548,
+       "TotalPrice": 255.48
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 9511,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 9511,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "863824",
+     "ValueText": "Standard (General Purpose)"
+    },
+    {
+     "ParameterId": 105,
+     "ParameterText": "Number of Elements",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 41,
+     "ParameterText": "Output Type",
+     "ParameterType": "String",
+     "ValueId": "432771",
+     "ValueText": "Open-Drain"
+    },
+    {
+     "ParameterId": 659,
+     "ParameterText": "Voltage - Supply, Single/Dual (±)",
+     "ParameterType": "String",
+     "ValueId": "57821",
+     "ValueText": "1.6V ~ 5.5V, ±0.8V ~ 2.75V"
+    },
+    {
+     "ParameterId": 1558,
+     "ParameterText": "Voltage - Input Offset (Max)",
+     "ParameterType": "String",
+     "ValueId": "294640",
+     "ValueText": "8mV @ 5V"
+    },
+    {
+     "ParameterId": 1559,
+     "ParameterText": "Current - Input Bias (Max)",
+     "ParameterType": "String",
+     "ValueId": "424989",
+     "ValueText": "5pA (Typ)"
+    },
+    {
+     "ParameterId": 1560,
+     "ParameterText": "Current - Output (Typ)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1545,
+     "ParameterText": "Current - Quiescent (Max)",
+     "ParameterType": "String",
+     "ValueId": "67044",
+     "ValueText": "10µA"
+    },
+    {
+     "ParameterId": 1561,
+     "ParameterText": "CMRR, PSRR (Typ)",
+     "ParameterType": "String",
+     "ValueId": "280075",
+     "ValueText": "78dB CMRR, 78dB PSRR"
+    },
+    {
+     "ParameterId": 1348,
+     "ParameterText": "Propagation Delay (Max)",
+     "ParameterType": "String",
+     "ValueId": "424985",
+     "ValueText": "260ns (Typ)"
+    },
+    {
+     "ParameterId": 1562,
+     "ParameterText": "Hysteresis",
+     "ParameterType": "String",
+     "ValueId": "97110",
+     "ValueText": "14mV"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212478",
+     "ValueText": "-40°C ~ 125°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "400230",
+     "ValueText": "SC-74A, SOT-753"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405420",
+     "ValueText": "SOT-23-5"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 28053,
+    "Name": "TLV7021"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2018,
+      "ParentId": 32,
+      "Name": "Linear",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/030/156/264%7E11-10C4%7E%7E8_tmb.jpg",
+      "SeoDescription": "Linear circuits and component parameters remain unchanged in regard to voltage and current levels. Included in this category are amplifiers, OP Amps, video amps and modules, analog multipliers, dividers, comparators, video processing, and more.",
+      "ChildCategories": [
+       {
+        "CategoryId": 692,
+        "ParentId": 2018,
+        "Name": "Comparators",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Linear comparator products are used to evaluate the relative magnitude of two analog input signals and generate a binary (two-state) output indicating which of the two is larger. Closely related to operational amplifiers in their function, linear comparators are specifically designed to tolerate the open-loop operation and large differential input conditions commonly encountered in analog comparison applications, which can cause standard operational amplifiers to behave in undesirable ways.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0090"
+   },
+   "OtherNames": [
+    "296-TLV7021DBVRDKR",
+    "296-TLV7021DBVRTR",
+    "296-TLV7021DBVRCT"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "IC COMPARATOR 1CH SOT-23-5",
+    "DetailedDescription": "Comparator Standard (General Purpose) Open-Drain SOT-23-5"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "TLV7021DBVR",
+   "UnitPrice": 0.55,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/TLV7021DBVR/10434670",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Ftlv7011",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8897/MFG_296%7E4214839%7EDBV%7E5.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-TLV7021DBVRTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.24235,
+       "TotalPrice": 727.05
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.23593,
+       "TotalPrice": 1415.58
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.23271,
+       "TotalPrice": 2094.39
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.22915,
+       "TotalPrice": 3437.25
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.22707,
+       "TotalPrice": 4768.47
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.22506,
+       "TotalPrice": 6751.8
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 9000,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 3000,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TLV7021DBVRCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.55,
+       "TotalPrice": 0.55
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.386,
+       "TotalPrice": 3.86
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.3452,
+       "TotalPrice": 8.63
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3004,
+       "TotalPrice": 30.04
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.279,
+       "TotalPrice": 69.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.2661,
+       "TotalPrice": 133.05
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.25548,
+       "TotalPrice": 255.48
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 9511,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TLV7021DBVRDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.55,
+       "TotalPrice": 0.55
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.386,
+       "TotalPrice": 3.86
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.3452,
+       "TotalPrice": 8.63
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3004,
+       "TotalPrice": 30.04
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.279,
+       "TotalPrice": 69.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.2661,
+       "TotalPrice": 133.05
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.25548,
+       "TotalPrice": 255.48
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 9511,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 9511,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "863824",
+     "ValueText": "Standard (General Purpose)"
+    },
+    {
+     "ParameterId": 105,
+     "ParameterText": "Number of Elements",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 41,
+     "ParameterText": "Output Type",
+     "ParameterType": "String",
+     "ValueId": "432771",
+     "ValueText": "Open-Drain"
+    },
+    {
+     "ParameterId": 659,
+     "ParameterText": "Voltage - Supply, Single/Dual (±)",
+     "ParameterType": "String",
+     "ValueId": "57821",
+     "ValueText": "1.6V ~ 5.5V, ±0.8V ~ 2.75V"
+    },
+    {
+     "ParameterId": 1558,
+     "ParameterText": "Voltage - Input Offset (Max)",
+     "ParameterType": "String",
+     "ValueId": "294640",
+     "ValueText": "8mV @ 5V"
+    },
+    {
+     "ParameterId": 1559,
+     "ParameterText": "Current - Input Bias (Max)",
+     "ParameterType": "String",
+     "ValueId": "424989",
+     "ValueText": "5pA (Typ)"
+    },
+    {
+     "ParameterId": 1560,
+     "ParameterText": "Current - Output (Typ)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1545,
+     "ParameterText": "Current - Quiescent (Max)",
+     "ParameterType": "String",
+     "ValueId": "67044",
+     "ValueText": "10µA"
+    },
+    {
+     "ParameterId": 1561,
+     "ParameterText": "CMRR, PSRR (Typ)",
+     "ParameterType": "String",
+     "ValueId": "280075",
+     "ValueText": "78dB CMRR, 78dB PSRR"
+    },
+    {
+     "ParameterId": 1348,
+     "ParameterText": "Propagation Delay (Max)",
+     "ParameterType": "String",
+     "ValueId": "424985",
+     "ValueText": "260ns (Typ)"
+    },
+    {
+     "ParameterId": 1562,
+     "ParameterText": "Hysteresis",
+     "ParameterType": "String",
+     "ValueId": "97110",
+     "ValueText": "14mV"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212478",
+     "ValueText": "-40°C ~ 125°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "400230",
+     "ValueText": "SC-74A, SOT-753"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405420",
+     "ValueText": "SOT-23-5"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 28053,
+    "Name": "TLV7021"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2018,
+      "ParentId": 32,
+      "Name": "Linear",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/030/156/264%7E11-10C4%7E%7E8_tmb.jpg",
+      "SeoDescription": "Linear circuits and component parameters remain unchanged in regard to voltage and current levels. Included in this category are amplifiers, OP Amps, video amps and modules, analog multipliers, dividers, comparators, video processing, and more.",
+      "ChildCategories": [
+       {
+        "CategoryId": 692,
+        "ParentId": 2018,
+        "Name": "Comparators",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Linear comparator products are used to evaluate the relative magnitude of two analog input signals and generate a binary (two-state) output indicating which of the two is larger. Closely related to operational amplifiers in their function, linear comparators are specifically designed to tolerate the open-loop operation and large differential input conditions commonly encountered in analog comparison applications, which can cause standard operational amplifiers to behave in undesirable ways.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0090"
+   },
+   "OtherNames": [
+    "296-TLV7021DBVRDKR",
+    "296-TLV7021DBVRTR",
+    "296-TLV7021DBVRCT"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 296,
+    "Value": "Texas Instruments",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

@@ -1,0 +1,159 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "23026 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Resettable Fuses - PPTC 1206 PTC 6V 500MA",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/littelfuse/images/PTC_1206L_series_SPL.jpg",
+    "Category": "Resettable Fuses - PPTC",
+    "LeadTime": "91 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Littelfuse",
+    "ManufacturerPartNumber": "1206L050YR",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "576-1206L050YR",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "4000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.53",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.488",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 50,
+      "Price": "$0.405",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.371",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 200,
+      "Price": "$0.336",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.31",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.283",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2000,
+      "Price": "$0.271",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 4000,
+      "Price": "$0.229",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Littelfuse/1206L050YR?qs=PWhpLWeW8wckT8hV5jLiAA%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 2.6e-05
+    },
+    "AvailabilityInStock": "23026",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8533408070"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8533400000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8533290000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8533400000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853340000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8533299000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "85332999"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85332900"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

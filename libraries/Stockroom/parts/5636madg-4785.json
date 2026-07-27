@@ -105,8 +105,8 @@
   },
   "derived": {
     "category": "Switches",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Toggle Switches TOGGLE SWITCH 5000 MINIATURE",
     "display_name": "Toggle Switch",
     "specs": {
@@ -127,8 +127,6 @@
       "HTS Code (US)": "8536509065",
       "Illumination": "Non-Illuminated",
       "Image": "https://www.mouser.com/images/apem/images/5636MADG_DSL.jpg",
-      "Lead Time": "70 Days",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "1 (Unlimited)",
       "Mounting Type": "Panel Mount",
@@ -148,7 +146,7 @@
       "Voltage Rating - AC": "125 V",
       "Voltage Rating - DC": "30 V"
     },
-    "value": ""
+    "value": "5636MADG"
   },
   "enrichment": {
     "Actuator Length": {
@@ -344,6 +342,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/5636madg-4785/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/5636madg-4785/mouser.json"
+    }
+  },
   "tags": []
 }

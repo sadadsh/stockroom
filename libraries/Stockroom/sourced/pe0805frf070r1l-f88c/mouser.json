@@ -1,0 +1,154 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "18432 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/508/1/PYU_PE_521_ROHS_L.pdf",
+    "Description": "Current Sense Resistors - SMD 100 mOhms 125mW 1 % 100 ppm/C AEC-Q200",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/yageo/images/PE_L_DSL.jpg",
+    "Category": "Current Sense Resistors - SMD",
+    "LeadTime": "56 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "YAGEO",
+    "ManufacturerPartNumber": "PE0805FRF070R1L",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "603-PE0805FRF070R1L",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "5000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.44",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.285",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$0.214",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.191",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.166",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.15",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.129",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.121",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/YAGEO/PE0805FRF070R1L?qs=bPYCDBrImPf%252B35OcHvtCRg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 5.5e-06
+    },
+    "AvailabilityInStock": "18432",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8533210030"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8533211000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8533210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8533210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853321000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8533219000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8533210100"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85332120"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -93,8 +93,8 @@
   },
   "derived": {
     "category": "Switches",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Tactile Switches SWITCH TACTILE",
     "display_name": "Tactile Switch",
     "specs": {
@@ -106,8 +106,6 @@
       "HTS Code (US)": "8536509031",
       "Image": "https://www.mouser.com/images/Littelfuse/images/KSC241JSPDELTALFS_SPL.jpg",
       "KRHTS": "8536502000",
-      "Lead Time": "105 Days",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "1 (Unlimited)",
       "Order Multiple": "1",
@@ -119,7 +117,7 @@
       "Standard Pack Qty": "2000",
       "Standard Package": "2000"
     },
-    "value": ""
+    "value": "KSC241J SP DELTA LFS"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -255,6 +253,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/ksc241j-sp-delta-lfs-1545/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/ksc241j-sp-delta-lfs-1545/mouser.json"
+    }
+  },
   "tags": []
 }

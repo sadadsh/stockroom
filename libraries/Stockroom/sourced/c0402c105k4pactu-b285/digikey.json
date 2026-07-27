@@ -1,0 +1,752 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "CAP CER 1UF 16V X5R 0402",
+    "DetailedDescription": "1 µF ±10% 16V Ceramic Capacitor X5R 0402 (1005 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 399,
+    "Name": "KEMET"
+   },
+   "ManufacturerProductNumber": "C0402C105K4PACTU",
+   "UnitPrice": 0.12,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/kemet/C0402C105K4PACTU/5422990",
+   "DatasheetUrl": "https://yageogroup.com/content/datasheet/asset/file/KEM_C1006_X5R_SMD",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5357/0402-%281005-Metric%29-Ceramic-Capacitor.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "399-12289-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 10000,
+       "UnitPrice": 0.01886,
+       "TotalPrice": 188.6
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.0175,
+       "TotalPrice": 350.0
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.01682,
+       "TotalPrice": 504.6
+      },
+      {
+       "BreakQuantity": 50000,
+       "UnitPrice": 0.01607,
+       "TotalPrice": 803.5
+      },
+      {
+       "BreakQuantity": 70000,
+       "UnitPrice": 0.01563,
+       "TotalPrice": 1094.1
+      },
+      {
+       "BreakQuantity": 100000,
+       "UnitPrice": 0.01521,
+       "TotalPrice": 1521.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 399,
+      "Name": "KEMET"
+     },
+     "QuantityAvailableforPackageType": 640000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 10000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "399-12289-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.12,
+       "TotalPrice": 0.12
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.066,
+       "TotalPrice": 0.66
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.0456,
+       "TotalPrice": 2.28
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0394,
+       "TotalPrice": 3.94
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.02902,
+       "TotalPrice": 14.51
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.02585,
+       "TotalPrice": 25.85
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.02252,
+       "TotalPrice": 56.3
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.02051,
+       "TotalPrice": 102.55
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 399,
+      "Name": "KEMET"
+     },
+     "QuantityAvailableforPackageType": 649237,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "399-12289-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.12,
+       "TotalPrice": 0.12
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.066,
+       "TotalPrice": 0.66
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.0456,
+       "TotalPrice": 2.28
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0394,
+       "TotalPrice": 3.94
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.02902,
+       "TotalPrice": 14.51
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.02585,
+       "TotalPrice": 25.85
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.02252,
+       "TotalPrice": 56.3
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.02051,
+       "TotalPrice": 102.55
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 399,
+      "Name": "KEMET"
+     },
+     "QuantityAvailableforPackageType": 649237,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 649237,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2049,
+     "ParameterText": "Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 µF",
+     "ValueText": "1 µF"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1340",
+     "ValueText": "±10%"
+    },
+    {
+     "ParameterId": 14,
+     "ParameterText": "Voltage - Rated",
+     "ParameterType": "String",
+     "ValueId": "108742",
+     "ValueText": "16V"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "422407",
+     "ValueText": "X5R"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "243000",
+     "ValueText": "-55°C ~ 85°C"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "323975",
+     "ValueText": "Bypass, Decoupling"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409416",
+     "ValueText": "Surface Mount, MLCC"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39158",
+     "ValueText": "0402 (1005 Metric)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "6310",
+     "ValueText": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "5314",
+     "ValueText": "0.022\" (0.55mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 4,
+     "ParameterText": "Lead Style",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 467203,
+    "Name": "C0402C"
+   },
+   "Category": {
+    "CategoryId": 3,
+    "ParentId": 0,
+    "Name": "Capacitors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/640/398/BCAP0350%20E270%20T11_tmb%2864x64%29.jpg",
+    "SeoDescription": "Capacitor products, also known as \"condensers\", are generally named and organized in reference to the dielectric material incorporated within. Along with variations in construction methods, the choice of dielectric material has strong influence on a given device's relative cost, size, parametric stability, and suitability for a particular application.",
+    "ChildCategories": [
+     {
+      "CategoryId": 60,
+      "ParentId": 3,
+      "Name": "Ceramic Capacitors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/365/960/CGA-Series-0402-%281005-Metric%29_tmb.jpg",
+      "SeoDescription": "A capacitor is a passive electronic device that stores electric charge. Ceramic capacitors consist of two or more alternating layers of ceramic material as the dielectric and metal layers acting as the non-polarized electrodes. Applications include automotive, bypass, decoupling, filtering, RF, and ESD protection. Through-hole versions are often disc or \"blob\" shaped with two wire leads.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "42",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 70689,
+    "Name": "SMD Comm X5R"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8532.24.0020"
+   },
+   "OtherNames": [
+    "399-12289-2",
+    "399-12289-1",
+    "399-12289-6",
+    "C0402C105K4PACTU",
+    "C0402C105K4PAC7867"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "CAP CER 1UF 16V X5R 0402",
+    "DetailedDescription": "1 µF ±10% 16V Ceramic Capacitor X5R 0402 (1005 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 399,
+    "Name": "KEMET"
+   },
+   "ManufacturerProductNumber": "C0402C105K4PACTU",
+   "UnitPrice": 0.12,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/kemet/C0402C105K4PACTU/5422990",
+   "DatasheetUrl": "https://yageogroup.com/content/datasheet/asset/file/KEM_C1006_X5R_SMD",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5357/0402-%281005-Metric%29-Ceramic-Capacitor.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "399-12289-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 10000,
+       "UnitPrice": 0.01886,
+       "TotalPrice": 188.6
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.0175,
+       "TotalPrice": 350.0
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.01682,
+       "TotalPrice": 504.6
+      },
+      {
+       "BreakQuantity": 50000,
+       "UnitPrice": 0.01607,
+       "TotalPrice": 803.5
+      },
+      {
+       "BreakQuantity": 70000,
+       "UnitPrice": 0.01563,
+       "TotalPrice": 1094.1
+      },
+      {
+       "BreakQuantity": 100000,
+       "UnitPrice": 0.01521,
+       "TotalPrice": 1521.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 399,
+      "Name": "KEMET"
+     },
+     "QuantityAvailableforPackageType": 640000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 10000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "399-12289-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.12,
+       "TotalPrice": 0.12
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.066,
+       "TotalPrice": 0.66
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.0456,
+       "TotalPrice": 2.28
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0394,
+       "TotalPrice": 3.94
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.02902,
+       "TotalPrice": 14.51
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.02585,
+       "TotalPrice": 25.85
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.02252,
+       "TotalPrice": 56.3
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.02051,
+       "TotalPrice": 102.55
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 399,
+      "Name": "KEMET"
+     },
+     "QuantityAvailableforPackageType": 649237,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "399-12289-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.12,
+       "TotalPrice": 0.12
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.066,
+       "TotalPrice": 0.66
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.0456,
+       "TotalPrice": 2.28
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0394,
+       "TotalPrice": 3.94
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.02902,
+       "TotalPrice": 14.51
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.02585,
+       "TotalPrice": 25.85
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.02252,
+       "TotalPrice": 56.3
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.02051,
+       "TotalPrice": 102.55
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 399,
+      "Name": "KEMET"
+     },
+     "QuantityAvailableforPackageType": 649237,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 649237,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2049,
+     "ParameterText": "Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 µF",
+     "ValueText": "1 µF"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1340",
+     "ValueText": "±10%"
+    },
+    {
+     "ParameterId": 14,
+     "ParameterText": "Voltage - Rated",
+     "ParameterType": "String",
+     "ValueId": "108742",
+     "ValueText": "16V"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "422407",
+     "ValueText": "X5R"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "243000",
+     "ValueText": "-55°C ~ 85°C"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "323975",
+     "ValueText": "Bypass, Decoupling"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409416",
+     "ValueText": "Surface Mount, MLCC"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39158",
+     "ValueText": "0402 (1005 Metric)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "6310",
+     "ValueText": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "5314",
+     "ValueText": "0.022\" (0.55mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 4,
+     "ParameterText": "Lead Style",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 467203,
+    "Name": "C0402C"
+   },
+   "Category": {
+    "CategoryId": 3,
+    "ParentId": 0,
+    "Name": "Capacitors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/640/398/BCAP0350%20E270%20T11_tmb%2864x64%29.jpg",
+    "SeoDescription": "Capacitor products, also known as \"condensers\", are generally named and organized in reference to the dielectric material incorporated within. Along with variations in construction methods, the choice of dielectric material has strong influence on a given device's relative cost, size, parametric stability, and suitability for a particular application.",
+    "ChildCategories": [
+     {
+      "CategoryId": 60,
+      "ParentId": 3,
+      "Name": "Ceramic Capacitors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/365/960/CGA-Series-0402-%281005-Metric%29_tmb.jpg",
+      "SeoDescription": "A capacitor is a passive electronic device that stores electric charge. Ceramic capacitors consist of two or more alternating layers of ceramic material as the dielectric and metal layers acting as the non-polarized electrodes. Applications include automotive, bypass, decoupling, filtering, RF, and ESD protection. Through-hole versions are often disc or \"blob\" shaped with two wire leads.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "42",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 70689,
+    "Name": "SMD Comm X5R"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8532.24.0020"
+   },
+   "OtherNames": [
+    "399-12289-2",
+    "399-12289-1",
+    "399-12289-6",
+    "C0402C105K4PACTU",
+    "C0402C105K4PAC7867"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 399,
+    "Value": "KEMET",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

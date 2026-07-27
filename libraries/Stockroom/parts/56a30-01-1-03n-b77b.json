@@ -117,8 +117,8 @@
   },
   "derived": {
     "category": "Switches",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Rotary Switches 56A30-01-1-03N",
     "display_name": "Rotary Switch",
     "specs": {
@@ -144,8 +144,6 @@
       "Image": "https://www.mouser.com/images/grayhill/images/56_series.jpg",
       "Index Stops": "Fixed",
       "KRHTS": "8536501000",
-      "Lead Time": "105 Days",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "1 (Unlimited)",
       "Mounting Type": "Panel Mount",
@@ -165,7 +163,7 @@
       "Voltage Rating - AC": "115 V",
       "Voltage Rating - DC": "30 V"
     },
-    "value": ""
+    "value": "56A30-01-1-03N"
   },
   "enrichment": {
     "Actuator Length": {
@@ -381,6 +379,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/56a30-01-1-03n-b77b/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/56a30-01-1-03n-b77b/mouser.json"
+    }
+  },
   "tags": []
 }

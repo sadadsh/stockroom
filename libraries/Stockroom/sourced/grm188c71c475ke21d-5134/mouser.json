@@ -1,0 +1,158 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "106198 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/76/1/GRM188C71C475KE21-01A.pdf",
+    "Description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 4.7 uF 16 VDC 10% 0603 X7S",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
+    "Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "LeadTime": "70 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Murata Electronics",
+    "ManufacturerPartNumber": "GRM188C71C475KE21D",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "81-GRM188C71C475KE1D",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "4000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.27",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.113",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.099",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.077",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.069",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2000,
+      "Price": "$0.067",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 4000,
+      "Price": "$0.052",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "GRM188C71C475KE21J"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Murata-Electronics/GRM188C71C475KE21D?qs=qkDYIeTQ%252BEkYyAAHsMqcYw%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 6.3e-06
+    },
+    "AvailabilityInStock": "106198",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 300000,
+      "Date": "2026-09-08T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8532240020"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8532241000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8532240000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8532240010"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853224000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8532240000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8532240400"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85322410"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Japan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

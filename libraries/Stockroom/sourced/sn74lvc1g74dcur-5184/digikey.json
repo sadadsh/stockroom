@@ -1,0 +1,1321 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "IC FF D-TYPE 1-ELE 1-BIT 8-VSSOP",
+    "DetailedDescription": "Flip Flop 1 Element D-Type 1 Bit Positive Edge 8-VFSOP (0.091\", 2.30mm Width)"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "SN74LVC1G74DCUR",
+   "UnitPrice": 0.6,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/SN74LVC1G74DCUR/2195376",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fsn74lvc1g74",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8907/MFG_296%7E4200503%7EDCU%7E8.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-25554-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.26724,
+       "TotalPrice": 801.72
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.26032,
+       "TotalPrice": 1561.92
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.25685,
+       "TotalPrice": 2311.65
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.25301,
+       "TotalPrice": 3795.15
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.25076,
+       "TotalPrice": 5265.96
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.2486,
+       "TotalPrice": 7458.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 22780,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-25554-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.6,
+       "TotalPrice": 0.6
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.422,
+       "TotalPrice": 4.22
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.3784,
+       "TotalPrice": 9.46
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3298,
+       "TotalPrice": 32.98
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.30676,
+       "TotalPrice": 76.69
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.29284,
+       "TotalPrice": 146.42
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28611,
+       "TotalPrice": 286.11
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 22784,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-25554-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.6,
+       "TotalPrice": 0.6
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.422,
+       "TotalPrice": 4.22
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.3784,
+       "TotalPrice": 9.46
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3298,
+       "TotalPrice": 32.98
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.30676,
+       "TotalPrice": 76.69
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.29284,
+       "TotalPrice": 146.42
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28611,
+       "TotalPrice": 286.11
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 22784,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 22784,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 110,
+     "ParameterText": "Function",
+     "ParameterType": "String",
+     "ValueId": "401648",
+     "ValueText": "Set(Preset) and Reset"
+    },
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "341755",
+     "ValueText": "D-Type"
+    },
+    {
+     "ParameterId": 41,
+     "ParameterText": "Output Type",
+     "ParameterType": "String",
+     "ValueId": "332614",
+     "ValueText": "Complementary"
+    },
+    {
+     "ParameterId": 105,
+     "ParameterText": "Number of Elements",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 2207,
+     "ParameterText": "Number of Bits per Element",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 800,
+     "ParameterText": "Clock Frequency",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "200 MHz",
+     "ValueText": "200 MHz"
+    },
+    {
+     "ParameterId": 1552,
+     "ParameterText": "Max Propagation Delay @ V, Max CL",
+     "ParameterType": "String",
+     "ValueId": "252555",
+     "ValueText": "6.4ns @ 5V, 50pF"
+    },
+    {
+     "ParameterId": 655,
+     "ParameterText": "Trigger Type",
+     "ParameterType": "String",
+     "ValueId": "389028",
+     "ValueText": "Positive Edge"
+    },
+    {
+     "ParameterId": 592,
+     "ParameterText": "Current - Output High, Low",
+     "ParameterType": "String",
+     "ValueId": "188508",
+     "ValueText": "32mA, 32mA"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "56916",
+     "ValueText": "1.65V ~ 5.5V"
+    },
+    {
+     "ParameterId": 477,
+     "ParameterText": "Current - Quiescent (Iq)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 µA",
+     "ValueText": "10 µA"
+    },
+    {
+     "ParameterId": 1267,
+     "ParameterText": "Input Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "5 pF",
+     "ValueText": "5 pF"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "295353",
+     "ValueText": "8-VSSOP"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "295328",
+     "ValueText": "8-VFSOP (0.091\", 2.30mm Width)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 44192,
+    "Name": "74LVC1G74"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2019,
+      "ParentId": 32,
+      "Name": "Logic",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/312/8-TSSOP%2C-8-MSOP-3x3mm_tmb.jpg",
+      "SeoDescription": "Logic components operate using two voltage levels. These two levels are referred to as High or Low, On or Off, True or False, or simply 1 or 0. There are many components included in this category, such as Buffers, Drivers, Receivers, Transceivers, Comparators, Counters, Dividers, FIFOs Memory, Flip Flops, Gates, Inverters, Latches, Multivibrators, Parity Generators, Shift Registers, Signal Switches, Multiplexers, Decoders, Translators, Level Shifters, Universal Bus FUnctions, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 706,
+        "ParentId": 2019,
+        "Name": "Flip Flops",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Flip-flops are elementary digital memory devices capable of storing a single logic state or \"bit\" of information. They have at least two inputs; one or more to communicate the data to be stored and another to indicate the point in time to store it. Different flip-flop types such as D (delay), SR (Set-Reset), and JK respond differently to the signals presented to their inputs and can be used to implement different logical functions. They differ from latches in that they are edge sensitive devices, whose retained logic state changes only at the moment a valid clock signal is received.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 75,
+    "Name": "74LVC"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "296-25554-1",
+    "-SN74LVC1G74DCUR-NDR",
+    "296-25554-6",
+    "296-25554-2",
+    "-296-25554-1-ND"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "IC FF D-TYPE 1-ELE 1-BIT 8-VSSOP",
+    "DetailedDescription": "Flip Flop 1 Element D-Type 1 Bit Positive Edge 8-VFSOP (0.091\", 2.30mm Width)"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "SN74LVC1G74DCURG4",
+   "UnitPrice": 0.29218,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/SN74LVC1G74DCURG4/3182114",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fsn74lvc1g74",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8907/MFG_296%7E4200503%7EDCU%7E8.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "SN74LVC1G74DCURG4-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.29218,
+       "TotalPrice": 876.54
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.28473,
+       "TotalPrice": 1708.38
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.281,
+       "TotalPrice": 2529.0
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.27686,
+       "TotalPrice": 4152.9
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.27444,
+       "TotalPrice": 5763.24
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.27212,
+       "TotalPrice": 8163.6
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 3000,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 0,
+   "ProductStatus": {
+    "Id": 2,
+    "Status": "Discontinued at DigiKey"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": false,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 110,
+     "ParameterText": "Function",
+     "ParameterType": "String",
+     "ValueId": "401648",
+     "ValueText": "Set(Preset) and Reset"
+    },
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "341755",
+     "ValueText": "D-Type"
+    },
+    {
+     "ParameterId": 41,
+     "ParameterText": "Output Type",
+     "ParameterType": "String",
+     "ValueId": "332614",
+     "ValueText": "Complementary"
+    },
+    {
+     "ParameterId": 105,
+     "ParameterText": "Number of Elements",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 2207,
+     "ParameterText": "Number of Bits per Element",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 800,
+     "ParameterText": "Clock Frequency",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "200 MHz",
+     "ValueText": "200 MHz"
+    },
+    {
+     "ParameterId": 1552,
+     "ParameterText": "Max Propagation Delay @ V, Max CL",
+     "ParameterType": "String",
+     "ValueId": "252555",
+     "ValueText": "6.4ns @ 5V, 50pF"
+    },
+    {
+     "ParameterId": 655,
+     "ParameterText": "Trigger Type",
+     "ParameterType": "String",
+     "ValueId": "389028",
+     "ValueText": "Positive Edge"
+    },
+    {
+     "ParameterId": 592,
+     "ParameterText": "Current - Output High, Low",
+     "ParameterType": "String",
+     "ValueId": "188508",
+     "ValueText": "32mA, 32mA"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "56916",
+     "ValueText": "1.65V ~ 5.5V"
+    },
+    {
+     "ParameterId": 477,
+     "ParameterText": "Current - Quiescent (Iq)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 µA",
+     "ValueText": "10 µA"
+    },
+    {
+     "ParameterId": 1267,
+     "ParameterText": "Input Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "5 pF",
+     "ValueText": "5 pF"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "295353",
+     "ValueText": "8-VSSOP"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "295328",
+     "ValueText": "8-VFSOP (0.091\", 2.30mm Width)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 44192,
+    "Name": "74LVC1G74"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2019,
+      "ParentId": 32,
+      "Name": "Logic",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/312/8-TSSOP%2C-8-MSOP-3x3mm_tmb.jpg",
+      "SeoDescription": "Logic components operate using two voltage levels. These two levels are referred to as High or Low, On or Off, True or False, or simply 1 or 0. There are many components included in this category, such as Buffers, Drivers, Receivers, Transceivers, Comparators, Counters, Dividers, FIFOs Memory, Flip Flops, Gates, Inverters, Latches, Multivibrators, Parity Generators, Shift Registers, Signal Switches, Multiplexers, Decoders, Translators, Level Shifters, Universal Bus FUnctions, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 706,
+        "ParentId": 2019,
+        "Name": "Flip Flops",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Flip-flops are elementary digital memory devices capable of storing a single logic state or \"bit\" of information. They have at least two inputs; one or more to communicate the data to be stored and another to indicate the point in time to store it. Different flip-flop types such as D (delay), SR (Set-Reset), and JK respond differently to the signals presented to their inputs and can be used to implement different logical functions. They differ from latches in that they are edge sensitive devices, whose retained logic state changes only at the moment a valid clock signal is received.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 75,
+    "Name": "74LVC"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0060"
+   },
+   "OtherNames": []
+  }
+ ],
+ "ProductsCount": 2,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "IC FF D-TYPE 1-ELE 1-BIT 8-VSSOP",
+    "DetailedDescription": "Flip Flop 1 Element D-Type 1 Bit Positive Edge 8-VFSOP (0.091\", 2.30mm Width)"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "SN74LVC1G74DCUR",
+   "UnitPrice": 0.6,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/SN74LVC1G74DCUR/2195376",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fsn74lvc1g74",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8907/MFG_296%7E4200503%7EDCU%7E8.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-25554-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.26724,
+       "TotalPrice": 801.72
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.26032,
+       "TotalPrice": 1561.92
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.25685,
+       "TotalPrice": 2311.65
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.25301,
+       "TotalPrice": 3795.15
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.25076,
+       "TotalPrice": 5265.96
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.2486,
+       "TotalPrice": 7458.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 22780,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-25554-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.6,
+       "TotalPrice": 0.6
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.422,
+       "TotalPrice": 4.22
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.3784,
+       "TotalPrice": 9.46
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3298,
+       "TotalPrice": 32.98
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.30676,
+       "TotalPrice": 76.69
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.29284,
+       "TotalPrice": 146.42
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28611,
+       "TotalPrice": 286.11
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 22784,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-25554-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.6,
+       "TotalPrice": 0.6
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.422,
+       "TotalPrice": 4.22
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.3784,
+       "TotalPrice": 9.46
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3298,
+       "TotalPrice": 32.98
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.30676,
+       "TotalPrice": 76.69
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.29284,
+       "TotalPrice": 146.42
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28611,
+       "TotalPrice": 286.11
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 22784,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 22784,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 110,
+     "ParameterText": "Function",
+     "ParameterType": "String",
+     "ValueId": "401648",
+     "ValueText": "Set(Preset) and Reset"
+    },
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "341755",
+     "ValueText": "D-Type"
+    },
+    {
+     "ParameterId": 41,
+     "ParameterText": "Output Type",
+     "ParameterType": "String",
+     "ValueId": "332614",
+     "ValueText": "Complementary"
+    },
+    {
+     "ParameterId": 105,
+     "ParameterText": "Number of Elements",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 2207,
+     "ParameterText": "Number of Bits per Element",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 800,
+     "ParameterText": "Clock Frequency",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "200 MHz",
+     "ValueText": "200 MHz"
+    },
+    {
+     "ParameterId": 1552,
+     "ParameterText": "Max Propagation Delay @ V, Max CL",
+     "ParameterType": "String",
+     "ValueId": "252555",
+     "ValueText": "6.4ns @ 5V, 50pF"
+    },
+    {
+     "ParameterId": 655,
+     "ParameterText": "Trigger Type",
+     "ParameterType": "String",
+     "ValueId": "389028",
+     "ValueText": "Positive Edge"
+    },
+    {
+     "ParameterId": 592,
+     "ParameterText": "Current - Output High, Low",
+     "ParameterType": "String",
+     "ValueId": "188508",
+     "ValueText": "32mA, 32mA"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "56916",
+     "ValueText": "1.65V ~ 5.5V"
+    },
+    {
+     "ParameterId": 477,
+     "ParameterText": "Current - Quiescent (Iq)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 µA",
+     "ValueText": "10 µA"
+    },
+    {
+     "ParameterId": 1267,
+     "ParameterText": "Input Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "5 pF",
+     "ValueText": "5 pF"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "295353",
+     "ValueText": "8-VSSOP"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "295328",
+     "ValueText": "8-VFSOP (0.091\", 2.30mm Width)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 44192,
+    "Name": "74LVC1G74"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2019,
+      "ParentId": 32,
+      "Name": "Logic",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/312/8-TSSOP%2C-8-MSOP-3x3mm_tmb.jpg",
+      "SeoDescription": "Logic components operate using two voltage levels. These two levels are referred to as High or Low, On or Off, True or False, or simply 1 or 0. There are many components included in this category, such as Buffers, Drivers, Receivers, Transceivers, Comparators, Counters, Dividers, FIFOs Memory, Flip Flops, Gates, Inverters, Latches, Multivibrators, Parity Generators, Shift Registers, Signal Switches, Multiplexers, Decoders, Translators, Level Shifters, Universal Bus FUnctions, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 706,
+        "ParentId": 2019,
+        "Name": "Flip Flops",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Flip-flops are elementary digital memory devices capable of storing a single logic state or \"bit\" of information. They have at least two inputs; one or more to communicate the data to be stored and another to indicate the point in time to store it. Different flip-flop types such as D (delay), SR (Set-Reset), and JK respond differently to the signals presented to their inputs and can be used to implement different logical functions. They differ from latches in that they are edge sensitive devices, whose retained logic state changes only at the moment a valid clock signal is received.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 75,
+    "Name": "74LVC"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "296-25554-1",
+    "-SN74LVC1G74DCUR-NDR",
+    "296-25554-6",
+    "296-25554-2",
+    "-296-25554-1-ND"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 296,
+    "Value": "Texas Instruments",
+    "ProductCount": 2
+   }
+  ],
+  "Packaging": [
+   {
+    "Id": 2,
+    "Value": "Cut Tape (CT)",
+    "ProductCount": 1
+   },
+   {
+    "Id": 243,
+    "Value": "Digi-Reel®",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1,
+    "Value": "Tape & Reel (TR)",
+    "ProductCount": 2
+   }
+  ],
+  "Status": [
+   {
+    "Id": 0,
+    "Value": "Active",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2,
+    "Value": "Discontinued at DigiKey",
+    "ProductCount": 1
+   }
+  ],
+  "Series": [
+   {
+    "Id": 75,
+    "Value": "74LVC",
+    "ProductCount": 2
+   }
+  ],
+  "ParametricFilters": [
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 110,
+    "ParameterName": "Function",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "401648",
+      "ValueName": "Set(Preset) and Reset",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 183,
+    "ParameterName": "Type",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "341755",
+      "ValueName": "D-Type",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 41,
+    "ParameterName": "Output Type",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "332614",
+      "ValueName": "Complementary",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 105,
+    "ParameterName": "Number of Elements",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "1",
+      "ValueName": "1",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 2207,
+    "ParameterName": "Number of Bits per Element",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "1",
+      "ValueName": "1",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "UnitOfMeasure",
+    "ParameterId": 800,
+    "ParameterName": "Clock Frequency",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "200 MHz",
+      "ValueName": "200 MHz",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1552,
+    "ParameterName": "Max Propagation Delay @ V, Max CL",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "252555",
+      "ValueName": "6.4ns @ 5V, 50pF",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 655,
+    "ParameterName": "Trigger Type",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "389028",
+      "ValueName": "Positive Edge",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 592,
+    "ParameterName": "Current - Output High, Low",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "188508",
+      "ValueName": "32mA, 32mA",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 276,
+    "ParameterName": "Voltage - Supply",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "56916",
+      "ValueName": "1.65V ~ 5.5V",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "UnitOfMeasure",
+    "ParameterId": 477,
+    "ParameterName": "Current - Quiescent (Iq)",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "10 µA",
+      "ValueName": "10 µA",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "UnitOfMeasure",
+    "ParameterId": 1267,
+    "ParameterName": "Input Capacitance",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "5 pF",
+      "ValueName": "5 pF",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 252,
+    "ParameterName": "Operating Temperature",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "212479",
+      "ValueName": "-40°C ~ 125°C (TA)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 69,
+    "ParameterName": "Mounting Type",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "409393",
+      "ValueName": "Surface Mount",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1291,
+    "ParameterName": "Supplier Device Package",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "295353",
+      "ValueName": "8-VSSOP",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 706,
+     "Value": "Flip Flops",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 16,
+    "ParameterName": "Package / Case",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "295328",
+      "ValueName": "8-VFSOP (0.091\", 2.30mm Width)",
+      "RangeFilterType": null
+     }
+    ]
+   }
+  ],
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

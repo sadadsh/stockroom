@@ -1,0 +1,159 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "34567 In Stock",
+    "DataSheetUrl": "",
+    "Description": "FFC & FPC Connectors 0.5 FPC ZIF BTM CONT EMBT PKG 18Ckt",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/molex/images/5051101892.36_SPL.jpg",
+    "Category": "FFC & FPC Connectors",
+    "LeadTime": "91 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Molex",
+    "ManufacturerPartNumber": "505110-1892",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "538-505110-1892",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$1.17",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.997",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$0.89",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.847",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.794",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.756",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.72",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.672",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.632",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Molex/505110-1892?qs=RawsiUxJOFT9kgonIbsWCg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.0001694
+    },
+    "AvailabilityInStock": "34567",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536694040"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536901100"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536690020"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853669000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536691000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536693000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8536699999"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85366990"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Vietnam"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

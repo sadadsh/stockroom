@@ -117,8 +117,8 @@
   },
   "derived": {
     "category": "Switches",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Analog Switch ICs SERIAL SPI, OCTAL SPST",
     "display_name": "Analog Switch IC 24-TSSOP",
     "specs": {
@@ -160,7 +160,7 @@
       "Voltage - Supply, Dual (V±)": "±2.5V",
       "Voltage - Supply, Single (V+)": "2.7V ~ 5.5V"
     },
-    "value": ""
+    "value": "ADG714BRUZ"
   },
   "enrichment": {},
   "hashes": null,
@@ -278,6 +278,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/adg714bruz-b8aa/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/adg714bruz-b8aa/mouser.json"
+    }
+  },
   "tags": []
 }

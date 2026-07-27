@@ -1,0 +1,692 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "IC MOTOR DRIVER 2V-5.5V 10VSSOP",
+    "DetailedDescription": "Motor Driver Power MOSFET I2C 10-VSSOP"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "DRV2605LDGSR",
+   "UnitPrice": 2.28,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/DRV2605LDGSR/5014144",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fdrv2605l",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4190/296%7E4073272%7EDGS%7E10.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-40032-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 1.1739,
+       "TotalPrice": 2934.75
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 1.14938,
+       "TotalPrice": 5746.9
+      },
+      {
+       "BreakQuantity": 7500,
+       "UnitPrice": 1.1371,
+       "TotalPrice": 8528.25
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 5000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 2500,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-40032-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.28,
+       "TotalPrice": 2.28
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.689,
+       "TotalPrice": 16.89
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.5408,
+       "TotalPrice": 38.52
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.3777,
+       "TotalPrice": 137.77
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.3,
+       "TotalPrice": 325.0
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.26072,
+       "TotalPrice": 630.36
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 6169,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-40032-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.28,
+       "TotalPrice": 2.28
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.689,
+       "TotalPrice": 16.89
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.5408,
+       "TotalPrice": 38.52
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.3777,
+       "TotalPrice": 137.77
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.3,
+       "TotalPrice": 325.0
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.26072,
+       "TotalPrice": 630.36
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 6169,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 6169,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 1663,
+     "ParameterText": "Motor Type - Stepper",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1664,
+     "ParameterText": "Motor Type - AC, DC",
+     "ParameterType": "String",
+     "ValueId": "344842",
+     "ValueText": "ERM, LRA"
+    },
+    {
+     "ParameterId": 110,
+     "ParameterText": "Function",
+     "ParameterType": "String",
+     "ValueId": "340643",
+     "ValueText": "Driver - Fully Integrated, Control and Power Stage"
+    },
+    {
+     "ParameterId": 255,
+     "ParameterText": "Output Configuration",
+     "ParameterType": "String",
+     "ValueId": "352470",
+     "ValueText": "Half Bridge (2)"
+    },
+    {
+     "ParameterId": 154,
+     "ParameterText": "Interface",
+     "ParameterType": "String",
+     "ValueId": "356918",
+     "ValueText": "I2C"
+    },
+    {
+     "ParameterId": 570,
+     "ParameterText": "Technology",
+     "ParameterType": "String",
+     "ValueId": "389350",
+     "ValueText": "Power MOSFET"
+    },
+    {
+     "ParameterId": 1855,
+     "ParameterText": "Step Resolution",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "352929",
+     "ValueText": "Haptic Feedback"
+    },
+    {
+     "ParameterId": 129,
+     "ParameterText": "Current - Output",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "169006",
+     "ValueText": "2V ~ 5.5V"
+    },
+    {
+     "ParameterId": 772,
+     "ParameterText": "Voltage - Load",
+     "ParameterType": "String",
+     "ValueId": "169006",
+     "ValueText": "2V ~ 5.5V"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212510",
+     "ValueText": "-40°C ~ 150°C (TJ)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "74447",
+     "ValueText": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "74705",
+     "ValueText": "10-VSSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 99697,
+    "Name": "DRV2605"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2025,
+      "ParentId": 32,
+      "Name": "Power Management (PMIC)",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/314/540/846%3B-TO220CP-3%3B-%3B-3_tmb.jpg",
+      "SeoDescription": "PMIC, or Power Management Integrated Circuits, refers to a wide range of application-specific ICs or chips. Included in this category is PMICs for AC/DC Converters, Battery Chargers, Battery Management, Current Regulation, Display Drivers, Energy Metering, Full/Half-Bridge Drivers, Gate Drivers, Hot Swap Controllers, Laser Drivers, LED Drivers, Lighting/Ballast Controllers, Motor Drivers, OR Controllers, Power Factor Correction, Power Distribution Switches, PoE Controllers, Power Supply Controllers, RMS to DC Converters, Supervisors, Thermal Management, V/F and F/V Controllers, various Voltage Regulators, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 744,
+        "ParentId": 2025,
+        "Name": "Motor Drivers, Controllers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/437/444/620%3B38TSSOP-4.4%3BLD%2CLG%3B38_tmb.jpg",
+        "SeoDescription": "Products in the motor driver and controller PMIC (Power Management Integrated Circuit) family are used to control or manipulate the application of power from some source to electric motors or related electromechanical actuators. The precise functionality and feature sets implemented vary widely depending on the characteristics of the intended load and expected application, ranging from simple open-loop speed control for brushed motors to advanced, closed-loop, stepper-based motion control.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "2  (1 Year)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "DRV2605LDGSR-ND",
+    "-296-40032-1-ND",
+    "296-40032-2",
+    "2156-DRV2605LDGSRTR",
+    "296-40032-1",
+    "296-40032-6"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "IC MOTOR DRIVER 2V-5.5V 10VSSOP",
+    "DetailedDescription": "Motor Driver Power MOSFET I2C 10-VSSOP"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "DRV2605LDGSR",
+   "UnitPrice": 2.28,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/DRV2605LDGSR/5014144",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fdrv2605l",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4190/296%7E4073272%7EDGS%7E10.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-40032-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 1.1739,
+       "TotalPrice": 2934.75
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 1.14938,
+       "TotalPrice": 5746.9
+      },
+      {
+       "BreakQuantity": 7500,
+       "UnitPrice": 1.1371,
+       "TotalPrice": 8528.25
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 5000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 2500,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-40032-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.28,
+       "TotalPrice": 2.28
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.689,
+       "TotalPrice": 16.89
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.5408,
+       "TotalPrice": 38.52
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.3777,
+       "TotalPrice": 137.77
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.3,
+       "TotalPrice": 325.0
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.26072,
+       "TotalPrice": 630.36
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 6169,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-40032-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.28,
+       "TotalPrice": 2.28
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.689,
+       "TotalPrice": 16.89
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.5408,
+       "TotalPrice": 38.52
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.3777,
+       "TotalPrice": 137.77
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.3,
+       "TotalPrice": 325.0
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.26072,
+       "TotalPrice": 630.36
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 6169,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 6169,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 1663,
+     "ParameterText": "Motor Type - Stepper",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1664,
+     "ParameterText": "Motor Type - AC, DC",
+     "ParameterType": "String",
+     "ValueId": "344842",
+     "ValueText": "ERM, LRA"
+    },
+    {
+     "ParameterId": 110,
+     "ParameterText": "Function",
+     "ParameterType": "String",
+     "ValueId": "340643",
+     "ValueText": "Driver - Fully Integrated, Control and Power Stage"
+    },
+    {
+     "ParameterId": 255,
+     "ParameterText": "Output Configuration",
+     "ParameterType": "String",
+     "ValueId": "352470",
+     "ValueText": "Half Bridge (2)"
+    },
+    {
+     "ParameterId": 154,
+     "ParameterText": "Interface",
+     "ParameterType": "String",
+     "ValueId": "356918",
+     "ValueText": "I2C"
+    },
+    {
+     "ParameterId": 570,
+     "ParameterText": "Technology",
+     "ParameterType": "String",
+     "ValueId": "389350",
+     "ValueText": "Power MOSFET"
+    },
+    {
+     "ParameterId": 1855,
+     "ParameterText": "Step Resolution",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "352929",
+     "ValueText": "Haptic Feedback"
+    },
+    {
+     "ParameterId": 129,
+     "ParameterText": "Current - Output",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "169006",
+     "ValueText": "2V ~ 5.5V"
+    },
+    {
+     "ParameterId": 772,
+     "ParameterText": "Voltage - Load",
+     "ParameterType": "String",
+     "ValueId": "169006",
+     "ValueText": "2V ~ 5.5V"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212510",
+     "ValueText": "-40°C ~ 150°C (TJ)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "74447",
+     "ValueText": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "74705",
+     "ValueText": "10-VSSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 99697,
+    "Name": "DRV2605"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2025,
+      "ParentId": 32,
+      "Name": "Power Management (PMIC)",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/314/540/846%3B-TO220CP-3%3B-%3B-3_tmb.jpg",
+      "SeoDescription": "PMIC, or Power Management Integrated Circuits, refers to a wide range of application-specific ICs or chips. Included in this category is PMICs for AC/DC Converters, Battery Chargers, Battery Management, Current Regulation, Display Drivers, Energy Metering, Full/Half-Bridge Drivers, Gate Drivers, Hot Swap Controllers, Laser Drivers, LED Drivers, Lighting/Ballast Controllers, Motor Drivers, OR Controllers, Power Factor Correction, Power Distribution Switches, PoE Controllers, Power Supply Controllers, RMS to DC Converters, Supervisors, Thermal Management, V/F and F/V Controllers, various Voltage Regulators, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 744,
+        "ParentId": 2025,
+        "Name": "Motor Drivers, Controllers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/437/444/620%3B38TSSOP-4.4%3BLD%2CLG%3B38_tmb.jpg",
+        "SeoDescription": "Products in the motor driver and controller PMIC (Power Management Integrated Circuit) family are used to control or manipulate the application of power from some source to electric motors or related electromechanical actuators. The precise functionality and feature sets implemented vary widely depending on the characteristics of the intended load and expected application, ranging from simple open-loop speed control for brushed motors to advanced, closed-loop, stepper-based motion control.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "2  (1 Year)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "DRV2605LDGSR-ND",
+    "-296-40032-1-ND",
+    "296-40032-2",
+    "2156-DRV2605LDGSRTR",
+    "296-40032-1",
+    "296-40032-6"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 296,
+    "Value": "Texas Instruments",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

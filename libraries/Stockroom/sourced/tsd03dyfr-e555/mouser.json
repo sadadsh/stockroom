@@ -1,0 +1,141 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "2529 In Stock",
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes 3.3V unidirectional surge protection dev",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/texasinstruments/images/TSD03DYFR_SPL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "112 Days",
+    "LifecycleStatus": "New Product",
+    "Manufacturer": "Texas Instruments",
+    "ManufacturerPartNumber": "TSD03DYFR",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "595-TSD03DYFR",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.64",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.393",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.251",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.20",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.17",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.153",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.139",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 9000,
+      "Price": "$0.116",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 24000,
+      "Price": "$0.11",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TSD03DYFR?qs=vOcB1WHNNXImKLB%2F56ZQNQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": "2529",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 15000,
+      "Date": "2026-08-03T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 38% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "China"
+     }
+    ]
+   }
+  ]
+ }
+}

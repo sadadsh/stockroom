@@ -1,0 +1,178 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 2,
+  "Parts": [
+   {
+    "Availability": "3457 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Headers & Wire Housings Classic PCB Header Strips",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/samtec/images/tsw-101-05-f-d_SPL.jpg",
+    "Category": "Headers & Wire Housings",
+    "LeadTime": "16 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Samtec",
+    "ManufacturerPartNumber": "TSW-120-07-G-D",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "200-TSW12007GD",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Bulk"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "1"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$4.06",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$4.04",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 50,
+      "Price": "$3.72",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$3.31",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$2.78",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$2.67",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$2.48",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Samtec/TSW-120-07-G-D?qs=FESYatJ8odIfQQTTXhz2jg%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.0007128
+    },
+    "AvailabilityInStock": "3457",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536694040"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536901100"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536690020"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853669000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536691000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536693000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8536699999"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85366990"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Vietnam"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/85/1/tsw_xxx_xx_xxx_x_xx_xxx_mkt.pdf",
+    "Description": "Headers & Wire Housings",
+    "FactoryStock": null,
+    "ImagePath": null,
+    "Category": "Headers & Wire Housings",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Samtec",
+    "ManufacturerPartNumber": "TSW12007GD",
+    "Min": "0",
+    "Mult": "0",
+    "MouserPartNumber": "N/A",
+    "ProductAttributes": [],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Samtec/TSW12007GD?qs=7%2F6SraaimPSSeY4v%2FhSvcg%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536694040"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": []
+   }
+  ]
+ }
+}

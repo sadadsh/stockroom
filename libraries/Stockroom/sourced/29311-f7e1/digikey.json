@@ -1,0 +1,2824 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "PTC RESET FUSE 600V 175MA RADIAL",
+    "DetailedDescription": "Ceramic PTC Resettable Fuse 600V 175 mA Ih Through Hole Radial, Disc"
+   },
+   "Manufacturer": {
+    "Id": 56,
+    "Name": "Vishay Beyschlag/Draloric/BC Components"
+   },
+   "ManufacturerProductNumber": "PTCTL7MR100SBE",
+   "UnitPrice": 1.51,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/vishay-beyschlag-draloric-bc-components/PTCTL7MR100SBE/773903",
+   "DatasheetUrl": "https://www.vishay.com/docs/29070/ptctl.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/368/Y1-VY1.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "BC3379-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 1.51,
+       "TotalPrice": 1.51
+      },
+      {
+       "BreakQuantity": 5,
+       "UnitPrice": 1.332,
+       "TotalPrice": 6.66
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.267,
+       "TotalPrice": 12.67
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.1896,
+       "TotalPrice": 29.74
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 1.1372,
+       "TotalPrice": 56.86
+      },
+      {
+       "BreakQuantity": 200,
+       "UnitPrice": 1.04525,
+       "TotalPrice": 209.05
+      },
+      {
+       "BreakQuantity": 600,
+       "UnitPrice": 0.98295,
+       "TotalPrice": 589.77
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.95679,
+       "TotalPrice": 956.79
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.8845,
+       "TotalPrice": 4422.5
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 56,
+      "Name": "Vishay Beyschlag/Draloric/BC Components"
+     },
+     "QuantityAvailableforPackageType": 5978,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 5978,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/6158580534001",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "328773",
+     "ValueText": "Ceramic"
+    },
+    {
+     "ParameterId": 686,
+     "ParameterText": "Voltage - Max",
+     "ParameterType": "String",
+     "ValueId": "256165",
+     "ValueText": "600V"
+    },
+    {
+     "ParameterId": 682,
+     "ParameterText": "Current - Hold (Ih) (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "175 mA",
+     "ValueText": "175 mA"
+    },
+    {
+     "ParameterId": 683,
+     "ParameterText": "Current - Trip (It)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "400 mA",
+     "ValueText": "400 mA"
+    },
+    {
+     "ParameterId": 2072,
+     "ParameterText": "Current - Max",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 A",
+     "ValueText": "1 A"
+    },
+    {
+     "ParameterId": 2073,
+     "ParameterText": "Time to Trip",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "7 s",
+     "ValueText": "7 s"
+    },
+    {
+     "ParameterId": 2076,
+     "ParameterText": "Resistance - 25°C (Typ)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 Ohms",
+     "ValueText": "10 Ohms"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "38976",
+     "ValueText": "0°C ~ 70°C"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "411897",
+     "ValueText": "Through Hole"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "392342",
+     "ValueText": "Radial, Disc"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "26023",
+     "ValueText": "0.512\" Dia x 0.217\" T (13.00mm x 5.50mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "31769",
+     "ValueText": "0.709\" (18.00mm)"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "13741",
+     "ValueText": "0.197\" (5.00mm)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 9,
+    "ParentId": 0,
+    "Name": "Circuit Protection",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/180/750/FHAC0001ZXJ_tmb.jpg",
+    "SeoDescription": "Circuit protection devices include products used to protect electrical circuits from damage caused by hazards such as static discharge (such as Transient Voltage Suppression diodes and gas discharge tubes) as well as products designed to reduce the risk of fire caused by electrical overload or circuit failure, such as fuses and circuit breakers. Related accessories designed for use with such products are also included, such as fuse holders, fuse pullers, and mounting bases for circuit breakers.",
+    "ChildCategories": [
+     {
+      "CategoryId": 150,
+      "ParentId": 9,
+      "Name": "PTC Resettable Fuses",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/014/532/MFG_MF-GSMF_tmb.jpg",
+      "SeoDescription": "PTC Resettable Fuses are designed to stop current flow when it exceeds a certain limit (overcurrent protection). The Fuses work by increasing its resistance as its temperature rises due to the current increase. The trip current ranges from 14 mA to 50 A with the Time to trip ranging from 8 ms to 90 s. PTC = Positive Temperature Coefficient.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "15",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Affected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "Not Applicable",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8533.40.8070"
+   },
+   "OtherNames": [
+    "BC3379",
+    "2381 662 93114-ND",
+    "238166293114",
+    "2381 662 93114"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "IC TRANSCEIVER HALF 1/1 8HVSON",
+    "DetailedDescription": "1/1 Transceiver Half CANbus 8-HVSON (3x3)"
+   },
+   "Manufacturer": {
+    "Id": 568,
+    "Name": "NXP USA Inc."
+   },
+   "ManufacturerProductNumber": "TJA1042TK/3,118",
+   "UnitPrice": 2.27,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/nxp-usa-inc/TJA1042TK-3-118/2606137",
+   "DatasheetUrl": "https://www.nxp.com/docs/en/data-sheet/TJA1042.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5363/568%7ESOT782-1%7E%7E8.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "568-8679-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 1.16048,
+       "TotalPrice": 6962.88
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 568,
+      "Name": "NXP USA Inc."
+     },
+     "QuantityAvailableforPackageType": 24000,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 6000,
+     "StandardPackage": 6000,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "568-8679-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.27,
+       "TotalPrice": 2.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.681,
+       "TotalPrice": 16.81
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.5336,
+       "TotalPrice": 38.34
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.3715,
+       "TotalPrice": 137.15
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.29408,
+       "TotalPrice": 323.52
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.25476,
+       "TotalPrice": 627.38
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 568,
+      "Name": "NXP USA Inc."
+     },
+     "QuantityAvailableforPackageType": 34899,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "568-8679-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.27,
+       "TotalPrice": 2.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.681,
+       "TotalPrice": 16.81
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.5336,
+       "TotalPrice": 38.34
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.3715,
+       "TotalPrice": 137.15
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.29408,
+       "TotalPrice": 323.52
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.25476,
+       "TotalPrice": 627.38
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 568,
+      "Name": "NXP USA Inc."
+     },
+     "QuantityAvailableforPackageType": 34899,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 34899,
+   "ProductStatus": {
+    "Id": 4,
+    "Status": "Last Time Buy"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": true,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "415534",
+     "ValueText": "Transceiver"
+    },
+    {
+     "ParameterId": 578,
+     "ParameterText": "Protocol",
+     "ParameterType": "String",
+     "ValueId": "325925",
+     "ValueText": "CANbus"
+    },
+    {
+     "ParameterId": 404,
+     "ParameterText": "Number of Drivers/Receivers",
+     "ParameterType": "String",
+     "ValueId": "63111",
+     "ValueText": "1/1"
+    },
+    {
+     "ParameterId": 1684,
+     "ParameterText": "Duplex",
+     "ParameterType": "String",
+     "ValueId": "352455",
+     "ValueText": "Half"
+    },
+    {
+     "ParameterId": 1683,
+     "ParameterText": "Receiver Hysteresis",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "120 mV",
+     "ValueText": "120 mV"
+    },
+    {
+     "ParameterId": 448,
+     "ParameterText": "Data Rate",
+     "ParameterType": "String",
+     "ValueId": "248675",
+     "ValueText": "5Mbps"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "208699",
+     "ValueText": "4.5V ~ 5.5V"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212507",
+     "ValueText": "-40°C ~ 150°C"
+    },
+    {
+     "ParameterId": 1977,
+     "ParameterText": "Grade",
+     "ParameterType": "String",
+     "ValueId": "316912",
+     "ValueText": "Automotive"
+    },
+    {
+     "ParameterId": 2700,
+     "ParameterText": "Qualification",
+     "ParameterType": "String",
+     "ValueId": "312102",
+     "ValueText": "AEC-Q100"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "295298",
+     "ValueText": "8-VDFN Exposed Pad"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "294186",
+     "ValueText": "8-HVSON (3x3)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 72679,
+    "Name": "TJA1042"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2016,
+      "ParentId": 32,
+      "Name": "Interface",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/236/976/175-16-QSOP_tmb%2864x64%29.jpg",
+      "SeoDescription": "Interface components are used to connect various signals or data transmission. Included in this category are analog switches, multiplexers, demultiplexers, CODECs, controllers for communication protocols, direct digital synthesis (DDS), drivers, receivers, transceivers, encoders, decoders, filters, I/O expanders, modems, modules, sensor and detectors, capacitive touch, serializers, deserializers, signal buffers, repeaters, splitters, signal terminators, telecom, universal asynchronous receiver/transmitter (UARTs), voice record and playback, and various boards and specialized products.",
+      "ChildCategories": [
+       {
+        "CategoryId": 710,
+        "ParentId": 2016,
+        "Name": "Drivers, Receivers, Transceivers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/109/446/BCM5464SA1xRBG_tmb%2864x64%29.jpg",
+        "SeoDescription": "Products in this family function chiefly to provide the hardware resources necessary for communication over extended cable or trace lengths. Exact functionality varies with the communications protocol employed, and may include things such as transient suppression which may not be strictly necessary for communications purposes but are highly advisable in likely use contexts.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": "2026-12-26T06:00:00+00:00",
+   "ManufacturerLeadWeeks": "10",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0090"
+   },
+   "OtherNames": [
+    "TJA1042TK3118",
+    "935285293118",
+    "TJA1042TK/3,118-ND",
+    "568-8679-1",
+    "568-8679-2",
+    "568-8679-6"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "CONN TAB 14-16AWG CRIMP GOLD",
+    "DetailedDescription": "Tab Contact Gold or PdNi +Gold 14-16 AWG Crimp"
+   },
+   "Manufacturer": {
+    "Id": 17,
+    "Name": "TE Connectivity AMP Connectors"
+   },
+   "ManufacturerProductNumber": "917802-2",
+   "UnitPrice": 3.48,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/te-connectivity-amp-connectors/917802-2/659500",
+   "DatasheetUrl": "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=1242132_d4000_d5000_plus&DocType=CS&DocLang=English",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/410/917802-2.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "A29311TR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1500,
+       "UnitPrice": 2.07345,
+       "TotalPrice": 3110.175
+      },
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 1.97459,
+       "TotalPrice": 5923.77
+      },
+      {
+       "BreakQuantity": 4500,
+       "UnitPrice": 1.91896,
+       "TotalPrice": 8635.32
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 17,
+      "Name": "TE Connectivity AMP Connectors"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1500,
+     "StandardPackage": 1500,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "A29311CT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 3.48,
+       "TotalPrice": 3.48
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 2.953,
+       "TotalPrice": 29.53
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 2.768,
+       "TotalPrice": 69.2
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 2.6358,
+       "TotalPrice": 131.79
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 2.5099,
+       "TotalPrice": 250.99
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 2.35276,
+       "TotalPrice": 588.19
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 2.24046,
+       "TotalPrice": 1120.23
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 17,
+      "Name": "TE Connectivity AMP Connectors"
+     },
+     "QuantityAvailableforPackageType": 1039,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 1039,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 233,
+     "ParameterText": "Pin or Socket",
+     "ParameterType": "String",
+     "ValueId": "410210",
+     "ValueText": "Tab"
+    },
+    {
+     "ParameterId": 31,
+     "ParameterText": "Contact Termination",
+     "ParameterType": "String",
+     "ValueId": "334919",
+     "ValueText": "Crimp"
+    },
+    {
+     "ParameterId": 78,
+     "ParameterText": "Wire Gauge",
+     "ParameterType": "String",
+     "ValueId": "94903",
+     "ValueText": "14-16 AWG"
+    },
+    {
+     "ParameterId": 30,
+     "ParameterText": "Contact Finish",
+     "ParameterType": "String",
+     "ValueId": "825278",
+     "ValueText": "Gold or PdNi +Gold"
+    },
+    {
+     "ParameterId": 834,
+     "ParameterText": "Contact Finish Thickness",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 191743,
+    "Name": "917802"
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2027,
+      "ParentId": 20,
+      "Name": "Rectangular Connectors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/244/550/C-Grid-III-90131%282-POS%29tin_tmb%2864x64%29.jpg",
+      "SeoDescription": "Rectangular Connectors include a wide variety of connector solutions for power, data, and signal applications. As the name implies, they are rectangular in shape and can provide ease to the design process. Many of the most commonly found connectors and connector accessories fall into this category.",
+      "ChildCategories": [
+       {
+        "CategoryId": 331,
+        "ParentId": 2027,
+        "Name": "Rectangular Connector Contacts",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/684/sxh-001t-p0.6_tmb%2864x64%29.jpg",
+        "SeoDescription": "Rectangular Connector Contacts are male, female, or non-gendered terminals that are used in connectors. These terminals are specifically used in connectors that will have a rectangular look to the mating end of the device. The pin or socket will be a blade, board-in, female blade sockets, non-gendered, pin, socket, split pin, or tab in wire gauges ranging from 1/0 AWG to 36 AWG.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "13",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 5674,
+    "Name": "Dynamic D-5"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH not applicable",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.90.4000"
+   },
+   "OtherNames": [
+    "2266-917802-2TR",
+    "A29311CT",
+    "-917802-2-CSI",
+    "A29311TR",
+    "9178022",
+    "A29307TR",
+    "A29307TR-ND",
+    "3937-917802-2TR",
+    "-917802-2-SI"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "CONN TIP JACK THRD BLACK",
+    "DetailedDescription": "Tip Jack Connector Standard Tip Threaded and Turret Black"
+   },
+   "Manufacturer": {
+    "Id": 501,
+    "Name": "Pomona Electronics"
+   },
+   "ManufacturerProductNumber": "3542-0",
+   "UnitPrice": 5.36,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/pomona-electronics/3542-0/603398",
+   "DatasheetUrl": "https://www.pomonaelectronics.com/file/17289/download?token=SuXeB-ps",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/1097/3542-0.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "501-1091-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 5.36,
+       "TotalPrice": 5.36
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 501,
+      "Name": "Pomona Electronics"
+     },
+     "QuantityAvailableforPackageType": 2152,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 2152,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/6187498655001",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "412291",
+     "ValueText": "Tip Jack"
+    },
+    {
+     "ParameterId": 29,
+     "ParameterText": "Gender",
+     "ParameterType": "String",
+     "ValueId": "346497",
+     "ValueText": "Female"
+    },
+    {
+     "ParameterId": 574,
+     "ParameterText": "Plug/Mating Plug Diameter",
+     "ParameterType": "String",
+     "ValueId": "407985",
+     "ValueText": "Standard Tip"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "383652",
+     "ValueText": "Panel Mount"
+    },
+    {
+     "ParameterId": 589,
+     "ParameterText": "Termination",
+     "ParameterType": "String",
+     "ValueId": "411813",
+     "ValueText": "Threaded and Turret"
+    },
+    {
+     "ParameterId": 92,
+     "ParameterText": "Insulation",
+     "ParameterType": "String",
+     "ValueId": "371704",
+     "ValueText": "Mating End Insulated"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 37,
+     "ParameterText": "Color",
+     "ParameterType": "String",
+     "ValueId": "319929",
+     "ValueText": "Black"
+    },
+    {
+     "ParameterId": 78,
+     "ParameterText": "Wire Gauge",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 427815,
+    "Name": "3542"
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2001,
+      "ParentId": 20,
+      "Name": "Banana and Tip Connectors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/163/544/MFG_BU-00243-2_tmb%2864x64%29.jpg",
+      "SeoDescription": "Banana and tip connectors are interconnect devices typically encountered in the context of general-purpose test equipment such as multimeters and variable output power supplies of modest capacity, where flexibility and price are dominant considerations. Included in this category are accessories, adapters, binding posts, jacks, plugs, and more.",
+      "ChildCategories": [
+       {
+        "CategoryId": 302,
+        "ParentId": 2001,
+        "Name": "Jacks, Plugs",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/308/097/3542-0_tmb%2864x64%29.jpg",
+        "SeoDescription": "Banana and tip connectors are interconnect devices typically encountered in context of general purpose test equipment such as multimeters and variable output power supplies of modest capacity, where flexibility and price are dominant considerations. The more common banana type is characterized by leaf spring elements that run axially along the plug, providing retention when inserted into a simple tubular jack opening. The somewhat smaller tip connectors reverse this concept using a simple cylindrical plug, with no retention agent incorporated into the jack component.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "2",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "Not Applicable",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.69.4030"
+   },
+   "OtherNames": [
+    "501-1091-NDR",
+    "5935005632293",
+    "1929311",
+    "501-1091"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "CONN DBL BAN PLUG STACK SLDRLESS",
+    "DetailedDescription": "Banana Plug, Double, Stackable Connector Standard Banana Solderless Black"
+   },
+   "Manufacturer": {
+    "Id": 501,
+    "Name": "Pomona Electronics"
+   },
+   "ManufacturerProductNumber": "4898-0",
+   "UnitPrice": 6.79,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/pomona-electronics/4898-0/737025",
+   "DatasheetUrl": "https://www.pomonaelectronics.com/file/17584/download?token=WX_d7R7C",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2363/4898-0.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "501-2460-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 6.79,
+       "TotalPrice": 6.79
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 501,
+      "Name": "Pomona Electronics"
+     },
+     "QuantityAvailableforPackageType": 1970,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 1970,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/6187498655001",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "317908",
+     "ValueText": "Banana Plug, Double, Stackable"
+    },
+    {
+     "ParameterId": 29,
+     "ParameterText": "Gender",
+     "ParameterType": "String",
+     "ValueId": "371147",
+     "ValueText": "Male"
+    },
+    {
+     "ParameterId": 574,
+     "ParameterText": "Plug/Mating Plug Diameter",
+     "ParameterType": "String",
+     "ValueId": "407953",
+     "ValueText": "Standard Banana"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "349292",
+     "ValueText": "Free Hanging (In-Line)"
+    },
+    {
+     "ParameterId": 589,
+     "ParameterText": "Termination",
+     "ParameterType": "String",
+     "ValueId": "405137",
+     "ValueText": "Solderless"
+    },
+    {
+     "ParameterId": 92,
+     "ParameterText": "Insulation",
+     "ParameterType": "String",
+     "ValueId": "380392",
+     "ValueText": "Non-Mating End Insulated"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "401641",
+     "ValueText": "Set Screw, Cross Hole"
+    },
+    {
+     "ParameterId": 37,
+     "ParameterText": "Color",
+     "ParameterType": "String",
+     "ValueId": "319929",
+     "ValueText": "Black"
+    },
+    {
+     "ParameterId": 78,
+     "ParameterText": "Wire Gauge",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 498202,
+    "Name": "4898"
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2001,
+      "ParentId": 20,
+      "Name": "Banana and Tip Connectors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/163/544/MFG_BU-00243-2_tmb%2864x64%29.jpg",
+      "SeoDescription": "Banana and tip connectors are interconnect devices typically encountered in the context of general-purpose test equipment such as multimeters and variable output power supplies of modest capacity, where flexibility and price are dominant considerations. Included in this category are accessories, adapters, binding posts, jacks, plugs, and more.",
+      "ChildCategories": [
+       {
+        "CategoryId": 302,
+        "ParentId": 2001,
+        "Name": "Jacks, Plugs",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/308/097/3542-0_tmb%2864x64%29.jpg",
+        "SeoDescription": "Banana and tip connectors are interconnect devices typically encountered in context of general purpose test equipment such as multimeters and variable output power supplies of modest capacity, where flexibility and price are dominant considerations. The more common banana type is characterized by leaf spring elements that run axially along the plug, providing retention when inserted into a simple tubular jack opening. The somewhat smaller tip connectors reverse this concept using a simple cylindrical plug, with no retention agent incorporated into the jack component.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "2",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "Not Applicable",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.69.8000"
+   },
+   "OtherNames": [
+    "4898-0-NDR",
+    "4898-0-ND",
+    "6625012931192",
+    "501-2460",
+    "1914887"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "CAP CER 1UF 16V X7R 0805",
+    "DetailedDescription": "1 µF ±10% 16V Ceramic Capacitor X7R 0805 (2012 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 1276,
+    "Name": "Samsung Electro-Mechanics"
+   },
+   "ManufacturerProductNumber": "CL21B105KOFNNWE",
+   "UnitPrice": 0.1,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/samsung-electro-mechanics/CL21B105KOFNNWE/3888589",
+   "DatasheetUrl": "https://www.samsungsem.com/resources/file/global/support/product_catalog/MLCC_2512.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2537/Ceramic-Capacitor-CL-Series.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "1276-2931-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 2000,
+       "UnitPrice": 0.01742,
+       "TotalPrice": 34.84
+      },
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.01572,
+       "TotalPrice": 62.88
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.01487,
+       "TotalPrice": 89.22
+      },
+      {
+       "BreakQuantity": 10000,
+       "UnitPrice": 0.01393,
+       "TotalPrice": 139.3
+      },
+      {
+       "BreakQuantity": 14000,
+       "UnitPrice": 0.01338,
+       "TotalPrice": 187.32
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.01286,
+       "TotalPrice": 257.2
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 1276,
+      "Name": "Samsung Electro-Mechanics"
+     },
+     "QuantityAvailableforPackageType": 158000,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 2000,
+     "StandardPackage": 2000,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "1276-2931-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.1,
+       "TotalPrice": 0.1
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.051,
+       "TotalPrice": 0.51
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.0352,
+       "TotalPrice": 1.76
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0302,
+       "TotalPrice": 3.02
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.022,
+       "TotalPrice": 11.0
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.01949,
+       "TotalPrice": 19.49
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 1276,
+      "Name": "Samsung Electro-Mechanics"
+     },
+     "QuantityAvailableforPackageType": 159290,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "1276-2931-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.1,
+       "TotalPrice": 0.1
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.051,
+       "TotalPrice": 0.51
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.0352,
+       "TotalPrice": 1.76
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0302,
+       "TotalPrice": 3.02
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.022,
+       "TotalPrice": 11.0
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.01949,
+       "TotalPrice": 19.49
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 1276,
+      "Name": "Samsung Electro-Mechanics"
+     },
+     "QuantityAvailableforPackageType": 159290,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 159290,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2049,
+     "ParameterText": "Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 µF",
+     "ValueText": "1 µF"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1340",
+     "ValueText": "±10%"
+    },
+    {
+     "ParameterId": 14,
+     "ParameterText": "Voltage - Rated",
+     "ParameterType": "String",
+     "ValueId": "108742",
+     "ValueText": "16V"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "422415",
+     "ValueText": "X7R"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242918",
+     "ValueText": "-55°C ~ 125°C"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "350483",
+     "ValueText": "General Purpose"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409416",
+     "ValueText": "Surface Mount, MLCC"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39329",
+     "ValueText": "0805 (2012 Metric)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "8569",
+     "ValueText": "0.079\" L x 0.049\" W (2.00mm x 1.25mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "7180",
+     "ValueText": "0.053\" (1.35mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 4,
+     "ParameterText": "Lead Style",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 3,
+    "ParentId": 0,
+    "Name": "Capacitors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/640/398/BCAP0350%20E270%20T11_tmb%2864x64%29.jpg",
+    "SeoDescription": "Capacitor products, also known as \"condensers\", are generally named and organized in reference to the dielectric material incorporated within. Along with variations in construction methods, the choice of dielectric material has strong influence on a given device's relative cost, size, parametric stability, and suitability for a particular application.",
+    "ChildCategories": [
+     {
+      "CategoryId": 60,
+      "ParentId": 3,
+      "Name": "Ceramic Capacitors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/365/960/CGA-Series-0402-%281005-Metric%29_tmb.jpg",
+      "SeoDescription": "A capacitor is a passive electronic device that stores electric charge. Ceramic capacitors consist of two or more alternating layers of ceramic material as the dielectric and metal layers acting as the non-polarized electrodes. Applications include automotive, bypass, decoupling, filtering, RF, and ESD protection. Through-hole versions are often disc or \"blob\" shaped with two wire leads.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "39",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 11392,
+    "Name": "CL"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8532.24.0020"
+   },
+   "OtherNames": [
+    "1276-2931-2",
+    "1276-2931-1",
+    "1276-2931-6"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "MACH SCREW PAN HEAD SLOTTED M3",
+    "DetailedDescription": "M3 Pan Head Machine Screw Slotted Drive Steel"
+   },
+   "Manufacturer": {
+    "Id": 36,
+    "Name": "Keystone Electronics"
+   },
+   "ManufacturerProductNumber": "29311",
+   "UnitPrice": 0.38,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/keystone-electronics/29311/1532208",
+   "DatasheetUrl": "https://www.keyelco.com/userAssets/file/K75p87.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/716/29311.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "36-29311-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.38,
+       "TotalPrice": 0.38
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.283,
+       "TotalPrice": 2.83
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2532,
+       "TotalPrice": 6.33
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.2144,
+       "TotalPrice": 21.44
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.21,
+       "TotalPrice": 105.0
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.19,
+       "TotalPrice": 475.0
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.14,
+       "TotalPrice": 700.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 36,
+      "Name": "Keystone Electronics"
+     },
+     "QuantityAvailableforPackageType": 17661,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 17661,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "370856",
+     "ValueText": "Machine Screw"
+    },
+    {
+     "ParameterId": 749,
+     "ParameterText": "Screw Head Type",
+     "ParameterType": "String",
+     "ValueId": "383419",
+     "ValueText": "Pan Head"
+    },
+    {
+     "ParameterId": 1608,
+     "ParameterText": "Drive Type",
+     "ParameterType": "String",
+     "ValueId": "403724",
+     "ValueText": "Slotted"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 121,
+     "ParameterText": "Thread Size",
+     "ParameterType": "String",
+     "ValueId": "370390",
+     "ValueText": "M3"
+    },
+    {
+     "ParameterId": 754,
+     "ParameterText": "Head Diameter",
+     "ParameterType": "String",
+     "ValueId": "14595",
+     "ValueText": "0.213\" (5.40mm)"
+    },
+    {
+     "ParameterId": 747,
+     "ParameterText": "Head Height",
+     "ParameterType": "String",
+     "ValueId": "7977",
+     "ValueText": "0.067\" (1.70mm)"
+    },
+    {
+     "ParameterId": 748,
+     "ParameterText": "Length - Below Head",
+     "ParameterType": "String",
+     "ValueId": "15346",
+     "ValueText": "0.236\" (6.00mm)"
+    },
+    {
+     "ParameterId": 577,
+     "ParameterText": "Length - Overall",
+     "ParameterType": "String",
+     "ValueId": "18236",
+     "ValueText": "0.303\" (7.70mm)"
+    },
+    {
+     "ParameterId": 70,
+     "ParameterText": "Material",
+     "ParameterType": "String",
+     "ValueId": "408172",
+     "ValueText": "Steel"
+    },
+    {
+     "ParameterId": 698,
+     "ParameterText": "Plating",
+     "ParameterType": "String",
+     "ValueId": "423667",
+     "ValueText": "Zinc, Clear Chromate"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 26,
+    "ParentId": 0,
+    "Name": "Hardware, Fasteners, Accessories",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/016/062/MFG_MR13-SS-ES_tmb.jpg",
+    "SeoDescription": "Hardware, fastener, and accessory products include items used for the mechanical assembly of electronic products, systems, and their enclosures. Examples include circuit board standoffs and spacers, rubber mounting feet, DIN rail channel, knobs, hinges, rivets, inch and metric-thread bolts, screws, & nuts, washers, shock and vibration dampening materials, hole plugs, rivets, and more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 572,
+      "ParentId": 26,
+      "Name": "Screws, Bolts",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/140/411/MFG_94xx_tmb.jpg",
+      "SeoDescription": "A screw is a conical fastener consisting of a protruding helix around a central shaft that acts as a wedge as it pushes into the fastened material. They are identified by head types such as cheese, flat, hex, knob, truss and pan. Bolts are cylindrical, threaded fasteners for the assembly of non-threaded components with the aid of a nut. They are identified by head types such as binding, cheese, flat, hex, oval, pan, round, spade and truss.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "11",
+   "ManufacturerPublicQuantity": 58400,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "7318.15.6070"
+   },
+   "OtherNames": [
+    "29311K",
+    "36-29311",
+    "29311K-ND"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "CONN TAB 14-16AWG CRIMP GOLD",
+    "DetailedDescription": "Tab Contact Gold 14-16 AWG Crimp"
+   },
+   "Manufacturer": {
+    "Id": 17,
+    "Name": "TE Connectivity AMP Connectors"
+   },
+   "ManufacturerProductNumber": "917804-2",
+   "UnitPrice": 2.96,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/te-connectivity-amp-connectors/917804-2/659504",
+   "DatasheetUrl": "",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/951/917804-2.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "A29311-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.96,
+       "TotalPrice": 2.96
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 2.511,
+       "TotalPrice": 25.11
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 2.354,
+       "TotalPrice": 58.85
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 2.2414,
+       "TotalPrice": 112.07
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 2.1342,
+       "TotalPrice": 213.42
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 2.00056,
+       "TotalPrice": 500.14
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.90506,
+       "TotalPrice": 952.53
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 1.81416,
+       "TotalPrice": 1814.16
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 1.70067,
+       "TotalPrice": 4251.675
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 17,
+      "Name": "TE Connectivity AMP Connectors"
+     },
+     "QuantityAvailableforPackageType": 556,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 556,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 233,
+     "ParameterText": "Pin or Socket",
+     "ParameterType": "String",
+     "ValueId": "410210",
+     "ValueText": "Tab"
+    },
+    {
+     "ParameterId": 31,
+     "ParameterText": "Contact Termination",
+     "ParameterType": "String",
+     "ValueId": "334919",
+     "ValueText": "Crimp"
+    },
+    {
+     "ParameterId": 78,
+     "ParameterText": "Wire Gauge",
+     "ParameterType": "String",
+     "ValueId": "94903",
+     "ValueText": "14-16 AWG"
+    },
+    {
+     "ParameterId": 30,
+     "ParameterText": "Contact Finish",
+     "ParameterType": "String",
+     "ValueId": "350796",
+     "ValueText": "Gold"
+    },
+    {
+     "ParameterId": 834,
+     "ParameterText": "Contact Finish Thickness",
+     "ParameterType": "String",
+     "ValueId": "97874",
+     "ValueText": "15.0µin (0.38µm)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 191745,
+    "Name": "917804"
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2027,
+      "ParentId": 20,
+      "Name": "Rectangular Connectors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/244/550/C-Grid-III-90131%282-POS%29tin_tmb%2864x64%29.jpg",
+      "SeoDescription": "Rectangular Connectors include a wide variety of connector solutions for power, data, and signal applications. As the name implies, they are rectangular in shape and can provide ease to the design process. Many of the most commonly found connectors and connector accessories fall into this category.",
+      "ChildCategories": [
+       {
+        "CategoryId": 331,
+        "ParentId": 2027,
+        "Name": "Rectangular Connector Contacts",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/684/sxh-001t-p0.6_tmb%2864x64%29.jpg",
+        "SeoDescription": "Rectangular Connector Contacts are male, female, or non-gendered terminals that are used in connectors. These terminals are specifically used in connectors that will have a rectangular look to the mating end of the device. The pin or socket will be a blade, board-in, female blade sockets, non-gendered, pin, socket, split pin, or tab in wire gauges ranging from 1/0 AWG to 36 AWG.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "20",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 5674,
+    "Name": "Dynamic D-5"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.90.4000"
+   },
+   "OtherNames": [
+    "-917804-2-CSI",
+    "9178042",
+    "3937-917804-2",
+    "-917804-2-SI",
+    "2266-917804-2",
+    "A29311"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "RES 100 OHM 0.1% 1/2W AXIAL",
+    "DetailedDescription": "100 Ohms ±0.1% 0.5W, 1/2W Through Hole Resistor Axial Metal Film"
+   },
+   "Manufacturer": {
+    "Id": 1712,
+    "Name": "TE Connectivity Passive Product"
+   },
+   "ManufacturerProductNumber": "UPF50B100RV",
+   "UnitPrice": 6.22,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/te-connectivity-passive-product/UPF50B100RV/5584395",
+   "DatasheetUrl": "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=1773299-1&DocType=Data%20Sheet&DocLang=English&PartCntxt=2176163-2&DocFormat=pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/773/UPF50-Metal-Film-Resistor.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "A129311-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 6.22,
+       "TotalPrice": 6.22
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 5.152,
+       "TotalPrice": 51.52
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 4.7932,
+       "TotalPrice": 119.83
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 4.5494,
+       "TotalPrice": 227.47
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 4.3292,
+       "TotalPrice": 432.92
+      },
+      {
+       "BreakQuantity": 300,
+       "UnitPrice": 4.0263,
+       "TotalPrice": 1207.89
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 3.9036,
+       "TotalPrice": 1951.8
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 3.75407,
+       "TotalPrice": 3754.07
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 1712,
+      "Name": "TE Connectivity Passive Product"
+     },
+     "QuantityAvailableforPackageType": 111,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 111,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2085,
+     "ParameterText": "Resistance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "100 Ohms",
+     "ValueText": "100 Ohms"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "731",
+     "ValueText": "±0.1%"
+    },
+    {
+     "ParameterId": 2,
+     "ParameterText": "Power (Watts)",
+     "ParameterType": "String",
+     "ValueId": "28682",
+     "ValueText": "0.5W, 1/2W"
+    },
+    {
+     "ParameterId": 174,
+     "ParameterText": "Composition",
+     "ParameterType": "String",
+     "ValueId": "374915",
+     "ValueText": "Metal Film"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "2648",
+     "ValueText": "±5ppm/°C"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242918",
+     "ValueText": "-55°C ~ 125°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "317190",
+     "ValueText": "Axial"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "317190",
+     "ValueText": "Axial"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "12223",
+     "ValueText": "0.157\" Dia x 0.402\" L (4.00mm x 10.20mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1127,
+     "ParameterText": "Number of Terminations",
+     "ParameterType": "Double",
+     "ValueId": "2",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 207917,
+    "Name": "UPF50"
+   },
+   "Category": {
+    "CategoryId": 2,
+    "ParentId": 0,
+    "Name": "Resistors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/639/316/FVT%20SERIES_tmb%2864x64%29.jpg",
+    "SeoDescription": "Products within this category include fixed-value (non-adjustable) resistors and related mounting accessories, organized according to their physical form factor or the method by which they are physically and electrically connected within an end application. Adjustable or variable-value resistors (also known as potentiometers or rheostats) are found separately, in a category of their own.",
+    "ChildCategories": [
+     {
+      "CategoryId": 53,
+      "ParentId": 2,
+      "Name": "Through Hole Resistors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/165/374/OX470KE_tmb%2864x64%29.jpg",
+      "SeoDescription": "Through-Hole Resistors are devices which oppose the flow of current. They have two wire terminals which are designed to be inserted and soldered to a printed circuit board (PCB) or are used in a breadboard. The characteristics are resistance (0 ohms to 500 G ohms), tolerance (jumper, ±0.001% to ±5%), power (watts), and composition (carbon composition, carbon film, ceramic, metal element, metal film, metal foil, metal oxide film, thick film, thin film, or wirewound).",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "18",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 52997,
+    "Name": "UPF, Holsworthy"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8533.21.0090"
+   },
+   "OtherNames": [
+    "A129311",
+    "2176163-2",
+    "UPF50B100RV-ND"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "RF MOSFET 50V M174",
+    "DetailedDescription": "RF Mosfet 50 V 250 mA 175MHz 15dB 150W M174"
+   },
+   "Manufacturer": {
+    "Id": 497,
+    "Name": "STMicroelectronics"
+   },
+   "ManufacturerProductNumber": "SD2931-10W",
+   "UnitPrice": 93.64,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/stmicroelectronics/SD2931-10W/3087730",
+   "DatasheetUrl": "https://www.st.com/content/ccc/resource/technical/document/datasheet/2b/59/07/8d/9c/41/45/d9/CD00002070.pdf/files/CD00002070.pdf/jcr:content/translations/en.CD00002070.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/509/M174.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "497-13080-ND",
+     "PackageType": {
+      "Id": 17,
+      "Name": "Tray"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 93.64,
+       "TotalPrice": 93.64
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 78.231,
+       "TotalPrice": 782.31
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 74.3828,
+       "TotalPrice": 1859.57
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 70.1543,
+       "TotalPrice": 7015.43
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 497,
+      "Name": "STMicroelectronics"
+     },
+     "QuantityAvailableforPackageType": 157,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 25,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 157,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 570,
+     "ParameterText": "Technology",
+     "ParameterType": "String",
+     "ValueId": "377049",
+     "ValueText": "MOSFET (Metal Oxide)"
+    },
+    {
+     "ParameterId": 207,
+     "ParameterText": "Configuration",
+     "ParameterType": "String",
+     "ValueId": "378999",
+     "ValueText": "N-Channel"
+    },
+    {
+     "ParameterId": 139,
+     "ParameterText": "Frequency",
+     "ParameterType": "String",
+     "ValueId": "111501",
+     "ValueText": "175MHz"
+    },
+    {
+     "ParameterId": 445,
+     "ParameterText": "Gain",
+     "ParameterType": "String",
+     "ValueId": "102953",
+     "ValueText": "15dB"
+    },
+    {
+     "ParameterId": 2140,
+     "ParameterText": "Voltage - Test",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "50 V",
+     "ValueText": "50 V"
+    },
+    {
+     "ParameterId": 66,
+     "ParameterText": "Current Rating (Amps)",
+     "ParameterType": "String",
+     "ValueId": "142049",
+     "ValueText": "20A"
+    },
+    {
+     "ParameterId": 1108,
+     "ParameterText": "Noise Figure",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 2159,
+     "ParameterText": "Current - Test",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "250 mA",
+     "ValueText": "250 mA"
+    },
+    {
+     "ParameterId": 306,
+     "ParameterText": "Power - Output",
+     "ParameterType": "String",
+     "ValueId": "100697",
+     "ValueText": "150W"
+    },
+    {
+     "ParameterId": 2079,
+     "ParameterText": "Voltage - Rated",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "125 V",
+     "ValueText": "125 V"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "370159",
+     "ValueText": "M174"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "370159",
+     "ValueText": "M174"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 42002,
+    "Name": "SD2931"
+   },
+   "Category": {
+    "CategoryId": 19,
+    "ParentId": 0,
+    "Name": "Discrete Semiconductor Products",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/350/MFG_CAB450M12XM3_tmb.jpg",
+    "SeoDescription": "Discrete semiconductor products include individual transistors, diodes, and thyristors, as well as small arrays of such composed of two, three, four, or some other small number of similar devices within a single package. They are most commonly used for constructing circuits with considerable voltage or current stress, or for realizing very basic circuit functions.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2045,
+      "ParentId": 19,
+      "Name": "Transistors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/955/997/448_TO252-3_tmb.jpg",
+      "SeoDescription": "Transistors are discrete semiconductor devices used to switch or amplify electrical signals. Types of transistors include bipolar (BJT), RF, pre-Biased bipolar (BJT), FETs, MOSEFETs, IGBTs, JFETs, programmable, and more.",
+      "ChildCategories": [
+       {
+        "CategoryId": 2088,
+        "ParentId": 2045,
+        "Name": "FETs, MOSFETs",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/871/273/MFG_TO-220SIS_tmb.jpg",
+        "SeoDescription": "Field-effect transistors (FET) are electronic devices which use an electric field to control the flow of current. Application of a voltage to the gate terminal alters the conductivity between the drain and source terminals. FETs are also known as unipolar transistors since they involve single-carrier-type operation. That is, FETs use electrons or holes as charge carriers in their operation, but not both. Field effect transistors generally display very high input impedance at low frequencies. Metal oxide semiconductor field effect transistors, or MOSFETs, are a type of FET.",
+        "ChildCategories": [
+         {
+          "CategoryId": 285,
+          "ParentId": 2088,
+          "Name": "RF FETs, MOSFETs",
+          "ProductCount": 0,
+          "NewProductCount": 0,
+          "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/014/193/MFG_MRF101AN-START_B_tmb.jpg",
+          "SeoDescription": "RF Transistors, FETs, and MOSFETs are a semiconductor device with three terminals where the current flowing through the device is controlled by an electric field. The devices in this family are designed be used in equipment involving radio frequencies. The transistor types for amplifying or switching the signal or power include E-pHEMT, LDMOS, MESFET, N-channel, P-channel, pHEMT, silicon carbide, 2 N-channel, and 4 N-channel.",
+          "ChildCategories": []
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "28",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "Not Applicable",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8541.29.0065"
+   },
+   "OtherNames": [
+    "SD293110W",
+    "SD2931-10W-ND",
+    "497-13080"
+   ]
+  }
+ ],
+ "ProductsCount": 157,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "MACH SCREW PAN HEAD SLOTTED M3",
+    "DetailedDescription": "M3 Pan Head Machine Screw Slotted Drive Steel"
+   },
+   "Manufacturer": {
+    "Id": 36,
+    "Name": "Keystone Electronics"
+   },
+   "ManufacturerProductNumber": "29311",
+   "UnitPrice": 0.38,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/keystone-electronics/29311/1532208",
+   "DatasheetUrl": "https://www.keyelco.com/userAssets/file/K75p87.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/716/29311.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "36-29311-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.38,
+       "TotalPrice": 0.38
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.283,
+       "TotalPrice": 2.83
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2532,
+       "TotalPrice": 6.33
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.2144,
+       "TotalPrice": 21.44
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.21,
+       "TotalPrice": 105.0
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.19,
+       "TotalPrice": 475.0
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.14,
+       "TotalPrice": 700.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 36,
+      "Name": "Keystone Electronics"
+     },
+     "QuantityAvailableforPackageType": 17661,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 17661,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "370856",
+     "ValueText": "Machine Screw"
+    },
+    {
+     "ParameterId": 749,
+     "ParameterText": "Screw Head Type",
+     "ParameterType": "String",
+     "ValueId": "383419",
+     "ValueText": "Pan Head"
+    },
+    {
+     "ParameterId": 1608,
+     "ParameterText": "Drive Type",
+     "ParameterType": "String",
+     "ValueId": "403724",
+     "ValueText": "Slotted"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 121,
+     "ParameterText": "Thread Size",
+     "ParameterType": "String",
+     "ValueId": "370390",
+     "ValueText": "M3"
+    },
+    {
+     "ParameterId": 754,
+     "ParameterText": "Head Diameter",
+     "ParameterType": "String",
+     "ValueId": "14595",
+     "ValueText": "0.213\" (5.40mm)"
+    },
+    {
+     "ParameterId": 747,
+     "ParameterText": "Head Height",
+     "ParameterType": "String",
+     "ValueId": "7977",
+     "ValueText": "0.067\" (1.70mm)"
+    },
+    {
+     "ParameterId": 748,
+     "ParameterText": "Length - Below Head",
+     "ParameterType": "String",
+     "ValueId": "15346",
+     "ValueText": "0.236\" (6.00mm)"
+    },
+    {
+     "ParameterId": 577,
+     "ParameterText": "Length - Overall",
+     "ParameterType": "String",
+     "ValueId": "18236",
+     "ValueText": "0.303\" (7.70mm)"
+    },
+    {
+     "ParameterId": 70,
+     "ParameterText": "Material",
+     "ParameterType": "String",
+     "ValueId": "408172",
+     "ValueText": "Steel"
+    },
+    {
+     "ParameterId": 698,
+     "ParameterText": "Plating",
+     "ParameterType": "String",
+     "ValueId": "423667",
+     "ValueText": "Zinc, Clear Chromate"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 26,
+    "ParentId": 0,
+    "Name": "Hardware, Fasteners, Accessories",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/016/062/MFG_MR13-SS-ES_tmb.jpg",
+    "SeoDescription": "Hardware, fastener, and accessory products include items used for the mechanical assembly of electronic products, systems, and their enclosures. Examples include circuit board standoffs and spacers, rubber mounting feet, DIN rail channel, knobs, hinges, rivets, inch and metric-thread bolts, screws, & nuts, washers, shock and vibration dampening materials, hole plugs, rivets, and more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 572,
+      "ParentId": 26,
+      "Name": "Screws, Bolts",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/140/411/MFG_94xx_tmb.jpg",
+      "SeoDescription": "A screw is a conical fastener consisting of a protruding helix around a central shaft that acts as a wedge as it pushes into the fastened material. They are identified by head types such as cheese, flat, hex, knob, truss and pan. Bolts are cylindrical, threaded fasteners for the assembly of non-threaded components with the aid of a nut. They are identified by head types such as binding, cheese, flat, hex, oval, pan, round, spade and truss.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "11",
+   "ManufacturerPublicQuantity": 58400,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "7318.15.6070"
+   },
+   "OtherNames": [
+    "29311K",
+    "36-29311",
+    "29311K-ND"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 19,
+    "Value": "3M",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1662,
+    "Value": "ABLIC Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 684,
+    "Value": "Advanced Thermal Solutions Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1920,
+    "Value": "Altech Corporation",
+    "ProductCount": 1
+   },
+   {
+    "Id": 339,
+    "Value": "Amphenol Industrial Operations",
+    "ProductCount": 1
+   },
+   {
+    "Id": 889,
+    "Value": "Amphenol Sine Systems Corp",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1603,
+    "Value": "Ampleon USA Inc.",
+    "ProductCount": 3
+   },
+   {
+    "Id": 475,
+    "Value": "ams-OSRAM USA INC.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 135,
+    "Value": "Belden Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2267,
+    "Value": "Brady Corporation",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1436,
+    "Value": "HellermannTyton",
+    "ProductCount": 1
+   },
+   {
+    "Id": 670,
+    "Value": "JAE Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2315,
+    "Value": "Kamaya Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 399,
+    "Value": "KEMET",
+    "ProductCount": 1
+   },
+   {
+    "Id": 36,
+    "Value": "Keystone Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 478,
+    "Value": "KYOCERA AVX",
+    "ProductCount": 2
+   },
+   {
+    "Id": 240,
+    "Value": "Laird-Signal Integrity Products",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2181,
+    "Value": "LAPP",
+    "ProductCount": 1
+   },
+   {
+    "Id": 150,
+    "Value": "Microchip Technology",
+    "ProductCount": 3
+   },
+   {
+    "Id": 54,
+    "Value": "Mill-Max Manufacturing Corp.",
+    "ProductCount": 12
+   },
+   {
+    "Id": 23,
+    "Value": "Molex",
+    "ProductCount": 1
+   },
+   {
+    "Id": 490,
+    "Value": "Murata Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1727,
+    "Value": "Nexperia USA Inc.",
+    "ProductCount": 8
+   },
+   {
+    "Id": 493,
+    "Value": "Nichicon",
+    "ProductCount": 1
+   },
+   {
+    "Id": 37,
+    "Value": "NorComp Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 568,
+    "Value": "NXP USA Inc.",
+    "ProductCount": 4
+   },
+   {
+    "Id": 255,
+    "Value": "Panasonic Electric Works",
+    "ProductCount": 3
+   },
+   {
+    "Id": 2046,
+    "Value": "Pepperl+Fuchs, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 501,
+    "Value": "Pomona Electronics",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1276,
+    "Value": "Samsung Electro-Mechanics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 612,
+    "Value": "Samtec Inc.",
+    "ProductCount": 11
+   },
+   {
+    "Id": 486,
+    "Value": "SCHURTER Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 3473,
+    "Value": "Siemens",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1645,
+    "Value": "Sierra Wireless",
+    "ProductCount": 1
+   },
+   {
+    "Id": 863,
+    "Value": "Skyworks Solutions Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 666,
+    "Value": "Souriau-Sunbank by Eaton",
+    "ProductCount": 1
+   },
+   {
+    "Id": 738,
+    "Value": "Stackpole Electronics Inc",
+    "ProductCount": 2
+   },
+   {
+    "Id": 497,
+    "Value": "STMicroelectronics",
+    "ProductCount": 7
+   },
+   {
+    "Id": 587,
+    "Value": "Taiyo Yuden",
+    "ProductCount": 1
+   },
+   {
+    "Id": 445,
+    "Value": "TDK",
+    "ProductCount": 3
+   },
+   {
+    "Id": 2585,
+    "Value": "TE - Kissling",
+    "ProductCount": 5
+   },
+   {
+    "Id": 450,
+    "Value": "TE Connectivity ALCOSWITCH Switches",
+    "ProductCount": 4
+   },
+   {
+    "Id": 17,
+    "Value": "TE Connectivity AMP Connectors",
+    "ProductCount": 6
+   },
+   {
+    "Id": 1508,
+    "Value": "TE Connectivity Deutsch Connectors",
+    "ProductCount": 7
+   },
+   {
+    "Id": 1712,
+    "Value": "TE Connectivity Passive Product",
+    "ProductCount": 2
+   },
+   {
+    "Id": 41,
+    "Value": "TE Connectivity Potter & Brumfield Relays",
+    "ProductCount": 1
+   },
+   {
+    "Id": 817,
+    "Value": "TE Connectivity Schaffner",
+    "ProductCount": 4
+   },
+   {
+    "Id": 296,
+    "Value": "Texas Instruments",
+    "ProductCount": 20
+   },
+   {
+    "Id": 56,
+    "Value": "Vishay Beyschlag/Draloric/BC Components",
+    "ProductCount": 2
+   },
+   {
+    "Id": 541,
+    "Value": "Vishay Dale",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1740,
+    "Value": "WeEn Semiconductors",
+    "ProductCount": 2
+   },
+   {
+    "Id": 732,
+    "Value": "Würth Elektronik",
+    "ProductCount": 3
+   },
+   {
+    "Id": 13,
+    "Value": "YAGEO",
+    "ProductCount": 6
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

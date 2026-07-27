@@ -7,8 +7,8 @@
   },
   "derived": {
     "category": "Other",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Screws & Fasteners M3 6.0mm Screw Zinc Plated Steel",
     "display_name": "Screw",
     "specs": {
@@ -16,22 +16,34 @@
       "BRHTS": "73181500",
       "Country of Diffusion": "Not available",
       "Country of Origin": "Taiwan",
+      "Drive Type": "Slotted",
       "ECCN": "EAR99",
       "HTS Code (CA)": "7318150010",
       "HTS Code (CN)": "7318159090",
       "HTS Code (JP)": "731815090",
       "HTS Code (US)": "7318156080",
+      "Head Diameter": "0.213\" (5.40mm)",
+      "Head Height": "0.067\" (1.70mm)",
       "Image": "https://www.mouser.com/images/keystoneelectronics/images/pan-head-screw.jpg",
-      "Lead Time": "18 Days",
+      "Length - Below Head": "0.236\" (6.00mm)",
+      "Length - Overall": "0.303\" (7.70mm)",
+      "Material": "Steel",
       "Minimum Order Quantity": "1",
+      "Moisture Sensitivity Level": "1 (Unlimited)",
       "Order Multiple": "1",
+      "Package Type": "Bulk",
       "Packaging": "Bulk",
+      "Plating": "Zinc, Clear Chromate",
       "Product Category": "Screws & Fasteners",
+      "REACH": "REACH Unaffected",
       "RoHS": "RoHS Compliant",
+      "Screw Head Type": "Pan Head",
       "Standard Pack Qty": "1",
+      "Thread Size": "M3",
+      "Type": "Machine Screw",
       "Unit Weight (kg)": "0.000804733"
     },
-    "value": ""
+    "value": "29311"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -111,7 +123,7 @@
   "id": "29311-f7e1",
   "manufacturer": "Keystone Electronics",
   "mpn": "29311",
-  "part_class": "component",
+  "part_class": "mechanical",
   "provenance": null,
   "purchase": [
     {
@@ -151,6 +163,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/29311-f7e1/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/29311-f7e1/mouser.json"
+    }
+  },
   "tags": []
 }

@@ -122,8 +122,8 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Logic Gates Single 2 Input A 595 -SN74LVC1G08DBVT A A 595-SN74LVC1G08DBVT",
     "display_name": "Logic Gate SOT-23-5",
     "specs": {
@@ -161,7 +161,7 @@
       "Unit Weight (kg)": "4.1e-05",
       "Voltage - Supply": "1.65V ~ 5.5V"
     },
-    "value": ""
+    "value": "SN74LVC1G08DBVR"
   },
   "enrichment": {},
   "hashes": null,
@@ -274,6 +274,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/sn74lvc1g08dbvr-f671/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/sn74lvc1g08dbvr-f671/mouser.json"
+    }
+  },
   "tags": []
 }

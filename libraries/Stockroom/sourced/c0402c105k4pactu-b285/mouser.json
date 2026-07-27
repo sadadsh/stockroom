@@ -1,0 +1,164 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "261957 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/72/1/C0402C105K4PACTU.pdf",
+    "Description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 16V 1uF X5R 0402 10%",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/yageo/images/SMD_MLCC_series_SPL.JPG",
+    "Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "LeadTime": "294 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "KEMET",
+    "ManufacturerPartNumber": "C0402C105K4PACTU",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "80-C0402C105K4P",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.12",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.045",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.039",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.029",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.026",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.022",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.02",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10000,
+      "Price": "$0.017",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 20000,
+      "Price": "$0.016",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/KEMET/C0402C105K4PACTU?qs=vBH1GPjCw2VG8GckdCzLBg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 1.5e-06
+    },
+    "AvailabilityInStock": "261957",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 260000,
+      "Date": "2027-01-21T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8532240020"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8532241000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8532240000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8532240010"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853224000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8532240000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8532240400"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85322410"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

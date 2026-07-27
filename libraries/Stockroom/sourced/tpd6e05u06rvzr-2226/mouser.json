@@ -1,0 +1,137 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "11637 In Stock",
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes 6-CH lo cap IEC ESD protect diodes",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/texasinstruments/images/ITP_595-TPD6E05U06RVZR_t.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "63 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Texas Instruments",
+    "ManufacturerPartNumber": "TPD6E05U06RVZR",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "595-TPD6E05U06RVZR",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$1.22",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.956",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.691",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.556",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.491",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.491",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR?qs=QCUnHQQYO1pCeVGx6Ibw%252BQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 4.2e-05
+    },
+    "AvailabilityInStock": "11637",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "1001",
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 38% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854239099"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8542399901"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "China"
+     }
+    ]
+   }
+  ]
+ }
+}

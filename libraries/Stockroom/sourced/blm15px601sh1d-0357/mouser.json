@@ -1,0 +1,149 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "108674 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/Murata_4-42023_QNFA9103SH.pdf",
+    "Description": "Ferrite Beads 0402 600ohm 25% 5A AEC-Q200 DC PWR Line",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/murata/images/BLM15PX-series_SPL.jpg",
+    "Category": "Ferrite Beads",
+    "LeadTime": "112 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Murata Electronics",
+    "ManufacturerPartNumber": "BLM15PX601SH1D",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "81-BLM15PX601SH1D",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.27",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.184",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$0.16",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 50,
+      "Price": "$0.143",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.128",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.11",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.094",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.083",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.082",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10000,
+      "Price": "$0.082",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Murata-Electronics/BLM15PX601SH1D?qs=9vOqFld9vZUw2N2VCY80IQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": "108674",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8548000000"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8548000001"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8548000000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854800000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8504509590"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Japan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Japan"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

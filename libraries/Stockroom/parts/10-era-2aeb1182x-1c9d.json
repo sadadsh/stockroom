@@ -7,8 +7,8 @@
   },
   "derived": {
     "category": "Resistors",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "RES SMD 11.8KOHM 0.1% 1/16W 0402",
     "display_name": "11.8kΩ ±0.1% 0402",
     "specs": {
@@ -18,8 +18,6 @@
       "HTS Code (US)": "8533.21.0030",
       "Height - Seated (Max)": "0.016\" (0.40mm)",
       "Image": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2494/ERAW%20Series%200402%20Pkg.jpg",
-      "Lead Time": "33",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "10000",
       "Moisture Sensitivity Level": "1 (Unlimited)",
       "Number of Terminations": "2",
@@ -38,7 +36,7 @@
       "Temperature Coefficient": "±25ppm/°C",
       "Tolerance": "±0.1%"
     },
-    "value": ""
+    "value": "11.8k"
   },
   "enrichment": {
     "Composition": {
@@ -146,7 +144,7 @@
   "id": "10-era-2aeb1182x-1c9d",
   "manufacturer": "Panasonic Industry",
   "mpn": "10-ERA-2AEB1182X",
-  "part_class": "component",
+  "part_class": "passive",
   "provenance": null,
   "purchase": [
     {
@@ -220,6 +218,11 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/10-era-2aeb1182x-1c9d/digikey.json"
+    }
+  },
   "tags": []
 }

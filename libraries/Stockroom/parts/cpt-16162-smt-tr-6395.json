@@ -7,25 +7,42 @@
   },
   "derived": {
     "category": "Electromechanical",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Buzzers & Audio Indicators - Board Mount buzzer, 16mmx16mmx2.5 mm deep, P, 3 V, 75 dB, Surface Mount, Audio Transducer",
     "display_name": "Buzzer",
     "specs": {
       "Assembly Country of Origin": "Not available",
       "Country of Diffusion": "Not available",
       "Country of Origin": "China",
+      "Current - Supply": "5mA",
+      "Driver Circuitry": "Transducer, Externally Driven",
       "ECCN": "EAR99",
+      "Frequency": "4kHz",
       "HTS Code (US)": "8518298000",
+      "Height - Seated (Max)": "0.106\" (2.70mm)",
       "Image": "https://www.mouser.com/images/samesky/images/CPT-16162-SMT-TR_SPL.jpg",
-      "Lead Time": "91 Days",
-      "Lifecycle": "New Product",
+      "Input Type": "Peak-Peak Signal",
       "Minimum Order Quantity": "1",
+      "Moisture Sensitivity Level": "1 (Unlimited)",
+      "Mounting Type": "Surface Mount",
+      "Operating Mode": "Single Tone",
+      "Operating Temperature": "-40°C ~ 85°C",
       "Order Multiple": "1",
+      "Package Type": "Cut Tape (CT)",
+      "Port Location": "Top",
       "Product Category": "Buzzers & Audio Indicators - Board Mount",
-      "RoHS": "RoHS Compliant"
+      "REACH": "REACH Affected",
+      "RoHS": "RoHS Compliant",
+      "Series": "CPT",
+      "Size / Dimension": "0.630\" L x 0.630\" W (16.00mm x 16.00mm)",
+      "Sound Pressure Level (SPL)": "75dB @ 3V, 10cm",
+      "Technology": "Piezo",
+      "Termination": "Solder Pads",
+      "Voltage - Rated": "3 V",
+      "Voltage Range": "1 ~ 25V"
     },
-    "value": ""
+    "value": "CPT-16162-SMT-TR"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -129,6 +146,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/cpt-16162-smt-tr-6395/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/cpt-16162-smt-tr-6395/mouser.json"
+    }
+  },
   "tags": []
 }

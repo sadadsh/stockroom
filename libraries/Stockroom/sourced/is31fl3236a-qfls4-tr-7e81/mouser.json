@@ -1,0 +1,185 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 2,
+  "Parts": [
+   {
+    "Availability": "33692 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/6047/1/IS31FL3236A_DS.pdf",
+    "Description": "LED Lighting Driver ICs 36-Channel LED Driver, QFN-44 (5.0mm x 5.0mm), T&R, selectable clock",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/integratedsiliconsolutioninc/images/QFN_44_t.jpg",
+    "Category": "LED Lighting Driver ICs",
+    "LeadTime": "140 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Lumissil",
+    "ManufacturerPartNumber": "IS31FL3236A-QFLS4-TR",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "870-I31FL3236AQFLS4T",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "2500"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$1.64",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$1.21",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$1.10",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.971",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.913",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.878",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.872",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.818",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Lumissil/IS31FL3236A-QFLS4-TR?qs=%252BEew9%252B0nqrBlIvW3k0u%2Frw%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.0014305
+    },
+    "AvailabilityInStock": "33692",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 10% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542390090"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8542390000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8542399999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "Integrated Silicon Solution Inc 36-Channel LED Driver, QFN-44 (5.0mm x 5.0mm), T&R, selectable clock",
+    "FactoryStock": null,
+    "ImagePath": null,
+    "Category": "Integrated Silicon Solution Inc",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "ISSI",
+    "ManufacturerPartNumber": "IS31FL3236A-QFLS4-TR",
+    "Min": "0",
+    "Mult": "0",
+    "MouserPartNumber": "N/A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "2500"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/ISSI/IS31FL3236A-QFLS4-TR?qs=7%2F6SraaimPQ%252BGinFRot2iw%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542390001"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": []
+   }
+  ]
+ }
+}

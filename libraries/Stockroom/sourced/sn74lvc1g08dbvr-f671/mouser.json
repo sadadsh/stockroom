@@ -1,0 +1,161 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "138409 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Logic Gates Single 2 Input A 595 -SN74LVC1G08DBVT A A 595-SN74LVC1G08DBVT",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_SOT-23-5_DBV_t.jpg",
+    "Category": "Logic Gates",
+    "LeadTime": "112 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Texas Instruments",
+    "ManufacturerPartNumber": "SN74LVC1G08DBVR",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "595-SN74LVC1G08DBVR",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.12",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.077",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$0.068",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.057",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.052",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.049",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.046",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.042",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.041",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "SN74LVC1G08DBVRG4"
+     },
+     {
+      "APMfrPN": " SN74LVC1G08DBVT"
+     },
+     {
+      "APMfrPN": " SN74LVC1G08DBVTG4"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1G08DBVR?qs=8yeEWhuAOtNjtL049wSCoQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "595-SN74LVC1G08DBVT",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 4.1e-05
+    },
+    "AvailabilityInStock": "138409",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 288000,
+      "Date": "2026-10-29T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542390090"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8542390000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "8542390990"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8542399999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Malaysia"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Malaysia"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Germany"
+     }
+    ]
+   }
+  ]
+ }
+}

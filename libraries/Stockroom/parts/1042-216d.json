@@ -170,10 +170,10 @@
   },
   "derived": {
     "category": "Connectors",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Cylindrical Battery Contacts, Clips, Holders & Springs 18650 S/M PC BATTERY HOLDER",
-    "display_name": "Stamped 0805",
+    "display_name": "Stamped",
     "specs": {
       "Assembly Country of Origin": "Not available",
       "BRHTS": "85369090",
@@ -190,12 +190,9 @@
       "HTS Code (US)": "8536908585",
       "Image": "https://www.mouser.com/images/keystoneelectronics/images/1042_tn.jpg",
       "KRHTS": "8536909090",
-      "Lead Time": "104 Days",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "1 (Unlimited)",
       "Order Multiple": "1",
-      "Package": "0805",
       "Package Type": "Tape & Reel (TR)",
       "Packaging": "Tray",
       "Pin or Socket": "Socket",
@@ -208,7 +205,7 @@
       "Unit Weight (kg)": "0.0250125",
       "Wire Gauge": "22-26 AWG"
     },
-    "value": ""
+    "value": "1042"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -384,6 +381,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/1042-216d/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/1042-216d/mouser.json"
+    }
+  },
   "tags": []
 }

@@ -1,0 +1,1558 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "IC SW SPST-NOX8 4.5OHM 24TSSOP",
+    "DetailedDescription": "8 Circuit IC Switch 1:1 4.5Ohm 24-TSSOP"
+   },
+   "Manufacturer": {
+    "Id": 505,
+    "Name": "Analog Devices Inc."
+   },
+   "ManufacturerProductNumber": "ADG714BRUZ-REEL7",
+   "UnitPrice": 6.34,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/analog-devices-inc/ADG714BRUZ-REEL7/995089",
+   "DatasheetUrl": "https://www.analog.com/media/en/technical-documentation/data-sheets/ADG714_715.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4994/505%7ERU-24%7ERU%7E24.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "ADG714BRUZ-REEL7TR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 3.68754,
+       "TotalPrice": 3687.54
+      },
+      {
+       "BreakQuantity": 2000,
+       "UnitPrice": 3.60862,
+       "TotalPrice": 7217.24
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 505,
+      "Name": "Analog Devices Inc."
+     },
+     "QuantityAvailableforPackageType": 4000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "ADG714BRUZ-REEL7CT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 6.34,
+       "TotalPrice": 6.34
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 4.867,
+       "TotalPrice": 48.67
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 4.4984,
+       "TotalPrice": 112.46
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 4.0932,
+       "TotalPrice": 409.32
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 3.9474,
+       "TotalPrice": 986.85
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 505,
+      "Name": "Analog Devices Inc."
+     },
+     "QuantityAvailableforPackageType": 4609,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "ADG714BRUZ-REEL7DKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 6.34,
+       "TotalPrice": 6.34
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 4.867,
+       "TotalPrice": 48.67
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 4.4984,
+       "TotalPrice": 112.46
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 4.0932,
+       "TotalPrice": 409.32
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 3.9474,
+       "TotalPrice": 986.85
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 505,
+      "Name": "Analog Devices Inc."
+     },
+     "QuantityAvailableforPackageType": 4609,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 4609,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 1960,
+     "ParameterText": "Switch Circuit",
+     "ParameterType": "String",
+     "ValueId": "406578",
+     "ValueText": "SPST - NO"
+    },
+    {
+     "ParameterId": 1961,
+     "ParameterText": "Multiplexer/Demultiplexer Circuit",
+     "ParameterType": "String",
+     "ValueId": "63478",
+     "ValueText": "1:1"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "8",
+     "ValueText": "8"
+    },
+    {
+     "ParameterId": 433,
+     "ParameterText": "On-State Resistance (Max)",
+     "ParameterType": "String",
+     "ValueId": "208490",
+     "ValueText": "4.5Ohm"
+    },
+    {
+     "ParameterId": 1962,
+     "ParameterText": "Channel-to-Channel Matching (ΔRon)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1956,
+     "ParameterText": "Voltage - Supply, Single (V+)",
+     "ParameterType": "String",
+     "ValueId": "134947",
+     "ValueText": "2.7V ~ 5.5V"
+    },
+    {
+     "ParameterId": 1957,
+     "ParameterText": "Voltage - Supply, Dual (V±)",
+     "ParameterType": "String",
+     "ValueId": "1823",
+     "ValueText": "±2.5V"
+    },
+    {
+     "ParameterId": 1963,
+     "ParameterText": "Switch Time (Ton, Toff) (Max)",
+     "ParameterType": "String",
+     "ValueId": "143530",
+     "ValueText": "20ns, 8ns (Typ)"
+    },
+    {
+     "ParameterId": 781,
+     "ParameterText": "-3db Bandwidth",
+     "ParameterType": "String",
+     "ValueId": "101638",
+     "ValueText": "155MHz"
+    },
+    {
+     "ParameterId": 1958,
+     "ParameterText": "Charge Injection",
+     "ParameterType": "String",
+     "ValueId": "202415",
+     "ValueText": "3pC"
+    },
+    {
+     "ParameterId": 1964,
+     "ParameterText": "Channel Capacitance (CS(off), CD(off))",
+     "ParameterType": "String",
+     "ValueId": "80274",
+     "ValueText": "11pF, 11pF"
+    },
+    {
+     "ParameterId": 1965,
+     "ParameterText": "Current - Leakage (IS(off)) (Max)",
+     "ParameterType": "String",
+     "ValueId": "69527",
+     "ValueText": "100pA"
+    },
+    {
+     "ParameterId": 1959,
+     "ParameterText": "Crosstalk",
+     "ParameterType": "String",
+     "ValueId": "299619",
+     "ValueText": "-90dB @ 1MHz"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212621",
+     "ValueText": "-40°C ~ 85°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "155158",
+     "ValueText": "24-TSSOP (0.173\", 4.40mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "155156",
+     "ValueText": "24-TSSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 24646,
+    "Name": "ADG714"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2016,
+      "ParentId": 32,
+      "Name": "Interface",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/236/976/175-16-QSOP_tmb%2864x64%29.jpg",
+      "SeoDescription": "Interface components are used to connect various signals or data transmission. Included in this category are analog switches, multiplexers, demultiplexers, CODECs, controllers for communication protocols, direct digital synthesis (DDS), drivers, receivers, transceivers, encoders, decoders, filters, I/O expanders, modems, modules, sensor and detectors, capacitive touch, serializers, deserializers, signal buffers, repeaters, splitters, signal terminators, telecom, universal asynchronous receiver/transmitter (UARTs), voice record and playback, and various boards and specialized products.",
+      "ChildCategories": [
+       {
+        "CategoryId": 747,
+        "ParentId": 2016,
+        "Name": "Analog Switches, Multiplexers, Demultiplexers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/084/032/505%7ECP-20-6%7ECP%7E20_tmb.jpg",
+        "SeoDescription": "Products in this family are used for interconnecting or routing analog signals between multiple available signal paths. Functioning similar to a traditional electromechanical switch, their solid-state character facilitates electronic control, longer service life, and reduced switching noise compared to electromechanical switching, in trade for added constraints on the amplitude and bias of the signals being switched.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "15",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "ADG714BRUZREEL7",
+    "ADG714BRUZ-REEL7-ND",
+    "ADG714BRUZ-REEL7CT",
+    "ADG714BRUZ-REEL7TR",
+    "ADG714BRUZ-REEL7DKR"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "IC SW SPST-NOX8 4.5OHM 24TSSOP",
+    "DetailedDescription": "8 Circuit IC Switch 1:1 4.5Ohm 24-TSSOP"
+   },
+   "Manufacturer": {
+    "Id": 505,
+    "Name": "Analog Devices Inc."
+   },
+   "ManufacturerProductNumber": "ADG714BRUZ-REEL",
+   "UnitPrice": 6.34,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/analog-devices-inc/ADG714BRUZ-REEL/994688",
+   "DatasheetUrl": "https://www.analog.com/media/en/technical-documentation/data-sheets/ADG714_715.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4994/505%7ERU-24%7ERU%7E24.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "ADG714BRUZ-REELTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 3.58633,
+       "TotalPrice": 8965.825
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 505,
+      "Name": "Analog Devices Inc."
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 2500,
+     "StandardPackage": 2500,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "ADG714BRUZ-REELCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 6.34,
+       "TotalPrice": 6.34
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 4.867,
+       "TotalPrice": 48.67
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 4.4984,
+       "TotalPrice": 112.46
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 4.0932,
+       "TotalPrice": 409.32
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 3.9474,
+       "TotalPrice": 986.85
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 505,
+      "Name": "Analog Devices Inc."
+     },
+     "QuantityAvailableforPackageType": 310,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "ADG714BRUZ-REELDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 6.34,
+       "TotalPrice": 6.34
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 4.867,
+       "TotalPrice": 48.67
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 4.4984,
+       "TotalPrice": 112.46
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 4.0932,
+       "TotalPrice": 409.32
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 3.9474,
+       "TotalPrice": 986.85
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 505,
+      "Name": "Analog Devices Inc."
+     },
+     "QuantityAvailableforPackageType": 310,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 310,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 1960,
+     "ParameterText": "Switch Circuit",
+     "ParameterType": "String",
+     "ValueId": "406578",
+     "ValueText": "SPST - NO"
+    },
+    {
+     "ParameterId": 1961,
+     "ParameterText": "Multiplexer/Demultiplexer Circuit",
+     "ParameterType": "String",
+     "ValueId": "63478",
+     "ValueText": "1:1"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "8",
+     "ValueText": "8"
+    },
+    {
+     "ParameterId": 433,
+     "ParameterText": "On-State Resistance (Max)",
+     "ParameterType": "String",
+     "ValueId": "208490",
+     "ValueText": "4.5Ohm"
+    },
+    {
+     "ParameterId": 1962,
+     "ParameterText": "Channel-to-Channel Matching (ΔRon)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1956,
+     "ParameterText": "Voltage - Supply, Single (V+)",
+     "ParameterType": "String",
+     "ValueId": "134947",
+     "ValueText": "2.7V ~ 5.5V"
+    },
+    {
+     "ParameterId": 1957,
+     "ParameterText": "Voltage - Supply, Dual (V±)",
+     "ParameterType": "String",
+     "ValueId": "1823",
+     "ValueText": "±2.5V"
+    },
+    {
+     "ParameterId": 1963,
+     "ParameterText": "Switch Time (Ton, Toff) (Max)",
+     "ParameterType": "String",
+     "ValueId": "143530",
+     "ValueText": "20ns, 8ns (Typ)"
+    },
+    {
+     "ParameterId": 781,
+     "ParameterText": "-3db Bandwidth",
+     "ParameterType": "String",
+     "ValueId": "101638",
+     "ValueText": "155MHz"
+    },
+    {
+     "ParameterId": 1958,
+     "ParameterText": "Charge Injection",
+     "ParameterType": "String",
+     "ValueId": "202415",
+     "ValueText": "3pC"
+    },
+    {
+     "ParameterId": 1964,
+     "ParameterText": "Channel Capacitance (CS(off), CD(off))",
+     "ParameterType": "String",
+     "ValueId": "80274",
+     "ValueText": "11pF, 11pF"
+    },
+    {
+     "ParameterId": 1965,
+     "ParameterText": "Current - Leakage (IS(off)) (Max)",
+     "ParameterType": "String",
+     "ValueId": "69527",
+     "ValueText": "100pA"
+    },
+    {
+     "ParameterId": 1959,
+     "ParameterText": "Crosstalk",
+     "ParameterType": "String",
+     "ValueId": "299619",
+     "ValueText": "-90dB @ 1MHz"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212621",
+     "ValueText": "-40°C ~ 85°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "155158",
+     "ValueText": "24-TSSOP (0.173\", 4.40mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "155156",
+     "ValueText": "24-TSSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 24646,
+    "Name": "ADG714"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2016,
+      "ParentId": 32,
+      "Name": "Interface",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/236/976/175-16-QSOP_tmb%2864x64%29.jpg",
+      "SeoDescription": "Interface components are used to connect various signals or data transmission. Included in this category are analog switches, multiplexers, demultiplexers, CODECs, controllers for communication protocols, direct digital synthesis (DDS), drivers, receivers, transceivers, encoders, decoders, filters, I/O expanders, modems, modules, sensor and detectors, capacitive touch, serializers, deserializers, signal buffers, repeaters, splitters, signal terminators, telecom, universal asynchronous receiver/transmitter (UARTs), voice record and playback, and various boards and specialized products.",
+      "ChildCategories": [
+       {
+        "CategoryId": 747,
+        "ParentId": 2016,
+        "Name": "Analog Switches, Multiplexers, Demultiplexers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/084/032/505%7ECP-20-6%7ECP%7E20_tmb.jpg",
+        "SeoDescription": "Products in this family are used for interconnecting or routing analog signals between multiple available signal paths. Functioning similar to a traditional electromechanical switch, their solid-state character facilitates electronic control, longer service life, and reduced switching noise compared to electromechanical switching, in trade for added constraints on the amplitude and bias of the signals being switched.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "15",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "ADG714BRUZ-REELCT",
+    "ADG714BRUZ-REEL-ND",
+    "ADG714BRUZ-REELTR",
+    "ADG714BRUZ-REELDKR"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "IC SW SPST-NOX8 4.5OHM 24TSSOP",
+    "DetailedDescription": "8 Circuit IC Switch 1:1 4.5Ohm 24-TSSOP"
+   },
+   "Manufacturer": {
+    "Id": 505,
+    "Name": "Analog Devices Inc."
+   },
+   "ManufacturerProductNumber": "ADG714BRUZ",
+   "UnitPrice": 6.34,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/analog-devices-inc/ADG714BRUZ/820111",
+   "DatasheetUrl": "https://www.analog.com/media/en/technical-documentation/data-sheets/ADG714_715.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4994/505%7ERU-24%7ERU%7E24.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "505-ADG714BRUZ-ND",
+     "PackageType": {
+      "Id": 6,
+      "Name": "Tube"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 6.34,
+       "TotalPrice": 6.34
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 4.867,
+       "TotalPrice": 48.67
+      },
+      {
+       "BreakQuantity": 62,
+       "UnitPrice": 4.21565,
+       "TotalPrice": 261.3703
+      },
+      {
+       "BreakQuantity": 124,
+       "UnitPrice": 4.04323,
+       "TotalPrice": 501.36052
+      },
+      {
+       "BreakQuantity": 310,
+       "UnitPrice": 3.86129,
+       "TotalPrice": 1196.9999
+      },
+      {
+       "BreakQuantity": 558,
+       "UnitPrice": 3.76695,
+       "TotalPrice": 2101.9581
+      },
+      {
+       "BreakQuantity": 1054,
+       "UnitPrice": 3.68099,
+       "TotalPrice": 3879.76346
+      },
+      {
+       "BreakQuantity": 2542,
+       "UnitPrice": 3.58473,
+       "TotalPrice": 9112.38366
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 505,
+      "Name": "Analog Devices Inc."
+     },
+     "QuantityAvailableforPackageType": 37,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 37,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 1960,
+     "ParameterText": "Switch Circuit",
+     "ParameterType": "String",
+     "ValueId": "406578",
+     "ValueText": "SPST - NO"
+    },
+    {
+     "ParameterId": 1961,
+     "ParameterText": "Multiplexer/Demultiplexer Circuit",
+     "ParameterType": "String",
+     "ValueId": "63478",
+     "ValueText": "1:1"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "8",
+     "ValueText": "8"
+    },
+    {
+     "ParameterId": 433,
+     "ParameterText": "On-State Resistance (Max)",
+     "ParameterType": "String",
+     "ValueId": "208490",
+     "ValueText": "4.5Ohm"
+    },
+    {
+     "ParameterId": 1962,
+     "ParameterText": "Channel-to-Channel Matching (ΔRon)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1956,
+     "ParameterText": "Voltage - Supply, Single (V+)",
+     "ParameterType": "String",
+     "ValueId": "134947",
+     "ValueText": "2.7V ~ 5.5V"
+    },
+    {
+     "ParameterId": 1957,
+     "ParameterText": "Voltage - Supply, Dual (V±)",
+     "ParameterType": "String",
+     "ValueId": "1823",
+     "ValueText": "±2.5V"
+    },
+    {
+     "ParameterId": 1963,
+     "ParameterText": "Switch Time (Ton, Toff) (Max)",
+     "ParameterType": "String",
+     "ValueId": "143530",
+     "ValueText": "20ns, 8ns (Typ)"
+    },
+    {
+     "ParameterId": 781,
+     "ParameterText": "-3db Bandwidth",
+     "ParameterType": "String",
+     "ValueId": "101638",
+     "ValueText": "155MHz"
+    },
+    {
+     "ParameterId": 1958,
+     "ParameterText": "Charge Injection",
+     "ParameterType": "String",
+     "ValueId": "202415",
+     "ValueText": "3pC"
+    },
+    {
+     "ParameterId": 1964,
+     "ParameterText": "Channel Capacitance (CS(off), CD(off))",
+     "ParameterType": "String",
+     "ValueId": "80274",
+     "ValueText": "11pF, 11pF"
+    },
+    {
+     "ParameterId": 1965,
+     "ParameterText": "Current - Leakage (IS(off)) (Max)",
+     "ParameterType": "String",
+     "ValueId": "69527",
+     "ValueText": "100pA"
+    },
+    {
+     "ParameterId": 1959,
+     "ParameterText": "Crosstalk",
+     "ParameterType": "String",
+     "ValueId": "299619",
+     "ValueText": "-90dB @ 1MHz"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212621",
+     "ValueText": "-40°C ~ 85°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "155158",
+     "ValueText": "24-TSSOP (0.173\", 4.40mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "155156",
+     "ValueText": "24-TSSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 24646,
+    "Name": "ADG714"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2016,
+      "ParentId": 32,
+      "Name": "Interface",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/236/976/175-16-QSOP_tmb%2864x64%29.jpg",
+      "SeoDescription": "Interface components are used to connect various signals or data transmission. Included in this category are analog switches, multiplexers, demultiplexers, CODECs, controllers for communication protocols, direct digital synthesis (DDS), drivers, receivers, transceivers, encoders, decoders, filters, I/O expanders, modems, modules, sensor and detectors, capacitive touch, serializers, deserializers, signal buffers, repeaters, splitters, signal terminators, telecom, universal asynchronous receiver/transmitter (UARTs), voice record and playback, and various boards and specialized products.",
+      "ChildCategories": [
+       {
+        "CategoryId": 747,
+        "ParentId": 2016,
+        "Name": "Analog Switches, Multiplexers, Demultiplexers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/084/032/505%7ECP-20-6%7ECP%7E20_tmb.jpg",
+        "SeoDescription": "Products in this family are used for interconnecting or routing analog signals between multiple available signal paths. Functioning similar to a traditional electromechanical switch, their solid-state character facilitates electronic control, longer service life, and reduced switching noise compared to electromechanical switching, in trade for added constraints on the amplitude and bias of the signals being switched.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "15",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "505-ADG714BRUZ",
+    "-2735-ADG714BRUZ",
+    "ADG714BRUZ-ND",
+    "2156-ADG714BRUZ",
+    "ANAANAADG714BRUZ"
+   ]
+  }
+ ],
+ "ProductsCount": 3,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "IC SW SPST-NOX8 4.5OHM 24TSSOP",
+    "DetailedDescription": "8 Circuit IC Switch 1:1 4.5Ohm 24-TSSOP"
+   },
+   "Manufacturer": {
+    "Id": 505,
+    "Name": "Analog Devices Inc."
+   },
+   "ManufacturerProductNumber": "ADG714BRUZ",
+   "UnitPrice": 6.34,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/analog-devices-inc/ADG714BRUZ/820111",
+   "DatasheetUrl": "https://www.analog.com/media/en/technical-documentation/data-sheets/ADG714_715.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4994/505%7ERU-24%7ERU%7E24.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "505-ADG714BRUZ-ND",
+     "PackageType": {
+      "Id": 6,
+      "Name": "Tube"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 6.34,
+       "TotalPrice": 6.34
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 4.867,
+       "TotalPrice": 48.67
+      },
+      {
+       "BreakQuantity": 62,
+       "UnitPrice": 4.21565,
+       "TotalPrice": 261.3703
+      },
+      {
+       "BreakQuantity": 124,
+       "UnitPrice": 4.04323,
+       "TotalPrice": 501.36052
+      },
+      {
+       "BreakQuantity": 310,
+       "UnitPrice": 3.86129,
+       "TotalPrice": 1196.9999
+      },
+      {
+       "BreakQuantity": 558,
+       "UnitPrice": 3.76695,
+       "TotalPrice": 2101.9581
+      },
+      {
+       "BreakQuantity": 1054,
+       "UnitPrice": 3.68099,
+       "TotalPrice": 3879.76346
+      },
+      {
+       "BreakQuantity": 2542,
+       "UnitPrice": 3.58473,
+       "TotalPrice": 9112.38366
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 505,
+      "Name": "Analog Devices Inc."
+     },
+     "QuantityAvailableforPackageType": 37,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 37,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 1960,
+     "ParameterText": "Switch Circuit",
+     "ParameterType": "String",
+     "ValueId": "406578",
+     "ValueText": "SPST - NO"
+    },
+    {
+     "ParameterId": 1961,
+     "ParameterText": "Multiplexer/Demultiplexer Circuit",
+     "ParameterType": "String",
+     "ValueId": "63478",
+     "ValueText": "1:1"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "8",
+     "ValueText": "8"
+    },
+    {
+     "ParameterId": 433,
+     "ParameterText": "On-State Resistance (Max)",
+     "ParameterType": "String",
+     "ValueId": "208490",
+     "ValueText": "4.5Ohm"
+    },
+    {
+     "ParameterId": 1962,
+     "ParameterText": "Channel-to-Channel Matching (ΔRon)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1956,
+     "ParameterText": "Voltage - Supply, Single (V+)",
+     "ParameterType": "String",
+     "ValueId": "134947",
+     "ValueText": "2.7V ~ 5.5V"
+    },
+    {
+     "ParameterId": 1957,
+     "ParameterText": "Voltage - Supply, Dual (V±)",
+     "ParameterType": "String",
+     "ValueId": "1823",
+     "ValueText": "±2.5V"
+    },
+    {
+     "ParameterId": 1963,
+     "ParameterText": "Switch Time (Ton, Toff) (Max)",
+     "ParameterType": "String",
+     "ValueId": "143530",
+     "ValueText": "20ns, 8ns (Typ)"
+    },
+    {
+     "ParameterId": 781,
+     "ParameterText": "-3db Bandwidth",
+     "ParameterType": "String",
+     "ValueId": "101638",
+     "ValueText": "155MHz"
+    },
+    {
+     "ParameterId": 1958,
+     "ParameterText": "Charge Injection",
+     "ParameterType": "String",
+     "ValueId": "202415",
+     "ValueText": "3pC"
+    },
+    {
+     "ParameterId": 1964,
+     "ParameterText": "Channel Capacitance (CS(off), CD(off))",
+     "ParameterType": "String",
+     "ValueId": "80274",
+     "ValueText": "11pF, 11pF"
+    },
+    {
+     "ParameterId": 1965,
+     "ParameterText": "Current - Leakage (IS(off)) (Max)",
+     "ParameterType": "String",
+     "ValueId": "69527",
+     "ValueText": "100pA"
+    },
+    {
+     "ParameterId": 1959,
+     "ParameterText": "Crosstalk",
+     "ParameterType": "String",
+     "ValueId": "299619",
+     "ValueText": "-90dB @ 1MHz"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212621",
+     "ValueText": "-40°C ~ 85°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "155158",
+     "ValueText": "24-TSSOP (0.173\", 4.40mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "155156",
+     "ValueText": "24-TSSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 24646,
+    "Name": "ADG714"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2016,
+      "ParentId": 32,
+      "Name": "Interface",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/236/976/175-16-QSOP_tmb%2864x64%29.jpg",
+      "SeoDescription": "Interface components are used to connect various signals or data transmission. Included in this category are analog switches, multiplexers, demultiplexers, CODECs, controllers for communication protocols, direct digital synthesis (DDS), drivers, receivers, transceivers, encoders, decoders, filters, I/O expanders, modems, modules, sensor and detectors, capacitive touch, serializers, deserializers, signal buffers, repeaters, splitters, signal terminators, telecom, universal asynchronous receiver/transmitter (UARTs), voice record and playback, and various boards and specialized products.",
+      "ChildCategories": [
+       {
+        "CategoryId": 747,
+        "ParentId": 2016,
+        "Name": "Analog Switches, Multiplexers, Demultiplexers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/084/032/505%7ECP-20-6%7ECP%7E20_tmb.jpg",
+        "SeoDescription": "Products in this family are used for interconnecting or routing analog signals between multiple available signal paths. Functioning similar to a traditional electromechanical switch, their solid-state character facilitates electronic control, longer service life, and reduced switching noise compared to electromechanical switching, in trade for added constraints on the amplitude and bias of the signals being switched.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "15",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "505-ADG714BRUZ",
+    "-2735-ADG714BRUZ",
+    "ADG714BRUZ-ND",
+    "2156-ADG714BRUZ",
+    "ANAANAADG714BRUZ"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 505,
+    "Value": "Analog Devices Inc.",
+    "ProductCount": 3
+   }
+  ],
+  "Packaging": [
+   {
+    "Id": 2,
+    "Value": "Cut Tape (CT)",
+    "ProductCount": 2
+   },
+   {
+    "Id": 243,
+    "Value": "Digi-Reel®",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1,
+    "Value": "Tape & Reel (TR)",
+    "ProductCount": 2
+   },
+   {
+    "Id": 6,
+    "Value": "Tube",
+    "ProductCount": 1
+   }
+  ],
+  "Status": [
+   {
+    "Id": 0,
+    "Value": "Active",
+    "ProductCount": 3
+   }
+  ],
+  "Series": [
+   {
+    "Id": 818,
+    "Value": "-",
+    "ProductCount": 3
+   }
+  ],
+  "ParametricFilters": [
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1960,
+    "ParameterName": "Switch Circuit",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "406578",
+      "ValueName": "SPST - NO",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1961,
+    "ParameterName": "Multiplexer/Demultiplexer Circuit",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "63478",
+      "ValueName": "1:1",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 2094,
+    "ParameterName": "Number of Circuits",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "8",
+      "ValueName": "8",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 433,
+    "ParameterName": "On-State Resistance (Max)",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "208490",
+      "ValueName": "4.5Ohm",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1962,
+    "ParameterName": "Channel-to-Channel Matching (ΔRon)",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "1",
+      "ValueName": "-",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1956,
+    "ParameterName": "Voltage - Supply, Single (V+)",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "134947",
+      "ValueName": "2.7V ~ 5.5V",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1957,
+    "ParameterName": "Voltage - Supply, Dual (V±)",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "1823",
+      "ValueName": "±2.5V",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1963,
+    "ParameterName": "Switch Time (Ton, Toff) (Max)",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "143530",
+      "ValueName": "20ns, 8ns (Typ)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 781,
+    "ParameterName": "-3db Bandwidth",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "101638",
+      "ValueName": "155MHz",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1958,
+    "ParameterName": "Charge Injection",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "202415",
+      "ValueName": "3pC",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1964,
+    "ParameterName": "Channel Capacitance (CS(off), CD(off))",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "80274",
+      "ValueName": "11pF, 11pF",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1965,
+    "ParameterName": "Current - Leakage (IS(off)) (Max)",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "69527",
+      "ValueName": "100pA",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1959,
+    "ParameterName": "Crosstalk",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "299619",
+      "ValueName": "-90dB @ 1MHz",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 252,
+    "ParameterName": "Operating Temperature",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "212621",
+      "ValueName": "-40°C ~ 85°C (TA)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 69,
+    "ParameterName": "Mounting Type",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "409393",
+      "ValueName": "Surface Mount",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 16,
+    "ParameterName": "Package / Case",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "155158",
+      "ValueName": "24-TSSOP (0.173\", 4.40mm Width)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 747,
+     "Value": "Analog Switches, Multiplexers, Demultiplexers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1291,
+    "ParameterName": "Supplier Device Package",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "155156",
+      "ValueName": "24-TSSOP",
+      "RangeFilterType": null
+     }
+    ]
+   }
+  ],
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

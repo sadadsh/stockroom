@@ -81,8 +81,8 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "IC & Component Sockets 100Pin QFP Burn-in Skt 0.50 pitch",
     "display_name": "IC & Component Socket",
     "specs": {
@@ -102,8 +102,6 @@
       "HTS Code (US)": "8536694040",
       "Image": "https://www.mouser.com/images/yamaichielectronics/images/ic201.jpg",
       "KRHTS": "8536691000",
-      "Lead Time": "56 Days",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "2 (1 Year)",
       "Number of Pins": "100",
@@ -116,7 +114,7 @@
       "Standard Package": "1",
       "Unit Weight (kg)": "0.012838"
     },
-    "value": ""
+    "value": "IC201-1004-008"
   },
   "enrichment": {
     "Accessory Type": {
@@ -272,6 +270,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/ic201-1004-008-333c/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/ic201-1004-008-333c/mouser.json"
+    }
+  },
   "tags": []
 }

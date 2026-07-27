@@ -93,8 +93,8 @@
   },
   "derived": {
     "category": "Connectors",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "USB Connectors hart-por USB Type C-C coupler black",
     "display_name": "Connector",
     "specs": {
@@ -111,8 +111,6 @@
       "HTS Code (US)": "8536694030",
       "Image": "https://www.mouser.com/images/harting/images/9454522912_SPL.JPG",
       "KRHTS": "8536699000",
-      "Lead Time": "35 Days",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "Not Applicable",
       "Mounting Type": "Panel Mount, Bulkhead - Rear Side Nut",
@@ -124,7 +122,7 @@
       "Series": "har-port",
       "Standard Pack Qty": "1"
     },
-    "value": ""
+    "value": "09454522912"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -264,6 +262,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/09454522912-5f9d/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/09454522912-5f9d/mouser.json"
+    }
+  },
   "tags": []
 }

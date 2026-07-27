@@ -1,0 +1,154 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "2578 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/184/1/ABM8G.pdf",
+    "Description": "Crystals Xtal 3225 4-SMD 25MHz Tol 30ppm Stab 30ppm -40C - 85C 10pF 60 Ohms",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/abracon/images/ABM8G_series_DSL.jpg",
+    "Category": "Crystals",
+    "LeadTime": "112 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "ABRACON",
+    "ManufacturerPartNumber": "ABM8G-25.000MHZ-D4Y-T",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "815-ABM8G25MHZD4YT",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "1000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.61",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.528",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$0.479",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.459",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.434",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.416",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.404",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.361",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/ABRACON/ABM8G-25.000MHZ-D4Y-T?qs=wnTfsH77Xs7j5b4j4cYsiQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant By Exemption",
+    "REACH-SVHC": [
+     "Lead monoxide (lead oxide) (1317-36-8)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": "2578",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 30% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541600060"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541600000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541600020"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854160010"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541609000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541600000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541600100"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85416010"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "China"
+     }
+    ]
+   }
+  ]
+ }
+}

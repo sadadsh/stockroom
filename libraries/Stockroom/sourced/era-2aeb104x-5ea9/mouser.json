@@ -1,0 +1,163 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "228586 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Thin Film Resistors - SMD 0402 1/16W 100Kohms",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/panasonic/images/ERA-xA_SPL.jpg",
+    "Category": "Thin Film Resistors - SMD",
+    "LeadTime": "231 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Panasonic",
+    "ManufacturerPartNumber": "ERA-2AEB104X",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "667-ERA-2AEB104X",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.11",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.082",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.078",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.072",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.068",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.065",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.058",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10000,
+      "Price": "$0.057",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 20000,
+      "Price": "$0.055",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Panasonic/ERA-2AEB104X?qs=YFwoyZoVY0jijibKYIWHHg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant By Exemption",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 6.5e-07
+    },
+    "AvailabilityInStock": "228586",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 190000,
+      "Date": "2027-01-28T00:00:00"
+     },
+     {
+      "Quantity": 260000,
+      "Date": "2027-04-26T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8533210030"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8533211000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8533210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8533210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853321000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8533219000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8533210100"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85332120"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Japan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

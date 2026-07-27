@@ -1,0 +1,113 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "24 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/348/1/toggle_switches_serie_5000M.pdf",
+    "Description": "Toggle Switches TOGGLE SWITCH 5000 MINIATURE",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/apem/images/5636MADG_DSL.jpg",
+    "Category": "Toggle Switches",
+    "LeadTime": "70 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Apem",
+    "ManufacturerPartNumber": "5636MADG",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "642-5636MADG",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "25"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$46.05",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$40.91",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$40.90",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$40.26",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$39.18",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Apem/5636MADG?qs=Mv7BduZupUijTGjfRAG2CA%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.025676
+    },
+    "AvailabilityInStock": "24",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536509065"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536500090"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536509090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853650090"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536508099"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85365090"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "France"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

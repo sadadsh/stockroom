@@ -7,8 +7,8 @@
   },
   "derived": {
     "category": "Other",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Solenoids & Actuators Surface Mount Haptic 13mm 154Hz 2Vrms",
     "display_name": "Solenoid",
     "specs": {
@@ -16,16 +16,27 @@
       "Country of Diffusion": "Not available",
       "Country of Origin": "China",
       "ECCN": "EAR99",
+      "Function": "Vibration, LRA (Haptic)",
       "HTS Code (US)": "8501104020",
       "Image": "https://www.mouser.com/images/puiaudio/images/HD-LA1307-SM_SPL.jpg",
-      "Lead Time": "90 Days",
       "Minimum Order Quantity": "1",
+      "Moisture Sensitivity Level": "2 (1 Year)",
+      "Operating Temperature": "-20°C ~ 65°C",
       "Order Multiple": "1",
+      "Package Type": "Tape & Reel (TR)",
       "Packaging": "Reel, Cut Tape",
       "Product Category": "Solenoids & Actuators",
-      "Standard Pack Qty": "400"
+      "REACH": "REACH Unaffected",
+      "RoHS": "ROHS3 Compliant",
+      "Series": "Haptics",
+      "Size / Dimension": "Square - 0.512\" x 0.512\" (13.00mm x 13.00mm)",
+      "Standard Pack Qty": "400",
+      "Standard Package": "200",
+      "Termination Style": "Solder Pad",
+      "Type": "AC Motor",
+      "Voltage - Rated": "1VAC"
     },
-    "value": ""
+    "value": "HD-LA1307-SM"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -125,6 +136,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/hd-la1307-sm-dcfc/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/hd-la1307-sm-dcfc/mouser.json"
+    }
+  },
   "tags": []
 }

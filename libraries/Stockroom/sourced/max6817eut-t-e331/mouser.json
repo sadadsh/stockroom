@@ -1,0 +1,226 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 2,
+  "Parts": [
+   {
+    "Availability": "8887 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/1014/1/MAX6816-MAX6818.pdf",
+    "Description": "Supervisory Circuits 15kV ESD-Protected, Single/Dual/Octal, CMOS Switch Debouncers",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_6_t.jpg",
+    "Category": "Supervisory Circuits",
+    "LeadTime": "98 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Analog Devices / Maxim Integrated",
+    "ManufacturerPartNumber": "MAX6817EUT+T",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "700-MAX6817EUTT",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "2500"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$9.28",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$7.22",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$6.70",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$6.13",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$5.98",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$5.98",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Analog-Devices-Maxim-Integrated/MAX6817EUT%2bT?qs=1THa7WoU59HkU%2FfQtsyW%252BA%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 3.6e-05
+    },
+    "AvailabilityInStock": "8887",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "250",
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542390090"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8542390000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "8542390990"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8542399999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Thailand"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Thailand"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "United States"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "Supervisory Circuits MAX6817EUT-T",
+    "FactoryStock": null,
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_6_t.jpg",
+    "Category": "Supervisory Circuits",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Obsolete",
+    "Manufacturer": "Analog Devices / Maxim Integrated",
+    "ManufacturerPartNumber": "MAX6817EUT-T",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "700-MAX6817EUTPBT",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "2500"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Analog-Devices-Maxim-Integrated/MAX6817EUT-T?qs=CDqwynd4ZNqjoqolH2B1Hw%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "No",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 6.5e-06
+    },
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [
+     "Mouser does not presently sell this product in your region."
+    ],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542390090"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8542319000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8542390000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854239099"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8542399901"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Malaysia"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,122 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "3848 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Single Color LEDs WL-SMCC 80mcd 2V 120 degress 0603 Amber",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/wurthelectronics/images/150060AS73220_SPL.jpg",
+    "Category": "Single Color LEDs",
+    "LeadTime": "119 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Wurth Elektronik",
+    "ManufacturerPartNumber": "150060AS73220",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "710-150060AS73220",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.22",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.208",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.196",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.185",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.159",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060AS73220?qs=1Kr7Jg1SGW9sU81rXsLyyQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 1e-05
+    },
+    "AvailabilityInStock": "3848",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541410000"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541410090"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541410000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854141000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541410000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

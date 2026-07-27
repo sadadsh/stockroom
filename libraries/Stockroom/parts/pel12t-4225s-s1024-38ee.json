@@ -105,8 +105,8 @@
   },
   "derived": {
     "category": "Sensors",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Encoders Red Blue/Green LED Push Switch Knurled",
     "display_name": "Encoder",
     "specs": {
@@ -126,8 +126,6 @@
       "HTS Code (MX)": "8536509999",
       "HTS Code (US)": "8543704500",
       "Image": "https://www.mouser.com/images/bourns/images/PEL12_red_led_encoder_SPL.jpg",
-      "Lead Time": "112 Days",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "Not Applicable",
       "Mounting Type": "PCB, Through Hole",
@@ -146,7 +144,7 @@
       "Termination Style": "PC Pin",
       "Unit Weight (kg)": "0.003"
     },
-    "value": ""
+    "value": "PEL12T-4225S-S1024"
   },
   "enrichment": {
     "Actuator Type": {
@@ -346,6 +344,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/pel12t-4225s-s1024-38ee/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/pel12t-4225s-s1024-38ee/mouser.json"
+    }
+  },
   "tags": []
 }

@@ -1,0 +1,126 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "None",
+    "DataSheetUrl": "",
+    "Description": "Tactile Switches SWITCH TACTILE",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/Littelfuse/images/KSC241JSPDELTALFS_SPL.jpg",
+    "Category": "Tactile Switches",
+    "LeadTime": "105 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "C&K",
+    "ManufacturerPartNumber": "KSC241JSPDELTALFS",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "611-SC241JSPDELTALFS",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "2000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.64",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.576",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$0.544",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.48",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.444",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.425",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2000,
+      "Price": "$0.38",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 4000,
+      "Price": "$0.349",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/CK/KSC241JSPDELTALFS?qs=Li%252BoUPsLEnslVYDCc2RJpg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": "0",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536509031"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536500090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536502000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "France"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

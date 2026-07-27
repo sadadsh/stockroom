@@ -1,0 +1,6314 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "CONN SOCKET 22-30AWG CRIMP TIN",
+    "DetailedDescription": "Socket Contact Tin 22-26 AWG Crimp Stamped"
+   },
+   "Manufacturer": {
+    "Id": 455,
+    "Name": "JST Sales America Inc."
+   },
+   "ManufacturerProductNumber": "SEH-001T-P0.6",
+   "UnitPrice": 0.01871,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/jst-sales-america-inc/SEH-001T-P0-6/527267",
+   "DatasheetUrl": "https://www.jst-mfg.com/product/pdf/eng/eEH.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/1067/SEH-001T-P0.6.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "455-1042TR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.01871,
+       "TotalPrice": 168.39
+      },
+      {
+       "BreakQuantity": 18000,
+       "UnitPrice": 0.01782,
+       "TotalPrice": 320.76
+      },
+      {
+       "BreakQuantity": 27000,
+       "UnitPrice": 0.01731,
+       "TotalPrice": 467.37
+      },
+      {
+       "BreakQuantity": 45000,
+       "UnitPrice": 0.0167,
+       "TotalPrice": 751.5
+      },
+      {
+       "BreakQuantity": 63000,
+       "UnitPrice": 0.01631,
+       "TotalPrice": 1027.53
+      },
+      {
+       "BreakQuantity": 90000,
+       "UnitPrice": 0.0159,
+       "TotalPrice": 1431.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 455,
+      "Name": "JST Sales America Inc."
+     },
+     "QuantityAvailableforPackageType": 828000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 9000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 828000,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "407919",
+     "ValueText": "Stamped"
+    },
+    {
+     "ParameterId": 233,
+     "ParameterText": "Pin or Socket",
+     "ParameterType": "String",
+     "ValueId": "404675",
+     "ValueText": "Socket"
+    },
+    {
+     "ParameterId": 31,
+     "ParameterText": "Contact Termination",
+     "ParameterType": "String",
+     "ValueId": "334919",
+     "ValueText": "Crimp"
+    },
+    {
+     "ParameterId": 78,
+     "ParameterText": "Wire Gauge",
+     "ParameterType": "String",
+     "ValueId": "148153",
+     "ValueText": "22-26 AWG"
+    },
+    {
+     "ParameterId": 30,
+     "ParameterText": "Contact Finish",
+     "ParameterType": "String",
+     "ValueId": "412237",
+     "ValueText": "Tin"
+    },
+    {
+     "ParameterId": 834,
+     "ParameterText": "Contact Finish Thickness",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 580826,
+    "Name": "SEH-001"
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2027,
+      "ParentId": 20,
+      "Name": "Rectangular Connectors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/244/550/C-Grid-III-90131%282-POS%29tin_tmb%2864x64%29.jpg",
+      "SeoDescription": "Rectangular Connectors include a wide variety of connector solutions for power, data, and signal applications. As the name implies, they are rectangular in shape and can provide ease to the design process. Many of the most commonly found connectors and connector accessories fall into this category.",
+      "ChildCategories": [
+       {
+        "CategoryId": 331,
+        "ParentId": 2027,
+        "Name": "Rectangular Connector Contacts",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/684/sxh-001t-p0.6_tmb%2864x64%29.jpg",
+        "SeoDescription": "Rectangular Connector Contacts are male, female, or non-gendered terminals that are used in connectors. These terminals are specifically used in connectors that will have a rectangular look to the mating end of the device. The pin or socket will be a blade, board-in, female blade sockets, non-gendered, pin, socket, split pin, or tab in wire gauges ranging from 1/0 AWG to 36 AWG.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 3740,
+    "Name": "EH"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.90.4000"
+   },
+   "OtherNames": [
+    "455-1042CT",
+    "455-1042TR",
+    "(C)SEH-001T-P0.6",
+    "455-SEH-001T-P0.6CT",
+    "455-SEH-001T-P0.6TR-ND",
+    "455-SEH-001T-P0.6TR",
+    "455-1042-1-ND",
+    "455-1042-2-ND",
+    "455-SEH-001T-P0.6CT-ND",
+    "455-1042-1",
+    "455-1042-2",
+    "SEH001TP06"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "CAP CER 10000PF 16V X7R 0402",
+    "DetailedDescription": "10000 pF ±10% 16V Ceramic Capacitor X7R 0402 (1005 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 13,
+    "Name": "YAGEO"
+   },
+   "ManufacturerProductNumber": "CC0402KRX7R7BB103",
+   "UnitPrice": 0.1,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/yageo/CC0402KRX7R7BB103/302776",
+   "DatasheetUrl": "https://yageogroup.com/content/datasheet/asset/file/UPY-GPHC_X7R_6_3V-TO-250V",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2392/0402%280%5E50%20thickness%29.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "311-1042-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 10000,
+       "UnitPrice": 0.00426,
+       "TotalPrice": 42.6
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.00383,
+       "TotalPrice": 76.6
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.00362,
+       "TotalPrice": 108.6
+      },
+      {
+       "BreakQuantity": 50000,
+       "UnitPrice": 0.00338,
+       "TotalPrice": 169.0
+      },
+      {
+       "BreakQuantity": 70000,
+       "UnitPrice": 0.00324,
+       "TotalPrice": 226.8
+      },
+      {
+       "BreakQuantity": 100000,
+       "UnitPrice": 0.00311,
+       "TotalPrice": 311.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 13,
+      "Name": "YAGEO"
+     },
+     "QuantityAvailableforPackageType": 4752347,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 10000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "311-1042-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.1,
+       "TotalPrice": 0.1
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.02,
+       "TotalPrice": 0.2
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.0128,
+       "TotalPrice": 0.64
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0108,
+       "TotalPrice": 1.08
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.00748,
+       "TotalPrice": 3.74
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.00648,
+       "TotalPrice": 6.48
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.00542,
+       "TotalPrice": 13.55
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.00478,
+       "TotalPrice": 23.9
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 13,
+      "Name": "YAGEO"
+     },
+     "QuantityAvailableforPackageType": 4752668,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "311-1042-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.1,
+       "TotalPrice": 0.1
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.02,
+       "TotalPrice": 0.2
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.0128,
+       "TotalPrice": 0.64
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0108,
+       "TotalPrice": 1.08
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.00748,
+       "TotalPrice": 3.74
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.00648,
+       "TotalPrice": 6.48
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.00542,
+       "TotalPrice": 13.55
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.00478,
+       "TotalPrice": 23.9
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 13,
+      "Name": "YAGEO"
+     },
+     "QuantityAvailableforPackageType": 4752668,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 4752668,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/6365329721112",
+   "Parameters": [
+    {
+     "ParameterId": 2049,
+     "ParameterText": "Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10000 pF",
+     "ValueText": "10000 pF"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1340",
+     "ValueText": "±10%"
+    },
+    {
+     "ParameterId": 14,
+     "ParameterText": "Voltage - Rated",
+     "ParameterType": "String",
+     "ValueId": "108742",
+     "ValueText": "16V"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "422415",
+     "ValueText": "X7R"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242918",
+     "ValueText": "-55°C ~ 125°C"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "350483",
+     "ValueText": "General Purpose"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409416",
+     "ValueText": "Surface Mount, MLCC"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39158",
+     "ValueText": "0402 (1005 Metric)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "6310",
+     "ValueText": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "5314",
+     "ValueText": "0.022\" (0.55mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 4,
+     "ParameterText": "Lead Style",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 3,
+    "ParentId": 0,
+    "Name": "Capacitors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/640/398/BCAP0350%20E270%20T11_tmb%2864x64%29.jpg",
+    "SeoDescription": "Capacitor products, also known as \"condensers\", are generally named and organized in reference to the dielectric material incorporated within. Along with variations in construction methods, the choice of dielectric material has strong influence on a given device's relative cost, size, parametric stability, and suitability for a particular application.",
+    "ChildCategories": [
+     {
+      "CategoryId": 60,
+      "ParentId": 3,
+      "Name": "Ceramic Capacitors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/365/960/CGA-Series-0402-%281005-Metric%29_tmb.jpg",
+      "SeoDescription": "A capacitor is a passive electronic device that stores electric charge. Ceramic capacitors consist of two or more alternating layers of ceramic material as the dielectric and metal layers acting as the non-polarized electrodes. Applications include automotive, bypass, decoupling, filtering, RF, and ESD protection. Through-hole versions are often disc or \"blob\" shaped with two wire leads.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 1727,
+    "Name": "CC"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8532.24.0020"
+   },
+   "OtherNames": [
+    "Q2693894",
+    "311-1042-6",
+    "04022R103K7B20D",
+    "311-1042-2",
+    "311-1042-1",
+    "223878715636"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "CONN SOCKET 14-20AWG CRIMP TIN",
+    "DetailedDescription": "Socket Contact Tin 14-20 AWG Crimp Power"
+   },
+   "Manufacturer": {
+    "Id": 23,
+    "Name": "Molex"
+   },
+   "ManufacturerProductNumber": "0002091104",
+   "UnitPrice": 0.17,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/molex/0002091104/26386",
+   "DatasheetUrl": "https://www.molex.com/en-us/products/part-detail/02091104?display=pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6680/MFG_2091104.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "WM1101-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.17,
+       "TotalPrice": 0.17
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.144,
+       "TotalPrice": 1.44
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.1356,
+       "TotalPrice": 3.39
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.129,
+       "TotalPrice": 6.45
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1227,
+       "TotalPrice": 12.27
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.11504,
+       "TotalPrice": 28.76
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.10952,
+       "TotalPrice": 54.76
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.10429,
+       "TotalPrice": 104.29
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.09775,
+       "TotalPrice": 244.375
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 900,
+      "Name": "Molex"
+     },
+     "QuantityAvailableforPackageType": 50910,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 50910,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "389095",
+     "ValueText": "Power"
+    },
+    {
+     "ParameterId": 233,
+     "ParameterText": "Pin or Socket",
+     "ParameterType": "String",
+     "ValueId": "404675",
+     "ValueText": "Socket"
+    },
+    {
+     "ParameterId": 31,
+     "ParameterText": "Contact Termination",
+     "ParameterType": "String",
+     "ValueId": "334919",
+     "ValueText": "Crimp"
+    },
+    {
+     "ParameterId": 78,
+     "ParameterText": "Wire Gauge",
+     "ParameterType": "String",
+     "ValueId": "95045",
+     "ValueText": "14-20 AWG"
+    },
+    {
+     "ParameterId": 30,
+     "ParameterText": "Contact Finish",
+     "ParameterType": "String",
+     "ValueId": "412237",
+     "ValueText": "Tin"
+    },
+    {
+     "ParameterId": 834,
+     "ParameterText": "Contact Finish Thickness",
+     "ParameterType": "String",
+     "ValueId": "138327",
+     "ValueText": "20.0µin (0.51µm)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 135770,
+    "Name": "000209"
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2027,
+      "ParentId": 20,
+      "Name": "Rectangular Connectors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/244/550/C-Grid-III-90131%282-POS%29tin_tmb%2864x64%29.jpg",
+      "SeoDescription": "Rectangular Connectors include a wide variety of connector solutions for power, data, and signal applications. As the name implies, they are rectangular in shape and can provide ease to the design process. Many of the most commonly found connectors and connector accessories fall into this category.",
+      "ChildCategories": [
+       {
+        "CategoryId": 331,
+        "ParentId": 2027,
+        "Name": "Rectangular Connector Contacts",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/684/sxh-001t-p0.6_tmb%2864x64%29.jpg",
+        "SeoDescription": "Rectangular Connector Contacts are male, female, or non-gendered terminals that are used in connectors. These terminals are specifically used in connectors that will have a rectangular look to the mating end of the device. The pin or socket will be a blade, board-in, female blade sockets, non-gendered, pin, socket, split pin, or tab in wire gauges ranging from 1/0 AWG to 36 AWG.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "13",
+   "ManufacturerPublicQuantity": 44000,
+   "Series": {
+    "Id": 5576,
+    "Name": "1189"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.90.4000"
+   },
+   "OtherNames": [
+    "02091104-C",
+    "1189-A(P901)L",
+    "WM1101-NDR",
+    "02-09-1103",
+    "02-09-1104",
+    "2091104",
+    "02-09-1104-C",
+    "2266-2091104-23",
+    "0002091104-C",
+    "0002-09-1104-C",
+    "0002-09-1104",
+    "02091104",
+    "WM1101"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "THERMISTOR NTC 10KOHM 3940K 0603",
+    "DetailedDescription": "NTC Thermistor 10k 0603 (1608 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 445,
+    "Name": "TDK"
+   },
+   "ManufacturerProductNumber": "B57321V2103J060",
+   "UnitPrice": 0.22,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/tdk/B57321V2103J060/739857",
+   "DatasheetUrl": "https://www.tdk-electronics.tdk.com/inf/50/db/ntc/NTC_SMD_Standard_series_0603.pdf?ref_disty=digikey",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/862/b57321v2103j60.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "495-2104-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.10466,
+       "TotalPrice": 418.64
+      },
+      {
+       "BreakQuantity": 8000,
+       "UnitPrice": 0.10043,
+       "TotalPrice": 803.44
+      },
+      {
+       "BreakQuantity": 12000,
+       "UnitPrice": 0.09812,
+       "TotalPrice": 1177.44
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.09537,
+       "TotalPrice": 1907.4
+      },
+      {
+       "BreakQuantity": 28000,
+       "UnitPrice": 0.09365,
+       "TotalPrice": 2622.2
+      },
+      {
+       "BreakQuantity": 40000,
+       "UnitPrice": 0.09191,
+       "TotalPrice": 3676.4
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 495,
+      "Name": "TDK"
+     },
+     "QuantityAvailableforPackageType": 64000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "495-2104-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.22,
+       "TotalPrice": 0.22
+      },
+      {
+       "BreakQuantity": 5,
+       "UnitPrice": 0.188,
+       "TotalPrice": 0.94
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.178,
+       "TotalPrice": 1.78
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.1644,
+       "TotalPrice": 4.11
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1556,
+       "TotalPrice": 7.78
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1475,
+       "TotalPrice": 14.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.13122,
+       "TotalPrice": 65.61
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.12517,
+       "TotalPrice": 125.17
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 495,
+      "Name": "TDK"
+     },
+     "QuantityAvailableforPackageType": 66136,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "495-2104-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.22,
+       "TotalPrice": 0.22
+      },
+      {
+       "BreakQuantity": 5,
+       "UnitPrice": 0.188,
+       "TotalPrice": 0.94
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.178,
+       "TotalPrice": 1.78
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.1644,
+       "TotalPrice": 4.11
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1556,
+       "TotalPrice": 7.78
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1475,
+       "TotalPrice": 14.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.13122,
+       "TotalPrice": 65.61
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.12517,
+       "TotalPrice": 125.17
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 495,
+      "Name": "TDK"
+     },
+     "QuantityAvailableforPackageType": 66136,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 66136,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/5410976528001",
+   "Parameters": [
+    {
+     "ParameterId": 866,
+     "ParameterText": "Resistance in Ohms @ 25°C",
+     "ParameterType": "String",
+     "ValueId": "73403",
+     "ValueText": "10k"
+    },
+    {
+     "ParameterId": 867,
+     "ParameterText": "Resistance Tolerance",
+     "ParameterType": "String",
+     "ValueId": "2503",
+     "ValueText": "±5%"
+    },
+    {
+     "ParameterId": 865,
+     "ParameterText": "B Value Tolerance",
+     "ParameterType": "String",
+     "ValueId": "2106",
+     "ValueText": "±3%"
+    },
+    {
+     "ParameterId": 861,
+     "ParameterText": "B0/50",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 862,
+     "ParameterText": "B25/50",
+     "ParameterType": "String",
+     "ValueId": "201093",
+     "ValueText": "3940K"
+    },
+    {
+     "ParameterId": 898,
+     "ParameterText": "B25/75",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 863,
+     "ParameterText": "B25/85",
+     "ParameterType": "String",
+     "ValueId": "201304",
+     "ValueText": "3980K"
+    },
+    {
+     "ParameterId": 864,
+     "ParameterText": "B25/100",
+     "ParameterType": "String",
+     "ValueId": "213090",
+     "ValueText": "4000K"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242918",
+     "ValueText": "-55°C ~ 125°C"
+    },
+    {
+     "ParameterId": 2109,
+     "ParameterText": "Power - Max",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "180 mW",
+     "ValueText": "180 mW"
+    },
+    {
+     "ParameterId": 976,
+     "ParameterText": "Length - Lead Wire",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39246",
+     "ValueText": "0603 (1608 Metric)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 25,
+    "ParentId": 0,
+    "Name": "Sensors, Transducers",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/103/177/MFG_TE-M32Mx-A11x_side_tmb%2864x64%29.jpg",
+    "SeoDescription": "Sensor and transducer products facilitate the measurement or detection of physical processes and phenomena, often though not always by transforming them into an electrical signal of some format. Among others, products are available for the measurement of color, fluid level or flow, gas concentration, image detection, magnetic field, linear acceleration or rotation, vibration, light intensity, object presence, distance, temperature, mechanical strain, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2075,
+      "ParentId": 25,
+      "Name": "Temperature Sensors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/030/220/004/MFG_NTE-DTO210_tmb.jpg",
+      "SeoDescription": "Temperature Sensors are devices that detect hot or cool temperatures and convert the findings into an electrical signal relative to the detection. Types include analog and digital output, industrial analog and digital output, NTC thermistors, PTC thermistors, resistance temperature detectors (RTDs), thermocouples, temperatures probes, thermostats (mechanical, industrial mechanical, solid state), and more.",
+      "ChildCategories": [
+       {
+        "CategoryId": 508,
+        "ParentId": 2075,
+        "Name": "NTC Thermistors",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/134/274/NXFT15XH103FA2B100_tmb.jpg",
+        "SeoDescription": "NTC Thermistors, or Negative Temperature Coefficient Thermistors, are devices that change resistance in response to changes in temperature. With negative coefficient parts, their resistance decreases as their temperature increases. They are typically defined with variables such as the parts base resistance value at a set temperature, usually 25°C, and B values, the performance curve of temperature vs. resistance calibrated between two fixed points.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "15",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 59143,
+    "Name": "B573xxV2"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8533.40.8070"
+   },
+   "OtherNames": [
+    "495-2104-6",
+    "B57321V2103J060V09",
+    "-B57321V2103J60",
+    "B57321V2103J 60",
+    "B57321V2103J60",
+    "495-2104-2",
+    "495-2104-1"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "WIRE MARKR SLIPON 9.9X31.8MM WHT",
+    "DetailedDescription": "Wire Marker, Slip-On 0.39\" W x 1.25\" L (9.9mm x 31.8mm) White Poly-Vinyl Chloride (PVC)"
+   },
+   "Manufacturer": {
+    "Id": 298,
+    "Name": "Panduit Corp"
+   },
+   "ManufacturerProductNumber": "NWSLC-7Y",
+   "UnitPrice": 0.25,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/panduit-corp/NWSLC-7Y/3992966",
+   "DatasheetUrl": "https://www.panduit.com/content/dam/panduit/en/products/media/9/19/319/1319/101471319.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/845/NWSLC-7Y.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "298-10422-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.25,
+       "TotalPrice": 0.25
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.233,
+       "TotalPrice": 2.33
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.226,
+       "TotalPrice": 5.65
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.2212,
+       "TotalPrice": 11.06
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.2164,
+       "TotalPrice": 21.64
+      },
+      {
+       "BreakQuantity": 300,
+       "UnitPrice": 0.20907,
+       "TotalPrice": 62.721
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.20574,
+       "TotalPrice": 102.87
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.20131,
+       "TotalPrice": 201.31
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.1956,
+       "TotalPrice": 489.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 298,
+      "Name": "Panduit Corp"
+     },
+     "QuantityAvailableforPackageType": 9080,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 9080,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "421542",
+     "ValueText": "Wire Marker, Slip-On"
+    },
+    {
+     "ParameterId": 352,
+     "ParameterText": "Size",
+     "ParameterType": "String",
+     "ValueId": "21326",
+     "ValueText": "0.39\" W x 1.25\" L (9.9mm x 31.8mm)"
+    },
+    {
+     "ParameterId": 261,
+     "ParameterText": "Cable Diameter",
+     "ParameterType": "String",
+     "ValueId": "16867",
+     "ValueText": "0.270\" (6.86mm)"
+    },
+    {
+     "ParameterId": 426,
+     "ParameterText": "Legend",
+     "ParameterType": "String",
+     "ValueId": "320326",
+     "ValueText": "Blank"
+    },
+    {
+     "ParameterId": 37,
+     "ParameterText": "Color",
+     "ParameterType": "String",
+     "ValueId": "421080",
+     "ValueText": "White"
+    },
+    {
+     "ParameterId": 70,
+     "ParameterText": "Material",
+     "ParameterType": "String",
+     "ValueId": "388809",
+     "ValueText": "Poly-Vinyl Chloride (PVC)"
+    },
+    {
+     "ParameterId": 2321,
+     "ParameterText": "Shelf Life",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 2320,
+     "ParameterText": "Shelf Life Start",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 353832,
+    "Name": "NWSLC"
+   },
+   "Category": {
+    "CategoryId": 23,
+    "ParentId": 0,
+    "Name": "Cables, Wires - Management",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/285/005/MFG_ACCxx-A%28T%29-x_tmb.jpg",
+    "SeoDescription": "Products within the cable and wire management category are used for physically organizing, protecting, installing, or identifying electrical or fiber optic conductors and cables. These include but are not limited to bushings, grommets, and cable grips to protect cordage passing through an enclosure wall from damage, cable ties and split loom or spiral wrap sleeving for physically bundling installed cables together, printable and pre-printed lables and clip-on markers for identification, and cable trays & raceways for serviceable routing of cable systems within a physical facility such as a data center or office building.",
+    "ChildCategories": [
+     {
+      "CategoryId": 493,
+      "ParentId": 23,
+      "Name": "Markers",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/215/08004620002_tmb%2864x64%29.jpg",
+      "SeoDescription": "Markers are small numeric labels used for identification of wires. These devices are secured to wires and cables through a variety of means: Adhesive, Cable Tie, Clip-on, Slip-on, Perforated, Cards, Heat Shrinkable, Push-on, Slip-in, Miniature, and Tape with Dispenser. Sizes range from 0.08” to 2.13” Dia., 0.12” W x 0.12” L to 14.00” W x 23.00” L.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "10",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 40413,
+    "Name": "PanTher™, LabelCore™"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "Not Applicable",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "3926.90.9989"
+   },
+   "OtherNames": [
+    "Q7596908",
+    "298-10422",
+    "NWSLC-7Y-ND"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "CAP CER 2.2UF 16V X7S 0603",
+    "DetailedDescription": "2.2 µF ±10% 16V Ceramic Capacitor X7S 0603 (1608 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 445,
+    "Name": "TDK"
+   },
+   "ManufacturerProductNumber": "CGA3E1X7S1C225K080AC",
+   "UnitPrice": 0.26,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/tdk/CGA3E1X7S1C225K080AC/4712720",
+   "DatasheetUrl": "https://product.tdk.com/system/files/dam/doc/product/capacitor/ceramic/mlcc/catalog/mlcc_automotive_general_en.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2097/CGA-Series-0603-%281608-Metric%29.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "445-16104-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.05392,
+       "TotalPrice": 215.68
+      },
+      {
+       "BreakQuantity": 8000,
+       "UnitPrice": 0.0504,
+       "TotalPrice": 403.2
+      },
+      {
+       "BreakQuantity": 12000,
+       "UnitPrice": 0.04864,
+       "TotalPrice": 583.68
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.04669,
+       "TotalPrice": 933.8
+      },
+      {
+       "BreakQuantity": 28000,
+       "UnitPrice": 0.04554,
+       "TotalPrice": 1275.12
+      },
+      {
+       "BreakQuantity": 40000,
+       "UnitPrice": 0.04445,
+       "TotalPrice": 1778.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 445,
+      "Name": "TDK"
+     },
+     "QuantityAvailableforPackageType": 60000,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 4000,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "445-16104-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.26,
+       "TotalPrice": 0.26
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.151,
+       "TotalPrice": 1.51
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1086,
+       "TotalPrice": 5.43
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0956,
+       "TotalPrice": 9.56
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.07384,
+       "TotalPrice": 36.92
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.06713,
+       "TotalPrice": 67.13
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 445,
+      "Name": "TDK"
+     },
+     "QuantityAvailableforPackageType": 60428,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "445-16104-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.26,
+       "TotalPrice": 0.26
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.151,
+       "TotalPrice": 1.51
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1086,
+       "TotalPrice": 5.43
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0956,
+       "TotalPrice": 9.56
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.07384,
+       "TotalPrice": 36.92
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.06713,
+       "TotalPrice": 67.13
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 445,
+      "Name": "TDK"
+     },
+     "QuantityAvailableforPackageType": 60428,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 60428,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/3903392545001",
+   "Parameters": [
+    {
+     "ParameterId": 2049,
+     "ParameterText": "Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "2.2 µF",
+     "ValueText": "2.2 µF"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1340",
+     "ValueText": "±10%"
+    },
+    {
+     "ParameterId": 14,
+     "ParameterText": "Voltage - Rated",
+     "ParameterType": "String",
+     "ValueId": "108742",
+     "ValueText": "16V"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "422418",
+     "ValueText": "X7S"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242918",
+     "ValueText": "-55°C ~ 125°C"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "312105",
+     "ValueText": "AEC-Q200"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "316912",
+     "ValueText": "Automotive"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409416",
+     "ValueText": "Surface Mount, MLCC"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39246",
+     "ValueText": "0603 (1608 Metric)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "7802",
+     "ValueText": "0.063\" L x 0.031\" W (1.60mm x 0.80mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "6031",
+     "ValueText": "0.035\" (0.90mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 4,
+     "ParameterText": "Lead Style",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 3,
+    "ParentId": 0,
+    "Name": "Capacitors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/640/398/BCAP0350%20E270%20T11_tmb%2864x64%29.jpg",
+    "SeoDescription": "Capacitor products, also known as \"condensers\", are generally named and organized in reference to the dielectric material incorporated within. Along with variations in construction methods, the choice of dielectric material has strong influence on a given device's relative cost, size, parametric stability, and suitability for a particular application.",
+    "ChildCategories": [
+     {
+      "CategoryId": 60,
+      "ParentId": 3,
+      "Name": "Ceramic Capacitors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/365/960/CGA-Series-0402-%281005-Metric%29_tmb.jpg",
+      "SeoDescription": "A capacitor is a passive electronic device that stores electric charge. Ceramic capacitors consist of two or more alternating layers of ceramic material as the dielectric and metal layers acting as the non-polarized electrodes. Applications include automotive, bypass, decoupling, filtering, RF, and ESD protection. Through-hole versions are often disc or \"blob\" shaped with two wire leads.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "24",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 26420,
+    "Name": "CGA"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8532.24.0020"
+   },
+   "OtherNames": [
+    "445-16104-2",
+    "445-16104-1",
+    "CGA3E1X7S1C225KT000N",
+    "445-16104-6"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "FIXED IND 1UH 2A 95 MOHM SMD",
+    "DetailedDescription": "1 µH Shielded Drum Core, Wirewound Inductor 2 A 95mOhm Max 0805 (2012 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 490,
+    "Name": "Murata Electronics"
+   },
+   "ManufacturerProductNumber": "DFE201210U-1R0M=P2",
+   "UnitPrice": 0.29,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/murata-electronics/DFE201210U-1R0M-P2/7927526",
+   "DatasheetUrl": "https://search.murata.co.jp/Ceramy/image/img/P02/J(E)TE243A-0029.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/895/0805-%282012-Metric%29-DFE2012.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "490-18104-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.14642,
+       "TotalPrice": 439.26
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.13806,
+       "TotalPrice": 828.36
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.13341,
+       "TotalPrice": 1200.69
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.12777,
+       "TotalPrice": 1916.55
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.12419,
+       "TotalPrice": 2607.99
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.1205,
+       "TotalPrice": 3615.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 75000,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 3000,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "490-18104-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.29,
+       "TotalPrice": 0.29
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.242,
+       "TotalPrice": 2.42
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1993,
+       "TotalPrice": 19.93
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.16387,
+       "TotalPrice": 163.87
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 75341,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "490-18104-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.29,
+       "TotalPrice": 0.29
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.242,
+       "TotalPrice": 2.42
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1993,
+       "TotalPrice": 19.93
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.16387,
+       "TotalPrice": 163.87
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 75341,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 75341,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "694884",
+     "ValueText": "Drum Core, Wirewound"
+    },
+    {
+     "ParameterId": 1221,
+     "ParameterText": "Material - Core",
+     "ParameterType": "String",
+     "ValueId": "374890",
+     "ValueText": "Metal"
+    },
+    {
+     "ParameterId": 2087,
+     "ParameterText": "Inductance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 µH",
+     "ValueText": "1 µH"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1900",
+     "ValueText": "±20%"
+    },
+    {
+     "ParameterId": 2088,
+     "ParameterText": "Current Rating (Amps)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "2 A",
+     "ValueText": "2 A"
+    },
+    {
+     "ParameterId": 1219,
+     "ParameterText": "Current - Saturation (Isat)",
+     "ParameterType": "String",
+     "ValueId": "171884",
+     "ValueText": "3.1A"
+    },
+    {
+     "ParameterId": 80,
+     "ParameterText": "Shielding",
+     "ParameterType": "String",
+     "ValueId": "402031",
+     "ValueText": "Shielded"
+    },
+    {
+     "ParameterId": 314,
+     "ParameterText": "DC Resistance (DCR)",
+     "ParameterType": "String",
+     "ValueId": "302636",
+     "ValueText": "95mOhm Max"
+    },
+    {
+     "ParameterId": 705,
+     "ParameterText": "Q @ Freq",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 706,
+     "ParameterText": "Frequency - Self Resonant",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212478",
+     "ValueText": "-40°C ~ 125°C"
+    },
+    {
+     "ParameterId": 1222,
+     "ParameterText": "Inductance Frequency - Test",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 MHz",
+     "ValueText": "1 MHz"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39329",
+     "ValueText": "0805 (2012 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "39329",
+     "ValueText": "0805 (2012 Metric)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "8568",
+     "ValueText": "0.079\" L x 0.047\" W (2.00mm x 1.20mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "6219",
+     "ValueText": "0.039\" (1.00mm)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 178416,
+    "Name": "DFE201210U"
+   },
+   "Category": {
+    "CategoryId": 4,
+    "ParentId": 0,
+    "Name": "Inductors, Coils, Chokes",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/465/830/760308104119_tmb%2864x64%29.jpg",
+    "SeoDescription": "Inductors, coils, and chokes are various names used to refer to products that store energy in the form of a magnetic field. The vast majority of the products found in this category are simple fixed-value devices, though adjustable types, products for wireless power transmission, and magnetically-coupled inductor arrays are also included. Note that the coupled-inductor devices found within this product family are characterized by having multiple identical windings sharing a common magnetic core; similar products with non-identical windings are more commonly described as transformers, and are categorized as such.",
+    "ChildCategories": [
+     {
+      "CategoryId": 71,
+      "ParentId": 4,
+      "Name": "Fixed Inductors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/690/369/MFG_WE-HCF%202013%20Series_tmb%2864x64%29.jpg",
+      "SeoDescription": "An inductor, also known as a coil, choke, or reactor, is a passive two-terminal electrical component that stores energy in a magnetic field when electric current flows through it. When the current changes, the magnetic field induces a voltage in the conductor. The induced voltage has a polarity which opposes the change in current that created it. The unit of inductance is the Henry (H). Mounting options include surface, through-hole, and chassis.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "21",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 59174,
+    "Name": "DFE201210U"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8504.50.8000"
+   },
+   "OtherNames": [
+    "490-18104-1",
+    "DFE201210U-1R0M=P2-ND",
+    "490-18104-2",
+    "490-18104-6"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "LED RED CLEAR CHIP SMD",
+    "DetailedDescription": "Red 630nm LED Indication - Discrete 1.95V 0402 (1005 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 754,
+    "Name": "Kingbright"
+   },
+   "ManufacturerProductNumber": "APHHS1005SURCK",
+   "UnitPrice": 0.31,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/kingbright/APHHS1005SURCK/1747502",
+   "DatasheetUrl": "https://www.KingbrightUSA.com/images/catalog/SPEC/APHHS1005SURCK.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6348/MFG_APG1005.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "754-1104-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 2000,
+       "UnitPrice": 0.10532,
+       "TotalPrice": 210.64
+      },
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.09843,
+       "TotalPrice": 393.72
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.09488,
+       "TotalPrice": 569.28
+      },
+      {
+       "BreakQuantity": 10000,
+       "UnitPrice": 0.09088,
+       "TotalPrice": 908.8
+      },
+      {
+       "BreakQuantity": 14000,
+       "UnitPrice": 0.08849,
+       "TotalPrice": 1238.86
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.08617,
+       "TotalPrice": 1723.4
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 754,
+      "Name": "Kingbright"
+     },
+     "QuantityAvailableforPackageType": 468000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 2000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "754-1104-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.31,
+       "TotalPrice": 0.31
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.215,
+       "TotalPrice": 2.15
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1517,
+       "TotalPrice": 15.17
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.12294,
+       "TotalPrice": 61.47
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.11343,
+       "TotalPrice": 113.43
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 754,
+      "Name": "Kingbright"
+     },
+     "QuantityAvailableforPackageType": 469015,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "754-1104-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.31,
+       "TotalPrice": 0.31
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.215,
+       "TotalPrice": 2.15
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1517,
+       "TotalPrice": 15.17
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.12294,
+       "TotalPrice": 61.47
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.11343,
+       "TotalPrice": 113.43
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 754,
+      "Name": "Kingbright"
+     },
+     "QuantityAvailableforPackageType": 469015,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 469015,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 37,
+     "ParameterText": "Color",
+     "ParameterType": "String",
+     "ValueId": "395219",
+     "ValueText": "Red"
+    },
+    {
+     "ParameterId": 207,
+     "ParameterText": "Configuration",
+     "ParameterType": "String",
+     "ValueId": "407938",
+     "ValueText": "Standard"
+    },
+    {
+     "ParameterId": 525,
+     "ParameterText": "Lens Color",
+     "ParameterType": "String",
+     "ValueId": "332225",
+     "ValueText": "Colorless"
+    },
+    {
+     "ParameterId": 1843,
+     "ParameterText": "Lens Transparency",
+     "ParameterType": "String",
+     "ValueId": "330893",
+     "ValueText": "Clear"
+    },
+    {
+     "ParameterId": 206,
+     "ParameterText": "Millicandela Rating",
+     "ParameterType": "String",
+     "ValueId": "273849",
+     "ValueText": "70mcd"
+    },
+    {
+     "ParameterId": 2028,
+     "ParameterText": "Lens Style",
+     "ParameterType": "String",
+     "ValueId": "393133",
+     "ValueText": "Rectangle with Flat Top"
+    },
+    {
+     "ParameterId": 2029,
+     "ParameterText": "Lens Size",
+     "ParameterType": "String",
+     "ValueId": "34592",
+     "ValueText": "0.80mm x 0.50mm"
+    },
+    {
+     "ParameterId": 319,
+     "ParameterText": "Voltage - Forward (Vf) (Typ)",
+     "ParameterType": "String",
+     "ValueId": "62164",
+     "ValueText": "1.95V"
+    },
+    {
+     "ParameterId": 543,
+     "ParameterText": "Current - Test",
+     "ParameterType": "String",
+     "ValueId": "143056",
+     "ValueText": "20mA"
+    },
+    {
+     "ParameterId": 551,
+     "ParameterText": "Viewing Angle",
+     "ParameterType": "String",
+     "ValueId": "83430",
+     "ValueText": "120°"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 969,
+     "ParameterText": "Wavelength - Dominant",
+     "ParameterType": "String",
+     "ValueId": "259979",
+     "ValueText": "630nm"
+    },
+    {
+     "ParameterId": 968,
+     "ParameterText": "Wavelength - Peak",
+     "ParameterType": "String",
+     "ValueId": "261306",
+     "ValueText": "645nm"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39158",
+     "ValueText": "0402 (1005 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "329488",
+     "ValueText": "Chip LED"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "41153",
+     "ValueText": "1.00mm L x 0.50mm W"
+    },
+    {
+     "ParameterId": 966,
+     "ParameterText": "Height (Max)",
+     "ParameterType": "String",
+     "ValueId": "29018",
+     "ValueText": "0.60mm"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 302733,
+    "Name": "APHHS1005"
+   },
+   "Category": {
+    "CategoryId": 7,
+    "ParentId": 0,
+    "Name": "Optoelectronics",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/388/510/MFG_ELI70-CR_tmb%2864x64%29.jpg",
+    "SeoDescription": "Broadly defined, optoelectronic products are devices that convert electricity to light, and accessory or supporting items such as reflectors or mounting hardware designed for use with such products. It is a diverse product category, including LEDs, fiber optic transmitters and receivers, LCD, OLED, and VFD displays, EL wire, incandescent lamps, lasers, light pipes and xenon flash tubes, among many other product types.",
+    "ChildCategories": [
+     {
+      "CategoryId": 105,
+      "ParentId": 7,
+      "Name": "LED Indication - Discrete",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/626/HLMP-3507%2CHLMP-3680%2CHLMP-3962_tmb%2864x64%29.jpg",
+      "SeoDescription": "Light emitting diodes are semiconductor devices that emit light when conducting current. LEDs in this family are single or array configuration for status indication on printed circuit boards. They are differentiated by package/case, wavelength, viewing angle, forward voltage, current rating, millicandela rating, color, and mounting type. Configurations include common anode or cathode and bidirectional.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "7",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "3  (168 Hours)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8541.41.0000"
+   },
+   "OtherNames": [
+    "754-1104-1",
+    "Q5899685D",
+    "754-1104-6",
+    "754-1104-2"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "CAP CER 10UF 6.3V X7S 0603",
+    "DetailedDescription": "10 µF ±20% 6.3V Ceramic Capacitor X7S 0603 (1608 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 445,
+    "Name": "TDK"
+   },
+   "ManufacturerProductNumber": "C1608X7S0J106M080AC",
+   "UnitPrice": 0.33,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/tdk/C1608X7S0J106M080AC/3661586",
+   "DatasheetUrl": "https://product.tdk.com/system/files/dam/doc/product/capacitor/ceramic/mlcc/catalog/mlcc_commercial_general_en.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4850/445_0603-%281608-Metric%29-0%2C95mm-C-Series.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "445-9104-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.07381,
+       "TotalPrice": 295.24
+      },
+      {
+       "BreakQuantity": 8000,
+       "UnitPrice": 0.06937,
+       "TotalPrice": 554.96
+      },
+      {
+       "BreakQuantity": 12000,
+       "UnitPrice": 0.06715,
+       "TotalPrice": 805.8
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.06469,
+       "TotalPrice": 1293.8
+      },
+      {
+       "BreakQuantity": 28000,
+       "UnitPrice": 0.06325,
+       "TotalPrice": 1771.0
+      },
+      {
+       "BreakQuantity": 40000,
+       "UnitPrice": 0.06187,
+       "TotalPrice": 2474.8
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 445,
+      "Name": "TDK"
+     },
+     "QuantityAvailableforPackageType": 122300,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "445-9104-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.33,
+       "TotalPrice": 0.33
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.196,
+       "TotalPrice": 1.96
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1428,
+       "TotalPrice": 7.14
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1266,
+       "TotalPrice": 12.66
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.09924,
+       "TotalPrice": 49.62
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.09079,
+       "TotalPrice": 90.79
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 445,
+      "Name": "TDK"
+     },
+     "QuantityAvailableforPackageType": 123316,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "445-9104-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.33,
+       "TotalPrice": 0.33
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.196,
+       "TotalPrice": 1.96
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1428,
+       "TotalPrice": 7.14
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1266,
+       "TotalPrice": 12.66
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.09924,
+       "TotalPrice": 49.62
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.09079,
+       "TotalPrice": 90.79
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 445,
+      "Name": "TDK"
+     },
+     "QuantityAvailableforPackageType": 123316,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 123316,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/3903392545001",
+   "Parameters": [
+    {
+     "ParameterId": 2049,
+     "ParameterText": "Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 µF",
+     "ValueText": "10 µF"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1900",
+     "ValueText": "±20%"
+    },
+    {
+     "ParameterId": 14,
+     "ParameterText": "Voltage - Rated",
+     "ParameterType": "String",
+     "ValueId": "252155",
+     "ValueText": "6.3V"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "422418",
+     "ValueText": "X7S"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242918",
+     "ValueText": "-55°C ~ 125°C"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "366832",
+     "ValueText": "Low ESL"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "350483",
+     "ValueText": "General Purpose"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409416",
+     "ValueText": "Surface Mount, MLCC"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39246",
+     "ValueText": "0603 (1608 Metric)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "7802",
+     "ValueText": "0.063\" L x 0.031\" W (1.60mm x 0.80mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "6219",
+     "ValueText": "0.039\" (1.00mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 4,
+     "ParameterText": "Lead Style",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 3,
+    "ParentId": 0,
+    "Name": "Capacitors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/640/398/BCAP0350%20E270%20T11_tmb%2864x64%29.jpg",
+    "SeoDescription": "Capacitor products, also known as \"condensers\", are generally named and organized in reference to the dielectric material incorporated within. Along with variations in construction methods, the choice of dielectric material has strong influence on a given device's relative cost, size, parametric stability, and suitability for a particular application.",
+    "ChildCategories": [
+     {
+      "CategoryId": 60,
+      "ParentId": 3,
+      "Name": "Ceramic Capacitors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/365/960/CGA-Series-0402-%281005-Metric%29_tmb.jpg",
+      "SeoDescription": "A capacitor is a passive electronic device that stores electric charge. Ceramic capacitors consist of two or more alternating layers of ceramic material as the dielectric and metal layers acting as the non-polarized electrodes. Applications include automotive, bypass, decoupling, filtering, RF, and ESD protection. Through-hole versions are often disc or \"blob\" shaped with two wire leads.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 1054,
+    "Name": "C"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8532.24.0020"
+   },
+   "OtherNames": [
+    "C1608X7S0J106MT000E",
+    "445-9104-6",
+    "445-9104-2",
+    "C1608X7S0J106M",
+    "445-9104-1"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "CONN SOCKET 22-24AWG CRIMP GOLD",
+    "DetailedDescription": "Socket Contact Gold 22-24 AWG Crimp"
+   },
+   "Manufacturer": {
+    "Id": 23,
+    "Name": "Molex"
+   },
+   "ManufacturerProductNumber": "0016020104",
+   "UnitPrice": 0.35,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/molex/0016020104/1118774",
+   "DatasheetUrl": "https://www.molex.com/pdm_docs/sd/016020104_sd.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/1266/0016020104.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "WM2564-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.35,
+       "TotalPrice": 0.35
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.301,
+       "TotalPrice": 3.01
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.282,
+       "TotalPrice": 7.05
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.2686,
+       "TotalPrice": 13.43
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.2558,
+       "TotalPrice": 25.58
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.23972,
+       "TotalPrice": 59.93
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.22826,
+       "TotalPrice": 114.13
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.21735,
+       "TotalPrice": 217.35
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.20374,
+       "TotalPrice": 509.35
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 900,
+      "Name": "Molex"
+     },
+     "QuantityAvailableforPackageType": 25700,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 25700,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 233,
+     "ParameterText": "Pin or Socket",
+     "ParameterType": "String",
+     "ValueId": "404675",
+     "ValueText": "Socket"
+    },
+    {
+     "ParameterId": 31,
+     "ParameterText": "Contact Termination",
+     "ParameterType": "String",
+     "ValueId": "334919",
+     "ValueText": "Crimp"
+    },
+    {
+     "ParameterId": 78,
+     "ParameterText": "Wire Gauge",
+     "ParameterType": "String",
+     "ValueId": "148142",
+     "ValueText": "22-24 AWG"
+    },
+    {
+     "ParameterId": 30,
+     "ParameterText": "Contact Finish",
+     "ParameterType": "String",
+     "ValueId": "350796",
+     "ValueText": "Gold"
+    },
+    {
+     "ParameterId": 834,
+     "ParameterText": "Contact Finish Thickness",
+     "ParameterType": "String",
+     "ValueId": "180903",
+     "ValueText": "30.0µin (0.76µm)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 135891,
+    "Name": "001602"
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2027,
+      "ParentId": 20,
+      "Name": "Rectangular Connectors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/244/550/C-Grid-III-90131%282-POS%29tin_tmb%2864x64%29.jpg",
+      "SeoDescription": "Rectangular Connectors include a wide variety of connector solutions for power, data, and signal applications. As the name implies, they are rectangular in shape and can provide ease to the design process. Many of the most commonly found connectors and connector accessories fall into this category.",
+      "ChildCategories": [
+       {
+        "CategoryId": 331,
+        "ParentId": 2027,
+        "Name": "Rectangular Connector Contacts",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/684/sxh-001t-p0.6_tmb%2864x64%29.jpg",
+        "SeoDescription": "Rectangular Connector Contacts are male, female, or non-gendered terminals that are used in connectors. These terminals are specifically used in connectors that will have a rectangular look to the mating end of the device. The pin or socket will be a blade, board-in, female blade sockets, non-gendered, pin, socket, split pin, or tab in wire gauges ranging from 1/0 AWG to 36 AWG.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "23",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 5488,
+    "Name": "SL 70058"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.90.4000"
+   },
+   "OtherNames": [
+    "16-02-0104-E",
+    "2266-16020104-23",
+    "16020104",
+    "001602-0104",
+    "0016-02-0104-E",
+    "70058-0226",
+    "16-02-0104",
+    "WM1035-ND",
+    "0016020104-E",
+    "0016-02-0104",
+    "16020104-E",
+    "WM2564",
+    "WM1035"
+   ]
+  }
+ ],
+ "ProductsCount": 9278,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "BATTERY HOLDER 18650 SMD",
+    "DetailedDescription": "Battery Holder (Open) 18650 1 Cell SMD (SMT) Tab"
+   },
+   "Manufacturer": {
+    "Id": 36,
+    "Name": "Keystone Electronics"
+   },
+   "ManufacturerProductNumber": "1042",
+   "UnitPrice": 5.99,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/keystone-electronics/1042/2745668",
+   "DatasheetUrl": "https://www.keyelco.com/userAssets/file/K75p29.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/535/MFG_1042.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "36-1042-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 5.99,
+       "TotalPrice": 5.99
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 4.973,
+       "TotalPrice": 49.73
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 4.6184,
+       "TotalPrice": 115.46
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 4.25,
+       "TotalPrice": 425.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 36,
+      "Name": "Keystone Electronics"
+     },
+     "QuantityAvailableforPackageType": 5513,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 5513,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/5290457783001",
+   "Parameters": [
+    {
+     "ParameterId": 1445,
+     "ParameterText": "Battery Type, Function",
+     "ParameterType": "String",
+     "ValueId": "336683",
+     "ValueText": "Cylindrical, Holder"
+    },
+    {
+     "ParameterId": 91,
+     "ParameterText": "Style",
+     "ParameterType": "String",
+     "ValueId": "355997",
+     "ValueText": "Holder (Open)"
+    },
+    {
+     "ParameterId": 32,
+     "ParameterText": "Battery Cell Size",
+     "ParameterType": "String",
+     "ValueId": "115505",
+     "ValueText": "18650"
+    },
+    {
+     "ParameterId": 36,
+     "ParameterText": "Number of Cells",
+     "ParameterType": "String",
+     "ValueId": "39665",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 1142,
+     "ParameterText": "Battery Series",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "385069",
+     "ValueText": "PCB, Surface Mount"
+    },
+    {
+     "ParameterId": 258,
+     "ParameterText": "Termination Style",
+     "ParameterType": "String",
+     "ValueId": "404185",
+     "ValueText": "SMD (SMT) Tab"
+    },
+    {
+     "ParameterId": 759,
+     "ParameterText": "Height Above Board",
+     "ParameterType": "String",
+     "ValueId": "27956",
+     "ValueText": "0.585\" (14.86mm)"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "236095",
+     "ValueText": "-50°C ~ 145°C"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 6,
+    "ParentId": 0,
+    "Name": "Battery Products",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/964/762/11_CR2032_tmb.jpg",
+    "SeoDescription": "The battery product category includes electrochemical storage cells (batteries) in a wide variety of chemistries and sizes, along with holders, clips, contacts, chargers, and other battery-related items including automotive 12V (\"cigarette lighter\") power plugs and sockets. Alkaline, Lithium, lead acid, silver oxide, Ni-MH, Ni-Cad, Zinc-Air, and other chemistries are available, in sizes ranging from the common AA, AAA, D, 9V, 123A, and 2032 to the more obscure 1/3N, 1/6D, 1/2AA, F, and SC, with many others in between.",
+    "ChildCategories": [
+     {
+      "CategoryId": 86,
+      "ParentId": 6,
+      "Name": "Battery Holders, Clips, Contacts",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/284/760/5213_tmb%2864x64%29.jpg",
+      "SeoDescription": "Battery holders, clips, and contacts allow circuitry and devices to connect to battery-based power sources using various termination methods such as plugs, PC pins, crimp, surface and through-hole solder, snaps, or wire leads. Battery holders for coin cell, cylindrical or rectangular batteries are used to secure battery(s) from one to 10 or more cells in series and parallel configurations.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "11",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "2  (1 Year)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.69.4040"
+   },
+   "OtherNames": [
+    "KEY1066",
+    "1042K-ND",
+    "36-1042",
+    "1042K",
+    "KEY1066-ND"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "WRENCH BOX END 19X24MM 12.99\"",
+    "DetailedDescription": "Box End Wrench 19mm x 24mm 12.99\" (330.0mm) Length"
+   },
+   "Manufacturer": {
+    "Id": 2991,
+    "Name": "Ampco Safety Tools"
+   },
+   "ManufacturerProductNumber": "1042",
+   "UnitPrice": 234.83,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/ampco-safety-tools/1042/13279607",
+   "DatasheetUrl": "https://catalog.ampcosafetytools.com/item/wrench-box-end/wrench-box-end-double-offset-type-12-point-metric-/1042-id-3029-",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4216/MFG_Wrench-Box-End-Double-Offset-Type-12_Point-W-3000-Series-hr.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "2991-1042-ND",
+     "PackageType": {
+      "Id": 61,
+      "Name": "Box"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 234.83,
+       "TotalPrice": 234.83
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": true,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 2991,
+      "Name": "Ampco Safety Tools"
+     },
+     "QuantityAvailableforPackageType": 1,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 1,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": true,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 335,
+     "ParameterText": "Tool Type",
+     "ParameterType": "String",
+     "ValueId": "322340",
+     "ValueText": "Box End"
+    },
+    {
+     "ParameterId": 2684,
+     "ParameterText": "Measurement Type",
+     "ParameterType": "String",
+     "ValueId": "375041",
+     "ValueText": "Metric"
+    },
+    {
+     "ParameterId": 1672,
+     "ParameterText": "End - Size",
+     "ParameterType": "String",
+     "ValueId": "472467",
+     "ValueText": "19mm x 24mm"
+    },
+    {
+     "ParameterId": 77,
+     "ParameterText": "Length",
+     "ParameterType": "String",
+     "ValueId": "82962",
+     "ValueText": "12.99\" (330.0mm)"
+    },
+    {
+     "ParameterId": 1826,
+     "ParameterText": "Finish",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 2685,
+     "ParameterText": "End Detail",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 2686,
+     "ParameterText": "Torque",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 17,
+    "ParentId": 0,
+    "Name": "Tools",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/265/005/63811-1000_tmb%2864x64%29.jpg",
+    "SeoDescription": "Tool products include general purpose hand and power-driven tools such as screwdrivers, nut drivers, socket sets, wrenches, wire cutters, vacuums, and flashlights, along with purpose-specific tools are included such as hand and machine-powered crimp tools for connector application, insertion and extraction tools for various connector styles, fiber optic splicing and termination tools, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 258,
+      "ParentId": 17,
+      "Name": "Wrenches",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/289/089/1055258-1_tmb%2864x64%29.jpg",
+      "SeoDescription": "A wrench or spanner is a tool used to provide grip and mechanical advantage in applying torque to turn rotary fasteners such as nuts bolts or to prevent rotation. Wrenches are made in SAE, metric and adjustable configurations to fit a wide variety of fastener sizes and may employ features such as high voltage insulation or angled ends for special conditions. Common tool types are box end, open end, ratcheting, combination, torque and lineman's wrenches.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "3",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unknown",
+    "RohsStatus": "RoHS Compliant",
+    "MoistureSensitivityLevel": "Not Applicable",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8204.11.0030"
+   },
+   "OtherNames": [
+    "2991-1042"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "RF EMI ABSORBING SHEET 24\" X 24\"",
+    "DetailedDescription": "RF EMI Absorbing Sheet Q-Zorb® Silicone Rubber Non-Conductive, Single Sided 24.000\" (609.60mm) X 24.000\" (609.60mm) X 0.094\" (2.40mm)"
+   },
+   "Manufacturer": {
+    "Id": 903,
+    "Name": "Laird Technologies EMI"
+   },
+   "ManufacturerProductNumber": "1042",
+   "UnitPrice": 472.97,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/laird-technologies-emi/1042/4423122",
+   "DatasheetUrl": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/2602/Microwave_Absorbing%20_Materials.pdf",
+   "PhotoUrl": "",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "1042L-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 472.97,
+       "TotalPrice": 472.97
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 903,
+      "Name": "Laird Technologies EMI"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 0,
+   "ProductStatus": {
+    "Id": 1,
+    "Status": "Obsolete"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": false,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/5734635986001",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "307134",
+     "ValueText": "Absorbing Sheet"
+    },
+    {
+     "ParameterId": 98,
+     "ParameterText": "Shape",
+     "ParameterType": "String",
+     "ValueId": "406666",
+     "ValueText": "Square"
+    },
+    {
+     "ParameterId": 77,
+     "ParameterText": "Length",
+     "ParameterType": "String",
+     "ValueId": "152330",
+     "ValueText": "24.000\" (609.60mm)"
+    },
+    {
+     "ParameterId": 193,
+     "ParameterText": "Width",
+     "ParameterType": "String",
+     "ValueId": "152330",
+     "ValueText": "24.000\" (609.60mm)"
+    },
+    {
+     "ParameterId": 1214,
+     "ParameterText": "Thickness - Overall",
+     "ParameterType": "String",
+     "ValueId": "9264",
+     "ValueText": "0.094\" (2.40mm)"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 699,
+     "ParameterText": "Adhesive",
+     "ParameterType": "String",
+     "ValueId": "380336",
+     "ValueText": "Non-Conductive, Single Sided"
+    },
+    {
+     "ParameterId": 70,
+     "ParameterText": "Material",
+     "ParameterType": "String",
+     "ValueId": "402814",
+     "ValueText": "Silicone Rubber"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 37,
+    "ParentId": 0,
+    "Name": "RF and Wireless",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/442/232/MFG_XR112_Front_tmb.jpg",
+    "SeoDescription": "Radio Frequency and Intermediate Frequency (RF/IF) products are used for wireless transmission of information by means of electromagnetic radiation. Radio Frequency Identification (RFID) is a specific subset of general RF applications, characterized by use of small, inexpensive devices known as \"tags\" capable of containing a limited amount of information, that can be wirelessly retrieved (and in some cases modified) through the use of a specialized device known as a \"reader\" and which are commonly used for object or material tracking, inventory, and similar purposes. Products found within this category may range from finished products for end use, to component-level products and materials from which such finished goods are assembled.",
+    "ChildCategories": [
+     {
+      "CategoryId": 869,
+      "ParentId": 37,
+      "Name": "RFI and EMI - Shielding and Absorbing Materials",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/211/339/3M1181C-ND_tmb%2864x64%29.jpg",
+      "SeoDescription": "RFI and EMI shielding materials are designed to absorb, reflect or conduct electronic noise away from or around sensitive devices and circuits. Common shielding materials include aluminum, copper, tin, epoxy and ferrite powders, gold fabric, nickel, nitrile and forms of polyester.  They are available in adhesive and non-adhesive sheets, rolls, tapes and die-cut shapes.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "6",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 56323,
+    "Name": "Q-Zorb®"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unknown",
+    "RohsStatus": "Unknown",
+    "MoistureSensitivityLevel": "Not Applicable",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "4016.93.1050"
+   },
+   "OtherNames": [
+    "1042L"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 19,
+    "Value": "3M",
+    "ProductCount": 165
+   },
+   {
+    "Id": 1067,
+    "Value": "3M (TC)",
+    "ProductCount": 4
+   },
+   {
+    "Id": 5503,
+    "Value": "3PEAK",
+    "ProductCount": 6
+   },
+   {
+    "Id": 1613,
+    "Value": "4D Systems Pty Ltd",
+    "ProductCount": 1
+   },
+   {
+    "Id": 6308,
+    "Value": "ABB Electrification (Thomas and Betts)",
+    "ProductCount": 16
+   },
+   {
+    "Id": 1662,
+    "Value": "ABLIC Inc.",
+    "ProductCount": 4
+   },
+   {
+    "Id": 535,
+    "Value": "Abracon LLC",
+    "ProductCount": 19
+   },
+   {
+    "Id": 134,
+    "Value": "ACL Staticide Inc",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1528,
+    "Value": "Adafruit Industries LLC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2057,
+    "Value": "Adam Tech",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1014,
+    "Value": "Advanced Linear Devices Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 684,
+    "Value": "Advanced Thermal Solutions Inc.",
+    "ProductCount": 17
+   },
+   {
+    "Id": 2084,
+    "Value": "Advantech Corporation",
+    "ProductCount": 5
+   },
+   {
+    "Id": 1717,
+    "Value": "Aearo Technologies LLC, a 3M company",
+    "ProductCount": 1
+   },
+   {
+    "Id": 600001,
+    "Value": "Agere Systems",
+    "ProductCount": 3
+   },
+   {
+    "Id": 600404,
+    "Value": "Aignep USA",
+    "ProductCount": 1
+   },
+   {
+    "Id": 601874,
+    "Value": "AirBorn",
+    "ProductCount": 2
+   },
+   {
+    "Id": 4134,
+    "Value": "AirBorn, a Molex company",
+    "ProductCount": 29
+   },
+   {
+    "Id": 2944,
+    "Value": "Airgain",
+    "ProductCount": 1
+   },
+   {
+    "Id": 620,
+    "Value": "Allegro MicroSystems",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1450,
+    "Value": "Alliance Memory, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1817,
+    "Value": "Alliance Sensors Group",
+    "ProductCount": 1
+   },
+   {
+    "Id": 3475,
+    "Value": "Allied Components International",
+    "ProductCount": 1
+   },
+   {
+    "Id": 785,
+    "Value": "Alpha & Omega Semiconductor Inc.",
+    "ProductCount": 5
+   },
+   {
+    "Id": 1920,
+    "Value": "Altech Corporation",
+    "ProductCount": 22
+   },
+   {
+    "Id": 544,
+    "Value": "Altera",
+    "ProductCount": 2
+   },
+   {
+    "Id": 2040,
+    "Value": "Altran Magnetics, LLC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 288,
+    "Value": "American Electrical Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1691,
+    "Value": "American Hakko Products, Inc.",
+    "ProductCount": 6
+   },
+   {
+    "Id": 2991,
+    "Value": "Ampco Safety Tools",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1178,
+    "Value": "Amphenol Aerospace Operations",
+    "ProductCount": 809
+   },
+   {
+    "Id": 602456,
+    "Value": "Amphenol Air LB France",
+    "ProductCount": 4
+   },
+   {
+    "Id": 442,
+    "Value": "Amphenol All Sensors Corporation",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1818,
+    "Value": "Amphenol Anytek",
+    "ProductCount": 9
+   },
+   {
+    "Id": 626,
+    "Value": "Amphenol CONEC",
+    "ProductCount": 18
+   },
+   {
+    "Id": 600073,
+    "Value": "Amphenol Corporation",
+    "ProductCount": 9
+   },
+   {
+    "Id": 2217,
+    "Value": "Amphenol Custom Cable",
+    "ProductCount": 40
+   },
+   {
+    "Id": 2188,
+    "Value": "Amphenol ICC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 664,
+    "Value": "Amphenol ICC (Commercial Products)",
+    "ProductCount": 12
+   },
+   {
+    "Id": 609,
+    "Value": "Amphenol ICC (FCI)",
+    "ProductCount": 63
+   },
+   {
+    "Id": 339,
+    "Value": "Amphenol Industrial Operations",
+    "ProductCount": 195
+   },
+   {
+    "Id": 1754,
+    "Value": "Amphenol LTW",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1967,
+    "Value": "Amphenol NEXUS Technologies",
+    "ProductCount": 1
+   },
+   {
+    "Id": 623,
+    "Value": "Amphenol PCD",
+    "ProductCount": 8
+   },
+   {
+    "Id": 1993,
+    "Value": "Amphenol Piher Sensing Systems",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2496,
+    "Value": "Amphenol Procom",
+    "ProductCount": 2
+   },
+   {
+    "Id": 4932,
+    "Value": "Amphenol ProLabs",
+    "ProductCount": 4
+   },
+   {
+    "Id": 115,
+    "Value": "Amphenol RF",
+    "ProductCount": 10
+   },
+   {
+    "Id": 889,
+    "Value": "Amphenol Sine Systems Corp",
+    "ProductCount": 1
+   },
+   {
+    "Id": 600315,
+    "Value": "Amphenol Socapex",
+    "ProductCount": 1
+   },
+   {
+    "Id": 734,
+    "Value": "Amphenol SSI Technologies",
+    "ProductCount": 1
+   },
+   {
+    "Id": 3936,
+    "Value": "Amphenol Technical Products International",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1946,
+    "Value": "Amphenol Times Microwave Systems",
+    "ProductCount": 2
+   },
+   {
+    "Id": 300637,
+    "Value": "Amphenol Tuchel Industrial",
+    "ProductCount": 7
+   },
+   {
+    "Id": 1603,
+    "Value": "Ampleon USA Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 705,
+    "Value": "Amprobe",
+    "ProductCount": 1
+   },
+   {
+    "Id": 475,
+    "Value": "ams-OSRAM USA INC.",
+    "ProductCount": 64
+   },
+   {
+    "Id": 505,
+    "Value": "Analog Devices Inc.",
+    "ProductCount": 12
+   },
+   {
+    "Id": 175,
+    "Value": "Analog Devices Inc./Maxim Integrated",
+    "ProductCount": 3
+   },
+   {
+    "Id": 3078,
+    "Value": "Anatech Electronics Inc.",
+    "ProductCount": 4
+   },
+   {
+    "Id": 627,
+    "Value": "Antenova",
+    "ProductCount": 1
+   },
+   {
+    "Id": 600548,
+    "Value": "Anvil",
+    "ProductCount": 14
+   },
+   {
+    "Id": 1582,
+    "Value": "Apacer Memory America",
+    "ProductCount": 1
+   },
+   {
+    "Id": 679,
+    "Value": "APEM Inc.",
+    "ProductCount": 3
+   },
+   {
+    "Id": 72,
+    "Value": "Apex Tool Group",
+    "ProductCount": 9
+   },
+   {
+    "Id": 335,
+    "Value": "APM Hexseal",
+    "ProductCount": 1
+   },
+   {
+    "Id": 39,
+    "Value": "Aratas America LLC",
+    "ProductCount": 14
+   },
+   {
+    "Id": 1050,
+    "Value": "Arduino",
+    "ProductCount": 1
+   },
+   {
+    "Id": 454,
+    "Value": "ARTESYN / Advanced Energy",
+    "ProductCount": 1
+   },
+   {
+    "Id": 974,
+    "Value": "Asahi Kasei Microdevices/AKM",
+    "ProductCount": 2
+   },
+   {
+    "Id": 123,
+    "Value": "Assmann WSW Components",
+    "ProductCount": 13
+   },
+   {
+    "Id": 2622,
+    "Value": "Astrodyne TDI",
+    "ProductCount": 2
+   },
+   {
+    "Id": 3441,
+    "Value": "ATGBICS",
+    "ProductCount": 6
+   },
+   {
+    "Id": 4110,
+    "Value": "Austin Hardware",
+    "ProductCount": 3
+   },
+   {
+    "Id": 1543,
+    "Value": "Avery Dennison RFID",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1790,
+    "Value": "Azoteq (Pty) Ltd",
+    "ProductCount": 1
+   },
+   {
+    "Id": 522,
+    "Value": "B B Battery",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2170,
+    "Value": "Banner Engineering Corporation",
+    "ProductCount": 4
+   },
+   {
+    "Id": 1932,
+    "Value": "Bantam Tools",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2820,
+    "Value": "BeagleBoard",
+    "ProductCount": 2
+   },
+   {
+    "Id": 507,
+    "Value": "Bel Fuse Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1847,
+    "Value": "Bel Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 179,
+    "Value": "Bel Power Solutions",
+    "ProductCount": 7
+   },
+   {
+    "Id": 135,
+    "Value": "Belden Inc.",
+    "ProductCount": 78
+   },
+   {
+    "Id": 4770,
+    "Value": "BeRex Corp",
+    "ProductCount": 1
+   },
+   {
+    "Id": 492,
+    "Value": "Bivar Inc.",
+    "ProductCount": 3
+   },
+   {
+    "Id": 1757,
+    "Value": "Bopla Enclosures",
+    "ProductCount": 1
+   },
+   {
+    "Id": 828,
+    "Value": "Bosch Sensortec",
+    "ProductCount": 1
+   },
+   {
+    "Id": 118,
+    "Value": "Bourns Inc.",
+    "ProductCount": 60
+   },
+   {
+    "Id": 59,
+    "Value": "Boyd Laconia, LLC",
+    "ProductCount": 3
+   },
+   {
+    "Id": 2267,
+    "Value": "Brady Corporation",
+    "ProductCount": 50
+   },
+   {
+    "Id": 976,
+    "Value": "Bridgelux",
+    "ProductCount": 7
+   },
+   {
+    "Id": 516,
+    "Value": "Broadcom Limited",
+    "ProductCount": 3
+   },
+   {
+    "Id": 377,
+    "Value": "Bud Industries",
+    "ProductCount": 5
+   },
+   {
+    "Id": 708,
+    "Value": "Bulgin",
+    "ProductCount": 2
+   },
+   {
+    "Id": 2042,
+    "Value": "Bumper Specialties Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 101,
+    "Value": "C-TON Industries",
+    "ProductCount": 1
+   },
+   {
+    "Id": 108,
+    "Value": "C&K",
+    "ProductCount": 15
+   },
+   {
+    "Id": 1768,
+    "Value": "Cal Test Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1526,
+    "Value": "Calian",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1440,
+    "Value": "Calmark/Birtcher",
+    "ProductCount": 1
+   },
+   {
+    "Id": 317,
+    "Value": "Cantherm",
+    "ProductCount": 2
+   },
+   {
+    "Id": 3692,
+    "Value": "Caplugs",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1066,
+    "Value": "Carclo Technical Plastics",
+    "ProductCount": 2
+   },
+   {
+    "Id": 370,
+    "Value": "Cardinal Components Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 432,
+    "Value": "Carling Technologies",
+    "ProductCount": 398
+   },
+   {
+    "Id": 1864,
+    "Value": "Carlo Gavazzi Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 51,
+    "Value": "CEL",
+    "ProductCount": 2
+   },
+   {
+    "Id": 3667,
+    "Value": "Celduc Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 2343,
+    "Value": "Century Spring Corp",
+    "ProductCount": 12
+   },
+   {
+    "Id": 565,
+    "Value": "Chemi-Con",
+    "ProductCount": 3
+   },
+   {
+    "Id": 1233,
+    "Value": "Cicoil",
+    "ProductCount": 1
+   },
+   {
+    "Id": 116,
+    "Value": "Cinch Connectivity Solutions",
+    "ProductCount": 2
+   },
+   {
+    "Id": 367,
+    "Value": "Cinch Connectivity Solutions AIM-Cambridge",
+    "ProductCount": 1
+   },
+   {
+    "Id": 24,
+    "Value": "Cinch Connectivity Solutions Johnson",
+    "ProductCount": 12
+   },
+   {
+    "Id": 652,
+    "Value": "Cinch Connectivity Solutions Midwest Microwave",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1097,
+    "Value": "Cinch Connectivity Solutions Trompeter",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2034,
+    "Value": "Cincon Electronics Co. LTD",
+    "ProductCount": 1
+   },
+   {
+    "Id": 598,
+    "Value": "Cirrus Logic Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 300,
+    "Value": "Citizen Finedevice Co Ltd",
+    "ProductCount": 4
+   },
+   {
+    "Id": 2032,
+    "Value": "CML Micro",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1175,
+    "Value": "CNC Tech",
+    "ProductCount": 14
+   },
+   {
+    "Id": 4870,
+    "Value": "Coherent",
+    "ProductCount": 5
+   },
+   {
+    "Id": 602346,
+    "Value": "Cole Hersee",
+    "ProductCount": 2
+   },
+   {
+    "Id": 641,
+    "Value": "Comchip Technology",
+    "ProductCount": 3
+   },
+   {
+    "Id": 2283,
+    "Value": "Comet America, LP",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1835,
+    "Value": "Comus International",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2080,
+    "Value": "Conta-Clip, Inc.",
+    "ProductCount": 22
+   },
+   {
+    "Id": 4624,
+    "Value": "Corelis",
+    "ProductCount": 2
+   },
+   {
+    "Id": 338,
+    "Value": "Cornell Dubilier Knowles",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1776,
+    "Value": "Cosel USA, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 306,
+    "Value": "Coto Technology",
+    "ProductCount": 6
+   },
+   {
+    "Id": 966,
+    "Value": "Crouzet",
+    "ProductCount": 3
+   },
+   {
+    "Id": 744,
+    "Value": "Crystek Corporation",
+    "ProductCount": 3
+   },
+   {
+    "Id": 294,
+    "Value": "CTS Thermal Management Products",
+    "ProductCount": 1
+   },
+   {
+    "Id": 110,
+    "Value": "CTS-Frequency Controls",
+    "ProductCount": 31
+   },
+   {
+    "Id": 364,
+    "Value": "Curtis Industries",
+    "ProductCount": 1
+   },
+   {
+    "Id": 267,
+    "Value": "Curtis Instruments Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 429,
+    "Value": "Custom Computer Services Inc. (CCS)",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2987,
+    "Value": "Cvilux USA",
+    "ProductCount": 2
+   },
+   {
+    "Id": 428,
+    "Value": "Cypress Semiconductor Corp",
+    "ProductCount": 38
+   },
+   {
+    "Id": 49,
+    "Value": "Daburn Electronics",
+    "ProductCount": 2
+   },
+   {
+    "Id": 3145,
+    "Value": "Dantona Industries",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1722,
+    "Value": "Davies Molding, LLC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2104,
+    "Value": "DB Unlimited",
+    "ProductCount": 1
+   },
+   {
+    "Id": 197,
+    "Value": "Delevan",
+    "ProductCount": 8
+   },
+   {
+    "Id": 603,
+    "Value": "Delta Electronics",
+    "ProductCount": 4
+   },
+   {
+    "Id": 2035,
+    "Value": "Delta Electronics/Components",
+    "ProductCount": 2
+   },
+   {
+    "Id": 5585,
+    "Value": "DESTACO",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1738,
+    "Value": "DFRobot",
+    "ProductCount": 2
+   },
+   {
+    "Id": 4252,
+    "Value": "di-soric",
+    "ProductCount": 2
+   },
+   {
+    "Id": 350,
+    "Value": "Dialight",
+    "ProductCount": 11
+   },
+   {
+    "Id": 602,
+    "Value": "Digi",
+    "ProductCount": 4
+   },
+   {
+    "Id": 8,
+    "Value": "DigiKey",
+    "ProductCount": 13
+   },
+   {
+    "Id": 1286,
+    "Value": "Digilent, Inc.",
+    "ProductCount": 5
+   },
+   {
+    "Id": 1661,
+    "Value": "Digital Six Labs",
+    "ProductCount": 1
+   },
+   {
+    "Id": 586,
+    "Value": "Digital View Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 31,
+    "Value": "Diodes Incorporated",
+    "ProductCount": 6
+   },
+   {
+    "Id": 1481,
+    "Value": "Display Visions",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1756,
+    "Value": "Displaytech",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2017,
+    "Value": "Dremel",
+    "ProductCount": 1
+   },
+   {
+    "Id": 5879,
+    "Value": "Dwyer",
+    "ProductCount": 23
+   },
+   {
+    "Id": 141,
+    "Value": "E-Switch",
+    "ProductCount": 2
+   },
+   {
+    "Id": 4137,
+    "Value": "E-Z LOK",
+    "ProductCount": 1
+   },
+   {
+    "Id": 461,
+    "Value": "E-Z-Hook",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1948,
+    "Value": "EAO",
+    "ProductCount": 5
+   },
+   {
+    "Id": 2041,
+    "Value": "Eaton - Bussmann Electrical Division",
+    "ProductCount": 1
+   },
+   {
+    "Id": 283,
+    "Value": "Eaton - Electronics Division",
+    "ProductCount": 82
+   },
+   {
+    "Id": 5730,
+    "Value": "Eaton Electrical",
+    "ProductCount": 1
+   },
+   {
+    "Id": 95,
+    "Value": "Eaton Tripp Lite",
+    "ProductCount": 4
+   },
+   {
+    "Id": 381,
+    "Value": "ebm-papst Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 4307,
+    "Value": "Eclipse Magnetics Ltd",
+    "ProductCount": 1
+   },
+   {
+    "Id": 3235,
+    "Value": "Eclipse Tools",
+    "ProductCount": 1
+   },
+   {
+    "Id": 50,
+    "Value": "ECS Inc.",
+    "ProductCount": 3
+   },
+   {
+    "Id": 151,
+    "Value": "EDAC Inc.",
+    "ProductCount": 326
+   },
+   {
+    "Id": 451,
+    "Value": "Electroswitch",
+    "ProductCount": 1
+   },
+   {
+    "Id": 4175,
+    "Value": "Elesa USA Corporation",
+    "ProductCount": 3
+   },
+   {
+    "Id": 4414,
+    "Value": "Encitech Connectors AB",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2879,
+    "Value": "Enclustra FPGA Solutions",
+    "ProductCount": 4
+   },
+   {
+    "Id": 6135,
+    "Value": "Encore Wire",
+    "ProductCount": 12
+   },
+   {
+    "Id": 547,
+    "Value": "Energizer Battery Company",
+    "ProductCount": 1
+   },
+   {
+    "Id": 917,
+    "Value": "EPC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 114,
+    "Value": "EPSON",
+    "ProductCount": 6
+   },
+   {
+    "Id": 1800,
+    "Value": "ERP Power, LLC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2082,
+    "Value": "Essentra Access Solutions",
+    "ProductCount": 2
+   },
+   {
+    "Id": 145,
+    "Value": "Essentra Components",
+    "ProductCount": 20
+   },
+   {
+    "Id": 1080,
+    "Value": "Everlight Electronics Co Ltd",
+    "ProductCount": 3
+   },
+   {
+    "Id": 819,
+    "Value": "Everspin Technologies Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1601,
+    "Value": "Excelitas Technologies",
+    "ProductCount": 22
+   },
+   {
+    "Id": 633,
+    "Value": "EXCELSYS / Advanced Energy",
+    "ProductCount": 1
+   },
+   {
+    "Id": 600426,
+    "Value": "EXXELIA Temex",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1934,
+    "Value": "Fair-Rite Products Corp.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 5328,
+    "Value": "Fairview Microwave",
+    "ProductCount": 30
+   },
+   {
+    "Id": 629,
+    "Value": "FEIG Electronic",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1779,
+    "Value": "Ferroxcube",
+    "ProductCount": 7
+   },
+   {
+    "Id": 2171,
+    "Value": "Festo Corporation",
+    "ProductCount": 26
+   },
+   {
+    "Id": 5496,
+    "Value": "Fischer Elektronik",
+    "ProductCount": 265
+   },
+   {
+    "Id": 510,
+    "Value": "Flambeau Inc.",
+    "ProductCount": 3
+   },
+   {
+    "Id": 2832,
+    "Value": "Flip Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 614,
+    "Value": "Fluke Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1986,
+    "Value": "Fluke Networks",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1785,
+    "Value": "Formerica Optoelectronics Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 631,
+    "Value": "Fox Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1685,
+    "Value": "Foxconn OE Technologies Singapore Pte. LTD",
+    "ProductCount": 2
+   },
+   {
+    "Id": 600055,
+    "Value": "Freescale Semiconductor",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1219,
+    "Value": "Fremont Micro Devices Ltd",
+    "ProductCount": 2
+   },
+   {
+    "Id": 768,
+    "Value": "FTDI, Future Technology Devices International Ltd",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1997,
+    "Value": "Gardtec Incorporated",
+    "ProductCount": 1
+   },
+   {
+    "Id": 183,
+    "Value": "GC Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 600326,
+    "Value": "Gearmo",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2128,
+    "Value": "Gedore Tools, Inc.",
+    "ProductCount": 46
+   },
+   {
+    "Id": 1970,
+    "Value": "Gigadevice Electronics Singapore PTE.LTD.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1448,
+    "Value": "Glenair",
+    "ProductCount": 11
+   },
+   {
+    "Id": 1939,
+    "Value": "GlobTek, Inc.",
+    "ProductCount": 12
+   },
+   {
+    "Id": 602157,
+    "Value": "Gotyger",
+    "ProductCount": 1
+   },
+   {
+    "Id": 131,
+    "Value": "Greenlee Communications",
+    "ProductCount": 2
+   },
+   {
+    "Id": 4871,
+    "Value": "Gruber Industries",
+    "ProductCount": 2
+   },
+   {
+    "Id": 4701,
+    "Value": "H&H Industrial Products, Inc.",
+    "ProductCount": 7
+   },
+   {
+    "Id": 164,
+    "Value": "Hammond Manufacturing",
+    "ProductCount": 1
+   },
+   {
+    "Id": 4590,
+    "Value": "Harimatec Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1195,
+    "Value": "HARTING",
+    "ProductCount": 28
+   },
+   {
+    "Id": 952,
+    "Value": "Harwin Inc.",
+    "ProductCount": 167
+   },
+   {
+    "Id": 1436,
+    "Value": "HellermannTyton",
+    "ProductCount": 11
+   },
+   {
+    "Id": 1953,
+    "Value": "Henrich Electronics Corporation",
+    "ProductCount": 1
+   },
+   {
+    "Id": 3720,
+    "Value": "Heyco Products Corporation",
+    "ProductCount": 16
+   },
+   {
+    "Id": 602342,
+    "Value": "HHIP",
+    "ProductCount": 1
+   },
+   {
+    "Id": 26,
+    "Value": "Hirose Electric Co Ltd",
+    "ProductCount": 58
+   },
+   {
+    "Id": 1797,
+    "Value": "Hirschmann",
+    "ProductCount": 30
+   },
+   {
+    "Id": 1976,
+    "Value": "HMS Networks",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1441,
+    "Value": "Hoffman Enclosures, Inc.",
+    "ProductCount": 40
+   },
+   {
+    "Id": 5308,
+    "Value": "Hoffmann Group",
+    "ProductCount": 1
+   },
+   {
+    "Id": 342,
+    "Value": "Honeywell Aerospace",
+    "ProductCount": 2
+   },
+   {
+    "Id": 480,
+    "Value": "Honeywell Sensing and Productivity Solutions",
+    "ProductCount": 13
+   },
+   {
+    "Id": 1566,
+    "Value": "Honeywell Sensing and Productivity Solutions T&M",
+    "ProductCount": 2
+   },
+   {
+    "Id": 3628,
+    "Value": "Huber+Suhner, Inc.",
+    "ProductCount": 3
+   },
+   {
+    "Id": 2014,
+    "Value": "Ideal-tek S.A.",
+    "ProductCount": 3
+   },
+   {
+    "Id": 1885,
+    "Value": "IDEC",
+    "ProductCount": 3
+   },
+   {
+    "Id": 2434,
+    "Value": "iFixit",
+    "ProductCount": 2
+   },
+   {
+    "Id": 4849,
+    "Value": "Igus",
+    "ProductCount": 1
+   },
+   {
+    "Id": 107,
+    "Value": "Industrial Fiber Optics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 448,
+    "Value": "Infineon Technologies",
+    "ProductCount": 82
+   },
+   {
+    "Id": 1830,
+    "Value": "Inolux",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1902,
+    "Value": "iNRCORE, LLC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1647,
+    "Value": "Inspired LED, LLC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2625,
+    "Value": "Integrated Power Designs",
+    "ProductCount": 30
+   },
+   {
+    "Id": 1079,
+    "Value": "Intematix Corporation",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1937,
+    "Value": "IO Audio Technologies",
+    "ProductCount": 1
+   },
+   {
+    "Id": 706,
+    "Value": "ISSI, Integrated Silicon Solution Inc",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1003,
+    "Value": "ITT Cannon, LLC",
+    "ProductCount": 97
+   },
+   {
+    "Id": 2291,
+    "Value": "Jacob GmbH",
+    "ProductCount": 5
+   },
+   {
+    "Id": 670,
+    "Value": "JAE Electronics",
+    "ProductCount": 3
+   },
+   {
+    "Id": 4285,
+    "Value": "JAM",
+    "ProductCount": 3
+   },
+   {
+    "Id": 602402,
+    "Value": "Jameco BenchPro",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1908,
+    "Value": "Jauch Quartz",
+    "ProductCount": 9
+   },
+   {
+    "Id": 2045,
+    "Value": "Jensen Global Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 289,
+    "Value": "JKL Components Corp.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 709,
+    "Value": "Johanson Dielectrics Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 455,
+    "Value": "JST Sales America Inc.",
+    "ProductCount": 6
+   },
+   {
+    "Id": 399,
+    "Value": "KEMET",
+    "ProductCount": 26
+   },
+   {
+    "Id": 2934,
+    "Value": "Kendall Howard",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1767,
+    "Value": "Kennedy Labs, a division of Hub Incorporated",
+    "ProductCount": 1
+   },
+   {
+    "Id": 36,
+    "Value": "Keystone Electronics",
+    "ProductCount": 3
+   },
+   {
+    "Id": 1621,
+    "Value": "Khatod North America LLC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 226,
+    "Value": "Kilo International",
+    "ProductCount": 2
+   },
+   {
+    "Id": 754,
+    "Value": "Kingbright",
+    "ProductCount": 3
+   },
+   {
+    "Id": 1191,
+    "Value": "Kionix Inc.",
+    "ProductCount": 6
+   },
+   {
+    "Id": 1927,
+    "Value": "Kitronik Ltd.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1742,
+    "Value": "Klein Tools, Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 2172,
+    "Value": "Knipex Tools LP",
+    "ProductCount": 2
+   },
+   {
+    "Id": 423,
+    "Value": "Knowles",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1761,
+    "Value": "Knowles Dielectric Labs",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1956,
+    "Value": "Knowles Johanson Manufacturing",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1763,
+    "Value": "Knowles Novacap",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1608,
+    "Value": "Knowles Syfer",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1674,
+    "Value": "Knowles Voltronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2019,
+    "Value": "KOA Speer Electronics, Inc.",
+    "ProductCount": 215
+   },
+   {
+    "Id": 478,
+    "Value": "KYOCERA AVX",
+    "ProductCount": 32
+   },
+   {
+    "Id": 73,
+    "Value": "Kyocera International, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 5073,
+    "Value": "L-com",
+    "ProductCount": 12
+   },
+   {
+    "Id": 5425,
+    "Value": "Labfacility Ltd",
+    "ProductCount": 1
+   },
+   {
+    "Id": 926,
+    "Value": "Laird Technologies - Thermal Materials",
+    "ProductCount": 1
+   },
+   {
+    "Id": 903,
+    "Value": "Laird Technologies EMI",
+    "ProductCount": 2
+   },
+   {
+    "Id": 240,
+    "Value": "Laird-Signal Integrity Products",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1829,
+    "Value": "Lantronix, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2181,
+    "Value": "LAPP",
+    "ProductCount": 73
+   },
+   {
+    "Id": 220,
+    "Value": "Lattice Semiconductor Corporation",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1798,
+    "Value": "Leader Tech Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 788,
+    "Value": "LEDdynamics Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2024,
+    "Value": "Ledex Dormeyer Saia, a Division of Johnson Electric",
+    "ProductCount": 1
+   },
+   {
+    "Id": 711,
+    "Value": "Ledil",
+    "ProductCount": 3
+   },
+   {
+    "Id": 398,
+    "Value": "LEM USA Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1124,
+    "Value": "LEMO",
+    "ProductCount": 1
+   },
+   {
+    "Id": 521,
+    "Value": "Lighting Science Group Corporation",
+    "ProductCount": 1
+   },
+   {
+    "Id": 18,
+    "Value": "Littelfuse Inc.",
+    "ProductCount": 17
+   },
+   {
+    "Id": 5346,
+    "Value": "Littelfuse/Commercial Vehicle Products",
+    "ProductCount": 1
+   },
+   {
+    "Id": 309,
+    "Value": "Logical Systems Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 3993,
+    "Value": "LTF technology LLC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1942,
+    "Value": "LulzBot",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1794,
+    "Value": "Lumberg Automation",
+    "ProductCount": 4
+   },
+   {
+    "Id": 5405,
+    "Value": "Lumberg Inc",
+    "ProductCount": 2
+   },
+   {
+    "Id": 67,
+    "Value": "Lumex Opto/Components Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1416,
+    "Value": "Lumileds",
+    "ProductCount": 6
+   },
+   {
+    "Id": 1214,
+    "Value": "Luminus Devices Inc.",
+    "ProductCount": 7
+   },
+   {
+    "Id": 1465,
+    "Value": "MACOM Technology Solutions",
+    "ProductCount": 4
+   },
+   {
+    "Id": 1092,
+    "Value": "Macronix",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2205,
+    "Value": "Magna-Power Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1910,
+    "Value": "Maker Emporium Ltd",
+    "ProductCount": 2
+   },
+   {
+    "Id": 458,
+    "Value": "Mallory Sonalert Products Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1125,
+    "Value": "Marktech Optoelectronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1681,
+    "Value": "Marlow Industries, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1796,
+    "Value": "Marutsuelec Co., Ltd.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 133,
+    "Value": "Master Appliance Co",
+    "ProductCount": 1
+   },
+   {
+    "Id": 635,
+    "Value": "Matrix Orbital",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1863,
+    "Value": "MaxBotix Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1016,
+    "Value": "MaxLinear, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 3127,
+    "Value": "Maxsa Innovations",
+    "ProductCount": 1
+   },
+   {
+    "Id": 589,
+    "Value": "Maxwell Technologies",
+    "ProductCount": 1
+   },
+   {
+    "Id": 353,
+    "Value": "MCC (Micro Commercial Components)",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1866,
+    "Value": "MEAN WELL USA Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 882,
+    "Value": "MEC Switches",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1995,
+    "Value": "Mechatronics Bearing Group",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1570,
+    "Value": "Mechatronics Fan Group",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2997,
+    "Value": "Meritek",
+    "ProductCount": 2
+   },
+   {
+    "Id": 2378,
+    "Value": "Mersen USA Newburyport-MA L.L.C.",
+    "ProductCount": 7
+   },
+   {
+    "Id": 1849,
+    "Value": "METZ CONNECT USA Inc.",
+    "ProductCount": 10
+   },
+   {
+    "Id": 473,
+    "Value": "MG Chemicals",
+    "ProductCount": 1
+   },
+   {
+    "Id": 4672,
+    "Value": "MH Connectors",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1033,
+    "Value": "Micro-Measurements (Division of Vishay Precision Group)",
+    "ProductCount": 1
+   },
+   {
+    "Id": 5505,
+    "Value": "Micro-Mode",
+    "ProductCount": 1
+   },
+   {
+    "Id": 150,
+    "Value": "Microchip Technology",
+    "ProductCount": 21
+   },
+   {
+    "Id": 557,
+    "Value": "Micron Technology Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 278,
+    "Value": "Microsemi Corporation",
+    "ProductCount": 10
+   },
+   {
+    "Id": 1471,
+    "Value": "MikroElektronika",
+    "ProductCount": 1
+   },
+   {
+    "Id": 54,
+    "Value": "Mill-Max Manufacturing Corp.",
+    "ProductCount": 98
+   },
+   {
+    "Id": 5705,
+    "Value": "Milliohm Electronics",
+    "ProductCount": 15
+   },
+   {
+    "Id": 3157,
+    "Value": "Mini-Circuits",
+    "ProductCount": 2
+   },
+   {
+    "Id": 23,
+    "Value": "Molex",
+    "ProductCount": 487
+   },
+   {
+    "Id": 1859,
+    "Value": "Monnit Corporation",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1589,
+    "Value": "Monolithic Power Systems Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 600066,
+    "Value": "Motorola",
+    "ProductCount": 1
+   },
+   {
+    "Id": 3453,
+    "Value": "Moujen",
+    "ProductCount": 1
+   },
+   {
+    "Id": 314,
+    "Value": "Mueller Electric Co",
+    "ProductCount": 2
+   },
+   {
+    "Id": 490,
+    "Value": "Murata Electronics",
+    "ProductCount": 26
+   },
+   {
+    "Id": 811,
+    "Value": "Murata Power Solutions Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 5088,
+    "Value": "Murrelektronik, Inc",
+    "ProductCount": 35
+   },
+   {
+    "Id": 2160,
+    "Value": "Murrplastik Systems, Inc.",
+    "ProductCount": 18
+   },
+   {
+    "Id": 3243,
+    "Value": "N2Power",
+    "ProductCount": 1
+   },
+   {
+    "Id": 14,
+    "Value": "National Semiconductor",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1913,
+    "Value": "Navitas Semiconductor, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 644,
+    "Value": "NDK (NIHON DEMPA KOGYO CO., LTD)",
+    "ProductCount": 2
+   },
+   {
+    "Id": 730,
+    "Value": "Nearson Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1672,
+    "Value": "New Energy",
+    "ProductCount": 1
+   },
+   {
+    "Id": 757,
+    "Value": "Newhaven Display Intl",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1727,
+    "Value": "Nexperia USA Inc.",
+    "ProductCount": 24
+   },
+   {
+    "Id": 493,
+    "Value": "Nichicon",
+    "ProductCount": 19
+   },
+   {
+    "Id": 563,
+    "Value": "Nidec Components",
+    "ProductCount": 7
+   },
+   {
+    "Id": 360,
+    "Value": "NKK Switches",
+    "ProductCount": 4
+   },
+   {
+    "Id": 12,
+    "Value": "NMB Technologies Corporation",
+    "ProductCount": 2
+   },
+   {
+    "Id": 37,
+    "Value": "NorComp Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1490,
+    "Value": "Nordic Semiconductor ASA",
+    "ProductCount": 1
+   },
+   {
+    "Id": 601218,
+    "Value": "Norton",
+    "ProductCount": 9
+   },
+   {
+    "Id": 5380,
+    "Value": "NOVOSENSE",
+    "ProductCount": 2
+   },
+   {
+    "Id": 3588,
+    "Value": "Novus Automation",
+    "ProductCount": 9
+   },
+   {
+    "Id": 390,
+    "Value": "NVE Corp/Isolation Products",
+    "ProductCount": 1
+   },
+   {
+    "Id": 391,
+    "Value": "NVE Corp/Sensor Products",
+    "ProductCount": 1
+   },
+   {
+    "Id": 568,
+    "Value": "NXP USA Inc.",
+    "ProductCount": 72
+   },
+   {
+    "Id": 1844,
+    "Value": "O.C. White Co.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1653,
+    "Value": "O'Reilly Media",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1907,
+    "Value": "ODU",
+    "ProductCount": 3
+   },
+   {
+    "Id": 5880,
+    "Value": "Omega",
+    "ProductCount": 17
+   },
+   {
+    "Id": 555,
+    "Value": "OmniOn Power™",
+    "ProductCount": 2
+   },
+   {
+    "Id": 884,
+    "Value": "OmniVision Technologies Inc",
+    "ProductCount": 1
+   },
+   {
+    "Id": 236,
+    "Value": "Omron Automation and Safety",
+    "ProductCount": 20
+   },
+   {
+    "Id": 52,
+    "Value": "On Shore Technology Inc.",
+    "ProductCount": 5
+   },
+   {
+    "Id": 488,
+    "Value": "onsemi",
+    "ProductCount": 7
+   },
+   {
+    "Id": 600499,
+    "Value": "ORing Networking",
+    "ProductCount": 5
+   },
+   {
+    "Id": 1053,
+    "Value": "Orion Fans",
+    "ProductCount": 1
+   },
+   {
+    "Id": 5284,
+    "Value": "PACE Worldwide",
+    "ProductCount": 1
+   },
+   {
+    "Id": 255,
+    "Value": "Panasonic Electric Works",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1110,
+    "Value": "Panasonic Industrial Automation Sales",
+    "ProductCount": 107
+   },
+   {
+    "Id": 10,
+    "Value": "Panasonic Industry",
+    "ProductCount": 13
+   },
+   {
+    "Id": 298,
+    "Value": "Panduit Corp",
+    "ProductCount": 19
+   },
+   {
+    "Id": 1944,
+    "Value": "Parker Chomerics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 3985,
+    "Value": "Pasternack",
+    "ProductCount": 56
+   },
+   {
+    "Id": 3574,
+    "Value": "PENCOM",
+    "ProductCount": 4
+   },
+   {
+    "Id": 2046,
+    "Value": "Pepperl+Fuchs, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 993,
+    "Value": "Phihong USA",
+    "ProductCount": 1
+   },
+   {
+    "Id": 277,
+    "Value": "Phoenix Contact",
+    "ProductCount": 29
+   },
+   {
+    "Id": 2010,
+    "Value": "PIC GmbH",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1778,
+    "Value": "Pimoroni Ltd",
+    "ProductCount": 1
+   },
+   {
+    "Id": 501,
+    "Value": "Pomona Electronics",
+    "ProductCount": 3
+   },
+   {
+    "Id": 403,
+    "Value": "Portescap",
+    "ProductCount": 1
+   },
+   {
+    "Id": 596,
+    "Value": "Power Integrations",
+    "ProductCount": 2
+   },
+   {
+    "Id": 835,
+    "Value": "Powerex Inc.",
+    "ProductCount": 6
+   },
+   {
+    "Id": 1212,
+    "Value": "Preci-Dip",
+    "ProductCount": 64
+   },
+   {
+    "Id": 42,
+    "Value": "Prysmian Group",
+    "ProductCount": 10
+   },
+   {
+    "Id": 1046,
+    "Value": "pSemi",
+    "ProductCount": 2
+   },
+   {
+    "Id": 3505,
+    "Value": "PT Speed",
+    "ProductCount": 2
+   },
+   {
+    "Id": 668,
+    "Value": "PUI Audio, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1736,
+    "Value": "PULS, LP",
+    "ProductCount": 1
+   },
+   {
+    "Id": 182,
+    "Value": "Pulsar",
+    "ProductCount": 1
+   },
+   {
+    "Id": 553,
+    "Value": "Pulse Electronics",
+    "ProductCount": 10
+   },
+   {
+    "Id": 2312,
+    "Value": "Qorvo",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1516,
+    "Value": "QT Brightek (QTB)",
+    "ProductCount": 2
+   },
+   {
+    "Id": 189,
+    "Value": "Qualtek",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2229,
+    "Value": "Quest Technology International Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 469,
+    "Value": "Radial Magnets, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2201,
+    "Value": "Radiall USA, Inc.",
+    "ProductCount": 26
+   },
+   {
+    "Id": 1783,
+    "Value": "Radiocrafts AS",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1772,
+    "Value": "RAF Electronic Hardware",
+    "ProductCount": 8
+   },
+   {
+    "Id": 1715,
+    "Value": "RAFI",
+    "ProductCount": 6
+   },
+   {
+    "Id": 945,
+    "Value": "Recom Power",
+    "ProductCount": 17
+   },
+   {
+    "Id": 3133,
+    "Value": "Red Pitaya d.d.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 602485,
+    "Value": "RELPOL S.A.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2328,
+    "Value": "Remington Industries",
+    "ProductCount": 2
+   },
+   {
+    "Id": 20,
+    "Value": "Renesas Electronics Corporation",
+    "ProductCount": 15
+   },
+   {
+    "Id": 3100,
+    "Value": "Rennsteig Tools, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2410,
+    "Value": "RFMi",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1028,
+    "Value": "Richtek USA Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 696,
+    "Value": "Riedon products by Bourns",
+    "ProductCount": 1
+   },
+   {
+    "Id": 4080,
+    "Value": "Rishabh Instruments",
+    "ProductCount": 1
+   },
+   {
+    "Id": 5385,
+    "Value": "Rittal",
+    "ProductCount": 3
+   },
+   {
+    "Id": 846,
+    "Value": "Rohm Semiconductor",
+    "ProductCount": 3
+   },
+   {
+    "Id": 1758,
+    "Value": "Rose+Krieger",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1868,
+    "Value": "Rosenberger",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1189,
+    "Value": "Rubycon",
+    "ProductCount": 11
+   },
+   {
+    "Id": 2524,
+    "Value": "Ruffy Controls Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 3188,
+    "Value": "Ruland Manufacturing",
+    "ProductCount": 4
+   },
+   {
+    "Id": 2337,
+    "Value": "SAB North America",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2223,
+    "Value": "Same Sky (Formerly CUI Devices)",
+    "ProductCount": 4
+   },
+   {
+    "Id": 1276,
+    "Value": "Samsung Electro-Mechanics",
+    "ProductCount": 5
+   },
+   {
+    "Id": 1510,
+    "Value": "Samsung Semiconductor, Inc.",
+    "ProductCount": 6
+   },
+   {
+    "Id": 612,
+    "Value": "Samtec Inc.",
+    "ProductCount": 1243
+   },
+   {
+    "Id": 2981,
+    "Value": "Sanoxy",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1688,
+    "Value": "Sanyo Denki America Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1988,
+    "Value": "Schmartboard, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 4008,
+    "Value": "Schneider Electric",
+    "ProductCount": 43
+   },
+   {
+    "Id": 1439,
+    "Value": "Schroff",
+    "ProductCount": 3
+   },
+   {
+    "Id": 486,
+    "Value": "SCHURTER Inc.",
+    "ProductCount": 21
+   },
+   {
+    "Id": 1569,
+    "Value": "SCS",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1597,
+    "Value": "Seeed Technology Co., Ltd",
+    "ProductCount": 8
+   },
+   {
+    "Id": 728,
+    "Value": "Seiko Instruments",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1560,
+    "Value": "SemiQ",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1862,
+    "Value": "Sensata Technologies",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1861,
+    "Value": "Sensata Technologies, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 725,
+    "Value": "Sensata Technologies, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 723,
+    "Value": "Sensata-Airpax",
+    "ProductCount": 3
+   },
+   {
+    "Id": 6207,
+    "Value": "Sensata-BEI Encoders",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1724,
+    "Value": "Sensata-BEI Sensors",
+    "ProductCount": 1
+   },
+   {
+    "Id": 172,
+    "Value": "Sensata-Crydom",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1649,
+    "Value": "Sensirion AG",
+    "ProductCount": 2
+   },
+   {
+    "Id": 5209,
+    "Value": "SensoPart",
+    "ProductCount": 9
+   },
+   {
+    "Id": 897,
+    "Value": "Seoul Semiconductor Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 600221,
+    "Value": "SerialGear",
+    "ProductCount": 1
+   },
+   {
+    "Id": 425,
+    "Value": "Sharp Microelectronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1855,
+    "Value": "SHARP/Socle Technology",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1882,
+    "Value": "SICK, Inc.",
+    "ProductCount": 177
+   },
+   {
+    "Id": 3473,
+    "Value": "Siemens",
+    "ProductCount": 36
+   },
+   {
+    "Id": 1645,
+    "Value": "Sierra Wireless",
+    "ProductCount": 17
+   },
+   {
+    "Id": 1719,
+    "Value": "Sierra Wireless AirLink",
+    "ProductCount": 9
+   },
+   {
+    "Id": 5422,
+    "Value": "Sigma Batteries",
+    "ProductCount": 4
+   },
+   {
+    "Id": 595,
+    "Value": "Signal Transformer",
+    "ProductCount": 9
+   },
+   {
+    "Id": 336,
+    "Value": "Silicon Labs",
+    "ProductCount": 3
+   },
+   {
+    "Id": 863,
+    "Value": "Skyworks Solutions Inc.",
+    "ProductCount": 4
+   },
+   {
+    "Id": 271,
+    "Value": "SL POWER / Advanced Energy",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1655,
+    "Value": "SMC Diode Solutions",
+    "ProductCount": 2
+   },
+   {
+    "Id": 433,
+    "Value": "Soberton Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 666,
+    "Value": "Souriau-Sunbank by Eaton",
+    "ProductCount": 4
+   },
+   {
+    "Id": 601885,
+    "Value": "Southco Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1568,
+    "Value": "SparkFun Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1684,
+    "Value": "SPEC Sensors (a division of Interlink Electronics)",
+    "ProductCount": 1
+   },
+   {
+    "Id": 905,
+    "Value": "Spectra Symbol",
+    "ProductCount": 1
+   },
+   {
+    "Id": 738,
+    "Value": "Stackpole Electronics Inc",
+    "ProductCount": 6
+   },
+   {
+    "Id": 452,
+    "Value": "Staco Energy Products Company",
+    "ProductCount": 1
+   },
+   {
+    "Id": 374,
+    "Value": "Standex-Meder Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 404,
+    "Value": "Stanley Electric Co",
+    "ProductCount": 1
+   },
+   {
+    "Id": 96,
+    "Value": "Steinel America",
+    "ProductCount": 1
+   },
+   {
+    "Id": 380,
+    "Value": "Stewart Connector",
+    "ProductCount": 1
+   },
+   {
+    "Id": 497,
+    "Value": "STMicroelectronics",
+    "ProductCount": 21
+   },
+   {
+    "Id": 35,
+    "Value": "Sullins Connector Solutions",
+    "ProductCount": 38
+   },
+   {
+    "Id": 308,
+    "Value": "Sumida America Components Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 527,
+    "Value": "Sumida America Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2786,
+    "Value": "Sumitomo Electric Interconnect Products, Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1497,
+    "Value": "SunLED",
+    "ProductCount": 2
+   },
+   {
+    "Id": 408,
+    "Value": "Susumu",
+    "ProductCount": 5
+   },
+   {
+    "Id": 232,
+    "Value": "Swanstrom Tools USA",
+    "ProductCount": 1
+   },
+   {
+    "Id": 137,
+    "Value": "Switchcraft Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1168,
+    "Value": "t-Global Technology",
+    "ProductCount": 2
+   },
+   {
+    "Id": 439,
+    "Value": "Tadiran Batteries",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1880,
+    "Value": "Taica North America Corporation",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1664,
+    "Value": "Taitien",
+    "ProductCount": 2
+   },
+   {
+    "Id": 587,
+    "Value": "Taiyo Yuden",
+    "ProductCount": 6
+   },
+   {
+    "Id": 1295,
+    "Value": "Talema Group LLC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 132,
+    "Value": "Tamura",
+    "ProductCount": 1
+   },
+   {
+    "Id": 931,
+    "Value": "Taoglas Limited",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1487,
+    "Value": "Tark Thermal Solutions",
+    "ProductCount": 3
+   },
+   {
+    "Id": 445,
+    "Value": "TDK",
+    "ProductCount": 196
+   },
+   {
+    "Id": 1428,
+    "Value": "TDK InvenSense",
+    "ProductCount": 2
+   },
+   {
+    "Id": 285,
+    "Value": "TDK-Lambda",
+    "ProductCount": 2
+   },
+   {
+    "Id": 2585,
+    "Value": "TE - Kissling",
+    "ProductCount": 2
+   },
+   {
+    "Id": 994,
+    "Value": "TE Connectivity",
+    "ProductCount": 7
+   },
+   {
+    "Id": 844,
+    "Value": "TE Connectivity Aerospace, Defense and Marine",
+    "ProductCount": 13
+   },
+   {
+    "Id": 450,
+    "Value": "TE Connectivity ALCOSWITCH Switches",
+    "ProductCount": 9
+   },
+   {
+    "Id": 17,
+    "Value": "TE Connectivity AMP Connectors",
+    "ProductCount": 286
+   },
+   {
+    "Id": 2132,
+    "Value": "TE Connectivity Application Tooling",
+    "ProductCount": 44
+   },
+   {
+    "Id": 174,
+    "Value": "TE Connectivity Corcom Filters",
+    "ProductCount": 3
+   },
+   {
+    "Id": 1508,
+    "Value": "TE Connectivity Deutsch Connectors",
+    "ProductCount": 129
+   },
+   {
+    "Id": 2684,
+    "Value": "TE Connectivity Erni",
+    "ProductCount": 1
+   },
+   {
+    "Id": 223,
+    "Value": "TE Connectivity Measurement Specialties",
+    "ProductCount": 26
+   },
+   {
+    "Id": 1712,
+    "Value": "TE Connectivity Passive Product",
+    "ProductCount": 12
+   },
+   {
+    "Id": 41,
+    "Value": "TE Connectivity Potter & Brumfield Relays",
+    "ProductCount": 11
+   },
+   {
+    "Id": 484,
+    "Value": "TE Connectivity Raychem Cable Protection",
+    "ProductCount": 11
+   },
+   {
+    "Id": 817,
+    "Value": "TE Connectivity Schaffner",
+    "ProductCount": 3
+   },
+   {
+    "Id": 1030,
+    "Value": "Techflex",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1873,
+    "Value": "Techspray",
+    "ProductCount": 1
+   },
+   {
+    "Id": 600452,
+    "Value": "Tek-Sub",
+    "ProductCount": 4
+   },
+   {
+    "Id": 2067,
+    "Value": "Teledyne FLIR Commercial Systems",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1133,
+    "Value": "Teledyne LeCroy",
+    "ProductCount": 1
+   },
+   {
+    "Id": 943,
+    "Value": "Telit Cinterion",
+    "ProductCount": 1
+   },
+   {
+    "Id": 839,
+    "Value": "Tensility International Corp",
+    "ProductCount": 3
+   },
+   {
+    "Id": 6322,
+    "Value": "Tepro-Vamistor",
+    "ProductCount": 1
+   },
+   {
+    "Id": 296,
+    "Value": "Texas Instruments",
+    "ProductCount": 126
+   },
+   {
+    "Id": 1121,
+    "Value": "Thomas Research Products",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1832,
+    "Value": "TinyCircuits",
+    "ProductCount": 2
+   },
+   {
+    "Id": 4626,
+    "Value": "Top Shelf Acoustics, LLC",
+    "ProductCount": 2
+   },
+   {
+    "Id": 893,
+    "Value": "Torex Semiconductor Ltd",
+    "ProductCount": 2
+   },
+   {
+    "Id": 290,
+    "Value": "TPI (Test Products Int)",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1951,
+    "Value": "Traco Power",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2492,
+    "Value": "Transko Electronics, Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 237,
+    "Value": "Triad Magnetics",
+    "ProductCount": 12
+   },
+   {
+    "Id": 600076,
+    "Value": "Triplett",
+    "ProductCount": 1
+   },
+   {
+    "Id": 987,
+    "Value": "TT Electronics/BI",
+    "ProductCount": 1
+   },
+   {
+    "Id": 989,
+    "Value": "TT Electronics/IRC",
+    "ProductCount": 4
+   },
+   {
+    "Id": 365,
+    "Value": "TT Electronics/Optek Technology",
+    "ProductCount": 1
+   },
+   {
+    "Id": 985,
+    "Value": "TT Electronics/Welwyn",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1173,
+    "Value": "TTM Technologies, Inc.",
+    "ProductCount": 2
+   },
+   {
+    "Id": 410,
+    "Value": "Tusonix a Subsidiary of CTS Electronic Components",
+    "ProductCount": 23
+   },
+   {
+    "Id": 438,
+    "Value": "Twin Industries",
+    "ProductCount": 1
+   },
+   {
+    "Id": 887,
+    "Value": "TXC CORPORATION",
+    "ProductCount": 3
+   },
+   {
+    "Id": 672,
+    "Value": "u-blox",
+    "ProductCount": 1
+   },
+   {
+    "Id": 3007,
+    "Value": "U-Reach Data Solutions, Inc",
+    "ProductCount": 1
+   },
+   {
+    "Id": 5138,
+    "Value": "Uni-Trend Technology US Inc",
+    "ProductCount": 1
+   },
+   {
+    "Id": 602269,
+    "Value": "USA Industrials",
+    "ProductCount": 17
+   },
+   {
+    "Id": 44,
+    "Value": "Vector Electronics",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1780,
+    "Value": "Verivolt LLC",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1241,
+    "Value": "VersaLogic Corporation",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1102,
+    "Value": "Vicor Corporation",
+    "ProductCount": 3
+   },
+   {
+    "Id": 5578,
+    "Value": "Vigortronix",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1803,
+    "Value": "Viking Technology",
+    "ProductCount": 1
+   },
+   {
+    "Id": 749,
+    "Value": "Vishay",
+    "ProductCount": 16
+   },
+   {
+    "Id": 570,
+    "Value": "Vishay Ametherm",
+    "ProductCount": 1
+   },
+   {
+    "Id": 56,
+    "Value": "Vishay Beyschlag/Draloric/BC Components",
+    "ProductCount": 27
+   },
+   {
+    "Id": 541,
+    "Value": "Vishay Dale",
+    "ProductCount": 156
+   },
+   {
+    "Id": 764,
+    "Value": "Vishay Dale Thin Film",
+    "ProductCount": 16
+   },
+   {
+    "Id": 112,
+    "Value": "Vishay General Semiconductor - Diodes Division",
+    "ProductCount": 3
+   },
+   {
+    "Id": 751,
+    "Value": "Vishay Semiconductor Opto Division",
+    "ProductCount": 1
+   },
+   {
+    "Id": 716,
+    "Value": "Vishay Sfernice",
+    "ProductCount": 17
+   },
+   {
+    "Id": 742,
+    "Value": "Vishay Siliconix",
+    "ProductCount": 1
+   },
+   {
+    "Id": 718,
+    "Value": "Vishay Sprague",
+    "ProductCount": 4
+   },
+   {
+    "Id": 720,
+    "Value": "Vishay Vitramon",
+    "ProductCount": 3
+   },
+   {
+    "Id": 62,
+    "Value": "Volgen + Furuno",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2050,
+    "Value": "Vox Power Ltd.",
+    "ProductCount": 4
+   },
+   {
+    "Id": 804,
+    "Value": "VPG Foil Resistors",
+    "ProductCount": 6
+   },
+   {
+    "Id": 1670,
+    "Value": "Vybronics Inc",
+    "ProductCount": 1
+   },
+   {
+    "Id": 2946,
+    "Value": "WAGO Corporation",
+    "ProductCount": 50
+   },
+   {
+    "Id": 345,
+    "Value": "Wakefield Thermal Solutions",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1292,
+    "Value": "Walsin Technology Corporation",
+    "ProductCount": 2
+   },
+   {
+    "Id": 2266,
+    "Value": "WEC",
+    "ProductCount": 8
+   },
+   {
+    "Id": 1740,
+    "Value": "WeEn Semiconductors",
+    "ProductCount": 3
+   },
+   {
+    "Id": 281,
+    "Value": "Weidmüller",
+    "ProductCount": 52
+   },
+   {
+    "Id": 5627,
+    "Value": "Wera Tools NA Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 431,
+    "Value": "Wiha",
+    "ProductCount": 2
+   },
+   {
+    "Id": 1928,
+    "Value": "WIMA",
+    "ProductCount": 1
+   },
+   {
+    "Id": 385,
+    "Value": "Wintec Industries",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1278,
+    "Value": "WIZnet",
+    "ProductCount": 1
+   },
+   {
+    "Id": 732,
+    "Value": "Würth Elektronik",
+    "ProductCount": 66
+   },
+   {
+    "Id": 415,
+    "Value": "Xeltek Inc.",
+    "ProductCount": 1
+   },
+   {
+    "Id": 880,
+    "Value": "XMOS",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1470,
+    "Value": "XP Power",
+    "ProductCount": 2
+   },
+   {
+    "Id": 13,
+    "Value": "YAGEO",
+    "ProductCount": 13
+   },
+   {
+    "Id": 311,
+    "Value": "Yageo America",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1759,
+    "Value": "Yageo Nexensos",
+    "ProductCount": 1
+   },
+   {
+    "Id": 4210,
+    "Value": "ZERO CONNECT",
+    "ProductCount": 5
+   },
+   {
+    "Id": 269,
+    "Value": "Zilog",
+    "ProductCount": 2
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

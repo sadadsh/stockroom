@@ -1,0 +1,144 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "2385 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Crystals 3.2x2.5mm 25MHz 12pF +-20ppm 40Ohms AEC-Q200 SMT",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/kyoceraelectronicdevices/images/CX3225SA_SPL.jpg",
+    "Category": "Crystals",
+    "LeadTime": "126 Days",
+    "LifecycleStatus": "New Product",
+    "Manufacturer": "KYOCERA AVX",
+    "ManufacturerPartNumber": "CX3225SA25000H0HSSC1",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "581-CX3225SAH0HSSC1",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.83",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.722",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$0.655",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.628",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.593",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.569",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.545",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.539",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.517",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/KYOCERA-AVX/CX3225SA25000H0HSSC1?qs=4dK74SdgGtwMDHjtQyOeIg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": "2385",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 10% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541600060"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541600020"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854160010"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541600000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541600100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Japan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

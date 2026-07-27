@@ -1,0 +1,688 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "CONN HEADER VERT 20POS 2.54MM",
+    "DetailedDescription": "Connector Header Through Hole 20 position 0.100\" (2.54mm)"
+   },
+   "Manufacturer": {
+    "Id": 732,
+    "Name": "Würth Elektronik"
+   },
+   "ManufacturerProductNumber": "61202021621",
+   "UnitPrice": 0.9,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/würth-elektronik/61202021621/2060592",
+   "DatasheetUrl": "https://www.we-online.com/components/products/datasheet/61202021621.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/513/61202021621.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "732-2096-ND",
+     "PackageType": {
+      "Id": 17,
+      "Name": "Tray"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.9,
+       "TotalPrice": 0.9
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.885,
+       "TotalPrice": 8.85
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.816,
+       "TotalPrice": 40.8
+      },
+      {
+       "BreakQuantity": 160,
+       "UnitPrice": 0.74675,
+       "TotalPrice": 119.48
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 732,
+      "Name": "Würth Elektronik"
+     },
+     "QuantityAvailableforPackageType": 9002,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 9002,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 28,
+     "ParameterText": "Connector Type",
+     "ParameterType": "String",
+     "ValueId": "353507",
+     "ValueText": "Header"
+    },
+    {
+     "ParameterId": 512,
+     "ParameterText": "Contact Type",
+     "ParameterType": "String",
+     "ValueId": "371353",
+     "ValueText": "Male Pin"
+    },
+    {
+     "ParameterId": 1790,
+     "ParameterText": "Pitch - Mating",
+     "ParameterType": "String",
+     "ValueId": "9726",
+     "ValueText": "0.100\" (2.54mm)"
+    },
+    {
+     "ParameterId": 88,
+     "ParameterText": "Number of Positions",
+     "ParameterType": "String",
+     "ValueId": "137796",
+     "ValueText": "20"
+    },
+    {
+     "ParameterId": 90,
+     "ParameterText": "Number of Rows",
+     "ParameterType": "String",
+     "ValueId": "121326",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 2024,
+     "ParameterText": "Row Spacing - Mating",
+     "ParameterType": "String",
+     "ValueId": "9726",
+     "ValueText": "0.100\" (2.54mm)"
+    },
+    {
+     "ParameterId": 564,
+     "ParameterText": "Number of Positions Loaded",
+     "ParameterType": "String",
+     "ValueId": "312745",
+     "ValueText": "All"
+    },
+    {
+     "ParameterId": 91,
+     "ParameterText": "Style",
+     "ParameterType": "String",
+     "ValueId": "321623",
+     "ValueText": "Board to Cable/Wire"
+    },
+    {
+     "ParameterId": 2021,
+     "ParameterText": "Shrouding",
+     "ParameterType": "String",
+     "ValueId": "402177",
+     "ValueText": "Shrouded - 4 Wall"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "411897",
+     "ValueText": "Through Hole"
+    },
+    {
+     "ParameterId": 589,
+     "ParameterText": "Termination",
+     "ParameterType": "String",
+     "ValueId": "405002",
+     "ValueText": "Solder"
+    },
+    {
+     "ParameterId": 518,
+     "ParameterText": "Fastening Type",
+     "ParameterType": "String",
+     "ValueId": "390971",
+     "ValueText": "Push-Pull"
+    },
+    {
+     "ParameterId": 2025,
+     "ParameterText": "Contact Length - Mating",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 2012,
+     "ParameterText": "Contact Length - Post",
+     "ParameterType": "String",
+     "ValueId": "10308",
+     "ValueText": "0.118\" (3.00mm)"
+    },
+    {
+     "ParameterId": 2022,
+     "ParameterText": "Overall Contact Length",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 2018,
+     "ParameterText": "Insulation Height",
+     "ParameterType": "String",
+     "ValueId": "20185",
+     "ValueText": "0.358\" (9.10mm)"
+    },
+    {
+     "ParameterId": 2011,
+     "ParameterText": "Contact Shape",
+     "ParameterType": "String",
+     "ValueId": "406666",
+     "ValueText": "Square"
+    },
+    {
+     "ParameterId": 1791,
+     "ParameterText": "Contact Finish - Mating",
+     "ParameterType": "String",
+     "ValueId": "350796",
+     "ValueText": "Gold"
+    },
+    {
+     "ParameterId": 1792,
+     "ParameterText": "Contact Finish Thickness - Mating",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1795,
+     "ParameterText": "Contact Finish - Post",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1084,
+     "ParameterText": "Contact Material",
+     "ParameterType": "String",
+     "ValueId": "333922",
+     "ValueText": "Copper Alloy"
+    },
+    {
+     "ParameterId": 2023,
+     "ParameterText": "Insulation Material",
+     "ParameterType": "String",
+     "ValueId": "388448",
+     "ValueText": "Polybutylene Terephthalate (PBT)"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "362519",
+     "ValueText": "Keying Slot"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212434",
+     "ValueText": "-40°C ~ 105°C"
+    },
+    {
+     "ParameterId": 697,
+     "ParameterText": "Ingress Protection",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 903,
+     "ParameterText": "Material Flammability Rating",
+     "ParameterType": "String",
+     "ValueId": "417627",
+     "ValueText": "UL94 V-0"
+    },
+    {
+     "ParameterId": 1693,
+     "ParameterText": "Insulation Color",
+     "ParameterType": "String",
+     "ValueId": "319929",
+     "ValueText": "Black"
+    },
+    {
+     "ParameterId": 66,
+     "ParameterText": "Current Rating (Amps)",
+     "ParameterType": "String",
+     "ValueId": "201594",
+     "ValueText": "3A"
+    },
+    {
+     "ParameterId": 63,
+     "ParameterText": "Voltage Rating",
+     "ParameterType": "String",
+     "ValueId": "157291",
+     "ValueText": "250V"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2027,
+      "ParentId": 20,
+      "Name": "Rectangular Connectors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/244/550/C-Grid-III-90131%282-POS%29tin_tmb%2864x64%29.jpg",
+      "SeoDescription": "Rectangular Connectors include a wide variety of connector solutions for power, data, and signal applications. As the name implies, they are rectangular in shape and can provide ease to the design process. Many of the most commonly found connectors and connector accessories fall into this category.",
+      "ChildCategories": [
+       {
+        "CategoryId": 314,
+        "ParentId": 2027,
+        "Name": "Headers, Male Pins",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/507/986/45212-600230_tmb.jpg",
+        "SeoDescription": "This type of header contains male pins within a plastic base and is meant to be mated with a rectangular cable connector or a female socket header for board-to-board connection. These come in a variety of position and pitch options, with some having a breakaway option to manually change position count with ease. Some are shrouded with 1 to 4 walls or unshrouded. Mounting types include panel mount, board edge, stacking, surface mount, and through-hole.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 20865,
+    "Name": "WR-BHD"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "Not Applicable",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.69.4040"
+   },
+   "OtherNames": [
+    "732-2096",
+    "-732-2096",
+    "3937-61202021621"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "CONN HEADER VERT 20POS 2.54MM",
+    "DetailedDescription": "Connector Header Through Hole 20 position 0.100\" (2.54mm)"
+   },
+   "Manufacturer": {
+    "Id": 732,
+    "Name": "Würth Elektronik"
+   },
+   "ManufacturerProductNumber": "61202021621",
+   "UnitPrice": 0.9,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/würth-elektronik/61202021621/2060592",
+   "DatasheetUrl": "https://www.we-online.com/components/products/datasheet/61202021621.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/513/61202021621.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "732-2096-ND",
+     "PackageType": {
+      "Id": 17,
+      "Name": "Tray"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.9,
+       "TotalPrice": 0.9
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.885,
+       "TotalPrice": 8.85
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.816,
+       "TotalPrice": 40.8
+      },
+      {
+       "BreakQuantity": 160,
+       "UnitPrice": 0.74675,
+       "TotalPrice": 119.48
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 732,
+      "Name": "Würth Elektronik"
+     },
+     "QuantityAvailableforPackageType": 9002,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 9002,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 28,
+     "ParameterText": "Connector Type",
+     "ParameterType": "String",
+     "ValueId": "353507",
+     "ValueText": "Header"
+    },
+    {
+     "ParameterId": 512,
+     "ParameterText": "Contact Type",
+     "ParameterType": "String",
+     "ValueId": "371353",
+     "ValueText": "Male Pin"
+    },
+    {
+     "ParameterId": 1790,
+     "ParameterText": "Pitch - Mating",
+     "ParameterType": "String",
+     "ValueId": "9726",
+     "ValueText": "0.100\" (2.54mm)"
+    },
+    {
+     "ParameterId": 88,
+     "ParameterText": "Number of Positions",
+     "ParameterType": "String",
+     "ValueId": "137796",
+     "ValueText": "20"
+    },
+    {
+     "ParameterId": 90,
+     "ParameterText": "Number of Rows",
+     "ParameterType": "String",
+     "ValueId": "121326",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 2024,
+     "ParameterText": "Row Spacing - Mating",
+     "ParameterType": "String",
+     "ValueId": "9726",
+     "ValueText": "0.100\" (2.54mm)"
+    },
+    {
+     "ParameterId": 564,
+     "ParameterText": "Number of Positions Loaded",
+     "ParameterType": "String",
+     "ValueId": "312745",
+     "ValueText": "All"
+    },
+    {
+     "ParameterId": 91,
+     "ParameterText": "Style",
+     "ParameterType": "String",
+     "ValueId": "321623",
+     "ValueText": "Board to Cable/Wire"
+    },
+    {
+     "ParameterId": 2021,
+     "ParameterText": "Shrouding",
+     "ParameterType": "String",
+     "ValueId": "402177",
+     "ValueText": "Shrouded - 4 Wall"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "411897",
+     "ValueText": "Through Hole"
+    },
+    {
+     "ParameterId": 589,
+     "ParameterText": "Termination",
+     "ParameterType": "String",
+     "ValueId": "405002",
+     "ValueText": "Solder"
+    },
+    {
+     "ParameterId": 518,
+     "ParameterText": "Fastening Type",
+     "ParameterType": "String",
+     "ValueId": "390971",
+     "ValueText": "Push-Pull"
+    },
+    {
+     "ParameterId": 2025,
+     "ParameterText": "Contact Length - Mating",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 2012,
+     "ParameterText": "Contact Length - Post",
+     "ParameterType": "String",
+     "ValueId": "10308",
+     "ValueText": "0.118\" (3.00mm)"
+    },
+    {
+     "ParameterId": 2022,
+     "ParameterText": "Overall Contact Length",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 2018,
+     "ParameterText": "Insulation Height",
+     "ParameterType": "String",
+     "ValueId": "20185",
+     "ValueText": "0.358\" (9.10mm)"
+    },
+    {
+     "ParameterId": 2011,
+     "ParameterText": "Contact Shape",
+     "ParameterType": "String",
+     "ValueId": "406666",
+     "ValueText": "Square"
+    },
+    {
+     "ParameterId": 1791,
+     "ParameterText": "Contact Finish - Mating",
+     "ParameterType": "String",
+     "ValueId": "350796",
+     "ValueText": "Gold"
+    },
+    {
+     "ParameterId": 1792,
+     "ParameterText": "Contact Finish Thickness - Mating",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1795,
+     "ParameterText": "Contact Finish - Post",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1084,
+     "ParameterText": "Contact Material",
+     "ParameterType": "String",
+     "ValueId": "333922",
+     "ValueText": "Copper Alloy"
+    },
+    {
+     "ParameterId": 2023,
+     "ParameterText": "Insulation Material",
+     "ParameterType": "String",
+     "ValueId": "388448",
+     "ValueText": "Polybutylene Terephthalate (PBT)"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "362519",
+     "ValueText": "Keying Slot"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212434",
+     "ValueText": "-40°C ~ 105°C"
+    },
+    {
+     "ParameterId": 697,
+     "ParameterText": "Ingress Protection",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 903,
+     "ParameterText": "Material Flammability Rating",
+     "ParameterType": "String",
+     "ValueId": "417627",
+     "ValueText": "UL94 V-0"
+    },
+    {
+     "ParameterId": 1693,
+     "ParameterText": "Insulation Color",
+     "ParameterType": "String",
+     "ValueId": "319929",
+     "ValueText": "Black"
+    },
+    {
+     "ParameterId": 66,
+     "ParameterText": "Current Rating (Amps)",
+     "ParameterType": "String",
+     "ValueId": "201594",
+     "ValueText": "3A"
+    },
+    {
+     "ParameterId": 63,
+     "ParameterText": "Voltage Rating",
+     "ParameterType": "String",
+     "ValueId": "157291",
+     "ValueText": "250V"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2027,
+      "ParentId": 20,
+      "Name": "Rectangular Connectors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/244/550/C-Grid-III-90131%282-POS%29tin_tmb%2864x64%29.jpg",
+      "SeoDescription": "Rectangular Connectors include a wide variety of connector solutions for power, data, and signal applications. As the name implies, they are rectangular in shape and can provide ease to the design process. Many of the most commonly found connectors and connector accessories fall into this category.",
+      "ChildCategories": [
+       {
+        "CategoryId": 314,
+        "ParentId": 2027,
+        "Name": "Headers, Male Pins",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/507/986/45212-600230_tmb.jpg",
+        "SeoDescription": "This type of header contains male pins within a plastic base and is meant to be mated with a rectangular cable connector or a female socket header for board-to-board connection. These come in a variety of position and pitch options, with some having a breakaway option to manually change position count with ease. Some are shrouded with 1 to 4 walls or unshrouded. Mounting types include panel mount, board edge, stacking, surface mount, and through-hole.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 20865,
+    "Name": "WR-BHD"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "Not Applicable",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.69.4040"
+   },
+   "OtherNames": [
+    "732-2096",
+    "-732-2096",
+    "3937-61202021621"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 732,
+    "Value": "Würth Elektronik",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

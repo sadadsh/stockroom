@@ -1,0 +1,1129 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "SWITCH SLIDE SPDT 200MA 30V",
+    "DetailedDescription": "Slide Switch SPDT Through Hole"
+   },
+   "Manufacturer": {
+    "Id": 141,
+    "Name": "E-Switch"
+   },
+   "ManufacturerProductNumber": "EG1218",
+   "UnitPrice": 0.72,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/e-switch/EG1218/101726",
+   "DatasheetUrl": "https://configured-product-images.s3.amazonaws.com/Datasheets/EG.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4844/141_EG1218.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "EG1903-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.72,
+       "TotalPrice": 0.72
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.617,
+       "TotalPrice": 6.17
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.5748,
+       "TotalPrice": 14.37
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.5128,
+       "TotalPrice": 51.28
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.475,
+       "TotalPrice": 118.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.44854,
+       "TotalPrice": 224.27
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.42418,
+       "TotalPrice": 424.18
+      },
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.39005,
+       "TotalPrice": 1170.15
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.37607,
+       "TotalPrice": 1880.35
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 141,
+      "Name": "E-Switch"
+     },
+     "QuantityAvailableforPackageType": 29346,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 29346,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/5796749514001",
+   "Parameters": [
+    {
+     "ParameterId": 130,
+     "ParameterText": "Circuit",
+     "ParameterType": "String",
+     "ValueId": "405967",
+     "ValueText": "SPDT"
+    },
+    {
+     "ParameterId": 1801,
+     "ParameterText": "Contact Timing",
+     "ParameterType": "String",
+     "ValueId": "380410",
+     "ValueText": "Non-Shorting (BBM)"
+    },
+    {
+     "ParameterId": 235,
+     "ParameterText": "Switch Function",
+     "ParameterType": "String",
+     "ValueId": "382062",
+     "ValueText": "On-On"
+    },
+    {
+     "ParameterId": 66,
+     "ParameterText": "Current Rating (Amps)",
+     "ParameterType": "String",
+     "ValueId": "140421",
+     "ValueText": "200mA (DC)"
+    },
+    {
+     "ParameterId": 2144,
+     "ParameterText": "Voltage Rating - DC",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "30 V",
+     "ValueText": "30 V"
+    },
+    {
+     "ParameterId": 545,
+     "ParameterText": "Actuator Type",
+     "ParameterType": "String",
+     "ValueId": "407938",
+     "ValueText": "Standard"
+    },
+    {
+     "ParameterId": 544,
+     "ParameterText": "Actuator Length",
+     "ParameterType": "String",
+     "ValueId": "122869",
+     "ValueText": "2.00mm"
+    },
+    {
+     "ParameterId": 1084,
+     "ParameterText": "Contact Material",
+     "ParameterType": "String",
+     "ValueId": "333922",
+     "ValueText": "Copper Alloy"
+    },
+    {
+     "ParameterId": 30,
+     "ParameterText": "Contact Finish",
+     "ParameterType": "String",
+     "ValueId": "402831",
+     "ValueText": "Silver"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "411897",
+     "ValueText": "Through Hole"
+    },
+    {
+     "ParameterId": 258,
+     "ParameterText": "Termination Style",
+     "ParameterType": "String",
+     "ValueId": "384842",
+     "ValueText": "PC Pin"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "139409",
+     "ValueText": "-20°C ~ 70°C"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 15,
+    "ParentId": 0,
+    "Name": "Switches",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/274/017/MFG_TL3215_tmb.jpg",
+    "SeoDescription": "Switches are devices used to interrupt the flow of electrical current in one or more circuits, under the direct physical control of some outside mechanism such as a user's finger or thumb, a magnet, or a moving machine component. Organization of sub-groups within the category occurs along lines of the physical style or form of switches' actuators, or a particular application or purpose for which they are designed.",
+    "ChildCategories": [
+     {
+      "CategoryId": 213,
+      "ParentId": 15,
+      "Name": "Slide Switches",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/171/149/MFG_JS202011CQN_tmb%2864x64%29.jpg",
+      "SeoDescription": "Slide Switches are an electromechanical device used to control current flow in a circuit path. Devices in this family are actuated by sliding a mechanical switch. The characteristics are circuit, contact timing, switch function, current rating, voltage rating (AC or DC), and actuator type. The actuator types are baton, flush, illuminated, plunger for cap, push-pull, recessed, rocker knob, screwdriver slot, snap on cap, and standard.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "11",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 15529,
+    "Name": "EG"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.50.9050"
+   },
+   "OtherNames": [
+    "EG1903",
+    "Q2921006",
+    "P040040"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "SWITCH SLIDE SPDT 0.2A 30V",
+    "DetailedDescription": "Slide Switch SPDT Through Hole"
+   },
+   "Manufacturer": {
+    "Id": 141,
+    "Name": "E-Switch"
+   },
+   "ManufacturerProductNumber": "EG1218REDACTUATOR",
+   "UnitPrice": 0.21418,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/e-switch/EG1218REDACTUATOR/16018668",
+   "DatasheetUrl": "http://spec_sheets.e-switch.com/specs/P040038.pdf",
+   "PhotoUrl": "",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "141-EG1218REDACTUATOR-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.21418,
+       "TotalPrice": 856.72
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 141,
+      "Name": "E-Switch"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 1000,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 0,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": false,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 130,
+     "ParameterText": "Circuit",
+     "ParameterType": "String",
+     "ValueId": "405967",
+     "ValueText": "SPDT"
+    },
+    {
+     "ParameterId": 1801,
+     "ParameterText": "Contact Timing",
+     "ParameterType": "String",
+     "ValueId": "380410",
+     "ValueText": "Non-Shorting (BBM)"
+    },
+    {
+     "ParameterId": 235,
+     "ParameterText": "Switch Function",
+     "ParameterType": "String",
+     "ValueId": "382062",
+     "ValueText": "On-On"
+    },
+    {
+     "ParameterId": 66,
+     "ParameterText": "Current Rating (Amps)",
+     "ParameterType": "String",
+     "ValueId": "140421",
+     "ValueText": "200mA (DC)"
+    },
+    {
+     "ParameterId": 2144,
+     "ParameterText": "Voltage Rating - DC",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "30 V",
+     "ValueText": "30 V"
+    },
+    {
+     "ParameterId": 545,
+     "ParameterText": "Actuator Type",
+     "ParameterType": "String",
+     "ValueId": "407938",
+     "ValueText": "Standard"
+    },
+    {
+     "ParameterId": 544,
+     "ParameterText": "Actuator Length",
+     "ParameterType": "String",
+     "ValueId": "122869",
+     "ValueText": "2.00mm"
+    },
+    {
+     "ParameterId": 1084,
+     "ParameterText": "Contact Material",
+     "ParameterType": "String",
+     "ValueId": "333922",
+     "ValueText": "Copper Alloy"
+    },
+    {
+     "ParameterId": 30,
+     "ParameterText": "Contact Finish",
+     "ParameterType": "String",
+     "ValueId": "402831",
+     "ValueText": "Silver"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "411897",
+     "ValueText": "Through Hole"
+    },
+    {
+     "ParameterId": 258,
+     "ParameterText": "Termination Style",
+     "ParameterType": "String",
+     "ValueId": "384842",
+     "ValueText": "PC Pin"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "139409",
+     "ValueText": "-20°C ~ 70°C"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 15,
+    "ParentId": 0,
+    "Name": "Switches",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/274/017/MFG_TL3215_tmb.jpg",
+    "SeoDescription": "Switches are devices used to interrupt the flow of electrical current in one or more circuits, under the direct physical control of some outside mechanism such as a user's finger or thumb, a magnet, or a moving machine component. Organization of sub-groups within the category occurs along lines of the physical style or form of switches' actuators, or a particular application or purpose for which they are designed.",
+    "ChildCategories": [
+     {
+      "CategoryId": 213,
+      "ParentId": 15,
+      "Name": "Slide Switches",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/171/149/MFG_JS202011CQN_tmb%2864x64%29.jpg",
+      "SeoDescription": "Slide Switches are an electromechanical device used to control current flow in a circuit path. Devices in this family are actuated by sliding a mechanical switch. The characteristics are circuit, contact timing, switch function, current rating, voltage rating (AC or DC), and actuator type. The actuator types are baton, flush, illuminated, plunger for cap, push-pull, recessed, rocker knob, screwdriver slot, snap on cap, and standard.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "15",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unknown",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.50.9050"
+   },
+   "OtherNames": [
+    "141-EG1218REDACTUATOR",
+    "P040038"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "SWITCH SLIDE SPDT 200MA 30V",
+    "DetailedDescription": "Slide Switch SPDT Through Hole"
+   },
+   "Manufacturer": {
+    "Id": 141,
+    "Name": "E-Switch"
+   },
+   "ManufacturerProductNumber": "EG1218A",
+   "UnitPrice": 0.44814,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/e-switch/EG1218A/2345324",
+   "DatasheetUrl": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/6629/EG_Series.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5649/MFG_EG1218A.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "EG1218A-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.44814,
+       "TotalPrice": 1792.56
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 141,
+      "Name": "E-Switch"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 1000,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 0,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": false,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/5796749514001",
+   "Parameters": [
+    {
+     "ParameterId": 130,
+     "ParameterText": "Circuit",
+     "ParameterType": "String",
+     "ValueId": "405967",
+     "ValueText": "SPDT"
+    },
+    {
+     "ParameterId": 1801,
+     "ParameterText": "Contact Timing",
+     "ParameterType": "String",
+     "ValueId": "380410",
+     "ValueText": "Non-Shorting (BBM)"
+    },
+    {
+     "ParameterId": 235,
+     "ParameterText": "Switch Function",
+     "ParameterType": "String",
+     "ValueId": "382062",
+     "ValueText": "On-On"
+    },
+    {
+     "ParameterId": 66,
+     "ParameterText": "Current Rating (Amps)",
+     "ParameterType": "String",
+     "ValueId": "140421",
+     "ValueText": "200mA (DC)"
+    },
+    {
+     "ParameterId": 2144,
+     "ParameterText": "Voltage Rating - DC",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "30 V",
+     "ValueText": "30 V"
+    },
+    {
+     "ParameterId": 545,
+     "ParameterText": "Actuator Type",
+     "ParameterType": "String",
+     "ValueId": "407938",
+     "ValueText": "Standard"
+    },
+    {
+     "ParameterId": 544,
+     "ParameterText": "Actuator Length",
+     "ParameterType": "String",
+     "ValueId": "122869",
+     "ValueText": "2.00mm"
+    },
+    {
+     "ParameterId": 1084,
+     "ParameterText": "Contact Material",
+     "ParameterType": "String",
+     "ValueId": "333922",
+     "ValueText": "Copper Alloy"
+    },
+    {
+     "ParameterId": 30,
+     "ParameterText": "Contact Finish",
+     "ParameterType": "String",
+     "ValueId": "402831",
+     "ValueText": "Silver"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "411897",
+     "ValueText": "Through Hole"
+    },
+    {
+     "ParameterId": 258,
+     "ParameterText": "Termination Style",
+     "ParameterType": "String",
+     "ValueId": "384842",
+     "ValueText": "PC Pin"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "139409",
+     "ValueText": "-20°C ~ 70°C"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 15,
+    "ParentId": 0,
+    "Name": "Switches",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/274/017/MFG_TL3215_tmb.jpg",
+    "SeoDescription": "Switches are devices used to interrupt the flow of electrical current in one or more circuits, under the direct physical control of some outside mechanism such as a user's finger or thumb, a magnet, or a moving machine component. Organization of sub-groups within the category occurs along lines of the physical style or form of switches' actuators, or a particular application or purpose for which they are designed.",
+    "ChildCategories": [
+     {
+      "CategoryId": 213,
+      "ParentId": 15,
+      "Name": "Slide Switches",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/171/149/MFG_JS202011CQN_tmb%2864x64%29.jpg",
+      "SeoDescription": "Slide Switches are an electromechanical device used to control current flow in a circuit path. Devices in this family are actuated by sliding a mechanical switch. The characteristics are circuit, contact timing, switch function, current rating, voltage rating (AC or DC), and actuator type. The actuator types are baton, flush, illuminated, plunger for cap, push-pull, recessed, rocker knob, screwdriver slot, snap on cap, and standard.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "15",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 15529,
+    "Name": "EG"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.50.9050"
+   },
+   "OtherNames": []
+  }
+ ],
+ "ProductsCount": 3,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "SWITCH SLIDE SPDT 200MA 30V",
+    "DetailedDescription": "Slide Switch SPDT Through Hole"
+   },
+   "Manufacturer": {
+    "Id": 141,
+    "Name": "E-Switch"
+   },
+   "ManufacturerProductNumber": "EG1218",
+   "UnitPrice": 0.72,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/e-switch/EG1218/101726",
+   "DatasheetUrl": "https://configured-product-images.s3.amazonaws.com/Datasheets/EG.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4844/141_EG1218.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "EG1903-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.72,
+       "TotalPrice": 0.72
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.617,
+       "TotalPrice": 6.17
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.5748,
+       "TotalPrice": 14.37
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.5128,
+       "TotalPrice": 51.28
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.475,
+       "TotalPrice": 118.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.44854,
+       "TotalPrice": 224.27
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.42418,
+       "TotalPrice": 424.18
+      },
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.39005,
+       "TotalPrice": 1170.15
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.37607,
+       "TotalPrice": 1880.35
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 141,
+      "Name": "E-Switch"
+     },
+     "QuantityAvailableforPackageType": 29346,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 29346,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/5796749514001",
+   "Parameters": [
+    {
+     "ParameterId": 130,
+     "ParameterText": "Circuit",
+     "ParameterType": "String",
+     "ValueId": "405967",
+     "ValueText": "SPDT"
+    },
+    {
+     "ParameterId": 1801,
+     "ParameterText": "Contact Timing",
+     "ParameterType": "String",
+     "ValueId": "380410",
+     "ValueText": "Non-Shorting (BBM)"
+    },
+    {
+     "ParameterId": 235,
+     "ParameterText": "Switch Function",
+     "ParameterType": "String",
+     "ValueId": "382062",
+     "ValueText": "On-On"
+    },
+    {
+     "ParameterId": 66,
+     "ParameterText": "Current Rating (Amps)",
+     "ParameterType": "String",
+     "ValueId": "140421",
+     "ValueText": "200mA (DC)"
+    },
+    {
+     "ParameterId": 2144,
+     "ParameterText": "Voltage Rating - DC",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "30 V",
+     "ValueText": "30 V"
+    },
+    {
+     "ParameterId": 545,
+     "ParameterText": "Actuator Type",
+     "ParameterType": "String",
+     "ValueId": "407938",
+     "ValueText": "Standard"
+    },
+    {
+     "ParameterId": 544,
+     "ParameterText": "Actuator Length",
+     "ParameterType": "String",
+     "ValueId": "122869",
+     "ValueText": "2.00mm"
+    },
+    {
+     "ParameterId": 1084,
+     "ParameterText": "Contact Material",
+     "ParameterType": "String",
+     "ValueId": "333922",
+     "ValueText": "Copper Alloy"
+    },
+    {
+     "ParameterId": 30,
+     "ParameterText": "Contact Finish",
+     "ParameterType": "String",
+     "ValueId": "402831",
+     "ValueText": "Silver"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "411897",
+     "ValueText": "Through Hole"
+    },
+    {
+     "ParameterId": 258,
+     "ParameterText": "Termination Style",
+     "ParameterType": "String",
+     "ValueId": "384842",
+     "ValueText": "PC Pin"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "139409",
+     "ValueText": "-20°C ~ 70°C"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 15,
+    "ParentId": 0,
+    "Name": "Switches",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/274/017/MFG_TL3215_tmb.jpg",
+    "SeoDescription": "Switches are devices used to interrupt the flow of electrical current in one or more circuits, under the direct physical control of some outside mechanism such as a user's finger or thumb, a magnet, or a moving machine component. Organization of sub-groups within the category occurs along lines of the physical style or form of switches' actuators, or a particular application or purpose for which they are designed.",
+    "ChildCategories": [
+     {
+      "CategoryId": 213,
+      "ParentId": 15,
+      "Name": "Slide Switches",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/001/171/149/MFG_JS202011CQN_tmb%2864x64%29.jpg",
+      "SeoDescription": "Slide Switches are an electromechanical device used to control current flow in a circuit path. Devices in this family are actuated by sliding a mechanical switch. The characteristics are circuit, contact timing, switch function, current rating, voltage rating (AC or DC), and actuator type. The actuator types are baton, flush, illuminated, plunger for cap, push-pull, recessed, rocker knob, screwdriver slot, snap on cap, and standard.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "11",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 15529,
+    "Name": "EG"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.50.9050"
+   },
+   "OtherNames": [
+    "EG1903",
+    "Q2921006",
+    "P040040"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 141,
+    "Value": "E-Switch",
+    "ProductCount": 3
+   }
+  ],
+  "Packaging": [
+   {
+    "Id": 3,
+    "Value": "Bulk",
+    "ProductCount": 3
+   }
+  ],
+  "Status": [
+   {
+    "Id": 0,
+    "Value": "Active",
+    "ProductCount": 3
+   }
+  ],
+  "Series": [
+   {
+    "Id": 818,
+    "Value": "-",
+    "ProductCount": 1
+   },
+   {
+    "Id": 15529,
+    "Value": "EG",
+    "ProductCount": 2
+   }
+  ],
+  "ParametricFilters": [
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 130,
+    "ParameterName": "Circuit",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "405967",
+      "ValueName": "SPDT",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1801,
+    "ParameterName": "Contact Timing",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "380410",
+      "ValueName": "Non-Shorting (BBM)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 235,
+    "ParameterName": "Switch Function",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "382062",
+      "ValueName": "On-On",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 66,
+    "ParameterName": "Current Rating (Amps)",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "140421",
+      "ValueName": "200mA (DC)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "UnitOfMeasure",
+    "ParameterId": 2144,
+    "ParameterName": "Voltage Rating - DC",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "30 V",
+      "ValueName": "30 V",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 545,
+    "ParameterName": "Actuator Type",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "407938",
+      "ValueName": "Standard",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 544,
+    "ParameterName": "Actuator Length",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "122869",
+      "ValueName": "2.00mm",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1084,
+    "ParameterName": "Contact Material",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "333922",
+      "ValueName": "Copper Alloy",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 30,
+    "ParameterName": "Contact Finish",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "402831",
+      "ValueName": "Silver",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 69,
+    "ParameterName": "Mounting Type",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "411897",
+      "ValueName": "Through Hole",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 258,
+    "ParameterName": "Termination Style",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "384842",
+      "ValueName": "PC Pin",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 5,
+    "ParameterName": "Features",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "1",
+      "ValueName": "-",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 213,
+     "Value": "Slide Switches",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 252,
+    "ParameterName": "Operating Temperature",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "139409",
+      "ValueName": "-20°C ~ 70°C",
+      "RangeFilterType": null
+     }
+    ]
+   }
+  ],
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}
