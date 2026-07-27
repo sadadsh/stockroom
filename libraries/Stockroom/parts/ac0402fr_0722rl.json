@@ -41,6 +41,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4205/AC-Series--SMD-Chip-Resistor.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "56 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "20"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -619,6 +631,70 @@
       "stock": 44801,
       "url": "https://www.lcsc.com/product-detail/C226359.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:41.704121+00:00",
+      "part_number": "603-AC0402FR-0722RL",
+      "price_breaks": [
+        {
+          "price": 0.1,
+          "qty": 1
+        },
+        {
+          "price": 0.009,
+          "qty": 10
+        },
+        {
+          "price": 0.007,
+          "qty": 100
+        },
+        {
+          "price": 0.005,
+          "qty": 1000
+        },
+        {
+          "price": 0.002,
+          "qty": 10000
+        }
+      ],
+      "stock": 173723,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:41.704121+00:00",
+      "part_number": "YAG3460TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00358,
+          "qty": 10000
+        },
+        {
+          "price": 0.00319,
+          "qty": 20000
+        },
+        {
+          "price": 0.003,
+          "qty": 30000
+        },
+        {
+          "price": 0.0028,
+          "qty": 50000
+        },
+        {
+          "price": 0.00268,
+          "qty": 70000
+        },
+        {
+          "price": 0.00257,
+          "qty": 100000
+        }
+      ],
+      "stock": 146805,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -668,7 +744,7 @@
     "LCSC Product Name": "RES 22Ω ±1% 62.5mW 0402",
     "LCSC Title": "YAGEO AC0402FR-0722RL",
     "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
-    "Lead Time": "84 Days",
+    "Lead Time": "56 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "100",
     "Moisture Sensitivity Level": "1 (Unlimited)",
