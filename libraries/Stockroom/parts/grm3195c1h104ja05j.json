@@ -1,4 +1,131 @@
 {
+  "alternates": {
+    "Capacitance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "100 nF"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "0.1 uF"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "0.1 µF"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "17"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Reel, Cut Tape, MouseReel"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Reel"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "5%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±5%"
+      }
+    ],
+    "US Tariff %": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "7.95"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 100 nF, 5%, 1206"
+      },
+      {
+        "confidence": "",
+        "source": "jsonld",
+        "value": "GRM3195C1H104JA05J Murata Electronics Multilayer Ceramic Capacitors MLCC - SMD/SMT 0.1 uF 50 VDC 5% 1206 C0G (NP0) datasheet, inventory, & pricing."
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 0.1UF 50V C0G 1206"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +149,64 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Brand": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Case Code - in": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Case Code - mm": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Dielectric": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Factory Pack Quantity": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Length": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Manufacturer": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Product Type": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Subcategory": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "US Tariff %": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Unit Weight": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Voltage Rating DC": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Width": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "grm3195c1h104ja05j",
   "manufacturer": "Murata Electronics",
@@ -36,9 +220,9 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:00:11.777033+00:00",
+      "part_number": "81-GRM3195C1H104JA5J",
       "price_breaks": [
         {
           "price": 0.44,
@@ -76,6 +260,40 @@
       "stock": 15400,
       "url": "https://www.mouser.com/c/?q=GRM3195C1H104JA05J",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:00:11.777033+00:00",
+      "part_number": "490-GRM3195C1H104JA05JTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.07648,
+          "qty": 10000
+        },
+        {
+          "price": 0.07275,
+          "qty": 20000
+        },
+        {
+          "price": 0.07089,
+          "qty": 30000
+        },
+        {
+          "price": 0.06882,
+          "qty": 50000
+        },
+        {
+          "price": 0.06761,
+          "qty": 70000
+        },
+        {
+          "price": 0.06645,
+          "qty": 100000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -84,18 +302,25 @@
     "Applications": "General Purpose",
     "Assembly Country of Origin": "Not available",
     "BRHTS": "85322410",
+    "Brand": "Murata Electronics",
     "Capacitance": "100 nF",
+    "Case Code - in": "1206",
+    "Case Code - mm": "3216",
     "Country of Diffusion": "Not available",
     "Country of Origin": "Japan",
+    "Dielectric": "C0G (NP0)",
     "ECCN": "EAR99",
+    "Factory Pack Quantity": "10000",
     "Footprint": "Capacitor_SMD:C_1206_3216Metric",
     "HTS Code (CN)": "8532241000",
     "HTS Code (EU TARIC)": "8532240000",
     "HTS Code (JP)": "853224000",
     "HTS Code (US)": "8532240020",
     "Image": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
-    "Lead Time": "70 Days",
+    "Lead Time": "10 Weeks",
+    "Length": "3.2 mm (0.126 in)",
     "Lifecycle": "Active",
+    "Manufacturer": "Murata",
     "Minimum Order Quantity": "1",
     "Moisture Sensitivity Level": "1 (Unlimited)",
     "Mounting Type": "Surface Mount, MLCC",
@@ -106,18 +331,24 @@
     "Package Type": "Tape & Reel (TR)",
     "Packaging": "Reel, Cut Tape, MouseReel",
     "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "Product Type": "Ceramic Capacitors",
     "REACH": "REACH Unaffected",
     "RoHS": "ROHS3 Compliant",
     "Series": "GRM",
     "Size / Dimension": "0.126\" L x 0.063\" W (3.20mm x 1.60mm)",
     "Standard Pack Qty": "10000",
     "Standard Package": "10000",
+    "Subcategory": "Capacitors",
     "Symbol": "Device:C",
     "Temperature Coefficient": "C0G, NP0",
     "Thickness (Max)": "0.037\" (0.95mm)",
     "Tolerance": "5%",
+    "US Tariff %": "7.95",
+    "Unit Weight": "0.000670 oz",
     "Unit Weight (kg)": "1.9e-05",
-    "Voltage - Rated": "50V"
+    "Voltage - Rated": "50V",
+    "Voltage Rating DC": "50 VDC",
+    "Width": "1.6 mm (0.063 in)"
   },
   "tags": [],
   "value": ""
