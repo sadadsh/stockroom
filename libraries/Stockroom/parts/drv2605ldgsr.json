@@ -1,5 +1,65 @@
 {
   "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_MSOP-10_DGS_t.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4190/296%7E4073272%7EDGS%7E10.JPG"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "16"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2500"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+85℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 150°C (TJ)"
+      }
+    ],
     "Packaging": [
       {
         "confidence": "medium",
@@ -12,6 +72,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Motor / Motion / Ignition Controllers & Drivers"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -22,6 +94,35 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Technology": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Power MOSFET"
+      }
+    ],
+    "Voltage - Supply": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "2V~5.2V"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2V ~ 5.5V"
       }
     ],
     "description": [
@@ -34,6 +135,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Motor / Motion / Ignition Controllers & Drivers Haptic Driver A 595- DRV2605LDGST A 595- A 595-DRV2605LDGST"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC MOTOR DRIVER 2V-5.5V 10VSSOP"
       }
     ],
     "manufacturer": [
@@ -89,6 +195,10 @@
     }
   },
   "enrichment": {
+    "Applications": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Assembly Country of Origin": {
       "confidence": "high",
       "source": "mouser"
@@ -140,6 +250,10 @@
     "Features": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Function": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "HTS Code (CA)": {
       "confidence": "high",
@@ -253,6 +367,18 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Motor Type - AC, DC": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of H-bridges": {
       "confidence": "medium",
       "source": "lcsc"
@@ -265,6 +391,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Output Configuration": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Output Current": {
       "confidence": "medium",
       "source": "lcsc"
@@ -273,6 +403,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -280,6 +414,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -321,6 +459,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -349,6 +491,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Supply Current (Iq)": {
       "confidence": "medium",
       "source": "lcsc"
@@ -364,6 +510,10 @@
     "Unit Weight (kg)": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Voltage - Load": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Voltage - Supply": {
       "confidence": "medium",
@@ -426,10 +576,75 @@
       "stock": 476,
       "url": "https://www.lcsc.com/product-detail/C527464.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:32.340356+00:00",
+      "part_number": "595-DRV2605LDGSR",
+      "price_breaks": [
+        {
+          "price": 2.13,
+          "qty": 1
+        },
+        {
+          "price": 1.62,
+          "qty": 10
+        },
+        {
+          "price": 1.49,
+          "qty": 25
+        },
+        {
+          "price": 1.35,
+          "qty": 100
+        },
+        {
+          "price": 1.28,
+          "qty": 250
+        },
+        {
+          "price": 1.25,
+          "qty": 500
+        },
+        {
+          "price": 1.23,
+          "qty": 1000
+        },
+        {
+          "price": 1.17,
+          "qty": 2500
+        }
+      ],
+      "stock": 6924,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:32.340356+00:00",
+      "part_number": "296-40032-2-ND",
+      "price_breaks": [
+        {
+          "price": 1.1739,
+          "qty": 2500
+        },
+        {
+          "price": 1.14938,
+          "qty": 5000
+        },
+        {
+          "price": 1.1371,
+          "qty": 7500
+        }
+      ],
+      "stock": 6169,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
+    "Applications": "Haptic Feedback",
     "Assembly Country of Origin": "China",
     "Available On Reel": "Yes",
     "Brand Id": "100",
@@ -443,6 +658,7 @@
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/b77416f886f74a91a0b9ce8513b8c211.svg?t=1718788226",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/a09a115c631445698765195d714e2d73.svg?t=1718788226",
     "Features": "Active braking function;Soft switching",
+    "Function": "Driver - Fully Integrated, Control and Power Stage",
     "HTS Code (CA)": "8542390000",
     "HTS Code (CN)": "8542391090",
     "HTS Code (EU TARIC)": "8542399000",
@@ -471,13 +687,19 @@
     "Lead Time": "112 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "2 (1 Year)",
+    "Motor Type - AC, DC": "ERM, LRA",
+    "Mounting Type": "Surface Mount",
     "Number of H-bridges": "1",
     "Operating Temperature": "-40℃~+85℃",
     "Order Multiple": "1",
+    "Output Configuration": "Half Bridge (2)",
     "Output Current": "-",
     "Package": "VSSOP-10-0.5mm",
+    "Package / Case": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)",
     "Package Quantity": "2500",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "13504",
     "Peak Current": "-",
@@ -488,6 +710,7 @@
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230104_Texas-Instruments-DRV2605LDGSR_C527464_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230104_Texas-Instruments-DRV2605LDGSR_C527464_blank.jpg",
     "RDS(on)": "-",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "RoHS": "Yes",
     "Standard Pack Qty": "2500",
@@ -495,10 +718,12 @@
     "Stock (Domestic)": "2156",
     "Stock (Overseas)": "2156",
     "Stock (Shenzhen)": "2156",
+    "Supplier Device Package": "10-VSSOP",
     "Supply Current (Iq)": "500uA",
     "Technology": "Yes",
     "Unit": "Piece",
     "Unit Weight (kg)": "3.32e-05",
+    "Voltage - Load": "2V ~ 5.5V",
     "Voltage - Supply": "2V~5.2V",
     "Weight": "0.065",
     "Weight (kg)": "6.5e-05",
