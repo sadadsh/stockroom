@@ -56,8 +56,35 @@ def save(plan: dict) -> None:
     PLAN.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def projects(plan: dict) -> list[dict]:
+    """Every project on the board.
+
+    Owner, 2026-07-27: *"it should hold everything your working on big projects and subprojects"*.
+    The file used to be ONE project's plan, so a second piece of work had nowhere to live and
+    simply went unrecorded -- which is the same invisibility complaint the activity feed fixed from
+    the other end.
+
+    BACK-COMPATIBLE by construction: a file with top-level `waves` and no `projects` is wrapped
+    into a single project on read, so nothing has to be migrated and an older file still renders.
+    """
+    if plan.get("projects"):
+        return plan["projects"]
+    return [{
+        "id": "main",
+        "name": plan.get("title", "Project"),
+        "why": plan.get("note", ""),
+        "waves": plan.get("waves", []),
+    }]
+
+
+def waves(plan: dict):
+    """Every wave across every project, so existing per-wave logic keeps working unchanged."""
+    for proj in projects(plan):
+        yield from proj.get("waves", [])
+
+
 def items(plan: dict):
-    for wave in plan["waves"]:
+    for wave in waves(plan):
         for item in wave["items"]:
             yield wave, item
 
@@ -83,9 +110,18 @@ def wave_progress(wave: dict) -> tuple[int, int]:
     return done, total
 
 
+def project_progress(proj: dict) -> tuple[int, int]:
+    done = total = 0
+    for wave in proj.get("waves", []):
+        d, t = wave_progress(wave)
+        done += d
+        total += t
+    return done, total
+
+
 def overall(plan: dict) -> tuple[int, int]:
     done = total = 0
-    for wave in plan["waves"]:
+    for wave in waves(plan):
         d, t = wave_progress(wave)
         done, total = done + d, total + t
     return done, total
@@ -347,7 +383,35 @@ def render_html(plan: dict) -> str:
         p.append(f"<li>{e(r)}</li>")
     p.append("</ol></details>")
 
-    for wave in plan["waves"]:
+    for proj in projects(plan):
+        multi = len(projects(plan)) > 1
+        if multi:
+            pd, pt = project_progress(proj)
+            pstate = "done" if pt and pd == pt else ("doing" if pd else "todo")
+            p += [
+                '<section class="proj">',
+                f'<div class="phead"><h2>{e(proj["name"])}</h2>'
+                f'<div class="row">{bar(pd, pt, pstate)}</div></div>',
+            ]
+            if proj.get("why"):
+                p.append(f'<p class="why">{e(proj["why"])}</p>')
+        for wave in proj.get("waves", []):
+            _render_wave(p, wave, e, bar)
+        if multi:
+            p.append("</section>")
+
+    p += [
+        f'<footer>Generated from <code>{e(PLAN.relative_to(ROOT).as_posix())}</code> by '
+        f'<code>scripts/progress.py</code>. A box is only ticked with evidence.</footer>',
+        "</div>",
+    ]
+    return "\n".join(p) + "\n"
+
+
+def _render_wave(p: list, wave: dict, e, bar) -> None:
+    """One wave and everything under it. Extracted so the project loop above reads as a loop
+    rather than as four levels of nesting."""
+    if True:
         wd, wt = wave_progress(wave)
         wstate = "done" if wt and wd == wt else ("doing" if wd else "todo")
         p += [
@@ -385,13 +449,6 @@ def render_html(plan: dict) -> str:
                          f'<div class="stext"><div class="t">{e(s["t"])}</div>{ev}</div></li>')
             p += ["</ul>", "</details>"]
         p.append("</section>")
-
-    p += [
-        f'<footer>Generated from <code>{e(PLAN.relative_to(ROOT).as_posix())}</code> by '
-        f'<code>scripts/progress.py</code>. A box is only ticked with evidence.</footer>',
-        "</div>",
-    ]
-    return "\n".join(p) + "\n"
 
 
 STYLE = """<style>
@@ -516,6 +573,12 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
 .more[open] summary::before{transform:rotate(90deg)}
 .more summary:hover{color:var(--fg)}
 .more .acts{margin-top:2px}
+
+.proj{margin:26px 0 8px}
+.phead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-bottom:8px;
+  border-bottom:2px solid var(--line)}
+.phead h2{margin:0;font-size:19px;letter-spacing:-.01em}
+.phead .row{flex:1;min-width:220px}
 </style>"""
 
 
@@ -576,9 +639,82 @@ def main() -> int:
     pn = sub.add_parser("now", help="set the WORKING ON NOW banner (empty string clears it)")
     pn.add_argument("text", help="one sentence. Pass '' to clear the banner entirely.")
     pn.add_argument("--at", default="", help="timestamp shown beside it (free-form)")
+
+    # CAPTURE, in one line each. Owner, 2026-07-27: *"make sure whatever system u use to update it
+    # is easy so u can always do it it should hold everything your working on big projects and
+    # subprojects"*. "Easy" is the load-bearing word: a board I have to hand-edit JSON to extend is
+    # a board that silently stops holding everything the first busy hour, which is exactly how the
+    # page came to show one project while several were in flight.
+    pp = sub.add_parser("add-project", help="a new PROJECT (top level)")
+    pp.add_argument("id")
+    pp.add_argument("name")
+    pp.add_argument("why", nargs="?", default="")
+    pg = sub.add_parser("add-group", help="a new GROUP inside a project (a wave)")
+    pg.add_argument("project")
+    pg.add_argument("id")
+    pg.add_argument("name")
+    pg.add_argument("why", nargs="?", default="")
+    pi = sub.add_parser("add-item", help="a new SUBPROJECT inside a group")
+    pi.add_argument("group")
+    pi.add_argument("id")
+    pi.add_argument("name")
+    pi.add_argument("why", nargs="?", default="")
+    pst = sub.add_parser("add-step", help="a new STEP on a subproject")
+    pst.add_argument("item")
+    pst.add_argument("text")
     a = ap.parse_args()
 
     plan = load()
+
+    def _migrate_to_projects() -> None:
+        """Move a legacy top-level `waves` under `projects` the first time a project is added, so
+        the one-project file and the many-project file are never both live at once."""
+        if "projects" not in plan:
+            plan["projects"] = [{
+                "id": "stockroom", "name": plan.get("title", "Project"),
+                "why": plan.get("note", ""), "waves": plan.pop("waves", []),
+            }]
+
+    if a.cmd == "add-project":
+        _migrate_to_projects()
+        if any(pr["id"] == a.id for pr in plan["projects"]):
+            raise SystemExit(f"project {a.id!r} already exists")
+        plan["projects"].append({"id": a.id, "name": a.name, "why": a.why, "waves": []})
+        save(plan)
+        cmd_render(plan)
+        print(f"project {a.id}: {a.name}")
+        return 0
+    if a.cmd == "add-group":
+        _migrate_to_projects()
+        proj = next((pr for pr in plan["projects"] if pr["id"] == a.project), None)
+        if proj is None:
+            raise SystemExit(f"no such project: {a.project}")
+        proj.setdefault("waves", []).append(
+            {"id": a.id, "name": a.name, "why": a.why, "items": []}
+        )
+        save(plan)
+        cmd_render(plan)
+        print(f"group {a.id}: {a.name}")
+        return 0
+    if a.cmd == "add-item":
+        group = next((w for w in waves(plan) if w["id"] == a.group), None)
+        if group is None:
+            raise SystemExit(f"no such group: {a.group}")
+        group.setdefault("items", []).append(
+            {"id": a.id, "name": a.name, "why": a.why, "steps": []}
+        )
+        save(plan)
+        cmd_render(plan)
+        print(f"item {a.id}: {a.name}")
+        return 0
+    if a.cmd == "add-step":
+        _, item = find(plan, a.item)
+        item.setdefault("steps", []).append({"t": a.text, "done": False, "evidence": ""})
+        save(plan)
+        cmd_render(plan)
+        print(f"{a.item} step {len(item['steps']) - 1}: {a.text}")
+        return 0
+
     if a.cmd == "render":
         cmd_render(plan)
         return 0

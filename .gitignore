@@ -109,3 +109,8 @@ docs/progress/index.html
 
 # pytest-testmon per-machine dependency DB (derived, never shared)
 .testmondata*
+
+# Where a pull moves aside an untracked file that an incoming commit wants to add, so an update
+# can never be blocked by a file this machine created (GitRepo._clear_untracked_blockers). Inside
+# the repo so the person whose file it was can find it; ignored so it travels nowhere.
+/.stockroom-kept/
