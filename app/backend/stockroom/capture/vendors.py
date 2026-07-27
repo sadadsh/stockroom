@@ -122,8 +122,18 @@ class UltraLibrarianAdapter:
     capability = VendorCapability(
         key="ultralibrarian",
         label="Ultra Librarian",
-        # NOT "altium", and that is a correction made on evidence rather than a limitation
-        # assumed. Ultra Librarian's Altium export is labelled "Altium Designer (script based)"
+        # NOT "altium" YET, and the reason is narrower than it first looked.
+        #
+        # OWNER, 2026-07-27: *"in ul when u download the altium pcad files it gives u a lia"* - and
+        # a `.LIA` is a P-CAD ASCII library, which Altium Designer IMPORTS directly. So Ultra
+        # Librarian very likely CAN supply Altium-usable libraries after all, via the
+        # `#AltiumPCADv14` / `#AltiumPCADV15` rows rather than the script row. That is recorded as
+        # the next thing to verify, NOT assumed: an attempt to download it headlessly failed when
+        # the UL session expired mid-run, so nobody has yet opened a PCAD export and confirmed a
+        # `.LIA` is inside. Until someone has, claiming altium here would repeat the exact mistake
+        # this comment replaced.
+        #
+        # What IS verified: the "Altium Designer (script based)" row
         # and the delivered zip contains `AltiumDesigner/UL_Import.pas` + a `.PrjScr` - a Delphi
         # script that builds the libraries INSIDE Altium - and no `.SchLib`/`.PcbLib` at all
         # (inspected on a real download, 2026-07-27). So it cannot satisfy `altium_symbol` /
@@ -230,14 +240,19 @@ class UltraLibrarianAdapter:
             return report
         submit.click()
         report.submitted = True
+        # STATES INTENT, NEVER ACHIEVEMENT. A drive can only observe what it SELECTED and that it
+        # clicked submit; whether the files arrived is decided later, by `classify_asset` on the
+        # actual download. The previous wording ("Downloading kicad and altium together") was a
+        # claim this code had no way to check, and on the live site it was FALSE - the zip carried
+        # no Altium libraries at all. The engine reports what landed, from the record.
         report.message = (
-            "Downloading " + " and ".join(report.selected) + " together."
+            "Requested " + " and ".join(report.selected) + " from " + self.capability.label + "."
             if not report.missed
-            else "Downloading "
+            else "Requested "
             + " and ".join(report.selected)
             + ", but could not select "
             + " and ".join(report.missed)
-            + "."
+            + " on this page."
         )
         return report
 
