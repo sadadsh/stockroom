@@ -182,6 +182,50 @@ def test_the_merge_follows_REGISTRY_priority_not_the_order_the_payloads_arrive_i
     )
 
 
+def test_the_canonical_vendor_fields_reach_the_derived_block(tmp_path):
+    """Regression pin, 2026-07-27. `derive_block` folded ONLY `merged.specs`, so every canonical
+    single-valued field an adapter parses into its own slot was silently dropped.
+
+    MEASURED on the owner's real library after the first full 158-part import: `Lifecycle` was on
+    149 of 158 records before and absent from ALL 158 after - real procurement data that the BOM's
+    lifecycle column and the procurement `not_active` risk both read. Found by diffing the library
+    against its pre-import commit rather than by any test, which is why this one now exists.
+    """
+    body = {
+        "SearchResults": {
+            "Parts": [
+                {
+                    "ManufacturerPartNumber": "ERJ-P03F1101V",
+                    "Manufacturer": "Panasonic",
+                    "Description": "Thick Film Resistor",
+                    "LifecycleStatus": "Active",
+                    "LeadTime": "12 Weeks",
+                    "ProductDetailUrl": "https://www.mouser.com/erj",
+                    "ProductAttributes": [
+                        {"AttributeName": "Resistance", "AttributeValue": "1.1 kOhms"},
+                    ],
+                }
+            ]
+        }
+    }
+    block = derive_block(Identity.of(_record()), {"mouser": body}, derived_at=AT)
+    # The vendor's own spec bag still comes through...
+    assert block.specs.get("Resistance")
+    # ...AND the canonical slots the adapter parsed separately are no longer thrown away.
+    carried = {k for k in ("Lifecycle", "Lead Time", "Product URL") if k in block.specs}
+    assert carried, (
+        f"no canonical enrichment field reached the derived block: {sorted(block.specs)}"
+    )
+
+
+def test_identity_is_NEVER_folded_into_the_derived_specs(tmp_path):
+    """The other side of the fix: `mpn` and `manufacturer` are identity and must stay OUT of the
+    derived block, or a re-derive would start rewriting them (spec rule 3)."""
+    block = derive_block(Identity.of(_record()), {"mouser": MOUSER_BODY}, derived_at=AT)
+    for forbidden in ("MPN", "Mpn", "Manufacturer"):
+        assert forbidden not in block.specs, f"{forbidden} leaked into the derived spec bag"
+
+
 # ---------------------------------------------------------------------------- LOSSLESS
 
 def test_a_derive_never_writes_under_sourced(tmp_path):

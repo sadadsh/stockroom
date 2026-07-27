@@ -46,6 +46,28 @@ from stockroom.model.spec_hygiene import normalize_specs
 # unclassified part must read as unclassified, and a blank category would make it look filed.
 UNFILED = "Other"
 
+# Canonical enrichment fields that are DERIVED presentation data, mapped to the spec label they
+# land under. Without this they were silently DROPPED: `derive_block` folded only `merged.specs`
+# into the derived block, so every single-valued field an adapter parses into its own slot
+# disappeared. MEASURED on the owner's real library after the first full import (2026-07-27):
+# `Lifecycle` was present on 149 of 158 records BEFORE and absent from all 158 after - real
+# procurement data (Active / NRND / Obsolete) that the BOM's own lifecycle column and the
+# procurement `not_active` risk both read.
+#
+# Deliberately EXCLUDED, each for a different reason:
+#   mpn, manufacturer   IDENTITY. Never derived, never rewritten by a re-derive (spec rule 3).
+#   stock               volatile, and it belongs to a VENDOR, so it lives on `purchase` rows.
+#   datasheet_url       the record has a first-class `datasheet` field; a second copy in the spec
+#                       bag would be two places to disagree.
+DERIVED_CANONICAL_FIELDS: tuple[tuple[str, str], ...] = (
+    ("lifecycle", "Lifecycle"),
+    ("lead_time", "Lead Time"),
+    ("product_url", "Product URL"),
+    ("country_of_origin", "Country of Origin"),
+    ("tariff_rate", "Tariff Rate"),
+    ("package", "Package"),
+)
+
 
 @dataclass(frozen=True)
 class Identity:
@@ -134,10 +156,26 @@ def derive_block(
 
     merged = merged_result(identity, payloads)
 
+    # Start from the vendors' own spec bag, then fold in the canonical single-valued fields the
+    # adapters parse into their own slots (see DERIVED_CANONICAL_FIELDS for why each is in or out).
+    # `setdefault` semantics: a value already in the spec bag WINS, because that is the vendor
+    # labelling it themselves rather than us mapping it in.
+    raw_specs: dict = {key: sv.value for key, sv in merged.specs.items()}
+    for attr, label in DERIVED_CANONICAL_FIELDS:
+        sourced = getattr(merged, attr, None)
+        if sourced is None or label in raw_specs:
+            continue
+        value = getattr(sourced, "value", None)
+        # `0` and `0.0` are MEANINGFUL here - a confirmed 0% tariff is a real answer, not a missing
+        # one - so this tests for None and blank rather than for falsiness.
+        if value is None or (isinstance(value, str) and not value.strip()):
+            continue
+        raw_specs[label] = value
+
     # NORMALIZE HERE. This is the line that moved off the import path: the values below are the
     # opinionated, canonical form, and the raw answers each source actually gave are still in
     # `sourced/` where they can be re-read if this normalization is ever wrong.
-    specs = normalize_specs({key: sv.value for key, sv in merged.specs.items()})
+    specs = normalize_specs(raw_specs)
 
     description = merged.description.value if merged.description is not None else ""
     description = str(description or "").strip()
