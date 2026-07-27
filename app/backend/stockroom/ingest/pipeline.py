@@ -72,7 +72,9 @@ class IngestPipeline:
 
         for i, lcsc_id in enumerate(lcsc_ids):
             fetch_dir = workdir / "lcsc" / str(i)
-            detected = fetch_lcsc(lcsc_id, fetch_dir, runner=None)
+            # `cli` so the converted footprint is upgraded from easyeda2kicad's KiCad 5
+            # `(module ...)` dialect to the current one before anything tries to parse it.
+            detected = fetch_lcsc(lcsc_id, fetch_dir, runner=None, cli=self.cli)
             prov = Provenance(source="lcsc", source_url="")
             stage_dir = workdir / "stage" / f"lcsc-{i}"
             for c in build_candidates(self.cli, detected, stage_dir, prov):
