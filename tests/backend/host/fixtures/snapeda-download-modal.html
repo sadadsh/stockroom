@@ -1,0 +1,1252 @@
+<!--
+SnapMagic (SnapEDA) 'Choose Download Format' modal, captured 2026-07-27 signed in, from
+www.snapeda.com for TPD6E05U06RVZR, via scripts/vendorprobe.py. Captured with the KiCad
+sub-chooser already expanded, so BOTH states are present in one fixture.
+
+THE MECHANIC THIS ENCODES, and it is NOT Ultra Librarian's:
+  * one BUTTON per format, so two formats = TWO downloads and the driver must sequence them
+    (Ultra Librarian's own site uses checkboxes and gives both in ONE download).
+  * KiCad is TWO STEPS: [data-format=kicad_options] opens a version chooser whose members are
+    [data-format=kicad]        'V3 & Prior'
+    [data-format=kicad_mod]    'V4 & Later'
+    [data-format=kicad_modv6]  'V6 & Later'   <- the one to take
+    Taking the wrong one downloads a library this repo's Footprint.load REFUSES.
+  * Altium is one step: [data-format=altium_native].
+  * the 3D model is a SEPARATE download (#download_step_model / #download-3d-modal).
+
+No account details appear in it; scanned for e-mail addresses, csrf tokens and session ids.
+The only address present is SnapEDA's own public support address.
+-->
+<div class="lean-modal modal-small" id="download-modal" style="min-height: 250px; display: block; position: fixed; opacity: 1; z-index: 11000; left: 50%; margin-left: -160px; top: 10vh; width: 320px;">
+
+    
+        <!-- Nothing -->
+    
+    <div class="modal-view modal-view-download">
+        
+            
+                <i class="fa fa-times modal-close black-arrow" style="display:none;"></i>
+            
+        <p class="align-center modal-title" style="padding: 35px 8px 8px;">Choose Download Format</p>
+        
+        <ul class="links-list" id="orange-gradient-list">
+            <!--Yohan-->
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="altium_native" style="background-color: rgb(175, 72, 4);">
+    Altium
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="circuit_studio" style="background-color: rgb(200, 82, 4);">
+    Circuit Studio
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="cr_8000" style="background-color: rgb(200, 82, 4);">
+    CR-8000/5000 (Beta)
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="designspark" style="background-color: rgb(225, 93, 5);">
+    DesignSpark PCB
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="diptrace" style="background-color: rgb(250, 103, 5);">
+    DipTrace
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="eagle" style="background-color: rgb(250, 108, 15);">
+    EAGLE
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="easypc" style="background-color: rgb(250, 108, 15);">
+    Easy-PC (Beta)
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="ecadstar" style="background-color: rgb(250, 108, 15);">
+    eCADSTAR (Beta)
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="express_pcb_plus" style="background-color: rgb(250, 118, 30);">
+    ExpressPCB Plus
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="fusion_360" style="background-color: rgb(250, 118, 30);">
+    Autodesk Fusion
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="kicad_options" style="background-color: rgb(250, 118, 30);">
+    KiCad
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="orcad17" style="background-color: rgb(250, 125, 40);">
+    OrCAD / Allegro v17
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="orcad" style="background-color: rgb(250, 125, 40);">OrCAD / Allegro v16</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="pads" style="background-color: rgb(250, 125, 40);">
+    PADS / DxDesigner
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="p_cad" style="background-color: rgb(250, 130, 50);">
+    P-CAD
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="pcb123" style="background-color: rgb(250, 130, 50);">
+    PCB123
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="proteus" style="background-color: rgb(250, 130, 50);">
+    Proteus 8.9 and later
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="pulsonix" style="background-color: rgb(250, 130, 50);">
+    Pulsonix
+</a>
+                  </li>
+                
+            
+                
+                
+                  <li>
+                    <a class="s-btn s-btn-medium s-btn-modal" data-format="target3001%21" style="background-color: rgb(250, 130, 50);">
+    TARGET 3001!
+</a>
+                  </li>
+                
+            
+
+                <li class="download-direct" style="display: none;">
+                    
+                    <a class="s-btn s-btn-medium orange" data-format="">
+                        Download Now
+                    </a>
+                    
+                </li>
+            
+                <hr style="margin: 10px -20px;">
+                <li class="snapfile-download ">
+                    <a class="s-btn s-btn-medium s-btn-modal orange-100 outer-place-part" data-format=".snap" data-cad=".snap" data-mode="place-part" href="/account/signup/?next=/parts/TPD6E05U06RVZR/Texas%2520Instruments/view-part/" style="background-color: rgb(251, 149, 80);">
+                        Place Part
+                    </a>
+                </li>
+                <li class="snapfile-download">
+                    <a class="s-btn s-btn-medium s-btn-modal orange-reversed" data-format=".snap" data-cad=".snap" data-mode="add-to-library" href="/account/signup/?next=/parts/TPD6E05U06RVZR/Texas%2520Instruments/view-part/" style="background-color: rgb(251, 149, 80);">
+                        Import to Library
+                    </a>
+                </li>
+            
+
+            <p class="align-center import-block">
+                
+                <a class="import-link mtop10" href="#" onclick="javascript:window.open(&quot;/about/import/&quot; + (global_link_matching[global_conversion_format] || &quot;&quot;), &quot;_blank&quot;);">
+                    <i class="fa fa-info-circle" aria-hidden="true"></i>
+                    How to Import
+                </a>
+                
+            </p>
+        </ul>
+        
+
+    </div>
+    
+     <!--Modal Multiple Sections Info-->
+    <div class="modal-view" id="modal-multiple-sections">
+        <i class="fa fa-times modal-close"></i>
+        
+        <p id="title-multiple-sections" class="clr-darker align-center modal-status modal-status-alt2 bigger" style="padding-top: 45px;">
+            Heads Up!
+        </p>
+
+        <p class="clr-dust huge-icon huge-icon-alt2">
+            
+            </p><div style="background-color:#304E70;width:40px; height:40px;margin:auto; padding:6px;text-align:center;border-radius:50%;border:2px solid white;">
+            <svg width="24" height="22" style="margin:6px;" viewBox="0 0 24 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21.963 13.3158C21.646 13.3158 21.3421 13.4386 21.118 13.6572C20.8939 13.8758 20.768 14.1723 20.768 14.4815V18.503C20.768 18.8122 20.6421 19.1087 20.418 19.3273C20.1939 19.5459 19.89 19.6687 19.5731 19.6687H3.58481C3.2679 19.6687 2.96396 19.5459 2.73986 19.3273C2.51577 19.1087 2.38988 18.8122 2.38988 18.503V14.4815C2.38988 14.1723 2.26398 13.8758 2.03989 13.6572C1.81579 13.4386 1.51185 13.3158 1.19494 13.3158C0.878021 13.3158 0.574083 13.4386 0.349989 13.6572C0.125895 13.8758 0 14.1723 0 14.4815V18.503C0 19.4305 0.377685 20.3199 1.04997 20.9758C1.72225 21.6316 2.63406 22 3.58481 22H19.5731C20.5238 22 21.4356 21.6316 22.1079 20.9758C22.7802 20.3199 23.1579 19.4305 23.1579 18.503V14.4815C23.1579 14.1723 23.032 13.8758 22.8079 13.6572C22.5838 13.4386 22.2799 13.3158 21.963 13.3158Z" fill="white"></path>
+                <path d="M11.5789 0C11.2637 0 10.9614 0.122298 10.7386 0.339989C10.5157 0.557681 10.3905 0.852934 10.3905 1.1608V11.0914L6.66158 7.44651C6.43857 7.2287 6.13611 7.10633 5.82073 7.10633C5.50534 7.10633 5.20288 7.2287 4.97987 7.44651C4.75686 7.66432 4.63158 7.95974 4.63158 8.26777C4.63158 8.4203 4.66233 8.57133 4.7221 8.71224C4.78186 8.85315 4.86945 8.98119 4.97987 9.08904L10.7381 14.7131L10.7589 14.7334C10.9801 14.9387 11.2738 15.053 11.5789 15.0526C11.8821 15.0515 12.1733 14.9373 12.3931 14.7334L12.4139 14.7131L18.178 9.08904C18.401 8.87123 18.5263 8.57581 18.5263 8.26777C18.5263 7.95974 18.401 7.66432 18.178 7.44651C17.955 7.2287 17.6525 7.10633 17.3372 7.10633C17.0218 7.10633 16.7193 7.2287 16.4963 7.44651L12.7674 11.0914V1.1608C12.7674 0.852934 12.6422 0.557681 12.4193 0.339989C12.1964 0.122298 11.8942 0 11.5789 0Z" fill="white"></path>
+            </svg>
+            </div>
+        <p></p>
+
+        <p id="multiple-sections-format-shift" class="modal-details modal-text-centered clr-concrete">
+            This part contains multiple symbol sections. View the sections to see all pinouts. 
+            <a id="multiple-sections-link" class="s-link" href="https://support.snapmagic.com/en/articles/6203010-why-am-i-getting-multiple-sections-of-the-symbol" style="color:#0FB8ED;" target="_blank"> Read more <svg width="12" height="9" viewBox="0 0 12 9" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11.5972 4.49882C11.5892 4.33795 11.5052 4.152 11.3653 4.03473L6.80032 0.209555C6.49098 -0.00966214 5.89781 -0.100157 5.55207 0.153305C5.21152 0.402943 5.22165 0.887094 5.56092 1.13772L8.7707 3.82379H0.855942C0.383233 3.82379 0 4.12602 0 4.49882C0 4.87162 0.383233 5.17385 0.855942 5.17385H8.7707L5.56092 7.85992C5.26884 8.09066 5.21486 8.59184 5.55207 8.84434C5.8892 9.09681 6.50368 9.01614 6.80032 8.78806L11.3653 4.96291C11.5216 4.83201 11.5977 4.67842 11.5972 4.49882Z" fill="#0FB8ED"></path>
+            </svg>
+        </a></p><a id="multiple-sections-link" class="s-link" href="https://support.snapmagic.com/en/articles/6203010-why-am-i-getting-multiple-sections-of-the-symbol" style="color:#0FB8ED;" target="_blank">
+
+        </a><p class="modal-text-centered"><a id="multiple-sections-link" class="s-link" href="https://support.snapmagic.com/en/articles/6203010-why-am-i-getting-multiple-sections-of-the-symbol" style="color:#0FB8ED;" target="_blank">
+        </a><a class="s-btn s-btn-medium orange" onclick="showNextViewMultipleSections();" style="padding:9px 22px; margin:auto;">
+            <b>Ok, download this part</b>
+        </a>
+        </p>
+
+    </div>
+
+     <!--Modal Altium Native Format Instructions-->
+    <div class="modal-view" id="modal-altium-instructions">
+        <i class="fa fa-times modal-close"></i>
+        
+        <p id="title-altium-instructions" class="clr-darker align-center modal-status modal-status-alt2 bigger" style="padding-top: 45px;">
+            Heads Up!
+        </p>
+
+        <p class="clr-dust huge-icon huge-icon-alt2">
+            
+            </p><div style="background-color:#304E70;width:40px; height:40px;margin:auto; padding:6px;text-align:center;border-radius:50%;border:2px solid white;">
+            <svg width="24" height="22" style="margin:6px;" viewBox="0 0 24 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21.963 13.3158C21.646 13.3158 21.3421 13.4386 21.118 13.6572C20.8939 13.8758 20.768 14.1723 20.768 14.4815V18.503C20.768 18.8122 20.6421 19.1087 20.418 19.3273C20.1939 19.5459 19.89 19.6687 19.5731 19.6687H3.58481C3.2679 19.6687 2.96396 19.5459 2.73986 19.3273C2.51577 19.1087 2.38988 18.8122 2.38988 18.503V14.4815C2.38988 14.1723 2.26398 13.8758 2.03989 13.6572C1.81579 13.4386 1.51185 13.3158 1.19494 13.3158C0.878021 13.3158 0.574083 13.4386 0.349989 13.6572C0.125895 13.8758 0 14.1723 0 14.4815V18.503C0 19.4305 0.377685 20.3199 1.04997 20.9758C1.72225 21.6316 2.63406 22 3.58481 22H19.5731C20.5238 22 21.4356 21.6316 22.1079 20.9758C22.7802 20.3199 23.1579 19.4305 23.1579 18.503V14.4815C23.1579 14.1723 23.032 13.8758 22.8079 13.6572C22.5838 13.4386 22.2799 13.3158 21.963 13.3158Z" fill="white"></path>
+                <path d="M11.5789 0C11.2637 0 10.9614 0.122298 10.7386 0.339989C10.5157 0.557681 10.3905 0.852934 10.3905 1.1608V11.0914L6.66158 7.44651C6.43857 7.2287 6.13611 7.10633 5.82073 7.10633C5.50534 7.10633 5.20288 7.2287 4.97987 7.44651C4.75686 7.66432 4.63158 7.95974 4.63158 8.26777C4.63158 8.4203 4.66233 8.57133 4.7221 8.71224C4.78186 8.85315 4.86945 8.98119 4.97987 9.08904L10.7381 14.7131L10.7589 14.7334C10.9801 14.9387 11.2738 15.053 11.5789 15.0526C11.8821 15.0515 12.1733 14.9373 12.3931 14.7334L12.4139 14.7131L18.178 9.08904C18.401 8.87123 18.5263 8.57581 18.5263 8.26777C18.5263 7.95974 18.401 7.66432 18.178 7.44651C17.955 7.2287 17.6525 7.10633 17.3372 7.10633C17.0218 7.10633 16.7193 7.2287 16.4963 7.44651L12.7674 11.0914V1.1608C12.7674 0.852934 12.6422 0.557681 12.4193 0.339989C12.1964 0.122298 11.8942 0 11.5789 0Z" fill="white"></path>
+            </svg>
+            </div>
+        <p></p>
+
+        <div class="modal-details modal-text-centered clr-concrete">
+            <p>
+                This part was provided by Diotec and contains a generic symbol name.
+            </p>
+            <p>
+                Click <a href="https://support.snapmagic.com/en/articles/12958834-how-to-rename-generic-symbols-in-altium" target="_blank" class="s-link" style="color:#0FB8ED;">here</a> for steps to rename the symbol.
+            </p>
+        </div>
+
+        <p class="modal-text-centered">
+        <a class="s-btn s-btn-medium orange" onclick="proceedWithAltiumDownload();" style="padding:9px 22px; margin:auto;">
+            <b>Ok, download this part</b>
+        </a>
+        </p>
+
+    </div>
+
+     <!--Modal No Device Mapping Warning (Instapublish parts with unmapped pins)-->
+    <div class="modal-view" id="modal-no-device-mapping">
+        <i class="fa fa-times modal-close"></i>
+
+        <div style="background:#ff761a; border-radius:2px 2px 0 0; padding-top:45px; padding-bottom:50px; text-align:center; position:relative; overflow:visible;">
+            <p style="color:white; font-size:24px; font-weight:300; line-height:30px; margin:0;">
+                Heads Up!
+            </p>
+            <svg style="position:absolute; bottom:-1px; left:0; width:100%; display:block;" viewBox="0 0 320 40" preserveAspectRatio="none">
+                <path d="M0,40 L0,20 Q160,60 320,20 L320,40 Z" fill="white"></path>
+            </svg>
+        </div>
+
+        <div style="text-align:center; position:relative; z-index:2; margin-top:-30px; margin-bottom:15px;">
+            <div style="background-color:#304E70;width:56px; height:56px;margin:auto; padding:6px;text-align:center;border-radius:50%;border:3px solid white; display:inline-block;">
+            <svg width="24" height="22" style="margin-top:11px;" viewBox="0 0 24 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21.963 13.3158C21.646 13.3158 21.3421 13.4386 21.118 13.6572C20.8939 13.8758 20.768 14.1723 20.768 14.4815V18.503C20.768 18.8122 20.6421 19.1087 20.418 19.3273C20.1939 19.5459 19.89 19.6687 19.5731 19.6687H3.58481C3.2679 19.6687 2.96396 19.5459 2.73986 19.3273C2.51577 19.1087 2.38988 18.8122 2.38988 18.503V14.4815C2.38988 14.1723 2.26398 13.8758 2.03989 13.6572C1.81579 13.4386 1.51185 13.3158 1.19494 13.3158C0.878021 13.3158 0.574083 13.4386 0.349989 13.6572C0.125895 13.8758 0 14.1723 0 14.4815V18.503C0 19.4305 0.377685 20.3199 1.04997 20.9758C1.72225 21.6316 2.63406 22 3.58481 22H19.5731C20.5238 22 21.4356 21.6316 22.1079 20.9758C22.7802 20.3199 23.1579 19.4305 23.1579 18.503V14.4815C23.1579 14.1723 23.032 13.8758 22.8079 13.6572C22.5838 13.4386 22.2799 13.3158 21.963 13.3158Z" fill="white"></path>
+                <path d="M11.5789 0C11.2637 0 10.9614 0.122298 10.7386 0.339989C10.5157 0.557681 10.3905 0.852934 10.3905 1.1608V11.0914L6.66158 7.44651C6.43857 7.2287 6.13611 7.10633 5.82073 7.10633C5.50534 7.10633 5.20288 7.2287 4.97987 7.44651C4.75686 7.66432 4.63158 7.95974 4.63158 8.26777C4.63158 8.4203 4.66233 8.57133 4.7221 8.71224C4.78186 8.85315 4.86945 8.98119 4.97987 9.08904L10.7381 14.7131L10.7589 14.7334C10.9801 14.9387 11.2738 15.053 11.5789 15.0526C11.8821 15.0515 12.1733 14.9373 12.3931 14.7334L12.4139 14.7131L18.178 9.08904C18.401 8.87123 18.5263 8.57581 18.5263 8.26777C18.5263 7.95974 18.401 7.66432 18.178 7.44651C17.955 7.2287 17.6525 7.10633 17.3372 7.10633C17.0218 7.10633 16.7193 7.2287 16.4963 7.44651L12.7674 11.0914V1.1608C12.7674 0.852934 12.6422 0.557681 12.4193 0.339989C12.1964 0.122298 11.8942 0 11.5789 0Z" fill="white"></path>
+            </svg>
+            </div>
+        </div>
+
+        <div class="modal-details modal-text-centered clr-concrete">
+            <p>
+                This part's symbol and footprint need to be mapped after import.
+            </p>
+            <p>
+                <a href="https://support.snapmagic.com/en/collections/19356263-footprint-mapping" target="_blank" class="s-link" style="color:#0FB8ED;">View the guide here.</a>
+            </p>
+        </div>
+
+        <p class="modal-text-centered">
+        <a class="s-btn s-btn-medium orange" onclick="proceedWithNoMappingDownload();" style="padding:9px 22px; margin:auto;">
+            <b>Ok, download this part</b>
+        </a>
+        </p>
+
+    </div>
+
+     <!--Modal Confirm Slots holes-->
+    <div class="modal-view" id="modal-slotted-holes">
+        <i class="fa fa-times modal-close"></i>
+        <!-- <div class="modal-head" id="modal-part-name">
+
+        </div> -->
+        <p id="title-slotted-holes" class="clr-darker align-center modal-status modal-status-alt2 bigger" style="padding-top: 45px;">
+            Almost there
+        </p>
+
+        <p class="clr-dust huge-icon huge-icon-alt2">
+            
+            </p><div style="background-color:#304E70;width:40px; height:40px;margin:auto; padding:6px;text-align:center;border-radius:50%;border:2px solid white;">
+            <svg width="24" height="22" style="margin:6px;" viewBox="0 0 24 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21.963 13.3158C21.646 13.3158 21.3421 13.4386 21.118 13.6572C20.8939 13.8758 20.768 14.1723 20.768 14.4815V18.503C20.768 18.8122 20.6421 19.1087 20.418 19.3273C20.1939 19.5459 19.89 19.6687 19.5731 19.6687H3.58481C3.2679 19.6687 2.96396 19.5459 2.73986 19.3273C2.51577 19.1087 2.38988 18.8122 2.38988 18.503V14.4815C2.38988 14.1723 2.26398 13.8758 2.03989 13.6572C1.81579 13.4386 1.51185 13.3158 1.19494 13.3158C0.878021 13.3158 0.574083 13.4386 0.349989 13.6572C0.125895 13.8758 0 14.1723 0 14.4815V18.503C0 19.4305 0.377685 20.3199 1.04997 20.9758C1.72225 21.6316 2.63406 22 3.58481 22H19.5731C20.5238 22 21.4356 21.6316 22.1079 20.9758C22.7802 20.3199 23.1579 19.4305 23.1579 18.503V14.4815C23.1579 14.1723 23.032 13.8758 22.8079 13.6572C22.5838 13.4386 22.2799 13.3158 21.963 13.3158Z" fill="white"></path>
+                <path d="M11.5789 0C11.2637 0 10.9614 0.122298 10.7386 0.339989C10.5157 0.557681 10.3905 0.852934 10.3905 1.1608V11.0914L6.66158 7.44651C6.43857 7.2287 6.13611 7.10633 5.82073 7.10633C5.50534 7.10633 5.20288 7.2287 4.97987 7.44651C4.75686 7.66432 4.63158 7.95974 4.63158 8.26777C4.63158 8.4203 4.66233 8.57133 4.7221 8.71224C4.78186 8.85315 4.86945 8.98119 4.97987 9.08904L10.7381 14.7131L10.7589 14.7334C10.9801 14.9387 11.2738 15.053 11.5789 15.0526C11.8821 15.0515 12.1733 14.9373 12.3931 14.7334L12.4139 14.7131L18.178 9.08904C18.401 8.87123 18.5263 8.57581 18.5263 8.26777C18.5263 7.95974 18.401 7.66432 18.178 7.44651C17.955 7.2287 17.6525 7.10633 17.3372 7.10633C17.0218 7.10633 16.7193 7.2287 16.4963 7.44651L12.7674 11.0914V1.1608C12.7674 0.852934 12.6422 0.557681 12.4193 0.339989C12.1964 0.122298 11.8942 0 11.5789 0Z" fill="white"></path>
+            </svg>
+            </div>
+        <p></p>
+
+        <p id="slotted-holes-caption" class="modal-text-centered clr-concrete">
+        We've implemented a new method to support footprint with slotted holes.
+        </p>
+
+
+        <p id="slotted-holes-format-shift" class="modal-details modal-text-centered clr-concrete">
+            All SnapMagic Search parts have slotted holes represented on <span id="slotted-holes-help"></span>
+            <a id="slotted-holes-link" class="s-link" href="/about/FAQ" style="color:#0FB8ED;" target="_blank"> Read more <svg width="12" height="9" viewBox="0 0 12 9" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11.5972 4.49882C11.5892 4.33795 11.5052 4.152 11.3653 4.03473L6.80032 0.209555C6.49098 -0.00966214 5.89781 -0.100157 5.55207 0.153305C5.21152 0.402943 5.22165 0.887094 5.56092 1.13772L8.7707 3.82379H0.855942C0.383233 3.82379 0 4.12602 0 4.49882C0 4.87162 0.383233 5.17385 0.855942 5.17385H8.7707L5.56092 7.85992C5.26884 8.09066 5.21486 8.59184 5.55207 8.84434C5.8892 9.09681 6.50368 9.01614 6.80032 8.78806L11.3653 4.96291C11.5216 4.83201 11.5977 4.67842 11.5972 4.49882Z" fill="#0FB8ED"></path>
+            </svg>
+        </a></p><a id="slotted-holes-link" class="s-link" href="/about/FAQ" style="color:#0FB8ED;" target="_blank">
+
+        </a><p class="modal-text-centered"><a id="slotted-holes-link" class="s-link" href="/about/FAQ" style="color:#0FB8ED;" target="_blank">
+        </a><a class="s-btn s-btn-medium orange" onclick="showNextView();globalRequestDownload(global_downloadUrl, global_conversion_format);" style="padding:9px 22px; margin:auto;">
+            <b>Ok, download this part</b>
+                <!-- <h2 style="display: inline-block;font-size: 14px;margin: 0;">
+
+                 </h2> -->
+        </a>
+        </p>
+
+    </div>
+
+    <div class="modal-view" id="mergeLoader">
+        <i class="fa fa-times modal-close"></i>
+        <!-- <div class="modal-head" id="modal-part-name">
+
+        </div> -->
+        <p style="padding-top: 45px;" class="clr-darker align-center modal-status modal-status-alt2 bigger">
+            Converting...
+        </p>
+        <p class="modal-details-alt modal-text-centered clr-concrete reg-download-details">
+            Making file compatible for import
+        </p>
+        <p class="clr-dust huge-icon huge-icon-alt huge-icon-alt2">
+            <i class="fa fa-download"></i>
+        </p>
+        <div class="clr-light icon-bg icon-bg-alt">
+            <i class="fa fa-circle-o-notch fa-spin fa-3x fa-fw"></i>
+        </div>
+
+        <p class="modal-details modal-text-centered clr-concrete">
+            <!-- <a class="s-link" href="/about/FAQ">See the FAQ</a> for import instructions,  -->
+            Your download will begin shortly.
+            <br>
+            <span class="safari-warning hidden">Note: If you're having issues downloading using <b>Safari</b>, try refreshing the page. Sorry for the inconvenience.</span>
+            <span class="ie-warning hidden">Note: If you're having issues downloading using <b>Internet Explorer or Edge</b>, try a different browser. Sorry for the inconvenience.</span>
+
+        </p>
+    </div>
+
+
+
+    <div class="modal-view modal-download-success">
+        <i class="fa fa-times modal-close"></i>
+        <!-- <div class="modal-head" id="modal-part-name">
+
+        </div> -->
+        <p class="clr-darker align-center modal-status modal-status-alt2 bigger" style="padding-top: 45px;">
+            Done!
+        </p>
+        <p class="clr-dust huge-icon dustToBlue huge-icon-alt huge-icon-alt2 huge-icon-alt-done">
+            <i class="fa fa-download"></i>
+        </p>
+
+        <p class="modal-details modal-details2 modal-text-centered clr-concrete">
+            
+            <a class="s-link s-btn ghost outl-blue s-btn-medium how-to-import-btn shadow_button shadow_button_alt" style="padding: 8px 20px;border-radius: 30px;background-color: #304e70;color:#ffffff" href="#" onclick="javascript:window.open(&quot;/about/import/?plugin=&amp;prev_ref=&quot; + (global_link_matching[global_conversion_format] || &quot;&quot;), &quot;_blank&quot;);">Learn How to Import</a>
+            
+        </p>
+
+    </div>
+    <div class="modal-view modal-download-success-auto-import">
+        <i class="fa fa-times modal-close"></i>
+        <!-- <div class="modal-head" id="modal-part-name">
+
+        </div> -->
+        <p class="clr-darker align-center modal-status modal-status-alt2 bigger" style="padding-top: 45px;">
+            Done!
+        </p>
+        <p class="clr-dust huge-icon dustToBlue huge-icon-alt huge-icon-alt2 huge-icon-alt-done">
+            <i class="fa fa-download"></i>
+        </p>
+    </div>
+    
+
+
+
+
+    
+    <div class="modal-view" id="download-modal-schematic">
+        <p class="clr-darker align-center modal-title" style="padding: 35px 8px 8px;">Choose Download Format</p>
+        <ul class="links-list" id="orange-gradient-list-static">
+            
+        </ul>
+    </div>
+    <style>
+        #check-on-instapart-button-not-free{
+            margin-bottom: 5px!important;
+        }
+        .pin-100{
+            display:none;
+        }
+        .amphenol-2dmodels-header-title-new-design {
+            background-image: url(/static/img/amphenol2.svg)!important;
+            background-repeat: no-repeat;
+            min-height: 125px;
+            color: white !important;
+            background-size: 320px;
+            margin-bottom: 0px;
+            font-family: 'Open Sans', sans-serif;
+            font-weight: 600;
+            padding-bottom: 0;
+            font-size: 18px;
+            padding-top: 24px!important;
+            padding-bottom: 0px!important;
+        }
+        .samtec-header-title-new-design {
+            background-image: url('/static/img/samtec-b-checkbox-header-bg.svg');
+            background-repeat: no-repeat;
+            min-height: 100px;
+            color: white !important;
+            padding-bottom: 20px !important;
+        }
+        .samtec-header-email {
+            background-image: url('/static/img/email-bg.svg');
+            background-repeat: no-repeat;
+            min-height: 100px;
+            padding-bottom: 20px !important;
+            color: #242323;
+        }
+        .s-btn.orange.samtec-download-btn:hover {
+            color: #ff761a !important;
+            background: white !important;
+        }
+        .third_party-header-title-new-design {
+            
+            background-image: url('/static/img/new-modal-download-3rd_party-list-header-background.svg');
+            
+            background-repeat: no-repeat;
+            min-height: 100px;
+            color: white !important;
+        }
+        .traceparts-header-title-new-design {
+            background-image: url('/static/img/new-modal-download-traceparts-list-header-background.svg');
+            background-repeat: no-repeat;
+            min-height: 100px;
+            color: white !important;
+        }
+        .modal-status.bigger.newdesign{
+            font-size: 24px;
+            line-height: 30px;
+            background: #ff761a;
+            color: #fff;
+            margin-top: -1px;
+            margin-right: -1px;
+            padding-bottom: 18px;
+            padding-top: 24px;
+        }
+        .third-party-header-status-background {
+            
+            background-image: url('/static/img/new-modal-success-3rd_party-header-background.svg');
+            
+            background-repeat: no-repeat;
+            min-height: 115px;
+            color: white !important;
+            padding-top: 35px;
+            font-size: 24px;
+        }
+
+        .third-party-header-status-background_2D {
+            
+            background-image: url('/static/img/new-modal-success-3rd_party-header-background_320x.svg');
+            
+            background-repeat: no-repeat;
+            min-height: 115px;
+            color: white !important;
+            padding-top: 35px;
+            font-size: 24px;
+        }
+        .third-party-header-status-background_disclaimer-3d{
+            
+            background-position: center;
+            background-size: 300px;
+            background-repeat: no-repeat;
+            min-height: 85px;
+            color: white !important;
+            padding-top: 35px;
+            font-size: 24px;            
+        }
+
+        .third-party-header-status-samtec_timeout {
+            background-image: url('https://snapeda.s3.amazonaws.com/images/samtec+embedded+timeout+popup.svg');
+            background-size: 300px;
+            background-repeat: no-repeat;
+            min-height: 106px;
+            color: white !important;
+            font-size: 18px;
+            line-height: 1.1em;
+            padding: 8px;
+            padding-top: 35px;
+            font-weight: 600;
+        }
+
+        .third-party-header-status {
+            background-image: url('/static/img/download-error-header.svg');
+            background-size: 300px;
+            background-repeat: no-repeat;
+            min-height: 106px;
+            color: white !important;
+            font-size: 18px;
+            line-height: 1.1em;
+            padding: 8px;
+            padding-top: 35px;
+            font-weight: 600;
+        }
+
+        .timeout-btn{
+            margin: 5px auto!important;
+        }
+        .samtec-email-done{
+            width: auto!important;
+            margin-bottom: 45px!important;
+        }
+
+        .samtec-timeout-text{
+            font-family: 'Open Sans';
+            font-style: normal;
+            font-weight: 400;
+            font-size: 13px;
+            line-height: 11px;
+            text-align: center;
+            color: #53514C;
+            margin-block: 15px;
+            margin-bottom: 5px;
+        }
+        .samtec-email-done-text{
+            font-family: 'Open Sans';
+            font-style: normal;
+            font-weight: 600;
+            font-size: 20px;
+            line-height: 25px;
+            text-align: center;
+            color: #53514C;
+            margin-block: 15px;
+        }
+        #send-timeout-email, #timeout-email{
+            word-break: break-all;
+        }
+        #send-timeout-email {
+            font-size: 14px;
+        }
+
+        .third-party-header-status-background_disclaimer {
+            
+            background-size: 320px;
+            background-repeat: no-repeat;
+            background-position: center;
+            min-height: 85px;
+            color: white !important;
+            padding-top: 35px;
+            font-size: 24px;
+        }
+
+        .samtec-custom-orange {
+            border: 1px solid #ff761a;
+            background-color: #ff761a;
+            color: #fff;
+        }
+
+        .samtec-custom-orange:hover {
+            background-color: #fff;
+            color: #ff761a !important;
+        }
+        .modal-close.newdesign{
+            color:#fff;
+        }
+        .modal-close.newdesign:hover{
+            color:#f7f7f7;
+        }
+        
+        .mouser_ad2 .digikey_buy{
+            padding: 8px 40px !important;
+            border-radius: 3px !important;
+            margin-bottom: 10px !important;
+            background-color: #ff771c !important;
+            color: #ffffff !important;
+            box-shadow: none !important;
+            border: none !important;
+            margin-top: 15px !important;
+        }
+        
+        .newdesign .s-btn-medium:hover{
+            background-color: #ff771c !important;
+            color:#fff !important;
+        }
+        .modal-download-success-te{
+            width:700px !important;
+        }
+        .modal-download-success-te .modal-left{
+            width:40%;
+            float:left;
+        }
+        .modal-download-success-te .modal-right{
+            width:60%;
+            float:left;
+        }
+        .te-top{
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
+        .te-top img{
+            max-width: 100px;
+            float: left;
+            margin-right: 10px;
+            font-size:14px;
+        }
+        .te-rec-part{
+            margin-bottom: 5px;
+        }
+        .te-rec-part-info .te_img_cont{
+            height: 80px;
+            float: left;
+            width: 75px;
+            margin-right: 10px;
+            margin-bottom: 20px;
+        }
+        .te-rec-part-info .te_img_cont img{
+            max-height: 80px;
+        }
+
+        .te-rec-part-info{
+            border: 1px solid #eee;
+            padding: 10px;
+            background: #fff;
+            font-size:14px;
+        }
+
+        .te-rec-part-info-large{
+            padding: 50px 50px;
+            margin-top: 30px;
+        }
+
+        .modal-download-success-te .modal-right{
+            background: #f3f3f3;
+        }
+        .modal-right-cont{
+            padding:20px;
+        }
+        .te-rec-part-info-text{
+            margin-left: 80px;
+            font-size:14px;
+        }
+        .te-rec-part-info-text p{
+            margin-bottom:3px;
+            font-size:14px;
+        }
+
+        .te_part_name{
+            font-weight: bold;
+            color: #08c;
+            font-size:16px;
+            overflow-wrap: break-word;
+            padding-bottom:3px;
+        }
+        .te_part_link, .te_part_link:hover, .te_part_link:active, .te_part_link:visited{
+            text-decoration: none;
+            color:#777;
+        }
+
+        .te_part_link_3d, .te_part_link_3d:hover, .te_part_link_3d:active, .te_part_link_3d:visited{
+            text-decoration: none;
+            color:#777;
+        }
+
+        .te-rec-part-info-text p.te_part_desc{
+            font-size: 12px;
+        }
+        .te_part_cat{
+            font-size: 12px;
+            font-weight: 300;
+            color:#999;
+        }
+        .fadeInUp025 {
+            animation-delay: 0.25s;
+            -webkit-animation-name: fadeInUp;
+            animation-name: fadeInUp;
+        }
+        .fadeInUp050 {
+            animation-delay: 0.5s;
+            -webkit-animation-name: fadeInUp;
+            animation-name: fadeInUp;
+        }
+
+        .newdesign .mouser-hover:hover {
+            background-color: #ffffff !important;
+            color: #004A85 !important;
+        }
+
+        .bold-font{
+            font-weight: 1000;
+        }
+
+        .manufacturer-text {
+            font-size: 16px;
+            margin-top: 15px;
+            margin-bottom: 15px;
+            margin-left: 15px;
+            margin-right: 15px;
+            line-height: 24px;
+        }
+
+        .manufacturer-text * {
+            display: inline-block;
+        }
+
+        .logo-img {
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+            width: 152px;
+            padding-right: 38px;
+        }
+
+        .modal-opt-in-btn {
+            padding: 9px 22px !important;
+            border: 1px solid #ff761a !important;
+            width: 79px !important;
+        }
+        .description-modal{
+            margin: 0 9px 9px 25px;
+        }
+        
+    
+        @media only screen and (pointer:coarse) and (max-width: 600px), only screen and (max-width: 250px) {
+            .links-list hr{
+                display: none!important;
+            }
+            .snapfile-download {
+                display: none!important;
+            }
+            #samtec-cad-sent-email-title,#samtec-cad-sent-email-title-3d{
+                color: #242323!important;
+                word-break: break-word;
+            }
+            #send-email-description-api,#send-email-description-api-3d{
+                color: #53514C!important;
+                word-break: break-word;
+            }
+            .lean-modal.modal-small {
+                
+                z-index: 11111111111!important;
+                
+            }
+            .modal-view-download {
+                max-height: 100vh;
+            }
+            #download-modal,#download-3d-modal{
+                text-align: center;
+                
+                left: unset!important;
+                margin-left: auto!important;
+                height: 100%!important;
+                width: 100%!important;
+                
+            }
+            #download-modal {
+                
+                left: unset!important;
+                
+            }
+            #download-modal .modal-view-download .modal-title{
+                padding-top: 70px!important;
+                font-size: 15px!important;
+            }
+            .modal-small#download-modal {
+                top: 0px !important;
+            }
+            .modal-small#download-3d-modal {
+                
+                top: 0px !important;
+                
+            }
+            .modal-title{
+                
+                min-height: 0px!important;
+                background-size: 100%!important;
+                
+            }
+            .lean-modal{
+                border-radius:0px!important;
+                box-shadow:none!important;
+            }
+            .third-party-header-status-background_2D {
+                padding-top: 65px!important;
+                background-size: cover!important;
+                background-position: center!important;
+            }
+            .third-party-header-status-background {
+                min-height: 155px!important;
+                background-size: cover!important;
+                background-position: center;
+            }
+            
+            .modal-close::before{
+                content: ""!important;
+            }
+            .modal-close{
+                display: block!important;
+                background-image: url(/static/img/arrow-2.svg)!important;
+                background-repeat: no-repeat;
+                background-position: center;
+                width: 35px!important;
+                float:left!important;
+                position:absolute;
+                top:15px;
+                left:15px;
+                bottom:10px;
+            }
+            
+            .success-email{
+                background-image: url(/static/img/sent-email.svg)!important;
+                background-repeat: no-repeat;
+                display: inline-block;
+                background-position: center;
+                height: 80px;
+                width: 80px;
+                margin-top: 20px;
+                margin-bottom: 20px;
+            }
+            .black-arrow{
+                background-image: url(/static/img/arrow-1.svg)!important;
+                background-repeat: no-repeat;
+                background-position: center;
+                width: 35px!important;
+                float:left!important;
+                position:absolute;
+                top:15px;
+                left:15px;
+                bottom:10px;
+            }
+            .icon-bg{
+              margin-left: -100px!important;
+            }
+            .icon-bg-alt{
+              margin-left: -78px!important;
+            }
+            .description-modal{
+                margin:0px 0 20px 0;
+                font-size: 16px;
+                max-width: 330px;
+                display: inline-block;
+            }
+            #samtec-checkbox-contain{
+                margin: 30px 0 25px 0!important;
+            }
+            #samtec-download-btns{
+                margin: 0 0 0 0!important;
+            }
+
+            #samtec-checkbox-modal-download-individual-btn{
+                width: 280px!important;
+                display: inline-block;
+                padding: 15px!important;
+                font-size: 16px!important;
+            }
+            #samtec-checkbox-modal-download-all-btn{
+                width: 280px!important;
+                display: inline-block;
+                padding: 15px!important;
+                font-size: 16px!important;
+            }
+            .email-submit-btn{
+                width: 280px!important;
+                display: inline-block!important;
+                padding: 15px!important;
+                font-size: 18px!important;
+            }
+            .samtec-input-email{
+                width: 280px;
+                display: inline-block;
+                text-align: center;
+                padding: 15px!important;
+                font-size: 16px!important;
+                font-family: 'Open Sans';
+            }
+            .samtec-header-title-new-design {
+                background-image: url('/static/img/samtec-b-checkbox-header-bg.svg');
+                background-repeat: no-repeat;
+                min-height: 100px!important;
+                color: #242323 !important;
+            }
+            .modal-title{
+                
+                font-weight: 400!important;
+                padding-bottom: 0!important;
+                color:#555!important;
+                line-height: 34px!important;
+                font-size: 28px!important;
+                padding-top: 250px!important;
+                
+            }
+            .modal-title.third_party-header-title-new-design {
+                
+            }
+            .modal-title.samtec-header-email-replace {
+                
+            }
+            #samtec-close-btn{
+                display: inline-block!important;
+                position: initial;
+                border: 1px solid #FF7700;
+                border-radius: 2px;
+                background: #FFFFFF;
+                color: #FF7700!important;
+                width: 280px!important;
+                font-size: 16px;
+                padding: 15px;
+                float:none!important;
+            }
+            #samtec-close-btn-3d{
+                display: inline-block!important;
+                position: initial;
+                border: 1px solid #FF7700;
+                border-radius: 2px;
+                background: #FFFFFF;
+                color: #FF7700!important;
+                width: 280px!important;
+                font-size: 16px;
+                padding: 15px;
+                float:none!important;
+            }
+            .links-list{
+                margin: 0 0 9px 0;
+            }
+            #snap_icon_div{
+                
+                justify-content: center;
+                
+            }
+        }
+        
+
+    </style>
+
+    <div class="modal-view modal-download-success-te transition">
+        <div class="modal-left">
+            <i class="fa fa-times modal-close"></i>
+            <!-- <div class="modal-head" id="modal-part-name">
+
+            </div> -->
+            <p class="clr-darker align-center modal-status modal-status-alt2 bigger" style="padding-top: 45px;">
+                Done!
+            </p>
+            <p class="clr-dust huge-icon dustToBlue huge-icon-alt huge-icon-alt2 huge-icon-alt-done">
+                <i class="fa fa-download"></i>
+            </p>
+            
+            <p class="modal-details modal-details2 modal-text-centered clr-concrete">
+                <a class="s-link s-btn ghost outl-blue s-btn-medium how-to-import-btn shadow_button shadow_button_alt" style="padding: 8px 20px;border-radius: 30px;background-color: #304e70;color:#ffffff" href="#" onclick="javascript:window.open(&quot;/about/import/?plugin=&amp;prev_ref=&quot; + (global_link_matching[global_conversion_format] || &quot;&quot;), &quot;_blank&quot;);">Learn How to Import</a>
+            </p>
+            
+        </div>
+        <div class="modal-right">
+            <div class="modal-right-cont te-modal">
+                <div class="te-top">
+                    <img class="te_modal_comp_manufacturer" src="" alt="">
+                    <p style="font-size:14px;padding-left: 110px;">You just downloaded <span class="te_modal_comp_type"></span></p>
+
+                </div>
+
+
+            </div>
+
+        </div>
+
+
+    </div>
+    
+    <div class="modal-view modal-download-success-newdesign">
+        <i class="fa fa-times modal-close newdesign"></i>
+        <!-- <div class="modal-head" id="modal-part-name">
+        </div> -->
+        <p class="clr-darker align-center modal-status modal-status-alt2 bigger newdesign" style="padding-top: 45px;">
+            Done!
+        </p>
+        
+        
+        
+        
+        
+
+        
+            <p class="modal-details modal-details2 modal-text-centered clr-concrete newdesign">
+                
+                    <a class="s-link s-btn ghost outl-blue s-btn-medium how-to-import-btn shadow_button shadow_button_alt" style="padding: 8px 20px; background: #fff; border: 1px solid #ff771c;color:#ff771c;margin-top: 35px;box-shadow:none" href="#" onclick="javascript:window.open(&quot;/about/import/?plugin=&amp;prev_ref=&quot; + (global_link_matching[global_conversion_format] || &quot;&quot;), &quot;_blank&quot;);">Learn How to Import</a>
+                
+            </p>
+        
+    </div>
+    
+    
+    <div class="modal-view modal-download-success-3rd_party transition">
+        <i class="fa fa-times modal-close newdesign"></i>
+        <p class="align-center third-party-header-status-background_2D">
+            Done!
+        </p>
+        <div style="margin: 20px;">
+            <a class="s-btn s-btn-medium s-btn-modal  outl-orange " style="border: 1px solid; opacity: 1 !important;" onclick="javascript:window.open(&quot;https://www.snapeda.com/about/import/&quot;, &quot;_blank&quot;);">Learn How To Import</a>
+        </div>
+    </div>
+    <div class="modal-view modal-download-success-request transition">
+        <i class="fa fa-times modal-close newdesign"></i>
+        <p class="align-center third-party-header-status-background_2D" style="background-size: 324px;min-height: 116px;padding-inline: 69px;line-height: 23px;">
+            We received your request
+        </p>
+        <div style="margin: 20px;font-family: Arial;font-style: normal;font-weight: normal;font-size: 14px;line-height: 19px;
+        /* or 136% */text-align: center;color: #000000;">
+            We'll email you at <span id="userEmail"></span> as soon as the model is ready
+        </div>
+    </div>
+    <div class="modal-view modal-download-failed-request transition">
+        <i class="fa fa-times modal-close newdesign"></i>
+        <p class="align-center third-party-header-status-background_2D" style="background-size: 324px;min-height: 116px;padding-inline: 69px;line-height: 23px;">
+            Request Failed
+        </p>
+        <div style="margin: 20px;font-family: Arial;font-style: normal;font-weight: normal;font-size: 14px;line-height: 19px;
+        /* or 136% */text-align: center;color: #000000;">
+            Please contact Amphenol for more information
+        </div>
+    </div>
+
+    <!-- TODO Modify to adapt to any brands (Currently hardcoded for Quectel) -->
+    <div class="modal-view modal-download-success-opt-in">
+        <i class="fa fa-times modal-close newdesign"></i>
+        <p class="clr-darker align-center modal-status modal-status-alt2 bigger newdesign" style="background: rgb(48, 78, 112) !important; padding-top: 45px; padding-bottom: 40px !important;">
+            That's it!
+        </p>
+        <img class="logo-img" src="" alt="" style="transform: translate(138px, -35px);padding: 10px;background-color: white;border-radius: 200px;border: solid 1px #eee;position: fixed;height: 30px;width: 30px;">
+         <div class="te_holder" style="text-align: center; margin-bottom: 1px; margin-top: 20px;">
+            
+            <img src="https://snapeda.s3.amazonaws.com/partpics/Texas%20Instruments_TPD6E05U06RVZR_8369.jpg" class="unipart-coverart" itemprop="image" alt="All Parts Semiconductors ICs ESD Protection TPD6E05U06RVZR by Texas Instruments" style="cursor: pointer; visibility: visible;">
+            
+            <div class="modal-te-back-design1" style=" display: none; ">
+                <p style="font-size: 13px;margin-top: 15px;margin-bottom: 15px;margin-left: 15px;margin-right: 15px;line-height: 20px;">
+                    
+                        Would you like  to contact you with more resources about the <strong>TPD6E05U06RVZR</strong>?
+                    
+                </p>
+                <a class="s-btn s-btn-medium outl-orange modal-opt-in-btn cancel-modal-opt-in">
+                    <b>Not now</b>
+                </a>
+                <a class="s-btn s-btn-medium orange modal-opt-in-btn submit-modal-opt-in">
+                    <b>Yes, please</b>
+                </a>
+                <p class="modal-details modal-details2 modal-text-centered clr-concrete newdesign animated fadeInUp" style="margin-top: 10px !important; margin-bottom: 10px !important;">
+                    <a class="how-to-import-btn" style="font-weight: 400; font-size: 12px; color: #999; text-decoration: underline; cursor: pointer;" href="https://www.snapeda.com/about/import/?plugin=&amp;prev_ref=" target="_blank">Learn how to import</a>
+                </p>
+            </div>
+            <div class="modal-te-back-design2" style="">
+                <div style="border-bottom: 1px solid #C4C4C4;padding: 20px 24px;">
+                    <!-- <i class="fa fa-check-square" style="margin-right: 2px; height: 20px; color: #ff761a"></i> -->
+                    
+                     will be in touch soon with more resources for the <strong>TPD6E05U06RVZR</strong>
+                    
+                </div>
+                <a href="https://www.snapeda.com/about/import/?plugin=&amp;prev_ref=" target="_blank" class="s-btn ghost outl-orange s-btn-medium datasheet-submit part-cta datasheet-link">Learn how to import</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-view modal-download-error">
+        <i class="fa fa-times modal-close black-arrow"></i>
+        <!-- <div class="modal-head" id="modal-part-name">
+
+        </div> -->
+        <p style="padding-top: 45px;" class="clr-darker align-center modal-status modal-status-alt2 bigger">
+            Oh Snap!
+        </p>
+        <p class="clr-dust huge-icon huge-icon-alt huge-icon-alt2 huge-icon-alt-done">
+            <i class="fa fa-download"></i>
+        </p>
+
+        <p class="modal-details modal-details2 modal-text-centered clr-concrete">
+            Something went wrong :( <br> Please <a class="s-link" href="mailto:info@snapeda.com" itemprop="email">drop us a line</a> for more info.
+        </p>
+    </div>
+
+    
+        <div class="modal-view view-active" id="modal-kicad-options">
+            
+                <i class="fa fa-times modal-close black-arrow"></i>
+            <p class="align-center modal-title" style="padding: 35px 8px 8px;">Choose Download Format</p>
+            <ul class="links-list" id="orange-gradient-list-kicad">
+                
+                    <li>
+                        <a class="s-btn s-btn-medium s-btn-modal" data-format="kicad" style="background-color: rgb(175, 72, 4);">
+    V3 &amp; Prior
+</a>
+                    </li>
+                
+                    <li>
+                        <a class="s-btn s-btn-medium s-btn-modal" data-format="kicad_mod" style="background-color: rgb(200, 82, 4);">
+    V4 &amp; Later
+</a>
+                    </li>
+                
+                    <li>
+                        <a class="s-btn s-btn-medium s-btn-modal" data-format="kicad_modv6" style="background-color: rgb(200, 82, 4);">
+    V6 &amp; Later
+</a>
+                    </li>
+                
+            </ul>
+         
+        </div>
+    
+
+    <div class="modal-view" id="modal-samtec-2d-options">
+        <i class="fa fa-times modal-close" style="color: white"></i>
+            <p class="align-center modal-title samtec-header-title-new-design" style="padding: 35px 8px 8px;">Choose Download Format</p>
+            <p class="description-modal">
+                We can include the .step file with the symbol and footprint for you.
+            </p>
+            <p class="description-modal">
+                If you need any other format, explore the other options on the 3D Models tab.
+            </p>
+            <div id="samtec-checkbox-contain" style="margin: 20px 9px 9px 25px;">
+                <input id="samtec-checkbox-modal-checkbox" type="checkbox" class="form-check-input">
+                <span style="margin-left: 5px; font-weight: bolder; color: black; font-size:14px;">Yes, include .step file.</span>
+            </div>
+
+            <div id="samtec-download-btns" style="margin: 20px 9px 20px 25px;">
+                <a id="samtec-checkbox-modal-download-individual-btn" class="s-btn orange samtec-download-btn s-btn-medium align-center" data-format="kicad_mod">
+                    Download Symbol and Footprint
+                </a>
+                <a id="samtec-checkbox-modal-download-all-btn" class="s-btn orange samtec-download-btn s-btn-medium align-center" data-format="kicad_mod" style="width: 220px; display:none; font-size:16px;">
+                    Download Models
+                </a>
+            </div>
+        </div>
+
+    <div class="modal-view" id="modal-samtec-cad-email-api">
+        <i class="fa fa-times modal-close cad-email-bg" style="color: white"></i>
+            <p id="samtec-cad-email-title" class="align-center modal-title samtec-header-email samtec-header-email-replace" style="padding: 35px 8px 8px;">Choose Download Format</p>
+            <p id="send-email-description-api" class="description-modal" style="line-height: 24px; display: inline-block; margin: 20px 0 30px 0;">
+            </p>
+            <div>
+                <a id="samtec-email-submit-btn-api" class="s-btn orange samtec-download-btn s-btn-medium align-center email-submit-btn" data-format="kicad_mod">
+                    Submit
+                </a>
+            </div>
+        </div>
+
+    <div id="modal-samtec-cad-email" style="display:none;">
+        <i class="fa fa-times modal-close cad-email-bg" style="color: white"></i>
+            <p id="samtec-cad-email-title" class="align-center modal-title samtec-header-email samtec-header-email-replace" style="padding: 35px 8px 8px;">Choose Download Format</p>
+            <p id="send-email-description" class="description-modal" style="line-height: 24px; margin-bottom: 30px;">
+                Enter your email address and we'll <br>
+                send the CAD models to you
+            </p>
+        <p id="unvalid-email" class="description-modal" style="line-height: 24px; margin-bottom: 30px; font-size:14px; color:red">
+            </p>
+            <input type="email" id="email-send-cad" class="samtec-input-email" placeholder="Email Address" value="">
+            <div>
+                <a id="samtec-email-submit-btn" class="s-btn orange samtec-download-btn s-btn-medium align-center email-submit-btn" data-format="kicad_mod">
+                    Submit
+                </a>
+            </div>
+        </div>
+
+    <div class="modal-view" id="modal-samtec-email-sent">
+            <p id="samtec-cad-sent-email-title" class="align-center modal-title samtec-header-email" style="padding: 35px 8px 8px;">Choose Download Format</p>
+        <div>
+        <i class="success-email">
+        </i>
+        </div>
+            <div>
+                <a id="samtec-close-btn-3d" class="s-btn orange samtec-download-btn s-btn-medium align-center modal-close">
+                    Got it, thanks
+                </a>
+            </div>
+        </div>
+
+
+    </div>
