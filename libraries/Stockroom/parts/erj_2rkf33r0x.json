@@ -1,0 +1,156 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://datasheet.lcsc.com/datasheet/pdf/0d2b24dc2788c3a52d0ca8a07148aca3.pdf?productCode=C278594"
+  },
+  "description": "Resistor, 33 Ohm, 1%, 0402",
+  "display_name": "33 Ohm 1% 0402 Resistor",
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "Resistor_SMD",
+        "name": "R_0402_1005Metric"
+      },
+      "model": null,
+      "symbol": {
+        "file": "",
+        "lib": "Device",
+        "name": "R"
+      }
+    }
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "erj_2rkf33r0x",
+  "manufacturer": "Panasonic",
+  "mpn": "ERJ-2RKF33R0X",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=ERJ-2RKF33R0X"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.004785714,
+          "qty": 20
+        },
+        {
+          "price": 0.003871429,
+          "qty": 20000
+        },
+        {
+          "price": 0.003357143,
+          "qty": 60000
+        },
+        {
+          "price": 0.002685714,
+          "qty": 200000
+        },
+        {
+          "price": 0.002428571,
+          "qty": 1000000
+        },
+        {
+          "price": 0.002271429,
+          "qty": 2000000
+        }
+      ],
+      "stock": 8,
+      "url": "https://www.mouser.com/c/?q=ERJ-2RKF33R0X",
+      "vendor": "Mouser"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "3D Model": "Resistor_SMD.3dshapes/R_0402_1005Metric.wrl",
+    "Assembly Country of Origin": "Not available",
+    "Available On Reel": "Yes",
+    "BRHTS": "85332120",
+    "Brand Id": "121",
+    "Catalog Id": "1199",
+    "Contains Battery": "No",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
+    "Currency Symbol": "$",
+    "Currency Type": "USD",
+    "ECCN": "EAR99",
+    "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/fafd024f554e426eb74cf4a204aa88b0.svg?t=1700019663",
+    "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/4e707e1d3422420a80f315acf8f8f495.svg?t=1700019663",
+    "Footprint": "Resistor_SMD:R_0402_1005Metric",
+    "HTS Code (BR)": "85332110",
+    "HTS Code (CA)": "8533210000",
+    "HTS Code (CN)": "8533211000",
+    "HTS Code (EU TARIC)": "8533210000",
+    "HTS Code (IN)": "85332111",
+    "HTS Code (JP)": "853321000",
+    "HTS Code (MX)": "8533.21.01",
+    "HTS Code (TARIC)": "8533210000",
+    "HTS Code (US)": "8533210020",
+    "Has Third Party Stock": "No",
+    "Image": "https://www.mouser.com/images/panasonic/images/ERJ-xR_series_SPL.jpg",
+    "Is Cable Category": "No",
+    "Is Foreign Display": "Yes",
+    "Is Foreign Onsale": "Yes",
+    "Is Infringement": "No",
+    "Is Mro": "No",
+    "Is Not Overstock": "No",
+    "Is Real Price": "Yes",
+    "Is Show Foreign Price": "Yes",
+    "KRHTS": "8533219000",
+    "Key Attributes": "RES 33Ω ±1% 0.1W 0402",
+    "LCSC Category": "Chip Resistor - Surface Mount",
+    "LCSC Category Path": "Passives > Resistors",
+    "LCSC Parent Category": "Resistors",
+    "LCSC Product ID": "265761",
+    "LCSC Product Name": "RES 33Ω ±1% 0.1W 0402",
+    "LCSC Title": "PANASONIC ERJ2RKF33R0X",
+    "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
+    "Lead Time": "105 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "100",
+    "Order Multiple": "100",
+    "Package": "0402",
+    "Package Quantity": "10000",
+    "Package Quantity Unit": "Reel",
+    "Packaging": "Tape & Reel (TR)",
+    "Parent Catalog Id": "308",
+    "Popular Part": "No",
+    "Power(Watts)": "100mW",
+    "Pre-Sale": "No",
+    "Product Category": "Thick Film Resistors - SMD",
+    "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20181113_PANASONIC-ERJ2RKF33R0X_C278594_front.jpg",
+    "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20181113_PANASONIC-ERJ2RKF33R0X_C278594_back.jpg",
+    "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20181113_PANASONIC-ERJ2RKF33R0X_C278594_blank.jpg",
+    "Reel Setup Fee": "3",
+    "Resistance": "33 Ohm",
+    "RoHS": "Yes",
+    "Standard Pack Qty": "10000",
+    "Stock": "3400",
+    "Stock (Domestic)": "3400",
+    "Stock (Overseas)": "3400",
+    "Stock (Shenzhen)": "3400",
+    "Symbol": "Device:R",
+    "Temperature Coefficient": "±100ppm/℃",
+    "Tolerance": "1%",
+    "Type": "Thick Film Resistor",
+    "Unit": "Piece",
+    "Unit Weight (kg)": "6.5e-07",
+    "Voltage Rating": "-",
+    "Weight": "0.011",
+    "Weight (kg)": "1.1e-05",
+    "Weight Foreign (kg)": "0",
+    "Wm Catalog Id": "1199"
+  },
+  "tags": [],
+  "value": ""
+}
