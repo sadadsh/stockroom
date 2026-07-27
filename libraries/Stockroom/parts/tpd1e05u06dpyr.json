@@ -53,6 +53,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6222/296%7E4211012%7EDPY%7E2.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "16"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -650,6 +662,86 @@
       "stock": 35779,
       "url": "https://www.lcsc.com/product-detail/C436349.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:57.078925+00:00",
+      "part_number": "595-TPD1E05U06DPYR",
+      "price_breaks": [
+        {
+          "price": 0.39,
+          "qty": 1
+        },
+        {
+          "price": 0.241,
+          "qty": 10
+        },
+        {
+          "price": 0.152,
+          "qty": 100
+        },
+        {
+          "price": 0.113,
+          "qty": 500
+        },
+        {
+          "price": 0.09,
+          "qty": 1000
+        },
+        {
+          "price": 0.088,
+          "qty": 2500
+        },
+        {
+          "price": 0.078,
+          "qty": 5000
+        },
+        {
+          "price": 0.064,
+          "qty": 10000
+        },
+        {
+          "price": 0.06,
+          "qty": 20000
+        }
+      ],
+      "stock": 10699,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:57.078925+00:00",
+      "part_number": "296-39341-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.07052,
+          "qty": 10000
+        },
+        {
+          "price": 0.0645,
+          "qty": 20000
+        },
+        {
+          "price": 0.06143,
+          "qty": 30000
+        },
+        {
+          "price": 0.05798,
+          "qty": 50000
+        },
+        {
+          "price": 0.05594,
+          "qty": 70000
+        },
+        {
+          "price": 0.05396,
+          "qty": 100000
+        }
+      ],
+      "stock": 405750,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
