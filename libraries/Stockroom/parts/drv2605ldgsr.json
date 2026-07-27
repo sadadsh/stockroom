@@ -1,0 +1,492 @@
+{
+  "alternates": {
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "2V~5.2V VSSOP-10-0.5mm Motor Drivers, Controllers RoHS"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Motor / Motion / Ignition Controllers & Drivers Haptic Driver A 595- DRV2605LDGST A 595- A 595-DRV2605LDGST"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "TI"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Texas Instruments"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C527464.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/search?q=DRV2605LDGSR"
+      }
+    ]
+  },
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "drv2605ldgsr.pdf",
+    "source_url": ""
+  },
+  "description": "2V~5.2V VSSOP-10-0.5mm Motor Drivers, Controllers RoHS",
+  "display_name": "Motor / Motion / Ignition Controller & Driver VSSOP-10-0.5mm",
+  "eda": {},
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Features": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (CN)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (MX)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (US)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Interface": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Number of H-bridges": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Operating Temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Output Current": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Peak Current": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RDS(on)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Supply Current (Iq)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Technology": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Voltage - Supply": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight Foreign (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "drv2605ldgsr",
+  "manufacturer": "TI",
+  "mpn": "DRV2605LDGSR",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 1.354285714,
+          "qty": 1
+        },
+        {
+          "price": 1.134285714,
+          "qty": 10
+        },
+        {
+          "price": 0.997142857,
+          "qty": 30
+        },
+        {
+          "price": 0.865714286,
+          "qty": 100
+        },
+        {
+          "price": 0.802857143,
+          "qty": 500
+        },
+        {
+          "price": 0.774285714,
+          "qty": 1000
+        }
+      ],
+      "stock": 476,
+      "url": "https://www.lcsc.com/product-detail/C527464.html",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Assembly Country of Origin": "China",
+    "Available On Reel": "Yes",
+    "Brand Id": "100",
+    "Catalog Id": "1016",
+    "Contains Battery": "No",
+    "Country of Diffusion": "United States",
+    "Country of Origin": "China",
+    "Currency Symbol": "$",
+    "Currency Type": "USD",
+    "ECCN": "EAR99",
+    "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/b77416f886f74a91a0b9ce8513b8c211.svg?t=1718788226",
+    "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/a09a115c631445698765195d714e2d73.svg?t=1718788226",
+    "Features": "Active braking function;Soft switching",
+    "HTS Code (CA)": "8542390000",
+    "HTS Code (CN)": "8542391090",
+    "HTS Code (EU TARIC)": "8542399000",
+    "HTS Code (JP)": "854239099",
+    "HTS Code (MX)": "8542399901",
+    "HTS Code (US)": "8542390090",
+    "Has Third Party Stock": "No",
+    "Image": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_MSOP-10_DGS_t.jpg",
+    "Interface": "I2C",
+    "Is Cable Category": "No",
+    "Is Foreign Display": "Yes",
+    "Is Foreign Onsale": "Yes",
+    "Is Infringement": "No",
+    "Is Mro": "No",
+    "Is Not Overstock": "No",
+    "Is Real Price": "Yes",
+    "Is Show Foreign Price": "Yes",
+    "Key Attributes": "2- to 5.2-V Haptic Driver for LRA and ERM with Effect Library and Smart-Loop Architecture",
+    "LCSC Category": "Motor Drivers, Controllers",
+    "LCSC Category Path": "Integrated Circuits (ICs) > Power Management (PMIC)",
+    "LCSC Parent Category": "Motor Driver ICs",
+    "LCSC Product ID": "545760",
+    "LCSC Product Name": "2- to 5.2-V Haptic Driver for LRA and ERM with Effect Library and Smart-Loop Architecture",
+    "LCSC Title": "TI DRV2605LDGSR",
+    "LCSC Warehouse Category": "Motor Drivers, Controllers",
+    "Lead Time": "112 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "1",
+    "Number of H-bridges": "1",
+    "Operating Temperature": "-40℃~+85℃",
+    "Order Multiple": "1",
+    "Output Current": "-",
+    "Package": "VSSOP-10-0.5mm",
+    "Package Quantity": "2500",
+    "Package Quantity Unit": "Reel",
+    "Packaging": "Tape & Reel (TR)",
+    "Parent Catalog Id": "13504",
+    "Peak Current": "-",
+    "Popular Part": "Yes",
+    "Pre-Sale": "No",
+    "Product Category": "Motor / Motion / Ignition Controllers & Drivers",
+    "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20230104_Texas-Instruments-DRV2605LDGSR_C527464_front.jpg",
+    "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230104_Texas-Instruments-DRV2605LDGSR_C527464_back.jpg",
+    "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230104_Texas-Instruments-DRV2605LDGSR_C527464_blank.jpg",
+    "RDS(on)": "-",
+    "Reel Setup Fee": "3",
+    "RoHS": "Yes",
+    "Standard Pack Qty": "2500",
+    "Stock": "2156",
+    "Stock (Domestic)": "2156",
+    "Stock (Overseas)": "2156",
+    "Stock (Shenzhen)": "2156",
+    "Supply Current (Iq)": "500uA",
+    "Technology": "Yes",
+    "Unit": "Piece",
+    "Unit Weight (kg)": "3.32e-05",
+    "Voltage - Supply": "2V~5.2V",
+    "Weight": "0.065",
+    "Weight (kg)": "6.5e-05",
+    "Weight Foreign (kg)": "0",
+    "Wm Catalog Id": "1016"
+  },
+  "tags": [],
+  "value": ""
+}
