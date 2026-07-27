@@ -22,6 +22,47 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0090"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_6_t.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4277/175%7E21-0058%7EUT%7E6.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "98 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2500"
       }
     ],
     "Packaging": [
@@ -36,6 +77,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Supervisory Circuits"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -46,6 +99,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
       }
     ],
     "datasheet_url": [
@@ -70,6 +128,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Supervisory Circuits 15kV ESD-Protected, Single/Dual/Octal, CMOS Switch Debouncers"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC SWITCH DEBOUNCER SOT-6"
       }
     ],
     "manufacturer": [
@@ -125,6 +188,10 @@
     }
   },
   "enrichment": {
+    "Applications": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Assembly Country of Origin": {
       "confidence": "high",
       "source": "mouser"
@@ -160,6 +227,10 @@
     "Currency Type": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "DigiKey Programmable": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "ECCN": {
       "confidence": "medium",
@@ -297,6 +368,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Order Multiple": {
       "confidence": "medium",
       "source": "lcsc"
@@ -305,6 +384,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -312,6 +395,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -345,6 +432,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -356,6 +447,10 @@
     "Standard Pack Qty": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Stock": {
       "confidence": "medium",
@@ -372,6 +467,14 @@
     "Stock (Shenzhen)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Type": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Unit": {
       "confidence": "medium",
@@ -438,10 +541,67 @@
       "stock": 271,
       "url": "https://www.lcsc.com/product-detail/C516788.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:12.865801+00:00",
+      "part_number": "700-MAX6817EUTT",
+      "price_breaks": [
+        {
+          "price": 9.28,
+          "qty": 1
+        },
+        {
+          "price": 7.22,
+          "qty": 10
+        },
+        {
+          "price": 6.7,
+          "qty": 25
+        },
+        {
+          "price": 6.13,
+          "qty": 100
+        },
+        {
+          "price": 5.98,
+          "qty": 250
+        },
+        {
+          "price": 5.88,
+          "qty": 500
+        },
+        {
+          "price": 5.81,
+          "qty": 1000
+        },
+        {
+          "price": 5.42,
+          "qty": 2500
+        }
+      ],
+      "stock": 9591,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:12.865801+00:00",
+      "part_number": "MAX6817EUT+TTR-ND",
+      "price_breaks": [
+        {
+          "price": 5.42018,
+          "qty": 2500
+        }
+      ],
+      "stock": 18257,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
+    "Applications": "µP Switch Interfacing",
     "Assembly Country of Origin": "Thailand",
     "Available On Reel": "Yes",
     "Brand Id": "234",
@@ -451,6 +611,7 @@
     "Country of Origin": "Thailand",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "DigiKey Programmable": "Not Verified",
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/9a066f903e65476fa74739d5e9b0ceb9.svg?t=1733136935",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/e26e45f72eec4795ae070fe64effb550.svg?t=1733136935",
@@ -485,10 +646,14 @@
     "Lifecycle": "Active",
     "Maximum Order Quantity": "250",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
     "Order Multiple": "1",
     "Package": "SOT-23-6",
+    "Package / Case": "SOT-23-6",
     "Package Quantity": "2500",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "487",
     "Popular Part": "No",
@@ -497,13 +662,17 @@
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20230204_Analog-Devices-Inc--Maxim-Integrated-MAX6817EUT-T_C516788_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230204_Analog-Devices-Inc--Maxim-Integrated-MAX6817EUT-T_C516788_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230204_Analog-Devices-Inc--Maxim-Integrated-MAX6817EUT-T_C516788_blank.jpg",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "RoHS": "Yes",
     "Standard Pack Qty": "2500",
+    "Standard Package": "2500",
     "Stock": "312",
     "Stock (Domestic)": "312",
     "Stock (Overseas)": "312",
     "Stock (Shenzhen)": "312",
+    "Supplier Device Package": "SOT-23-6",
+    "Type": "Switch Debouncer",
     "Unit": "Piece",
     "Unit Weight (kg)": "3.6e-05",
     "Weight": "0.177",
