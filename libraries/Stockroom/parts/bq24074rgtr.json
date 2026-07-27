@@ -1,0 +1,546 @@
+{
+  "alternates": {
+    "HTS Code (MX)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542.39.99"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542399999"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542390001"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542390070"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "4.35V~10.2V Lithium Battery 1 1.5A QFN-16-EP(3x3) Battery Chargers RoHS"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Battery Management Li-Ion Batt Chrgr & Pwr-Path Mgmt IC A 5 A 595-BQ24074RGTT"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "TI"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Texas Instruments"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C54313.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/search?q=BQ24074RGTR"
+      }
+    ]
+  },
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "bq24074rgtr.pdf",
+    "source_url": ""
+  },
+  "description": "4.35V~10.2V Lithium Battery 1 1.5A QFN-16-EP(3x3) Battery Chargers RoHS",
+  "display_name": "Battery Management QFN-16-EP",
+  "eda": {},
+  "enrichment": {
+    "0V Battery Charge": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Balance Current": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Battery Temperature Detection": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Charge Current - Max": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Charging Saturation Voltage": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "End-Off Voltage": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Interface": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "KRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Number of Cells": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Operating Temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Quiescent Current": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "The Chip Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Type of Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Voltage - Supply": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight Foreign (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "bq24074rgtr",
+  "manufacturer": "TI",
+  "mpn": "BQ24074RGTR",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 1.144285714,
+          "qty": 1
+        },
+        {
+          "price": 0.945714286,
+          "qty": 10
+        },
+        {
+          "price": 0.847142857,
+          "qty": 30
+        },
+        {
+          "price": 0.75,
+          "qty": 100
+        },
+        {
+          "price": 0.625714286,
+          "qty": 500
+        },
+        {
+          "price": 0.594285714,
+          "qty": 1000
+        }
+      ],
+      "stock": 736,
+      "url": "https://www.lcsc.com/product-detail/C54313.html",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "0V Battery Charge": "Not supported",
+    "Assembly Country of Origin": "Philippines",
+    "Available On Reel": "No",
+    "Balance Current": "-",
+    "Battery Temperature Detection": "Support",
+    "Brand Id": "100",
+    "Catalog Id": "1616",
+    "Charge Current - Max": "1.5A",
+    "Charging Saturation Voltage": "4.2V",
+    "Contains Battery": "No",
+    "Country of Diffusion": "United States",
+    "Country of Origin": "Philippines",
+    "Currency Symbol": "$",
+    "Currency Type": "USD",
+    "ECCN": "EAR99",
+    "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/17c514692c5549c7b235395c89b1446f.svg?t=1732276285",
+    "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/46a447ef12c94516fb8f06cc747e0133.svg?t=1732276285",
+    "End-Off Voltage": "-",
+    "HTS Code (BR)": "85423999",
+    "HTS Code (CA)": "8542390000",
+    "HTS Code (CN)": "8542399000",
+    "HTS Code (IN)": "85423900",
+    "HTS Code (JP)": "8542330996",
+    "HTS Code (MX)": "8542.39.99",
+    "HTS Code (TARIC)": "8542399000",
+    "HTS Code (US)": "8542390001",
+    "Has Third Party Stock": "No",
+    "Image": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_VQFN-16_RGT_t.jpg",
+    "Interface": "-",
+    "Is Cable Category": "No",
+    "Is Foreign Display": "Yes",
+    "Is Foreign Onsale": "Yes",
+    "Is Infringement": "No",
+    "Is Mro": "No",
+    "Is Not Overstock": "No",
+    "Is Real Price": "Yes",
+    "Is Show Foreign Price": "Yes",
+    "KRHTS": "8532331000",
+    "Key Attributes": "1.5-A USB-Friendly Li-lon Battery Charger and Power-Path Management IC",
+    "LCSC Category": "Battery Chargers",
+    "LCSC Category Path": "Integrated Circuits (ICs) > Power Management (PMIC)",
+    "LCSC Parent Category": "Power Management (PMIC)",
+    "LCSC Product ID": "55331",
+    "LCSC Product Name": "1.5-A USB-Friendly Li-lon Battery Charger and Power-Path Management IC",
+    "LCSC Title": "TI BQ24074RGTR",
+    "LCSC Warehouse Category": "Battery Chargers",
+    "Lead Time": "112 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "1",
+    "Number of Cells": "1",
+    "Operating Temperature": "-40℃~+125℃",
+    "Order Multiple": "1",
+    "Package": "QFN-16-EP(3x3)",
+    "Package Quantity": "3000",
+    "Package Quantity Unit": "Reel",
+    "Packaging": "Tape & Reel (TR)",
+    "Parent Catalog Id": "380",
+    "Popular Part": "No",
+    "Pre-Sale": "No",
+    "Product Category": "Battery Management",
+    "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20221230_Texas-Instruments-BQ24074RGTR_C54313_front.jpg",
+    "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20221230_Texas-Instruments-BQ24074RGTR_C54313_back.jpg",
+    "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20221230_Texas-Instruments-BQ24074RGTR_C54313_blank.jpg",
+    "Quiescent Current": "6.5uA",
+    "Reel Setup Fee": "0",
+    "RoHS": "Yes",
+    "Standard Pack Qty": "3000",
+    "Stock": "5641",
+    "Stock (Domestic)": "5641",
+    "Stock (Overseas)": "5641",
+    "Stock (Shenzhen)": "5641",
+    "The Chip Type": "Charging IC",
+    "Type of Battery": "Lithium Battery",
+    "Unit": "Piece",
+    "Unit Weight (kg)": "2.29e-05",
+    "Voltage - Supply": "4.35V~10.2V",
+    "Weight": "0.203",
+    "Weight (kg)": "0.000202957",
+    "Weight Foreign (kg)": "0",
+    "Wm Catalog Id": "1616"
+  },
+  "tags": [],
+  "value": ""
+}
