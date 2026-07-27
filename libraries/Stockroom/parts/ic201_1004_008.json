@@ -1,0 +1,271 @@
+{
+  "alternates": {
+    "Image": [
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "https://www.mouser.com/images/yamaichielectronics/images/ic201.jpg"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/460/MFG_QFPPHOTO.jpg"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "IC & Component Sockets"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "Connectors, Interconnects"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "datasheet_url": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "https://www.mouser.com/catalog/specsheets/Yamaichi Electronics_08162018_IC201-1004-008x-x-xx_K.pdf"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/491/IC201-1004-008x-x-yy_K_Drawing.pdf"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "IC & Component Sockets 100Pin QFP Burn-in Skt 0.50 pitch"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "100 PIN QFP, 0.50 MM"
+      }
+    ],
+    "lead_time": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "56 Days"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "1"
+      }
+    ]
+  },
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "ic201_1004_008.pdf",
+    "source_url": ""
+  },
+  "description": "IC & Component Sockets 100Pin QFP Burn-in Skt 0.50 pitch",
+  "display_name": "IC & Component Socket",
+  "eda": {},
+  "enrichment": {
+    "Accessory Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "BRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Body Material": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Color": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "ECCN": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (CA)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (CN)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (MX)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (US)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "KRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number of Pins": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "RoHS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    }
+  },
+  "hashes": null,
+  "id": "ic201_1004_008",
+  "manufacturer": "Yamaichi Electronics",
+  "mpn": "IC201-1004-008",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 98.94,
+          "qty": 1
+        },
+        {
+          "price": 86.37,
+          "qty": 25
+        },
+        {
+          "price": 85.09,
+          "qty": 50
+        },
+        {
+          "price": 83.07,
+          "qty": 100
+        }
+      ],
+      "stock": 6,
+      "url": "https://www.lcsc.com/search?q=IC201-1004-008",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Accessory Type": "Chip Carrier",
+    "Assembly Country of Origin": "Not available",
+    "BRHTS": "85366990",
+    "Body Material": "Polyetherimide (PEI), Glass Filled",
+    "Color": "Black",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Philippines",
+    "ECCN": "EAR99",
+    "HTS Code (CA)": "8536690020",
+    "HTS Code (CN)": "8538900000",
+    "HTS Code (EU TARIC)": "8536693000",
+    "HTS Code (JP)": "853669000",
+    "HTS Code (MX)": "8536699999",
+    "HTS Code (US)": "8536694040",
+    "Image": "https://www.mouser.com/images/yamaichielectronics/images/ic201.jpg",
+    "KRHTS": "8536691000",
+    "Lead Time": "56 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "2 (1 Year)",
+    "Number of Pins": "100",
+    "Order Multiple": "1",
+    "Package Type": "Box",
+    "Product Category": "IC & Component Sockets",
+    "REACH": "REACH Unaffected",
+    "RoHS": "RoHS Compliant",
+    "Standard Pack Qty": "25",
+    "Standard Package": "1",
+    "Unit Weight (kg)": "0.012838"
+  },
+  "tags": [],
+  "value": ""
+}
