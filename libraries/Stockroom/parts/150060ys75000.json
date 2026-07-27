@@ -24,6 +24,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2958/WL-SMCW%20Series%200603.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "77 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "13"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -332,6 +344,54 @@
       "stock": 2211,
       "url": "https://www.lcsc.com/product-detail/C6784997.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:59.213217+00:00",
+      "part_number": "710-150060YS75000",
+      "price_breaks": [
+        {
+          "price": 0.16,
+          "qty": 1
+        },
+        {
+          "price": 0.151,
+          "qty": 10
+        },
+        {
+          "price": 0.142,
+          "qty": 50
+        },
+        {
+          "price": 0.122,
+          "qty": 100
+        },
+        {
+          "price": 0.116,
+          "qty": 500
+        },
+        {
+          "price": 0.116,
+          "qty": 4000
+        }
+      ],
+      "stock": 141450,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:59.213217+00:00",
+      "part_number": "732-4981-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.11745,
+          "qty": 4000
+        }
+      ],
+      "stock": 94414,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
