@@ -1,4 +1,184 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8533210020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8533.21.0030"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4849/13_0402-%281005-metric%29.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "9 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "17"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "100"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Reel"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Thick Film Resistors - SMD"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Resistors"
+      }
+    ],
+    "Resistance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "16.2 kOhm"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "16.2 kOhms"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Details"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Series": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "RC_L"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "RC L"
+      }
+    ],
+    "Temperature Coefficient": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "±100ppm/℃"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "100 PPM/C"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±100ppm/°C"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±1%"
+      }
+    ],
+    "US Tariff %": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8.0"
+      }
+    ],
+    "Voltage Rating": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "50V"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "50 V"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Resistor, 16.2 kOhm, 1%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "jsonld",
+        "value": "RC0402FR-0716K2L YAGEO Thick Film Resistors - SMD General Purpose Chip Resistor 0402, 16.2kOhms, 1%, 1/16W datasheet, inventory, & pricing."
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "RES 16.2K OHM 1% 1/16W 0402"
+      }
+    ]
+  },
   "category": "Resistors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +202,92 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Application": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Brand": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Case Code - in": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Case Code - mm": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Factory Pack Quantity": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Height": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Length": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Manufacturer": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Maximum Operating Temperature": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Minimum Operating Temperature": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Mounting Style": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Power Rating": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Product": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Product Type": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Subcategory": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Technology": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Termination Style": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "US Tariff %": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Unit Weight": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Width": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "rc0402fr_0716k2l",
   "manufacturer": "Yageo",
@@ -36,47 +301,81 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:09.261704+00:00",
+      "part_number": "603-RC0402FR-0716K2L",
       "price_breaks": [
         {
-          "price": 0.000571429,
-          "qty": 20
+          "price": 0.1,
+          "qty": 1
         },
         {
-          "price": 0.000442857,
+          "price": 0.008,
+          "qty": 10
+        },
+        {
+          "price": 0.006,
+          "qty": 100
+        },
+        {
+          "price": 0.005,
+          "qty": 1000
+        },
+        {
+          "price": 0.002,
+          "qty": 10000
+        }
+      ],
+      "stock": 589608,
+      "url": "https://www.mouser.com/c/?q=RC0402FR-0716K2L",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:09.261704+00:00",
+      "part_number": "311-16.2KLRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0031,
+          "qty": 10000
+        },
+        {
+          "price": 0.00275,
           "qty": 20000
         },
         {
-          "price": 0.000371429,
-          "qty": 60000
+          "price": 0.00257,
+          "qty": 30000
         },
         {
-          "price": 0.000342857,
-          "qty": 200000
+          "price": 0.00239,
+          "qty": 50000
         },
         {
-          "price": 0.000271429,
-          "qty": 1000000
+          "price": 0.00228,
+          "qty": 70000
         },
         {
-          "price": 0.000271429,
-          "qty": 1004000
+          "price": 0.00218,
+          "qty": 100000
         }
       ],
-      "stock": 11720,
-      "url": "https://www.mouser.com/c/?q=RC0402FR-0716K2L",
-      "vendor": "Mouser"
+      "stock": 325286,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
     "3D Model": "Resistor_SMD.3dshapes/R_0402_1005Metric.wrl",
+    "Application": "High Reliability",
     "Assembly Country of Origin": "Not available",
     "Available On Reel": "Yes",
     "BRHTS": "85332120",
+    "Brand": "YAGEO",
     "Brand Id": "396",
+    "Case Code - in": "0402",
+    "Case Code - mm": "1005",
     "Catalog Id": "1199",
     "Composition": "Thick Film",
     "Contains Battery": "No",
@@ -87,6 +386,7 @@
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/fafd024f554e426eb74cf4a204aa88b0.svg?t=1706583067",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/ba2fa9df83b545869febdcedd4bbbc2a.svg?t=1706583067",
+    "Factory Pack Quantity": "10000",
     "Features": "Moisture Resistant",
     "Footprint": "Resistor_SMD:R_0402_1005Metric",
     "HTS Code (BR)": "85332110",
@@ -99,6 +399,7 @@
     "HTS Code (TARIC)": "8533210000",
     "HTS Code (US)": "8533210020",
     "Has Third Party Stock": "No",
+    "Height": "0.35 mm (0.014 in)",
     "Height - Seated (Max)": "0.016\" (0.40mm)",
     "Image": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg",
     "Is Asian Brand": "Yes",
@@ -119,10 +420,15 @@
     "LCSC Product Name": "RES 16.2kΩ ±1% 62.5mW 0402",
     "LCSC Title": "YAGEO RC0402FR-0716K2L",
     "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
-    "Lead Time": "56 Days",
+    "Lead Time": "9 Weeks",
+    "Length": "1 mm (0.039 in)",
     "Lifecycle": "Active",
+    "Manufacturer": "YAGEO",
+    "Maximum Operating Temperature": "+ 155 C",
+    "Minimum Operating Temperature": "- 55 C",
     "Minimum Order Quantity": "100",
     "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Style": "PCB Mount",
     "Number of Terminations": "2",
     "Operating Temperature": "-55°C ~ 155°C",
     "Order Multiple": "100",
@@ -136,12 +442,15 @@
     "Popular Part": "No",
     "Power": "0.063 W",
     "Power (Watts)": "0.063W, 1/16W",
+    "Power Rating": "62.5 mW (1/16 W)",
     "Power(Watts)": "62.5mW",
     "Pre-Sale": "No",
+    "Product": "Thick Film Resistors SMD",
     "Product Category": "Thick Film Resistors - SMD",
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20250715_YAGEO-RC0402FR-0716K2L_C138050_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20250715_YAGEO-RC0402FR-0716K2L_C138050_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20250715_YAGEO-RC0402FR-0716K2L_C138050_blank.jpg",
+    "Product Type": "Thick Film Resistors",
     "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "Resistance": "16.2 kOhm",
@@ -153,17 +462,23 @@
     "Stock (Domestic)": "600",
     "Stock (Overseas)": "600",
     "Stock (Shenzhen)": "600",
+    "Subcategory": "Resistors",
     "Supplier Device Package": "0402",
     "Symbol": "Device:R",
+    "Technology": "Thick Film",
     "Temperature Coefficient": "±100ppm/℃",
+    "Termination Style": "SMD/SMT",
     "Tolerance": "1%",
     "Type": "Thick Film Resistor",
+    "US Tariff %": "8.0",
     "Unit": "Piece",
+    "Unit Weight": "0.000023 oz",
     "Unit Weight (kg)": "6.5e-07",
     "Voltage Rating": "50V",
     "Weight": "0.009",
     "Weight (kg)": "9e-06",
     "Weight Foreign (kg)": "0",
+    "Width": "0.5 mm (0.02 in)",
     "Wm Catalog Id": "1199"
   },
   "tags": [],
