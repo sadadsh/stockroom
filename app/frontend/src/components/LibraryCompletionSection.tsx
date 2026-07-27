@@ -45,9 +45,11 @@ const KINDS: { key: string; label: string }[] = [
   { key: "model", label: "3D Model" },
 ];
 
-// Roughly eight parts a minute, measured against the real catalogue: the converter costs about
-// two API calls per part and the catalogue blocks past ~20 calls a minute. Stated, not hidden.
-const PARTS_PER_MINUTE = 8;
+// MEASURED end to end on the owner's real 158-part library, 2026-07-27: a 68-part run filed its
+// first part at 22:54:52 and its last at 23:04:32, so 68 parts in 9.7 minutes = 7.0 a minute. The
+// limiter's 8-a-minute cap is the binding constraint, as designed, and real throughput sits just
+// under it. Stated to the user rather than hidden, because at this rate 10,000 parts is a day.
+const PARTS_PER_MINUTE = 7;
 
 function estimate(parts: number): string {
   if (parts <= 0) return "";

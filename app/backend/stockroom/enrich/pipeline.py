@@ -17,7 +17,11 @@ from urllib.parse import quote
 from stockroom.enrich.apply import conflict_entries, spec_updates
 from stockroom.enrich.cache import TtlCache
 from stockroom.enrich.datasheet import extract_datasheet_specs, fetch_datasheet
-from stockroom.enrich.distributor_url import distributor_mpn_from_url
+from stockroom.enrich.distributor_url import (
+    distributor_mpn_from_url,
+    distributor_part_number_from_url,
+    vendor_from_url,
+)
 from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.extract import extract_all
 from stockroom.enrich.fetch import HttpFetcher, HttpRenderedDomFetcher, RenderedDomFetcher
@@ -38,6 +42,29 @@ _CANDIDATE_FIELDS = {
     "manufacturer": "manufacturer",
     "description": "description",
 }
+
+
+def purchase_from_product_url(url: str, *, price_breaks=None, stock=None) -> Purchase:
+    """A `Purchase` naming the DISTRIBUTOR the link points at, carrying its own part number.
+
+    This used to be built inline as `Purchase(vendor="scrape", ...)`, with no part number at all.
+    MEASURED on the owner's real library 2026-07-27: 85 of 158 records were filed that way, so
+    every surface that groups or filters by vendor reported LCSC as zero while holding a perfectly
+    good LCSC product url, its price ladder and its live stock. The owner asked *"why are all
+    these missing their digikey and lcsc sourcing"* -- they were not missing, they were misfiled.
+
+    `vendor` is the name a person uses ("LCSC"), never the mechanism that found it ("scrape").
+    `part_number` is parsed from the url when it is a product page and left EMPTY when it is a
+    search page: 20 of those records only ever resolved to a search, and a guessed part number is
+    a wrong part.
+    """
+    return Purchase(
+        vendor=vendor_from_url(url),
+        part_number=distributor_part_number_from_url(url),
+        url=url,
+        price_breaks=list(price_breaks or []),
+        stock=stock,
+    )
 
 
 def _copy_specs(candidate, result, overwrite: set[str]) -> None:
@@ -777,9 +804,8 @@ class EnrichmentPipeline:
         # sourcing field; still per-field: only if the candidate has no purchase yet)
         product_url = result.specs.get("product_url")
         if product_url is not None and (not candidate.purchase or "purchase" in overwrite):
-            candidate.purchase = [Purchase(
-                vendor="scrape",
-                url=str(product_url.value),
+            candidate.purchase = [purchase_from_product_url(
+                str(product_url.value),
                 price_breaks=[{"qty": b.qty, "price": b.price} for b in result.price_breaks],
                 stock=(result.stock.value if result.stock else None),
             )]

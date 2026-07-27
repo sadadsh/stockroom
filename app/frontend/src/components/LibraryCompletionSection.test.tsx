@@ -95,7 +95,7 @@ describe("coverage", () => {
     // entry and will find nothing. The copy says what is TRIED, not what is guaranteed.
     expect(await screen.findByText(/47 components have gaps a source can try/i)).toBeInTheDocument();
     expect(screen.getByText(/Not every one will find files/i)).toBeInTheDocument();
-    expect(screen.getByText(/about 6 minutes/i)).toBeInTheDocument();
+    expect(screen.getByText(/about 7 minutes/i)).toBeInTheDocument();
   });
 
   it("estimates a 10,000 part library in hours, not in 1250 minutes", async () => {
@@ -103,7 +103,7 @@ describe("coverage", () => {
       coverage({ total: 10000, complete: 0, needs_files: 10000, unsourced: 0 }),
     );
     renderSection();
-    expect(await screen.findByText(/about 20.8 hours/i)).toBeInTheDocument();
+    expect(await screen.findByText(/about 23.8 hours/i)).toBeInTheDocument();
   });
 
   it("separately names the components no automatic source can reach", async () => {

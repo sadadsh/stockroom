@@ -53,3 +53,60 @@ def distributor_mpn_from_url(url: str) -> tuple[str, str] | None:
         return None
 
     return None
+
+
+# The distributor each known host IS, by the name a person uses. Lives here, beside the other
+# url parsing, because the enrich pipeline needs it and cannot import a FastAPI router; it used
+# to live only in `api/routers/ingest.py`, which is exactly why the pipeline hardcoded the string
+# "scrape" instead and 85 of the owner's records ended up filed under a mechanism name.
+_KNOWN_VENDOR_HOSTS = {"lcsc": "LCSC", "mouser": "Mouser", "digikey": "DigiKey"}
+
+# LCSC product urls end in the C-number, either bare (`/product-detail/C3034813.html`) or after a
+# descriptive slug (`/product-detail/Thermistors_Semitec-103AT-2_C3034813.html`). A SEARCH url has
+# no part number at all, and must yield "" rather than a guess: 20 of the owner's records only
+# ever resolved to a search page, and inventing a number for those would be worse than empty.
+_LCSC_IN_PATH = __import__("re").compile(r"(?:^|[-_/])(C\d+)(?:\.html?)?$", __import__("re").I)
+
+
+def vendor_from_url(url: str) -> str:
+    """The distributor's NAME for a purchase link: a known distributor by name, any other shop by
+    its host, and a non-url as a manual entry. Never the name of the mechanism that found it."""
+    u = (url or "").strip()
+    try:
+        host = (urlparse(u).hostname or "").lower()
+    except ValueError:
+        return "manual"
+    if not host:
+        return "manual"
+    for token, name in _KNOWN_VENDOR_HOSTS.items():
+        if token in host:
+            return name
+    return host.removeprefix("www.")
+
+
+def distributor_part_number_from_url(url: str) -> str:
+    """The distributor's own part number embedded in a product url, or "".
+
+    Extends `distributor_mpn_from_url` (Mouser/DigiKey only, by design -- those are the two
+    Akamai-guarded sites with an official API) to LCSC, whose C-number is the key the
+    easyeda2kicad conversion needs. Returns "" for anything unrecognised, including a search
+    page: an empty part number is honest, and a guessed one is a wrong part.
+    """
+    u = (url or "").strip()
+    if not u:
+        return ""
+    known = distributor_mpn_from_url(u)
+    if known is not None:
+        return known[1]
+    try:
+        parsed = urlparse(u)
+    except ValueError:
+        return ""
+    host = (parsed.hostname or "").lower()
+    if "lcsc." not in host:
+        return ""
+    for segment in reversed([s for s in parsed.path.split("/") if s]):
+        m = _LCSC_IN_PATH.search(unquote(segment))
+        if m:
+            return m.group(1).upper()
+    return ""
