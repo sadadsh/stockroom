@@ -133,23 +133,55 @@ _KIND_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     # (label, substrings that identify it). First match wins, so the order is the priority.
     ("fix", ("fix", "stop ", "repair", "defect", "instead of", "no longer", "follow the reference")),
     ("tool", ("gate", "script", "harness", "shot", "tooling", "waitable", "detach")),
-    ("record", ("record ", "log ", "document")),
     ("build", ()),
 )
 
+# The LEADING VERB wins over anything later in the sentence. Without this, "Record the cold-eyes
+# review findings and their FIXES" read as a fix, and "Record the index schema work and REPAIR an
+# evidence string" read as a fix -- both are notes. A verb at the start states what the commit IS;
+# a word in the middle only says what it is about.
+_LEADING_VERBS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("revert", ("revert",)),
+    ("record", ("record", "log", "document", "note")),
+)
 
-def _commit_kind(subject: str) -> str:
+
+def _commit_kind(subject: str, code_files: int, data_files: int) -> str:
     """What KIND of work a commit was, so the feed can show that most of a session is not steps.
 
     A heuristic over the subject line, and labelled as one: it decides a LABEL on a feed, never a
     number anyone relies on. Getting it wrong mis-tints one row and misleads nobody about progress,
     which is why a rough rule is acceptable here and would not be inside `overall()`.
+
+    `data` is decided by PATHS, not by words: a commit touching only the library or the built
+    bundle is imported records or a build artifact, not engineering, and calling it a build made
+    the biggest numbers on the page belong to the least work.
     """
+    if data_files and not code_files:
+        return "data"
+    first = subject.strip().split(" ", 1)[0].lower().rstrip(":")
+    for label, verbs in _LEADING_VERBS:
+        if first in verbs:
+            return label
     low = subject.lower()
     for label, needles in _KIND_RULES:
         if any(n in low for n in needles):
             return label
     return "build"
+
+
+# Paths whose churn is not engineering effort: the part records and their raw evidence are IMPORTED
+# DATA, and `frontend-dist` is a build artifact committed because the backend serves it. Counting
+# either as work put "+210270 / 474 files" next to a records import and "+511" next to a real
+# feature, which reads as the exact opposite of the truth.
+# How many changes stay open before the rest fold away.
+FEED_OPEN = 8
+
+_DATA_PREFIXES = ("libraries/", "app/frontend-dist/", "docs/progress/")
+
+
+def _is_data_path(path: str) -> bool:
+    return path.startswith(_DATA_PREFIXES)
 
 
 def activity(limit: int = 40) -> list[dict]:
@@ -164,33 +196,44 @@ def activity(limit: int = 40) -> list[dict]:
     fmt = sep.join(["%H", "%h", "%cI", "%s"])
     try:
         out = subprocess.run(
-            ["git", "log", f"-{limit}", f"--format={fmt}", "--shortstat"],
+            ["git", "log", f"-{limit}", f"--format={fmt}", "--numstat"],
             cwd=ROOT, capture_output=True, text=True, timeout=20, check=True,
         ).stdout
     except Exception:  # noqa: BLE001 - a feed must never take the page down
         return []
     rows: list[dict] = []
     current: dict | None = None
+
+    def close(row: dict | None) -> None:
+        if row is None:
+            return
+        row["kind"] = _commit_kind(row["subject"], row["files"], row["data_files"])
+        rows.append(row)
+
     for line in out.splitlines():
         if sep in line:
-            if current:
-                rows.append(current)
+            close(current)
             full, short, when, subject = line.split(sep, 3)
             current = {
                 "sha": short, "full": full, "when": when, "subject": subject,
-                "kind": _commit_kind(subject), "files": 0, "ins": 0, "dels": 0,
+                "kind": "build", "files": 0, "ins": 0, "dels": 0, "data_files": 0,
             }
         elif current and line.strip():
-            # " 7 files changed, 120 insertions(+), 3 deletions(-)"
-            for count, noun in re.findall(r"(\d+) (files? changed|insertions?|deletions?)", line):
-                if noun.startswith("file"):
-                    current["files"] = int(count)
-                elif noun.startswith("insertion"):
-                    current["ins"] = int(count)
-                else:
-                    current["dels"] = int(count)
-    if current:
-        rows.append(current)
+            # `--numstat`: "<added>\t<deleted>\t<path>", with "-" for a binary file. Per-PATH, so
+            # the churn shown can EXCLUDE data. `--shortstat` gave only a total, which is why the
+            # first version put "+210270" beside a records import and made the biggest number on
+            # the page belong to the least engineering.
+            parts = line.split("\t")
+            if len(parts) != 3:
+                continue
+            added, deleted, path = parts
+            if _is_data_path(path):
+                current["data_files"] += 1
+                continue
+            current["files"] += 1
+            current["ins"] += int(added) if added.isdigit() else 0
+            current["dels"] += int(deleted) if deleted.isdigit() else 0
+    close(current)
     return rows
 
 
@@ -261,13 +304,21 @@ def render_html(plan: dict) -> str:
             'defects, hardening gates and building tools, and this is where that shows.</p>',
             '<ol class="acts">',
         ]
-        for row in feed:
+        def row_html(row: dict) -> str:
             when = row["when"][:16].replace("T", " ")
-            churn = (
-                f'{row["files"]} file{"" if row["files"] == 1 else "s"} '
-                f'+{row["ins"]}/-{row["dels"]}'
-            ) if row["files"] else ""
-            p.append(
+            if row["kind"] == "data":
+                # For a records commit the meaningful size is how many RECORDS moved, not code
+                # churn -- which is zero by definition here.
+                n = row["data_files"]
+                churn = f'{n} record{"" if n == 1 else "s"}' if n else ""
+            elif row["files"]:
+                churn = (
+                    f'{row["files"]} file{"" if row["files"] == 1 else "s"} '
+                    f'+{row["ins"]}/-{row["dels"]}'
+                )
+            else:
+                churn = ""
+            return (
                 f'<li class="act k-{row["kind"]}">'
                 f'<span class="akind">{e(row["kind"])}</span>'
                 f'<span class="asub">{e(row["subject"])}</span>'
@@ -275,7 +326,21 @@ def render_html(plan: dict) -> str:
                 + (f'<span class="achurn">{e(churn)}</span>' if churn else "")
                 + f'<time>{e(when)}</time></span></li>'
             )
-        p += ["</ol>", "</section>"]
+
+        # The most recent OPEN, the rest one click away. The whole feed inline pushed the plan --
+        # the thing this page is named for -- below forty rows, so answering "is anything moving"
+        # cost you the answer to "how far along is it".
+        head, tail = feed[:FEED_OPEN], feed[FEED_OPEN:]
+        p += [row_html(r) for r in head]
+        p.append("</ol>")
+        if tail:
+            p.append(
+                f'<details class="more"><summary>{len(tail)} earlier '
+                f'{"change" if len(tail) == 1 else "changes"}</summary><ol class="acts">'
+            )
+            p += [row_html(r) for r in tail]
+            p.append("</ol></details>")
+        p.append("</section>")
 
     p.append('<details class="reqs"><summary>The owner\'s five requirements, verbatim</summary><ol>')
     for r in plan["owner_requirements"]:
@@ -439,6 +504,18 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
   .act{grid-template-columns:56px 1fr;grid-template-areas:"k s" ". m"}
   .akind{grid-area:k}.asub{grid-area:s}.ameta{grid-area:m;margin-top:2px}
 }
+
+.k-data .akind{background:rgba(150,120,200,.16);color:#a98fd6}
+.k-revert .akind{background:rgba(200,90,90,.16);color:#d08a8a}
+.more{margin-top:6px}
+.more summary{cursor:pointer;font-size:12px;color:var(--dim);padding:6px 0;list-style:none}
+.more summary::-webkit-details-marker{display:none}
+/* An explicit affordance: the default marker is suppressed by the reset, so without this the
+   toggle rendered as plain grey text and read as a caption rather than a control. */
+.more summary::before{content:"\25B8";display:inline-block;margin-right:6px;transition:transform .12s}
+.more[open] summary::before{transform:rotate(90deg)}
+.more summary:hover{color:var(--fg)}
+.more .acts{margin-top:2px}
 </style>"""
 
 
