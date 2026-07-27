@@ -191,3 +191,26 @@ def test_default_requester_raises_plain_enricherror_on_transport_failure(monkeyp
     with pytest.raises(EnrichError) as exc_info:
         _default_requester("key")("X")
     assert exc_info.value.status_code is None
+
+
+def test_lookup_by_mouser_stock_number_picks_that_row_at_full_confidence():
+    """The endpoint is `search/partnumber` with `mouserPartNumber`, so a Mouser STOCK NUMBER
+    is a first-class query - and the owner's Component Register names parts that way for 164
+    of its 169 orderable line items. Matching only ManufacturerPartNumber made every such
+    lookup a non-match: the adapter fell back to parts[0], which is a DIFFERENT part, and
+    stamped it `low` instead of flagging it. Wrong part, quietly."""
+    body = json.loads((FIX / "mouser_partnumber.json").read_text())
+    a = MouserAdapter(api_key="k", requester=lambda mpn: body)
+    r = a.lookup("595-TPS62130RGTR")
+    assert r.mpn.value == "TPS62130RGTR"
+    assert r.mpn.confidence == "high"
+    assert r.dist_pns["mouser"] == "595-TPS62130RGTR"
+
+
+def test_a_genuine_non_match_is_still_downgraded():
+    """The guard above must not become a rubber stamp: a query matching NEITHER the
+    manufacturer part nor the stock number still falls back and still says `low`."""
+    body = json.loads((FIX / "mouser_partnumber.json").read_text())
+    a = MouserAdapter(api_key="k", requester=lambda mpn: body)
+    r = a.lookup("SOMETHING-ELSE")
+    assert r.mpn.confidence == "low"

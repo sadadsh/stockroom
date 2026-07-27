@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
+from stockroom.api.errors import ApiError
 from stockroom.enrich.pipeline import EnrichmentPipeline
 from stockroom.enrich.schema import SOURCED_FIELDS, EnrichmentResult, Sourced
 
@@ -107,6 +108,20 @@ def _report_dto(report) -> dict:
     }
 
 
+def _import_report_dto(report) -> dict:
+    """Every row, plus the counts. The rows are the point: a summary alone ("143 added") leaves
+    the owner with no way to see WHICH 26 did not, which is the half that needs their attention."""
+    return {
+        "counts": report.counts(),
+        "items": [
+            {"query": i.query, "mpn": i.mpn, "part_id": i.part_id, "status": i.status,
+             "display_name": i.display_name, "category": i.category,
+             "missing": list(i.missing), "error": i.error, "resolved_by": i.resolved_by}
+            for i in report.items
+        ],
+    }
+
+
 def enrich_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/enrich", dependencies=[Depends(require_token)])
 
@@ -141,6 +156,63 @@ def enrich_router(require_token) -> APIRouter:
         def work(progress):
             pipeline = _make_pipeline(ctx)
             return _result_dto(pipeline.extract_from_url(url, progress=progress))
+
+        return {"job_id": ctx.jobs.submit(work)}
+
+    @r.post("/bulk-import")
+    def bulk_import_route(request: Request, body: dict) -> dict:
+        """Import a pasted list of part numbers (or a BOM CSV) into the library.
+
+        A background job, because 169 parts is minutes of network work, and the SSE stream
+        names the part it is on: a bar with no part name cannot be told from a hang.
+
+        Runs on the READ lane and pushes each individual add onto the WRITE lane
+        (`jobs.run_write`), exactly as the rescan does - so every commit stays serialized
+        against every other writer while the slow network work never occupies the single write
+        worker. `dry_run` reports what WOULD land and writes nothing, so an import into the
+        owner's real git-backed library is previewable before it commits.
+        """
+        from stockroom.enrich.bulk import bulk_import, parse_bom_csv, parse_mpn_list
+
+        ctx = request.app.state.ctx
+        text = str(body.get("text", ""))
+        queries = list(body.get("part_numbers") or [])
+        if not queries and text:
+            queries = parse_bom_csv(text) if body.get("format") == "csv" else parse_mpn_list(text)
+        if not queries:
+            raise ApiError(422, "no part numbers to import")
+        dry_run = bool(body.get("dry_run"))
+        category = str(body.get("category") or "Other")
+
+        class _WriteLaneOps:
+            """add_part on the serialized write lane. The mutation is unchanged - the same
+            complete-to-add gate, the same single git Transaction - only its thread differs."""
+
+            @staticmethod
+            def add_part(staged):
+                return ctx.jobs.run_write(lambda: ctx.ops.add_part(staged))
+
+        def work(progress):
+            pipeline = _make_pipeline(ctx)
+
+            def on_progress(done: int, total: int, query: str) -> None:
+                if progress is None:
+                    return
+                progress({
+                    "stage": "importing",
+                    "pct": (done / total) if total else 1.0,
+                    "done": done, "total": total, "query": query,
+                    "message": f"importing {query} ({done + 1} of {total})",
+                })
+
+            report = bulk_import(
+                queries, pipeline, _WriteLaneOps(), index=ctx.index,
+                category=category, dry_run=dry_run, on_progress=on_progress,
+            )
+            if not dry_run and report.of("added"):
+                ctx.jobs.run_write(ctx.rebuild_index)
+                ctx.jobs.run_write(ctx.auto_push)
+            return _import_report_dto(report)
 
         return {"job_id": ctx.jobs.submit(work)}
 

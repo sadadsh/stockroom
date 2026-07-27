@@ -249,3 +249,85 @@ def test_enrich_dto_carries_every_canonical_field_and_the_field_conflicts(client
         {"value": "A", "source": "mouser", "confidence": "high"},
         {"value": "B", "source": "digikey", "confidence": "high"},
     ]
+
+
+def _fake_bulk_pipeline(datasheet):
+    """A pipeline that resolves one stock number and fills a candidate to completeness."""
+    from stockroom.enrich.pipeline import ResolvedQuery
+    from stockroom.model.part import Purchase
+
+    class _P:
+        def resolve_to_mpn(self, query):
+            if query == "595-TPS62130RGTR":
+                return ResolvedQuery(mpn="TPS62130RGTR", query=query,
+                                     vendor="mouser", resolved=True)
+            return ResolvedQuery(mpn=query, query=query)
+
+        def enrich_candidate(self, candidate, overwrite=None):
+            if candidate.mpn == "NOTHING":
+                return candidate  # stays incomplete
+            candidate.manufacturer = "Texas Instruments"
+            candidate.description = "3A step-down converter"
+            candidate.category = "ICs"
+            candidate.datasheet_path = datasheet
+            candidate.purchase = [Purchase(vendor="mouser", url="https://mouser/x")]
+            return candidate
+
+    return _P()
+
+
+def test_bulk_import_adds_the_complete_parts_and_reports_the_rest(client, monkeypatch, tmp_path):
+    """End to end through the real route, the real bulk_import and the real add_part gate:
+    a stock number resolves, lands as a part, and an unresolvable one is REPORTED, not forced."""
+    ds = tmp_path / "d.pdf"
+    ds.write_bytes(b"%PDF-1.4\n")
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline",
+                        lambda ctx: _fake_bulk_pipeline(ds))
+
+    r = client.post("/api/enrich/bulk-import",
+                    json={"part_numbers": ["595-TPS62130RGTR", "NOTHING"]})
+    assert r.status_code == 200
+    out = _drain_job(client, r.json()["job_id"])
+    assert out["status"] == "done", out
+    result = out["result"]
+    assert result["counts"] == {"added": 1, "incomplete": 1}
+    added = [i for i in result["items"] if i["status"] == "added"][0]
+    assert added["query"] == "595-TPS62130RGTR"
+    assert added["mpn"] == "TPS62130RGTR"
+    assert added["resolved_by"] == "mouser"
+    assert added["part_id"]
+    incomplete = [i for i in result["items"] if i["status"] == "incomplete"][0]
+    assert incomplete["missing"], "an incomplete part must say which fields it lacks"
+    # the part is really in the library, not just claimed in a report
+    assert client.get(f"/api/library/parts/{added['part_id']}").status_code == 200
+    assert "importing" in out["stages"]
+
+
+def test_bulk_import_dry_run_writes_nothing(client, monkeypatch, tmp_path):
+    ds = tmp_path / "d.pdf"
+    ds.write_bytes(b"%PDF-1.4\n")
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline",
+                        lambda ctx: _fake_bulk_pipeline(ds))
+    before = client.get("/api/library/parts").json()
+
+    r = client.post("/api/enrich/bulk-import",
+                    json={"part_numbers": ["595-TPS62130RGTR"], "dry_run": True})
+    out = _drain_job(client, r.json()["job_id"])
+    assert out["result"]["counts"] == {"would-add": 1}
+    assert client.get("/api/library/parts").json() == before
+
+
+def test_bulk_import_reads_a_pasted_bom_csv(client, monkeypatch, tmp_path):
+    ds = tmp_path / "d.pdf"
+    ds.write_bytes(b"%PDF-1.4\n")
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline",
+                        lambda ctx: _fake_bulk_pipeline(ds))
+    csv = "Ref,MPN,Qty\nU1,595-TPS62130RGTR,3\n"
+    r = client.post("/api/enrich/bulk-import", json={"text": csv, "format": "csv"})
+    out = _drain_job(client, r.json()["job_id"])
+    assert out["result"]["counts"] == {"added": 1}
+
+
+def test_bulk_import_refuses_an_empty_list(client):
+    r = client.post("/api/enrich/bulk-import", json={"part_numbers": []})
+    assert r.status_code == 422

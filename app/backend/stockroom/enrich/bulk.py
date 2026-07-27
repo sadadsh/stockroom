@@ -112,24 +112,125 @@ def bulk_enrich(mpns, pipeline, category: str = "Other", candidate_factory=None)
 
 
 def _missing_for(candidate: StagingCandidate) -> list[str]:
-    """Evaluate the M2 completeness gate on the enriched candidate WITHOUT
-    requiring it to project to a StagedPart (a bare-MPN candidate has no symbol,
-    which to_staged_part would reject); build the presence view directly from the
-    candidate so we can report incomplete parts rather than crash on them."""
-    from stockroom.mutation.library_ops import StagedPart
+    """The M2 completeness gate, evaluated on exactly the StagedPart the add would use.
 
-    staged = StagedPart(
-        display_name=candidate.display_name,
-        category=candidate.category,
-        mpn=candidate.mpn,
-        manufacturer=candidate.manufacturer,
-        description=candidate.description,
-        symbol_source=candidate.symbol_lib_path,
-        symbol_source_name=candidate.symbol_name,
-        entry_name=candidate.entry_name,
-        footprint_source=candidate.chosen_footprint,
-        model_source=candidate.model_path,
-        datasheet_source=candidate.datasheet_path,
-        purchase=list(candidate.purchase),
+    This used to hand-build a StagedPart from the candidate's fields, on the belief that
+    `to_staged_part` would reject an asset-less candidate. It does not - staging.py:65 says a
+    candidate may stage with no asset files at all. The hand-built copy dropped
+    `datasheet_meta`, so a part whose datasheet is a known URL rather than a downloaded PDF was
+    reported missing a datasheet here while `add_part` would have accepted it: the two halves of
+    one gate disagreeing, which is the exact failure staged_missing_fields exists to prevent."""
+    return staged_missing_fields(candidate.to_staged_part())
+
+
+@dataclass
+class ImportItem:
+    """One query's outcome. `query` is what the user supplied and `mpn` what it resolved to;
+    keeping both is what lets a report say "595-TPS62130RGTR -> TPS62130RGTR" instead of
+    silently substituting one for the other."""
+
+    query: str
+    mpn: str = ""
+    part_id: str = ""
+    status: str = ""          # added | would-add | exists | duplicate | incomplete | error
+    display_name: str = ""
+    category: str = ""
+    missing: list[str] = field(default_factory=list)
+    error: str = ""
+    resolved_by: str = ""     # which distributor recognised the stock number, if any
+
+
+@dataclass
+class ImportReport:
+    items: list[ImportItem] = field(default_factory=list)
+
+    def of(self, *statuses: str) -> list[ImportItem]:
+        return [i for i in self.items if i.status in statuses]
+
+    def counts(self) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for i in self.items:
+            out[i.status] = out.get(i.status, 0) + 1
+        return out
+
+
+def _candidate_for(mpn: str, category: str) -> StagingCandidate:
+    return StagingCandidate(
+        vendor="bulk",
+        symbol_lib_path=None,
+        symbol_name="",
+        footprint_variants=[],
+        category=category,
+        mpn=mpn,
+        display_name=mpn,
+        entry_name=mpn,
     )
-    return staged_missing_fields(staged)
+
+
+def bulk_import(queries, pipeline, ops, *, index, category: str = "Other",
+                dry_run: bool = False, on_progress=None) -> ImportReport:
+    """Import a list of part numbers into the library, one atomic add each.
+
+    Each query is RESOLVED to a manufacturer part number first (a distributor stock number is
+    meaningless to every source but the distributor that issued it), then enriched, then added
+    through the ordinary `add_part` seam so the complete-to-add gate and the git transaction are
+    exactly the ones a single add uses. Nothing here bypasses a gate.
+
+    Nothing aborts the batch: an enrichment that raises, an add that fails and a part that never
+    reaches completeness are all ROWS in the report, so a 169-part run always finishes and always
+    says what happened to every line.
+    """
+    report = ImportReport()
+    seen_queries: set[str] = set()
+    added_mpns: set[str] = set()
+    todo = [q.strip() for q in queries if q and q.strip()]
+    total = len(todo)
+
+    for done, query in enumerate(todo):
+        if on_progress is not None:
+            on_progress(done, total, query)
+        if query in seen_queries:
+            report.items.append(ImportItem(query=query, status="duplicate"))
+            continue
+        seen_queries.add(query)
+        item = ImportItem(query=query)
+        report.items.append(item)
+        try:
+            resolved = pipeline.resolve_to_mpn(query)
+            item.mpn = resolved.mpn
+            item.resolved_by = resolved.vendor
+            # Check the library BEFORE enriching: a re-run over a list that is already imported
+            # must cost no network at all, or "run it again to catch the stragglers" is a
+            # full-price operation every time.
+            existing = index.find_by_mpn(item.mpn)
+            if existing:
+                item.status = "exists"
+                item.part_id = existing[0].id
+                continue
+            if item.mpn in added_mpns:
+                # Two different queries can name one device (a Mouser SKU and a DigiKey number).
+                # The index cannot know: it is rebuilt after the run, not during it.
+                item.status = "duplicate"
+                continue
+            candidate = _candidate_for(item.mpn, category)
+            pipeline.enrich_candidate(candidate)
+            item.category = candidate.category
+            item.display_name = candidate.display_name
+            missing = _missing_for(candidate)
+            if missing:
+                item.status = "incomplete"
+                item.missing = missing
+                continue
+            if dry_run:
+                item.status = "would-add"
+                added_mpns.add(item.mpn)
+                continue
+            record = ops.add_part(candidate.to_staged_part())
+            item.status = "added"
+            item.part_id = getattr(record, "id", "")
+            item.display_name = getattr(record, "display_name", "") or item.display_name
+            added_mpns.add(item.mpn)
+        except Exception as exc:  # noqa: BLE001 - one bad part never aborts the batch
+            item.status = "error"
+            item.error = str(exc)
+    return report
