@@ -21,7 +21,7 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../api/client";
-import type { Requirement, StagingCandidate } from "../api/types";
+import type { CadSourceResponse, Requirement, StagingCandidate } from "../api/types";
 import { streamEvents } from "./sse";
 
 export type { Requirement };
@@ -113,7 +113,9 @@ function hostOpenCadDownload():
 
 export interface CaptureApi {
   active: CaptureState;
-  start: (partId: string, partName: string, needs: Requirement[]) => Promise<void>;
+  // `sourceKey` picks WHICH vendor page to open ("ultralibrarian", "samacsys", ...). Omitted
+  // means the first source the backend returns, which is its trust order's head.
+  start: (partId: string, partName: string, needs: Requirement[], sourceKey?: string) => Promise<void>;
   submitPaths: (partId: string, partName: string, needs: Requirement[], paths: string[]) => Promise<void>;
   reset: () => void;
   keepWorking: () => void;
@@ -346,7 +348,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
   }, [onCapture]);
 
   const start = useCallback(
-    async (partId: string, partName: string, needs: Requirement[]) => {
+    async (partId: string, partName: string, needs: Requirement[], sourceKey?: string) => {
       clearWatchdog();
       clearHandler();
       partIdRef.current = partId;
@@ -361,19 +363,26 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         status: "resolving",
         message: "Looking up the download page...",
       });
-      let source: { url: string | null; vendor: string; needs: Requirement[] };
+      let source: CadSourceResponse;
       try {
         source = await api.partCadSource(partId);
       } catch (err) {
         setState((s) => ({ ...s, status: "error", message: errMsg(err, "Could not resolve a CAD source.") }));
         return;
       }
-      if (!source.url) {
+      // The CHOSEN vendor, or the head of the backend's trust order. A key that resolves to
+      // nothing falls back to the head rather than opening nowhere -- the list the caller picked
+      // from came from this same endpoint, so a miss means the part changed under them.
+      const picked =
+        (sourceKey ? source.sources.find((v) => v.key === sourceKey) : undefined) ??
+        source.sources[0];
+      if (!picked?.url) {
         setState((s) => ({ ...s, status: "unavailable", message: "No CAD source page for this part." }));
         return;
       }
-      setState((s) => ({ ...s, url: source.url, vendor: source.vendor, received: {} }));
+      setState((s) => ({ ...s, url: picked.url, vendor: picked.label, received: {} }));
       const open = hostOpenCadDownload();
+      const url = picked.url;
       if (!open) {
         armCapture(onCaptureRef.current);
         setState((s) => ({
@@ -384,7 +393,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        const returned = await open(source.url, needsRef.current, partName);
+        const returned = await open(url, needsRef.current, partName);
         tokenRef.current = typeof returned === "string" && returned ? returned : null;
       } catch {
         // best-effort; the host may not echo a token, and the widened watch still fires.

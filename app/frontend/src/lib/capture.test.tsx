@@ -9,12 +9,30 @@ function wrap(qc: QueryClient) {
     createElement(QueryClientProvider, { client: qc }, createElement(CaptureProvider, null, children));
 }
 
+function _cadSources(url: string | null) {
+  // The real DTO shape: a list in the backend's trust order, plus the flattened head. A mock that
+  // still returned only `url`/`vendor` would pass while the code reads `sources`.
+  return url === null
+    ? []
+    : [
+        {
+          key: "ultralibrarian",
+          label: "Ultra Librarian",
+          url,
+          tools: ["kicad", "altium"],
+          aggregator: false,
+          instruction: "Pick the part, choose KiCad and Altium, then Download.",
+        },
+      ];
+}
+
 function mockSource(url: string | null = "https://app.ultralibrarian.com/x") {
   vi.spyOn(api, "partCadSource").mockResolvedValue({
     url,
     mpn: "M",
-    vendor: "UltraLibrarian",
+    vendor: "Ultra Librarian",
     needs: [],
+    sources: _cadSources(url),
   } as never);
 }
 

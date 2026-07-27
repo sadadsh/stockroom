@@ -271,6 +271,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "complete.root", label: "Complete Part dialog", area: "complete" },
   { id: "complete.header", label: "Complete Part header", area: "complete" },
   { id: "complete.cad", label: "CAD Files capture block", area: "complete" },
+  { id: "complete.cad-vendor", label: "Guided capture vendor choice", area: "complete" },
   { id: "complete.cad-checklist", label: "CAD capture checklist", area: "complete" },
   { id: "complete.cad-actions", label: "Get CAD Files buttons", area: "complete" },
   { id: "complete.requirements", label: "Requirements list", area: "complete" },

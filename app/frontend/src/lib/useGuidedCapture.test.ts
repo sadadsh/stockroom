@@ -70,12 +70,30 @@ function mockHost(returnToken: string | undefined = "tok") {
 }
 
 // partCadSource still resolves the URL; needs are now passed into the hook by the caller.
+function _cadSources(url: string | null) {
+  // The real DTO shape: a list in the backend's trust order, plus the flattened head. A mock that
+  // still returned only `url`/`vendor` would pass while the code reads `sources`.
+  return url === null
+    ? []
+    : [
+        {
+          key: "ultralibrarian",
+          label: "Ultra Librarian",
+          url,
+          tools: ["kicad", "altium"],
+          aggregator: false,
+          instruction: "Pick the part, choose KiCad and Altium, then Download.",
+        },
+      ];
+}
+
 function mockCadSourceUrl(url: string | null = UL_URL) {
   vi.spyOn(api, "partCadSource").mockResolvedValue({
     url,
     mpn: "BQ24074",
-    vendor: "UltraLibrarian",
+    vendor: "Ultra Librarian",
     needs: [],
+    sources: _cadSources(url),
   } as never);
 }
 
