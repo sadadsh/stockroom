@@ -9,6 +9,8 @@ the complete-to-add gate; the missed fields are simply left for manual fill
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
 
@@ -198,6 +200,36 @@ def _drop_thin_description(result: EnrichmentResult) -> None:
     line; this catches ANY shell that slips past a specific marker, for any anti-bot vendor."""
     if result.description is not None and not _is_substantive(result):
         result.description = None
+
+
+@dataclass
+class ResolvedQuery:
+    """What a user-supplied part number turned out to be. `resolved` distinguishes "a
+    distributor confirmed this stock number" from "nothing was looked up, so the query is
+    being used as-is" - two very different states that a bare string would flatten."""
+
+    mpn: str
+    query: str = ""
+    vendor: str = ""
+    product_url: str = ""
+    resolved: bool = False
+
+
+# A Mouser stock number is a 2-4 digit line prefix, a hyphen, then the manufacturer part
+# ("595-TPD6E05U06RVZR", "81-GRM155R71C104KA88"). A DigiKey part number ends in one of its
+# packaging suffixes. Deliberately narrow: a manufacturer part that merely CONTAINS a hyphen
+# ("1N5819HW-7-F", "MCP4728-E/UN") must NOT be mistaken for a stock number, or a perfectly
+# good MPN would be sent on a pointless lookup and reported unresolved.
+_MOUSER_SKU_RE = re.compile(r"^\d{2,4}-[A-Za-z0-9][A-Za-z0-9./+_-]*$")
+_DIGIKEY_PN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9./+_-]*-(?:ND|CT-ND|TR-ND|DKR-ND)$")
+
+
+def _looks_like_stock_number(query: str, vendor: str) -> bool:
+    if vendor == "digikey":
+        return bool(_DIGIKEY_PN_RE.match(query))
+    # A DigiKey number can also carry a numeric prefix ("296-11601-1-ND"), so the DigiKey
+    # shape is checked FIRST and wins; otherwise Mouser would claim it and miss.
+    return bool(_MOUSER_SKU_RE.match(query)) and not _DIGIKEY_PN_RE.match(query)
 
 
 def _default_url_for(mpn: str, category: str) -> str:
@@ -650,6 +682,44 @@ class EnrichmentPipeline:
             self.url_cache.put(url, _result_to_cache(result))
         return result
 
+    def resolve_to_mpn(self, query: str) -> ResolvedQuery:
+        """Turn a DISTRIBUTOR STOCK NUMBER into the manufacturer part number before anything
+        else runs.
+
+        A sourcing document names parts the way its distributor does - the owner's Component
+        Register carries a Mouser stock number for 164 of its 169 orderable line items - and
+        every other leg of the registry (the passive fast path, LCSC, the scrape, the datasheet
+        follow) can only match a MANUFACTURER part. Measured on the real APIs: enriching
+        `595-TPD6E05U06RVZR` directly yielded 37 specs, no datasheet and an LCSC *search* URL as
+        its purchase link (incomplete); resolving it to `TPD6E05U06RVZR` first yielded 91 specs,
+        a fetched datasheet PDF and a real product page - a complete part.
+
+        A query that is not a stock number costs NO call: it is already an MPN.
+        """
+        q = (query or "").strip()
+        if not q:
+            return ResolvedQuery(mpn="", query=q)
+        for vendor, adapter in (("mouser", self.mouser), ("digikey", self.digikey)):
+            if not _looks_like_stock_number(q, vendor):
+                continue
+            if adapter is None or not getattr(adapter, "enabled", False):
+                continue
+            self.mouser_limiter.acquire()
+            result = adapter.lookup(q)
+            if result.mpn is None or not str(result.mpn.value).strip():
+                continue
+            return ResolvedQuery(
+                mpn=str(result.mpn.value).strip(),
+                query=q,
+                vendor=vendor,
+                product_url=str(result.product_url.value) if result.product_url else "",
+                resolved=True,
+            )
+        # Not resolvable (or not a stock number at all): the query stands as the MPN, and
+        # `resolved` says which of those two it was, so a caller can report the difference
+        # instead of guessing why a part came back thin.
+        return ResolvedQuery(mpn=q, query=q)
+
     def enrich_candidate(self, candidate: StagingCandidate,
                          overwrite: set[str] | None = None) -> StagingCandidate:
         overwrite = overwrite or set()
@@ -663,6 +733,15 @@ class EnrichmentPipeline:
             # blank fields stay blank rather than firing a junk empty-query search.
             return candidate
         result = self.enrich(mpn, candidate.category)
+
+        # The category the distributors' own taxonomy implies. `fill_category` derives it onto
+        # the RESULT, the enrich route serialises it, and the frontend applies it - so the Add
+        # form has always filed parts correctly while this seam silently did not. Any headless
+        # caller therefore filed every part under "Other". "Other" is the form's default, i.e.
+        # unfiled; a real category is a decision someone made and is never overwritten.
+        if result.category and result.category != "Other":
+            if not candidate.category or candidate.category == "Other" or "category" in overwrite:
+                candidate.category = result.category
 
         for field_name, attr in _CANDIDATE_FIELDS.items():
             sourced = getattr(result, field_name)

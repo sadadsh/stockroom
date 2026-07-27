@@ -202,8 +202,15 @@ class MouserAdapter:
             self.last_status = "not_found"
             return EnrichmentResult()
         target = normalize_mpn(mpn)
+        # The query may be a MANUFACTURER part number or a MOUSER STOCK NUMBER - the endpoint
+        # accepts both (`mouserPartNumber`, options "Exact"), and a sourcing document written
+        # against Mouser names parts the second way. Checking only the manufacturer field made
+        # every stock-number query a non-match, so the adapter silently fell through to
+        # parts[0]: a DIFFERENT part, returned as the answer with a `low` label nobody reads.
         exact = next(
-            (p for p in parts if normalize_mpn(p.get("ManufacturerPartNumber") or "") == target),
+            (p for p in parts
+             if target in {normalize_mpn(p.get("ManufacturerPartNumber") or ""),
+                           normalize_mpn(p.get("MouserPartNumber") or "")}),
             None,
         )
         chosen = exact if exact is not None else parts[0]
