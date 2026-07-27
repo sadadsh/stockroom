@@ -1,0 +1,543 @@
+<!--
+Ultra Librarian's REAL export panel, captured 2026-07-27 from app.ultralibrarian.com for
+TPD6E05U06RVZR (a part in the owner's library), signed in, via scripts/vendorprobe.py.
+
+It exists so the guided-capture driver is tested against the vendor's ACTUAL markup instead
+of against selectors we guessed. Before this, drivers.py carried first-guess selectors
+(`[data-ecad='KiCad']`, `button.download`) that match NOTHING on this page, and the tests
+asserted only that those guesses appeared in the generated string - which they always did.
+
+Captured verbatim except the __RequestVerificationToken value, scrubbed (per-session CSRF).
+No account details appear in it; it was scanned for e-mail addresses and bearer tokens.
+-->
+<form id="export-submission-form" action="/Export/QueueExport" method="post" novalidate="novalidate">
+        <input type="hidden" id="PartUniqueId" name="PartUniqueId" value="16996ed8-103f-11e9-ab3a-0a3560a4cccc">
+        <input type="hidden" id="BxlToken" name="BxlToken" value="">
+        <input type="hidden" id="AdvertiserReferrerTag" name="AdvertiserReferrerTag" value="">
+        <input type="hidden" id="AdvertiserTerm" name="AdvertiserTerm" value="">
+        <input type="hidden" id="DistributorUniqueIds" name="DistributorUniqueIds" value="">
+
+        <h2 class="export-title text-center">Select Your CAD Format</h2>
+        <div class="export-selection-listing d-flex justify-content-between">
+            <div class="flex-even p-2 ml-5 mr-5">
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-1">
+            3D CAD Model
+        </a>
+    </div>
+    <div id="ef-1" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="IGES" name="exports" type="checkbox" value="45" class="custom-control-input export-option">
+                    <label for="IGES" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        IGES v5.3
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-3d.svg" title="3D Model Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="MfrThreeDModel" name="exports" type="checkbox" value="37" class="custom-control-input export-option">
+                    <label for="MfrThreeDModel" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        STEP
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-3d.svg" title="3D Model Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="STL" name="exports" type="checkbox" value="57" class="custom-control-input export-option">
+                    <label for="STL" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        STL
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-3d.svg" title="3D Model Available">
+                    </label>
+                </div>
+
+        </div>
+    </div>
+</div>
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-15">
+            Altair
+        </a>
+    </div>
+    <div id="ef-15" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="Pollex" name="exports" type="checkbox" value="43" class="custom-control-input export-option">
+                    <label for="Pollex" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        PollEx
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="SimLab" name="exports" type="checkbox" value="44" class="custom-control-input export-option">
+                    <label for="SimLab" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        SimLab
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-3d.svg" title="3D Model Available">
+                    </label>
+                </div>
+
+        </div>
+    </div>
+</div>
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-2">
+            Altium
+        </a>
+    </div>
+    <div id="ef-2" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="AltiumDesigner" name="exports" type="checkbox" value="0" class="custom-control-input export-option">
+                    <label for="AltiumDesigner" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        Altium Designer (script based)
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="AltiumPCADv14" name="exports" type="checkbox" value="1" class="custom-control-input export-option">
+                    <label for="AltiumPCADv14" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        PCAD v14
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="AltiumPCADV15" name="exports" type="checkbox" value="2" class="custom-control-input export-option">
+                    <label for="AltiumPCADV15" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        PCAD v15
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+
+        </div>
+    </div>
+</div>
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-13">
+            Autodesk
+        </a>
+    </div>
+    <div id="ef-13" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="DXF2D" name="exports" type="checkbox" value="35" class="custom-control-input export-option">
+                    <label for="DXF2D" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        DXF-2D
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="EagleV6" name="exports" type="checkbox" value="11" class="custom-control-input export-option">
+                    <label for="EagleV6" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        Eagle6 Library
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="Eagle" name="exports" type="checkbox" value="39" class="custom-control-input export-option">
+                    <label for="Eagle" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        Fusion360 PCB
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+
+        </div>
+    </div>
+</div>
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-3">
+            Cadence
+        </a>
+    </div>
+    <div id="ef-3" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="CadenceAllegroDesignAuthoring" name="exports" type="checkbox" value="6" class="custom-control-input export-option">
+                    <label for="CadenceAllegroDesignAuthoring" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        Allegro Design Authoring v16+ (Concept HDL)
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="CadenceDEHDL" name="exports" type="checkbox" value="32" class="custom-control-input export-option">
+                    <label for="CadenceDEHDL" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        DEHDL
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="CadenceOrCADCaptureXML" name="exports" type="checkbox" value="8" class="custom-control-input export-option">
+                    <label for="CadenceOrCADCaptureXML" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        OrCAD Capture v17.2
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="CadenceOLB" name="exports" type="checkbox" value="33" class="custom-control-input export-option">
+                    <label for="CadenceOLB" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        OrCAD Capture v17.4+
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="CadenceAllegroV17_2" name="exports" type="checkbox" value="5" class="custom-control-input export-option">
+                    <label for="CadenceAllegroV17_2" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        OrCAD/Allegro PCB Editor v17.2
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="CadenceAllegroPCBFootprint" name="exports" type="checkbox" value="31" class="custom-control-input export-option">
+                    <label for="CadenceAllegroPCBFootprint" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        OrCAD/Allegro PCB Editor v17.4+
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+
+                <div class="card export-group legacy-exports">
+                    <div class="card-header">
+                        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#lef-3">
+                            Previous Formats
+                        </a>
+                    </div>
+                    <div id="lef-3" class="collapse">
+                        <div class="card-body pt-2">
+                                <div class="d-flex custom-control custom-checkbox pb-2">
+                                    <input id="CadenceOrCADCaptureEDF" name="exports" type="checkbox" value="7" class="custom-control-input export-option">
+                                    <label for="CadenceOrCADCaptureEDF" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey" style="">
+                                        OrCAD Capture v9-16.x
+                                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                                    </label>
+                                </div>
+                                <div class="d-flex custom-control custom-checkbox pb-2">
+                                    <input id="CadenceOrCADLayout" name="exports" type="checkbox" value="9" class="custom-control-input export-option">
+                                    <label for="CadenceOrCADLayout" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey" style="">
+                                        OrCAD Layout DOS
+                                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                                    </label>
+                                </div>
+                                <div class="d-flex custom-control custom-checkbox pb-2">
+                                    <input id="CadenceAllegroV15_2" name="exports" type="checkbox" value="3" class="custom-control-input export-option">
+                                    <label for="CadenceAllegroV15_2" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey" style="">
+                                        OrCAD/Allegro PCB Editor v15.2-16
+                                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                                    </label>
+                                </div>
+                                <div class="d-flex custom-control custom-checkbox pb-2">
+                                    <input id="CadenceAllegroV16_6" name="exports" type="checkbox" value="4" class="custom-control-input export-option">
+                                    <label for="CadenceAllegroV16_6" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey" style="">
+                                        OrCAD/Allegro PCB Editor v16.x
+                                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                                    </label>
+                                </div>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-4">
+            DesignSpark
+        </a>
+    </div>
+    <div id="ef-4" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="DesignSpark" name="exports" type="checkbox" value="10" class="custom-control-input export-option">
+                    <label for="DesignSpark" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        DesignSpark
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+
+        </div>
+    </div>
+</div>
+            </div>
+            <div class="flex-even p-2 ml-5 mr-5">
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-6">
+            KiCAD
+        </a>
+    </div>
+    <div id="ef-6" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="KiCAD" name="exports" type="checkbox" value="24" class="custom-control-input export-option">
+                    <label for="KiCAD" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        KiCAD v5
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="KiCADv6" name="exports" type="checkbox" value="42" class="custom-control-input export-option">
+                    <label for="KiCADv6" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        KiCAD v6+
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+
+        </div>
+    </div>
+</div>
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-7">
+            Mentor
+        </a>
+    </div>
+    <div id="ef-7" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="MentorBoardStation" name="exports" type="checkbox" value="12" class="custom-control-input export-option">
+                    <label for="MentorBoardStation" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        Board Station
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="MentorDesignArchitect" name="exports" type="checkbox" value="13" class="custom-control-input export-option">
+                    <label for="MentorDesignArchitect" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        Design Architect
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="MentorPADSv2007" name="exports" type="checkbox" value="16" class="custom-control-input export-option">
+                    <label for="MentorPADSv2007" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        PADS v2007
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="MentorPADSv2009" name="exports" type="checkbox" value="17" class="custom-control-input export-option">
+                    <label for="MentorPADSv2009" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        PADS v2009
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="MentorViewDraw" name="exports" type="checkbox" value="30" class="custom-control-input export-option">
+                    <label for="MentorViewDraw" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        ViewDraw
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="MentorXpeditionDesignCapture" name="exports" type="checkbox" value="18" class="custom-control-input export-option">
+                    <label for="MentorXpeditionDesignCapture" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        Xpedition PCB w/ Design Capture v99+
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="MentroXpeditionDesignerV99" name="exports" type="checkbox" value="19" class="custom-control-input export-option">
+                    <label for="MentroXpeditionDesignerV99" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        Xpedition PCB w/ xDX Designer v99+
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+
+                <div class="card export-group legacy-exports">
+                    <div class="card-header">
+                        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#lef-7">
+                            Previous Formats
+                        </a>
+                    </div>
+                    <div id="lef-7" class="collapse">
+                        <div class="card-body pt-2">
+                                <div class="d-flex custom-control custom-checkbox pb-2">
+                                    <input id="MentorPADSv3" name="exports" type="checkbox" value="14" class="custom-control-input export-option">
+                                    <label for="MentorPADSv3" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey" style="">
+                                        PADS v3
+                                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                                    </label>
+                                </div>
+                                <div class="d-flex custom-control custom-checkbox pb-2">
+                                    <input id="MentorPADSv4" name="exports" type="checkbox" value="15" class="custom-control-input export-option">
+                                    <label for="MentorPADSv4" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey" style="">
+                                        PADS v4
+                                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                                    </label>
+                                </div>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-8">
+            Pulsonix
+        </a>
+    </div>
+    <div id="ef-8" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="Pulsonix" name="exports" type="checkbox" value="20" class="custom-control-input export-option">
+                    <label for="Pulsonix" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        Pulsonix
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+
+        </div>
+    </div>
+</div>
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-9">
+            Quadcept
+        </a>
+    </div>
+    <div id="ef-9" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="Quadcept" name="exports" type="checkbox" value="25" class="custom-control-input export-option">
+                    <label for="Quadcept" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        Quadcept
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+
+        </div>
+    </div>
+</div>
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-12">
+            TARGET 3001!
+        </a>
+    </div>
+    <div id="ef-12" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="TARGET 3001!" name="exports" type="checkbox" value="29" class="custom-control-input export-option">
+                    <label for="TARGET 3001!" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        TARGET 3001!
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+
+        </div>
+    </div>
+</div>
+                    
+<div class="card export-group mb-3">
+    <div class="card-header">
+        <a class="accordion-toggle frut-55-roman collapsed" data-toggle="collapse" data-target="#ef-10">
+            Zuken
+        </a>
+    </div>
+    <div id="ef-10" class="collapse ">
+        <div class="card-body pt-1">
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="ZukenCADSTARv3" name="exports" type="checkbox" value="22" class="custom-control-input export-option">
+                    <label for="ZukenCADSTARv3" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        CADSTAR v3+
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="ZukenCR" name="exports" type="checkbox" value="23" class="custom-control-input export-option">
+                    <label for="ZukenCR" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        CR-5000/CR-8000
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="Zuken-eCadstar" name="exports" type="checkbox" value="38" class="custom-control-input export-option">
+                    <label for="Zuken-eCadstar" class="custom-control-label d-flex align-items-center frut-55-roman export-selection ul-dark-grey flex-grow-1" style="">
+                        eCadstar
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-symbol.svg" title="Symbol Available">
+                            <img class="pl-2" src="https://static.ultralibrarian.com/images/general/availability-footprint.svg" title="Footprint Available">
+                    </label>
+                </div>
+
+        </div>
+    </div>
+</div>
+            </div>
+        </div>  
+            <div class="export-setting-listing d-flex justify-content-between pl-2 pr-2">
+                <div class="flex-even p-2 ml-5 mr-5">
+                        
+<div class="d-flex align-items-center pl-2 pr-2 ul-dark-grey">
+    Symbol Pin Ordering
+    <i class="fa fa-info-circle ul-tooltip" data-placement="top" title="" data-original-title="The pin ordering selection determines how we order the pins on a schematic symbol.  Sequential means the pins are ordered from 1 to n around the body of the part (where n is the number of pins).  Function means we will order the pins by an algorithm that groups pins by function.  For instance, pins A1, A2, � An would all be grouped together, input pins are on the left, output pins are on the right, etc."></i>
+    <div class="flex-grow-1 pl-5">
+        <select name="export_options[0]" class="form-control form-control-sm rounded-0 export-setting-entry" data-val="true" data-val-required="The OptionId field is required." id="OptionId"><option value="1-1">Sequential</option>
+<option value="1-2">Functional</option>
+</select>
+    </div>
+</div>
+                </div>
+                <div class="flex-even p-2 ml-5 mr-5">
+                        
+<div class="d-flex align-items-center pl-2 pr-2 ul-dark-grey">
+    Footprint Units
+    <i class="fa fa-info-circle ul-tooltip" data-placement="top" title="" data-original-title="Changing unit of measurement from English units to Metric units will be reflected in the naming of padstacks."></i>
+    <div class="flex-grow-1 pl-5">
+        <select name="export_options[1]" class="form-control form-control-sm rounded-0 export-setting-entry" id="OptionId"><option value="2-1">English (mil)</option>
+<option value="2-2">Metric (mm)</option>
+</select>
+    </div>
+</div>
+                </div>
+            </div> 
+                    <div class="d-flex col-8 offset-2 justify-content-center custom-control custom-checkbox pb-2">
+                        <input id="consent-TIInfoShare" class="custom-control-input consentRequest required " type="checkbox" name="consent-TIInfoShare" value="14">
+                        <label style="font-size:14px; margin: 0px" class="custom-control-label" for="consent-TIInfoShare">
+                                <span class="required" aria-required="true">*</span>
+                            I agree to the use of my personal information (including but not limited to my name and email) according to <a target="_blank" href="https://www.ti.com/legal/terms-conditions/privacy-policy.html">Texas Instruments� Privacy Policy</a>, and I agree that it may be shared with Texas Instruments and Texas Instruments� affiliates, based globally. I understand that my personal information may be transferred for processing outside my country of residence. Texas Instruments, as well as its authorized affiliates and vendors, may use such information to contact me regarding Texas Instruments� products and services.
+                        </label>
+                    </div>
+                <div class="d-flex justify-content-center mb-2">
+                    <a id="submit-export" class="btn btn-dark export-trigger pl-5 pr-5 pt-2 pb-2 disabled">Download Now</a>
+                </div>
+                <div class="row">
+                    <div class="col-xs-10 col-sm-offset-2 text-center">
+                        <div class="validation-summary-valid" data-valmsg-summary="true"><ul><li style="display:none"></li>
+</ul></div>
+                    </div>
+                </div>
+    <input name="__RequestVerificationToken" type="hidden" value="SCRUBBED"></form>
