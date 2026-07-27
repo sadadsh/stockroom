@@ -42,11 +42,19 @@ _ALTIUM_REQS = frozenset({Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRIN
 
 
 def formats_for(needs) -> list[str]:
-    """The vendor-side formats a set of Requirements implies, KiCad first."""
+    """The vendor-side export categories a set of Requirements implies.
+
+    `model` is its OWN category, not part of `kicad`. Measured on Ultra Librarian 2026-07-27: the
+    STEP model lives behind a separate "3D CAD Model" accordion (`#MfrThreeDModel`), so a capture
+    that only ticked the KiCad box came back with a symbol and a footprint and NO 3D - which is
+    exactly what happened, and the run still reported success.
+    """
     wanted = set(needs or ())
     out: list[str] = []
-    if wanted & _KICAD_REQS:
+    if wanted & {Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT}:
         out.append("kicad")
+    if Requirement.KICAD_MODEL in wanted:
+        out.append("model")
     if wanted & _ALTIUM_REQS:
         out.append("altium")
     return out
@@ -114,17 +122,26 @@ class UltraLibrarianAdapter:
     capability = VendorCapability(
         key="ultralibrarian",
         label="Ultra Librarian",
-        tools=("kicad", "altium"),
+        # NOT "altium", and that is a correction made on evidence rather than a limitation
+        # assumed. Ultra Librarian's Altium export is labelled "Altium Designer (script based)"
+        # and the delivered zip contains `AltiumDesigner/UL_Import.pas` + a `.PrjScr` - a Delphi
+        # script that builds the libraries INSIDE Altium - and no `.SchLib`/`.PcbLib` at all
+        # (inspected on a real download, 2026-07-27). So it cannot satisfy `altium_symbol` /
+        # `altium_footprint` as FILES, and claiming it can made the engine report a success that
+        # attached nothing. Running that script through the existing Altium driver is a real
+        # future capability; until it exists, this says the true thing.
+        tools=("kicad",),
         formats_exclusive=False,
         aggregator=False,
         needs_login=True,
-        instruction="Pick the part, then Download Now. Both formats come in one file.",
-        # measured element ids on the export panel
-        version_pins={"kicad": "KiCADv6", "altium": "AltiumDesigner"},
+        instruction="Pick the part, then Download Now. Symbol, footprint and 3D come together.",
+        # measured element ids on the export panel. `model` is separate from `kicad`: the STEP
+        # sits behind its own "3D CAD Model" accordion and is missed entirely if not ticked.
+        version_pins={"kicad": "KiCADv6", "model": "MfrThreeDModel"},
     )
 
     # The accordion each format hides behind, by its visible text.
-    _ACCORDION = {"kicad": "KiCAD", "altium": "Altium"}
+    _ACCORDION = {"kicad": "KiCAD", "altium": "Altium", "model": "3D CAD Model"}
 
     def resolve_url(self, mpn: str) -> str:
         from stockroom.enrich.cad_sources import resolve_cad_sources
@@ -134,7 +151,52 @@ class UltraLibrarianAdapter:
                 return source.url
         return ""
 
+    def open_panel(self, page) -> str:
+        """Navigate from wherever we landed to the export panel, and say what happened.
+
+        THE WHOLE JOURNEY, not just the last screen. `resolve_url` returns a SEARCH url, so a
+        drive that assumed the export panel was already on screen would find nothing on the real
+        site - it only worked against a fixture captured at the end state. That gap is exactly the
+        kind a fixture cannot catch, so the steps are explicit here:
+
+            /search?queryText=<MPN>   -> the first result's a[href*="/details/"]
+            /details/<guid>/<mfr>/<mpn>  -> the export panel, reached by `&open=exports`
+                                            (a real deep link, measured) or #export-selection-btn
+
+        Returns "" on success, else a human-readable reason.
+        """
+        if page.locator("input[name=exports]").count() > 0:
+            return ""  # already there
+
+        if "/search" in (page.url or ""):
+            results = page.locator('a[href*="/details/"]')
+            try:
+                results.first.wait_for(state="visible", timeout=20_000)
+            except Exception:  # noqa: BLE001 - no result is an answer, not a crash
+                return "Ultra Librarian has no model for this part."
+            href = results.first.get_attribute("href") or ""
+            if not href:
+                return "the result row carried no link"
+            page.goto(_absolute(page, href), wait_until="domcontentloaded")
+
+        # The export panel is a real deep link on the part page - fewer clicks than the button,
+        # and it survives the button being renamed.
+        if "/details/" in (page.url or "") and "open=exports" not in (page.url or ""):
+            joiner = "&" if "?" in page.url else "?"
+            page.goto(f"{page.url}{joiner}open=exports", wait_until="domcontentloaded")
+
+        try:
+            page.locator("input[name=exports]").first.wait_for(state="attached", timeout=20_000)
+        except Exception:  # noqa: BLE001
+            if page.locator('a[href*="/Account/Login"]').count() > 0:
+                return "Sign in to Ultra Librarian in the window; the sign-in is remembered."
+            return "the CAD format list did not open on this page"
+        return ""
+
     def drive(self, page, formats: list[str]) -> DriveReport:
+        blocked = self.open_panel(page)
+        if blocked:
+            return DriveReport(missed=list(formats), message=blocked)
         report = DriveReport()
         for fmt in formats:
             box_id = self.capability.version_pins.get(fmt)
@@ -238,3 +300,12 @@ def capture_dir_for(root: Path, part_id: str) -> Path:
     """Where one part's downloads land. Per part, so two captures can never mingle files."""
     safe = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in part_id)[:80]
     return Path(root) / f"capture-{safe or 'part'}"
+
+
+def _absolute(page, href: str) -> str:
+    """Resolve a vendor's relative link against the page it came from."""
+    if href.startswith("http://") or href.startswith("https://"):
+        return href
+    from urllib.parse import urljoin
+
+    return urljoin(page.url, href)

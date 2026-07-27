@@ -20,6 +20,8 @@ That is exactly why the run is stoppable and why resuming is free.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from stockroom.capture.complete import complete_library, iter_incomplete, sourceable_needs
 from stockroom.capture.pacing import CircuitBreaker, PacedSource
 from stockroom.capture.sources import LcscSource
@@ -167,6 +169,101 @@ def run_completion(ctx, *, progress=None, should_stop=None, part_ids=None, limit
         ctx.jobs.run_write(ctx.rebuild_index)
         ctx.jobs.run_write(ctx.auto_push)
     return report.to_dict()
+
+
+def run_guided_capture(
+    ctx,
+    *,
+    part_ids=None,
+    vendor: str = "ultralibrarian",
+    progress=None,
+    should_stop=None,
+    limit=None,
+    headless: bool = False,
+) -> dict:
+    """Capture from a trusted vendor through a real browser: ONE component, or the whole library.
+
+    Owner, 2026-07-27: *"i also need guided capture per component"*. `part_ids=[one]` is the
+    per-component run and `part_ids=None` is the whole library - the SAME path, so whichever one is
+    verified verifies the other. That is also why this shares `complete_library` with the offline
+    sources rather than being its own flow.
+
+    The browser is opened lazily by the source (a run with nothing to do never flashes a window)
+    and ALWAYS closed here, so a stopped, failed or completed run leaves no window behind.
+    """
+    from stockroom.capture.guided import GuidedCaptureSource
+    from stockroom.ingest.pipeline import IngestPipeline
+
+    def make_pipeline():
+        return IngestPipeline(ctx.profile, ctx.repo, ctx.cli)
+
+    source = GuidedCaptureSource(
+        make_pipeline,
+        vendor=vendor,
+        download_root=_capture_downloads(ctx),
+        profile_dir=_capture_profile(ctx),
+        headless=headless,
+        run_write=ctx.jobs.run_write,
+        now_iso=_utc_now_iso,
+    )
+    load_record = ctx.ops.load_record
+
+    if part_ids is None:
+        work = iter_incomplete(
+            ctx.profile.library.parts_dir, load_record=load_record, sources=[source]
+        )
+        total = None
+    else:
+        work = list(part_ids)
+        total = len(work)
+    if limit is not None:
+        work = _take(work, limit)
+        total = min(total, limit) if total is not None else None
+
+    try:
+        report = complete_library(
+            work,
+            load_record=load_record,
+            sources=[source],
+            on_progress=progress,
+            should_stop=should_stop,
+            total=total,
+            breaker=CircuitBreaker(threshold=_BREAKER_THRESHOLD),
+        )
+    finally:
+        source.close()
+
+    if report.of("completed", "improved"):
+        ctx.jobs.run_write(ctx.rebuild_index)
+        ctx.jobs.run_write(ctx.auto_push)
+    return report.to_dict()
+
+
+def _utc_now_iso() -> str:
+    """Stamped by the SERVER. A timestamp a caller can set is not evidence of when a file landed."""
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _capture_downloads(ctx) -> Path:
+    """Where captured files land before they are attached. Beside the library, never inside it:
+    an un-attached download is not library data and must never be committed."""
+    root = Path(ctx.profile.library.root).parent / ".stockroom-capture" / "downloads"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _capture_profile(ctx) -> Path:
+    """The persistent browser profile holding vendor sign-ins.
+
+    PER-MACHINE, and it is the permitted kind: it holds session cookies only, so it cannot change
+    what the library renders the way a per-machine enrich cache can. It is what makes a 90-part
+    sitting cost ONE sign-in.
+    """
+    root = Path(ctx.profile.library.root).parent / ".stockroom-capture" / "profile"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 
 def _take(iterable, n: int):
