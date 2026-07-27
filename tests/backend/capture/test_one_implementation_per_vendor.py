@@ -70,13 +70,43 @@ def test_no_vendor_is_implemented_twice():
 
 def test_the_check_can_actually_see_both_sides():
     """Anti-vacuous guard. If either side parsed to nothing, the test above would pass for the
-    worst possible reason: seeing no vendors at all."""
-    js_vendors = _js_driver_vendors()
+    worst possible reason: seeing no vendors at all.
+
+    It no longer asserts that any PARTICULAR vendor is still implemented as JS, because that made
+    the guard fail the moment a vendor was correctly ported - punishing exactly the migration this
+    file exists to encourage. SnapEDA was the last one, deleted 2026-07-27 when `SnapMagicAdapter`
+    landed. The parser is proved on a synthetic source instead, so it can never go quietly blind.
+    """
     adapter_keys = {adapter.capability.key for adapter in all_adapters()}
-    assert js_vendors, "parsed ZERO JS drivers - the parser is broken, not the codebase clean"
     assert adapter_keys, "the Python adapter registry is empty"
-    # and the alias map must be doing real work rather than sitting unused
-    assert "snapeda" in js_vendors or "snapmagic" in js_vendors
+    assert _DRIVERS.is_file(), f"the JS driver module is missing at {_DRIVERS}"
+    # The real file may legitimately contain ZERO js vendors (every one ported). What must never
+    # break silently is the PARSER, so run it against a source that definitely contains both shapes.
+    import re as _re
+
+    sample = (
+        '_VENDORS: dict[str, dict] = {\n    "examplevendor": {\n        "label": "X",\n    },\n}\n'
+        "def _othervendor_driver_js(page):\n    return ''\n"
+    )
+    table = _re.search(r"_VENDORS:\s*dict\[str,\s*dict\]\s*=\s*\{(.*?)\n\}", sample, _re.S)
+    assert table, "the _VENDORS table pattern no longer matches its own shape"
+    assert set(_re.findall(r'^\s*"([a-z0-9_]+)":\s*\{', table.group(1), _re.M)) == {"examplevendor"}
+    assert set(_re.findall(r"^def _([a-z0-9_]+)_driver_js\(", sample, _re.M)) == {"othervendor"}
+
+
+def test_a_vendor_implemented_on_both_sides_is_detected_through_its_alias():
+    """The alias map must do REAL work, proved directly rather than by hoping live data exercises it.
+
+    SnapEDA is `snapmagic` in the CAD-source registry and `snapeda` in the driver layer; the same
+    vendor under two names is the case a naive set-intersection would miss entirely.
+    """
+    js_vendors = {"snapeda"}
+    adapter_keys = {"snapmagic"}
+    aliased = {_ALIASES.get(key, key) for key in adapter_keys} | adapter_keys
+    assert sorted(js_vendors & aliased) == ["snapeda"], (
+        "the alias map failed to connect snapeda to snapmagic, so a genuine double "
+        "implementation of that vendor would go unreported"
+    )
 
 
 def test_ultra_librarian_lives_only_in_the_python_adapter():

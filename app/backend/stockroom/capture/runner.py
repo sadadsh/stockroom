@@ -175,7 +175,7 @@ def run_guided_capture(
     ctx,
     *,
     part_ids=None,
-    vendor: str = "ultralibrarian",
+    vendor=None,
     progress=None,
     should_stop=None,
     limit=None,
@@ -189,8 +189,19 @@ def run_guided_capture(
     verified verifies the other. That is also why this shares `complete_library` with the offline
     sources rather than being its own flow.
 
-    The browser is opened lazily by the source (a run with nothing to do never flashes a window)
-    and ALWAYS closed here, so a stopped, failed or completed run leaves no window behind.
+    BOTH VENDORS, IN ORDER. Owner, 2026-07-27: *"i wanted both"* / *"check both to see which one
+    has it, and if one download fails use the other."* `vendor` accepts a single key or a list; the
+    default is the whole chain. Nothing clever implements the fallback - `complete_library` already
+    walks its sources in order and skips any whose `provides()` no longer overlaps what the part
+    still needs, so Ultra Librarian runs first and SnapMagic is asked only for what is STILL
+    missing. A part that gets everything from the first vendor never opens the second.
+
+    Order is the policy: Ultra Librarian first because its models are manufacturer-authored and it
+    serves every format in ONE download; SnapMagic second because it blends community and
+    automatically generated content, and because it costs one download per format.
+
+    The browser is opened lazily by each source (a run with nothing to do never flashes a window)
+    and ALL of them are closed here, so a stopped, failed or completed run leaves no window behind.
     """
     from stockroom.capture.guided import GuidedCaptureSource
     from stockroom.ingest.pipeline import IngestPipeline
@@ -198,32 +209,35 @@ def run_guided_capture(
     def make_pipeline():
         return IngestPipeline(ctx.profile, ctx.repo, ctx.cli)
 
-    source = GuidedCaptureSource(
-        make_pipeline,
-        vendor=vendor,
-        download_root=_capture_downloads(ctx),
-        profile_dir=_capture_profile(ctx),
-        headless=headless,
-        # THE engine for real vendors, named HERE at the production call site rather than as a
-        # constructor default. Stated where it ships means a test that forgets to choose gets the
-        # fast engine instead of silently launching a full Firefox and hanging the suite - which is
-        # exactly what a camoufox constructor default did on 2026-07-27.
-        engine=engine,
-        # The Altium seam, which already existed and was already atomic but which guided capture
-        # never called - so a vendor shipping real .SchLib/.PcbLib had them downloaded and dropped.
-        # Passed in rather than imported so capture/ stays clear of the mutation layer.
-        attach_altium=ctx.ops.attach_altium_assets,
-        # Saved vendor sign-ins, so a 90-part sitting runs unattended instead of stopping on every
-        # part at the Download button (which the vendor renders only for a signed-in user).
-        credentials=_saved_credentials,
-        run_write=ctx.jobs.run_write,
-        now_iso=_utc_now_iso,
-    )
+    sources = [
+        GuidedCaptureSource(
+            make_pipeline,
+            vendor=key,
+            download_root=_capture_downloads(ctx),
+            profile_dir=_capture_profile(ctx),
+            headless=headless,
+            # THE engine for real vendors, named HERE at the production call site rather than as a
+            # constructor default. Stated where it ships means a test that forgets to choose gets
+            # the fast engine instead of silently launching a full Firefox and hanging the suite -
+            # which is exactly what a camoufox constructor default did on 2026-07-27.
+            engine=engine,
+            # The Altium seam, which already existed and was already atomic but which guided capture
+            # never called - so a vendor shipping real .SchLib/.PcbLib had them downloaded and
+            # dropped. Passed in rather than imported so capture/ stays clear of the mutation layer.
+            attach_altium=ctx.ops.attach_altium_assets,
+            # Saved vendor sign-ins, so a 90-part sitting runs unattended instead of stopping on
+            # every part at a Download button the vendor renders only for a signed-in user.
+            credentials=_saved_credentials,
+            run_write=ctx.jobs.run_write,
+            now_iso=_utc_now_iso,
+        )
+        for key in _vendor_chain(vendor)
+    ]
     load_record = ctx.ops.load_record
 
     if part_ids is None:
         work = iter_incomplete(
-            ctx.profile.library.parts_dir, load_record=load_record, sources=[source]
+            ctx.profile.library.parts_dir, load_record=load_record, sources=sources
         )
         total = None
     else:
@@ -237,14 +251,15 @@ def run_guided_capture(
         report = complete_library(
             work,
             load_record=load_record,
-            sources=[source],
+            sources=sources,
             on_progress=progress,
             should_stop=should_stop,
             total=total,
             breaker=CircuitBreaker(threshold=_BREAKER_THRESHOLD),
         )
     finally:
-        source.close()
+        for source in sources:
+            source.close()
 
     if report.of("completed", "improved"):
         ctx.jobs.run_write(ctx.rebuild_index)
@@ -319,3 +334,33 @@ def _saved_credentials(vendor_key: str):
     if not user or not secret:
         return None
     return user, secret
+
+
+# The vendor chain, in the order a run tries them. ORDER IS THE POLICY: Ultra Librarian first
+# because its models are manufacturer-authored and it serves every format in ONE download;
+# SnapMagic second because it blends community and automatically generated content and costs one download per
+# format. A part that gets everything from the first never opens the second - `complete_library`
+# skips a source whose `provides()` no longer overlaps what is still missing.
+_VENDOR_CHAIN = ("ultralibrarian", "snapmagic")
+
+
+def _vendor_chain(vendor) -> list[str]:
+    """Normalise `vendor` to an ordered list of adapter keys.
+
+    Accepts None (the whole chain), one key, or an explicit list, so the existing single-vendor
+    callers and the API keep working unchanged while the default becomes "try both". Unknown keys
+    are dropped rather than raising: a stale vendor name in a saved request should degrade to the
+    vendors that DO exist, not fail the run.
+    """
+    from stockroom.capture.vendors import get_adapter
+
+    if vendor is None:
+        wanted = list(_VENDOR_CHAIN)
+    elif isinstance(vendor, str):
+        wanted = [vendor]
+    else:
+        wanted = list(vendor)
+    keys = [k for k in wanted if get_adapter(k) is not None]
+    # Never return an empty chain silently - that would open no browser and report "nothing to do"
+    # for what is really a typo.
+    return keys or [_VENDOR_CHAIN[0]]

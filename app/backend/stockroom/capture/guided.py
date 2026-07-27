@@ -287,8 +287,18 @@ class GuidedCaptureSource:
         session = self._ensure_session()
         before = len(session.browser.captured)
         try:
-            session.page.goto(url, wait_until="domcontentloaded")
-            report = adapter.drive(session.page, formats)
+            # ONE download, or ONE PER FORMAT - decided by the adapter's capability, never by a
+            # vendor name. Ultra Librarian ticks checkboxes and exports everything together
+            # (`formats_exclusive=False`); SnapMagic has a separate button per format, so asking for
+            # both in one drive would fetch only the first and silently lose the other. That flag
+            # was DATA nothing read until now, which is exactly how a half-working vendor ships.
+            if adapter.capability.formats_exclusive:
+                report, failure = self._drive_each_format(session, adapter, formats, url)
+                if failure is not None:
+                    return failure
+            else:
+                session.page.goto(url, wait_until="domcontentloaded")
+                report = adapter.drive(session.page, formats)
             if not report.submitted:
                 why = report.message or "the vendor offered no download"
                 if self._sign_in_error:
@@ -324,6 +334,52 @@ class GuidedCaptureSource:
             return SourceOutcome(error="the vendor download did not produce a file")
 
         return self._attach(record, landed, url)
+
+    def _drive_each_format(self, session, adapter, formats, url):
+        """One download per format, for a vendor whose formats are mutually exclusive.
+
+        Returns `(combined_report, failure_outcome_or_None)`. A format the vendor simply does not
+        carry is recorded as MISSED and the rest still run - a part that can get its footprint but
+        not its 3D model must come away with the footprint, not with nothing.
+
+        Re-navigates to the part page before each format, because taking a download generally leaves
+        the vendor's modal closed or the page changed; `open_panel` is cheap and idempotent, and
+        assuming the panel survived a download is the kind of guess that works on a fixture and
+        fails on the real site.
+        """
+        from stockroom.capture.vendors import DriveReport
+
+        combined = DriveReport()
+        for fmt in formats:
+            mark = len(session.browser.captured)
+            try:
+                session.page.goto(url, wait_until="domcontentloaded")
+                one = adapter.drive(session.page, [fmt])
+            except Exception as exc:  # noqa: BLE001 - one format failing is a row, not a dead run
+                combined.missed.append(fmt)
+                combined.message = f"{adapter.capability.label}: {exc}"
+                continue
+            if not one.submitted:
+                combined.missed.extend(one.missed or [fmt])
+                if one.message:
+                    combined.message = one.message
+                continue
+            if not _wait_for_capture(
+                session.browser, session.page, mark, _DOWNLOAD_TIMEOUT_MS / 1000.0
+            ):
+                # A format that was submitted and never arrived is a REAL failure, not a miss:
+                # saying "missed" would let the run look partially fine while a file vanished.
+                return combined, SourceOutcome(
+                    error=f"{adapter.capability.label} did not deliver {fmt} within "
+                    f"{_DOWNLOAD_TIMEOUT_MS // 1000}s"
+                )
+            combined.selected.extend(one.selected or [fmt])
+            combined.submitted = True
+        if combined.selected:
+            combined.message = (
+                f"Requested {' and '.join(combined.selected)} from {adapter.capability.label}."
+            )
+        return combined, None
 
     def _attach(self, record, landed, url: str) -> SourceOutcome:
         """Turn the downloaded file(s) into attached assets, with provenance.
