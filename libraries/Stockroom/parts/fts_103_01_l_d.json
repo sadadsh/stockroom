@@ -1,5 +1,12 @@
 {
   "alternates": {
+    "Contact Material": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Phosphor bronze"
+      }
+    ],
     "HTS Code (CA)": [
       {
         "confidence": "medium",
@@ -51,6 +58,18 @@
         "confidence": "medium",
         "source": "digikey",
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6637/MFG_INC3-FTS-01-6pos-Gold-D.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "14 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2"
       }
     ],
     "Mounting Type": [
@@ -678,6 +697,66 @@
       "stock": 482,
       "url": "https://www.lcsc.com/product-detail/C448647.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:56.308529+00:00",
+      "part_number": "200-FTS10301LD",
+      "price_breaks": [
+        {
+          "price": 1.08,
+          "qty": 1
+        },
+        {
+          "price": 0.999,
+          "qty": 100
+        },
+        {
+          "price": 0.709,
+          "qty": 2000
+        },
+        {
+          "price": 0.64,
+          "qty": 5000
+        }
+      ],
+      "stock": 1349,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:56.308529+00:00",
+      "part_number": "612-FTS-103-01-L-D-ND",
+      "price_breaks": [
+        {
+          "price": 1.78,
+          "qty": 1
+        },
+        {
+          "price": 1.515,
+          "qty": 10
+        },
+        {
+          "price": 1.2877,
+          "qty": 100
+        },
+        {
+          "price": 1.14942,
+          "qty": 500
+        },
+        {
+          "price": 1.09457,
+          "qty": 1000
+        },
+        {
+          "price": 0.99812,
+          "qty": 5000
+        }
+      ],
+      "stock": 774,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
