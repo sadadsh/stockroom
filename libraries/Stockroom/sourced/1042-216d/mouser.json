@@ -1,0 +1,277 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 4,
+  "Parts": [
+   {
+    "Availability": "3862 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/Keystone_01142020_1042.pdf",
+    "Description": "Cylindrical Battery Contacts, Clips, Holders & Springs 18650 S/M PC BATTERY HOLDER",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/keystoneelectronics/images/1042_tn.jpg",
+    "Category": "Cylindrical Battery Contacts, Clips, Holders & Springs",
+    "LeadTime": "104 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Keystone Electronics",
+    "ManufacturerPartNumber": "1042",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "534-1042",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Tray"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "200"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$5.32",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$4.40",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$4.12",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$3.89",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 200,
+      "Price": "$3.88",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 600,
+      "Price": "$3.51",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$3.09",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1042?qs=%2F7TOpeL5Mz4qPdWi9tuLKw%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.0250125
+    },
+    "AvailabilityInStock": "3862",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 6200,
+      "Date": "2026-09-04T00:00:00"
+     },
+     {
+      "Quantity": 9400,
+      "Date": "2026-09-28T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536908585"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536909000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536900090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853690000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536909090"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536909599"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "85369099"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85369090"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "United States"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "infinite Electronics",
+    "FactoryStock": null,
+    "ImagePath": null,
+    "Category": "infinite Electronics",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "L-Com",
+    "ManufacturerPartNumber": "1042",
+    "Min": "0",
+    "Mult": "0",
+    "MouserPartNumber": "N/A",
+    "ProductAttributes": [],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/L-Com/1042?qs=3GbUB62Nf7eCe%252B9xwWZaKg%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [],
+    "TradeCompliance": []
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "EMI Gaskets, Sheets, Absorbers & Shielding RFSB,S,3.5,PSA",
+    "FactoryStock": null,
+    "ImagePath": null,
+    "Category": "EMI Gaskets, Sheets, Absorbers & Shielding",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Laird",
+    "ManufacturerPartNumber": "1042",
+    "Min": "0",
+    "Mult": "0",
+    "MouserPartNumber": "N/A",
+    "ProductAttributes": [],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Laird/1042?qs=3W4fUHWfaiOYLx1uJG%252BG3w%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "5911900080"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": []
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "Adafruit Accessories Aluminum SMT Heat Sink Square",
+    "FactoryStock": null,
+    "ImagePath": "https://www.mouser.com/images/adafruit/images/1042_spl.jpg",
+    "Category": "Adafruit Accessories",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Obsolete",
+    "Manufacturer": "Adafruit",
+    "ManufacturerPartNumber": "1042",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "485-1042",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "1"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Adafruit/1042?qs=GURawfaeGuA0fwLjfRkRqA%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [
+     "Mouser does not presently sell this product in your region."
+    ],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8473305100"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8473309000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8473308000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Canada"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

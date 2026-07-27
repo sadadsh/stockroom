@@ -1,0 +1,154 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "103108 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/40/1/cra.pdf",
+    "Description": "Current Sense Resistors - SMD 0.020ohms 1%",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/bourns/images/chpreztr.jpg",
+    "Category": "Current Sense Resistors - SMD",
+    "LeadTime": "98 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Bourns",
+    "ManufacturerPartNumber": "CRA2512-FZ-R020ELF",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "652-CRA2512FZ-R20ELF",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "4000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.55",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.353",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$0.267",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.238",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.207",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.187",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.171",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 4000,
+      "Price": "$0.144",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 8000,
+      "Price": "$0.135",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Bourns/CRA2512-FZ-R020ELF?qs=WqWCsLCZBkqBWIN8p659hA%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 4.05e-05
+    },
+    "AvailabilityInStock": "103108",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8533210030"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8533211000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8533210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8533210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853321000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8533219000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8533210100"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85332120"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

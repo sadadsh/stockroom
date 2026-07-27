@@ -1,0 +1,720 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "IC REG BOOST ADJ 3A SOT563",
+    "DetailedDescription": "Boost Switching Regulator IC Positive Adjustable 2.2V 1 Output 3A SOT-563, SOT-666"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "TPS61023DRLR",
+   "UnitPrice": 1.22,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/TPS61023DRLR/11310629",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Ftps61023",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6147/296%7E4223266%7EDRL%7E6.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-TPS61023DRLRTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.57775,
+       "TotalPrice": 2311.0
+      },
+      {
+       "BreakQuantity": 8000,
+       "UnitPrice": 0.56556,
+       "TotalPrice": 4524.48
+      },
+      {
+       "BreakQuantity": 12000,
+       "UnitPrice": 0.55946,
+       "TotalPrice": 6713.52
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 20000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TPS61023DRLRCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 1.22,
+       "TotalPrice": 1.22
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.879,
+       "TotalPrice": 8.79
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.7956,
+       "TotalPrice": 19.89
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.7031,
+       "TotalPrice": 70.31
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.659,
+       "TotalPrice": 164.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.63242,
+       "TotalPrice": 316.21
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.61965,
+       "TotalPrice": 619.65
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 23863,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TPS61023DRLRDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 1.22,
+       "TotalPrice": 1.22
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.879,
+       "TotalPrice": 8.79
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.7956,
+       "TotalPrice": 19.89
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.7031,
+       "TotalPrice": 70.31
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.659,
+       "TotalPrice": 164.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.63242,
+       "TotalPrice": 316.21
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.61965,
+       "TotalPrice": 619.65
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 23863,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 23863,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 110,
+     "ParameterText": "Function",
+     "ParameterType": "String",
+     "ValueId": "408382",
+     "ValueText": "Step-Up"
+    },
+    {
+     "ParameterId": 255,
+     "ParameterText": "Output Configuration",
+     "ParameterType": "String",
+     "ValueId": "389019",
+     "ValueText": "Positive"
+    },
+    {
+     "ParameterId": 1098,
+     "ParameterText": "Topology",
+     "ParameterType": "String",
+     "ValueId": "322154",
+     "ValueText": "Boost"
+    },
+    {
+     "ParameterId": 41,
+     "ParameterText": "Output Type",
+     "ParameterType": "String",
+     "ValueId": "310372",
+     "ValueText": "Adjustable"
+    },
+    {
+     "ParameterId": 87,
+     "ParameterText": "Number of Outputs",
+     "ParameterType": "String",
+     "ValueId": "39665",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 1471,
+     "ParameterText": "Voltage - Input (Min)",
+     "ParameterType": "String",
+     "ValueId": "28548",
+     "ValueText": "0.5V"
+    },
+    {
+     "ParameterId": 573,
+     "ParameterText": "Voltage - Input (Max)",
+     "ParameterType": "String",
+     "ValueId": "233086",
+     "ValueText": "5.5V"
+    },
+    {
+     "ParameterId": 1779,
+     "ParameterText": "Voltage - Output (Min/Fixed)",
+     "ParameterType": "String",
+     "ValueId": "126943",
+     "ValueText": "2.2V"
+    },
+    {
+     "ParameterId": 1429,
+     "ParameterText": "Voltage - Output (Max)",
+     "ParameterType": "String",
+     "ValueId": "233086",
+     "ValueText": "5.5V"
+    },
+    {
+     "ParameterId": 129,
+     "ParameterText": "Current - Output",
+     "ParameterType": "String",
+     "ValueId": "201594",
+     "ValueText": "3A"
+    },
+    {
+     "ParameterId": 384,
+     "ParameterText": "Frequency - Switching",
+     "ParameterType": "String",
+     "ValueId": "120562",
+     "ValueText": "1MHz"
+    },
+    {
+     "ParameterId": 1320,
+     "ParameterText": "Synchronous Rectifier",
+     "ParameterType": "String",
+     "ValueId": "423329",
+     "ValueText": "Yes"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212481",
+     "ValueText": "-40°C ~ 125°C (TJ)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "405542",
+     "ValueText": "SOT-563, SOT-666"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405541",
+     "ValueText": "SOT-563"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 29044,
+    "Name": "TPS61023"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2025,
+      "ParentId": 32,
+      "Name": "Power Management (PMIC)",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/314/540/846%3B-TO220CP-3%3B-%3B-3_tmb.jpg",
+      "SeoDescription": "PMIC, or Power Management Integrated Circuits, refers to a wide range of application-specific ICs or chips. Included in this category is PMICs for AC/DC Converters, Battery Chargers, Battery Management, Current Regulation, Display Drivers, Energy Metering, Full/Half-Bridge Drivers, Gate Drivers, Hot Swap Controllers, Laser Drivers, LED Drivers, Lighting/Ballast Controllers, Motor Drivers, OR Controllers, Power Factor Correction, Power Distribution Switches, PoE Controllers, Power Supply Controllers, RMS to DC Converters, Supervisors, Thermal Management, V/F and F/V Controllers, various Voltage Regulators, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 739,
+        "ParentId": 2025,
+        "Name": "Voltage Regulators - DC DC Switching Regulators",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/932/150%3B-C04-1196%3B-PHA%3B-32_tmb%2864x64%29.jpg",
+        "SeoDescription": "Products in the DC-DC switching regulator PMIC (Power Management Integrated Circuit) family are component-level devices used in applications requiring stabilization of a DC input voltage and/or transformation thereof to an output voltage of different magnitude. They are distinguished from similar products called \"controller\" PMICs by virtue of integrating the main switching element through which the power delivered by the device passes.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "296-TPS61023DRLRCT",
+    "296-TPS61023DRLRDKR",
+    "296-TPS61023DRLRTR"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "IC REG BOOST ADJ 3A SOT563",
+    "DetailedDescription": "Boost Switching Regulator IC Positive Adjustable 2.2V 1 Output 3A SOT-563, SOT-666"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "TPS61023DRLR",
+   "UnitPrice": 1.22,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/TPS61023DRLR/11310629",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Ftps61023",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6147/296%7E4223266%7EDRL%7E6.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-TPS61023DRLRTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.57775,
+       "TotalPrice": 2311.0
+      },
+      {
+       "BreakQuantity": 8000,
+       "UnitPrice": 0.56556,
+       "TotalPrice": 4524.48
+      },
+      {
+       "BreakQuantity": 12000,
+       "UnitPrice": 0.55946,
+       "TotalPrice": 6713.52
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 20000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TPS61023DRLRCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 1.22,
+       "TotalPrice": 1.22
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.879,
+       "TotalPrice": 8.79
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.7956,
+       "TotalPrice": 19.89
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.7031,
+       "TotalPrice": 70.31
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.659,
+       "TotalPrice": 164.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.63242,
+       "TotalPrice": 316.21
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.61965,
+       "TotalPrice": 619.65
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 23863,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TPS61023DRLRDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 1.22,
+       "TotalPrice": 1.22
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.879,
+       "TotalPrice": 8.79
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.7956,
+       "TotalPrice": 19.89
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.7031,
+       "TotalPrice": 70.31
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.659,
+       "TotalPrice": 164.75
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.63242,
+       "TotalPrice": 316.21
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.61965,
+       "TotalPrice": 619.65
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 23863,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 23863,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 110,
+     "ParameterText": "Function",
+     "ParameterType": "String",
+     "ValueId": "408382",
+     "ValueText": "Step-Up"
+    },
+    {
+     "ParameterId": 255,
+     "ParameterText": "Output Configuration",
+     "ParameterType": "String",
+     "ValueId": "389019",
+     "ValueText": "Positive"
+    },
+    {
+     "ParameterId": 1098,
+     "ParameterText": "Topology",
+     "ParameterType": "String",
+     "ValueId": "322154",
+     "ValueText": "Boost"
+    },
+    {
+     "ParameterId": 41,
+     "ParameterText": "Output Type",
+     "ParameterType": "String",
+     "ValueId": "310372",
+     "ValueText": "Adjustable"
+    },
+    {
+     "ParameterId": 87,
+     "ParameterText": "Number of Outputs",
+     "ParameterType": "String",
+     "ValueId": "39665",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 1471,
+     "ParameterText": "Voltage - Input (Min)",
+     "ParameterType": "String",
+     "ValueId": "28548",
+     "ValueText": "0.5V"
+    },
+    {
+     "ParameterId": 573,
+     "ParameterText": "Voltage - Input (Max)",
+     "ParameterType": "String",
+     "ValueId": "233086",
+     "ValueText": "5.5V"
+    },
+    {
+     "ParameterId": 1779,
+     "ParameterText": "Voltage - Output (Min/Fixed)",
+     "ParameterType": "String",
+     "ValueId": "126943",
+     "ValueText": "2.2V"
+    },
+    {
+     "ParameterId": 1429,
+     "ParameterText": "Voltage - Output (Max)",
+     "ParameterType": "String",
+     "ValueId": "233086",
+     "ValueText": "5.5V"
+    },
+    {
+     "ParameterId": 129,
+     "ParameterText": "Current - Output",
+     "ParameterType": "String",
+     "ValueId": "201594",
+     "ValueText": "3A"
+    },
+    {
+     "ParameterId": 384,
+     "ParameterText": "Frequency - Switching",
+     "ParameterType": "String",
+     "ValueId": "120562",
+     "ValueText": "1MHz"
+    },
+    {
+     "ParameterId": 1320,
+     "ParameterText": "Synchronous Rectifier",
+     "ParameterType": "String",
+     "ValueId": "423329",
+     "ValueText": "Yes"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212481",
+     "ValueText": "-40°C ~ 125°C (TJ)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "405542",
+     "ValueText": "SOT-563, SOT-666"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405541",
+     "ValueText": "SOT-563"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 29044,
+    "Name": "TPS61023"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2025,
+      "ParentId": 32,
+      "Name": "Power Management (PMIC)",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/314/540/846%3B-TO220CP-3%3B-%3B-3_tmb.jpg",
+      "SeoDescription": "PMIC, or Power Management Integrated Circuits, refers to a wide range of application-specific ICs or chips. Included in this category is PMICs for AC/DC Converters, Battery Chargers, Battery Management, Current Regulation, Display Drivers, Energy Metering, Full/Half-Bridge Drivers, Gate Drivers, Hot Swap Controllers, Laser Drivers, LED Drivers, Lighting/Ballast Controllers, Motor Drivers, OR Controllers, Power Factor Correction, Power Distribution Switches, PoE Controllers, Power Supply Controllers, RMS to DC Converters, Supervisors, Thermal Management, V/F and F/V Controllers, various Voltage Regulators, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 739,
+        "ParentId": 2025,
+        "Name": "Voltage Regulators - DC DC Switching Regulators",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/932/150%3B-C04-1196%3B-PHA%3B-32_tmb%2864x64%29.jpg",
+        "SeoDescription": "Products in the DC-DC switching regulator PMIC (Power Management Integrated Circuit) family are component-level devices used in applications requiring stabilization of a DC input voltage and/or transformation thereof to an output voltage of different magnitude. They are distinguished from similar products called \"controller\" PMICs by virtue of integrating the main switching element through which the power delivered by the device passes.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "296-TPS61023DRLRCT",
+    "296-TPS61023DRLRDKR",
+    "296-TPS61023DRLRTR"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 296,
+    "Value": "Texas Instruments",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

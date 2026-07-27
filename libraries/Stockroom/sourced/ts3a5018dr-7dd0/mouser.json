@@ -1,0 +1,155 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "11394 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Analog Switch ICs 10-Ohm Quad SPDT Ana log Switch A 595-TS A 595-TS3A5018D",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_SOIC-16_D_t.jpg",
+    "Category": "Analog Switch ICs",
+    "LeadTime": "112 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Texas Instruments",
+    "ManufacturerPartNumber": "TS3A5018DR",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "595-TS3A5018DR",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "2500"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.77",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.55",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$0.494",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.433",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.404",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.386",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.372",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.356",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.347",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "TS3A5018D"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TS3A5018DR?qs=0O%2FZFlpUpJXorOS44CKPgg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.0001417
+    },
+    "AvailabilityInStock": "11394",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 10% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542390090"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8542390000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "8542390990"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8542399999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Mexico"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

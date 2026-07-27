@@ -1,0 +1,121 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "6 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/Yamaichi Electronics_08162018_IC201-1004-008x-x-xx_K.pdf",
+    "Description": "IC & Component Sockets 100Pin QFP Burn-in Skt 0.50 pitch",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/yamaichielectronics/images/ic201.jpg",
+    "Category": "IC & Component Sockets",
+    "LeadTime": "56 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Yamaichi Electronics",
+    "ManufacturerPartNumber": "IC201-1004-008",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "945-IC201-1004-008",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "25"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$98.94",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$86.37",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 50,
+      "Price": "$85.09",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$83.07",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Yamaichi-Electronics/IC201-1004-008?qs=nO3wRANIIvmld3xoe38f1w%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.012838
+    },
+    "AvailabilityInStock": "6",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536694040"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8538900000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536690020"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853669000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536691000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536693000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8536699999"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85366990"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Philippines"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

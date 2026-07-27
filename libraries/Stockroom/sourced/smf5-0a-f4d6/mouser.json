@@ -1,0 +1,736 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 5,
+  "Parts": [
+   {
+    "Availability": "163372 In Stock",
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes 200W 5V 5% Uni-directional",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/littelfuse/images/SOD_123_FL_2_SPL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "119 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Littelfuse",
+    "ManufacturerPartNumber": "SMF5.0A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "576-SMF5.0A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.46",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.305",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.178",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.147",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.125",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.096",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.088",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 9000,
+      "Price": "$0.079",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Littelfuse/SMF5.0A?qs=w7s0xA%252BTU%2FHYt6%2FEHP8V9g%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "REACH-SVHC": [
+     "Lead (7439-92-1)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8.414700001e-05
+    },
+    "AvailabilityInStock": "163372",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 45% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100199"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85411029"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "15530 In Stock",
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes TVS, SMF series, 5V Oper., Uni-dir.",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/eatoncorporation/images/SOD_123_FL_2_SPL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "95 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Eaton Electronics",
+    "ManufacturerPartNumber": "SMF5.0A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "504-SMFE5-0A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "6000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.39",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.239",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.151",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.112",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.099",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.09",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.084",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 12000,
+      "Price": "$0.074",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 24000,
+      "Price": "$0.069",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Eaton-Electronics/SMF5.0A?qs=Tc%252BHE9vUsnv8QFE0xewdqg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "REACH-SVHC": [
+     "Tetrabromobisphenol A (79-94-7)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.00014
+    },
+    "AvailabilityInStock": "15530",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100199"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85411029"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "13586 In Stock",
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes TVS, SOD-123FL,  150C,  200W, Unidir",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/diotecsemiconductor/images/sod-123fl_SPL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "70 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Diotec Semiconductor",
+    "ManufacturerPartNumber": "SMF5.0A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "637-SMF5.0A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.25",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.182",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.153",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.124",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.107",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.046",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 9000,
+      "Price": "$0.031",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diotec-Semiconductor/SMF5.0A?qs=OlC7AqGiEDn%252BpVra0bqFbQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant By Exemption",
+    "REACH-SVHC": [
+     "Tetrabromobisphenol A (79-94-7)",
+     "Lead (7439-92-1)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 4.8e-05
+    },
+    "AvailabilityInStock": "13586",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 38% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541590000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100199"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85411029"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "9556 In Stock",
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes 200W, 6.7V, 5%, Unidirectional, TVS",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/taiwansemiconductor/images/SOD-123W_SPL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "140 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Taiwan Semiconductor",
+    "ManufacturerPartNumber": "SMF5.0A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "821-SMF5.0ARQG",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.44",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.268",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.166",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.126",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.099",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.083",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.08",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10000,
+      "Price": "$0.069",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 20000,
+      "Price": "$0.062",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Taiwan-Semiconductor/SMF5.0A?qs=1mbolxNpo8eR5rZB%252BCLtCw%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant By Exemption",
+    "REACH-SVHC": [
+     "Tetrabromobisphenol A (79-94-7)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": "9556",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 10% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100199"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85411029"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "4289 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/225/1/SMF5.0A_SMF200CA(SOD-123FL).pdf",
+    "Description": "ESD Protection Diodes / TVS Diodes TVS 200W, 9.2V",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mcc/images/sod-123.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "126 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Micro Commercial Components (MCC)",
+    "ManufacturerPartNumber": "SMF5.0A-TP",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "833-SMF5.0A-TP",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "2500"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.43",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.291",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.168",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.13",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.112",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.112",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Micro-Commercial-Components-MCC/SMF5.0A-TP?qs=O1HRStiETCgnzykcd8cGfQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant By Exemption",
+    "REACH-SVHC": [
+     "Lead (7439-92-1)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 7.13e-05
+    },
+    "AvailabilityInStock": "4289",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100199"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85411029"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Vietnam"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

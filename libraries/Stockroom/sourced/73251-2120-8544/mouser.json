@@ -1,0 +1,153 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "3320 In Stock",
+    "DataSheetUrl": "",
+    "Description": "RF Connectors / Coaxial Connectors SMA JACK 50 OHM EDGE MNT BOARD.062",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/molex/images/732512120.jpg",
+    "Category": "RF Connectors / Coaxial Connectors",
+    "LeadTime": "84 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Molex",
+    "ManufacturerPartNumber": "73251-2120",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "538-73251-2120",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Bulk"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "1600"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$6.29",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$5.92",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$5.73",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 50,
+      "Price": "$5.24",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$5.08",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$4.76",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$4.60",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$4.47",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1600,
+      "Price": "$4.24",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Molex/73251-2120?qs=UWfdUHhsSi6HCiGcgSPg4Q%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant By Exemption",
+    "REACH-SVHC": [
+     "Lead (7439-92-1)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.001829
+    },
+    "AvailabilityInStock": "3320",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536694010"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536901100"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536691000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536690010"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853669000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536691000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8536699999"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85366990"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

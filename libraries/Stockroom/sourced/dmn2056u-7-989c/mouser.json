@@ -1,0 +1,150 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "148286 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/175/1/DMN2056U.pdf",
+    "Description": "MOSFETs MOSFET N-CHANNEL 20V 4A SOT23-3",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "280 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "DMN2056U-7",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "621-DMN2056U-7",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.41",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.245",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.153",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.113",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.10",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.081",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "DMN2056U-13"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/DMN2056U-7?qs=G1ssh2j%252Bqz44ih%252Bi%252B7LcyQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "148286",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 99000,
+      "Date": "2026-11-23T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "3000",
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 38% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541299000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

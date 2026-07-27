@@ -93,8 +93,8 @@
   },
   "derived": {
     "category": "Connectors",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Headers & Wire Housings WR-BHD 2.54mm Box 20Pin Male Straight",
     "display_name": "Connector 2x10",
     "specs": {
@@ -123,8 +123,6 @@
       "Insulation Height": "0.358\" (9.10mm)",
       "Insulation Material": "Polybutylene Terephthalate (PBT)",
       "KRHTS": "8536691000",
-      "Lead Time": "98 Days",
-      "Lifecycle": "Active",
       "Material Flammability Rating": "UL94 V-0",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "Not Applicable",
@@ -149,7 +147,7 @@
       "Unit Weight (kg)": "0.0025",
       "Voltage Rating": "250V"
     },
-    "value": ""
+    "value": "61202021621"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -389,6 +387,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/61202021621-6720/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/61202021621-6720/mouser.json"
+    }
+  },
   "tags": []
 }

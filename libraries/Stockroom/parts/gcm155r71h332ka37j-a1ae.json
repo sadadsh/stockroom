@@ -25,20 +25,18 @@
   },
   "derived": {
     "category": "Capacitors",
-    "derived_at": "",
-    "derived_by": "",
-    "description": "Capacitor, 3.3 nF, 10%, 0402",
-    "display_name": "3.3 nF 10% 0402 Capacitor",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
+    "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 3300 pF 50 VDC 10% 0402 X7R AEC-Q200",
+    "display_name": "3300pF ±10% 0402",
     "specs": {
-      "3D Model": "Capacitor_SMD.3dshapes/C_0402_1005Metric.wrl",
       "Applications": "Automotive",
       "Assembly Country of Origin": "Not available",
       "BRHTS": "85322410",
-      "Capacitance": "3.3 nF",
+      "Capacitance": "3300 pF",
       "Country of Diffusion": "Not available",
       "Country of Origin": "Japan",
       "ECCN": "EAR99",
-      "Footprint": "Capacitor_SMD:C_0402_1005Metric",
       "HTS Code (CA)": "8532240010",
       "HTS Code (CN)": "8532241000",
       "HTS Code (EU TARIC)": "8532240000",
@@ -46,14 +44,11 @@
       "HTS Code (US)": "8532240020",
       "Image": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
       "KRHTS": "8532240000",
-      "Lead Time": "98 Days",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "1 (Unlimited)",
       "Mounting Type": "Surface Mount, MLCC",
       "Operating Temperature": "-55°C ~ 125°C",
       "Order Multiple": "1",
-      "Package": "0402",
       "Package / Case": "0402 (1005 Metric)",
       "Package Type": "Tape & Reel (TR)",
       "Packaging": "Reel, Cut Tape, MouseReel",
@@ -65,14 +60,13 @@
       "Size / Dimension": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)",
       "Standard Pack Qty": "50000",
       "Standard Package": "50000",
-      "Symbol": "Device:C",
       "Temperature Coefficient": "X7R",
       "Thickness (Max)": "0.022\" (0.55mm)",
-      "Tolerance": "10%",
+      "Tolerance": "±10%",
       "Unit Weight (kg)": "1.6e-06",
       "Voltage - Rated": "50V"
     },
-    "value": ""
+    "value": "3300pF"
   },
   "enrichment": {},
   "hashes": null,
@@ -132,6 +126,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/gcm155r71h332ka37j-a1ae/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/gcm155r71h332ka37j-a1ae/mouser.json"
+    }
+  },
   "tags": []
 }

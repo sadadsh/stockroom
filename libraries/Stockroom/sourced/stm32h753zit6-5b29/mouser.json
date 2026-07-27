@@ -1,0 +1,156 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 2,
+  "Parts": [
+   {
+    "Availability": "14 In Stock",
+    "DataSheetUrl": "",
+    "Description": "ARM Microcontrollers - MCU High-performance & DSP DP-FPU, Arm Cortex-M7 MCU 2MBytes of Flash 1MB RAM, 480 M",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/LQFP_144_t.jpg",
+    "Category": "ARM Microcontrollers - MCU",
+    "LeadTime": "364 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "STMicroelectronics",
+    "ManufacturerPartNumber": "STM32H753ZIT6",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "511-STM32H753ZIT6",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Tray"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "360"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$17.13",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$14.15",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$13.42",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$12.01",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$11.45",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 360,
+      "Price": "$10.94",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "STM32H753ZIT6TR"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/STMicroelectronics/STM32H753ZIT6?qs=u4fy%2FsgLU9PzR9vtNNw%2FMw%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.001315
+    },
+    "AvailabilityInStock": "14",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 9720,
+      "Date": "2026-09-09T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542310025"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8542319092"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8542310000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8542319000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8542310302"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "5A992.C"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "France"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "Microchip Technology",
+    "FactoryStock": null,
+    "ImagePath": null,
+    "Category": "Microchip Technology",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Microchip / Microsemi",
+    "ManufacturerPartNumber": "STM32H753ZIT6",
+    "Min": "0",
+    "Mult": "0",
+    "MouserPartNumber": "N/A",
+    "ProductAttributes": [],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Microchip-Microsemi/STM32H753ZIT6?qs=eG9znyypUbsIkm%252BeJx4dOw%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [],
+    "TradeCompliance": []
+   }
+  ]
+ }
+}

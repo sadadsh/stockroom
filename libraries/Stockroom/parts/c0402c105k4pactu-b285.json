@@ -105,8 +105,8 @@
   },
   "derived": {
     "category": "Capacitors",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 16V 1uF X5R 0402 10%",
     "display_name": "1µF ±10% 0402",
     "specs": {
@@ -125,8 +125,6 @@
       "HTS Code (US)": "8532240020",
       "Image": "https://www.mouser.com/images/yageo/images/SMD_MLCC_series_SPL.JPG",
       "KRHTS": "8532240000",
-      "Lead Time": "294 Days",
-      "Lifecycle": "Active",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "1 (Unlimited)",
       "Mounting Type": "Surface Mount, MLCC",
@@ -147,7 +145,7 @@
       "Unit Weight (kg)": "1.5e-06",
       "Voltage - Rated": "16V"
     },
-    "value": ""
+    "value": "1µF"
   },
   "enrichment": {
     "Applications": {
@@ -299,7 +297,7 @@
   "id": "c0402c105k4pactu-b285",
   "manufacturer": "KEMET",
   "mpn": "C0402C105K4PACTU",
-  "part_class": "component",
+  "part_class": "passive",
   "provenance": null,
   "purchase": [
     {
@@ -351,6 +349,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/c0402c105k4pactu-b285/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/c0402c105k4pactu-b285/mouser.json"
+    }
+  },
   "tags": []
 }

@@ -1,0 +1,168 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 2,
+  "Parts": [
+   {
+    "Availability": "45 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/85/1/sfm.pdf",
+    "Description": "Headers & Wire Housings High-Reliability Tiger Eye Socket Strips",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/samtec/images/sfm-102-01-l-d_SPL.jpg",
+    "Category": "Headers & Wire Housings",
+    "LeadTime": "15 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Samtec",
+    "ManufacturerPartNumber": "SFM-150-02-L-D-A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "200-SFM15002LDA",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Tube"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "8"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$18.58",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 104,
+      "Price": "$14.40",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 256,
+      "Price": "$13.32",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 504,
+      "Price": "$10.66",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$8.95",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "SFM-150-02-L-D-A-TR"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Samtec/SFM-150-02-L-D-A?qs=Cqqh%252BS766wl7eqSXUs82NQ%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.000805
+    },
+    "AvailabilityInStock": "45",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536694040"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536901100"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536690020"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853669000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536691000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536693000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8536699999"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85366990"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Vietnam"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/85/1/sfm.pdf",
+    "Description": "Headers & Wire Housings",
+    "FactoryStock": null,
+    "ImagePath": null,
+    "Category": "Headers & Wire Housings",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Samtec",
+    "ManufacturerPartNumber": "SFM15002LDA",
+    "Min": "0",
+    "Mult": "0",
+    "MouserPartNumber": "N/A",
+    "ProductAttributes": [],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Samtec/SFM15002LDA?qs=7%2F6SraaimPQosvo%252BVHWH2w%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": []
+   }
+  ]
+ }
+}

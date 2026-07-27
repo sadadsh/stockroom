@@ -1,0 +1,167 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "1774100 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/76/2/GRM155R71E104KE14_01A.pdf",
+    "Description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 0.1 uF 25 VDC 10% 0402 X7R",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
+    "Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "LeadTime": "70 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Murata Electronics",
+    "ManufacturerPartNumber": "GRM155R71E104KE14D",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "81-GRM155R71E104KE4D",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.10",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.016",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.014",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.01",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.008",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.007",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.006",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10000,
+      "Price": "$0.004",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "GRM155R71E104KE14J"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Murata-Electronics/GRM155R71E104KE14D?qs=IPQhFcwEUOgaz7Co1ZLU6w%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 1.5e-06
+    },
+    "AvailabilityInStock": "1774100",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 350000,
+      "Date": "2026-08-04T00:00:00"
+     },
+     {
+      "Quantity": 7100000,
+      "Date": "2026-12-07T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8532240020"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8532241000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8532240000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8532240010"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853224000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8532240000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8532240400"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85322410"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Philippines"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Philippines"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

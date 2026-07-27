@@ -1,0 +1,1400 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 12,
+  "Parts": [
+   {
+    "Availability": "13558 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/Data Sheets AVX TVS Diodes (SMA-SMB-SMC Series).pdf",
+    "Description": "ESD Protection Diodes / TVS Diodes TVS DIODES",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/kyoceraelectronicdevices/images/SMBJ_series_DSL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "175 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "KYOCERA AVX",
+    "ManufacturerPartNumber": "SMBJ5.0A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "581-SMBJ5.0A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.65",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.40",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.256",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.198",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.174",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.147",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.135",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 9000,
+      "Price": "$0.119",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/KYOCERA-AVX/SMBJ5.0A?qs=tuYJFV7zqWuU2ROA4BmnwA%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "REACH-SVHC": [
+     "Lead (7439-92-1)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 9.3e-05
+    },
+    "AvailabilityInStock": "13558",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 12000,
+      "Date": "2026-11-04T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541409021"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100101"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "89233 In Stock",
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes 600W 5V 5% Uni-Directional",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/Littelfuse/images/DO_214AA_2_SMB_SPL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "147 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Littelfuse",
+    "ManufacturerPartNumber": "SMBJ5.0A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "576-SMBJ5.0A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.45",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.291",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.178",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.143",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.129",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.083",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.082",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 9000,
+      "Price": "$0.079",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Littelfuse/SMBJ5.0A?qs=JJML70Qc14t9tktzNr1oMQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant By Exemption",
+    "REACH-SVHC": [
+     "Lead (7439-92-1)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 9.3e-05
+    },
+    "AvailabilityInStock": "89233",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 12000,
+      "Date": "2026-07-30T00:00:00"
+     },
+     {
+      "Quantity": 81000,
+      "Date": "2026-12-02T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 45% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100199"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85411029"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "None",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/287/1/tfmbj.pdf",
+    "Description": "ESD Protection Diodes / TVS Diodes TVS Diode, 600W, 5V Unidirectional",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/rectron/images/SMB_SPL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Rectron",
+    "ManufacturerPartNumber": "SMBJ5.0A",
+    "Min": "6000",
+    "Mult": "3000",
+    "MouserPartNumber": "583-SMBJ5.0A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 6000,
+      "Price": "$0.105",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 9000,
+      "Price": "$0.101",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 24000,
+      "Price": "$0.10",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Rectron/SMBJ5.0A?qs=COJyYuYQspsdHxc3BHOMmA%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 9.3e-05
+    },
+    "AvailabilityInStock": "0",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536300000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100199"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85411099"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Switzerland"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "2701 In Stock",
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes 600W, 6.7V, Unidirectional, TVS",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/taiwansemiconductor/images/DO-214AA-SMB_SPL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "161 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Taiwan Semiconductor",
+    "ManufacturerPartNumber": "SMBJ5.0A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "821-SMBJ5.0A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.61",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.373",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.238",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.188",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.161",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.136",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.113",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 9000,
+      "Price": "$0.106",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 24000,
+      "Price": "$0.101",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Taiwan-Semiconductor/SMBJ5.0A?qs=tHU%2FlV7kTyRDIXSfJ5c3Gg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "REACH-SVHC": [
+     "Lead (7439-92-1)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 9e-05
+    },
+    "AvailabilityInStock": "2701",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 9000,
+      "Date": "2026-12-15T00:00:00"
+     },
+     {
+      "Quantity": 3000,
+      "Date": "2027-04-01T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536300000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "85411001"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "192 In Stock",
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes 5volts 800uA 65.2 Amps Uni-Dir",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/bourns/images/DO_214_SPL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "140 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Bourns",
+    "ManufacturerPartNumber": "SMBJ5.0A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "652-SMBJ5.0A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.42",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.277",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.175",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.141",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.125",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.101",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.093",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 9000,
+      "Price": "$0.083",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 24000,
+      "Price": "$0.078",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "SMBJ5.0A-H"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Bourns/SMBJ5.0A?qs=%252Bf8Cd6aE5bzxiTejuNj8Ig%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant By Exemption",
+    "REACH-SVHC": [
+     "Lead (7439-92-1)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 9.3e-05
+    },
+    "AvailabilityInStock": "192",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 23095,
+      "Date": "2026-08-07T00:00:00"
+     },
+     {
+      "Quantity": 24000,
+      "Date": "2026-11-16T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541590000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100199"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85411029"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "373 In Stock",
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes 5.0V 1000W UniDir TransZorb 5% Tol",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/vishay/images/DO_214_AA_SMBJ_2_DSL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "53 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Vishay Semiconductors",
+    "ManufacturerPartNumber": "SMBJ5.0A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "78-SMBJ5.0A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "750"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.53",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.328",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.208",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.163",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 750,
+      "Price": "$0.139",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2250,
+      "Price": "$0.118",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 4500,
+      "Price": "$0.107",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 9750,
+      "Price": "$0.101",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 24750,
+      "Price": "$0.091",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "SMBJ5.0A-E3/52"
+     },
+     {
+      "APMfrPN": " SMBJ5.0A-E3/5B"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Vishay-Semiconductors/SMBJ5.0A?qs=%252BA9HMDDz5Kb9TFnQYm%2FyaQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "REACH-SVHC": [
+     "Lead (7439-92-1)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 9.6e-05
+    },
+    "AvailabilityInStock": "373",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 7500,
+      "Date": "2026-09-02T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100199"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85411029"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "5182 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/Semtech_SMBJxxA.pdf",
+    "Description": "ESD Protection Diodes / TVS Diodes 1-Line 5V 65.3A TVS DO-214AA(SMB)",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/DO-214AA_SMB_2_DSL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "89 Days",
+    "LifecycleStatus": "New Product",
+    "Manufacturer": "Semtech",
+    "ManufacturerPartNumber": "SMBJ5.0A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "947-SMBJ5.0A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.73",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.453",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.292",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.222",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.20",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.184",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.153",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 9000,
+      "Price": "$0.141",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 24000,
+      "Price": "$0.134",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Semtech/SMBJ5.0A?qs=jcD%2FCkGBYePeIcbE2D3MBw%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": "5182",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "India"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "India"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes 5V 600W UNI 5%",
+    "FactoryStock": null,
+    "ImagePath": null,
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Obsolete",
+    "Manufacturer": "Crydom",
+    "ManufacturerPartNumber": "SMBJ5.0A",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "558-SMBJ5.0A",
+    "ProductAttributes": [],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Crydom/SMBJ5.0A?qs=iP%252BIbwRug4GCXfguSX%252BpAA%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "No",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 9.3e-05
+    },
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [
+     "Mouser does not presently sell this product in your region."
+    ],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536300000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes",
+    "FactoryStock": null,
+    "ImagePath": null,
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Obsolete",
+    "Manufacturer": "LITEON",
+    "ManufacturerPartNumber": "SMBJ5.0A",
+    "Min": "0",
+    "Mult": "0",
+    "MouserPartNumber": "N/A",
+    "ProductAttributes": [],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/LITEON/SMBJ5.0A?qs=j%252B1pi9TdxUZv6FX49y1ZUg%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536300000"
+     }
+    ],
+    "TradeCompliance": []
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes BID Wkg5V 1CH SMD DO214AA2 Bkdn6.4V",
+    "FactoryStock": null,
+    "ImagePath": "https://www.mouser.com/images/yageo/images/DO-214AA_DSL.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "YAGEO",
+    "ManufacturerPartNumber": "SMBJ5.0A",
+    "Min": "0",
+    "Mult": "0",
+    "MouserPartNumber": "N/A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/YAGEO/SMBJ5.0A?qs=0lSvoLzn4L8X0SsLp4aFbQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 9.3e-05
+    },
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536300000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": []
+   },
+   {
+    "Availability": "2375 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/225/1/SMBJ5.0-SMBJ440CA(DO-214AA).pdf",
+    "Description": "ESD Protection Diodes / TVS Diodes 5V 600 Watts",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mcc/images/DO_214_AA_t.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "126 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Micro Commercial Components (MCC)",
+    "ManufacturerPartNumber": "SMBJ5.0A-TP",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "833-SMBJ5.0A-TP",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.52",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.323",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.206",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.165",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.138",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.138",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Micro-Commercial-Components-MCC/SMBJ5.0A-TP?qs=ZNK0BnemlqF4rKRhjwSgkg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant By Exemption",
+    "REACH-SVHC": [
+     "Lead (7439-92-1)"
+    ],
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 9.2e-05
+    },
+    "AvailabilityInStock": "2375",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 38% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100199"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85411029"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "ESD Protection Diodes / TVS Diodes 600W 6.7V 5% Unidire ctional TVS",
+    "FactoryStock": null,
+    "ImagePath": "https://www.mouser.com/images/taiwansemiconductor/images/DO_214_AA_t.jpg",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Verify Status with Factory",
+    "Manufacturer": "Taiwan Semiconductor",
+    "ManufacturerPartNumber": "SMBJ5.0A M4G",
+    "Min": "6000",
+    "Mult": "3000",
+    "MouserPartNumber": "821-SMBJ5.0AM4G",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Taiwan-Semiconductor/SMBJ5.0A-M4G?qs=mAH9sUMRCtsYvIMj9E6gAg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant By Exemption",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 9.3e-05
+    },
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536300000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100199"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85411029"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

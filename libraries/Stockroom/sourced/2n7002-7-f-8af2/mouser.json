@@ -1,0 +1,153 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "6757 In Stock",
+    "DataSheetUrl": "",
+    "Description": "MOSFETs 60V 200mW",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "280 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "2N7002-7-F",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "621-2N7002-F",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.23",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.124",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.086",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.062",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.054",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.032",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "2N7002-13-F"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/2N7002-7-F?qs=jMXWnm70%252BC%252BAX%252BMLzUkTZg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "621-2N7002-7-F-W",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "6757",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 171130,
+      "Date": "2026-08-07T00:00:00"
+     },
+     {
+      "Quantity": 300000,
+      "Date": "2027-02-19T00:00:00"
+     },
+     {
+      "Quantity": 384000,
+      "Date": "2027-06-30T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "6000",
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541219000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

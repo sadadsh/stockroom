@@ -1,0 +1,147 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "15500 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/76/2/GRM3195C1H104JA05_01A.pdf",
+    "Description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 0.1 uF 50 VDC 5% 1206 C0G (NP0)",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
+    "Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "LeadTime": "70 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Murata Electronics",
+    "ManufacturerPartNumber": "GRM3195C1H104JA05J",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "81-GRM3195C1H104JA5J",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.45",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.263",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.159",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.127",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.108",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.106",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.093",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10000,
+      "Price": "$0.08",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 20000,
+      "Price": "$0.078",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Murata-Electronics/GRM3195C1H104JA05J?qs=d0WKAl%252BL4KaAAGMwlt9ztA%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 1.9e-05
+    },
+    "AvailabilityInStock": "15500",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8532240020"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8532241000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853224000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8532240000"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85322410"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Japan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

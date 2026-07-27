@@ -1,0 +1,708 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "CAP CER 4.7UF 16V X7S 0603",
+    "DetailedDescription": "4.7 µF ±10% 16V Ceramic Capacitor X7S 0603 (1608 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 490,
+    "Name": "Murata Electronics"
+   },
+   "ManufacturerProductNumber": "GRM188C71C475KE21D",
+   "UnitPrice": 0.27,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/murata-electronics/GRM188C71C475KE21D/7363081",
+   "DatasheetUrl": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/8942/490_Chip_Multilayer_CAT2021_MLCC.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "490-16337-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.05609,
+       "TotalPrice": 224.36
+      },
+      {
+       "BreakQuantity": 8000,
+       "UnitPrice": 0.05247,
+       "TotalPrice": 419.76
+      },
+      {
+       "BreakQuantity": 12000,
+       "UnitPrice": 0.05065,
+       "TotalPrice": 607.8
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.04864,
+       "TotalPrice": 972.8
+      },
+      {
+       "BreakQuantity": 28000,
+       "UnitPrice": 0.04747,
+       "TotalPrice": 1329.16
+      },
+      {
+       "BreakQuantity": 40000,
+       "UnitPrice": 0.04634,
+       "TotalPrice": 1853.6
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 104000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "490-16337-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.27,
+       "TotalPrice": 0.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.156,
+       "TotalPrice": 1.56
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1124,
+       "TotalPrice": 5.62
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.099,
+       "TotalPrice": 9.9
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.07662,
+       "TotalPrice": 38.31
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.06972,
+       "TotalPrice": 69.72
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 104667,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "490-16337-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.27,
+       "TotalPrice": 0.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.156,
+       "TotalPrice": 1.56
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1124,
+       "TotalPrice": 5.62
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.099,
+       "TotalPrice": 9.9
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.07662,
+       "TotalPrice": 38.31
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.06972,
+       "TotalPrice": 69.72
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 104667,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 104667,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2049,
+     "ParameterText": "Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "4.7 µF",
+     "ValueText": "4.7 µF"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1340",
+     "ValueText": "±10%"
+    },
+    {
+     "ParameterId": 14,
+     "ParameterText": "Voltage - Rated",
+     "ParameterType": "String",
+     "ValueId": "108742",
+     "ValueText": "16V"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "422418",
+     "ValueText": "X7S"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242918",
+     "ValueText": "-55°C ~ 125°C"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "350483",
+     "ValueText": "General Purpose"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409416",
+     "ValueText": "Surface Mount, MLCC"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39246",
+     "ValueText": "0603 (1608 Metric)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "7802",
+     "ValueText": "0.063\" L x 0.031\" W (1.60mm x 0.80mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "6219",
+     "ValueText": "0.039\" (1.00mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 4,
+     "ParameterText": "Lead Style",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 179519,
+    "Name": "GRM188C71C"
+   },
+   "Category": {
+    "CategoryId": 3,
+    "ParentId": 0,
+    "Name": "Capacitors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/640/398/BCAP0350%20E270%20T11_tmb%2864x64%29.jpg",
+    "SeoDescription": "Capacitor products, also known as \"condensers\", are generally named and organized in reference to the dielectric material incorporated within. Along with variations in construction methods, the choice of dielectric material has strong influence on a given device's relative cost, size, parametric stability, and suitability for a particular application.",
+    "ChildCategories": [
+     {
+      "CategoryId": 60,
+      "ParentId": 3,
+      "Name": "Ceramic Capacitors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/365/960/CGA-Series-0402-%281005-Metric%29_tmb.jpg",
+      "SeoDescription": "A capacitor is a passive electronic device that stores electric charge. Ceramic capacitors consist of two or more alternating layers of ceramic material as the dielectric and metal layers acting as the non-polarized electrodes. Applications include automotive, bypass, decoupling, filtering, RF, and ESD protection. Through-hole versions are often disc or \"blob\" shaped with two wire leads.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "17",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 5390,
+    "Name": "GRM"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8532.24.0020"
+   },
+   "OtherNames": [
+    "490-16337-2",
+    "490-16337-1",
+    "490-16337-6"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "CAP CER 4.7UF 16V X7S 0603",
+    "DetailedDescription": "4.7 µF ±10% 16V Ceramic Capacitor X7S 0603 (1608 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 490,
+    "Name": "Murata Electronics"
+   },
+   "ManufacturerProductNumber": "GRM188C71C475KE21D",
+   "UnitPrice": 0.27,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/murata-electronics/GRM188C71C475KE21D/7363081",
+   "DatasheetUrl": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/8942/490_Chip_Multilayer_CAT2021_MLCC.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "490-16337-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.05609,
+       "TotalPrice": 224.36
+      },
+      {
+       "BreakQuantity": 8000,
+       "UnitPrice": 0.05247,
+       "TotalPrice": 419.76
+      },
+      {
+       "BreakQuantity": 12000,
+       "UnitPrice": 0.05065,
+       "TotalPrice": 607.8
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.04864,
+       "TotalPrice": 972.8
+      },
+      {
+       "BreakQuantity": 28000,
+       "UnitPrice": 0.04747,
+       "TotalPrice": 1329.16
+      },
+      {
+       "BreakQuantity": 40000,
+       "UnitPrice": 0.04634,
+       "TotalPrice": 1853.6
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 104000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "490-16337-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.27,
+       "TotalPrice": 0.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.156,
+       "TotalPrice": 1.56
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1124,
+       "TotalPrice": 5.62
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.099,
+       "TotalPrice": 9.9
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.07662,
+       "TotalPrice": 38.31
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.06972,
+       "TotalPrice": 69.72
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 104667,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "490-16337-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.27,
+       "TotalPrice": 0.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.156,
+       "TotalPrice": 1.56
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1124,
+       "TotalPrice": 5.62
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.099,
+       "TotalPrice": 9.9
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.07662,
+       "TotalPrice": 38.31
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.06972,
+       "TotalPrice": 69.72
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 104667,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 104667,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2049,
+     "ParameterText": "Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "4.7 µF",
+     "ValueText": "4.7 µF"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1340",
+     "ValueText": "±10%"
+    },
+    {
+     "ParameterId": 14,
+     "ParameterText": "Voltage - Rated",
+     "ParameterType": "String",
+     "ValueId": "108742",
+     "ValueText": "16V"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "422418",
+     "ValueText": "X7S"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242918",
+     "ValueText": "-55°C ~ 125°C"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "350483",
+     "ValueText": "General Purpose"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409416",
+     "ValueText": "Surface Mount, MLCC"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39246",
+     "ValueText": "0603 (1608 Metric)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "7802",
+     "ValueText": "0.063\" L x 0.031\" W (1.60mm x 0.80mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "6219",
+     "ValueText": "0.039\" (1.00mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 4,
+     "ParameterText": "Lead Style",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 179519,
+    "Name": "GRM188C71C"
+   },
+   "Category": {
+    "CategoryId": 3,
+    "ParentId": 0,
+    "Name": "Capacitors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/640/398/BCAP0350%20E270%20T11_tmb%2864x64%29.jpg",
+    "SeoDescription": "Capacitor products, also known as \"condensers\", are generally named and organized in reference to the dielectric material incorporated within. Along with variations in construction methods, the choice of dielectric material has strong influence on a given device's relative cost, size, parametric stability, and suitability for a particular application.",
+    "ChildCategories": [
+     {
+      "CategoryId": 60,
+      "ParentId": 3,
+      "Name": "Ceramic Capacitors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/365/960/CGA-Series-0402-%281005-Metric%29_tmb.jpg",
+      "SeoDescription": "A capacitor is a passive electronic device that stores electric charge. Ceramic capacitors consist of two or more alternating layers of ceramic material as the dielectric and metal layers acting as the non-polarized electrodes. Applications include automotive, bypass, decoupling, filtering, RF, and ESD protection. Through-hole versions are often disc or \"blob\" shaped with two wire leads.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "17",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 5390,
+    "Name": "GRM"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8532.24.0020"
+   },
+   "OtherNames": [
+    "490-16337-2",
+    "490-16337-1",
+    "490-16337-6"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 490,
+    "Value": "Murata Electronics",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

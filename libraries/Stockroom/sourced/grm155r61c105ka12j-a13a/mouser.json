@@ -1,0 +1,171 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/76/2/GRM155R61C105KA12_01A.pdf",
+    "Description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 1 uF 16 VDC 10% 0402 X5R",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
+    "Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "LeadTime": "70 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Murata Electronics",
+    "ManufacturerPartNumber": "GRM155R61C105KA12J",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "81-GRM155R61C105KA2J",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "50000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.10",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.02",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.017",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.012",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.011",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.008",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.007",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25000,
+      "Price": "$0.006",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 50000,
+      "Price": "$0.006",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "GRM155R61C105KA12D"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Murata-Electronics/GRM155R61C105KA12J?qs=hNud%2FORuBR0BebdCvsO0Bw%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 1.5e-06
+    },
+    "AvailabilityInStock": "0",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 347297,
+      "Date": "2026-09-14T00:00:00"
+     },
+     {
+      "Quantity": 150000,
+      "Date": "2026-10-07T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8532240020"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8532241000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8532240010"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853224000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8532240000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8532240000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8532240400"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85322410"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Philippines"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

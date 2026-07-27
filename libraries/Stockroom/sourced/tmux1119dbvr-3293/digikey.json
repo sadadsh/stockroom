@@ -1,0 +1,704 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "IC SWITCH SPDT X 1 4OHM SOT23-6",
+    "DetailedDescription": "1 Circuit IC Switch 2:1 4Ohm SOT-23-6"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "TMUX1119DBVR",
+   "UnitPrice": 2.66,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/TMUX1119DBVR/15856768",
+   "DatasheetUrl": "https://www.ti.com/lit/ds/symlink/tmux1119.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8441/MFG_296%7E4073253-5%7EDBV%7E6.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-TMUX1119DBVRTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 1.38115,
+       "TotalPrice": 4143.45
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 1.35442,
+       "TotalPrice": 8126.52
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 3000,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 3000,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TMUX1119DBVRCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.66,
+       "TotalPrice": 2.66
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.98,
+       "TotalPrice": 19.8
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.81,
+       "TotalPrice": 45.25
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.6229,
+       "TotalPrice": 162.29
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.53376,
+       "TotalPrice": 383.44
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.49788,
+       "TotalPrice": 748.94
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 5143,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TMUX1119DBVRDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.66,
+       "TotalPrice": 2.66
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.98,
+       "TotalPrice": 19.8
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.81,
+       "TotalPrice": 45.25
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.6229,
+       "TotalPrice": 162.29
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.53376,
+       "TotalPrice": 383.44
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.49788,
+       "TotalPrice": 748.94
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 5143,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 5143,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 1960,
+     "ParameterText": "Switch Circuit",
+     "ParameterType": "String",
+     "ValueId": "405967",
+     "ValueText": "SPDT"
+    },
+    {
+     "ParameterId": 1961,
+     "ParameterText": "Multiplexer/Demultiplexer Circuit",
+     "ParameterType": "String",
+     "ValueId": "137551",
+     "ValueText": "2:1"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 433,
+     "ParameterText": "On-State Resistance (Max)",
+     "ParameterType": "String",
+     "ValueId": "228130",
+     "ValueText": "4Ohm"
+    },
+    {
+     "ParameterId": 1962,
+     "ParameterText": "Channel-to-Channel Matching (ΔRon)",
+     "ParameterType": "String",
+     "ValueId": "90102",
+     "ValueText": "130mOhm"
+    },
+    {
+     "ParameterId": 1956,
+     "ParameterText": "Voltage - Supply, Single (V+)",
+     "ParameterType": "String",
+     "ValueId": "42989",
+     "ValueText": "1.08V ~ 5.5V"
+    },
+    {
+     "ParameterId": 1957,
+     "ParameterText": "Voltage - Supply, Dual (V±)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1963,
+     "ParameterText": "Switch Time (Ton, Toff) (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 781,
+     "ParameterText": "-3db Bandwidth",
+     "ParameterType": "String",
+     "ValueId": "157010",
+     "ValueText": "250MHz"
+    },
+    {
+     "ParameterId": 1958,
+     "ParameterText": "Charge Injection",
+     "ParameterType": "String",
+     "ValueId": "267150",
+     "ValueText": "-6pC"
+    },
+    {
+     "ParameterId": 1964,
+     "ParameterText": "Channel Capacitance (CS(off), CD(off))",
+     "ParameterType": "String",
+     "ValueId": "267157",
+     "ValueText": "6pF"
+    },
+    {
+     "ParameterId": 1965,
+     "ParameterText": "Current - Leakage (IS(off)) (Max)",
+     "ParameterType": "String",
+     "ValueId": "287561",
+     "ValueText": "80pA"
+    },
+    {
+     "ParameterId": 1959,
+     "ParameterText": "Crosstalk",
+     "ParameterType": "String",
+     "ValueId": "221988",
+     "ValueText": "-45dB @ 10MHz"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "405431",
+     "ValueText": "SOT-23-6"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405431",
+     "ValueText": "SOT-23-6"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2016,
+      "ParentId": 32,
+      "Name": "Interface",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/236/976/175-16-QSOP_tmb%2864x64%29.jpg",
+      "SeoDescription": "Interface components are used to connect various signals or data transmission. Included in this category are analog switches, multiplexers, demultiplexers, CODECs, controllers for communication protocols, direct digital synthesis (DDS), drivers, receivers, transceivers, encoders, decoders, filters, I/O expanders, modems, modules, sensor and detectors, capacitive touch, serializers, deserializers, signal buffers, repeaters, splitters, signal terminators, telecom, universal asynchronous receiver/transmitter (UARTs), voice record and playback, and various boards and specialized products.",
+      "ChildCategories": [
+       {
+        "CategoryId": 747,
+        "ParentId": 2016,
+        "Name": "Analog Switches, Multiplexers, Demultiplexers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/084/032/505%7ECP-20-6%7ECP%7E20_tmb.jpg",
+        "SeoDescription": "Products in this family are used for interconnecting or routing analog signals between multiple available signal paths. Functioning similar to a traditional electromechanical switch, their solid-state character facilitates electronic control, longer service life, and reduced switching noise compared to electromechanical switching, in trade for added constraints on the amplitude and bias of the signals being switched.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "9",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "296-TMUX1119DBVRTR",
+    "296-TMUX1119DBVRDKR",
+    "296-TMUX1119DBVRCT"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "IC SWITCH SPDT X 1 4OHM SOT23-6",
+    "DetailedDescription": "1 Circuit IC Switch 2:1 4Ohm SOT-23-6"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "TMUX1119DBVR",
+   "UnitPrice": 2.66,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/TMUX1119DBVR/15856768",
+   "DatasheetUrl": "https://www.ti.com/lit/ds/symlink/tmux1119.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8441/MFG_296%7E4073253-5%7EDBV%7E6.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-TMUX1119DBVRTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 1.38115,
+       "TotalPrice": 4143.45
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 1.35442,
+       "TotalPrice": 8126.52
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 3000,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 3000,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TMUX1119DBVRCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.66,
+       "TotalPrice": 2.66
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.98,
+       "TotalPrice": 19.8
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.81,
+       "TotalPrice": 45.25
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.6229,
+       "TotalPrice": 162.29
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.53376,
+       "TotalPrice": 383.44
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.49788,
+       "TotalPrice": 748.94
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 5143,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-TMUX1119DBVRDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.66,
+       "TotalPrice": 2.66
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.98,
+       "TotalPrice": 19.8
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.81,
+       "TotalPrice": 45.25
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.6229,
+       "TotalPrice": 162.29
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.53376,
+       "TotalPrice": 383.44
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.49788,
+       "TotalPrice": 748.94
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 5143,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 5143,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 1960,
+     "ParameterText": "Switch Circuit",
+     "ParameterType": "String",
+     "ValueId": "405967",
+     "ValueText": "SPDT"
+    },
+    {
+     "ParameterId": 1961,
+     "ParameterText": "Multiplexer/Demultiplexer Circuit",
+     "ParameterType": "String",
+     "ValueId": "137551",
+     "ValueText": "2:1"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 433,
+     "ParameterText": "On-State Resistance (Max)",
+     "ParameterType": "String",
+     "ValueId": "228130",
+     "ValueText": "4Ohm"
+    },
+    {
+     "ParameterId": 1962,
+     "ParameterText": "Channel-to-Channel Matching (ΔRon)",
+     "ParameterType": "String",
+     "ValueId": "90102",
+     "ValueText": "130mOhm"
+    },
+    {
+     "ParameterId": 1956,
+     "ParameterText": "Voltage - Supply, Single (V+)",
+     "ParameterType": "String",
+     "ValueId": "42989",
+     "ValueText": "1.08V ~ 5.5V"
+    },
+    {
+     "ParameterId": 1957,
+     "ParameterText": "Voltage - Supply, Dual (V±)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1963,
+     "ParameterText": "Switch Time (Ton, Toff) (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 781,
+     "ParameterText": "-3db Bandwidth",
+     "ParameterType": "String",
+     "ValueId": "157010",
+     "ValueText": "250MHz"
+    },
+    {
+     "ParameterId": 1958,
+     "ParameterText": "Charge Injection",
+     "ParameterType": "String",
+     "ValueId": "267150",
+     "ValueText": "-6pC"
+    },
+    {
+     "ParameterId": 1964,
+     "ParameterText": "Channel Capacitance (CS(off), CD(off))",
+     "ParameterType": "String",
+     "ValueId": "267157",
+     "ValueText": "6pF"
+    },
+    {
+     "ParameterId": 1965,
+     "ParameterText": "Current - Leakage (IS(off)) (Max)",
+     "ParameterType": "String",
+     "ValueId": "287561",
+     "ValueText": "80pA"
+    },
+    {
+     "ParameterId": 1959,
+     "ParameterText": "Crosstalk",
+     "ParameterType": "String",
+     "ValueId": "221988",
+     "ValueText": "-45dB @ 10MHz"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "405431",
+     "ValueText": "SOT-23-6"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405431",
+     "ValueText": "SOT-23-6"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2016,
+      "ParentId": 32,
+      "Name": "Interface",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/003/236/976/175-16-QSOP_tmb%2864x64%29.jpg",
+      "SeoDescription": "Interface components are used to connect various signals or data transmission. Included in this category are analog switches, multiplexers, demultiplexers, CODECs, controllers for communication protocols, direct digital synthesis (DDS), drivers, receivers, transceivers, encoders, decoders, filters, I/O expanders, modems, modules, sensor and detectors, capacitive touch, serializers, deserializers, signal buffers, repeaters, splitters, signal terminators, telecom, universal asynchronous receiver/transmitter (UARTs), voice record and playback, and various boards and specialized products.",
+      "ChildCategories": [
+       {
+        "CategoryId": 747,
+        "ParentId": 2016,
+        "Name": "Analog Switches, Multiplexers, Demultiplexers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/084/032/505%7ECP-20-6%7ECP%7E20_tmb.jpg",
+        "SeoDescription": "Products in this family are used for interconnecting or routing analog signals between multiple available signal paths. Functioning similar to a traditional electromechanical switch, their solid-state character facilitates electronic control, longer service life, and reduced switching noise compared to electromechanical switching, in trade for added constraints on the amplitude and bias of the signals being switched.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "9",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "296-TMUX1119DBVRTR",
+    "296-TMUX1119DBVRDKR",
+    "296-TMUX1119DBVRCT"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 296,
+    "Value": "Texas Instruments",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

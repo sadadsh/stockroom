@@ -1,0 +1,724 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "RES 0.02 OHM 1% 3W 2512",
+    "DetailedDescription": "20 mOhms ±1% 3W Chip Resistor 2512 (6332 Metric) Automotive AEC-Q200, Current Sense, Moisture Resistant Metal Element"
+   },
+   "Manufacturer": {
+    "Id": 118,
+    "Name": "Bourns Inc."
+   },
+   "ManufacturerProductNumber": "CRA2512-FZ-R020ELF",
+   "UnitPrice": 0.55,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/bourns-inc/CRA2512-FZ-R020ELF/1775030",
+   "DatasheetUrl": "https://www.bourns.com/docs/product-datasheets/cra.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/649/CRA2512.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "CRA2512-FZ-R020ELFTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.14471,
+       "TotalPrice": 578.84
+      },
+      {
+       "BreakQuantity": 8000,
+       "UnitPrice": 0.13455,
+       "TotalPrice": 1076.4
+      },
+      {
+       "BreakQuantity": 12000,
+       "UnitPrice": 0.12933,
+       "TotalPrice": 1551.96
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.12342,
+       "TotalPrice": 2468.4
+      },
+      {
+       "BreakQuantity": 28000,
+       "UnitPrice": 0.1199,
+       "TotalPrice": 3357.2
+      },
+      {
+       "BreakQuantity": 40000,
+       "UnitPrice": 0.11646,
+       "TotalPrice": 4658.4
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 118,
+      "Name": "Bourns Inc."
+     },
+     "QuantityAvailableforPackageType": 157000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "CRA2512-FZ-R020ELFCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.55,
+       "TotalPrice": 0.55
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.353,
+       "TotalPrice": 3.53
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2996,
+       "TotalPrice": 7.49
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.2664,
+       "TotalPrice": 13.32
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.238,
+       "TotalPrice": 23.8
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.20684,
+       "TotalPrice": 51.71
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.18734,
+       "TotalPrice": 93.67
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.17077,
+       "TotalPrice": 170.77
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 118,
+      "Name": "Bourns Inc."
+     },
+     "QuantityAvailableforPackageType": 157443,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "CRA2512-FZ-R020ELFDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.55,
+       "TotalPrice": 0.55
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.353,
+       "TotalPrice": 3.53
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2996,
+       "TotalPrice": 7.49
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.2664,
+       "TotalPrice": 13.32
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.238,
+       "TotalPrice": 23.8
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.20684,
+       "TotalPrice": 51.71
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.18734,
+       "TotalPrice": 93.67
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.17077,
+       "TotalPrice": 170.77
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 118,
+      "Name": "Bourns Inc."
+     },
+     "QuantityAvailableforPackageType": 157443,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 157443,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2085,
+     "ParameterText": "Resistance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "20 mOhms",
+     "ValueText": "20 mOhms"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1131",
+     "ValueText": "±1%"
+    },
+    {
+     "ParameterId": 2,
+     "ParameterText": "Power (Watts)",
+     "ParameterType": "String",
+     "ValueId": "203013",
+     "ValueText": "3W"
+    },
+    {
+     "ParameterId": 174,
+     "ParameterText": "Composition",
+     "ParameterType": "String",
+     "ValueId": "374912",
+     "ValueText": "Metal Element"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "316917",
+     "ValueText": "Automotive AEC-Q200, Current Sense, Moisture Resistant"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "2617",
+     "ValueText": "±50ppm/°C"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242940",
+     "ValueText": "-55°C ~ 170°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "735156",
+     "ValueText": "2512 (6332 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "157401",
+     "ValueText": "2512"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "16286",
+     "ValueText": "0.254\" L x 0.132\" W (6.45mm x 3.35mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "6031",
+     "ValueText": "0.035\" (0.90mm)"
+    },
+    {
+     "ParameterId": 1127,
+     "ParameterText": "Number of Terminations",
+     "ParameterType": "Double",
+     "ValueId": "2",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 121051,
+    "Name": "CRA2512"
+   },
+   "Category": {
+    "CategoryId": 2,
+    "ParentId": 0,
+    "Name": "Resistors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/639/316/FVT%20SERIES_tmb%2864x64%29.jpg",
+    "SeoDescription": "Products within this category include fixed-value (non-adjustable) resistors and related mounting accessories, organized according to their physical form factor or the method by which they are physically and electrically connected within an end application. Adjustable or variable-value resistors (also known as potentiometers or rheostats) are found separately, in a category of their own.",
+    "ChildCategories": [
+     {
+      "CategoryId": 52,
+      "ParentId": 2,
+      "Name": "Chip Resistor - Surface Mount",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/683/989/MFG_RMC%20SERIES_tmb%2864x64%29.jpg",
+      "SeoDescription": "Resistors provide opposition to current flow, in a manner that is proportional to the electric potential (voltage) imposed across them, and which is ideally unaffected by signal frequency or changes in temperature. Resistors described as surface mount chip types are designed to be affixed to the surface of a printed circuit board and incorporate a single resistor per device package.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "18",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 27642,
+    "Name": "CRA2512"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8533.21.0030"
+   },
+   "OtherNames": [
+    "CRA2512-FZ-R020ELFDKR",
+    "CRA2512-FZ-R020ELFTR",
+    "CRA2512FZR020ELF",
+    "CRA2512-FZ-R020ELFCT",
+    "2266-CRA2512-FZ-R020ELF"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "RES 0.02 OHM 1% 3W 2512",
+    "DetailedDescription": "20 mOhms ±1% 3W Chip Resistor 2512 (6332 Metric) Automotive AEC-Q200, Current Sense, Moisture Resistant Metal Element"
+   },
+   "Manufacturer": {
+    "Id": 118,
+    "Name": "Bourns Inc."
+   },
+   "ManufacturerProductNumber": "CRA2512-FZ-R020ELF",
+   "UnitPrice": 0.55,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/bourns-inc/CRA2512-FZ-R020ELF/1775030",
+   "DatasheetUrl": "https://www.bourns.com/docs/product-datasheets/cra.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/649/CRA2512.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "CRA2512-FZ-R020ELFTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.14471,
+       "TotalPrice": 578.84
+      },
+      {
+       "BreakQuantity": 8000,
+       "UnitPrice": 0.13455,
+       "TotalPrice": 1076.4
+      },
+      {
+       "BreakQuantity": 12000,
+       "UnitPrice": 0.12933,
+       "TotalPrice": 1551.96
+      },
+      {
+       "BreakQuantity": 20000,
+       "UnitPrice": 0.12342,
+       "TotalPrice": 2468.4
+      },
+      {
+       "BreakQuantity": 28000,
+       "UnitPrice": 0.1199,
+       "TotalPrice": 3357.2
+      },
+      {
+       "BreakQuantity": 40000,
+       "UnitPrice": 0.11646,
+       "TotalPrice": 4658.4
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 118,
+      "Name": "Bourns Inc."
+     },
+     "QuantityAvailableforPackageType": 157000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "CRA2512-FZ-R020ELFCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.55,
+       "TotalPrice": 0.55
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.353,
+       "TotalPrice": 3.53
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2996,
+       "TotalPrice": 7.49
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.2664,
+       "TotalPrice": 13.32
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.238,
+       "TotalPrice": 23.8
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.20684,
+       "TotalPrice": 51.71
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.18734,
+       "TotalPrice": 93.67
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.17077,
+       "TotalPrice": 170.77
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 118,
+      "Name": "Bourns Inc."
+     },
+     "QuantityAvailableforPackageType": 157443,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "CRA2512-FZ-R020ELFDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.55,
+       "TotalPrice": 0.55
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.353,
+       "TotalPrice": 3.53
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2996,
+       "TotalPrice": 7.49
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.2664,
+       "TotalPrice": 13.32
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.238,
+       "TotalPrice": 23.8
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.20684,
+       "TotalPrice": 51.71
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.18734,
+       "TotalPrice": 93.67
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.17077,
+       "TotalPrice": 170.77
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 118,
+      "Name": "Bourns Inc."
+     },
+     "QuantityAvailableforPackageType": 157443,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 157443,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2085,
+     "ParameterText": "Resistance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "20 mOhms",
+     "ValueText": "20 mOhms"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1131",
+     "ValueText": "±1%"
+    },
+    {
+     "ParameterId": 2,
+     "ParameterText": "Power (Watts)",
+     "ParameterType": "String",
+     "ValueId": "203013",
+     "ValueText": "3W"
+    },
+    {
+     "ParameterId": 174,
+     "ParameterText": "Composition",
+     "ParameterType": "String",
+     "ValueId": "374912",
+     "ValueText": "Metal Element"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "316917",
+     "ValueText": "Automotive AEC-Q200, Current Sense, Moisture Resistant"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "2617",
+     "ValueText": "±50ppm/°C"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242940",
+     "ValueText": "-55°C ~ 170°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "735156",
+     "ValueText": "2512 (6332 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "157401",
+     "ValueText": "2512"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "16286",
+     "ValueText": "0.254\" L x 0.132\" W (6.45mm x 3.35mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "6031",
+     "ValueText": "0.035\" (0.90mm)"
+    },
+    {
+     "ParameterId": 1127,
+     "ParameterText": "Number of Terminations",
+     "ParameterType": "Double",
+     "ValueId": "2",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 121051,
+    "Name": "CRA2512"
+   },
+   "Category": {
+    "CategoryId": 2,
+    "ParentId": 0,
+    "Name": "Resistors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/639/316/FVT%20SERIES_tmb%2864x64%29.jpg",
+    "SeoDescription": "Products within this category include fixed-value (non-adjustable) resistors and related mounting accessories, organized according to their physical form factor or the method by which they are physically and electrically connected within an end application. Adjustable or variable-value resistors (also known as potentiometers or rheostats) are found separately, in a category of their own.",
+    "ChildCategories": [
+     {
+      "CategoryId": 52,
+      "ParentId": 2,
+      "Name": "Chip Resistor - Surface Mount",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/683/989/MFG_RMC%20SERIES_tmb%2864x64%29.jpg",
+      "SeoDescription": "Resistors provide opposition to current flow, in a manner that is proportional to the electric potential (voltage) imposed across them, and which is ideally unaffected by signal frequency or changes in temperature. Resistors described as surface mount chip types are designed to be affixed to the surface of a printed circuit board and incorporate a single resistor per device package.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "18",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 27642,
+    "Name": "CRA2512"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8533.21.0030"
+   },
+   "OtherNames": [
+    "CRA2512-FZ-R020ELFDKR",
+    "CRA2512-FZ-R020ELFTR",
+    "CRA2512FZR020ELF",
+    "CRA2512-FZ-R020ELFCT",
+    "2266-CRA2512-FZ-R020ELF"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 118,
+    "Value": "Bourns Inc.",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

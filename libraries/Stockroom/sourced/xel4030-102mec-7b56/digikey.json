@@ -1,0 +1,480 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "FIXED IND 1UH 10.7A 9.78 MOHM",
+    "DetailedDescription": "1 µH Shielded Molded Inductor 10.7 A 9.78mOhm Max 1616 (4040 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 2457,
+    "Name": "Coilcraft"
+   },
+   "ManufacturerProductNumber": "XEL4030-102MEC",
+   "UnitPrice": 0.0,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/coilcraft/XEL4030-102MEC/21381728",
+   "DatasheetUrl": "https://www.coilcraft.com/en-us/files/datasheet/XEL4030",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5530/MFG_XEL4030-122MEC.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "2457-XEL4030-102MEC-ND",
+     "PackageType": {
+      "Id": 250,
+      "Name": "Strip"
+     },
+     "StandardPricing": [],
+     "MyPricing": [],
+     "MarketPlace": true,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 2457,
+      "Name": "Coilcraft"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 10000,
+     "MinimumOrderQuantity": 0,
+     "StandardPackage": 1,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 0,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": true,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "376942",
+     "ValueText": "Molded"
+    },
+    {
+     "ParameterId": 1221,
+     "ParameterText": "Material - Core",
+     "ParameterType": "String",
+     "ValueId": "374907",
+     "ValueText": "Metal Composite"
+    },
+    {
+     "ParameterId": 2087,
+     "ParameterText": "Inductance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 µH",
+     "ValueText": "1 µH"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1900",
+     "ValueText": "±20%"
+    },
+    {
+     "ParameterId": 2088,
+     "ParameterText": "Current Rating (Amps)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10.7 A",
+     "ValueText": "10.7 A"
+    },
+    {
+     "ParameterId": 1219,
+     "ParameterText": "Current - Saturation (Isat)",
+     "ParameterType": "String",
+     "ValueId": "304899",
+     "ValueText": "9A"
+    },
+    {
+     "ParameterId": 80,
+     "ParameterText": "Shielding",
+     "ParameterType": "String",
+     "ValueId": "402031",
+     "ValueText": "Shielded"
+    },
+    {
+     "ParameterId": 314,
+     "ParameterText": "DC Resistance (DCR)",
+     "ParameterType": "String",
+     "ValueId": "697880",
+     "ValueText": "9.78mOhm Max"
+    },
+    {
+     "ParameterId": 705,
+     "ParameterText": "Q @ Freq",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 706,
+     "ParameterText": "Frequency - Self Resonant",
+     "ParameterType": "String",
+     "ValueId": "262937",
+     "ValueText": "65MHz"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "312105",
+     "ValueText": "AEC-Q200"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212478",
+     "ValueText": "-40°C ~ 125°C"
+    },
+    {
+     "ParameterId": 1222,
+     "ParameterText": "Inductance Frequency - Test",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 MHz",
+     "ValueText": "1 MHz"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "106189",
+     "ValueText": "1616 (4040 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "106188",
+     "ValueText": "1616"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "12254",
+     "ValueText": "0.157\" L x 0.157\" W (4.00mm x 4.00mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "10653",
+     "ValueText": "0.122\" (3.10mm)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 4,
+    "ParentId": 0,
+    "Name": "Inductors, Coils, Chokes",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/465/830/760308104119_tmb%2864x64%29.jpg",
+    "SeoDescription": "Inductors, coils, and chokes are various names used to refer to products that store energy in the form of a magnetic field. The vast majority of the products found in this category are simple fixed-value devices, though adjustable types, products for wireless power transmission, and magnetically-coupled inductor arrays are also included. Note that the coupled-inductor devices found within this product family are characterized by having multiple identical windings sharing a common magnetic core; similar products with non-identical windings are more commonly described as transformers, and are categorized as such.",
+    "ChildCategories": [
+     {
+      "CategoryId": 71,
+      "ParentId": 4,
+      "Name": "Fixed Inductors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/690/369/MFG_WE-HCF%202013%20Series_tmb%2864x64%29.jpg",
+      "SeoDescription": "An inductor, also known as a coil, choke, or reactor, is a passive two-terminal electrical component that stores energy in a magnetic field when electric current flows through it. When the current changes, the magnetic field induces a voltage in the conductor. The induced voltage has a polarity which opposes the change in current that created it. The unit of inductance is the Henry (H). Mounting options include surface, through-hole, and chassis.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "0",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 118099,
+    "Name": "XEL4030"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unknown",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8504.50.8000"
+   },
+   "OtherNames": [
+    "2457-XEL4030-102MEC"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "FIXED IND 1UH 10.7A 9.78 MOHM",
+    "DetailedDescription": "1 µH Shielded Molded Inductor 10.7 A 9.78mOhm Max 1616 (4040 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 2457,
+    "Name": "Coilcraft"
+   },
+   "ManufacturerProductNumber": "XEL4030-102MEC",
+   "UnitPrice": 0.0,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/coilcraft/XEL4030-102MEC/21381728",
+   "DatasheetUrl": "https://www.coilcraft.com/en-us/files/datasheet/XEL4030",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5530/MFG_XEL4030-122MEC.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "2457-XEL4030-102MEC-ND",
+     "PackageType": {
+      "Id": 250,
+      "Name": "Strip"
+     },
+     "StandardPricing": [],
+     "MyPricing": [],
+     "MarketPlace": true,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 2457,
+      "Name": "Coilcraft"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 10000,
+     "MinimumOrderQuantity": 0,
+     "StandardPackage": 1,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 0,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": true,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "376942",
+     "ValueText": "Molded"
+    },
+    {
+     "ParameterId": 1221,
+     "ParameterText": "Material - Core",
+     "ParameterType": "String",
+     "ValueId": "374907",
+     "ValueText": "Metal Composite"
+    },
+    {
+     "ParameterId": 2087,
+     "ParameterText": "Inductance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 µH",
+     "ValueText": "1 µH"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1900",
+     "ValueText": "±20%"
+    },
+    {
+     "ParameterId": 2088,
+     "ParameterText": "Current Rating (Amps)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10.7 A",
+     "ValueText": "10.7 A"
+    },
+    {
+     "ParameterId": 1219,
+     "ParameterText": "Current - Saturation (Isat)",
+     "ParameterType": "String",
+     "ValueId": "304899",
+     "ValueText": "9A"
+    },
+    {
+     "ParameterId": 80,
+     "ParameterText": "Shielding",
+     "ParameterType": "String",
+     "ValueId": "402031",
+     "ValueText": "Shielded"
+    },
+    {
+     "ParameterId": 314,
+     "ParameterText": "DC Resistance (DCR)",
+     "ParameterType": "String",
+     "ValueId": "697880",
+     "ValueText": "9.78mOhm Max"
+    },
+    {
+     "ParameterId": 705,
+     "ParameterText": "Q @ Freq",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 706,
+     "ParameterText": "Frequency - Self Resonant",
+     "ParameterType": "String",
+     "ValueId": "262937",
+     "ValueText": "65MHz"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "312105",
+     "ValueText": "AEC-Q200"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212478",
+     "ValueText": "-40°C ~ 125°C"
+    },
+    {
+     "ParameterId": 1222,
+     "ParameterText": "Inductance Frequency - Test",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "1 MHz",
+     "ValueText": "1 MHz"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "106189",
+     "ValueText": "1616 (4040 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "106188",
+     "ValueText": "1616"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "12254",
+     "ValueText": "0.157\" L x 0.157\" W (4.00mm x 4.00mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "10653",
+     "ValueText": "0.122\" (3.10mm)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 4,
+    "ParentId": 0,
+    "Name": "Inductors, Coils, Chokes",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/465/830/760308104119_tmb%2864x64%29.jpg",
+    "SeoDescription": "Inductors, coils, and chokes are various names used to refer to products that store energy in the form of a magnetic field. The vast majority of the products found in this category are simple fixed-value devices, though adjustable types, products for wireless power transmission, and magnetically-coupled inductor arrays are also included. Note that the coupled-inductor devices found within this product family are characterized by having multiple identical windings sharing a common magnetic core; similar products with non-identical windings are more commonly described as transformers, and are categorized as such.",
+    "ChildCategories": [
+     {
+      "CategoryId": 71,
+      "ParentId": 4,
+      "Name": "Fixed Inductors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/690/369/MFG_WE-HCF%202013%20Series_tmb%2864x64%29.jpg",
+      "SeoDescription": "An inductor, also known as a coil, choke, or reactor, is a passive two-terminal electrical component that stores energy in a magnetic field when electric current flows through it. When the current changes, the magnetic field induces a voltage in the conductor. The induced voltage has a polarity which opposes the change in current that created it. The unit of inductance is the Henry (H). Mounting options include surface, through-hole, and chassis.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "0",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 118099,
+    "Name": "XEL4030"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unknown",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8504.50.8000"
+   },
+   "OtherNames": [
+    "2457-XEL4030-102MEC"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 2457,
+    "Value": "Coilcraft",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

@@ -1,0 +1,155 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "21908 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Tactile Switches 6 mm Tact Switches",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/ckcomponents/images/pts645_series_new_SPL.jpg",
+    "Category": "Tactile Switches",
+    "LeadTime": "84 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "C&K",
+    "ManufacturerPartNumber": "PTS645SK50SMTR92 LFS",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "611-PTS645SK50SMTR92",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "1000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.36",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.313",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$0.293",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.262",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.243",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.229",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.183",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2000,
+      "Price": "$0.172",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.17",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/CK/PTS645SK50SMTR92-LFS?qs=Imq1NPwxi76Jk1DLOTw19A%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.000870817
+    },
+    "AvailabilityInStock": "21908",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536509031"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536500090"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536509040"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853650090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536502000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536501190"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85365090"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

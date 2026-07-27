@@ -1,0 +1,122 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "28 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/grhls00363-1.pdf",
+    "Description": "Rotary Switches 56A30-01-1-03N",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/grayhill/images/56_series.jpg",
+    "Category": "Rotary Switches",
+    "LeadTime": "105 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Grayhill",
+    "ManufacturerPartNumber": "56A30-01-1-03N",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "706-56A30-01-1-03N",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "1"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$31.64",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$22.86",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 50,
+      "Price": "$21.85",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$20.06",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$18.95",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$18.76",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Grayhill/56A30-01-1-03N?qs=ls7QRyWmRk7M7KJ96PIF0A%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.01491375
+    },
+    "AvailabilityInStock": "28",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536509020"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536500090"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536509030"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853650090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536501000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536501590"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85365090"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

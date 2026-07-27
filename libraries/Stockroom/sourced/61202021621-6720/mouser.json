@@ -1,0 +1,120 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "8226 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Headers & Wire Housings WR-BHD 2.54mm Box 20Pin Male Straight",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/wurthelectronics/images/61201421621.jpg",
+    "Category": "Headers & Wire Housings",
+    "LeadTime": "98 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Wurth Elektronik",
+    "ManufacturerPartNumber": "61202021621",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "710-61202021621",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Tray"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "160"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.95",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.932",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 50,
+      "Price": "$0.859",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.769",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/61202021621?qs=ZtY9WdtwX56vYmz0%252BUtUhA%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.0025
+    },
+    "AvailabilityInStock": "8226",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536694040"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536901100"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536690020"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853669000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536691000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536693000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8536699999"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85366990"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

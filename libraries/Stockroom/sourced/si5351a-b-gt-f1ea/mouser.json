@@ -1,0 +1,146 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "3254 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/564/1/Si5351_B.pdf",
+    "Description": "Clock Generators & Support Products I2C program, any-frequency, any-output, Xtal reference, 3-output LVCMOS clock generator",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/skyworks/images/skyworks_msop10_spl.jpg",
+    "Category": "Clock Generators & Support Products",
+    "LeadTime": "84 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Skyworks Solutions, Inc.",
+    "ManufacturerPartNumber": "SI5351A-B-GT",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "634-SI5351A-B-GT",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Tube"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "95"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$2.19",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$1.62",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$1.33",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 95,
+      "Price": "$1.26",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 285,
+      "Price": "$1.23",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 570,
+      "Price": "$1.19",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1045,
+      "Price": "$1.15",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2565,
+      "Price": "$1.12",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5035,
+      "Price": "$1.09",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "Si5351A-B-GTR"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Skyworks-Solutions-Inc/SI5351A-B-GT?qs=p9T7GgSe1IEO%252BMfC%2FKPFfA%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "634-SI5351A-B-GTR",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.0001432
+    },
+    "AvailabilityInStock": "3254",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 4085,
+      "Date": "2027-05-25T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542390070"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8542390000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854239099"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8542399901"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Malaysia"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

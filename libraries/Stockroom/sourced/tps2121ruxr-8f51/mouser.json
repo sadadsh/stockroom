@@ -1,0 +1,134 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "28537 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Power Switch ICs - Power Distribution 2.7-V&nbsp;to 22-V 5 6-m? 4.5-A power A A 595-TPS2121RUXT",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/texasinstruments/images/TPS2121RUXR_t.jpg",
+    "Category": "Power Switch ICs - Power Distribution",
+    "LeadTime": "112 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Texas Instruments",
+    "ManufacturerPartNumber": "TPS2121RUXR",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "595-TPS2121RUXR",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$2.44",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$1.82",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$1.66",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$1.49",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$1.40",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$1.37",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$1.34",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$1.34",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "TPS2121RUXT"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS2121RUXR?qs=qSfuJ%252Bfl%2Fd7dCYiVnUfngQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "595-TPS2121RUXT",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 2.8e-05
+    },
+    "AvailabilityInStock": "28537",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "1001",
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542390090"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Philippines"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Philippines"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "United States"
+     }
+    ]
+   }
+  ]
+ }
+}

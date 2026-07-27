@@ -1,0 +1,628 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "FERRITE BEAD 8.5 OHM 0603 1LN",
+    "DetailedDescription": "8.5 Ohms @ 100 MHz 1 Power Line Ferrite Bead 0603 (1608 Metric) 5A 4mOhm"
+   },
+   "Manufacturer": {
+    "Id": 490,
+    "Name": "Murata Electronics"
+   },
+   "ManufacturerProductNumber": "BLE18PS080BH1D",
+   "UnitPrice": 0.37,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/murata-electronics/BLE18PS080BH1D/13904871",
+   "DatasheetUrl": "https://www.murata.com/products/productdata/8801029750814/QNFA9147.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2414/EMIFIL%2C-BLxxx.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "490-BLE18PS080BH1DTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.09125,
+       "TotalPrice": 365.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "490-BLE18PS080BH1DCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.37,
+       "TotalPrice": 0.37
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.257,
+       "TotalPrice": 2.57
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2224,
+       "TotalPrice": 5.56
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1988,
+       "TotalPrice": 9.94
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.177,
+       "TotalPrice": 17.7
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.15068,
+       "TotalPrice": 37.67
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.13248,
+       "TotalPrice": 66.24
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.11558,
+       "TotalPrice": 115.58
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 324,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "490-BLE18PS080BH1DDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.37,
+       "TotalPrice": 0.37
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.257,
+       "TotalPrice": 2.57
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2224,
+       "TotalPrice": 5.56
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1988,
+       "TotalPrice": 9.94
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.177,
+       "TotalPrice": 17.7
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.15068,
+       "TotalPrice": 37.67
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.13248,
+       "TotalPrice": 66.24
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.11558,
+       "TotalPrice": 115.58
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 324,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 324,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 21,
+     "ParameterText": "Filter Type",
+     "ParameterType": "String",
+     "ValueId": "389223",
+     "ValueText": "Power Line"
+    },
+    {
+     "ParameterId": 2169,
+     "ParameterText": "Number of Lines",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 2280,
+     "ParameterText": "Impedance @ Frequency",
+     "ParameterType": "CoupledUnitOfMeasure",
+     "ValueId": "8.5 Ohms @ 100 MHz",
+     "ValueText": "8.5 Ohms @ 100 MHz"
+    },
+    {
+     "ParameterId": 1923,
+     "ParameterText": "Current Rating (Max)",
+     "ParameterType": "String",
+     "ValueId": "247706",
+     "ValueText": "5A"
+    },
+    {
+     "ParameterId": 1924,
+     "ParameterText": "DC Resistance (DCR) (Max)",
+     "ParameterType": "String",
+     "ValueId": "228025",
+     "ValueText": "4mOhm"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "312105",
+     "ValueText": "AEC-Q200"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242931",
+     "ValueText": "-55°C ~ 150°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39246",
+     "ValueText": "0603 (1608 Metric)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 966,
+     "ParameterText": "Height (Max)",
+     "ParameterType": "String",
+     "ValueId": "5744",
+     "ValueText": "0.030\" (0.75mm)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "7802",
+     "ValueText": "0.063\" L x 0.031\" W (1.60mm x 0.80mm)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 36,
+    "ParentId": 0,
+    "Name": "Filters",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/120/MFG_Star-Tec-LFS_tmb.jpg",
+    "SeoDescription": "The filter product category includes a wide variety of devices and materials used for the separation, suppression, or selection of electrical and magnetic signals on the basis of frequency. Products designed for use across a wide range of contexts are included, ranging from power lines carrying kiloamperes at DC to radio receivers detecting microvolt-level signals at frequencies of tens of gigahertz.",
+    "ChildCategories": [
+     {
+      "CategoryId": 841,
+      "ParentId": 36,
+      "Name": "Ferrite Beads and Chips",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/281/882/MPZ2012xxxxxxxx_tmb.jpg",
+      "SeoDescription": "Ferrite cores are devices that are designed to prevent high frequency noise or EMI (electromagnetic interference). These ferrite cores are made to be placed within an electric circuit. Key characteristics are the filter type (differential, signal, or power), number of lines, max current rating, impedance and a specified frequency, and mounting type (free hanging, surface mount, or through-hole).",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 84546,
+    "Name": "EMIFIL®, BLE18"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8548.00.0000"
+   },
+   "OtherNames": [
+    "490-BLE18PS080BH1DDKR",
+    "490-BLE18PS080BH1DCT",
+    "490-BLE18PS080BH1DTR"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "FERRITE BEAD 8.5 OHM 0603 1LN",
+    "DetailedDescription": "8.5 Ohms @ 100 MHz 1 Power Line Ferrite Bead 0603 (1608 Metric) 5A 4mOhm"
+   },
+   "Manufacturer": {
+    "Id": 490,
+    "Name": "Murata Electronics"
+   },
+   "ManufacturerProductNumber": "BLE18PS080BH1D",
+   "UnitPrice": 0.37,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/murata-electronics/BLE18PS080BH1D/13904871",
+   "DatasheetUrl": "https://www.murata.com/products/productdata/8801029750814/QNFA9147.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2414/EMIFIL%2C-BLxxx.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "490-BLE18PS080BH1DTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 4000,
+       "UnitPrice": 0.09125,
+       "TotalPrice": 365.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 4000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "490-BLE18PS080BH1DCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.37,
+       "TotalPrice": 0.37
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.257,
+       "TotalPrice": 2.57
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2224,
+       "TotalPrice": 5.56
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1988,
+       "TotalPrice": 9.94
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.177,
+       "TotalPrice": 17.7
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.15068,
+       "TotalPrice": 37.67
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.13248,
+       "TotalPrice": 66.24
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.11558,
+       "TotalPrice": 115.58
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 324,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "490-BLE18PS080BH1DDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.37,
+       "TotalPrice": 0.37
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.257,
+       "TotalPrice": 2.57
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2224,
+       "TotalPrice": 5.56
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.1988,
+       "TotalPrice": 9.94
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.177,
+       "TotalPrice": 17.7
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.15068,
+       "TotalPrice": 37.67
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.13248,
+       "TotalPrice": 66.24
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.11558,
+       "TotalPrice": 115.58
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 490,
+      "Name": "Murata Electronics"
+     },
+     "QuantityAvailableforPackageType": 324,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 324,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 21,
+     "ParameterText": "Filter Type",
+     "ParameterType": "String",
+     "ValueId": "389223",
+     "ValueText": "Power Line"
+    },
+    {
+     "ParameterId": 2169,
+     "ParameterText": "Number of Lines",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 2280,
+     "ParameterText": "Impedance @ Frequency",
+     "ParameterType": "CoupledUnitOfMeasure",
+     "ValueId": "8.5 Ohms @ 100 MHz",
+     "ValueText": "8.5 Ohms @ 100 MHz"
+    },
+    {
+     "ParameterId": 1923,
+     "ParameterText": "Current Rating (Max)",
+     "ParameterType": "String",
+     "ValueId": "247706",
+     "ValueText": "5A"
+    },
+    {
+     "ParameterId": 1924,
+     "ParameterText": "DC Resistance (DCR) (Max)",
+     "ParameterType": "String",
+     "ValueId": "228025",
+     "ValueText": "4mOhm"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "312105",
+     "ValueText": "AEC-Q200"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242931",
+     "ValueText": "-55°C ~ 150°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39246",
+     "ValueText": "0603 (1608 Metric)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 966,
+     "ParameterText": "Height (Max)",
+     "ParameterType": "String",
+     "ValueId": "5744",
+     "ValueText": "0.030\" (0.75mm)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "7802",
+     "ValueText": "0.063\" L x 0.031\" W (1.60mm x 0.80mm)"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 36,
+    "ParentId": 0,
+    "Name": "Filters",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/120/MFG_Star-Tec-LFS_tmb.jpg",
+    "SeoDescription": "The filter product category includes a wide variety of devices and materials used for the separation, suppression, or selection of electrical and magnetic signals on the basis of frequency. Products designed for use across a wide range of contexts are included, ranging from power lines carrying kiloamperes at DC to radio receivers detecting microvolt-level signals at frequencies of tens of gigahertz.",
+    "ChildCategories": [
+     {
+      "CategoryId": 841,
+      "ParentId": 36,
+      "Name": "Ferrite Beads and Chips",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/281/882/MPZ2012xxxxxxxx_tmb.jpg",
+      "SeoDescription": "Ferrite cores are devices that are designed to prevent high frequency noise or EMI (electromagnetic interference). These ferrite cores are made to be placed within an electric circuit. Key characteristics are the filter type (differential, signal, or power), number of lines, max current rating, impedance and a specified frequency, and mounting type (free hanging, surface mount, or through-hole).",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 84546,
+    "Name": "EMIFIL®, BLE18"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8548.00.0000"
+   },
+   "OtherNames": [
+    "490-BLE18PS080BH1DDKR",
+    "490-BLE18PS080BH1DCT",
+    "490-BLE18PS080BH1DTR"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 490,
+    "Value": "Murata Electronics",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

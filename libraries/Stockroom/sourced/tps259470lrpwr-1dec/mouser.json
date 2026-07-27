@@ -1,0 +1,127 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "5634 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Hot Swap Voltage Controllers 2.7-V to 23-V 28-m? 5.5-A eFuse with i",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/texasinstruments/images/VQFN-HR-10_DSL.jpg",
+    "Category": "Hot Swap Voltage Controllers",
+    "LeadTime": "63 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Texas Instruments",
+    "ManufacturerPartNumber": "TPS259470LRPWR",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "595-TPS259470LRPWR",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$1.72",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$1.27",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$1.15",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$1.02",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.96",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.923",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.918",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.856",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 6000,
+      "Price": "$0.838",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS259470LRPWR?qs=iLbezkQI%252BsibLmP55loGPQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": "5634",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542390090"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "United States"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,145 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "309000 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Single Color LEDs WL-SMCW SMDMono TpVw Waterclr 0603 BrtGrn",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/wurthelectronics/images/WL-SMCW.JPG",
+    "Category": "Single Color LEDs",
+    "LeadTime": "77 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Wurth Elektronik",
+    "ManufacturerPartNumber": "150060VS75000",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "710-150060VS75000",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "4000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.16",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.151",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 50,
+      "Price": "$0.142",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.122",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.116",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 4000,
+      "Price": "$0.116",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060VS75000?qs=LlUlMxKIyB1Q1Bi5mQ%2FKLw%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 2.5e-05
+    },
+    "AvailabilityInStock": "309000",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 352000,
+      "Date": "2026-08-07T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 35% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541410000"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541410090"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541410000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854141000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541410000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541410100"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85414011"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

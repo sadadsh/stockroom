@@ -1,0 +1,1184 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "IC CLOCK GENERATOR 10MSOP",
+    "DetailedDescription": "Clock Generator IC 200MHz 2 10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+   },
+   "Manufacturer": {
+    "Id": 863,
+    "Name": "Skyworks Solutions Inc."
+   },
+   "ManufacturerProductNumber": "SI5351A-B-GT",
+   "UnitPrice": 2.19,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/skyworks-solutions-inc/SI5351A-B-GT/3679847",
+   "DatasheetUrl": "https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/data-sheets/Si5351-B.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/7228/MFG_863%7E10MSOP-3%7EGT%7E10.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "336-2399-5-ND",
+     "PackageType": {
+      "Id": 6,
+      "Name": "Tube"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.19,
+       "TotalPrice": 2.19
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.621,
+       "TotalPrice": 16.21
+      },
+      {
+       "BreakQuantity": 95,
+       "UnitPrice": 1.32526,
+       "TotalPrice": 125.8997
+      },
+      {
+       "BreakQuantity": 190,
+       "UnitPrice": 1.26584,
+       "TotalPrice": 240.5096
+      },
+      {
+       "BreakQuantity": 285,
+       "UnitPrice": 1.23611,
+       "TotalPrice": 352.29135
+      },
+      {
+       "BreakQuantity": 570,
+       "UnitPrice": 1.19246,
+       "TotalPrice": 679.7022
+      },
+      {
+       "BreakQuantity": 1045,
+       "UnitPrice": 1.16069,
+       "TotalPrice": 1212.92105
+      },
+      {
+       "BreakQuantity": 2565,
+       "UnitPrice": 1.12252,
+       "TotalPrice": 2879.2638
+      },
+      {
+       "BreakQuantity": 5035,
+       "UnitPrice": 1.09957,
+       "TotalPrice": 5536.33495
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 863,
+      "Name": "Skyworks Solutions Inc."
+     },
+     "QuantityAvailableforPackageType": 11521,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 11521,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2697,
+     "ParameterText": "DigiKey Programmable",
+     "ParameterType": "String",
+     "ValueId": "750491",
+     "ValueText": "Not Verified"
+    },
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "331315",
+     "ValueText": "Clock Generator"
+    },
+    {
+     "ParameterId": 1299,
+     "ParameterText": "PLL",
+     "ParameterType": "String",
+     "ValueId": "423329",
+     "ValueText": "Yes"
+    },
+    {
+     "ParameterId": 199,
+     "ParameterText": "Input",
+     "ParameterType": "String",
+     "ValueId": "335090",
+     "ValueText": "Crystal"
+    },
+    {
+     "ParameterId": 71,
+     "ParameterText": "Output",
+     "ParameterType": "String",
+     "ValueId": "369681",
+     "ValueText": "LVCMOS"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "2",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 1273,
+     "ParameterText": "Ratio - Input:Output",
+     "ParameterType": "String",
+     "ValueId": "63651",
+     "ValueText": "1:3"
+    },
+    {
+     "ParameterId": 1274,
+     "ParameterText": "Differential - Input:Output",
+     "ParameterType": "String",
+     "ValueId": "380286",
+     "ValueText": "No/No"
+    },
+    {
+     "ParameterId": 158,
+     "ParameterText": "Frequency - Max",
+     "ParameterType": "String",
+     "ValueId": "140510",
+     "ValueText": "200MHz"
+    },
+    {
+     "ParameterId": 1301,
+     "ParameterText": "Divider/Multiplier",
+     "ParameterType": "String",
+     "ValueId": "423342",
+     "ValueText": "Yes/No"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "58218",
+     "ValueText": "1.71V ~ 3.6V"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212617",
+     "ValueText": "-40°C ~ 85°C"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "74447",
+     "ValueText": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "73980",
+     "ValueText": "10-MSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 81213,
+    "Name": "SI5351"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2006,
+      "ParentId": 32,
+      "Name": "Clock/Timing",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/966/073/296_8-SOIC_tmb.jpg",
+      "SeoDescription": "Clock/Timing products are used to provide timing for data transmission. There are specified categories including application-specific, buffers, drivers, generators, PLLs, frequency synthesizers, delay lines, IC batteries, programmable timers and oscillators, and real-time clocks.",
+      "ChildCategories": [
+       {
+        "CategoryId": 728,
+        "ParentId": 2006,
+        "Name": "Clock Generators, PLLs, Frequency Synthesizers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/133/803/8-SOIC_tmb%2864x64%29.jpg",
+        "SeoDescription": "Clock generators, PLLs, and frequency synthesizer integrated circuits (ICs) provide a steady timing pulse from a reference signal for logic devices such as computers, microcontrollers, data communication systems, and graphic/video generators. These integrated circuits may include buffers, drivers, dividers, multipliers, multiplexers, synthesizers, fanout distributors, and prescalers.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "8",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 30521,
+    "Name": "MultiSynth™"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "2  (1 Year)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "336-2399-5",
+    "SI5351ABGT"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "IC CLOCK GENERATOR 10MSOP",
+    "DetailedDescription": "Clock Generator IC 200MHz 2 10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+   },
+   "Manufacturer": {
+    "Id": 863,
+    "Name": "Skyworks Solutions Inc."
+   },
+   "ManufacturerProductNumber": "SI5351A-B-GTR",
+   "UnitPrice": 2.19,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/skyworks-solutions-inc/SI5351A-B-GTR/4069612",
+   "DatasheetUrl": "https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/data-sheets/Si5351-B.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/7228/MFG_863%7E10MSOP-3%7EGT%7E10.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "336-3908-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 1.12349,
+       "TotalPrice": 2808.725
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 1.09978,
+       "TotalPrice": 5498.9
+      },
+      {
+       "BreakQuantity": 7500,
+       "UnitPrice": 1.08791,
+       "TotalPrice": 8159.325
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 863,
+      "Name": "Skyworks Solutions Inc."
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 2500,
+     "StandardPackage": 2500,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "336-3908-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.19,
+       "TotalPrice": 2.19
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.621,
+       "TotalPrice": 16.21
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.478,
+       "TotalPrice": 36.95
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.3204,
+       "TotalPrice": 132.04
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.24532,
+       "TotalPrice": 311.33
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.20006,
+       "TotalPrice": 600.03
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 1.1934,
+       "TotalPrice": 1193.4
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 863,
+      "Name": "Skyworks Solutions Inc."
+     },
+     "QuantityAvailableforPackageType": 1866,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "336-3908-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.19,
+       "TotalPrice": 2.19
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.621,
+       "TotalPrice": 16.21
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.478,
+       "TotalPrice": 36.95
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.3204,
+       "TotalPrice": 132.04
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 1.24532,
+       "TotalPrice": 311.33
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 1.20006,
+       "TotalPrice": 600.03
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 1.1934,
+       "TotalPrice": 1193.4
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 863,
+      "Name": "Skyworks Solutions Inc."
+     },
+     "QuantityAvailableforPackageType": 1866,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 1866,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2697,
+     "ParameterText": "DigiKey Programmable",
+     "ParameterType": "String",
+     "ValueId": "750491",
+     "ValueText": "Not Verified"
+    },
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "331315",
+     "ValueText": "Clock Generator"
+    },
+    {
+     "ParameterId": 1299,
+     "ParameterText": "PLL",
+     "ParameterType": "String",
+     "ValueId": "423329",
+     "ValueText": "Yes"
+    },
+    {
+     "ParameterId": 199,
+     "ParameterText": "Input",
+     "ParameterType": "String",
+     "ValueId": "335090",
+     "ValueText": "Crystal"
+    },
+    {
+     "ParameterId": 71,
+     "ParameterText": "Output",
+     "ParameterType": "String",
+     "ValueId": "369681",
+     "ValueText": "LVCMOS"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "2",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 1273,
+     "ParameterText": "Ratio - Input:Output",
+     "ParameterType": "String",
+     "ValueId": "63651",
+     "ValueText": "1:3"
+    },
+    {
+     "ParameterId": 1274,
+     "ParameterText": "Differential - Input:Output",
+     "ParameterType": "String",
+     "ValueId": "380286",
+     "ValueText": "No/No"
+    },
+    {
+     "ParameterId": 158,
+     "ParameterText": "Frequency - Max",
+     "ParameterType": "String",
+     "ValueId": "140510",
+     "ValueText": "200MHz"
+    },
+    {
+     "ParameterId": 1301,
+     "ParameterText": "Divider/Multiplier",
+     "ParameterType": "String",
+     "ValueId": "423342",
+     "ValueText": "Yes/No"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "58218",
+     "ValueText": "1.71V ~ 3.6V"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212617",
+     "ValueText": "-40°C ~ 85°C"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "74447",
+     "ValueText": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "73980",
+     "ValueText": "10-MSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 81213,
+    "Name": "SI5351"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2006,
+      "ParentId": 32,
+      "Name": "Clock/Timing",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/966/073/296_8-SOIC_tmb.jpg",
+      "SeoDescription": "Clock/Timing products are used to provide timing for data transmission. There are specified categories including application-specific, buffers, drivers, generators, PLLs, frequency synthesizers, delay lines, IC batteries, programmable timers and oscillators, and real-time clocks.",
+      "ChildCategories": [
+       {
+        "CategoryId": 728,
+        "ParentId": 2006,
+        "Name": "Clock Generators, PLLs, Frequency Synthesizers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/133/803/8-SOIC_tmb%2864x64%29.jpg",
+        "SeoDescription": "Clock generators, PLLs, and frequency synthesizer integrated circuits (ICs) provide a steady timing pulse from a reference signal for logic devices such as computers, microcontrollers, data communication systems, and graphic/video generators. These integrated circuits may include buffers, drivers, dividers, multipliers, multiplexers, synthesizers, fanout distributors, and prescalers.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "8",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 30521,
+    "Name": "MultiSynth™"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "2  (1 Year)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "336-3908-6",
+    "336-3908-1",
+    "336-3908-2",
+    "SI5351A-B-GTR-ND"
+   ]
+  }
+ ],
+ "ProductsCount": 2,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "IC CLOCK GENERATOR 10MSOP",
+    "DetailedDescription": "Clock Generator IC 200MHz 2 10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+   },
+   "Manufacturer": {
+    "Id": 863,
+    "Name": "Skyworks Solutions Inc."
+   },
+   "ManufacturerProductNumber": "SI5351A-B-GT",
+   "UnitPrice": 2.19,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/skyworks-solutions-inc/SI5351A-B-GT/3679847",
+   "DatasheetUrl": "https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/data-sheets/Si5351-B.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/7228/MFG_863%7E10MSOP-3%7EGT%7E10.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "336-2399-5-ND",
+     "PackageType": {
+      "Id": 6,
+      "Name": "Tube"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 2.19,
+       "TotalPrice": 2.19
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.621,
+       "TotalPrice": 16.21
+      },
+      {
+       "BreakQuantity": 95,
+       "UnitPrice": 1.32526,
+       "TotalPrice": 125.8997
+      },
+      {
+       "BreakQuantity": 190,
+       "UnitPrice": 1.26584,
+       "TotalPrice": 240.5096
+      },
+      {
+       "BreakQuantity": 285,
+       "UnitPrice": 1.23611,
+       "TotalPrice": 352.29135
+      },
+      {
+       "BreakQuantity": 570,
+       "UnitPrice": 1.19246,
+       "TotalPrice": 679.7022
+      },
+      {
+       "BreakQuantity": 1045,
+       "UnitPrice": 1.16069,
+       "TotalPrice": 1212.92105
+      },
+      {
+       "BreakQuantity": 2565,
+       "UnitPrice": 1.12252,
+       "TotalPrice": 2879.2638
+      },
+      {
+       "BreakQuantity": 5035,
+       "UnitPrice": 1.09957,
+       "TotalPrice": 5536.33495
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 863,
+      "Name": "Skyworks Solutions Inc."
+     },
+     "QuantityAvailableforPackageType": 11521,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 11521,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2697,
+     "ParameterText": "DigiKey Programmable",
+     "ParameterType": "String",
+     "ValueId": "750491",
+     "ValueText": "Not Verified"
+    },
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "331315",
+     "ValueText": "Clock Generator"
+    },
+    {
+     "ParameterId": 1299,
+     "ParameterText": "PLL",
+     "ParameterType": "String",
+     "ValueId": "423329",
+     "ValueText": "Yes"
+    },
+    {
+     "ParameterId": 199,
+     "ParameterText": "Input",
+     "ParameterType": "String",
+     "ValueId": "335090",
+     "ValueText": "Crystal"
+    },
+    {
+     "ParameterId": 71,
+     "ParameterText": "Output",
+     "ParameterType": "String",
+     "ValueId": "369681",
+     "ValueText": "LVCMOS"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "2",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 1273,
+     "ParameterText": "Ratio - Input:Output",
+     "ParameterType": "String",
+     "ValueId": "63651",
+     "ValueText": "1:3"
+    },
+    {
+     "ParameterId": 1274,
+     "ParameterText": "Differential - Input:Output",
+     "ParameterType": "String",
+     "ValueId": "380286",
+     "ValueText": "No/No"
+    },
+    {
+     "ParameterId": 158,
+     "ParameterText": "Frequency - Max",
+     "ParameterType": "String",
+     "ValueId": "140510",
+     "ValueText": "200MHz"
+    },
+    {
+     "ParameterId": 1301,
+     "ParameterText": "Divider/Multiplier",
+     "ParameterType": "String",
+     "ValueId": "423342",
+     "ValueText": "Yes/No"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "58218",
+     "ValueText": "1.71V ~ 3.6V"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212617",
+     "ValueText": "-40°C ~ 85°C"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "74447",
+     "ValueText": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "73980",
+     "ValueText": "10-MSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 81213,
+    "Name": "SI5351"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2006,
+      "ParentId": 32,
+      "Name": "Clock/Timing",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/966/073/296_8-SOIC_tmb.jpg",
+      "SeoDescription": "Clock/Timing products are used to provide timing for data transmission. There are specified categories including application-specific, buffers, drivers, generators, PLLs, frequency synthesizers, delay lines, IC batteries, programmable timers and oscillators, and real-time clocks.",
+      "ChildCategories": [
+       {
+        "CategoryId": 728,
+        "ParentId": 2006,
+        "Name": "Clock Generators, PLLs, Frequency Synthesizers",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/133/803/8-SOIC_tmb%2864x64%29.jpg",
+        "SeoDescription": "Clock generators, PLLs, and frequency synthesizer integrated circuits (ICs) provide a steady timing pulse from a reference signal for logic devices such as computers, microcontrollers, data communication systems, and graphic/video generators. These integrated circuits may include buffers, drivers, dividers, multipliers, multiplexers, synthesizers, fanout distributors, and prescalers.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "8",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 30521,
+    "Name": "MultiSynth™"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "2  (1 Year)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "336-2399-5",
+    "SI5351ABGT"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 863,
+    "Value": "Skyworks Solutions Inc.",
+    "ProductCount": 2
+   }
+  ],
+  "Packaging": [
+   {
+    "Id": 2,
+    "Value": "Cut Tape (CT)",
+    "ProductCount": 1
+   },
+   {
+    "Id": 243,
+    "Value": "Digi-Reel®",
+    "ProductCount": 1
+   },
+   {
+    "Id": 1,
+    "Value": "Tape & Reel (TR)",
+    "ProductCount": 1
+   },
+   {
+    "Id": 6,
+    "Value": "Tube",
+    "ProductCount": 1
+   }
+  ],
+  "Status": [
+   {
+    "Id": 0,
+    "Value": "Active",
+    "ProductCount": 2
+   }
+  ],
+  "Series": [
+   {
+    "Id": 30521,
+    "Value": "MultiSynth™",
+    "ProductCount": 2
+   }
+  ],
+  "ParametricFilters": [
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 2697,
+    "ParameterName": "DigiKey Programmable",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "750491",
+      "ValueName": "Not Verified",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 183,
+    "ParameterName": "Type",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "331315",
+      "ValueName": "Clock Generator",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1299,
+    "ParameterName": "PLL",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "423329",
+      "ValueName": "Yes",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 199,
+    "ParameterName": "Input",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "335090",
+      "ValueName": "Crystal",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 71,
+    "ParameterName": "Output",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "369681",
+      "ValueName": "LVCMOS",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 2094,
+    "ParameterName": "Number of Circuits",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "2",
+      "ValueName": "2",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1273,
+    "ParameterName": "Ratio - Input:Output",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "63651",
+      "ValueName": "1:3",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1274,
+    "ParameterName": "Differential - Input:Output",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "380286",
+      "ValueName": "No/No",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 158,
+    "ParameterName": "Frequency - Max",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "140510",
+      "ValueName": "200MHz",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1301,
+    "ParameterName": "Divider/Multiplier",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "423342",
+      "ValueName": "Yes/No",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 276,
+    "ParameterName": "Voltage - Supply",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "58218",
+      "ValueName": "1.71V ~ 3.6V",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 252,
+    "ParameterName": "Operating Temperature",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "212617",
+      "ValueName": "-40°C ~ 85°C",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 69,
+    "ParameterName": "Mounting Type",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "409393",
+      "ValueName": "Surface Mount",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 16,
+    "ParameterName": "Package / Case",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "74447",
+      "ValueName": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 728,
+     "Value": "Clock Generators, PLLs, Frequency Synthesizers",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1291,
+    "ParameterName": "Supplier Device Package",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "73980",
+      "ValueName": "10-MSOP",
+      "RangeFilterType": null
+     }
+    ]
+   }
+  ],
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

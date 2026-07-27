@@ -1,0 +1,596 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "IC CURRENT MONITOR 0.02% 10VSSOP",
+    "DetailedDescription": "Current Monitor Regulator High/Low-Side 10mA 10-VSSOP"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "INA226AIDGST",
+   "UnitPrice": 4.27,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/INA226AIDGST/2688425",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fina226",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4190/296%7E4073272%7EDGS%7E10.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-29100-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 2.55308,
+       "TotalPrice": 638.27
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 2.47104,
+       "TotalPrice": 1235.52
+      },
+      {
+       "BreakQuantity": 750,
+       "UnitPrice": 2.42996,
+       "TotalPrice": 1822.47
+      },
+      {
+       "BreakQuantity": 1250,
+       "UnitPrice": 2.38442,
+       "TotalPrice": 2980.525
+      },
+      {
+       "BreakQuantity": 1750,
+       "UnitPrice": 2.35782,
+       "TotalPrice": 4126.185
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 2.33224,
+       "TotalPrice": 5830.6
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 12417,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 250,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-29100-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 4.27,
+       "TotalPrice": 4.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 3.234,
+       "TotalPrice": 32.34
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 2.9748,
+       "TotalPrice": 74.37
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 2.6892,
+       "TotalPrice": 268.92
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 12433,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-29100-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 4.27,
+       "TotalPrice": 4.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 3.234,
+       "TotalPrice": 32.34
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 2.9748,
+       "TotalPrice": 74.37
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 2.6892,
+       "TotalPrice": 268.92
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 12433,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 12433,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 110,
+     "ParameterText": "Function",
+     "ParameterType": "String",
+     "ValueId": "336073",
+     "ValueText": "Current Monitor"
+    },
+    {
+     "ParameterId": 43,
+     "ParameterText": "Sensing Method",
+     "ParameterType": "String",
+     "ValueId": "354842",
+     "ValueText": "High/Low-Side"
+    },
+    {
+     "ParameterId": 222,
+     "ParameterText": "Accuracy",
+     "ParameterType": "String",
+     "ValueId": "667",
+     "ValueText": "±0.02%"
+    },
+    {
+     "ParameterId": 127,
+     "ParameterText": "Voltage - Input",
+     "ParameterType": "String",
+     "ValueId": "39634",
+     "ValueText": "0V ~ 36V"
+    },
+    {
+     "ParameterId": 129,
+     "ParameterText": "Current - Output",
+     "ParameterType": "String",
+     "ValueId": "73564",
+     "ValueText": "10mA"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212478",
+     "ValueText": "-40°C ~ 125°C"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "74447",
+     "ValueText": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "74705",
+     "ValueText": "10-VSSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 85444,
+    "Name": "INA226"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2025,
+      "ParentId": 32,
+      "Name": "Power Management (PMIC)",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/314/540/846%3B-TO220CP-3%3B-%3B-3_tmb.jpg",
+      "SeoDescription": "PMIC, or Power Management Integrated Circuits, refers to a wide range of application-specific ICs or chips. Included in this category is PMICs for AC/DC Converters, Battery Chargers, Battery Management, Current Regulation, Display Drivers, Energy Metering, Full/Half-Bridge Drivers, Gate Drivers, Hot Swap Controllers, Laser Drivers, LED Drivers, Lighting/Ballast Controllers, Motor Drivers, OR Controllers, Power Factor Correction, Power Distribution Switches, PoE Controllers, Power Supply Controllers, RMS to DC Converters, Supervisors, Thermal Management, V/F and F/V Controllers, various Voltage Regulators, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 734,
+        "ParentId": 2025,
+        "Name": "Current Regulation/Management",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/961/994/950_TO-92%20PKG_tmb.jpg",
+        "SeoDescription": "Current Regulation/Management ICs are a semiconductor device designed to monitor and regulate current within a circuit. The functions are current gauge, current limiting, current mirror, current monitor, current regulator, current ripple suppressor, current sense, current source, current switch, and an electronic fuse with a current output of adjustable, and 100µA to 50A.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "2  (1 Year)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "-296-29100-1",
+    "296-29100-6",
+    "296-29100-1",
+    "296-29100-2",
+    "-296-29100-1-ND"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "IC CURRENT MONITOR 0.02% 10VSSOP",
+    "DetailedDescription": "Current Monitor Regulator High/Low-Side 10mA 10-VSSOP"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "INA226AIDGST",
+   "UnitPrice": 4.27,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/INA226AIDGST/2688425",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fina226",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4190/296%7E4073272%7EDGS%7E10.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-29100-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 2.55308,
+       "TotalPrice": 638.27
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 2.47104,
+       "TotalPrice": 1235.52
+      },
+      {
+       "BreakQuantity": 750,
+       "UnitPrice": 2.42996,
+       "TotalPrice": 1822.47
+      },
+      {
+       "BreakQuantity": 1250,
+       "UnitPrice": 2.38442,
+       "TotalPrice": 2980.525
+      },
+      {
+       "BreakQuantity": 1750,
+       "UnitPrice": 2.35782,
+       "TotalPrice": 4126.185
+      },
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 2.33224,
+       "TotalPrice": 5830.6
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 12417,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 250,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-29100-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 4.27,
+       "TotalPrice": 4.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 3.234,
+       "TotalPrice": 32.34
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 2.9748,
+       "TotalPrice": 74.37
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 2.6892,
+       "TotalPrice": 268.92
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 12433,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-29100-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 4.27,
+       "TotalPrice": 4.27
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 3.234,
+       "TotalPrice": 32.34
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 2.9748,
+       "TotalPrice": 74.37
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 2.6892,
+       "TotalPrice": 268.92
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 12433,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 12433,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 110,
+     "ParameterText": "Function",
+     "ParameterType": "String",
+     "ValueId": "336073",
+     "ValueText": "Current Monitor"
+    },
+    {
+     "ParameterId": 43,
+     "ParameterText": "Sensing Method",
+     "ParameterType": "String",
+     "ValueId": "354842",
+     "ValueText": "High/Low-Side"
+    },
+    {
+     "ParameterId": 222,
+     "ParameterText": "Accuracy",
+     "ParameterType": "String",
+     "ValueId": "667",
+     "ValueText": "±0.02%"
+    },
+    {
+     "ParameterId": 127,
+     "ParameterText": "Voltage - Input",
+     "ParameterType": "String",
+     "ValueId": "39634",
+     "ValueText": "0V ~ 36V"
+    },
+    {
+     "ParameterId": 129,
+     "ParameterText": "Current - Output",
+     "ParameterType": "String",
+     "ValueId": "73564",
+     "ValueText": "10mA"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212478",
+     "ValueText": "-40°C ~ 125°C"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "74447",
+     "ValueText": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "74705",
+     "ValueText": "10-VSSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 85444,
+    "Name": "INA226"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2025,
+      "ParentId": 32,
+      "Name": "Power Management (PMIC)",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/314/540/846%3B-TO220CP-3%3B-%3B-3_tmb.jpg",
+      "SeoDescription": "PMIC, or Power Management Integrated Circuits, refers to a wide range of application-specific ICs or chips. Included in this category is PMICs for AC/DC Converters, Battery Chargers, Battery Management, Current Regulation, Display Drivers, Energy Metering, Full/Half-Bridge Drivers, Gate Drivers, Hot Swap Controllers, Laser Drivers, LED Drivers, Lighting/Ballast Controllers, Motor Drivers, OR Controllers, Power Factor Correction, Power Distribution Switches, PoE Controllers, Power Supply Controllers, RMS to DC Converters, Supervisors, Thermal Management, V/F and F/V Controllers, various Voltage Regulators, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 734,
+        "ParentId": 2025,
+        "Name": "Current Regulation/Management",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/961/994/950_TO-92%20PKG_tmb.jpg",
+        "SeoDescription": "Current Regulation/Management ICs are a semiconductor device designed to monitor and regulate current within a circuit. The functions are current gauge, current limiting, current mirror, current monitor, current regulator, current ripple suppressor, current sense, current source, current switch, and an electronic fuse with a current output of adjustable, and 100µA to 50A.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 818,
+    "Name": "-"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "2  (1 Year)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "-296-29100-1",
+    "296-29100-6",
+    "296-29100-1",
+    "296-29100-2",
+    "-296-29100-1-ND"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 296,
+    "Value": "Texas Instruments",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

@@ -1,0 +1,139 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 2,
+  "Parts": [
+   {
+    "Availability": "66 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/5/1/PDF_DS_09454522912_EN.pdf",
+    "Description": "USB Connectors hart-por USB Type C-C coupler black",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/harting/images/9454522912_SPL.JPG",
+    "Category": "USB Connectors",
+    "LeadTime": "35 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "HARTING",
+    "ManufacturerPartNumber": "09454522912",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "617-09454522912",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "1"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$47.09",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 50,
+      "Price": "$45.97",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$37.06",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$37.05",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/HARTING/09454522912?qs=1Kr7Jg1SGW%252BqH6H9YzeLcw%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": "66",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536694030"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536699099"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536690040"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853669000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536699000"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85366990"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Germany"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "Modular Connectors / Ethernet Connectors",
+    "FactoryStock": null,
+    "ImagePath": null,
+    "Category": "Modular Connectors / Ethernet Connectors",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "HARTING",
+    "ManufacturerPartNumber": "0945-452-2912",
+    "Min": "0",
+    "Mult": "0",
+    "MouserPartNumber": "N/A",
+    "ProductAttributes": [],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/HARTING/0945-452-2912?qs=efUn273yAhctkS8qgFyRhg%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536699099"
+     }
+    ],
+    "TradeCompliance": []
+   }
+  ]
+ }
+}

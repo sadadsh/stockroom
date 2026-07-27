@@ -1,0 +1,750 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "CONN U.FL RCPT STR 50 OHM SMD",
+    "DetailedDescription": "U.FL (UMCC) Connector Receptacle, Male Pin 50 Ohms Surface Mount Solder"
+   },
+   "Manufacturer": {
+    "Id": 26,
+    "Name": "Hirose Electric Co Ltd"
+   },
+   "ManufacturerProductNumber": "U.FL-R-SMT-1(10)",
+   "UnitPrice": 1.29,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/hirose-electric-co-ltd/U-FL-R-SMT-1-10/2391570",
+   "DatasheetUrl": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/8942/HIROS08829-1.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/386/U.FL-R-SMT-1%2810%29.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "H11891TR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.84895,
+       "TotalPrice": 2122.375
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.80846,
+       "TotalPrice": 4042.3
+      },
+      {
+       "BreakQuantity": 7500,
+       "UnitPrice": 0.78567,
+       "TotalPrice": 5892.525
+      },
+      {
+       "BreakQuantity": 12500,
+       "UnitPrice": 0.75789,
+       "TotalPrice": 9473.625
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 26,
+      "Name": "Hirose Electric Co Ltd"
+     },
+     "QuantityAvailableforPackageType": 274163,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 2500,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "H11891CT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 1.48,
+       "TotalPrice": 1.48
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.254,
+       "TotalPrice": 12.54
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.1752,
+       "TotalPrice": 29.38
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 1.119,
+       "TotalPrice": 55.95
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.0655,
+       "TotalPrice": 106.55
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.99872,
+       "TotalPrice": 249.68
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.95102,
+       "TotalPrice": 475.51
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.90563,
+       "TotalPrice": 905.63
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 26,
+      "Name": "Hirose Electric Co Ltd"
+     },
+     "QuantityAvailableforPackageType": 274163,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "H11891DKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 1.29,
+       "TotalPrice": 1.29
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.098,
+       "TotalPrice": 10.98
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.0288,
+       "TotalPrice": 25.72
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.9794,
+       "TotalPrice": 48.97
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.9327,
+       "TotalPrice": 93.27
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.8742,
+       "TotalPrice": 218.55
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.83244,
+       "TotalPrice": 416.22
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.7927,
+       "TotalPrice": 792.7
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 26,
+      "Name": "Hirose Electric Co Ltd"
+     },
+     "QuantityAvailableforPackageType": 274163,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 274163,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/6068217923001",
+   "Parameters": [
+    {
+     "ParameterId": 801,
+     "ParameterText": "Connector Style",
+     "ParameterType": "String",
+     "ValueId": "416960",
+     "ValueText": "U.FL (UMCC)"
+    },
+    {
+     "ParameterId": 28,
+     "ParameterText": "Connector Type",
+     "ParameterType": "String",
+     "ValueId": "393048",
+     "ValueText": "Receptacle, Male Pin"
+    },
+    {
+     "ParameterId": 31,
+     "ParameterText": "Contact Termination",
+     "ParameterType": "String",
+     "ValueId": "405002",
+     "ValueText": "Solder"
+    },
+    {
+     "ParameterId": 1652,
+     "ParameterText": "Shield Termination",
+     "ParameterType": "String",
+     "ValueId": "405002",
+     "ValueText": "Solder"
+    },
+    {
+     "ParameterId": 60,
+     "ParameterText": "Impedance",
+     "ParameterType": "String",
+     "ValueId": "770446",
+     "ValueText": "50 Ohms"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1061,
+     "ParameterText": "Mounting Feature",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 164,
+     "ParameterText": "Cable Group",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 518,
+     "ParameterText": "Fastening Type",
+     "ParameterType": "String",
+     "ValueId": "404607",
+     "ValueText": "Snap-On"
+    },
+    {
+     "ParameterId": 2157,
+     "ParameterText": "Frequency - Max",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "6 GHz",
+     "ValueText": "6 GHz"
+    },
+    {
+     "ParameterId": 2171,
+     "ParameterText": "Number of Ports",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1401,
+     "ParameterText": "Housing Color",
+     "ParameterType": "String",
+     "ValueId": "319181",
+     "ValueText": "Beige"
+    },
+    {
+     "ParameterId": 697,
+     "ParameterText": "Ingress Protection",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1654,
+     "ParameterText": "Center Contact Material",
+     "ParameterType": "String",
+     "ValueId": "322862",
+     "ValueText": "Brass"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 658629,
+    "Name": "U.FL-R-SMT"
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2007,
+      "ParentId": 20,
+      "Name": "Coaxial Connectors (RF)",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/302/375/MFG_112954_tmb%2864x64%29.jpg",
+      "SeoDescription": "Products in the coaxial connector family are interconnect devices used with cable materials consisting of a central conductor surrounded by insulation material and an outer conductor of circular cross section, designed to maintain a consistent characteristic impedance over the length of the material in order to serve as a suitable transmission line for high frequency signals.",
+      "ChildCategories": [
+       {
+        "CategoryId": 437,
+        "ParentId": 2007,
+        "Name": "Coaxial Connector (RF) Assemblies",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/201/184/6741_tmb.jpg",
+        "SeoDescription": "Products in the coaxial connector family are interconnect devices used with cable materials consisting of a central conductor surrounded by insulation material and an outer conductor of circular cross section, designed to maintain a consistent characteristic impedance over the length of the material in order to serve as a suitable transmission line for high frequency signals.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "12",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 8717,
+    "Name": "U.FL"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.69.4010"
+   },
+   "OtherNames": [
+    "Q9928084",
+    "331-0472-2-10",
+    "H11891TR",
+    "Q5400621",
+    "U.FL-R-SMT-1 10",
+    "U.FL-R-SMT-1(10)-ND",
+    "H11891DKR",
+    "UFLRSMT110",
+    "H11891CT",
+    "*U.FL-R-SMT-1(10)"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "CONN U.FL RCPT STR 50 OHM SMD",
+    "DetailedDescription": "U.FL (UMCC) Connector Receptacle, Male Pin 50 Ohms Surface Mount Solder"
+   },
+   "Manufacturer": {
+    "Id": 26,
+    "Name": "Hirose Electric Co Ltd"
+   },
+   "ManufacturerProductNumber": "U.FL-R-SMT-1(10)",
+   "UnitPrice": 1.29,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/hirose-electric-co-ltd/U-FL-R-SMT-1-10/2391570",
+   "DatasheetUrl": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/8942/HIROS08829-1.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/386/U.FL-R-SMT-1%2810%29.JPG",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "H11891TR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 2500,
+       "UnitPrice": 0.84895,
+       "TotalPrice": 2122.375
+      },
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.80846,
+       "TotalPrice": 4042.3
+      },
+      {
+       "BreakQuantity": 7500,
+       "UnitPrice": 0.78567,
+       "TotalPrice": 5892.525
+      },
+      {
+       "BreakQuantity": 12500,
+       "UnitPrice": 0.75789,
+       "TotalPrice": 9473.625
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 26,
+      "Name": "Hirose Electric Co Ltd"
+     },
+     "QuantityAvailableforPackageType": 274163,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 2500,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "H11891CT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 1.48,
+       "TotalPrice": 1.48
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.254,
+       "TotalPrice": 12.54
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.1752,
+       "TotalPrice": 29.38
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 1.119,
+       "TotalPrice": 55.95
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 1.0655,
+       "TotalPrice": 106.55
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.99872,
+       "TotalPrice": 249.68
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.95102,
+       "TotalPrice": 475.51
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.90563,
+       "TotalPrice": 905.63
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 26,
+      "Name": "Hirose Electric Co Ltd"
+     },
+     "QuantityAvailableforPackageType": 274163,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "H11891DKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 1.29,
+       "TotalPrice": 1.29
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 1.098,
+       "TotalPrice": 10.98
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 1.0288,
+       "TotalPrice": 25.72
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.9794,
+       "TotalPrice": 48.97
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.9327,
+       "TotalPrice": 93.27
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.8742,
+       "TotalPrice": 218.55
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.83244,
+       "TotalPrice": 416.22
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.7927,
+       "TotalPrice": 792.7
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 26,
+      "Name": "Hirose Electric Co Ltd"
+     },
+     "QuantityAvailableforPackageType": 274163,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 274163,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "https://www.digikey.com/api/videos/videoplayer/smallplayer/6068217923001",
+   "Parameters": [
+    {
+     "ParameterId": 801,
+     "ParameterText": "Connector Style",
+     "ParameterType": "String",
+     "ValueId": "416960",
+     "ValueText": "U.FL (UMCC)"
+    },
+    {
+     "ParameterId": 28,
+     "ParameterText": "Connector Type",
+     "ParameterType": "String",
+     "ValueId": "393048",
+     "ValueText": "Receptacle, Male Pin"
+    },
+    {
+     "ParameterId": 31,
+     "ParameterText": "Contact Termination",
+     "ParameterType": "String",
+     "ValueId": "405002",
+     "ValueText": "Solder"
+    },
+    {
+     "ParameterId": 1652,
+     "ParameterText": "Shield Termination",
+     "ParameterType": "String",
+     "ValueId": "405002",
+     "ValueText": "Solder"
+    },
+    {
+     "ParameterId": 60,
+     "ParameterText": "Impedance",
+     "ParameterType": "String",
+     "ValueId": "770446",
+     "ValueText": "50 Ohms"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1061,
+     "ParameterText": "Mounting Feature",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 164,
+     "ParameterText": "Cable Group",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 518,
+     "ParameterText": "Fastening Type",
+     "ParameterType": "String",
+     "ValueId": "404607",
+     "ValueText": "Snap-On"
+    },
+    {
+     "ParameterId": 2157,
+     "ParameterText": "Frequency - Max",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "6 GHz",
+     "ValueText": "6 GHz"
+    },
+    {
+     "ParameterId": 2171,
+     "ParameterText": "Number of Ports",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1401,
+     "ParameterText": "Housing Color",
+     "ParameterType": "String",
+     "ValueId": "319181",
+     "ValueText": "Beige"
+    },
+    {
+     "ParameterId": 697,
+     "ParameterText": "Ingress Protection",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1654,
+     "ParameterText": "Center Contact Material",
+     "ParameterType": "String",
+     "ValueId": "322862",
+     "ValueText": "Brass"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 658629,
+    "Name": "U.FL-R-SMT"
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2007,
+      "ParentId": 20,
+      "Name": "Coaxial Connectors (RF)",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/302/375/MFG_112954_tmb%2864x64%29.jpg",
+      "SeoDescription": "Products in the coaxial connector family are interconnect devices used with cable materials consisting of a central conductor surrounded by insulation material and an outer conductor of circular cross section, designed to maintain a consistent characteristic impedance over the length of the material in order to serve as a suitable transmission line for high frequency signals.",
+      "ChildCategories": [
+       {
+        "CategoryId": 437,
+        "ParentId": 2007,
+        "Name": "Coaxial Connector (RF) Assemblies",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/201/184/6741_tmb.jpg",
+        "SeoDescription": "Products in the coaxial connector family are interconnect devices used with cable materials consisting of a central conductor surrounded by insulation material and an outer conductor of circular cross section, designed to maintain a consistent characteristic impedance over the length of the material in order to serve as a suitable transmission line for high frequency signals.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "12",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 8717,
+    "Name": "U.FL"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.69.4010"
+   },
+   "OtherNames": [
+    "Q9928084",
+    "331-0472-2-10",
+    "H11891TR",
+    "Q5400621",
+    "U.FL-R-SMT-1 10",
+    "U.FL-R-SMT-1(10)-ND",
+    "H11891DKR",
+    "UFLRSMT110",
+    "H11891CT",
+    "*U.FL-R-SMT-1(10)"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 26,
+    "Value": "Hirose Electric Co Ltd",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

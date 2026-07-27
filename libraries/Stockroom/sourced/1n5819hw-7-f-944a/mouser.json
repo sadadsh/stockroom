@@ -1,0 +1,145 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "322437 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Schottky Diodes & Rectifiers Vr/40V Io/1A T/R",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/diodesinc/images/sod-123.jpg",
+    "Category": "Schottky Diodes & Rectifiers",
+    "LeadTime": "280 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "1N5819HW-7-F",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "621-1N5819HW-F",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.29",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.178",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.111",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.082",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.072",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.055",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/1N5819HW-7-F?qs=NQ47qNm99eDyWTEd07miYA%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 1e-05
+    },
+    "AvailabilityInStock": "322437",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 72000,
+      "Date": "2026-07-31T00:00:00"
+     },
+     {
+      "Quantity": 177383,
+      "Date": "2026-08-03T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "3000",
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541100080"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541100090"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854110090"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541109000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541100101"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "United Kingdom"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

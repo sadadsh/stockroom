@@ -1,0 +1,344 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "HART-POR USB TYPE C-C COUPLER BL",
+    "DetailedDescription": "Adapter Connector USB-C (USB TYPE-C), Receptacle To USB-C (USB TYPE-C), Receptacle Panel Mount, Bulkhead - Rear Side Nut"
+   },
+   "Manufacturer": {
+    "Id": 1195,
+    "Name": "HARTING"
+   },
+   "ManufacturerProductNumber": "09454522912",
+   "UnitPrice": 50.94,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/harting/09454522912/21528621",
+   "DatasheetUrl": "https://b2b.harting.com/files/download/PRD/PDF_DS/PDF_DS_09454522912_EN.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5737/MFG_1195_09454522912.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "1195-09454522912-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 50.94,
+       "TotalPrice": 50.94
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 43.297,
+       "TotalPrice": 432.97
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 40.5868,
+       "TotalPrice": 1014.67
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 38.6512,
+       "TotalPrice": 1932.56
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 36.8082,
+       "TotalPrice": 3680.82
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 34.5072,
+       "TotalPrice": 8626.8
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 1195,
+      "Name": "HARTING"
+     },
+     "QuantityAvailableforPackageType": 87,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 87,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 166,
+     "ParameterText": "Convert From (Adapter End)",
+     "ParameterType": "String",
+     "ValueId": "418397",
+     "ValueText": "USB-C (USB TYPE-C), Receptacle"
+    },
+    {
+     "ParameterId": 167,
+     "ParameterText": "Convert To (Adapter End)",
+     "ParameterType": "String",
+     "ValueId": "418397",
+     "ValueText": "USB-C (USB TYPE-C), Receptacle"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "383683",
+     "ValueText": "Panel Mount, Bulkhead - Rear Side Nut"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 743952,
+    "Name": "094545"
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2032,
+      "ParentId": 20,
+      "Name": "USB, DVI, HDMI Connectors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/290/048/0484050003_tmb.jpg",
+      "SeoDescription": "USB, DVI, and HDMI Connectors are devices most often used to provide a connection port between a computer and some other device for audio and video interface. The characteristics being connector type, number of contacts, gender, mounting type, current rating, and voltage rating. The connector types are DisplayPort, DMS-59, DVI- (A, D, or I), Firewire, HDMI (micro, mini), and USB (A, B, C, micro, mini).",
+      "ChildCategories": [
+       {
+        "CategoryId": 377,
+        "ParentId": 2032,
+        "Name": "USB, DVI, HDMI Connector Adapters",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/954/317/MFG_1528_2910_tmb.jpg",
+        "SeoDescription": "USB, DVI, HDMI Adapters are used to convert from one USB, DVI, HDMI connector style to another style, whether they are Board mounted, DIN Rail, Free Hanging, Panel Mount, or PCB mounted. Examples include Digital Flat Panel, DisplayPort, DVI-I, Firewire, HDMI, Magnetic Rectangular connector, Rectangular connector, Terminal Blocks, and USB plug or receptacle.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "5",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 98506,
+    "Name": "har-port"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unknown",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "Not Applicable",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.69.8000"
+   },
+   "OtherNames": [
+    "1195-09454522912",
+    "09-45-452-2912",
+    "09 45 452 2912"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "HART-POR USB TYPE C-C COUPLER BL",
+    "DetailedDescription": "Adapter Connector USB-C (USB TYPE-C), Receptacle To USB-C (USB TYPE-C), Receptacle Panel Mount, Bulkhead - Rear Side Nut"
+   },
+   "Manufacturer": {
+    "Id": 1195,
+    "Name": "HARTING"
+   },
+   "ManufacturerProductNumber": "09454522912",
+   "UnitPrice": 50.94,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/harting/09454522912/21528621",
+   "DatasheetUrl": "https://b2b.harting.com/files/download/PRD/PDF_DS/PDF_DS_09454522912_EN.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5737/MFG_1195_09454522912.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "1195-09454522912-ND",
+     "PackageType": {
+      "Id": 3,
+      "Name": "Bulk"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 50.94,
+       "TotalPrice": 50.94
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 43.297,
+       "TotalPrice": 432.97
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 40.5868,
+       "TotalPrice": 1014.67
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 38.6512,
+       "TotalPrice": 1932.56
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 36.8082,
+       "TotalPrice": 3680.82
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 34.5072,
+       "TotalPrice": 8626.8
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 1195,
+      "Name": "HARTING"
+     },
+     "QuantityAvailableforPackageType": 87,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    }
+   ],
+   "QuantityAvailable": 87,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 166,
+     "ParameterText": "Convert From (Adapter End)",
+     "ParameterType": "String",
+     "ValueId": "418397",
+     "ValueText": "USB-C (USB TYPE-C), Receptacle"
+    },
+    {
+     "ParameterId": 167,
+     "ParameterText": "Convert To (Adapter End)",
+     "ParameterType": "String",
+     "ValueId": "418397",
+     "ValueText": "USB-C (USB TYPE-C), Receptacle"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "383683",
+     "ValueText": "Panel Mount, Bulkhead - Rear Side Nut"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 743952,
+    "Name": "094545"
+   },
+   "Category": {
+    "CategoryId": 20,
+    "ParentId": 0,
+    "Name": "Connectors, Interconnects",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/279/043/204507-1_tmb%2864x64%29.jpg",
+    "SeoDescription": "Connector and interconnect products facilitate the joining of electrical or fiber optic conductors & cables. An enormous variety of styles are available, to accommodate most any application; banana plugs for lab equipment, coaxial connectors for RF, modular plugs for network and phone systems, spade and ring terminals for connecting discrete wires to terminal blocks, terminal blocks, sockets for transistors and integrated circuits, standard AC power connectors, headphone plugs and jacks, high-voltage connectors, USB connectors, and many, many more.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2032,
+      "ParentId": 20,
+      "Name": "USB, DVI, HDMI Connectors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/290/048/0484050003_tmb.jpg",
+      "SeoDescription": "USB, DVI, and HDMI Connectors are devices most often used to provide a connection port between a computer and some other device for audio and video interface. The characteristics being connector type, number of contacts, gender, mounting type, current rating, and voltage rating. The connector types are DisplayPort, DMS-59, DVI- (A, D, or I), Firewire, HDMI (micro, mini), and USB (A, B, C, micro, mini).",
+      "ChildCategories": [
+       {
+        "CategoryId": 377,
+        "ParentId": 2032,
+        "Name": "USB, DVI, HDMI Connector Adapters",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/954/317/MFG_1528_2910_tmb.jpg",
+        "SeoDescription": "USB, DVI, HDMI Adapters are used to convert from one USB, DVI, HDMI connector style to another style, whether they are Board mounted, DIN Rail, Free Hanging, Panel Mount, or PCB mounted. Examples include Digital Flat Panel, DisplayPort, DVI-I, Firewire, HDMI, Magnetic Rectangular connector, Rectangular connector, Terminal Blocks, and USB plug or receptacle.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "5",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 98506,
+    "Name": "har-port"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unknown",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "Not Applicable",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8536.69.8000"
+   },
+   "OtherNames": [
+    "1195-09454522912",
+    "09-45-452-2912",
+    "09 45 452 2912"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 1195,
+    "Value": "HARTING",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

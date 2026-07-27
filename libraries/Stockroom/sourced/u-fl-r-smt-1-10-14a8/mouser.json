@@ -1,0 +1,163 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "162666 In Stock",
+    "DataSheetUrl": "",
+    "Description": "RF Connectors / Coaxial Connectors SMT ML REC AU 50 OHM W/ANTI SLDR WCKNG R",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/hiroseelectric/images/UFL-R-SMT.jpg",
+    "Category": "RF Connectors / Coaxial Connectors",
+    "LeadTime": "46 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Hirose Connector",
+    "ManufacturerPartNumber": "U.FL-R-SMT-1(10)",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "798-U.FL-R-SMT-110",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "2500"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$1.29",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$1.10",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$0.98",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.933",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$0.875",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.849",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.833",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.806",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.80",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "U.FL-R-SMT-1(01)"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Hirose-Connector/U.FL-R-SMT-110?qs=kL1ClTr6oBoOdtqlGQpQrQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "798-UFLRSMT180",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 5e-05
+    },
+    "AvailabilityInStock": "162666",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8536694040"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8536901100"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8536690020"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853669000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8536691000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8536693000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8536699999"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85366990"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Japan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,2725 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 24,
+  "Parts": [
+   {
+    "Availability": "719500 In Stock",
+    "DataSheetUrl": "",
+    "Description": "MOSFETs SOT-23 N-CH LOGIC",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "182 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "onsemi",
+    "ManufacturerPartNumber": "BSS138",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "512-BSS138",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.38",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.267",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.169",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.106",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.093",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.081",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "BSS138_D87Z"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/onsemi/BSS138?qs=HK%252BeIG1iaahCeqBvjB4arg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "719500",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 525000,
+      "Date": "2026-12-04T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "3000",
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541219000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Korea, Republic of"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "",
+    "Description": "MOSFETs 50V, 0.26A, Single N-Channel Small-signal MOSFETs",
+    "FactoryStock": null,
+    "ImagePath": null,
+    "Category": "MOSFETs",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Taiwan Semiconductor",
+    "ManufacturerPartNumber": "BSS138",
+    "Min": "0",
+    "Mult": "0",
+    "MouserPartNumber": "N/A",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Taiwan-Semiconductor/BSS138?qs=Znm5pLBrcAIJQrcyWDZ7sg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541290000"
+     }
+    ],
+    "TradeCompliance": []
+   },
+   {
+    "Availability": "143010 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/70/1/BSS138N_Rev2.86.pdf",
+    "Description": "MOSFETs N-Ch 60V 230mA SOT-23-3",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "364 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Infineon Technologies",
+    "ManufacturerPartNumber": "BSS138NH6433XTMA1",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "726-BSS138NH6433XTMA",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.34",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.205",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.129",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.114",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.10",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.088",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.075",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10000,
+      "Price": "$0.059",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 20000,
+      "Price": "$0.054",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "BSS138N H6433"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Infineon-Technologies/BSS138NH6433XTMA1?qs=Dj8dEyEphkNJLDMnGQZYNA%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "143010",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541299000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Austria"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Austria"
+     }
+    ]
+   },
+   {
+    "Availability": "1341 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/70/1/Infineon_BSS138N_DS_v02_86_en.pdf",
+    "Description": "MOSFETs N-Ch 60V 230mA SOT-23-3",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "315 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Infineon Technologies",
+    "ManufacturerPartNumber": "SP000919330",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "726-SP000919330",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.39",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.27",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.171",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.108",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.094",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.052",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "BSS138N H6327"
+     },
+     {
+      "APMfrPN": " BSS138NH6327XTSA2"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Infineon-Technologies/SP000919330?qs=glduVv6OWv6qIe0r0uZFKw%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "1341",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "8541290100"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541299000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "85412999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Malaysia"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Austria"
+     }
+    ]
+   },
+   {
+    "Availability": "618095 On Order",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/175/1/BSS138W.pdf",
+    "Description": "MOSFETs 50V 200mW",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_323_3_new_SPL.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "280 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "BSS138W-7-F",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "621-BSS138W-F",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.32",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.176",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.116",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.094",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.082",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.055",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/BSS138W-7-F?qs=5zGBC69kmp6%2FnOvJMzpLyg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 6e-06
+    },
+    "AvailabilityInStock": "0",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 231095,
+      "Date": "2027-02-15T00:00:00"
+     },
+     {
+      "Quantity": 387000,
+      "Date": "2027-03-19T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "3310",
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 38% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541219000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/70/1/Infineon_BSS138W_DS_v02_43_en.pdf",
+    "Description": "MOSFETs N-Ch 60V 280mA SOT-323-3",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_323_3_new_SPL.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "287 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Infineon Technologies",
+    "ManufacturerPartNumber": "BSS138WH6327XTSA1",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "726-BSS138WH6327XTSA",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.40",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.294",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.212",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.135",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.118",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.074",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "BSS138W H6327"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Infineon-Technologies/BSS138WH6327XTSA1?qs=Dj8dEyEphkMUJZog1oMAlA%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 6e-06
+    },
+    "AvailabilityInStock": "0",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541299000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Austria"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Austria"
+     }
+    ]
+   },
+   {
+    "Availability": "1105969 In Stock",
+    "DataSheetUrl": "",
+    "Description": "MOSFETs FET 50V 3.5 OHM",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/onsemiconductor/images/SOT-23-3_TO-236_case_318_style8_DSL.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "140 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "onsemi",
+    "ManufacturerPartNumber": "BSS138-G",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "863-BSS138-G",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.57",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.349",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.223",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.167",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.15",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.15",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/onsemi/BSS138-G?qs=UkDUCjYnTB3VwCqWT1Cb%2FQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "1105969",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "1350",
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Philippines"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Korea, Republic of"
+     }
+    ]
+   },
+   {
+    "Availability": "77168 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/175/1/BSS138.pdf",
+    "Description": "MOSFETs 300mW 50V DSS",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "280 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "BSS138-7-F",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "621-BSS138-7-F",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.21",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.129",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.081",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.067",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.058",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.04",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "BSS138-13-F"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/BSS138-7-F?qs=TJSU9qitBVRAP5gIAnNy0g%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "621-BSS138-7-F-W",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "77168",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 881081,
+      "Date": "2026-08-04T00:00:00"
+     },
+     {
+      "Quantity": 378000,
+      "Date": "2027-02-05T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "6000",
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 38% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541219000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "China"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/ds30144.pdf",
+    "Description": "MOSFETs 60V 360mW",
+    "FactoryStock": null,
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Obsolete",
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "BSS138-7",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "621-BSS138",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/BSS138-7?qs=c5EoN2P94W955Wy7u9kyEg%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "No",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [
+     "Mouser does not presently sell this product in your region."
+    ],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "1780 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/Infineon_BSS138W.pdf",
+    "Description": "MOSFETs N-Ch 60V 280mA SOT-323-3",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_323_3_new_SPL.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "322 Days",
+    "LifecycleStatus": "Not Recommended for New Designs",
+    "Manufacturer": "Infineon Technologies",
+    "ManufacturerPartNumber": "BSS138WH6433XTMA1",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "726-BSS138WH6433XTMA",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.44",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.262",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.164",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.122",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.096",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.081",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10000,
+      "Price": "$0.057",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 20000,
+      "Price": "$0.053",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Infineon-Technologies/BSS138WH6433XTMA1?qs=Dj8dEyEphkNlA40XmWLzSg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 6e-06
+    },
+    "AvailabilityInStock": "1780",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "8541290100"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541299000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "85412999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Malaysia"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Malaysia"
+     }
+    ]
+   },
+   {
+    "Availability": "45745 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/225/1/BSS138_SOT_23_.pdf",
+    "Description": "MOSFETs N-Ch Enh FET 50Vds 0.22A 20Vgs 0.35W",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mcc/images/SOT-23-3_DSL.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "168 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Micro Commercial Components (MCC)",
+    "ManufacturerPartNumber": "BSS138-TP",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "833-BSS138-TP",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.28",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.164",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.10",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.072",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.063",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.055",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Micro-Commercial-Components-MCC/BSS138-TP?qs=EBDBlbfErPzWWHQpUlSR6w%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "45745",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Vietnam"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/225/1/BSS138_SOT_23_.pdf",
+    "Description": "MOSFETs",
+    "FactoryStock": null,
+    "ImagePath": "https://www.mouser.com/images/mcc/images/BZX84B3V6HE3-TP_SPL.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "168 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Micro Commercial Components (MCC)",
+    "ManufacturerPartNumber": "BSS138-13P",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "833-BSS138-13P",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Micro-Commercial-Components-MCC/BSS138-13P?qs=vvQtp7zwQdNCjOKsW8nGYQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541290000"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "454 In Stock",
+    "DataSheetUrl": "",
+    "Description": "MOSFETs N-Chnl 50V",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "280 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "BSS138TA",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "522-BSS138TA",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.39",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.239",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.155",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.134",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.134",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/BSS138TA?qs=zhx2xqPtQQyMS1%252BV68zZfg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "621-BSS138-7-F",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "454",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 9000,
+      "Date": "2027-02-12T00:00:00"
+     },
+     {
+      "Quantity": 9000,
+      "Date": "2027-07-21T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "870",
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 38% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541299000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/diodes inc_ds30144.pdf",
+    "Description": "MOSFETs N-Chnl 50V",
+    "FactoryStock": null,
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Obsolete",
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "BSS138TC",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "522-BSS138TC",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/BSS138TC?qs=zhx2xqPtQQy6uiq7l%2FUwag%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "522-BSS138TA",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [
+     "Mouser does not presently sell this product in your region."
+    ],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541290065"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "85412999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "United Kingdom"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "2794 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/175/1/ds30203.pdf",
+    "Description": "MOSFETs 50V 200mW",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_363_6_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "280 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "BSS138DW-7-F",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "621-BSS138DW-F",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.42",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.232",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.156",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.115",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.102",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.056",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/BSS138DW-7-F?qs=rGAXPo9uwV10UlZnPRLyGg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 7.5e-06
+    },
+    "AvailabilityInStock": "2794",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 156000,
+      "Date": "2027-05-19T00:00:00"
+     },
+     {
+      "Quantity": 354000,
+      "Date": "2027-09-17T00:00:00"
+     },
+     {
+      "Quantity": 174000,
+      "Date": "2027-11-24T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "6000",
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 38% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541219000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/70/1/Infineon_BSS138N_DS_v02_86_en.pdf",
+    "Description": "MOSFETs N-Ch 60V 230mA SOT-23-3",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "315 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Infineon Technologies",
+    "ManufacturerPartNumber": "BSS138NH6327XTSA2",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "726-BSS138NH6327XTSA",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.39",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.27",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.171",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.108",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.094",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.067",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "BSS138N H6327"
+     },
+     {
+      "APMfrPN": " SP000919330"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Infineon-Technologies/BSS138NH6327XTSA2?qs=OwbwYO03UsJ7SlZOgl9icA%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "0",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541299000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Malaysia"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Malaysia"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/70/1/Infineon-BSS138N-DS-v02_86-en.pdf",
+    "Description": "GaN FETs N-Ch 60V 230mA SOT-23-3",
+    "FactoryStock": null,
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "GaN FETs",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Obsolete",
+    "Manufacturer": "Infineon Technologies",
+    "ManufacturerPartNumber": "BSS138N L6327",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "726-BSS138NL6327",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Infineon-Technologies/BSS138N-L6327?qs=mzcOS1kGbgdUS1nTTz%2FbeA%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "726-BSS138NH6327",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [
+     "Mouser does not presently sell this product in your region."
+    ],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541290065"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "85412999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Malaysia"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/diodes inc._ds30206.pdf",
+    "Description": "MOSFETs 50V 200mW",
+    "FactoryStock": null,
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_323_3_new_SPL.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Obsolete",
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "BSS138W-7",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "621-BSS138W",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/BSS138W-7?qs=mdiO5HdF0Kisa1z%2FmMZTBw%3D%3D",
+    "Reeling": false,
+    "ROHSStatus": "No",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 6e-06
+    },
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [
+     "Mouser does not presently sell this product in your region."
+    ],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "528 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/175/1/BSS138.pdf",
+    "Description": "MOSFETs 50V N-Ch Enh FET 20Vgss 300Pd 200mA",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "280 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "BSS138Q-7-F",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "621-BSS138Q-7-F",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.35",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.215",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.135",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.095",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.083",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.061",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/BSS138Q-7-F?qs=AsTZqt%2FmeqkAamxBL%2F3lPw%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "528",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 36000,
+      "Date": "2026-08-28T00:00:00"
+     },
+     {
+      "Quantity": 36000,
+      "Date": "2027-02-12T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "3000",
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 38% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "854121000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541299000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8541210100"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/70/1/Infineon-BSS138N-DS-v02_86-en.pdf",
+    "Description": "GaN FETs N-Ch 60V 230mA SOT-23-3",
+    "FactoryStock": null,
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "GaN FETs",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Obsolete",
+    "Manufacturer": "Infineon Technologies",
+    "ManufacturerPartNumber": "BSS138N L6433",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "726-BSS138NL6433",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Infineon-Technologies/BSS138N-L6433?qs=mzcOS1kGbgfGKfkJNAIx0w%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [
+     "Mouser does not presently sell this product in your region."
+    ],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541290065"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "85412999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Malaysia"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "41 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/70/1/Infineon_BSS138N_DS_v02_86_en.pdf",
+    "Description": "MOSFETs N-Ch 60V 230mA SOT-23-3",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "315 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Infineon Technologies",
+    "ManufacturerPartNumber": "BSS138N H6327",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "726-BSS138NH6327",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.39",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.27",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.171",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.108",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.094",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$0.052",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "SP000919330"
+     },
+     {
+      "APMfrPN": " BSS138NH6327XTSA2"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Infineon-Technologies/BSS138N-H6327?qs=9Vqdt%252BdHmfKdJjFegG53Rg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "726-BSS138NH6327XTSA",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "41",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "8541290100"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541299000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "85412999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Malaysia"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Austria"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/diodes inc._ds30203.pdf",
+    "Description": "MOSFETs 50V 200mW",
+    "FactoryStock": null,
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_363_6_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Obsolete",
+    "Manufacturer": "Diodes Incorporated",
+    "ManufacturerPartNumber": "BSS138DW-7",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "621-BSS138DW",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/BSS138DW-7?qs=FOlmdCx%252BAA0EImDqr6AmLg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "No",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 7.5e-06
+    },
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [
+     "Mouser does not presently sell this product in your region."
+    ],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541100000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   },
+   {
+    "Availability": "107681 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/70/1/Infineon_BSS138N_DS_v02_86_en.pdf",
+    "Description": "MOSFETs N-Ch 60V 230mA SOT-23-3",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+    "Category": "MOSFETs",
+    "LeadTime": "364 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Infineon Technologies",
+    "ManufacturerPartNumber": "BSS138N H6433",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "726-BSS138NH6433",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "10000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.36",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.247",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.156",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$0.099",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.086",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 2500,
+      "Price": "$0.076",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.065",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10000,
+      "Price": "$0.057",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 20000,
+      "Price": "$0.042",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": [
+     {
+      "APMfrPN": "BSS138NH6433XTMA1"
+     }
+    ],
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Infineon-Technologies/BSS138N-H6433?qs=oPPfIaWL1l0Oz%2Fjyrct07w%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": "107681",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8541210000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "8541290100"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8541299000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "85412999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Austria"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Austria"
+     }
+    ]
+   },
+   {
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/225/1/BSS138HE3(SOT-23).pdf",
+    "Description": "MOSFETs N-Channel Enhancement Mode Field Effect Transistor",
+    "FactoryStock": null,
+    "ImagePath": null,
+    "Category": "MOSFETs",
+    "LeadTime": "0 Days",
+    "LifecycleStatus": "Obsolete",
+    "Manufacturer": "Micro Commercial Components (MCC)",
+    "ManufacturerPartNumber": "BSS138HE3-TP",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "833-BSS138HE3-TP",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Micro-Commercial-Components-MCC/BSS138HE3-TP?qs=QNEnbhJQKvaJOi2rdXMCSw%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 8e-06
+    },
+    "AvailabilityInStock": null,
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [
+     "Mouser does not presently sell this product in your region."
+    ],
+    "SurchargeMessages": null,
+    "RestrictionMessage": "Mouser does not presently sell this product in your region.",
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8541210095"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8541290000"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

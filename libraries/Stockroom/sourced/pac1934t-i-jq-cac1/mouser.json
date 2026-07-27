@@ -1,0 +1,108 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "4590 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/282/1/PAC1931_Family_Data_Sheet_DS20005850E.pdf",
+    "Description": "Current & Power Monitors & Regulators PAC1934 Four Channel DC Power Monitor",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/microchiptechnology/images/UQFN-16microchip.jpg",
+    "Category": "Current & Power Monitors & Regulators",
+    "LeadTime": "77 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "Microchip Technology",
+    "ManufacturerPartNumber": "PAC1934T-I/JQ",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "579-PAC1934JQ",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3300"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$1.94",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3300,
+      "Price": "$1.94",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Microchip-Technology/PAC1934T-I-JQ?qs=%252BEew9%252B0nqrC2v6G%2FLAdDNg%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 0.00018
+    },
+    "AvailabilityInStock": "4590",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 6600,
+      "Date": "2026-08-12T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": null,
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542390090"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8542399000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8542390000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8542399999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Thailand"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Taiwan"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -105,8 +105,8 @@
   },
   "derived": {
     "category": "Diodes",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Single Color LEDs WL-SMCC 80mcd 2V 120 degress 0603 Amber",
     "display_name": "Single Color LED 0603",
     "specs": {
@@ -124,12 +124,10 @@
       "HTS Code (US)": "8541410000",
       "Height (Max)": "0.25mm",
       "Image": "https://www.mouser.com/images/wurthelectronics/images/150060AS73220_SPL.jpg",
-      "Lead Time": "119 Days",
       "Lens Color": "Colorless",
       "Lens Size": "1.60mm x 0.80mm",
       "Lens Style": "Rectangle with Flat Top",
       "Lens Transparency": "Clear",
-      "Lifecycle": "Active",
       "Millicandela Rating": "80mcd",
       "Minimum Order Quantity": "1",
       "Moisture Sensitivity Level": "3 (168 Hours)",
@@ -152,7 +150,7 @@
       "Wavelength - Dominant": "605nm",
       "Wavelength - Peak": "609nm"
     },
-    "value": ""
+    "value": "150060AS73220"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -360,6 +358,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/150060as73220-a229/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/150060as73220-a229/mouser.json"
+    }
+  },
   "tags": []
 }

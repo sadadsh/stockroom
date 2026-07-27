@@ -1,0 +1,722 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "RES 0.1 OHM 1% 1/8W 0805",
+    "DetailedDescription": "100 mOhms ±1% 0.125W, 1/8W Chip Resistor 0805 (2012 Metric) Automotive AEC-Q200, Current Sense Metal Film"
+   },
+   "Manufacturer": {
+    "Id": 13,
+    "Name": "YAGEO"
+   },
+   "ManufacturerProductNumber": "PE0805FRF070R1L",
+   "UnitPrice": 0.44,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/yageo/PE0805FRF070R1L/5914048",
+   "DatasheetUrl": "https://yageogroup.com/content/Resource%20Library/Datasheet/PYU-PE_521_ROHS_L.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2399/CRSM%20PT0805.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "13-PE0805FRF070R1LTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.11185,
+       "TotalPrice": 559.25
+      },
+      {
+       "BreakQuantity": 10000,
+       "UnitPrice": 0.10397,
+       "TotalPrice": 1039.7
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.09992,
+       "TotalPrice": 1498.8
+      },
+      {
+       "BreakQuantity": 25000,
+       "UnitPrice": 0.09534,
+       "TotalPrice": 2383.5
+      },
+      {
+       "BreakQuantity": 35000,
+       "UnitPrice": 0.09262,
+       "TotalPrice": 3241.7
+      },
+      {
+       "BreakQuantity": 50000,
+       "UnitPrice": 0.09022,
+       "TotalPrice": 4511.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 13,
+      "Name": "YAGEO"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 5000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "13-PE0805FRF070R1LCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.44,
+       "TotalPrice": 0.44
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.285,
+       "TotalPrice": 2.85
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2412,
+       "TotalPrice": 6.03
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.214,
+       "TotalPrice": 10.7
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1908,
+       "TotalPrice": 19.08
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.1654,
+       "TotalPrice": 41.35
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.14948,
+       "TotalPrice": 74.74
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.13594,
+       "TotalPrice": 135.94
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 13,
+      "Name": "YAGEO"
+     },
+     "QuantityAvailableforPackageType": 2708,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "13-PE0805FRF070R1LDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.44,
+       "TotalPrice": 0.44
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.285,
+       "TotalPrice": 2.85
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2412,
+       "TotalPrice": 6.03
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.214,
+       "TotalPrice": 10.7
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1908,
+       "TotalPrice": 19.08
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.1654,
+       "TotalPrice": 41.35
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.14948,
+       "TotalPrice": 74.74
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.13594,
+       "TotalPrice": 135.94
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 13,
+      "Name": "YAGEO"
+     },
+     "QuantityAvailableforPackageType": 2708,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 2708,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2085,
+     "ParameterText": "Resistance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "100 mOhms",
+     "ValueText": "100 mOhms"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1131",
+     "ValueText": "±1%"
+    },
+    {
+     "ParameterId": 2,
+     "ParameterText": "Power (Watts)",
+     "ParameterType": "String",
+     "ValueId": "10879",
+     "ValueText": "0.125W, 1/8W"
+    },
+    {
+     "ParameterId": 174,
+     "ParameterText": "Composition",
+     "ParameterType": "String",
+     "ValueId": "374915",
+     "ValueText": "Metal Film"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "316915",
+     "ValueText": "Automotive AEC-Q200, Current Sense"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "1378",
+     "ValueText": "±100ppm/°C"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242940",
+     "ValueText": "-55°C ~ 170°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39329",
+     "ValueText": "0805 (2012 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "39328",
+     "ValueText": "0805"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "8732",
+     "ValueText": "0.080\" L x 0.050\" W (2.03mm x 1.27mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "5511",
+     "ValueText": "0.026\" (0.65mm)"
+    },
+    {
+     "ParameterId": 1127,
+     "ParameterText": "Number of Terminations",
+     "ParameterType": "Double",
+     "ValueId": "2",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 717777,
+    "Name": "PE0805F"
+   },
+   "Category": {
+    "CategoryId": 2,
+    "ParentId": 0,
+    "Name": "Resistors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/639/316/FVT%20SERIES_tmb%2864x64%29.jpg",
+    "SeoDescription": "Products within this category include fixed-value (non-adjustable) resistors and related mounting accessories, organized according to their physical form factor or the method by which they are physically and electrically connected within an end application. Adjustable or variable-value resistors (also known as potentiometers or rheostats) are found separately, in a category of their own.",
+    "ChildCategories": [
+     {
+      "CategoryId": 52,
+      "ParentId": 2,
+      "Name": "Chip Resistor - Surface Mount",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/683/989/MFG_RMC%20SERIES_tmb%2864x64%29.jpg",
+      "SeoDescription": "Resistors provide opposition to current flow, in a manner that is proportional to the electric potential (voltage) imposed across them, and which is ideally unaffected by signal frequency or changes in temperature. Resistors described as surface mount chip types are designed to be affixed to the surface of a printed circuit board and incorporate a single resistor per device package.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "20",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 68208,
+    "Name": "PE_L"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8533.21.0030"
+   },
+   "OtherNames": [
+    "13-PE0805FRF070R1LTR",
+    "13-PE0805FRF070R1LDKR",
+    "PE0805FRF070R1L-ND",
+    "13-PE0805FRF070R1LCT"
+   ]
+  }
+ ],
+ "ProductsCount": 1,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "RES 0.1 OHM 1% 1/8W 0805",
+    "DetailedDescription": "100 mOhms ±1% 0.125W, 1/8W Chip Resistor 0805 (2012 Metric) Automotive AEC-Q200, Current Sense Metal Film"
+   },
+   "Manufacturer": {
+    "Id": 13,
+    "Name": "YAGEO"
+   },
+   "ManufacturerProductNumber": "PE0805FRF070R1L",
+   "UnitPrice": 0.44,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/yageo/PE0805FRF070R1L/5914048",
+   "DatasheetUrl": "https://yageogroup.com/content/Resource%20Library/Datasheet/PYU-PE_521_ROHS_L.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2399/CRSM%20PT0805.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "13-PE0805FRF070R1LTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 5000,
+       "UnitPrice": 0.11185,
+       "TotalPrice": 559.25
+      },
+      {
+       "BreakQuantity": 10000,
+       "UnitPrice": 0.10397,
+       "TotalPrice": 1039.7
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.09992,
+       "TotalPrice": 1498.8
+      },
+      {
+       "BreakQuantity": 25000,
+       "UnitPrice": 0.09534,
+       "TotalPrice": 2383.5
+      },
+      {
+       "BreakQuantity": 35000,
+       "UnitPrice": 0.09262,
+       "TotalPrice": 3241.7
+      },
+      {
+       "BreakQuantity": 50000,
+       "UnitPrice": 0.09022,
+       "TotalPrice": 4511.0
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 13,
+      "Name": "YAGEO"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 5000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "13-PE0805FRF070R1LCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.44,
+       "TotalPrice": 0.44
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.285,
+       "TotalPrice": 2.85
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2412,
+       "TotalPrice": 6.03
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.214,
+       "TotalPrice": 10.7
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1908,
+       "TotalPrice": 19.08
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.1654,
+       "TotalPrice": 41.35
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.14948,
+       "TotalPrice": 74.74
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.13594,
+       "TotalPrice": 135.94
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 13,
+      "Name": "YAGEO"
+     },
+     "QuantityAvailableforPackageType": 2708,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "13-PE0805FRF070R1LDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.44,
+       "TotalPrice": 0.44
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.285,
+       "TotalPrice": 2.85
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.2412,
+       "TotalPrice": 6.03
+      },
+      {
+       "BreakQuantity": 50,
+       "UnitPrice": 0.214,
+       "TotalPrice": 10.7
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1908,
+       "TotalPrice": 19.08
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.1654,
+       "TotalPrice": 41.35
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.14948,
+       "TotalPrice": 74.74
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.13594,
+       "TotalPrice": 135.94
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 13,
+      "Name": "YAGEO"
+     },
+     "QuantityAvailableforPackageType": 2708,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 2708,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 2085,
+     "ParameterText": "Resistance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "100 mOhms",
+     "ValueText": "100 mOhms"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1131",
+     "ValueText": "±1%"
+    },
+    {
+     "ParameterId": 2,
+     "ParameterText": "Power (Watts)",
+     "ParameterType": "String",
+     "ValueId": "10879",
+     "ValueText": "0.125W, 1/8W"
+    },
+    {
+     "ParameterId": 174,
+     "ParameterText": "Composition",
+     "ParameterType": "String",
+     "ValueId": "374915",
+     "ValueText": "Metal Film"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "316915",
+     "ValueText": "Automotive AEC-Q200, Current Sense"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "1378",
+     "ValueText": "±100ppm/°C"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242940",
+     "ValueText": "-55°C ~ 170°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39329",
+     "ValueText": "0805 (2012 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "39328",
+     "ValueText": "0805"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "8732",
+     "ValueText": "0.080\" L x 0.050\" W (2.03mm x 1.27mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "5511",
+     "ValueText": "0.026\" (0.65mm)"
+    },
+    {
+     "ParameterId": 1127,
+     "ParameterText": "Number of Terminations",
+     "ParameterType": "Double",
+     "ValueId": "2",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 717777,
+    "Name": "PE0805F"
+   },
+   "Category": {
+    "CategoryId": 2,
+    "ParentId": 0,
+    "Name": "Resistors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/639/316/FVT%20SERIES_tmb%2864x64%29.jpg",
+    "SeoDescription": "Products within this category include fixed-value (non-adjustable) resistors and related mounting accessories, organized according to their physical form factor or the method by which they are physically and electrically connected within an end application. Adjustable or variable-value resistors (also known as potentiometers or rheostats) are found separately, in a category of their own.",
+    "ChildCategories": [
+     {
+      "CategoryId": 52,
+      "ParentId": 2,
+      "Name": "Chip Resistor - Surface Mount",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/683/989/MFG_RMC%20SERIES_tmb%2864x64%29.jpg",
+      "SeoDescription": "Resistors provide opposition to current flow, in a manner that is proportional to the electric potential (voltage) imposed across them, and which is ideally unaffected by signal frequency or changes in temperature. Resistors described as surface mount chip types are designed to be affixed to the surface of a printed circuit board and incorporate a single resistor per device package.",
+      "ChildCategories": []
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "20",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 68208,
+    "Name": "PE_L"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8533.21.0030"
+   },
+   "OtherNames": [
+    "13-PE0805FRF070R1LTR",
+    "13-PE0805FRF070R1LDKR",
+    "PE0805FRF070R1L-ND",
+    "13-PE0805FRF070R1LCT"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 13,
+    "Value": "YAGEO",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": null,
+  "Status": null,
+  "Series": null,
+  "ParametricFilters": null,
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

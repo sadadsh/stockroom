@@ -7,31 +7,47 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "LED Lighting Driver ICs 36-Channel LED Driver, QFN-44 (5.0mm x 5.0mm), T&R, selectable clock",
-    "display_name": "LED Lighting Driver IC",
+    "display_name": "LED Lighting Driver IC 44-QFN",
     "specs": {
+      "Applications": "LED Lighting",
       "Assembly Country of Origin": "Not available",
       "Country of Diffusion": "Not available",
       "Country of Origin": "China",
+      "Current - Output / Channel": "38mA",
       "ECCN": "EAR99",
+      "Frequency": "3kHz, 22kHz",
       "HTS Code (CA)": "8542390000",
       "HTS Code (CN)": "8542399000",
       "HTS Code (EU TARIC)": "8542399000",
       "HTS Code (MX)": "8542399999",
       "HTS Code (US)": "8542390090",
       "Image": "https://www.mouser.com/images/integratedsiliconsolutioninc/images/QFN_44_t.jpg",
-      "Lead Time": "140 Days",
+      "Internal Switch(s)": "No",
       "Minimum Order Quantity": "1",
+      "Moisture Sensitivity Level": "3 (168 Hours)",
+      "Mounting Type": "Surface Mount",
+      "Number of Outputs": "36",
+      "Operating Temperature": "-40°C ~ 125°C (TA)",
       "Order Multiple": "1",
+      "Package / Case": "44-PowerWFQFN",
+      "Package Type": "Tape & Reel (TR)",
       "Packaging": "Reel, Cut Tape, MouseReel",
       "Product Category": "LED Lighting Driver ICs",
+      "REACH": "REACH Unaffected",
       "RoHS": "RoHS Compliant",
       "Standard Pack Qty": "2500",
-      "Unit Weight (kg)": "0.0014305"
+      "Standard Package": "2500",
+      "Supplier Device Package": "44-QFN (5x5)",
+      "Topology": "Constant Current",
+      "Type": "Linear",
+      "Unit Weight (kg)": "0.0014305",
+      "Voltage - Supply (Max)": "5.5V",
+      "Voltage - Supply (Min)": "2.7V"
     },
-    "value": ""
+    "value": "IS31FL3236A-QFLS4-TR"
   },
   "enrichment": {
     "Assembly Country of Origin": {
@@ -159,6 +175,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/is31fl3236a-qfls4-tr-7e81/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/is31fl3236a-qfls4-tr-7e81/mouser.json"
+    }
+  },
   "tags": []
 }

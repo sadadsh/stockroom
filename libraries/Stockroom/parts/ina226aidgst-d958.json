@@ -122,8 +122,8 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "",
-    "derived_by": "",
+    "derived_at": "2026-07-27T11:39:39Z",
+    "derived_by": "rules@1",
     "description": "Current & Power Monitors & Regulators Hi-Side Msmt Bi-Dir Current/Pwr Mon A 59 A 595-INA226AIDGSR",
     "display_name": "Current & Power Monitor 10-VSSOP",
     "specs": {
@@ -159,7 +159,7 @@
       "Unit Weight (kg)": "2.37e-05",
       "Voltage - Input": "0V ~ 36V"
     },
-    "value": ""
+    "value": "INA226AIDGST"
   },
   "enrichment": {},
   "hashes": null,
@@ -252,6 +252,15 @@
   ],
   "requires_override": null,
   "schema_version": 3,
-  "sources": {},
+  "sources": {
+    "digikey": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/ina226aidgst-d958/digikey.json"
+    },
+    "mouser": {
+      "fetched_at": "2026-07-27T11:39:39Z",
+      "file": "sourced/ina226aidgst-d958/mouser.json"
+    }
+  },
   "tags": []
 }

@@ -1,0 +1,154 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "4511 In Stock",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/508/1/PYu-AF_51_RoHS_L_9.pdf",
+    "Description": "Thick Film Resistors - SMD 2.2Ohms 100 mW 0603  1% AEC-Q200",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/yageo/images/AF_series_DSL.jpg",
+    "Category": "Thick Film Resistors - SMD",
+    "LeadTime": "84 Days",
+    "LifecycleStatus": null,
+    "Manufacturer": "YAGEO",
+    "ManufacturerPartNumber": "AF0603FR-072R2L",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "603-AF0603FR-072R2L",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "5000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$0.10",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$0.031",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$0.02",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$0.017",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 5000,
+      "Price": "$0.012",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10000,
+      "Price": "$0.01",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25000,
+      "Price": "$0.009",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/YAGEO/AF0603FR-072R2L?qs=tggtontpCXPYp5lxWRUBGQ%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant By Exemption",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "UnitWeightKg": {
+     "UnitWeight": 2e-06
+    },
+    "AvailabilityInStock": "4511",
+    "AvailabilityOnOrder": [
+     {
+      "Quantity": 10000,
+      "Date": "2026-09-18T00:00:00"
+     }
+    ],
+    "InfoMessages": [],
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 8% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8533210030"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8533211000"
+     },
+     {
+      "ComplianceName": "CAHTS",
+      "ComplianceValue": "8533210000"
+     },
+     {
+      "ComplianceName": "JPHTS",
+      "ComplianceValue": "853321000"
+     },
+     {
+      "ComplianceName": "KRHTS",
+      "ComplianceValue": "8533219000"
+     },
+     {
+      "ComplianceName": "TARIC",
+      "ComplianceValue": "8533210000"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8533210100"
+     },
+     {
+      "ComplianceName": "BRHTS",
+      "ComplianceValue": "85332120"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "Taiwan"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}

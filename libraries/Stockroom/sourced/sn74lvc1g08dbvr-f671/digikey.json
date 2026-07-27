@@ -1,0 +1,2846 @@
+{
+ "Products": [
+  {
+   "Description": {
+    "ProductDescription": "IC GATE AND 1CH 2-INP SOT23-5",
+    "DetailedDescription": "AND Gate IC 1 Channel SOT-23-5"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "SN74LVC1G08DBVR",
+   "UnitPrice": 0.12,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/SN74LVC1G08DBVR/385718",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fsn74lvc1g08",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8900/MFG_296%7E4073253-4%7EDBV%7E5.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-11601-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.04275,
+       "TotalPrice": 128.25
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.04123,
+       "TotalPrice": 247.38
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.04047,
+       "TotalPrice": 364.23
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.03962,
+       "TotalPrice": 594.3
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.03913,
+       "TotalPrice": 821.73
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.03866,
+       "TotalPrice": 1159.8
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 518635,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-11601-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.12,
+       "TotalPrice": 0.12
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.077,
+       "TotalPrice": 0.77
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.0672,
+       "TotalPrice": 1.68
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0565,
+       "TotalPrice": 5.65
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.05144,
+       "TotalPrice": 12.86
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.04838,
+       "TotalPrice": 24.19
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.04586,
+       "TotalPrice": 45.86
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 518635,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-11601-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.12,
+       "TotalPrice": 0.12
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.077,
+       "TotalPrice": 0.77
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.0672,
+       "TotalPrice": 1.68
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0565,
+       "TotalPrice": 5.65
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.05144,
+       "TotalPrice": 12.86
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.04838,
+       "TotalPrice": 24.19
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.04586,
+       "TotalPrice": 45.86
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 518635,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 518635,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 247,
+     "ParameterText": "Logic Type",
+     "ParameterType": "String",
+     "ValueId": "313906",
+     "ValueText": "AND Gate"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 667,
+     "ParameterText": "Number of Inputs",
+     "ParameterType": "String",
+     "ValueId": "121326",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "56916",
+     "ValueText": "1.65V ~ 5.5V"
+    },
+    {
+     "ParameterId": 2116,
+     "ParameterText": "Current - Quiescent (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 µA",
+     "ValueText": "10 µA"
+    },
+    {
+     "ParameterId": 592,
+     "ParameterText": "Current - Output High, Low",
+     "ParameterType": "String",
+     "ValueId": "188508",
+     "ValueText": "32mA, 32mA"
+    },
+    {
+     "ParameterId": 1543,
+     "ParameterText": "Input Logic Level - Low",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1542,
+     "ParameterText": "Input Logic Level - High",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1552,
+     "ParameterText": "Max Propagation Delay @ V, Max CL",
+     "ParameterType": "String",
+     "ValueId": "228120",
+     "ValueText": "4ns @ 5V, 50pF"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405420",
+     "ValueText": "SOT-23-5"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "400230",
+     "ValueText": "SC-74A, SOT-753"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 14239,
+    "Name": "74LVC1G08"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2019,
+      "ParentId": 32,
+      "Name": "Logic",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/312/8-TSSOP%2C-8-MSOP-3x3mm_tmb.jpg",
+      "SeoDescription": "Logic components operate using two voltage levels. These two levels are referred to as High or Low, On or Off, True or False, or simply 1 or 0. There are many components included in this category, such as Buffers, Drivers, Receivers, Transceivers, Comparators, Counters, Dividers, FIFOs Memory, Flip Flops, Gates, Inverters, Latches, Multivibrators, Parity Generators, Shift Registers, Signal Switches, Multiplexers, Decoders, Translators, Level Shifters, Universal Bus FUnctions, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 705,
+        "ParentId": 2019,
+        "Name": "Gates and Inverters",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Products in the logic gate and inverter family perform elementary logical operations on individual logic signals such as AND, NOT, OR, etc. Unlike flip-flops they do not have a capacity to store information and respond immediately to the signals presented to their inputs. Though long supplanted by implementations in integrated circuit form for realizing complex functions, discrete gates remain available for use in circumstances where only very simple logical functions are needed.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 75,
+    "Name": "74LVC"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "-SN74LVC1G08DBVRE4",
+    "-296-11601-1",
+    "296-11601-6",
+    "-SN74LVC1G08DBVRE4-NDR",
+    "-SN74LVC1G08DBVR-NDR",
+    "296-11601-2",
+    "296-11601-1",
+    "TEXTISSN74LVC1G08DBVR",
+    "-296-11601-1-ND",
+    "2156-SN74LVC1G08DBVR"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "IC GATE AND 1CH 2-INP SOT23-5",
+    "DetailedDescription": "AND Gate IC 1 Channel SOT-23-5"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "SN74LVC1G08DBVRG4",
+   "UnitPrice": 0.6,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/SN74LVC1G08DBVRG4/1591975",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fsn74lvc1g08",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8900/MFG_296%7E4073253-4%7EDBV%7E5.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-35939-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.26863,
+       "TotalPrice": 805.89
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.26168,
+       "TotalPrice": 1570.08
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.25819,
+       "TotalPrice": 2323.71
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.25433,
+       "TotalPrice": 3814.95
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.25208,
+       "TotalPrice": 5293.68
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.24991,
+       "TotalPrice": 7497.3
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 3000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-35939-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.6,
+       "TotalPrice": 0.6
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.424,
+       "TotalPrice": 4.24
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.38,
+       "TotalPrice": 9.5
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3315,
+       "TotalPrice": 33.15
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.30832,
+       "TotalPrice": 77.08
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.29434,
+       "TotalPrice": 147.17
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28764,
+       "TotalPrice": 287.64
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 4754,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-35939-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.6,
+       "TotalPrice": 0.6
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.424,
+       "TotalPrice": 4.24
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.38,
+       "TotalPrice": 9.5
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3315,
+       "TotalPrice": 33.15
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.30832,
+       "TotalPrice": 77.08
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.29434,
+       "TotalPrice": 147.17
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28764,
+       "TotalPrice": 287.64
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 4754,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 4754,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 247,
+     "ParameterText": "Logic Type",
+     "ParameterType": "String",
+     "ValueId": "313906",
+     "ValueText": "AND Gate"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 667,
+     "ParameterText": "Number of Inputs",
+     "ParameterType": "String",
+     "ValueId": "121326",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "56916",
+     "ValueText": "1.65V ~ 5.5V"
+    },
+    {
+     "ParameterId": 2116,
+     "ParameterText": "Current - Quiescent (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 µA",
+     "ValueText": "10 µA"
+    },
+    {
+     "ParameterId": 592,
+     "ParameterText": "Current - Output High, Low",
+     "ParameterType": "String",
+     "ValueId": "188508",
+     "ValueText": "32mA, 32mA"
+    },
+    {
+     "ParameterId": 1543,
+     "ParameterText": "Input Logic Level - Low",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1542,
+     "ParameterText": "Input Logic Level - High",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1552,
+     "ParameterText": "Max Propagation Delay @ V, Max CL",
+     "ParameterType": "String",
+     "ValueId": "228120",
+     "ValueText": "4ns @ 5V, 50pF"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405420",
+     "ValueText": "SOT-23-5"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "400230",
+     "ValueText": "SC-74A, SOT-753"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 14239,
+    "Name": "74LVC1G08"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2019,
+      "ParentId": 32,
+      "Name": "Logic",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/312/8-TSSOP%2C-8-MSOP-3x3mm_tmb.jpg",
+      "SeoDescription": "Logic components operate using two voltage levels. These two levels are referred to as High or Low, On or Off, True or False, or simply 1 or 0. There are many components included in this category, such as Buffers, Drivers, Receivers, Transceivers, Comparators, Counters, Dividers, FIFOs Memory, Flip Flops, Gates, Inverters, Latches, Multivibrators, Parity Generators, Shift Registers, Signal Switches, Multiplexers, Decoders, Translators, Level Shifters, Universal Bus FUnctions, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 705,
+        "ParentId": 2019,
+        "Name": "Gates and Inverters",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Products in the logic gate and inverter family perform elementary logical operations on individual logic signals such as AND, NOT, OR, etc. Unlike flip-flops they do not have a capacity to store information and respond immediately to the signals presented to their inputs. Though long supplanted by implementations in integrated circuit form for realizing complex functions, discrete gates remain available for use in circumstances where only very simple logical functions are needed.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 75,
+    "Name": "74LVC"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "296-35939-1",
+    "296-35939-2",
+    "TEXTISSN74LVC1G08DBVRG4",
+    "SN74LVC1G08DBVRG4-ND",
+    "296-35939-6",
+    "2156-SN74LVC1G08DBVRG4"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "IC GATE AND 1CH 2-INP SOT23-5",
+    "DetailedDescription": "AND Gate IC 1 Channel SOT-23-5"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "SN74LVC1G08DBVRE4",
+   "UnitPrice": 0.6,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/SN74LVC1G08DBVRE4/1591974",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fsn74lvc1g08",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8900/MFG_296%7E4073253-4%7EDBV%7E5.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-35938-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.26863,
+       "TotalPrice": 805.89
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.26168,
+       "TotalPrice": 1570.08
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.25819,
+       "TotalPrice": 2323.71
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.25433,
+       "TotalPrice": 3814.95
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.25208,
+       "TotalPrice": 5293.68
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.24991,
+       "TotalPrice": 7497.3
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 3000,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-35938-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.6,
+       "TotalPrice": 0.6
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.424,
+       "TotalPrice": 4.24
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.38,
+       "TotalPrice": 9.5
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3315,
+       "TotalPrice": 33.15
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.30832,
+       "TotalPrice": 77.08
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.29434,
+       "TotalPrice": 147.17
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28764,
+       "TotalPrice": 287.64
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 3676,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-35938-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.6,
+       "TotalPrice": 0.6
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.424,
+       "TotalPrice": 4.24
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.38,
+       "TotalPrice": 9.5
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.3315,
+       "TotalPrice": 33.15
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.30832,
+       "TotalPrice": 77.08
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.29434,
+       "TotalPrice": 147.17
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.28764,
+       "TotalPrice": 287.64
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 3676,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 3676,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 247,
+     "ParameterText": "Logic Type",
+     "ParameterType": "String",
+     "ValueId": "313906",
+     "ValueText": "AND Gate"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 667,
+     "ParameterText": "Number of Inputs",
+     "ParameterType": "String",
+     "ValueId": "121326",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "56916",
+     "ValueText": "1.65V ~ 5.5V"
+    },
+    {
+     "ParameterId": 2116,
+     "ParameterText": "Current - Quiescent (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 µA",
+     "ValueText": "10 µA"
+    },
+    {
+     "ParameterId": 592,
+     "ParameterText": "Current - Output High, Low",
+     "ParameterType": "String",
+     "ValueId": "188508",
+     "ValueText": "32mA, 32mA"
+    },
+    {
+     "ParameterId": 1543,
+     "ParameterText": "Input Logic Level - Low",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1542,
+     "ParameterText": "Input Logic Level - High",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1552,
+     "ParameterText": "Max Propagation Delay @ V, Max CL",
+     "ParameterType": "String",
+     "ValueId": "228120",
+     "ValueText": "4ns @ 5V, 50pF"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405420",
+     "ValueText": "SOT-23-5"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "400230",
+     "ValueText": "SC-74A, SOT-753"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 14239,
+    "Name": "74LVC1G08"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2019,
+      "ParentId": 32,
+      "Name": "Logic",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/312/8-TSSOP%2C-8-MSOP-3x3mm_tmb.jpg",
+      "SeoDescription": "Logic components operate using two voltage levels. These two levels are referred to as High or Low, On or Off, True or False, or simply 1 or 0. There are many components included in this category, such as Buffers, Drivers, Receivers, Transceivers, Comparators, Counters, Dividers, FIFOs Memory, Flip Flops, Gates, Inverters, Latches, Multivibrators, Parity Generators, Shift Registers, Signal Switches, Multiplexers, Decoders, Translators, Level Shifters, Universal Bus FUnctions, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 705,
+        "ParentId": 2019,
+        "Name": "Gates and Inverters",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Products in the logic gate and inverter family perform elementary logical operations on individual logic signals such as AND, NOT, OR, etc. Unlike flip-flops they do not have a capacity to store information and respond immediately to the signals presented to their inputs. Though long supplanted by implementations in integrated circuit form for realizing complex functions, discrete gates remain available for use in circumstances where only very simple logical functions are needed.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 75,
+    "Name": "74LVC"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "296-35938-2",
+    "296-35938-1",
+    "SN74LVC1G08DBVRE4-ND",
+    "296-35938-6"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "IC GATE AND 1CH 2-INP SOT23-5",
+    "DetailedDescription": "AND Gate IC 1 Channel SOT-23-5"
+   },
+   "Manufacturer": {
+    "Id": 4518,
+    "Name": "UMW"
+   },
+   "ManufacturerProductNumber": "SN74LVC1G08DBVR",
+   "UnitPrice": 0.1,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/umw/SN74LVC1G08DBVR/16705961",
+   "DatasheetUrl": "https://www.umw-ic.com/static/pdf/342a713d9b8cabac044ae15cacb7cad9.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4319/MFG_SN74LVC1G08DBVR.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "4518-SN74LVC1G08DBVRTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.02214,
+       "TotalPrice": 66.42
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.02126,
+       "TotalPrice": 127.56
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.02082,
+       "TotalPrice": 187.38
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.02033,
+       "TotalPrice": 304.95
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.02005,
+       "TotalPrice": 421.05
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.01978,
+       "TotalPrice": 593.4
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 4518,
+      "Name": "UMW"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 3000,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "4518-SN74LVC1G08DBVRCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.1,
+       "TotalPrice": 0.1
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.042,
+       "TotalPrice": 0.42
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.036,
+       "TotalPrice": 0.9
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0301,
+       "TotalPrice": 3.01
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.02716,
+       "TotalPrice": 6.79
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.02538,
+       "TotalPrice": 12.69
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.02393,
+       "TotalPrice": 23.93
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 4518,
+      "Name": "UMW"
+     },
+     "QuantityAvailableforPackageType": 1549,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "4518-SN74LVC1G08DBVRDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.1,
+       "TotalPrice": 0.1
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.042,
+       "TotalPrice": 0.42
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.036,
+       "TotalPrice": 0.9
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0301,
+       "TotalPrice": 3.01
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.02716,
+       "TotalPrice": 6.79
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.02538,
+       "TotalPrice": 12.69
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.02393,
+       "TotalPrice": 23.93
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 4518,
+      "Name": "UMW"
+     },
+     "QuantityAvailableforPackageType": 1549,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 1549,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 247,
+     "ParameterText": "Logic Type",
+     "ParameterType": "String",
+     "ValueId": "313906",
+     "ValueText": "AND Gate"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 667,
+     "ParameterText": "Number of Inputs",
+     "ParameterType": "String",
+     "ValueId": "121326",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "56916",
+     "ValueText": "1.65V ~ 5.5V"
+    },
+    {
+     "ParameterId": 2116,
+     "ParameterText": "Current - Quiescent (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 µA",
+     "ValueText": "10 µA"
+    },
+    {
+     "ParameterId": 592,
+     "ParameterText": "Current - Output High, Low",
+     "ParameterType": "String",
+     "ValueId": "188508",
+     "ValueText": "32mA, 32mA"
+    },
+    {
+     "ParameterId": 1543,
+     "ParameterText": "Input Logic Level - Low",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1542,
+     "ParameterText": "Input Logic Level - High",
+     "ParameterType": "String",
+     "ValueId": "59425",
+     "ValueText": "1.7V"
+    },
+    {
+     "ParameterId": 1552,
+     "ParameterText": "Max Propagation Delay @ V, Max CL",
+     "ParameterType": "String",
+     "ValueId": "710183",
+     "ValueText": "10ns @ 5V, 15pF"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212434",
+     "ValueText": "-40°C ~ 105°C"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405420",
+     "ValueText": "SOT-23-5"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "400230",
+     "ValueText": "SC-74A, SOT-753"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 14239,
+    "Name": "74LVC1G08"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2019,
+      "ParentId": 32,
+      "Name": "Logic",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/312/8-TSSOP%2C-8-MSOP-3x3mm_tmb.jpg",
+      "SeoDescription": "Logic components operate using two voltage levels. These two levels are referred to as High or Low, On or Off, True or False, or simply 1 or 0. There are many components included in this category, such as Buffers, Drivers, Receivers, Transceivers, Comparators, Counters, Dividers, FIFOs Memory, Flip Flops, Gates, Inverters, Latches, Multivibrators, Parity Generators, Shift Registers, Signal Switches, Multiplexers, Decoders, Translators, Level Shifters, Universal Bus FUnctions, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 705,
+        "ParentId": 2019,
+        "Name": "Gates and Inverters",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Products in the logic gate and inverter family perform elementary logical operations on individual logic signals such as AND, NOT, OR, etc. Unlike flip-flops they do not have a capacity to store information and respond immediately to the signals presented to their inputs. Though long supplanted by implementations in integrated circuit form for realizing complex functions, discrete gates remain available for use in circumstances where only very simple logical functions are needed.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "8",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 75,
+    "Name": "74LVC"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "UMW SN74LVC1G08DBVR",
+    "4518-UMWSN74LVC1G08DBVRTR-ND",
+    "4518-UMWSN74LVC1G08DBVRTR",
+    "4518-SN74LVC1G08DBVRCT",
+    "4518-SN74LVC1G08DBVRTR",
+    "4518-SN74LVC1G08DBVRDKR"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "IC GATE AND 1CH 2-INP SOT23-5",
+    "DetailedDescription": "AND Gate IC 1 Channel SOT-23-5"
+   },
+   "Manufacturer": {
+    "Id": 5272,
+    "Name": "EVVO"
+   },
+   "ManufacturerProductNumber": "SN74LVC1G08DBVR-EV",
+   "UnitPrice": 0.25,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/evvo/SN74LVC1G08DBVR-EV/22482017",
+   "DatasheetUrl": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7158/5272_SN74LVC1G08DBVR-EV.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/7160/MFG_5272%7ESOT23-5%7E%7E5.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "5272-SN74LVC1G08DBVR-EVTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.10254,
+       "TotalPrice": 307.62
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.0994,
+       "TotalPrice": 596.4
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.09782,
+       "TotalPrice": 880.38
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.09608,
+       "TotalPrice": 1441.2
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.09506,
+       "TotalPrice": 1996.26
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.09408,
+       "TotalPrice": 2822.4
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 5272,
+      "Name": "EVVO"
+     },
+     "QuantityAvailableforPackageType": 3000,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 3000,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "5272-SN74LVC1G08DBVR-EVCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.25,
+       "TotalPrice": 0.25
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.173,
+       "TotalPrice": 1.73
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.1528,
+       "TotalPrice": 3.82
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1309,
+       "TotalPrice": 13.09
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.12048,
+       "TotalPrice": 30.12
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.11416,
+       "TotalPrice": 57.08
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.10896,
+       "TotalPrice": 108.96
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 5272,
+      "Name": "EVVO"
+     },
+     "QuantityAvailableforPackageType": 4928,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "5272-SN74LVC1G08DBVR-EVDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.25,
+       "TotalPrice": 0.25
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.173,
+       "TotalPrice": 1.73
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.1528,
+       "TotalPrice": 3.82
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.1309,
+       "TotalPrice": 13.09
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.12048,
+       "TotalPrice": 30.12
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.11416,
+       "TotalPrice": 57.08
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.10896,
+       "TotalPrice": 108.96
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 5272,
+      "Name": "EVVO"
+     },
+     "QuantityAvailableforPackageType": 4928,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 4928,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 247,
+     "ParameterText": "Logic Type",
+     "ParameterType": "String",
+     "ValueId": "313906",
+     "ValueText": "AND Gate"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 667,
+     "ParameterText": "Number of Inputs",
+     "ParameterType": "String",
+     "ValueId": "121326",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "56916",
+     "ValueText": "1.65V ~ 5.5V"
+    },
+    {
+     "ParameterId": 2116,
+     "ParameterText": "Current - Quiescent (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 µA",
+     "ValueText": "10 µA"
+    },
+    {
+     "ParameterId": 592,
+     "ParameterText": "Current - Output High, Low",
+     "ParameterType": "String",
+     "ValueId": "188508",
+     "ValueText": "32mA, 32mA"
+    },
+    {
+     "ParameterId": 1543,
+     "ParameterText": "Input Logic Level - Low",
+     "ParameterType": "String",
+     "ValueId": "34148",
+     "ValueText": "0.7V"
+    },
+    {
+     "ParameterId": 1542,
+     "ParameterText": "Input Logic Level - High",
+     "ParameterType": "String",
+     "ValueId": "59425",
+     "ValueText": "1.7V"
+    },
+    {
+     "ParameterId": 1552,
+     "ParameterText": "Max Propagation Delay @ V, Max CL",
+     "ParameterType": "String",
+     "ValueId": "710183",
+     "ValueText": "10ns @ 5V, 15pF"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212434",
+     "ValueText": "-40°C ~ 105°C"
+    },
+    {
+     "ParameterId": 1977,
+     "ParameterText": "Grade",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 2700,
+     "ParameterText": "Qualification",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405420",
+     "ValueText": "SOT-23-5"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "400230",
+     "ValueText": "SC-74A, SOT-753"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": null,
+    "Name": null
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2019,
+      "ParentId": 32,
+      "Name": "Logic",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/312/8-TSSOP%2C-8-MSOP-3x3mm_tmb.jpg",
+      "SeoDescription": "Logic components operate using two voltage levels. These two levels are referred to as High or Low, On or Off, True or False, or simply 1 or 0. There are many components included in this category, such as Buffers, Drivers, Receivers, Transceivers, Comparators, Counters, Dividers, FIFOs Memory, Flip Flops, Gates, Inverters, Latches, Multivibrators, Parity Generators, Shift Registers, Signal Switches, Multiplexers, Decoders, Translators, Level Shifters, Universal Bus FUnctions, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 705,
+        "ParentId": 2019,
+        "Name": "Gates and Inverters",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Products in the logic gate and inverter family perform elementary logical operations on individual logic signals such as AND, NOT, OR, etc. Unlike flip-flops they do not have a capacity to store information and respond immediately to the signals presented to their inputs. Though long supplanted by implementations in integrated circuit form for realizing complex functions, discrete gates remain available for use in circumstances where only very simple logical functions are needed.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "3",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 75,
+    "Name": "74LVC"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0060"
+   },
+   "OtherNames": [
+    "5272-SN74LVC1G08DBVR-EVTR",
+    "5272-SN74LVC1G08DBVR-EVCT",
+    "5272-SN74LVC1G08DBVR-EVDKR"
+   ]
+  }
+ ],
+ "ProductsCount": 5,
+ "ExactMatches": [
+  {
+   "Description": {
+    "ProductDescription": "IC GATE AND 1CH 2-INP SOT23-5",
+    "DetailedDescription": "AND Gate IC 1 Channel SOT-23-5"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "SN74LVC1G08DBVR",
+   "UnitPrice": 0.12,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/SN74LVC1G08DBVR/385718",
+   "DatasheetUrl": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fsn74lvc1g08",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8900/MFG_296%7E4073253-4%7EDBV%7E5.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "296-11601-2-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.04275,
+       "TotalPrice": 128.25
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.04123,
+       "TotalPrice": 247.38
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.04047,
+       "TotalPrice": 364.23
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.03962,
+       "TotalPrice": 594.3
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.03913,
+       "TotalPrice": 821.73
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.03866,
+       "TotalPrice": 1159.8
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 518635,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-11601-1-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.12,
+       "TotalPrice": 0.12
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.077,
+       "TotalPrice": 0.77
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.0672,
+       "TotalPrice": 1.68
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0565,
+       "TotalPrice": 5.65
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.05144,
+       "TotalPrice": 12.86
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.04838,
+       "TotalPrice": 24.19
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.04586,
+       "TotalPrice": 45.86
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 518635,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "296-11601-6-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.12,
+       "TotalPrice": 0.12
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.077,
+       "TotalPrice": 0.77
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.0672,
+       "TotalPrice": 1.68
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0565,
+       "TotalPrice": 5.65
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.05144,
+       "TotalPrice": 12.86
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.04838,
+       "TotalPrice": 24.19
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.04586,
+       "TotalPrice": 45.86
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": true,
+     "Supplier": {
+      "Id": 296,
+      "Name": "Texas Instruments"
+     },
+     "QuantityAvailableforPackageType": 518635,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 518635,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 247,
+     "ParameterText": "Logic Type",
+     "ParameterType": "String",
+     "ValueId": "313906",
+     "ValueText": "AND Gate"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 667,
+     "ParameterText": "Number of Inputs",
+     "ParameterType": "String",
+     "ValueId": "121326",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "56916",
+     "ValueText": "1.65V ~ 5.5V"
+    },
+    {
+     "ParameterId": 2116,
+     "ParameterText": "Current - Quiescent (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 µA",
+     "ValueText": "10 µA"
+    },
+    {
+     "ParameterId": 592,
+     "ParameterText": "Current - Output High, Low",
+     "ParameterType": "String",
+     "ValueId": "188508",
+     "ValueText": "32mA, 32mA"
+    },
+    {
+     "ParameterId": 1543,
+     "ParameterText": "Input Logic Level - Low",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1542,
+     "ParameterText": "Input Logic Level - High",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1552,
+     "ParameterText": "Max Propagation Delay @ V, Max CL",
+     "ParameterType": "String",
+     "ValueId": "228120",
+     "ValueText": "4ns @ 5V, 50pF"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212479",
+     "ValueText": "-40°C ~ 125°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405420",
+     "ValueText": "SOT-23-5"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "400230",
+     "ValueText": "SC-74A, SOT-753"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 14239,
+    "Name": "74LVC1G08"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2019,
+      "ParentId": 32,
+      "Name": "Logic",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/312/8-TSSOP%2C-8-MSOP-3x3mm_tmb.jpg",
+      "SeoDescription": "Logic components operate using two voltage levels. These two levels are referred to as High or Low, On or Off, True or False, or simply 1 or 0. There are many components included in this category, such as Buffers, Drivers, Receivers, Transceivers, Comparators, Counters, Dividers, FIFOs Memory, Flip Flops, Gates, Inverters, Latches, Multivibrators, Parity Generators, Shift Registers, Signal Switches, Multiplexers, Decoders, Translators, Level Shifters, Universal Bus FUnctions, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 705,
+        "ParentId": 2019,
+        "Name": "Gates and Inverters",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Products in the logic gate and inverter family perform elementary logical operations on individual logic signals such as AND, NOT, OR, etc. Unlike flip-flops they do not have a capacity to store information and respond immediately to the signals presented to their inputs. Though long supplanted by implementations in integrated circuit form for realizing complex functions, discrete gates remain available for use in circumstances where only very simple logical functions are needed.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "16",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 75,
+    "Name": "74LVC"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "-SN74LVC1G08DBVRE4",
+    "-296-11601-1",
+    "296-11601-6",
+    "-SN74LVC1G08DBVRE4-NDR",
+    "-SN74LVC1G08DBVR-NDR",
+    "296-11601-2",
+    "296-11601-1",
+    "TEXTISSN74LVC1G08DBVR",
+    "-296-11601-1-ND",
+    "2156-SN74LVC1G08DBVR"
+   ]
+  },
+  {
+   "Description": {
+    "ProductDescription": "IC GATE AND 1CH 2-INP SOT23-5",
+    "DetailedDescription": "AND Gate IC 1 Channel SOT-23-5"
+   },
+   "Manufacturer": {
+    "Id": 4518,
+    "Name": "UMW"
+   },
+   "ManufacturerProductNumber": "SN74LVC1G08DBVR",
+   "UnitPrice": 0.1,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/umw/SN74LVC1G08DBVR/16705961",
+   "DatasheetUrl": "https://www.umw-ic.com/static/pdf/342a713d9b8cabac044ae15cacb7cad9.pdf",
+   "PhotoUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4319/MFG_SN74LVC1G08DBVR.jpg",
+   "ProductVariations": [
+    {
+     "DigiKeyProductNumber": "4518-SN74LVC1G08DBVRTR-ND",
+     "PackageType": {
+      "Id": 1,
+      "Name": "Tape & Reel (TR)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 3000,
+       "UnitPrice": 0.02214,
+       "TotalPrice": 66.42
+      },
+      {
+       "BreakQuantity": 6000,
+       "UnitPrice": 0.02126,
+       "TotalPrice": 127.56
+      },
+      {
+       "BreakQuantity": 9000,
+       "UnitPrice": 0.02082,
+       "TotalPrice": 187.38
+      },
+      {
+       "BreakQuantity": 15000,
+       "UnitPrice": 0.02033,
+       "TotalPrice": 304.95
+      },
+      {
+       "BreakQuantity": 21000,
+       "UnitPrice": 0.02005,
+       "TotalPrice": 421.05
+      },
+      {
+       "BreakQuantity": 30000,
+       "UnitPrice": 0.01978,
+       "TotalPrice": 593.4
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 4518,
+      "Name": "UMW"
+     },
+     "QuantityAvailableforPackageType": 0,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 3000,
+     "StandardPackage": 3000,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "4518-SN74LVC1G08DBVRCT-ND",
+     "PackageType": {
+      "Id": 2,
+      "Name": "Cut Tape (CT)"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.1,
+       "TotalPrice": 0.1
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.042,
+       "TotalPrice": 0.42
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.036,
+       "TotalPrice": 0.9
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0301,
+       "TotalPrice": 3.01
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.02716,
+       "TotalPrice": 6.79
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.02538,
+       "TotalPrice": 12.69
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.02393,
+       "TotalPrice": 23.93
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 4518,
+      "Name": "UMW"
+     },
+     "QuantityAvailableforPackageType": 1549,
+     "MaxQuantityForDistribution": 0,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 0,
+     "DigiReelFee": 0.0
+    },
+    {
+     "DigiKeyProductNumber": "4518-SN74LVC1G08DBVRDKR-ND",
+     "PackageType": {
+      "Id": 243,
+      "Name": "Digi-Reel®"
+     },
+     "StandardPricing": [
+      {
+       "BreakQuantity": 1,
+       "UnitPrice": 0.1,
+       "TotalPrice": 0.1
+      },
+      {
+       "BreakQuantity": 10,
+       "UnitPrice": 0.042,
+       "TotalPrice": 0.42
+      },
+      {
+       "BreakQuantity": 25,
+       "UnitPrice": 0.036,
+       "TotalPrice": 0.9
+      },
+      {
+       "BreakQuantity": 100,
+       "UnitPrice": 0.0301,
+       "TotalPrice": 3.01
+      },
+      {
+       "BreakQuantity": 250,
+       "UnitPrice": 0.02716,
+       "TotalPrice": 6.79
+      },
+      {
+       "BreakQuantity": 500,
+       "UnitPrice": 0.02538,
+       "TotalPrice": 12.69
+      },
+      {
+       "BreakQuantity": 1000,
+       "UnitPrice": 0.02393,
+       "TotalPrice": 23.93
+      }
+     ],
+     "MyPricing": [],
+     "MarketPlace": false,
+     "TariffActive": false,
+     "Supplier": {
+      "Id": 4518,
+      "Name": "UMW"
+     },
+     "QuantityAvailableforPackageType": 1549,
+     "MaxQuantityForDistribution": 999999999,
+     "MinimumOrderQuantity": 1,
+     "StandardPackage": 1,
+     "DigiReelFee": 7.0
+    }
+   ],
+   "QuantityAvailable": 1549,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "BackOrderNotAllowed": false,
+   "NormallyStocking": true,
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Ncnr": false,
+   "PrimaryVideoUrl": "",
+   "Parameters": [
+    {
+     "ParameterId": 247,
+     "ParameterText": "Logic Type",
+     "ParameterType": "String",
+     "ValueId": "313906",
+     "ValueText": "AND Gate"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 667,
+     "ParameterText": "Number of Inputs",
+     "ParameterType": "String",
+     "ValueId": "121326",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "56916",
+     "ValueText": "1.65V ~ 5.5V"
+    },
+    {
+     "ParameterId": 2116,
+     "ParameterText": "Current - Quiescent (Max)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 µA",
+     "ValueText": "10 µA"
+    },
+    {
+     "ParameterId": 592,
+     "ParameterText": "Current - Output High, Low",
+     "ParameterType": "String",
+     "ValueId": "188508",
+     "ValueText": "32mA, 32mA"
+    },
+    {
+     "ParameterId": 1543,
+     "ParameterText": "Input Logic Level - Low",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1542,
+     "ParameterText": "Input Logic Level - High",
+     "ParameterType": "String",
+     "ValueId": "59425",
+     "ValueText": "1.7V"
+    },
+    {
+     "ParameterId": 1552,
+     "ParameterText": "Max Propagation Delay @ V, Max CL",
+     "ParameterType": "String",
+     "ValueId": "710183",
+     "ValueText": "10ns @ 5V, 15pF"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212434",
+     "ValueText": "-40°C ~ 105°C"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "405420",
+     "ValueText": "SOT-23-5"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "400230",
+     "ValueText": "SC-74A, SOT-753"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 14239,
+    "Name": "74LVC1G08"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2019,
+      "ParentId": 32,
+      "Name": "Logic",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/312/8-TSSOP%2C-8-MSOP-3x3mm_tmb.jpg",
+      "SeoDescription": "Logic components operate using two voltage levels. These two levels are referred to as High or Low, On or Off, True or False, or simply 1 or 0. There are many components included in this category, such as Buffers, Drivers, Receivers, Transceivers, Comparators, Counters, Dividers, FIFOs Memory, Flip Flops, Gates, Inverters, Latches, Multivibrators, Parity Generators, Shift Registers, Signal Switches, Multiplexers, Decoders, Translators, Level Shifters, Universal Bus FUnctions, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 705,
+        "ParentId": 2019,
+        "Name": "Gates and Inverters",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://www.digikey.com//mm.digikey.com/Volume0/opasdata/d220001/derivates/3/100/958/564/296_14-DIP_tmb.jpg",
+        "SeoDescription": "Products in the logic gate and inverter family perform elementary logical operations on individual logic signals such as AND, NOT, OR, etc. Unlike flip-flops they do not have a capacity to store information and respond immediately to the signals presented to their inputs. Though long supplanted by implementations in integrated circuit form for realizing complex functions, discrete gates remain available for use in circumstances where only very simple logical functions are needed.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   },
+   "DateLastBuyChance": null,
+   "ManufacturerLeadWeeks": "8",
+   "ManufacturerPublicQuantity": 0,
+   "Series": {
+    "Id": 75,
+    "Name": "74LVC"
+   },
+   "ShippingInfo": null,
+   "Classifications": {
+    "ReachStatus": "REACH Unaffected",
+    "RohsStatus": "ROHS3 Compliant",
+    "MoistureSensitivityLevel": "1  (Unlimited)",
+    "ExportControlClassNumber": "EAR99",
+    "HtsusCode": "8542.39.0070"
+   },
+   "OtherNames": [
+    "UMW SN74LVC1G08DBVR",
+    "4518-UMWSN74LVC1G08DBVRTR-ND",
+    "4518-UMWSN74LVC1G08DBVRTR",
+    "4518-SN74LVC1G08DBVRCT",
+    "4518-SN74LVC1G08DBVRTR",
+    "4518-SN74LVC1G08DBVRDKR"
+   ]
+  }
+ ],
+ "FilterOptions": {
+  "Manufacturers": [
+   {
+    "Id": 5272,
+    "Value": "EVVO",
+    "ProductCount": 1
+   },
+   {
+    "Id": 296,
+    "Value": "Texas Instruments",
+    "ProductCount": 3
+   },
+   {
+    "Id": 4518,
+    "Value": "UMW",
+    "ProductCount": 1
+   }
+  ],
+  "Packaging": [
+   {
+    "Id": 2,
+    "Value": "Cut Tape (CT)",
+    "ProductCount": 5
+   },
+   {
+    "Id": 243,
+    "Value": "Digi-Reel®",
+    "ProductCount": 5
+   },
+   {
+    "Id": 1,
+    "Value": "Tape & Reel (TR)",
+    "ProductCount": 5
+   }
+  ],
+  "Status": [
+   {
+    "Id": 0,
+    "Value": "Active",
+    "ProductCount": 5
+   }
+  ],
+  "Series": [
+   {
+    "Id": 75,
+    "Value": "74LVC",
+    "ProductCount": 5
+   }
+  ],
+  "ParametricFilters": [
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 247,
+    "ParameterName": "Logic Type",
+    "FilterValues": [
+     {
+      "ProductCount": 5,
+      "ValueId": "313906",
+      "ValueName": "AND Gate",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 2094,
+    "ParameterName": "Number of Circuits",
+    "FilterValues": [
+     {
+      "ProductCount": 5,
+      "ValueId": "1",
+      "ValueName": "1",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 667,
+    "ParameterName": "Number of Inputs",
+    "FilterValues": [
+     {
+      "ProductCount": 5,
+      "ValueId": "121326",
+      "ValueName": "2",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 5,
+    "ParameterName": "Features",
+    "FilterValues": [
+     {
+      "ProductCount": 5,
+      "ValueId": "1",
+      "ValueName": "-",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 276,
+    "ParameterName": "Voltage - Supply",
+    "FilterValues": [
+     {
+      "ProductCount": 5,
+      "ValueId": "56916",
+      "ValueName": "1.65V ~ 5.5V",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "UnitOfMeasure",
+    "ParameterId": 2116,
+    "ParameterName": "Current - Quiescent (Max)",
+    "FilterValues": [
+     {
+      "ProductCount": 5,
+      "ValueId": "10 µA",
+      "ValueName": "10 µA",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 592,
+    "ParameterName": "Current - Output High, Low",
+    "FilterValues": [
+     {
+      "ProductCount": 5,
+      "ValueId": "188508",
+      "ValueName": "32mA, 32mA",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1543,
+    "ParameterName": "Input Logic Level - Low",
+    "FilterValues": [
+     {
+      "ProductCount": 1,
+      "ValueId": "34148",
+      "ValueName": "0.7V",
+      "RangeFilterType": null
+     },
+     {
+      "ProductCount": 4,
+      "ValueId": "1",
+      "ValueName": "-",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1542,
+    "ParameterName": "Input Logic Level - High",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "59425",
+      "ValueName": "1.7V",
+      "RangeFilterType": null
+     },
+     {
+      "ProductCount": 3,
+      "ValueId": "1",
+      "ValueName": "-",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1552,
+    "ParameterName": "Max Propagation Delay @ V, Max CL",
+    "FilterValues": [
+     {
+      "ProductCount": 3,
+      "ValueId": "228120",
+      "ValueName": "4ns @ 5V, 50pF",
+      "RangeFilterType": null
+     },
+     {
+      "ProductCount": 2,
+      "ValueId": "710183",
+      "ValueName": "10ns @ 5V, 15pF",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 252,
+    "ParameterName": "Operating Temperature",
+    "FilterValues": [
+     {
+      "ProductCount": 2,
+      "ValueId": "212434",
+      "ValueName": "-40°C ~ 105°C",
+      "RangeFilterType": null
+     },
+     {
+      "ProductCount": 3,
+      "ValueId": "212479",
+      "ValueName": "-40°C ~ 125°C (TA)",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1977,
+    "ParameterName": "Grade",
+    "FilterValues": [
+     {
+      "ProductCount": 1,
+      "ValueId": "1",
+      "ValueName": "-",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 2700,
+    "ParameterName": "Qualification",
+    "FilterValues": [
+     {
+      "ProductCount": 1,
+      "ValueId": "1",
+      "ValueName": "-",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 69,
+    "ParameterName": "Mounting Type",
+    "FilterValues": [
+     {
+      "ProductCount": 5,
+      "ValueId": "409393",
+      "ValueName": "Surface Mount",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 1291,
+    "ParameterName": "Supplier Device Package",
+    "FilterValues": [
+     {
+      "ProductCount": 5,
+      "ValueId": "405420",
+      "ValueName": "SOT-23-5",
+      "RangeFilterType": null
+     }
+    ]
+   },
+   {
+    "Category": {
+     "Id": 705,
+     "Value": "Gates and Inverters",
+     "ProductCount": null
+    },
+    "ParameterType": "String",
+    "ParameterId": 16,
+    "ParameterName": "Package / Case",
+    "FilterValues": [
+     {
+      "ProductCount": 5,
+      "ValueId": "400230",
+      "ValueName": "SC-74A, SOT-753",
+      "RangeFilterType": null
+     }
+    ]
+   }
+  ],
+  "TopCategories": null,
+  "MarketPlaceFilters": null
+ },
+ "SearchLocaleUsed": {
+  "Site": "US",
+  "Language": "en",
+  "Currency": "USD"
+ },
+ "AppliedParametricFiltersDto": []
+}

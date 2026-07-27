@@ -1,0 +1,132 @@
+{
+ "Errors": [],
+ "SearchResults": {
+  "NumberOfResult": 1,
+  "Parts": [
+   {
+    "Availability": "2228 In Stock",
+    "DataSheetUrl": "",
+    "Description": "Switching Voltage Regulators 17V VIN 4.5A low-no ise low-ripple buck",
+    "FactoryStock": "0",
+    "ImagePath": "https://www.mouser.com/images/texasinstruments/images/VQFN-HR-14_DSL.jpg",
+    "Category": "Switching Voltage Regulators",
+    "LeadTime": "112 Days",
+    "LifecycleStatus": "New Product",
+    "Manufacturer": "Texas Instruments",
+    "ManufacturerPartNumber": "TPS62914RPYR",
+    "Min": "1",
+    "Mult": "1",
+    "MouserPartNumber": "595-TPS62914RPYR",
+    "ProductAttributes": [
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Reel"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "Cut Tape"
+     },
+     {
+      "AttributeName": "Packaging",
+      "AttributeValue": "MouseReel",
+      "AttributeCost": "$7.00 MouseReel™ fee will be added and calculated in your shopping cart. All MouseReel™ orders are non-cancellable and non-returnable."
+     },
+     {
+      "AttributeName": "Standard Pack Qty",
+      "AttributeValue": "3000"
+     }
+    ],
+    "PriceBreaks": [
+     {
+      "Quantity": 1,
+      "Price": "$4.02",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 10,
+      "Price": "$3.04",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 25,
+      "Price": "$2.79",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 100,
+      "Price": "$2.52",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 250,
+      "Price": "$2.40",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 500,
+      "Price": "$2.38",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 1000,
+      "Price": "$2.24",
+      "Currency": "USD"
+     },
+     {
+      "Quantity": 3000,
+      "Price": "$2.24",
+      "Currency": "USD"
+     }
+    ],
+    "AlternatePackagings": null,
+    "ProductDetailUrl": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS62914RPYR?qs=IKkN%2F947nfBsu5PgBfXn4w%3D%3D",
+    "Reeling": true,
+    "ROHSStatus": "RoHS Compliant",
+    "SuggestedReplacement": "",
+    "MultiSimBlue": 0,
+    "AvailabilityInStock": "2228",
+    "AvailabilityOnOrder": [],
+    "InfoMessages": [],
+    "SalesMaximumOrderQty": "1001",
+    "SurchargeMessages": [
+     {
+      "code": "TARIFF_US",
+      "message": "A tariff of 38% may be applied."
+     }
+    ],
+    "ProductCompliance": [
+     {
+      "ComplianceName": "USHTS",
+      "ComplianceValue": "8542390070"
+     },
+     {
+      "ComplianceName": "CNHTS",
+      "ComplianceValue": "8542391090"
+     },
+     {
+      "ComplianceName": "MXHTS",
+      "ComplianceValue": "8542399999"
+     },
+     {
+      "ComplianceName": "ECCN",
+      "ComplianceValue": "EAR99"
+     }
+    ],
+    "TradeCompliance": [
+     {
+      "ComplianceName": "Country of Origin",
+      "ComplianceValue": "China"
+     },
+     {
+      "ComplianceName": "Assembly Country of Origin",
+      "ComplianceValue": "Not available"
+     },
+     {
+      "ComplianceName": "Country of Diffusion",
+      "ComplianceValue": "Not available"
+     }
+    ]
+   }
+  ]
+ }
+}
