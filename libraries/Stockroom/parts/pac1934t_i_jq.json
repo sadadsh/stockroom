@@ -1,0 +1,518 @@
+{
+  "alternates": {
+    "HTS Code (MX)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542.39.99"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542399999"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542390001"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542390090"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      }
+    ],
+    "datasheet_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://datasheet.lcsc.com/datasheet/pdf/62f7cd0d752af70a0449c510fd660097.pdf?productCode=C623960"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "https://www.mouser.com/datasheet/3/282/1/PAC1931_Family_Data_Sheet_DS20005850E.pdf"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Active Low 2.7V~5.5V 4 UQFN-16-EP(4x4) Current Regulation/Management RoHS"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Current & Power Monitors & Regulators PAC1934 Four Channel DC Power Monitor"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "MICROCHIP"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Microchip Technology"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C623960.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/search?q=PAC1934T-I%2FJQ"
+      }
+    ]
+  },
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "pac1934t_i_jq.pdf",
+    "source_url": ""
+  },
+  "description": "Active Low 2.7V~5.5V 4 UQFN-16-EP(4x4) Current Regulation/Management RoHS",
+  "display_name": "Current & Power Monitor UQFN-16-EP",
+  "eda": {},
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ChipType": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Number of Voltages Monitored": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Operating Temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Output Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Quiescent Current": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reset Active Level": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Voltage - Supply": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight Foreign (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "pac1934t_i_jq",
+  "manufacturer": "MICROCHIP",
+  "mpn": "PAC1934T-I/JQ",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 2.572857143,
+          "qty": 1
+        },
+        {
+          "price": 2.19,
+          "qty": 10
+        },
+        {
+          "price": 1.961428571,
+          "qty": 30
+        },
+        {
+          "price": 1.731428571,
+          "qty": 100
+        },
+        {
+          "price": 1.625714286,
+          "qty": 500
+        },
+        {
+          "price": 1.578571429,
+          "qty": 1000
+        }
+      ],
+      "stock": 491,
+      "url": "https://www.lcsc.com/product-detail/C623960.html",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Assembly Country of Origin": "Not available",
+    "Available On Reel": "Yes",
+    "Brand Id": "169",
+    "Catalog Id": "1006",
+    "ChipType": "Voltage monitor",
+    "Contains Battery": "No",
+    "Country of Diffusion": "Taiwan",
+    "Country of Origin": "Thailand",
+    "Currency Symbol": "$",
+    "Currency Type": "USD",
+    "ECCN": "EAR99",
+    "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/02aaa8b0909c4fdc85f9dd452938cabc.svg?t=1729859148",
+    "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/1fba17f3db3d4505b99f1f17450cadbb.svg?t=1729859148",
+    "HTS Code (BR)": "85423999",
+    "HTS Code (CA)": "8542390000",
+    "HTS Code (CN)": "8542399000",
+    "HTS Code (IN)": "85423900",
+    "HTS Code (MX)": "8542.39.99",
+    "HTS Code (TARIC)": "8542399000",
+    "HTS Code (US)": "8542390001",
+    "Has Third Party Stock": "No",
+    "Image": "https://www.mouser.com/images/microchiptechnology/images/UQFN-16microchip.jpg",
+    "Is Cable Category": "No",
+    "Is Foreign Display": "Yes",
+    "Is Foreign Onsale": "Yes",
+    "Is Infringement": "No",
+    "Is Mro": "No",
+    "Is Not Overstock": "No",
+    "Is Real Price": "Yes",
+    "Is Show Foreign Price": "Yes",
+    "Key Attributes": "Single/Multi-Channel DC Power/Energy Monitor with Accumulator",
+    "LCSC Category": "Current Regulation/Management",
+    "LCSC Category Path": "Integrated Circuits (ICs) > Power Management (PMIC)",
+    "LCSC Parent Category": "Power Management (PMIC)",
+    "LCSC Product ID": "653807",
+    "LCSC Product Name": "Single/Multi-Channel DC Power/Energy Monitor with Accumulator",
+    "LCSC Title": "MICROCHIP PAC1934T-I/JQ",
+    "LCSC Warehouse Category": "Current Regulation/Management",
+    "Lead Time": "77 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "1",
+    "Number of Voltages Monitored": "4",
+    "Operating Temperature": "-40℃~+85℃@(TA)",
+    "Order Multiple": "1",
+    "Output Type": "Open-drain",
+    "Package": "UQFN-16-EP(4x4)",
+    "Package Quantity": "3300",
+    "Package Quantity Unit": "Reel",
+    "Packaging": "Tape & Reel (TR)",
+    "Parent Catalog Id": "380",
+    "Popular Part": "No",
+    "Pre-Sale": "No",
+    "Product Category": "Current & Power Monitors & Regulators",
+    "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20230201_Microchip-Tech-PAC1934T-I-JQ_C623960_front.jpg",
+    "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230201_Microchip-Tech-PAC1934T-I-JQ_C623960_back.jpg",
+    "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230201_Microchip-Tech-PAC1934T-I-JQ_C623960_blank.jpg",
+    "Quiescent Current": "585uA",
+    "Reel Setup Fee": "3",
+    "Reset Active Level": "Active Low",
+    "RoHS": "Yes",
+    "Standard Pack Qty": "3300",
+    "Stock": "459",
+    "Stock (Domestic)": "459",
+    "Stock (Overseas)": "459",
+    "Stock (Shenzhen)": "459",
+    "Unit": "Piece",
+    "Unit Weight (kg)": "0.00018",
+    "Voltage - Supply": "2.7V~5.5V",
+    "Weight": "0.267",
+    "Weight (kg)": "0.000267134",
+    "Weight Foreign (kg)": "0",
+    "Wm Catalog Id": "1006"
+  },
+  "tags": [],
+  "value": ""
+}
