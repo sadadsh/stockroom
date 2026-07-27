@@ -193,6 +193,27 @@ def test_last_status_defaults_to_empty_before_any_lookup():
     assert DigiKeyAdapter("id", "secret").last_status == ""
 
 
+# ------------------------------------------------------------------------ fetch_payload
+#
+# Regression pin for cold-eyes finding 1 (2026-07-27), the DigiKey twin of the Mouser test. See
+# tests/backend/enrich/test_mouser.py's block comment for the full story.
+
+def test_fetch_payload_is_NOT_FOUND_and_returns_NONE_on_empty_results():
+    a = DigiKeyAdapter("id", "secret", requester=lambda mpn: {"Products": []})
+    got = a.fetch_payload("ZZZNOTAREALPART123")
+    assert got is None
+    assert a.last_status == "not_found"
+
+
+def test_fetch_payload_is_ok_on_a_real_hit():
+    a = DigiKeyAdapter("id", "secret", requester=lambda mpn: {"Products": [
+        {"ManufacturerProductNumber": "TPS62130RGTR", "Description": {"ProductDescription": "x"}}
+    ]})
+    got = a.fetch_payload("TPS62130RGTR")
+    assert got is not None
+    assert a.last_status == "ok"
+
+
 def test_lookup_never_raises_on_a_non_dict_products_entry():
     # a garbled API response with non-dict Products entries must not raise (never-raises constraint)
     body = {"Products": ["error", None, {"ManufacturerProductNumber": "X"}]}

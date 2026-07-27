@@ -1173,3 +1173,60 @@ describe("a spec group's count", () => {
     expect(count?.className ?? "").not.toContain("ml-auto");
   });
 });
+
+// The regression pin for cold-eyes finding 3 (2026-07-27): `missingAssets`/`needsList` were a
+// hardcoded symbol/footprint/3D-model list evaluated regardless of the part's CLASS, recreating
+// the exact "CAD Incomplete forever" shape one layer up from the fix in edaTarget.ts. A mechanical
+// part was told to add a symbol it can never have; a fiducial was told to add all three while the
+// CAD chip simultaneously read Complete. All four rows are the reviewer's own reproduction table.
+describe("the Complete-Part needs line respects the part's class (cold-eyes finding 3)", () => {
+  async function needsText(over: Partial<PartDetail> = {}) {
+    // `canComplete` gates the whole "Add X to make this part usable" sentence
+    // (`!!(onEditField || onAttachSymbol || onAttachFootprint)`), so at least one write callback
+    // must be present or the sentence never renders and every assertion below passes vacuously
+    // regardless of what missingAssets/needsList computed - which is exactly what happened on
+    // the first version of this test, caught before it was trusted.
+    wrap(<DetailPanel detail={detail(over)} {...BASE} onAttachSymbol={vi.fn()} />);
+    await userEvent.click(await screen.findByRole("button", { name: /CAD/ }));
+    return document.body.textContent ?? "";
+  }
+
+  it("a mechanical part with its footprint attached is never told to add a symbol", async () => {
+    const text = await needsText({
+      part_class: "mechanical",
+      assets: { kicad: { symbol: null, footprint: FP, model: null } },
+    });
+    expect(text).not.toMatch(/Add[^.]*\bsymbol\b/i);
+  });
+
+  it("a virtual part is never told to add all three while the chip reads Complete", async () => {
+    const text = await needsText({
+      part_class: "virtual",
+      assets: { kicad: { symbol: null, footprint: null, model: null } },
+    });
+    expect(text).not.toMatch(/Add symbol, footprint, 3D model/i);
+  });
+
+  it("a passive with a stock footprint and no symbol is never told to add a symbol", async () => {
+    const text = await needsText({
+      part_class: "passive",
+      assets: {
+        kicad: {
+          symbol: null,
+          footprint: makeAsset({ lib: "Resistor_SMD", name: "R_0603_1608Metric" }),
+          model: null,
+        },
+      },
+    });
+    expect(text).not.toMatch(/Add[^.]*\bsymbol\b/i);
+  });
+
+  it("control: a component with nothing attached is still told to add everything", async () => {
+    const text = await needsText({
+      part_class: "component",
+      assets: { kicad: { symbol: null, footprint: null, model: null } },
+    });
+    expect(text).toMatch(/symbol/i);
+    expect(text).toMatch(/footprint/i);
+  });
+});

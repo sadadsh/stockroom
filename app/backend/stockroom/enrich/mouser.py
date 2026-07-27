@@ -243,8 +243,22 @@ class MouserAdapter:
         except EnrichError as exc:
             self.last_status = status_from_error(exc)
             return None
-        self.last_status = "ok" if body else "not_found"
-        return body if isinstance(body, dict) else None
+        if not isinstance(body, dict):
+            self.last_status = "not_found"
+            return None
+        # FIXED 2026-07-27 (cold-eyes finding 1): a genuine "no such part" answer from Mouser is
+        # HTTP 200 with an EMPTY Parts list - a truthy dict - so `"ok" if body else "not_found"`
+        # reported EVERY not-found lookup as a hit. Measured: a fabricated MPN
+        # ("ZZZNOTAREALPART123") was indistinguishable from a real one, the importer wrote it as
+        # evidence, indexed it in `sources`, and counted it `imported`. The sibling `lookup()`
+        # already gets this right (`"ok" if result.filled_fields() else "not_found"`); this now
+        # matches it by parsing the same way, rather than trusting an HTTP-level truthiness check.
+        found = parse_mouser_payload(body, mpn).filled_fields()
+        self.last_status = "ok" if found else "not_found"
+        # A genuine not-found must return None, same as a failed call: there is no evidence here,
+        # and storing an empty-results response under sourced/ would look like a successful import
+        # of nothing, forever.
+        return body if found else None
 
     def lookup(self, mpn: str) -> EnrichmentResult:
         if not self.enabled or not mpn or self._requester is None:

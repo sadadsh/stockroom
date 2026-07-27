@@ -80,10 +80,17 @@ _COMPILED: tuple[tuple[PartClass, tuple[re.Pattern[str], ...]], ...] = tuple(
 # reads. "Heatsink-mounted TO-220 regulator" contains "heatsink"; it is a regulator. This is the
 # veto that stops the keyword table from being a false-positive machine, and it runs FIRST.
 _ELECTRICAL_VETO = re.compile(
-    r"\b(resistor|capacitor|inductor|diode|transistor|mosfet|regulator|converter|amplifier"
-    r"|microcontroller|mcu|processor|memory|eeprom|flash|sram|dram|oscillator|crystal|resonator"
-    r"|sensor|thermistor|led|photodiode|optocoupler|relay|switch|connector|header|receptacle"
-    r"|transformer|fuse|varistor|transceiver|comparator|multiplexer|gate|buffer|driver|ic\b)",
+    # MEASURED (cold-eyes finding 9, 2026-07-27): only the LAST alternative closed with `\b`, so
+    # every other word matched as a substring - "Aluminium ledge bracket M3" veto'd on "led" inside
+    # "ledge", and "Gateway enclosure" veto'd on "gate" inside "Gateway". The whole module's thesis
+    # is whole-word matching ("substring matching is how 'SOT-23' became 23 pins"); this list broke
+    # its own rule. Every alternative now closes with its own `\b`.
+    r"\b(resistor\b|capacitor\b|inductor\b|diode\b|transistor\b|mosfet\b|regulator\b"
+    r"|converter\b|amplifier\b|microcontroller\b|mcu\b|processor\b|memory\b|eeprom\b|flash\b"
+    r"|sram\b|dram\b|oscillator\b|crystal\b|resonator\b|sensor\b|thermistor\b|led\b"
+    r"|photodiode\b|optocoupler\b|relay\b|switch\b|connector\b|header\b|receptacle\b"
+    r"|transformer\b|fuse\b|varistor\b|transceiver\b|comparator\b|multiplexer\b|gate\b"
+    r"|buffer\b|driver\b|ic\b)",
     re.IGNORECASE,
 )
 

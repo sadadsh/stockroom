@@ -517,21 +517,25 @@ export function DetailPanel({
       return next;
     });
   }, []);
-  // A class that needs no 3D model of its OWN inherits the one built into the stock footprint
-  // it references (the model.glb endpoint resolves it from the footprint). So "has a 3D model"
-  // for such a part is "has a footprint", not "has an owned model.file" - which the passive add
-  // correctly leaves null. Without this a passive read "Not Linked" though its 3D rendered
-  // during add (A8).
+  // A passive inherits the 3D body BUILT INTO the KiCad STOCK footprint it references (the
+  // model.glb endpoint resolves it from the footprint), so "has a 3D model" for a passive is "has
+  // a footprint", not "has an owned model.file" - which the passive add correctly leaves null.
+  // Without this a passive read "Not Linked" though its 3D rendered during add (A8).
   //
-  // Asked of the CLASS TABLE rather than of `part_class === "passive"`: `virtual` owns no files
-  // either, and hardcoding the one class that happens to exist today is how the sibling defect
-  // (every `mechanical` part missing a symbol forever) gets written a second time.
+  // FIXED 2026-07-27 (cold-eyes finding 3): this used to read "any class that does not need its
+  // OWN model", generalising from `neededKinds` on the theory that avoiding `part_class ===
+  // "passive"` avoids the sibling class-blind bug. It does not - it is a DIFFERENT fact. Every
+  // class in `CLASS_NEEDS` whose `assets` excludes "model" (passive, mechanical, virtual) took
+  // this branch, but only PASSIVE's KiCad reference is guaranteed to be a stock KiCad part
+  // shipping a baked-in 3D body; a mechanical part's footprint is Stockroom-authored and has no
+  // such guarantee. So a mechanical part with a footprint and NO 3D file read "has a 3D model"
+  // regardless. "Doesn't need to own a model" and "its footprint carries one built in" are
+  // genuinely different claims, and only the second is true of passives specifically.
   const kicadAssets = detail ? assetsFor(detail, "kicad") : null;
-  const kicadNeeds = detail ? neededKinds(detail, "kicad", partClass(detail.part_class)) : [];
-  const ownsModelFile = kicadNeeds.includes("model");
-  const hasModel = ownsModelFile
-    ? !!assetRef(kicadAssets?.model)?.file
-    : assetPresent(kicadAssets?.footprint);
+  const usesStockKicadModel = detail?.part_class === "passive";
+  const hasModel = usesStockKicadModel
+    ? assetPresent(kicadAssets?.footprint)
+    : !!assetRef(kicadAssets?.model)?.file;
   // EVERY product photo on record, not just the one that won the specs slot (owner 2026-07-25).
   // Both distributor adapters write specs["Image"] with setdefault, so a second vendor's genuinely
   // different photograph was preserved in `alternates["Image"]` and shown to nobody. Still hidden
@@ -633,10 +637,18 @@ export function DetailPanel({
       : null;
 
   // What the part still needs, files + data, for the one Complete-Part window and its trigger.
+  //
+  // FIXED 2026-07-27 (cold-eyes finding 3): this used to be a hardcoded symbol/footprint/3-model
+  // list, evaluated regardless of what the part's CLASS actually needs - the exact "CAD Incomplete
+  // forever" shape `edaTarget.ts` exists to prevent, recreated one layer up. A mechanical part was
+  // told to add a symbol it can never have; a fiducial was told to add all three while the CAD
+  // chip simultaneously read Complete. Derived from `kicad.missing` instead, which is already
+  // class-aware (assetReadiness intersects the class's needed kinds with what KiCad can hold).
+  const kicadMissing = new Set(kicad.missing);
   const missingAssets = [
-    !assetPresent(kicadAssets?.symbol) ? "symbol" : null,
-    !assetPresent(kicadAssets?.footprint) ? "footprint" : null,
-    !hasModel ? "3D model" : null,
+    kicadMissing.has("Symbol") ? "symbol" : null,
+    kicadMissing.has("Footprint") ? "footprint" : null,
+    kicadMissing.has("3D Model") ? "3D model" : null,
   ].filter((x): x is string => x !== null);
   // Altium gaps read straight off the part RECORD (altium.missing from assetReadiness), so an
   // attach updates them on the ["part", id] refresh - never a stale cad-source needs list.

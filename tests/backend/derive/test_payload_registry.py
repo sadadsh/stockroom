@@ -60,19 +60,40 @@ def test_the_derive_path_cannot_write_evidence():
     assert_no_writer_imported()
 
 
-def test_the_writer_check_can_actually_FAIL():
+def test_the_writer_check_can_actually_FAIL(tmp_path):
     """A gate that cannot fail is worse than no gate, because it reports safety.
 
-    Rather than tampering a real module on disk, this feeds the same AST rule a module that DOES
-    call a writer and asserts it is convicted - so the rule itself is measured, not just its
-    current happy answer.
+    FIXED 2026-07-27 (cold-eyes finding 2). The version this replaces built its own tiny AST from
+    a bare string and asserted `ast.walk` finds a call in it - which measures the `ast` module,
+    not `assert_no_writer_imported`. MEASURED to be vacuous: an early `return` inserted at the top
+    of `assert_no_writer_imported`, disabling BOTH of its checks, left the entire
+    `tests/backend/derive` suite green - 25 passed - including this very test.
+
+    `engine._scan_modules_for_writes` was split out specifically so this test can drive the REAL
+    scanning logic against a genuinely offending module, rather than restating the rule in
+    miniature beside it.
     """
-    offending = ast.parse("def go(root):\n    write_payload(root, 'x', 'mouser', '{}')\n")
-    calls = [
-        n for n in ast.walk(offending)
-        if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "write_payload"
-    ]
-    assert calls, "the AST rule would not have seen a bare write_payload() call"
+    import types
+
+    from stockroom.derive.engine import _scan_modules_for_writes
+
+    offending_path = tmp_path / "offending_module.py"
+    offending_path.write_text(
+        "def go(root):\n    write_payload(root, 'x', 'mouser', '{}')\n", encoding="utf-8"
+    )
+    fake_module = types.ModuleType("offending_module")
+    fake_module.__file__ = str(offending_path)
+
+    with pytest.raises(AssertionError, match="write_payload"):
+        _scan_modules_for_writes((fake_module,), object())
+
+    # NEGATIVE CONTROL: a module with no such call must pass cleanly, so the test above is
+    # detecting the offending CALL and not merely "any module raises".
+    clean_path = tmp_path / "clean_module.py"
+    clean_path.write_text("def go(root):\n    return root.read_text()\n", encoding="utf-8")
+    clean_module = types.ModuleType("clean_module")
+    clean_module.__file__ = str(clean_path)
+    _scan_modules_for_writes((clean_module,), object())  # must not raise
 
 
 def test_no_derive_module_branches_on_a_SOURCE_NAME():

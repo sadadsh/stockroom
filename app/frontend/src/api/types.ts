@@ -240,8 +240,11 @@ export interface PartDetail {
   manufacturer: string;
   part_class: PartClass;
   requires_override: RequirementOverride | null;
-  // The recomputable half. `display_name`, `category`, `description` and `specs` live HERE,
-  // not at the top level -- reach them through the helpers in lib/partFields.ts.
+  // The recomputable half. `display_name`, `category`, `description` and `specs` live HERE, not
+  // at the top level -- read them as `detail.derived.<field>`. No dedicated helper module exists
+  // (a prior version of this comment pointed to a lib/partFields.ts that was never written);
+  // lib/edaTarget.ts's `neededKinds`/`assetsFor` are the closest thing to shared logic over this
+  // block today.
   derived: Derived;
   // Which sources this record was derived from, keyed by source name ("mouser", "digikey").
   sources: Record<string, SourceEntry>;
