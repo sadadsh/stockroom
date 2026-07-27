@@ -58,6 +58,35 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8533408070"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8533.40.8070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/semitecusacorporation/images/AT-2.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2607/103AT-2.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "93 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "12"
       }
     ],
     "Minimum Order Quantity": [
@@ -96,6 +125,18 @@
         "value": "Bulk"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "NTC Thermistors"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Sensors, Transducers"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -106,6 +147,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant By Exemption"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
       }
     ],
     "datasheet_url": [
@@ -130,6 +176,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "NTC Thermistors 10kohm 1%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "NTC THERMISTOR 10KOHM 1%"
       }
     ],
     "manufacturer": [
@@ -204,6 +255,14 @@
     "Available On Reel": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "B Value Tolerance": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "B25/85": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "BRHTS": {
       "confidence": "high",
@@ -377,6 +436,10 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "Length - Lead Wire": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Lifecycle": {
       "confidence": "medium",
       "source": "lcsc"
@@ -384,6 +447,14 @@
     "Minimum Order Quantity": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Non-Repetitive Peak Forward Surge Current": {
       "confidence": "medium",
@@ -393,6 +464,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Order Multiple": {
       "confidence": "medium",
       "source": "lcsc"
@@ -401,6 +476,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -408,6 +487,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -420,6 +503,10 @@
     "Popular Part": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Power - Max": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Pre-Sale": {
       "confidence": "medium",
@@ -441,9 +528,21 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Resistance Tolerance": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Resistance in Ohms @ 25°C": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Reverse Leakage Current (Ir)": {
       "confidence": "medium",
@@ -452,6 +551,10 @@
     "RoHS": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Standard Pack Qty": {
       "confidence": "high",
@@ -542,12 +645,102 @@
       "stock": 2151,
       "url": "https://www.lcsc.com/product-detail/C3034813.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:35.716337+00:00",
+      "part_number": "954-103AT-2",
+      "price_breaks": [
+        {
+          "price": 0.58,
+          "qty": 1
+        },
+        {
+          "price": 0.545,
+          "qty": 10
+        },
+        {
+          "price": 0.509,
+          "qty": 25
+        },
+        {
+          "price": 0.485,
+          "qty": 50
+        },
+        {
+          "price": 0.462,
+          "qty": 100
+        },
+        {
+          "price": 0.416,
+          "qty": 200
+        },
+        {
+          "price": 0.4,
+          "qty": 1000
+        },
+        {
+          "price": 0.366,
+          "qty": 2600
+        }
+      ],
+      "stock": 68854,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:35.716337+00:00",
+      "part_number": "4316-103AT-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.68,
+          "qty": 1
+        },
+        {
+          "price": 0.598,
+          "qty": 5
+        },
+        {
+          "price": 0.567,
+          "qty": 10
+        },
+        {
+          "price": 0.5292,
+          "qty": 25
+        },
+        {
+          "price": 0.5036,
+          "qty": 50
+        },
+        {
+          "price": 0.4803,
+          "qty": 100
+        },
+        {
+          "price": 0.43346,
+          "qty": 500
+        },
+        {
+          "price": 0.41604,
+          "qty": 1000
+        },
+        {
+          "price": 0.38101,
+          "qty": 5000
+        }
+      ],
+      "stock": 14074,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
     "Assembly Country of Origin": "Japan",
     "Available On Reel": "Yes",
+    "B Value Tolerance": "±1%",
+    "B25/85": "3435K",
     "BRHTS": "85334011",
     "Brand Id": "64",
     "Catalog Id": "1430",
@@ -591,25 +784,36 @@
     "LCSC Title": "JSCJ SD103ATW",
     "LCSC Warehouse Category": "Single Diodes",
     "Lead Time": "93 Days",
+    "Length - Lead Wire": "0.49\" (12.50mm)",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "10",
+    "Moisture Sensitivity Level": "Not Applicable",
+    "Mounting Type": "Through Hole",
     "Non-Repetitive Peak Forward Surge Current": "2A",
     "Operating Junction Temperature Range": "-40℃~+125℃",
+    "Operating Temperature": "-50°C ~ 110°C",
     "Order Multiple": "10",
     "Package": "SOT-363",
+    "Package / Case": "Bead",
     "Package Quantity": "3000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Bulk",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "319",
     "Popular Part": "No",
+    "Power - Max": "10 mW",
     "Pre-Sale": "No",
     "Product Category": "NTC Thermistors",
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20230123_Jiangsu-Changjing-Electronics-Technology-Co---Ltd--SD103ATW_C3034813_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230123_Jiangsu-Changjing-Electronics-Technology-Co---Ltd--SD103ATW_C3034813_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230123_Jiangsu-Changjing-Electronics-Technology-Co---Ltd--SD103ATW_C3034813_blank.jpg",
+    "REACH": "REACH Affected",
     "Reel Setup Fee": "3",
+    "Resistance Tolerance": "±1%",
+    "Resistance in Ohms @ 25°C": "10k",
     "Reverse Leakage Current (Ir)": "5uA@30V",
     "RoHS": "Yes",
+    "Series": "AT",
     "Standard Pack Qty": "200",
     "Stock": "70",
     "Stock (Domestic)": "70",
