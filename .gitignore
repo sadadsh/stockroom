@@ -106,3 +106,6 @@ build/shots/
 
 # Generated progress page (rendered from rebuild-plan.json by scripts/progress.py on service start)
 docs/progress/index.html
+
+# pytest-testmon per-machine dependency DB (derived, never shared)
+.testmondata*

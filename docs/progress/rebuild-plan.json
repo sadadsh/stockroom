@@ -21,16 +21,56 @@
           "name": "Part Record Model",
           "why": "Sourced/derived split, four part classes, per-asset origin and checks. Every downstream task builds against this contract.",
           "steps": [
-            { "t": "part_id: slug + sha256[:4], collision-proof", "done": true, "evidence": "Verified inline: MAX6817EUT+T and MAX6817EUT-T slug identically (max6817eut-t) but yield distinct ids (-e331 / -9c69). Negative control shown." },
-            { "t": "Windows reserved stems guarded", "done": true, "evidence": "CON/PRN/AUX/NUL/COM1/LPT9 all rewritten to part-<stem>-<hash>; is_reserved_stem returns True for each." },
-            { "t": "part_class: passive/component/mechanical/virtual + override", "done": true, "evidence": "model/part_class.py: PartClass enum, ClassNeeds, RequirementOverride, needed_kinds()." },
-            { "t": "sourced/: append-only raw payloads beside the record", "done": true, "evidence": "model/sourced.py: write_payload/read_payload/list_sources, SOURCED_DIRNAME, SourcedPayloadExists guard." },
-            { "t": "derived block, disposable and recomputable", "done": true, "evidence": "model/derived.py: Derived dataclass, RULESET_VERSION/DERIVED_BY stamp." },
-            { "t": "assets carry origin + checks (evidence, not verdict)", "done": true, "evidence": "model/asset.py: AssetRef/AssetOrigin/Asset/EdaAssets. model/trust.py derives Verdict from checks on read." },
-            { "t": "Migrate call sites across ingest/mutation/store/api", "done": false, "evidence": "" },
-            { "t": "Update stale test expectations (eg sourced/ is a legitimate 6th profile subdir)", "done": false, "evidence": "" },
-            { "t": "Full backend gate green", "done": false, "evidence": "" },
-            { "t": "Committed on main", "done": false, "evidence": "" }
+            {
+              "t": "part_id: slug + sha256[:4], collision-proof",
+              "done": true,
+              "evidence": "Verified inline: MAX6817EUT+T and MAX6817EUT-T slug identically (max6817eut-t) but yield distinct ids (-e331 / -9c69). Negative control shown."
+            },
+            {
+              "t": "Windows reserved stems guarded",
+              "done": true,
+              "evidence": "CON/PRN/AUX/NUL/COM1/LPT9 all rewritten to part-<stem>-<hash>; is_reserved_stem returns True for each."
+            },
+            {
+              "t": "part_class: passive/component/mechanical/virtual + override",
+              "done": true,
+              "evidence": "model/part_class.py: PartClass enum, ClassNeeds, RequirementOverride, needed_kinds()."
+            },
+            {
+              "t": "sourced/: append-only raw payloads beside the record",
+              "done": true,
+              "evidence": "model/sourced.py: write_payload/read_payload/list_sources, SOURCED_DIRNAME, SourcedPayloadExists guard."
+            },
+            {
+              "t": "derived block, disposable and recomputable",
+              "done": true,
+              "evidence": "model/derived.py: Derived dataclass, RULESET_VERSION/DERIVED_BY stamp."
+            },
+            {
+              "t": "assets carry origin + checks (evidence, not verdict)",
+              "done": true,
+              "evidence": "model/asset.py: AssetRef/AssetOrigin/Asset/EdaAssets. model/trust.py derives Verdict from checks on read."
+            },
+            {
+              "t": "Migrate call sites across ingest/mutation/store/api",
+              "done": true,
+              "evidence": "Two call sites passed the removed kwarg: ingest/passive_add.py:308 and mutation/library_ops.py:393 used eda= where the field is now assets=. Fixed; that alone cleared 162 of 108 failures' occurrences."
+            },
+            {
+              "t": "Update stale test expectations (eg sourced/ is a legitimate 6th profile subdir)",
+              "done": true,
+              "evidence": "24 test files updated: eda->assets, +[ref] unwrap, specs/category/description now under derived, passive flag -> part_class, and 40 hardcoded pre-hash ids replaced with make_part_id() so they assert the contract."
+            },
+            {
+              "t": "Full backend gate green",
+              "done": true,
+              "evidence": "FULL suite green: 3424 passed, 3 skipped, 0 failed (2m25s). ruff: All checks passed. Mutation-tested: breaking the id mint site turns test_library_ops RED (22 failed), so the rewritten assertions are not tautological."
+            },
+            {
+              "t": "Committed on main",
+              "done": true,
+              "evidence": "Committed 32652fb on main."
+            }
           ]
         }
       ]
@@ -45,12 +85,36 @@
           "name": "Derive Engine",
           "why": "The owner's acceptance test lives here: change the naming scheme, re-derive, lose nothing.",
           "steps": [
-            { "t": "Recompute the whole derived block from sourced/", "done": false, "evidence": "" },
-            { "t": "IDEMPOTENT: derive twice, byte-identical records", "done": false, "evidence": "" },
-            { "t": "LOSSLESS: a derive never writes under sourced/", "done": false, "evidence": "" },
-            { "t": "Naming scheme swappable by config, not by editing code", "done": false, "evidence": "" },
-            { "t": "Normalization moved from import time to derive time", "done": false, "evidence": "" },
-            { "t": "Merged to main, gate green", "done": false, "evidence": "" }
+            {
+              "t": "Recompute the whole derived block from sourced/",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "IDEMPOTENT: derive twice, byte-identical records",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "LOSSLESS: a derive never writes under sourced/",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Naming scheme swappable by config, not by editing code",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Normalization moved from import time to derive time",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Merged to main, gate green",
+              "done": false,
+              "evidence": ""
+            }
           ]
         },
         {
@@ -58,12 +122,36 @@
           "name": "Requirements By Part Class",
           "why": "Fixes 136 requirements nothing could ever satisfy: passives were being asked for Altium symbol and footprint.",
           "steps": [
-            { "t": "requirements = f(part_class, tool) off the EDA registry", "done": false, "evidence": "" },
-            { "t": "passive resolves to [] for EVERY tool", "done": false, "evidence": "" },
-            { "t": "mechanical = footprint only, virtual = nothing and no BOM line", "done": false, "evidence": "" },
-            { "t": "requires_override wins over the class default", "done": false, "evidence": "" },
-            { "t": "Requirement enum still matches the TypeScript union", "done": false, "evidence": "" },
-            { "t": "Merged to main, gate green", "done": false, "evidence": "" }
+            {
+              "t": "requirements = f(part_class, tool) off the EDA registry",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "passive resolves to [] for EVERY tool",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "mechanical = footprint only, virtual = nothing and no BOM line",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "requires_override wins over the class default",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Requirement enum still matches the TypeScript union",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Merged to main, gate green",
+              "done": false,
+              "evidence": ""
+            }
           ]
         },
         {
@@ -71,13 +159,41 @@
           "name": "Index Schema",
           "why": "Today the index physically cannot express 'has an Altium footprint'. It is single-tool, single-asset, and rebuilt from scratch every sync.",
           "steps": [
-            { "t": "Per-tool columns by iterating the EDA registry", "done": false, "evidence": "" },
-            { "t": "Multiple purchase rows, not one purchase_url", "done": false, "evidence": "" },
-            { "t": "Incremental sync, no DROP TABLE", "done": false, "evidence": "" },
-            { "t": "Measured before/after on a synthetic 10k library", "done": false, "evidence": "" },
-            { "t": "Expresses TRUST, not just presence", "done": false, "evidence": "" },
-            { "t": "Search, facets and parametric filters still green", "done": false, "evidence": "" },
-            { "t": "Merged to main, gate green", "done": false, "evidence": "" }
+            {
+              "t": "Per-tool columns by iterating the EDA registry",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Multiple purchase rows, not one purchase_url",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Incremental sync, no DROP TABLE",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Measured before/after on a synthetic 10k library",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Expresses TRUST, not just presence",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Search, facets and parametric filters still green",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Merged to main, gate green",
+              "done": false,
+              "evidence": ""
+            }
           ]
         }
       ]
@@ -92,13 +208,41 @@
           "name": "Importer",
           "why": "The library is being deleted and rebuilt, so this is the tool that does it. No migration needed.",
           "steps": [
-            { "t": "Takes the MPN register, pulls Mouser + DigiKey", "done": false, "evidence": "" },
-            { "t": "Writes sourced/<id>/<vendor>.json verbatim", "done": false, "evidence": "" },
-            { "t": "Calls the existing derive engine, does not write a second one", "done": false, "evidence": "" },
-            { "t": "Classifies each part into one of the four classes", "done": false, "evidence": "" },
-            { "t": "Rate-limited part is DEFERRED, not FAILED", "done": false, "evidence": "" },
-            { "t": "Stoppable and resumable, worklist derived from library state", "done": false, "evidence": "" },
-            { "t": "Merged to main, gate green", "done": false, "evidence": "" }
+            {
+              "t": "Takes the MPN register, pulls Mouser + DigiKey",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Writes sourced/<id>/<vendor>.json verbatim",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Calls the existing derive engine, does not write a second one",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Classifies each part into one of the four classes",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Rate-limited part is DEFERRED, not FAILED",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Stoppable and resumable, worklist derived from library state",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Merged to main, gate green",
+              "done": false,
+              "evidence": ""
+            }
           ]
         },
         {
@@ -106,13 +250,41 @@
           "name": "Guided Capture UI",
           "why": "The surface the owner uses for a 90-part sitting. Every extra click is multiplied by 90.",
           "steps": [
-            { "t": "All four vendors on enrich/cad_sources.py", "done": false, "evidence": "" },
-            { "t": "Catch, classify and attach the downloaded file", "done": false, "evidence": "" },
-            { "t": "Record origin {vendor, url, captured_at} on the asset", "done": false, "evidence": "" },
-            { "t": "Both formats per part where the vendor offers them", "done": false, "evidence": "" },
-            { "t": "Fast path to the next part", "done": false, "evidence": "" },
-            { "t": "Designed deliberately, screenshot critiqued both themes", "done": false, "evidence": "" },
-            { "t": "Merged to main, gates green incl. frontend-dist", "done": false, "evidence": "" }
+            {
+              "t": "All four vendors on enrich/cad_sources.py",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Catch, classify and attach the downloaded file",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Record origin {vendor, url, captured_at} on the asset",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Both formats per part where the vendor offers them",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Fast path to the next part",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Designed deliberately, screenshot critiqued both themes",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Merged to main, gates green incl. frontend-dist",
+              "done": false,
+              "evidence": ""
+            }
           ]
         }
       ]
@@ -127,10 +299,26 @@
           "name": "Acceptance Test",
           "why": "The owner's own bar, verbatim: 'we can edit it without reimporting'.",
           "steps": [
-            { "t": "Import real parts into a scratch library", "done": false, "evidence": "" },
-            { "t": "Derive twice, prove byte-identical", "done": false, "evidence": "" },
-            { "t": "Prove sourced/ untouched by either derive", "done": false, "evidence": "" },
-            { "t": "Change the naming scheme, re-derive, identity survives", "done": false, "evidence": "" }
+            {
+              "t": "Import real parts into a scratch library",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Derive twice, prove byte-identical",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Prove sourced/ untouched by either derive",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Change the naming scheme, re-derive, identity survives",
+              "done": false,
+              "evidence": ""
+            }
           ]
         },
         {
@@ -138,11 +326,31 @@
           "name": "Adversarial Review",
           "why": "This project has shipped a check that could not fail and an audit that was 100% false positives. Refute, do not confirm.",
           "steps": [
-            { "t": "Every new detector fed a known-BAD input", "done": false, "evidence": "" },
-            { "t": "No presence-measuring code that reads like trust", "done": false, "evidence": "" },
-            { "t": "No 'if tool ==' branch in shared logic", "done": false, "evidence": "" },
-            { "t": "No success message emitted before the thing was observed", "done": false, "evidence": "" },
-            { "t": "Nothing lost in the merges", "done": false, "evidence": "" }
+            {
+              "t": "Every new detector fed a known-BAD input",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "No presence-measuring code that reads like trust",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "No 'if tool ==' branch in shared logic",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "No success message emitted before the thing was observed",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Nothing lost in the merges",
+              "done": false,
+              "evidence": ""
+            }
           ]
         },
         {
@@ -150,10 +358,26 @@
           "name": "Delete And Re-Import The Library",
           "why": "Step 2 of the owner's build order. Only after the schema is proven.",
           "steps": [
-            { "t": "Full backup of the current library taken and verified", "done": false, "evidence": "" },
-            { "t": "Re-import all 158 records onto the new schema", "done": false, "evidence": "" },
-            { "t": "Zero records missing description, manufacturer or datasheet", "done": false, "evidence": "" },
-            { "t": "Owner confirms the app shows what they expect", "done": false, "evidence": "" }
+            {
+              "t": "Full backup of the current library taken and verified",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Re-import all 158 records onto the new schema",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Zero records missing description, manufacturer or datasheet",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Owner confirms the app shows what they expect",
+              "done": false,
+              "evidence": ""
+            }
           ]
         }
       ]
@@ -168,11 +392,31 @@
           "name": "Device Parity",
           "why": "Owner: 'i meant libraries linked between devices'. Same parts, same files, same info, nobody clicking Sync.",
           "steps": [
-            { "t": "Two devices adding different parts converges", "done": true, "evidence": "Commit 7ed6b99 on branch wf/device-sync (not yet merged)." },
-            { "t": "Per-device enrich cache stops dirtying the synced repo", "done": true, "evidence": "Commit d8b9508 on branch wf/device-sync (not yet merged)." },
-            { "t": "Automatic PULL, not just auto_push", "done": false, "evidence": "" },
-            { "t": "Merged to main, gate green", "done": false, "evidence": "" },
-            { "t": "Verified on two real machines", "done": false, "evidence": "" }
+            {
+              "t": "Two devices adding different parts converges",
+              "done": true,
+              "evidence": "Commit 7ed6b99 on branch wf/device-sync (not yet merged)."
+            },
+            {
+              "t": "Per-device enrich cache stops dirtying the synced repo",
+              "done": true,
+              "evidence": "Commit d8b9508 on branch wf/device-sync (not yet merged)."
+            },
+            {
+              "t": "Automatic PULL, not just auto_push",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Merged to main, gate green",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Verified on two real machines",
+              "done": false,
+              "evidence": ""
+            }
           ]
         },
         {
@@ -180,10 +424,26 @@
           "name": "Hot Reload And Auto Update",
           "why": "Owner requirement 5: 'app shouldnt have to fully relaunch to update either'. The first attempt produced zero commits.",
           "steps": [
-            { "t": "Frontend bundle reloads in place", "done": false, "evidence": "" },
-            { "t": "Backend change restarts without a closed window", "done": false, "evidence": "" },
-            { "t": "A failed update rolls back and says so", "done": false, "evidence": "" },
-            { "t": "Every device converges by itself, no deploy script by hand", "done": false, "evidence": "" }
+            {
+              "t": "Frontend bundle reloads in place",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Backend change restarts without a closed window",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "A failed update rolls back and says so",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Every device converges by itself, no deploy script by hand",
+              "done": false,
+              "evidence": ""
+            }
           ]
         },
         {
@@ -191,9 +451,21 @@
           "name": "Automatic EDA Linking",
           "why": "Owner requirement 3. The spec's ordering: files first, linking second.",
           "steps": [
-            { "t": "KiCad symbol/footprint/3D linked by reference", "done": false, "evidence": "" },
-            { "t": "Altium .SchLib/.PcbLib written with embedded 3D body", "done": false, "evidence": "" },
-            { "t": "Linking runs automatically, not on a button", "done": false, "evidence": "" }
+            {
+              "t": "KiCad symbol/footprint/3D linked by reference",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Altium .SchLib/.PcbLib written with embedded 3D body",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Linking runs automatically, not on a button",
+              "done": false,
+              "evidence": ""
+            }
           ]
         },
         {
@@ -201,13 +473,30 @@
           "name": "3D Rotation Fix",
           "why": "Measured: 21 of 57 parts render wrong. Spec puts this LAST, labelled cosmetic. First attempt produced zero commits.",
           "steps": [
-            { "t": "Sign settled FROM EVIDENCE against KiCad's own viewer", "done": false, "evidence": "" },
-            { "t": "rotate + offset + scale all applied", "done": false, "evidence": "" },
-            { "t": "The 10 parts at 270 deg render correctly", "done": false, "evidence": "" },
-            { "t": "No previously-correct part rotated away from correct", "done": false, "evidence": "" }
+            {
+              "t": "Sign settled FROM EVIDENCE against KiCad's own viewer",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "rotate + offset + scale all applied",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "The 10 parts at 270 deg render correctly",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "No previously-correct part rotated away from correct",
+              "done": false,
+              "evidence": ""
+            }
           ]
         }
       ]
     }
-  ]
+  ],
+  "updated": "2026-07-27 06:55 UTC"
 }
