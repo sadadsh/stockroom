@@ -1,4 +1,131 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8533210020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8533.21.0030"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4849/13_0402-%281005-metric%29.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "17"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "100"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Thick Film Resistors - SMD"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Resistors"
+      }
+    ],
+    "Resistance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "18 kOhm"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "18 kOhms"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Temperature Coefficient": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "±100ppm/℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±100ppm/°C"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±1%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Resistor, 18 kOhm, 1%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: RC0402FR-0718KL Thick Film Resistors - SMD – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "RES 18K OHM 1% 1/16W 0402"
+      }
+    ]
+  },
   "category": "Resistors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +149,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "rc0402fr_0718kl",
   "manufacturer": "Yageo",
@@ -37,8 +169,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:01:16.133572+00:00",
+      "part_number": "603-RC0402FR-0718KL",
       "price_breaks": [
         {
           "price": 0.000557143,
@@ -65,9 +197,43 @@
           "qty": 1004000
         }
       ],
-      "stock": 150074,
+      "stock": 118916,
       "url": "https://www.mouser.com/c/?q=RC0402FR-0718KL",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:16.133572+00:00",
+      "part_number": "311-18.0KLRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0031,
+          "qty": 10000
+        },
+        {
+          "price": 0.00275,
+          "qty": 20000
+        },
+        {
+          "price": 0.00257,
+          "qty": 30000
+        },
+        {
+          "price": 0.00239,
+          "qty": 50000
+        },
+        {
+          "price": 0.00228,
+          "qty": 70000
+        },
+        {
+          "price": 0.00218,
+          "qty": 100000
+        }
+      ],
+      "stock": 193927,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -119,7 +285,7 @@
     "LCSC Product Name": "RES 18kΩ ±1% 62.5mW 0402",
     "LCSC Title": "YAGEO RC0402FR-0718KL",
     "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
-    "Lead Time": "56 Days",
+    "Lead Time": "8 Weeks",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "100",
     "Moisture Sensitivity Level": "1 (Unlimited)",
