@@ -1,4 +1,18 @@
 {
+  "alternates": {
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Resistor, 470 kOhm, 1%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: RC0402FR-07470KL Thick Film Resistors - SMD – Mouser"
+      }
+    ]
+  },
   "category": "Resistors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +36,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "rc0402fr_07470kl",
   "manufacturer": "Yageo",
@@ -37,8 +56,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:04:11.099353+00:00",
+      "part_number": "603-RC0402FR-07470KL",
       "price_breaks": [
         {
           "price": 0.0006,
@@ -65,7 +84,7 @@
           "qty": 1004000
         }
       ],
-      "stock": 109806,
+      "stock": 91757,
       "url": "https://www.mouser.com/c/?q=RC0402FR-07470KL",
       "vendor": "Mouser"
     }
@@ -116,7 +135,7 @@
     "LCSC Product Name": "RES 470kΩ ±1% 62.5mW 0402",
     "LCSC Title": "YAGEO RC0402FR-07470KL",
     "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
-    "Lead Time": "56 Days",
+    "Lead Time": "8 Weeks",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "100",
     "Order Multiple": "100",
