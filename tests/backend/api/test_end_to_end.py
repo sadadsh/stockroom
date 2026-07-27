@@ -22,7 +22,7 @@ def test_full_flow_over_every_router(client):
                           json={"field": "manufacturer", "value": "X"})
     assert edited.status_code == 200 and edited.json()["manufacturer"] == "X"
     moved = client.post("/api/library/parts/tps62130/move", json={"category": "Modules"})
-    assert moved.status_code == 200 and moved.json()["category"] == "Modules"
+    assert moved.status_code == 200 and moved.json()["derived"]["category"] == "Modules"
 
     # previews router mounted (kicad-cli-free: an absent part is a clean 404)
     assert client.get("/api/previews/symbol/nope.svg").status_code == 404

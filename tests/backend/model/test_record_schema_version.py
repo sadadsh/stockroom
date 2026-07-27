@@ -35,7 +35,7 @@ def test_a_versionless_legacy_record_is_upgraded_in_place():
         "id": "x", "display_name": "n", "category": "ICs",
         "symbol": {"lib": "SR-ICs", "name": "A"},
     })
-    assert rec.assets_for("kicad").symbol == AssetRef(lib="SR-ICs", name="A")
+    assert rec.assets_for("kicad").symbol.ref == AssetRef(lib="SR-ICs", name="A")
     assert rec.schema_version == SCHEMA_VERSION
     assert rec.is_future_schema() is False
 
@@ -48,14 +48,17 @@ def test_a_legacy_record_is_rewritten_at_the_current_version():
 # ------------------------------------------------- forward compatibility
 
 
+# A record from a build SEVEN versions ahead of ours. It is written in the shape we know (v3),
+# plus fields we have never heard of - which is the realistic case: a newer peer ADDS fields, it
+# does not usually rewrite the whole record. A record whose SHAPE we do not know is a different
+# problem, and `is_future_schema` is what tells a caller not to restructure it.
 FUTURE = {
     "id": "x",
-    "display_name": "n",
-    "category": "ICs",
     "schema_version": SCHEMA_VERSION + 7,
+    "derived": {"display_name": "n", "category": "ICs"},
     "lifecycle": {"status": "active", "checked_at": "2027-01-01"},
     "compliance_docs": ["rohs.pdf"],
-    "eda": {"kicad": {"symbol": {"lib": "SR-ICs", "name": "A"}, "footprint": None, "model": None}},
+    "assets": {"kicad": {"symbol": {"ref": {"lib": "SR-ICs", "name": "A"}}}},
 }
 
 
@@ -70,7 +73,7 @@ def test_an_unknown_field_survives_an_EDIT_to_a_known_field():
     rec = PartRecord.from_dict(dict(FUTURE))
     rec.description = "edited by an older build"
     out = json.loads(rec.dumps())
-    assert out["description"] == "edited by an older build"
+    assert out["derived"]["description"] == "edited by an older build"
     assert out["lifecycle"]["status"] == "active", "the edit must not erase the unknown field"
 
 
@@ -89,8 +92,8 @@ def test_a_record_from_the_future_is_flagged_not_silently_accepted():
 
 def test_a_known_field_is_never_duplicated_into_the_unknown_bag():
     rec = PartRecord.from_dict(dict(FUTURE))
-    assert "description" not in rec.extra
-    assert "eda" not in rec.extra
+    assert "derived" not in rec.extra
+    assert "assets" not in rec.extra
     assert set(rec.extra) == {"lifecycle", "compliance_docs"}
 
 

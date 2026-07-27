@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from stockroom.model.part_id import make_part_id
+
 _OWNER_URL = (
     "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V"
     "?qs=sGAEpiMZZMtG0KNrPCHnjYpPrk%252BOMd4bdFNd%2Ftqgjvc%3D"
@@ -13,16 +15,16 @@ def test_passive_preview_decodes_without_committing(client):
     assert resp.status_code == 200
     body = resp.json()
     rec = body["record"]
-    assert rec["passive"] is True
+    assert rec["part_class"] == "passive"
     assert rec["mpn"] == "ERJ-P03F1101V"
     assert rec["manufacturer"] == "Panasonic"
     # A passive references KiCad STOCK assets by lib_id and owns no files. The refs sit in
     # the KiCad bundle and nowhere else; `file` is blank because these are entry-shaped.
-    assert rec["eda"]["kicad"]["symbol"] == {"lib": "Device", "name": "R", "file": ""}
-    assert rec["eda"]["kicad"]["footprint"] == {
+    assert rec["assets"]["kicad"]["symbol"]["ref"] == {"lib": "Device", "name": "R", "file": ""}
+    assert rec["assets"]["kicad"]["footprint"]["ref"] == {
         "lib": "Resistor_SMD", "name": "R_0603_1608Metric", "file": "",
     }
-    assert "altium" not in rec["eda"]
+    assert "altium" not in rec["assets"]
     assert rec["purchase"][0]["url"] == _OWNER_URL
     assert body["gaps"] == ["datasheet"]
     # preview must not have added anything
@@ -36,11 +38,11 @@ def test_passive_add_commits_and_indexes(client):
     })
     assert resp.status_code == 200, resp.text
     rec = resp.json()
-    assert rec["id"] == "erj_p03f1101v" and rec["passive"] is True
+    assert rec["id"] == make_part_id("ERJ-P03F1101V") and rec["part_class"] == "passive"
     # the derived index picked it up (2 seeded + 1 added)
     parts = client.get("/api/library/parts").json()
     assert parts["count"] == 3
-    assert client.get("/api/library/parts/erj_p03f1101v").json()["mpn"] == "ERJ-P03F1101V"
+    assert client.get(f"/api/library/parts/{make_part_id('ERJ-P03F1101V')}").json()["mpn"] == "ERJ-P03F1101V"
 
 
 def test_passive_add_without_datasheet_is_422_incomplete(client):
@@ -73,7 +75,7 @@ def test_manual_kind_and_package_preview_then_add(client):
     assert preview.status_code == 200, preview.text
     pbody = preview.json()
     assert pbody["status"] == "ok"
-    assert pbody["record"]["eda"]["kicad"]["footprint"] == {
+    assert pbody["record"]["assets"]["kicad"]["footprint"]["ref"] == {
         "lib": "Inductor_SMD", "name": "L_1210_3225Metric", "file": "",
     }
 

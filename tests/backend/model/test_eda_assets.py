@@ -10,6 +10,7 @@ import json
 import pytest
 
 from stockroom.model.part import (
+    Asset,
     AssetRef,
     EdaAssets,
     PartRecord,
@@ -17,6 +18,7 @@ from stockroom.model.part import (
     tool_assets_ready,
     tool_place_ready,
 )
+from stockroom.model.part_class import PartClass
 
 
 def _rec(**kw) -> PartRecord:
@@ -27,7 +29,7 @@ def _rec(**kw) -> PartRecord:
 
 
 def test_a_fresh_record_carries_an_empty_bundle_for_every_registered_tool():
-    assert _rec().eda == {"kicad": EdaAssets(), "altium": EdaAssets()}
+    assert _rec().assets == {"kicad": EdaAssets(), "altium": EdaAssets()}
 
 
 def test_assets_for_returns_the_LIVE_bundle_so_mutating_it_mutates_the_record():
@@ -35,8 +37,8 @@ def test_assets_for_returns_the_LIVE_bundle_so_mutating_it_mutates_the_record():
     # silently do nothing -- the exact quiet-failure class this cutover exists to kill.
     r = _rec()
     r.assets_for("altium").symbol = AssetRef(lib="BQ24074RGTT.SchLib", name="BQ24074RGTT")
-    assert r.eda["altium"].symbol.name == "BQ24074RGTT"
-    assert r.assets_for("altium") is r.eda["altium"]
+    assert r.assets["altium"].symbol.name == "BQ24074RGTT"
+    assert r.assets_for("altium") is r.assets["altium"]
 
 
 def test_an_unknown_tool_raises_instead_of_silently_defaulting_to_kicad():
@@ -53,8 +55,8 @@ def test_the_two_tools_hold_independent_assets():
     r = _rec()
     r.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name="TPS62130RGTR")
     r.assets_for("altium").symbol = AssetRef(lib="TPS62130.SchLib", name="TPS62130RGTR")
-    assert r.eda["kicad"].symbol.lib == "SR-ICs"
-    assert r.eda["altium"].symbol.lib == "TPS62130.SchLib"
+    assert r.assets["kicad"].symbol.lib == "SR-ICs"
+    assert r.assets["altium"].symbol.lib == "TPS62130.SchLib"
 
 
 def test_every_tool_has_its_own_model_slot():
@@ -76,7 +78,7 @@ def test_round_trip_preserves_every_tool_bundle():
     r.assets_for("kicad").model = AssetRef(file="models/a.step")
     r.assets_for("altium").symbol = AssetRef(lib="a.SchLib", name="A")
     r.assets_for("altium").footprint = AssetRef(lib="a.PcbLib", name="VQFN-16")
-    assert PartRecord.loads(r.dumps()).eda == r.eda
+    assert PartRecord.loads(r.dumps()).assets == r.assets
 
 
 def test_the_flat_legacy_fields_are_gone_from_the_wire_format():
@@ -85,21 +87,23 @@ def test_the_flat_legacy_fields_are_gone_from_the_wire_format():
     d = json.loads(r.dumps())
     for gone in ("symbol", "footprint", "model", "altium_symbol", "altium_footprint"):
         assert gone not in d, f"{gone} must not survive the cutover"
-    assert d["eda"]["kicad"]["symbol"] == {"lib": "SR-ICs", "name": "A", "file": ""}
+    # v3 nests the reference inside the asset, beside its origin and its checks.
+    assert d["assets"]["kicad"]["symbol"] == {"ref": {"lib": "SR-ICs", "name": "A", "file": ""}}
 
 
 def test_an_empty_tool_bundle_is_not_persisted():
     # Keeps the JSON minimal so a one-field edit stays a one-line diff.
-    assert json.loads(_rec().dumps())["eda"] == {}
+    assert json.loads(_rec().dumps())["assets"] == {}
 
 
 def test_a_tool_this_build_does_not_know_survives_a_round_trip():
     # A peer on a newer Stockroom may write an entry for a tool we have never heard of.
     # Dropping it would silently destroy their work on our next write.
     d = json.loads(_rec().dumps())
-    d["eda"]["eagle"] = {"symbol": {"lib": "e.lbr", "name": "A", "file": ""},
-                         "footprint": None, "model": None}
-    assert json.loads(PartRecord.from_dict(d).dumps())["eda"]["eagle"]["symbol"]["lib"] == "e.lbr"
+    d["assets"]["eagle"] = {"symbol": {"ref": {"lib": "e.lbr", "name": "A", "file": ""}},
+                            "footprint": None, "model": None}
+    out = json.loads(PartRecord.from_dict(d).dumps())
+    assert out["assets"]["eagle"]["symbol"]["ref"]["lib"] == "e.lbr"
 
 
 # ------------------------------------------------- legacy read compatibility
@@ -119,9 +123,11 @@ LEGACY = {
 
 def test_a_legacy_record_folds_its_flat_fields_into_the_per_tool_map():
     r = PartRecord.from_dict(dict(LEGACY))
-    assert r.assets_for("kicad").symbol == AssetRef(lib="SR-ICs", name="TPS62130RGTR")
-    assert r.assets_for("kicad").model == AssetRef(file="models/TPS62130RGTR.step")
-    assert r.assets_for("altium").footprint == AssetRef(lib="a.PcbLib", name="VQFN-16")
+    assert r.assets_for("kicad").symbol.ref == AssetRef(lib="SR-ICs", name="TPS62130RGTR")
+    assert r.assets_for("kicad").model.ref == AssetRef(file="models/TPS62130RGTR.step")
+    assert r.assets_for("altium").footprint.ref == AssetRef(lib="a.PcbLib", name="VQFN-16")
+    # A migrated asset gets NO invented origin: nothing recorded where these files came from.
+    assert r.assets_for("kicad").symbol.origin is None
 
 
 def test_a_legacy_ref_tagged_for_another_tool_folds_under_that_tool():
@@ -131,18 +137,19 @@ def test_a_legacy_ref_tagged_for_another_tool_folds_under_that_tool():
     d.pop("altium_symbol")
     r = PartRecord.from_dict(d)
     assert r.assets_for("kicad").symbol is None
-    assert r.assets_for("altium").symbol == AssetRef(lib="a.SchLib", name="A")
+    assert r.assets_for("altium").symbol.ref == AssetRef(lib="a.SchLib", name="A")
 
 
 def test_a_legacy_record_rewrites_in_the_new_format():
     d = json.loads(PartRecord.from_dict(dict(LEGACY)).dumps())
     assert "altium_symbol" not in d
-    assert set(d["eda"]) == {"kicad", "altium"}
+    assert set(d["assets"]) == {"kicad", "altium"}
 
 
 def test_the_new_format_wins_when_both_are_present():
     d = dict(LEGACY)
     d["eda"] = {"kicad": {"symbol": {"lib": "NEW", "name": "N", "file": ""}}}
+    d["schema_version"] = 2  # a v2 record: the `eda` map is the shape it is read at
     assert PartRecord.from_dict(d).assets_for("kicad").symbol.lib == "NEW"
 
 
@@ -150,6 +157,7 @@ def test_the_new_format_wins_when_both_are_present():
 
 
 def test_asset_present_reads_the_field_that_kind_actually_uses():
+    assert asset_present(Asset(ref=AssetRef(lib="SR-ICs", name="A"))) is True
     assert asset_present(AssetRef(lib="SR-ICs", name="A")) is True
     assert asset_present(AssetRef(file="models/a.step")) is True
     assert asset_present(AssetRef(lib="SR-ICs")) is False  # container but no entry
@@ -200,7 +208,7 @@ def test_an_embeddable_kind_is_never_asked_of_a_capture_session():
 
 
 def test_a_passive_needs_no_owned_model():
-    r = _rec(passive=True)
+    r = _rec(part_class=PartClass.PASSIVE)
     r.assets_for("kicad").symbol = AssetRef(lib="Device", name="R")
     r.assets_for("kicad").footprint = AssetRef(lib="Resistor_SMD", name="R_0603_1608Metric")
     assert r.missing_assets("kicad") == []
@@ -221,7 +229,7 @@ def test_tool_assets_ready_requires_both_named_refs():
     assert tool_assets_ready(r, "altium") is False
     r.assets_for("altium").footprint = AssetRef(lib="a.PcbLib", name="FP")
     assert tool_assets_ready(r, "altium") is True
-    r.eda["altium"].footprint = AssetRef(lib="a.PcbLib", name="")
+    r.assets["altium"].footprint = AssetRef(lib="a.PcbLib", name="")
     assert tool_assets_ready(r, "altium") is False
 
 

@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord
+from stockroom.model.part_class import PartClass
 from stockroom.projects import binding, fill
 from stockroom.sexp.document import SexpDocument
 from stockroom.verify.semdiff import assert_only_changed
@@ -83,7 +84,7 @@ def _parts():
     opamp = PartRecord(
         id="lm358", display_name="LM358 Op-Amp", category="ICs",
         description="Dual op-amp", mpn="LM358DR", manufacturer="TI",
-        eda={"kicad": EdaAssets(
+        assets={"kicad": EdaAssets(
             symbol=AssetRef(lib="SR-ICs", name="LM358"),
             footprint=AssetRef(lib="SR-ICs", name="SOIC-8"),
         )},
@@ -92,7 +93,7 @@ def _parts():
     res = PartRecord(
         id="r10k", display_name="10k 0402", category="Resistors",
         description="10k 1% 0402", mpn="RC0402FR-0710KL", manufacturer="Yageo",
-        eda={"kicad": EdaAssets(
+        assets={"kicad": EdaAssets(
             symbol=AssetRef(lib="SR-Resistors", name="R_10k"),
             footprint=AssetRef(lib="SR-Resistors", name="R_0402"),
         )},
@@ -307,7 +308,7 @@ def test_proposed_changes_does_not_re_add_mpn_under_an_alternate_key():
 def test_datasheet_falls_back_to_file_when_no_source_url():
     part = PartRecord(
         id="d", display_name="D", category="ICs", description="x", mpn="M1", manufacturer="ACME",
-        eda={"kicad": EdaAssets(symbol=AssetRef(lib="SR-ICs", name="D"))},
+        assets={"kicad": EdaAssets(symbol=AssetRef(lib="SR-ICs", name="D"))},
         datasheet=Datasheet(file="datasheets/d.pdf", source_url=""),  # file present, URL empty
     )
     rec = fill.library_match_records([part])[0]
@@ -322,7 +323,7 @@ def test_bad_category_part_keeps_its_references_but_forfeits_the_symbol_tier():
     part = PartRecord(
         id="w", display_name="Widget", category="Widgets",  # not in the taxonomy
         description="x", mpn="WMPN", manufacturer="ACME",
-        eda={"kicad": EdaAssets(symbol=AssetRef(lib="X", name="WSYM"), footprint=AssetRef(lib="X", name="WFP"))},
+        assets={"kicad": EdaAssets(symbol=AssetRef(lib="X", name="WSYM"), footprint=AssetRef(lib="X", name="WFP"))},
     )
     rec = fill.library_match_records([part])
     assert len(rec) == 1  # not dropped
@@ -350,8 +351,8 @@ def _passive_parts():
     def res(pid, mpn, value, package, metric):
         return PartRecord(
             id=pid, display_name=f"{value} {package}", category="Resistors",
-            description=f"{value} 1% {package}", mpn=mpn, manufacturer="Yageo", passive=True,
-            eda={"kicad": EdaAssets(
+            description=f"{value} 1% {package}", mpn=mpn, manufacturer="Yageo", part_class=PartClass.PASSIVE,
+            assets={"kicad": EdaAssets(
                 symbol=AssetRef(lib="Device", name="R"),
                 footprint=AssetRef(lib="Resistor_SMD", name=f"R_{package}_{metric}"),
             )},
@@ -449,8 +450,8 @@ def test_candidates_surface_only_the_ratings_that_differ_between_them():
     def res(pid, mpn, tol):
         return PartRecord(
             id=pid, display_name="10k 0402 Thick Film", category="Resistors",
-            description=f"10k {tol} 0402", mpn=mpn, manufacturer="Yageo", passive=True,
-            eda={"kicad": EdaAssets(
+            description=f"10k {tol} 0402", mpn=mpn, manufacturer="Yageo", part_class=PartClass.PASSIVE,
+            assets={"kicad": EdaAssets(
                 symbol=AssetRef(lib="Device", name="R"),
                 footprint=AssetRef(lib="Resistor_SMD", name="R_0402_1005Metric"),
             )},
@@ -471,8 +472,8 @@ def test_a_rating_the_name_already_states_is_not_repeated():
     def res(pid, mpn, tol, name):
         return PartRecord(
             id=pid, display_name=name, category="Resistors", description="10k",
-            mpn=mpn, manufacturer="Yageo", passive=True,
-            eda={"kicad": EdaAssets(
+            mpn=mpn, manufacturer="Yageo", part_class=PartClass.PASSIVE,
+            assets={"kicad": EdaAssets(
                 symbol=AssetRef(lib="Device", name="R"),
                 footprint=AssetRef(lib="Resistor_SMD", name="R_0402_1005Metric"),
             )},

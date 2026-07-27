@@ -15,7 +15,7 @@ def _complete(pid, name, cat="ICs", mpn="M1", mfr="TI", fp="VQFN-16") -> PartRec
         manufacturer=mfr,
         datasheet=Datasheet(file=f"{pid}.pdf"),
         purchase=[Purchase(vendor="Mouser", url="https://mouser.com/" + pid)],
-        eda={"kicad": EdaAssets(
+        assets={"kicad": EdaAssets(
             symbol=AssetRef(lib="SR-" + cat, name=name),
             footprint=AssetRef(lib="SR-" + cat, name=fp),
             model=AssetRef(file=f"models/{name}.step"),

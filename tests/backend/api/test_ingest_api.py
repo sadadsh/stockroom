@@ -260,10 +260,10 @@ def test_commit_lands_a_file_less_candidate_from_a_pulled_link(client):
     body = r.json()
     # A file-less add carries NO assets for any tool, and an empty bundle is omitted from
     # the wire format entirely rather than serialized as a wall of nulls.
-    assert body["eda"] == {}
+    assert body["assets"] == {}
     assert body["mpn"] == "TPD6E05U06RVZR"
     detail = client.get(f"/api/library/parts/{body['id']}").json()
-    assert detail["eda"] == {}
+    assert detail["assets"] == {}
 
 
 def test_the_add_lane_carries_vendor_disagreements_all_the_way_to_the_record():

@@ -27,9 +27,9 @@ def test_library_layout_paths(tmp_path):
 def test_ensure_layout_creates_five_subdirs_with_gitkeep(tmp_path):
     lib = ProfileLibrary(tmp_path / "Main")
     keeps = lib.ensure_layout()
-    for sub in ("parts", "symbols", "footprints", "models", "datasheets"):
+    for sub in ("parts", "symbols", "footprints", "models", "datasheets", "sourced"):
         assert (tmp_path / "Main" / sub / ".gitkeep").exists()
-    assert len(keeps) == 5
+    assert len(keeps) == 6
 
 
 def test_create_profile_commits_and_lists(tmp_path):

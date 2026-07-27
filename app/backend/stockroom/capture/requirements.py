@@ -21,6 +21,7 @@ from __future__ import annotations
 from enum import Enum
 
 from stockroom.eda.registry import all_tools
+from stockroom.model.part import asset_present
 
 
 class Requirement(str, Enum):
@@ -57,28 +58,23 @@ def capture_needs(record) -> list[Requirement]:
     Reads the record's per-tool asset bundles directly, so a part carrying a full KiCad set
     and no Altium set reports exactly the Altium gaps. The asymmetry that made every part
     read "CAD Incomplete" forever is gone by construction, not by a branch.
-    """
-    # A PASSIVE NEEDS NOTHING, FROM ANY TOOL. Owner, 2026-07-27: *"passive components dont need
-    # files, models or symbols not for kicad or for altium, theyre built in. we use kicad for those
-    # passives only for our app's uis. the only 'linking to the eda' is for building boms."*
-    #
-    # So a requirement is a function of the PART CLASS, not only of the tool. Both KiCad and Altium
-    # ship generic passives, so there is nothing to acquire for a resistor in either. The `SR-*`
-    # symbol a passive does carry is a BOM-property vehicle (see
-    # `docs/work plans/specs/2026-07-20-bom-ready-library-rebuild-design.md`, which promotes each
-    # passive to an owned symbol precisely so it can carry the mirrored BOM field set) - it is
-    # produced by `rebuild_part`, never captured, and its absence is not a gap.
-    #
-    # MEASURED before this exemption existed: the completion surface demanded `altium_symbol` and
-    # `altium_footprint` from all 68 of the owner's passives - 136 requirements nothing could ever
-    # satisfy, which was most of what the UI reported as permanently stuck. This used to exempt
-    # only `model`, which was the same rule applied one asset kind too narrowly.
-    if getattr(record, "passive", False):
-        return []
 
+    A requirement is `f(part class, tool)`, and BOTH halves are data:
+
+    - the PART CLASS says which asset kinds this part needs at all (model/part_class.py, spec
+      decision D3), with `requires_override` for the genuine exception;
+    - the EDA REGISTRY says which of those the tool can actually be given by reference.
+
+    A passive therefore resolves to `[]` for every tool without this function knowing what a
+    passive is. Owner, 2026-07-27: *"passive components dont need files, models or symbols not
+    for kicad or for altium, theyre built in."* MEASURED before that rule existed: the
+    completion surface demanded `altium_symbol` and `altium_footprint` from all 68 of the
+    owner's passives - 136 requirements nothing could ever satisfy.
+    """
     needs: list[Requirement] = []
     for tool_key, kind in _capturable():
-        ref = record.assets_for(tool_key).get(kind)
-        if ref is None or not (ref.name or ref.file):
+        if kind not in record.capturable(tool_key):
+            continue
+        if not asset_present(record.assets_for(tool_key).get(kind)):
             needs.append(requirement(tool_key, kind))
     return needs

@@ -790,6 +790,7 @@ def test_consolidated_bom_sums_across_boards(tmp_path):
 # -- library combining (schematic + library) -----------------------------------
 
 from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord, Purchase  # noqa: E402
+from stockroom.model.part_class import PartClass
 from stockroom.projects.bom import (  # noqa: E402
     _bom_from_components,
     combined_price_lookup,
@@ -807,7 +808,7 @@ def _lib_resistor():
     return PartRecord(
         id="r10k", display_name="10k 0402", category="Resistors",
         description="10k 1% 0402", mpn="RC0402FR-0710KL", manufacturer="Yageo",
-        eda={"kicad": EdaAssets(
+        assets={"kicad": EdaAssets(
             symbol=AssetRef(lib="SR-Resistors", name="R_10k"),
             footprint=AssetRef(lib="SR-Resistors", name="R_0402"),
         )},
@@ -1090,8 +1091,8 @@ def _bound_library():
     def res(pid, mpn, value, package, metric):
         return PartRecord(
             id=pid, display_name=f"{value} {package}", category="Resistors",
-            description=f"{value} 1% {package}", mpn=mpn, manufacturer="Yageo", passive=True,
-            eda={"kicad": EdaAssets(
+            description=f"{value} 1% {package}", mpn=mpn, manufacturer="Yageo", part_class=PartClass.PASSIVE,
+            assets={"kicad": EdaAssets(
                 symbol=AssetRef(lib="Device", name="R"),
                 footprint=AssetRef(lib="Resistor_SMD", name=f"R_{package}_{metric}"),
             )},

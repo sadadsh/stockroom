@@ -4,7 +4,7 @@ The old record had implicitly-KiCad `symbol`/`footprint`/`model` plus bolted-on
 `altium_symbol`/`altium_footprint` and NO Altium model slot. That asymmetry caused the
 permanent "CAD Incomplete" bug (readiness read the KiCad fields for Altium) and the
 attach-clobber bug (an Altium attach overwrote the KiCad reference). Both are now impossible
-by construction -- every tool owns a symmetric `EdaAssets` bundle in `record.eda`.
+by construction -- every tool owns a symmetric `EdaAssets` bundle in `record.assets`.
 
 This is the gate that keeps it that way. It exists because the failure mode is SILENT:
 `getattr(part, "symbol", None)` still compiles, still runs, and now returns None forever --

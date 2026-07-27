@@ -9,6 +9,8 @@ from stockroom.model.part import (
     Purchase,
     new_part_id,
 )
+from stockroom.model.part_class import PartClass
+from stockroom.model.part_id import is_valid_part_id, make_part_id
 
 
 def _sample() -> PartRecord:
@@ -22,7 +24,7 @@ def _sample() -> PartRecord:
         manufacturer="Texas Instruments",
         datasheet=Datasheet(file="tps62130rgtr.pdf", source_url="https://ti.com/x.pdf", fetched_at="2026-07-12T00:00:00Z"),
         purchase=[Purchase(vendor="Mouser", url="https://mouser.com/x", price_breaks=[[1, "3.21"]], stock=42, currency="USD", fetched_at="2026-07-12T00:00:00Z")],
-        eda={"kicad": EdaAssets(
+        assets={"kicad": EdaAssets(
             symbol=AssetRef(lib="SR-ICs", name="TPS62130RGTR"),
             footprint=AssetRef(lib="SR-ICs", name="VQFN-16"),
         )},
@@ -41,8 +43,8 @@ def _passive_sample() -> PartRecord:
         description="Resistor, 1.1 kOhm, 1%, 0603",
         mpn="ERJ-P03F1101V",
         manufacturer="Panasonic",
-        passive=True,
-        eda={"kicad": EdaAssets(
+        part_class=PartClass.PASSIVE,
+        assets={"kicad": EdaAssets(
             symbol=AssetRef(lib="Device", name="R"),
             footprint=AssetRef(lib="Resistor_SMD", name="R_0603_1608Metric"),
         )},
@@ -147,14 +149,14 @@ def test_defaults_are_empty_not_none():
     assert d["tags"] == []
     assert d["purchase"] == []
     assert d["datasheet"] is None
-    assert d["eda"] == {}  # empty per-tool bundles are omitted, not serialized as nulls
+    assert d["assets"] == {}  # empty per-tool bundles are omitted, not serialized as nulls
     assert d["enrichment"] == {}
 
 
 def test_specs_defaults_to_empty_dict():
     p = PartRecord(id="x", display_name="X", category="Other")
     assert p.specs == {}
-    assert p.to_dict()["specs"] == {}
+    assert p.to_dict()["derived"]["specs"] == {}
 
 
 def test_specs_round_trips():
@@ -180,21 +182,37 @@ def test_specs_is_not_a_gate_field():
     assert incomplete.missing_fields() == before
 
 
-def test_new_part_id_slugifies(tmp_path):
-    assert new_part_id(tmp_path, "TPS62130RGTR") == "tps62130rgtr"
+def test_new_part_id_is_the_decided_scheme_for_an_mpn(tmp_path):
+    # slug + a 4-hex fingerprint of the exact MPN. See model/part_id.py for why.
+    assert new_part_id(tmp_path, "TPS62130RGTR") == make_part_id("TPS62130RGTR")
+    assert is_valid_part_id(new_part_id(tmp_path, "TPS62130RGTR"))
 
 
-def test_new_part_id_never_reuses(tmp_path):
-    (tmp_path / "tps62130rgtr.json").write_text("{}")
-    assert new_part_id(tmp_path, "TPS62130RGTR") == "tps62130rgtr-2"
-    (tmp_path / "tps62130rgtr-2.json").write_text("{}")
-    assert new_part_id(tmp_path, "TPS62130RGTR") == "tps62130rgtr-3"
+def test_the_same_mpn_ALWAYS_gets_the_same_id_even_when_the_file_exists(tmp_path):
+    # The old scheme suffixed -2, -3 on collision, which quietly turned a RE-import of one
+    # part into a second copy of it. The id is a pure function of the MPN now, so a repeat
+    # lands on the same file and the caller has to decide what a duplicate means.
+    first = new_part_id(tmp_path, "TPS62130RGTR")
+    (tmp_path / f"{first}.json").write_text("{}")
+    assert new_part_id(tmp_path, "TPS62130RGTR") == first
 
 
-def test_new_part_id_handles_empty_base(tmp_path):
-    # a base that slugifies to empty still yields a usable id
-    got = new_part_id(tmp_path, "///")
-    assert got == "part"
+def test_two_mpns_that_SLUG_alike_still_get_different_ids(tmp_path):
+    # The owner owns MAX6817EUT+T. A bare slug would file it over MAX6817EUT-T.
+    assert new_part_id(tmp_path, "MAX6817EUT+T") != new_part_id(tmp_path, "MAX6817EUT-T")
+
+
+def test_a_part_with_NO_mpn_falls_back_to_its_name_and_is_de_duplicated(tmp_path):
+    # No MPN means no stable identity, so this is the one case that still consults the
+    # directory - and those ids are deliberately not stable across a rename.
+    assert new_part_id(tmp_path, "", "Mounting Hole M3") == "mounting_hole_m3"
+    (tmp_path / "mounting_hole_m3.json").write_text("{}")
+    assert new_part_id(tmp_path, "", "Mounting Hole M3") == "mounting_hole_m3-2"
+
+
+def test_new_part_id_handles_an_empty_base(tmp_path):
+    assert new_part_id(tmp_path, "", "///") == "part"
+    assert new_part_id(tmp_path, "", "") == "part"
 
 
 # --- F2 spec hygiene: PartRecord normalizes specs at every boundary ---
@@ -227,13 +245,13 @@ def test_partrecord_to_dict_cleans_late_mutation():
     # the way out to disk / the API, because to_dict normalizes too.
     r = PartRecord(id="x", display_name="X", category="ICs")
     r.specs["Temperature Coefficient"] = "200 PPM / C"
-    assert r.to_dict()["specs"]["Temperature Coefficient"] == "200 PPM/C"
+    assert r.to_dict()["derived"]["specs"]["Temperature Coefficient"] == "200 PPM/C"
 
 
 def test_partrecord_preserves_non_string_spec_value():
     r = PartRecord(id="x", display_name="X", category="ICs", specs={"US Tariff %": 37.0})
     assert r.specs["US Tariff %"] == 37.0
-    assert r.to_dict()["specs"]["US Tariff %"] == 37.0
+    assert r.to_dict()["derived"]["specs"]["US Tariff %"] == 37.0
 
 
 def test_partrecord_roundtrip_cleans_persisted_malformed_specs():
@@ -244,5 +262,5 @@ def test_partrecord_roundtrip_cleans_persisted_malformed_specs():
         "category": "ICs",
         "specs": {"Tolerance": "1 %", "Factory Pack Quantity: Factory Pack Quantity": "100"},
     }
-    reserialized = PartRecord.from_dict(malformed).to_dict()["specs"]
+    reserialized = PartRecord.from_dict(malformed).to_dict()["derived"]["specs"]
     assert reserialized == {"Tolerance": "1%", "Factory Pack Quantity": "100"}

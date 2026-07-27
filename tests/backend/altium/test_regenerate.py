@@ -16,7 +16,7 @@ def _place_ready(pid, mpn):
     return PartRecord(
         id=pid, display_name=pid, category="ICs", mpn=mpn, manufacturer="TI",
         description="d", value=mpn,
-        eda={"altium": EdaAssets(
+        assets={"altium": EdaAssets(
             symbol=AssetRef(lib=f"{pid}.SchLib", name=mpn),
             footprint=AssetRef(lib=f"{pid}.PcbLib", name="FP"),
         )},
@@ -60,7 +60,7 @@ def test_place_ready_does_not_require_a_persisted_value(library_ops):
     rec = PartRecord(
         id="c", display_name="c", category="ICs", mpn="CCC", manufacturer="TI",
         description="a chip", value="",  # NOT populated by the real pipeline
-        eda={"altium": EdaAssets(
+        assets={"altium": EdaAssets(
             symbol=AssetRef(lib="c.SchLib", name="CCC"),
             footprint=AssetRef(lib="c.PcbLib", name="FP"),
         )},

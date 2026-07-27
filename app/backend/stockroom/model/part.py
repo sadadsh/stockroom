@@ -1,9 +1,32 @@
 """The Stockroom part record: one JSON file per part.
 
-One file per part is git-merge friendly by construction: concurrent adds on two
-machines land in different files and cannot conflict (spec section 3). JSON is
-emitted canonically (sorted keys, 2-space indent, trailing newline) so a
-one-field edit produces a minimal, stable diff.
+One file per part is git-merge friendly by construction: concurrent adds on two machines land
+in different files and cannot conflict (spec section 3). JSON is emitted canonically (sorted
+keys, 2-space indent, trailing newline) so a one-field edit produces a minimal, stable diff.
+
+**The v3 shape** is drawn in `docs/specs/2026-07-27-owner-spec-complete-trusted-library.md`
+section 9 and is not re-litigated here:
+
+    parts/<id>.json          identity + part_class + DERIVED + asset refs + a sources INDEX
+    sourced/<id>/<src>.json  the raw pull, byte for byte, append-only evidence
+
+Four rules hold the whole thing up:
+
+  1. **`sourced/` is append-only evidence.** A re-derive READS it and never writes it. That is
+     what "edit without reimporting" means, and it is why normalization moved off the import
+     path (see model/derived.py).
+  2. **`derived` is disposable by construction.** Drop the block, recompute, get the record
+     back. `clear_derived()` exists so that is testable rather than asserted.
+  3. **Identity is not derived.** `id`, `mpn`, `manufacturer` and `part_class` are never
+     rewritten by a re-derive; only a human or an explicit re-classify changes them.
+  4. **Checks are facts, the verdict is derived** (model/trust.py). Tightening a check
+     re-judges the whole library with no re-audit.
+
+The derived fields keep their flat Python attributes (`record.display_name`), because the
+boundary the schema needs is a boundary in the DATA, not a second way to spell an attribute.
+`record.derived` reads and writes them as one `Derived` block, and `DERIVED_FIELDS` is the one
+list the record, the serializer and the drift test all read - so a derived field added in one
+place and forgotten in another fails a test rather than silently persisting flat.
 """
 
 from __future__ import annotations
@@ -13,20 +36,35 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from stockroom.eda.registry import all_tools, get_tool
+from stockroom.model.asset import ASSET_KINDS, Asset, AssetOrigin, AssetRef, EdaAssets
 from stockroom.model.category import slugify
+from stockroom.model.derived import DERIVED_BY, DERIVED_FIELDS, Derived
+from stockroom.model.part_class import (
+    DEFAULT_PART_CLASS,
+    PartClass,
+    RequirementOverride,
+    capturable_kinds,
+    needed_kinds,
+    parse_part_class,
+)
+from stockroom.model.part_id import make_part_id
+from stockroom.model.sourced import SourceEntry, source_rel_path
 from stockroom.model.spec_hygiene import normalize_specs
+from stockroom.model.trust import AssetCheck
 
-# The record schema version this build WRITES. Bump it when the shape changes in a way an
-# older build cannot faithfully reproduce.
+# The record schema version this build WRITES. Bump it when the shape changes in a way an older
+# build cannot faithfully reproduce, AND add the migration that upgrades the previous shape.
 #   1 = flat, implicitly-KiCad `symbol`/`footprint`/`model` plus `altium_symbol`/`altium_footprint`
 #   2 = the per-tool `eda` map (one symmetric EdaAssets bundle per EDA registry key)
+#   3 = identity / `derived` / `sources` / `assets` (asset = ref + origin + checks), and
+#       `part_class` in place of the two-valued `passive` flag
 #
 # This exists because peers share these records through git and BOTH write them. Kubernetes'
 # API conventions state the rule: patching a resource at schema version N-1 must not erase
-# fields defined at version N. Before this, an older build editing one field on a newer
-# peer's part silently deleted every field it did not recognise, and git recorded the
-# deletion as an intentional change. `extra` (below) is the other half of that guarantee.
-SCHEMA_VERSION = 2
+# fields defined at version N. Before this, an older build editing one field on a newer peer's
+# part silently deleted every field it did not recognise, and git recorded the deletion as an
+# intentional change. `extra` (below) is the other half of that guarantee.
+SCHEMA_VERSION = 3
 
 # KiCad-visible fields mirrored INTO symbol properties so KiCad shows a complete
 # part even without Stockroom (spec section 3). Maps record-derived value ->
@@ -42,13 +80,11 @@ KICAD_MIRROR_FIELDS: tuple[str, ...] = (
 )
 
 # The completion passport (owner directive, 2026-07-16): a part enters the library on
-# its IDENTITY + SOURCING alone. The KiCad assets (symbol / footprint / 3D model) are NO
-# LONGER gated - a part is added first and its assets are attached afterwards (attach_symbol
-# / attach_footprint / attach_model). This lets a whole BOM land as tracked records
-# immediately, then be completed at leisure. Each pair is (presence-flag key, human label);
-# the key names a flag, not a record attribute directly, so the same set gates staged inputs
-# and finished records alike. symbol/footprint/model presence is still COMPUTED (for the
-# "assets attached?" UI + drift checks), just not REQUIRED here.
+# its IDENTITY + SOURCING alone. The CAD assets are NO LONGER gated - a part is added first and
+# its assets are attached afterwards. This lets a whole BOM land as tracked records immediately,
+# then be completed at leisure. Each pair is (presence-flag key, human label); the key names a
+# flag, not a record attribute directly, so the same set gates staged inputs and finished
+# records alike.
 REQUIRED_FIELDS: tuple[tuple[str, str], ...] = (
     ("display_name", "name"),
     ("mpn", "MPN"),
@@ -68,6 +104,16 @@ ASSET_LABELS: dict[str, str] = {
 }
 
 
+class UnmigratableRecord(Exception):
+    """A record whose schema version this build cannot upgrade.
+
+    Raised instead of relabelling. The bug this replaces did `max(SCHEMA_VERSION, ...)` in
+    `from_dict`, which stamped an old record as CURRENT while leaving its data in the old
+    shape - so a stale record silently claimed to be understood, and the next reader had no
+    way to tell.
+    """
+
+
 def asset_label(kind: str) -> str:
     """The human label for an asset kind. Falls back to the kind itself so a tool that
     registers a kind we have no label for still reads sensibly rather than crashing."""
@@ -82,15 +128,18 @@ def missing_from_presence(present: dict[str, bool]) -> list[str]:
     return [label for key, label in REQUIRED_FIELDS if not present.get(key)]
 
 
-def asset_present(ref) -> bool:
-    """True when an asset reference actually resolves to something.
+def asset_present(value) -> bool:
+    """True when an asset (or a bare reference) actually resolves to something.
 
-    Generic across kinds on purpose: an entry-shaped asset (symbol, footprint) is
-    identified by `name`, a file-shaped one (3D model) by `file`. A container with no
-    entry (`lib` alone) is NOT present -- that half-filled state is what produced the
-    dangling `Footprint` property fixed in 21fce45.
+    Generic across kinds on purpose: an entry-shaped asset (symbol, footprint) is identified by
+    `name`, a file-shaped one (3D model) by `file`. A container with no entry (`lib` alone) is
+    NOT present - that half-filled state is what produced the dangling `Footprint` property
+    fixed in 21fce45. Accepts an `Asset` or a bare `AssetRef` so a caller holding either does
+    not have to know which.
     """
-    return ref is not None and bool(ref.name or ref.file)
+    if value is None:
+        return False
+    return bool(value.is_present())
 
 
 def tool_assets_ready(record, tool: str) -> bool:
@@ -129,144 +178,6 @@ class Purchase:
     stock: int | None = None
     currency: str = ""
     fetched_at: str = ""
-
-
-@dataclass
-class AssetRef:
-    """One EDA asset reference, in a shape every tool shares.
-
-    `lib` names the container (a KiCad `.kicad_sym` library nickname, an Altium `.SchLib`
-    / `.PcbLib` filename relative to `<profile>/altium/`), `name` the exact entry inside
-    it (the value KiCad's `lib_id` or Altium's `[Library Ref]` / `[Footprint Ref]`
-    resolves), and `file` the repo-relative path for a file-shaped asset such as a 3D
-    model, which has no container or entry name. A kind fills the fields it needs and
-    leaves the rest blank; nothing here is tool-specific, because per-tool facts belong in
-    `stockroom.eda.registry`, not in the record shape.
-
-    Vendor library files are stored verbatim -- Stockroom only reads their entry names.
-    """
-
-    lib: str = ""
-    name: str = ""
-    file: str = ""
-
-
-@dataclass
-class EdaAssets:
-    """Everything ONE EDA tool holds for one part.
-
-    Each tool gets a full, symmetric bundle. That symmetry is the point: the previous
-    record had implicitly-KiCad flat `symbol`/`footprint`/`model` fields plus bolted-on
-    `altium_symbol`/`altium_footprint` and NO Altium model slot, so readiness code had to
-    branch on the tool -- which is how every part read "CAD Incomplete" forever and how an
-    Altium attach silently clobbered the KiCad reference.
-    """
-
-    symbol: AssetRef | None = None
-    footprint: AssetRef | None = None
-    model: AssetRef | None = None
-
-    def get(self, kind: str) -> AssetRef | None:
-        """The reference for an asset kind, or None. Lets generic code iterate a tool's
-        registered `asset_kinds` instead of naming symbol/footprint/model by hand."""
-        return getattr(self, kind, None)
-
-    def set(self, kind: str, ref: AssetRef | None) -> None:
-        if not hasattr(self, kind):
-            raise KeyError(f"unknown asset kind {kind!r}")
-        setattr(self, kind, ref)
-
-    def is_empty(self) -> bool:
-        return self.symbol is None and self.footprint is None and self.model is None
-
-    def to_dict(self) -> dict:
-        return {
-            "symbol": asdict(self.symbol) if self.symbol else None,
-            "footprint": asdict(self.footprint) if self.footprint else None,
-            "model": asdict(self.model) if self.model else None,
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict) -> "EdaAssets":
-        def ref(key):
-            raw = d.get(key)
-            if not raw:
-                return None
-            # Tolerate an unknown extra key (e.g. a legacy `tool` discriminator) rather
-            # than exploding on a record written by another build.
-            return AssetRef(
-                lib=raw.get("lib", ""), name=raw.get("name", ""), file=raw.get("file", "")
-            )
-
-        return cls(symbol=ref("symbol"), footprint=ref("footprint"), model=ref("model"))
-
-
-# The pre-cutover flat fields, mapped to (default tool, asset kind). Records written before
-# the per-EDA cutover are folded into `eda` on read so the owner's existing library upgrades
-# in place on its next write instead of losing every attached asset. A legacy ref carrying an
-# explicit `tool` discriminator is honoured over the default here.
-_LEGACY_ASSET_FIELDS: tuple[tuple[str, str, str], ...] = (
-    ("symbol", "kicad", "symbol"),
-    ("footprint", "kicad", "footprint"),
-    ("model", "kicad", "model"),
-    ("altium_symbol", "altium", "symbol"),
-    ("altium_footprint", "altium", "footprint"),
-)
-
-
-# Every top-level key this build understands: the current shape, plus the legacy asset fields
-# that `_read_eda` CONSUMES (folding them into `eda`). Anything outside this set is a field
-# from a newer build and is preserved verbatim in `PartRecord.extra`. A legacy field must be
-# listed here or the record would carry two contradictory copies of its assets.
-_KNOWN_KEYS: frozenset[str] = frozenset(
-    {
-        "schema_version",
-        "id",
-        "display_name",
-        "category",
-        "description",
-        "tags",
-        "mpn",
-        "manufacturer",
-        "value",
-        "passive",
-        "datasheet",
-        "purchase",
-        "eda",
-        "provenance",
-        "hashes",
-        "enrichment",
-        "specs",
-        "alternates",
-    }
-    | {legacy for legacy, _, _ in _LEGACY_ASSET_FIELDS}
-)
-
-
-def _read_eda(d: dict) -> dict[str, EdaAssets]:
-    """The per-tool asset map for a record dict, in either format.
-
-    The new `eda` map wins outright when present; otherwise the legacy flat fields are
-    folded in. Tool keys this build does not recognise are preserved verbatim rather than
-    dropped -- a peer running a newer Stockroom must not lose their work on our next write.
-    """
-    raw = d.get("eda")
-    if raw:
-        return {tool: EdaAssets.from_dict(a or {}) for tool, a in raw.items()}
-
-    out: dict[str, EdaAssets] = {}
-    for legacy_key, default_tool, kind in _LEGACY_ASSET_FIELDS:
-        ref = d.get(legacy_key)
-        if not ref:
-            continue
-        tool = ref.get("tool") or default_tool
-        out.setdefault(tool, EdaAssets()).set(
-            kind,
-            AssetRef(
-                lib=ref.get("lib", ""), name=ref.get("name", ""), file=ref.get("file", "")
-            ),
-        )
-    return out
 
 
 @dataclass
@@ -327,55 +238,214 @@ class SourcedValue:
         )
 
 
+# ----------------------------------------------------------------- migrations
+
+# The pre-v2 flat fields, mapped to (default tool, asset kind). A legacy ref carrying an
+# explicit `tool` discriminator is honoured over the default here.
+_LEGACY_ASSET_FIELDS: tuple[tuple[str, str, str], ...] = (
+    ("symbol", "kicad", "symbol"),
+    ("footprint", "kicad", "footprint"),
+    ("model", "kicad", "model"),
+    ("altium_symbol", "altium", "symbol"),
+    ("altium_footprint", "altium", "footprint"),
+)
+
+
+def record_version(d: dict) -> int:
+    """The schema version a record dict declares. A record with no version predates
+    versioning, which is exactly schema 1."""
+    try:
+        return int(d.get("schema_version", 1))
+    except (TypeError, ValueError):
+        raise UnmigratableRecord(f"unreadable schema_version {d.get('schema_version')!r}") from None
+
+
+def _v1_to_v2(d: dict) -> dict:
+    """Fold the flat, implicitly-KiCad asset fields into the per-tool `eda` map."""
+    out = dict(d)
+    eda: dict = dict(out.get("eda") or {})
+    for legacy_key, default_tool, kind in _LEGACY_ASSET_FIELDS:
+        ref = out.pop(legacy_key, None)
+        if not ref:
+            continue
+        tool = ref.get("tool") or default_tool
+        bundle = dict(eda.get(tool) or {})
+        bundle[kind] = {
+            "lib": ref.get("lib", ""),
+            "name": ref.get("name", ""),
+            "file": ref.get("file", ""),
+        }
+        eda[tool] = bundle
+    if eda:
+        out["eda"] = eda
+    out["schema_version"] = 2
+    return out
+
+
+def _v2_to_v3(d: dict) -> dict:
+    """Split identity from DERIVED, replace `passive` with `part_class`, and wrap each bare
+    asset reference in the ref/origin/checks shape.
+
+    A v2 asset gets `origin: None` rather than a fabricated one: nothing recorded where those
+    files came from, and inventing a vendor would be exactly the false confidence this schema
+    exists to remove.
+    """
+    out = dict(d)
+    derived = dict(out.get("derived") or {})
+    for name in DERIVED_FIELDS:
+        if name in out:
+            derived.setdefault(name, out.pop(name))
+    out["derived"] = derived
+
+    # `passive: true` is the only class v2 could express; everything else was a component.
+    out["part_class"] = (
+        PartClass.PASSIVE.value if out.pop("passive", False) else DEFAULT_PART_CLASS.value
+    )
+
+    eda = out.pop("eda", None) or {}
+    assets: dict = {}
+    for tool, bundle in eda.items():
+        slots: dict = {}
+        for kind, ref in (bundle or {}).items():
+            if not ref:
+                continue
+            slots[kind] = {
+                "ref": {
+                    "lib": ref.get("lib", ""),
+                    "name": ref.get("name", ""),
+                    "file": ref.get("file", ""),
+                }
+            }
+        if slots:
+            assets[tool] = slots
+    if assets:
+        out["assets"] = assets
+    out["schema_version"] = 3
+    return out
+
+
+# version present -> the step that upgrades it to the next one. A version with no entry is
+# REFUSED rather than restamped.
+_MIGRATIONS = {1: _v1_to_v2, 2: _v2_to_v3}
+
+
+def migrate_record(d: dict) -> dict:
+    """Upgrade a record dict to `SCHEMA_VERSION`, one real step at a time.
+
+    Pure: the caller's dict is never mutated. A record from the FUTURE is returned untouched
+    and keeps its own version - downgrading the stamp would tell the next reader that a record
+    still holding material we never understood is fully understood at our version.
+
+    Raises `UnmigratableRecord` for a version we have no step for. That refusal is the point:
+    the previous implementation did `max(SCHEMA_VERSION, ...)` and relabelled instead.
+    """
+    version = record_version(d)
+    if version >= SCHEMA_VERSION:
+        return dict(d)
+    out = dict(d)
+    while version < SCHEMA_VERSION:
+        step = _MIGRATIONS.get(version)
+        if step is None:
+            raise UnmigratableRecord(
+                f"no migration from schema version {version} to {SCHEMA_VERSION} "
+                f"(record id {d.get('id')!r})"
+            )
+        out = step(out)
+        moved = record_version(out)
+        if moved <= version:
+            raise UnmigratableRecord(
+                f"migration from schema version {version} did not advance the record"
+            )
+        version = moved
+    return out
+
+
+# Every top-level key the v3 shape defines. Anything outside this set is a field from a newer
+# build and is preserved verbatim in `PartRecord.extra`. Legacy keys are absent on purpose:
+# `migrate_record` CONSUMES them before this set is consulted, so a migrated record can never
+# carry two contradictory copies of its assets.
+_KNOWN_KEYS: frozenset[str] = frozenset(
+    {
+        "schema_version",
+        "id",
+        "mpn",
+        "manufacturer",
+        "part_class",
+        "requires_override",
+        "derived",
+        "sources",
+        "assets",
+        "tags",
+        "datasheet",
+        "purchase",
+        "provenance",
+        "hashes",
+        "enrichment",
+        "alternates",
+    }
+)
+
+
 @dataclass
 class PartRecord:
+    # ---- identity. Never rewritten by a re-derive; only a human or an explicit re-classify
+    # changes any of these.
     id: str
-    display_name: str
-    category: str
+    # ---- DERIVED. Recomputable from `sourced/`; grouped under "derived" on disk. Keep this
+    # list in step with `DERIVED_FIELDS` - `test_part_record_v3` fails if they drift.
+    display_name: str = ""
+    category: str = ""
     description: str = ""
-    tags: list[str] = field(default_factory=list)
+    # The component Value shown on a schematic + in a BOM (e.g. "10k" for a passive; the MPN
+    # for an active). Mirrored to the symbol's Value property so a placed part is
+    # self-describing.
+    value: str = ""
+    # Normalized spec keys and values. A free-form value bag keyed by spec name
+    # (specs["pinout"] is a list of {"pin", "name"} dicts); per-key provenance lives in
+    # `enrichment`, and every value a source offered and lost with lives in `alternates`.
+    # NOT a completion-gate field: a part without a pinout is still complete.
+    specs: dict = field(default_factory=dict)
+    derived_at: str = ""
+    derived_by: str = ""
+    # Keys a newer build wrote INSIDE the derived block. Held here rather than in `extra` so a
+    # re-derive replaces them with the block they belong to instead of stranding them at the
+    # top level, where they would outlive the values they describe.
+    derived_extra: dict = field(default_factory=dict)
+    # ---- identity, continued
     mpn: str = ""
     manufacturer: str = ""
-    # The component Value shown on a schematic + in a BOM (e.g. "10k", "1µF" for a
-    # passive; the MPN for an active). Mirrored to the symbol's Value property so a
-    # placed part is self-describing. Derived on rebuild (ingest/component_naming).
-    value: str = ""
-    # A passive (R/C/L) references KiCad STOCK symbol/footprint/3D by lib_id rather
-    # than owning copied asset files (the generic package is already in KiCad). The
-    # completion gate is relaxed accordingly: a passive needs no owned 3D model, and
-    # its symbol/footprint are satisfied by the stock lib_ids (spec: drop-in passives).
-    passive: bool = False
+    # What this part IS, which decides what files it needs (model/part_class.py). Replaces the
+    # two-valued `passive` flag, which had no home for the M3 mounting holes or the
+    # button-integral ring LED already in the owner's register.
+    part_class: PartClass = DEFAULT_PART_CLASS
+    # The per-part escape hatch, so one odd part never forces a new class. None means "use the
+    # class default"; an override with empty `needs` means "this part needs nothing", and the
+    # two are deliberately different.
+    requires_override: RequirementOverride | None = None
+    # ---- evidence INDEX. The payloads live in `sourced/<id>/<source>.json`, never here.
+    sources: dict[str, SourceEntry] = field(default_factory=dict)
+    # ---- the CAD assets, one symmetric bundle per EDA tool, keyed by the tool key in
+    # `stockroom.eda.registry` ("kicad", "altium", ...). Every registered tool always has an
+    # entry (see __post_init__), so `record.assets_for(tool).symbol = ref` is always a live
+    # write; empty bundles are dropped on serialization so the JSON stays minimal.
+    assets: dict[str, EdaAssets] = field(default_factory=dict)
+    # ---- curated / vendor data that is neither identity nor recomputed from `sourced/`
+    tags: list[str] = field(default_factory=list)
     datasheet: Datasheet | None = None
     purchase: list[Purchase] = field(default_factory=list)
-    # The CAD assets, one symmetric bundle per EDA tool, keyed by the tool key in
-    # `stockroom.eda.registry` ("kicad", "altium", ...). Every registered tool always has an
-    # entry (see __post_init__), so `record.eda[tool].symbol = ref` is always a live write;
-    # empty bundles are dropped on serialization so the JSON stays minimal.
-    eda: dict[str, EdaAssets] = field(default_factory=dict)
     provenance: Provenance | None = None
     hashes: Hashes | None = None
     enrichment: dict[str, EnrichmentField] = field(default_factory=dict)
-    # Canonical, high-confidence spec data persisted from enrichment (e.g. the
-    # pinout extracted from the datasheet) so a viewer reads the source of truth,
-    # not a transient enrich call. A free-form value bag keyed by spec name
-    # (specs["pinout"] is a list of {"pin", "name"} dicts); per-key provenance
-    # lives in `enrichment`. NOT a completion-gate field (spec section 6): a part
-    # without a pinout is still complete.
-    specs: dict = field(default_factory=dict)
-    # Every value a source offered for a field that it did NOT win, with its origin (Batch 3,
-    # punch 2/9). The winning value stays in its own slot (`description`, `specs[key]`, ...) and
-    # is repeated as the FIRST entry here, so a reader always sees which answer is in force
-    # beside the ones set aside, and the user can swap between two distributors' descriptions.
-    #
-    # The key space is shared with `enrichment`, which is the convention already shipped: a
-    # canonical field name in lower_snake ("description", "package", "tariff_rate") or a spec
-    # label exactly as stored ("Package", "HTS Code (US)"). Empty for a part whose sources never
-    # disagreed, and then omitted from the JSON entirely - a part must not gain a key just
-    # because this feature exists.
+    # Every value a source offered for a field that it did NOT win, with its origin. The
+    # winning value stays in its own slot and is repeated as the FIRST entry here, so a reader
+    # always sees which answer is in force beside the ones set aside. The key space is shared
+    # with `enrichment`. Omitted from the JSON entirely when empty - a part must not gain a key
+    # just because this feature exists.
     alternates: dict[str, list[SourcedValue]] = field(default_factory=dict)
     # The schema version this record was WRITTEN at. A record read from disk keeps its own
-    # value (never downgraded to ours), so a build that does not fully understand a newer
-    # record cannot claim otherwise to the next reader. See SCHEMA_VERSION.
+    # value (never downgraded to ours, never RAISED to ours without a real migration), so a
+    # build that does not fully understand a newer record cannot claim otherwise to the next
+    # reader. See SCHEMA_VERSION and migrate_record.
     schema_version: int = SCHEMA_VERSION
     # Top-level keys this build does not recognise, kept verbatim and re-emitted on write.
     # Without this, an older Stockroom editing one field on a newer peer's part would DELETE
@@ -383,22 +453,74 @@ class PartRecord:
     # Not part of the public shape: never read from here, only preserved through it.
     extra: dict = field(default_factory=dict)
 
-    def is_future_schema(self) -> bool:
-        """True when this record was written by a build newer than ours. It is still loaded
-        and still round-trips losslessly (see `extra`), but a caller that is about to REWRITE
-        its structure should say so rather than assume it understood everything."""
-        return self.schema_version > SCHEMA_VERSION
-
     def __post_init__(self) -> None:
-        # Canonicalize spec keys/values on construction (covers from_dict + direct
-        # build). A later direct mutation of self.specs (as the enrich pipeline does)
-        # is re-cleaned by to_dict, so persisted + served data is always clean.
+        # An unknown part_class is LOUD, never guessed: it decides which files a part needs, so
+        # a wrong guess either demands the impossible or excuses a real gap, invisibly.
+        self.part_class = parse_part_class(self.part_class)
+        # Canonicalize spec keys/values on construction (covers from_dict + direct build). A
+        # later direct mutation of self.specs is re-cleaned by to_dict, so persisted + served
+        # data is always clean. Normalizing DERIVED specs is legitimate precisely because the
+        # raw value the source returned now survives in `sourced/`.
         self.specs = normalize_specs(self.specs)
         # Every registered tool always has a live bundle, so `assets_for(tool).symbol = ref`
-        # can never write into a throwaway object that is silently discarded. Bundles for
-        # tools this build does not know (written by a newer peer) are left untouched.
+        # can never write into a throwaway object that is silently discarded. Bundles for tools
+        # this build does not know (written by a newer peer) are left untouched.
         for tool in all_tools():
-            self.eda.setdefault(tool.key, EdaAssets())
+            self.assets.setdefault(tool.key, EdaAssets())
+
+    # ------------------------------------------------------------- derived block
+
+    @property
+    def derived(self) -> Derived:
+        """The recomputable half of this record, as one block.
+
+        Spec keys and values are normalized on the way out as well as on construction, so a
+        spec added AFTER construction (as the enrich pipeline does) is still clean by the time
+        it reaches disk or the API.
+        """
+        block = Derived(
+            **{name: getattr(self, name) for name in DERIVED_FIELDS}, extra=dict(self.derived_extra)
+        )
+        block.specs = normalize_specs(block.specs)
+        return block
+
+    @derived.setter
+    def derived(self, block: Derived) -> None:
+        for name in DERIVED_FIELDS:
+            setattr(self, name, getattr(block, name))
+        self.derived_extra = dict(block.extra)
+        self.specs = normalize_specs(self.specs)
+
+    def clear_derived(self) -> None:
+        """Drop the whole derived block. Recomputing it must reproduce the record exactly -
+        that is what makes `derived` disposable BY CONSTRUCTION rather than by assertion, and
+        it is the acceptance test for the schema (spec section 9)."""
+        self.derived = Derived()
+
+    def stamp_derived(self, *, at: str, by: str = DERIVED_BY) -> None:
+        """Record WHEN this block was computed and by WHICH ruleset, so a library can be swept
+        for parts still carrying an older derivation."""
+        self.derived_at = at
+        self.derived_by = by
+
+    @property
+    def passive(self) -> bool:
+        """Read-only: a passive is a PART CLASS, not a flag. Kept because "is this a passive"
+        is a real question with a real answer; setting it is not, because the answer to "what
+        is it if not passive" is one of three things, not one."""
+        return self.part_class is PartClass.PASSIVE
+
+    # ------------------------------------------------------------- evidence index
+
+    def record_source(self, source: str, *, fetched_at: str, file: str = "") -> SourceEntry:
+        """Index one source's raw payload on this record. Writes NOTHING to `sourced/` - the
+        payload is stored by `model.sourced.write_payload`, and keeping the two apart is what
+        stops a re-derive from ever touching evidence."""
+        entry = SourceEntry(fetched_at=fetched_at, file=file or source_rel_path(self.id, source))
+        self.sources[source] = entry
+        return entry
+
+    # ------------------------------------------------------------- assets
 
     def assets_for(self, tool: str) -> EdaAssets:
         """The LIVE asset bundle for `tool` -- mutating it mutates the record.
@@ -407,10 +529,12 @@ class PartRecord:
         record. Never falls back to KiCad: that silent fallback is exactly what let an
         Altium attach overwrite the KiCad reference (f7d80ac).
         """
-        if tool not in self.eda:
+        if tool not in self.assets:
             get_tool(tool)  # raises with the known-tool list
-            self.eda[tool] = EdaAssets()
-        return self.eda[tool]
+            self.assets[tool] = EdaAssets()
+        return self.assets[tool]
+
+    # ------------------------------------------------------------- serialization
 
     def to_dict(self) -> dict:
         # Unknown keys first so a known key can never be shadowed by a stale preserved copy
@@ -419,24 +543,24 @@ class PartRecord:
             **self.extra,
             "schema_version": self.schema_version,
             "id": self.id,
-            "display_name": self.display_name,
-            "category": self.category,
-            "description": self.description,
-            "tags": list(self.tags),
             "mpn": self.mpn,
             "manufacturer": self.manufacturer,
-            "value": self.value,
-            "passive": self.passive,
-            "datasheet": asdict(self.datasheet) if self.datasheet else None,
-            "purchase": [asdict(p) for p in self.purchase],
+            "part_class": self.part_class.value,
+            "requires_override": (
+                self.requires_override.to_dict() if self.requires_override else None
+            ),
+            "derived": self.derived.to_dict(),
+            "sources": {k: v.to_dict() for k, v in self.sources.items()},
             # Empty bundles are omitted: a part with only KiCad assets should not carry a
             # wall of nulls for every other tool, and a one-field edit stays a one-line diff.
-            "eda": {k: a.to_dict() for k, a in self.eda.items() if not a.is_empty()},
+            "assets": {k: a.to_dict() for k, a in self.assets.items() if not a.is_empty()},
+            "tags": list(self.tags),
+            "datasheet": asdict(self.datasheet) if self.datasheet else None,
+            "purchase": [asdict(p) for p in self.purchase],
             "provenance": asdict(self.provenance) if self.provenance else None,
             "hashes": asdict(self.hashes) if self.hashes else None,
             "enrichment": {k: asdict(v) for k, v in self.enrichment.items()},
-            "specs": normalize_specs(self.specs),
-            # Omitted when empty, like `eda`: adopting this must not rewrite every part in a
+            # Omitted when empty, like `assets`: adopting this must not rewrite every part in a
             # real library to add a `{}`.
             **(
                 {"alternates": {k: [a.to_dict() for a in v] for k, v in self.alternates.items()}}
@@ -446,37 +570,41 @@ class PartRecord:
 
     @classmethod
     def from_dict(cls, d: dict) -> "PartRecord":
+        # MIGRATE, never relabel. A record older than us is upgraded field by field or refused;
+        # a record newer than us keeps its own stamp and its unknown fields (see `extra`).
+        d = migrate_record(d)
+        derived = Derived.from_dict(d.get("derived") or {})
+        override = d.get("requires_override")
         return cls(
             id=d["id"],
-            display_name=d["display_name"],
-            category=d["category"],
-            description=d.get("description", ""),
-            tags=list(d.get("tags", [])),
+            **{name: getattr(derived, name) for name in DERIVED_FIELDS},
+            derived_extra=dict(derived.extra),
             mpn=d.get("mpn", ""),
             manufacturer=d.get("manufacturer", ""),
-            value=d.get("value", ""),
-            passive=bool(d.get("passive", False)),
+            part_class=parse_part_class(d.get("part_class", DEFAULT_PART_CLASS)),
+            requires_override=(
+                RequirementOverride.from_dict(override) if isinstance(override, dict) else None
+            ),
+            sources={
+                k: SourceEntry.from_dict(v)
+                for k, v in (d.get("sources") or {}).items()
+                if isinstance(v, dict)
+            },
+            assets={
+                tool: EdaAssets.from_dict(a or {}) for tool, a in (d.get("assets") or {}).items()
+            },
+            tags=list(d.get("tags", [])),
             datasheet=Datasheet(**d["datasheet"]) if d.get("datasheet") else None,
             purchase=[Purchase(**p) for p in d.get("purchase", [])],
-            eda=_read_eda(d),
-            # A record with no version predates versioning, which is exactly schema 1. The
-            # value we carry (and re-emit) is the HIGHER of that and ours, because both
-            # directions matter: reading a v1 record UPGRADES it (we fold it into the v2
-            # shape in memory and write it that way), while reading a future record must not
-            # DOWNGRADE the stamp -- that would tell the next reader a record still holding
-            # material we never understood is fully understood at our version.
-            schema_version=max(SCHEMA_VERSION, int(d.get("schema_version", 1))),
-            extra={k: v for k, v in d.items() if k not in _KNOWN_KEYS},
             provenance=Provenance(**d["provenance"]) if d.get("provenance") else None,
             hashes=Hashes(**d["hashes"]) if d.get("hashes") else None,
-            enrichment={
-                k: EnrichmentField(**v) for k, v in d.get("enrichment", {}).items()
-            },
-            specs=dict(d.get("specs", {})),
+            enrichment={k: EnrichmentField(**v) for k, v in d.get("enrichment", {}).items()},
             alternates={
                 k: [SourcedValue.from_dict(a) for a in (v or []) if isinstance(a, dict)]
                 for k, v in (d.get("alternates") or {}).items()
             },
+            schema_version=record_version(d),
+            extra={k: v for k, v in d.items() if k not in _KNOWN_KEYS},
         )
 
     def dumps(self) -> str:
@@ -485,6 +613,14 @@ class PartRecord:
     @classmethod
     def loads(cls, text: str) -> "PartRecord":
         return cls.from_dict(json.loads(text))
+
+    def is_future_schema(self) -> bool:
+        """True when this record was written by a build newer than ours. It is still loaded
+        and still round-trips losslessly (see `extra`), but a caller that is about to REWRITE
+        its structure should say so rather than assume it understood everything."""
+        return self.schema_version > SCHEMA_VERSION
+
+    # ------------------------------------------------------------- completeness
 
     def _presence(self) -> dict[str, bool]:
         return {
@@ -504,28 +640,31 @@ class PartRecord:
         """Human labels of the required passport fields this record lacks (empty => complete)."""
         return missing_from_presence(self._presence())
 
-    def missing_assets(self, tool: str) -> list[str]:
-        """Human labels of the assets `tool` still lacks, in the tool's registered kind
-        order. Not part of completeness -- a part is complete without any assets now -- but
-        it tells the UI what can still be attached.
+    def needs(self, tool: str) -> tuple[str, ...]:
+        """The asset kinds this part should END UP holding for `tool`, from its part class and
+        any per-part override, intersected with what the tool can actually hold. There is no
+        `if passive` and no `if tool == ...` here or below: both answers are data."""
+        return needed_kinds(self.part_class, tool, self.requires_override)
 
-        A kind that can never be closed at all is skipped, because reporting an impossible
-        gap is what "CAD Incomplete forever" looked like. A kind the tool cannot take by
-        REFERENCE but can be given by EMBEDDING (Altium's 3D model, written into the
-        footprint's `.PcbLib` by Altium itself) is a genuine closable gap and IS reported;
-        hiding it is how Altium parts silently shipped with no 3D. The registry decides which
-        is which, so neither case is a branch here. A passive inherits the stock footprint's
-        own 3D model, so it needs no owned model file.
+    def capturable(self, tool: str) -> tuple[str, ...]:
+        """The asset kinds a CAPTURE session can be asked to fetch for this part from `tool`.
+        Narrower than `needs`: an Altium 3D body is a real gap that a vendor cannot close."""
+        return capturable_kinds(self.part_class, tool, self.requires_override)
+
+    def missing_assets(self, tool: str) -> list[str]:
+        """Human labels of the assets `tool` still lacks, in the tool's registered kind order.
+
+        Not part of completeness -- a part is complete without any assets now -- but it tells
+        the UI what can still be attached. Only kinds this part's CLASS actually needs are
+        reported: a passive needs nothing from any tool, a mechanical part has no symbol, and
+        reporting a gap nothing can close is what "CAD Incomplete forever" looked like.
         """
         assets = self.assets_for(tool)
-        spec = get_tool(tool)
-        out: list[str] = []
-        for kind in spec.closable_assets():
-            if kind == "model" and self.passive:
-                continue
-            if not asset_present(assets.get(kind)):
-                out.append(asset_label(kind))
-        return out
+        return [
+            asset_label(kind)
+            for kind in self.needs(tool)
+            if not asset_present(assets.get(kind))
+        ]
 
     def missing_assets_by_tool(self) -> dict[str, list[str]]:
         """`missing_assets` for every registered tool. The generic entry point the API and
@@ -536,16 +675,66 @@ class PartRecord:
         return not self.missing_fields()
 
 
-def new_part_id(parts_dir: Path, base: str) -> str:
-    """A stable, unique, never-reused id derived from `base` (an MPN or name).
+def new_part_id(parts_dir: Path, mpn: str, fallback_name: str = "") -> str:
+    """The id for a new part.
 
-    Slug of `base`; if `parts/<slug>.json` exists, suffix -2, -3, ... A base
-    that slugifies to empty falls back to 'part'."""
+    With an MPN the answer is the decided scheme (`model/part_id.py`):
+    `slug(mpn)-sha256(mpn)[:4]`, a PURE function of the MPN. `parts_dir` is not consulted,
+    because the id must not depend on what is already on disk: two calls for the same MPN
+    return the same id, so a re-import lands on the same file instead of minting `-2`, `-3`,
+    ... duplicates of one part.
+
+    `fallback_name` covers the one case the pure function cannot settle. A part with NO MPN has
+    no stable identity, so its id is slugged from whatever name it has and de-duplicated
+    against the directory - and those ids are NOT stable across a rename, which is exactly why
+    an MPN-less part is a gap to close rather than a supported shape.
+
+    The two arguments are separate on purpose: passing `mpn or display_name` in one slot would
+    hide which of the two answers a caller got, and `display_name` is a DERIVED field - an id
+    minted from it would move the moment the naming scheme changed.
+    """
+    mpn = (mpn or "").strip()
+    if mpn:
+        return make_part_id(mpn)
     parts_dir = Path(parts_dir)
-    slug = slugify(base) or "part"
+    slug = slugify(fallback_name) or "part"
     candidate = slug
     n = 1
     while (parts_dir / f"{candidate}.json").exists():
         n += 1
         candidate = f"{slug}-{n}"
     return candidate
+
+
+__all__ = [
+    "ASSET_KINDS",
+    "ASSET_LABELS",
+    "KICAD_MIRROR_FIELDS",
+    "REQUIRED_FIELDS",
+    "SCHEMA_VERSION",
+    "Asset",
+    "AssetCheck",
+    "AssetOrigin",
+    "AssetRef",
+    "Datasheet",
+    "Derived",
+    "EdaAssets",
+    "EnrichmentField",
+    "Hashes",
+    "PartClass",
+    "PartRecord",
+    "Provenance",
+    "Purchase",
+    "RequirementOverride",
+    "SourceEntry",
+    "SourcedValue",
+    "UnmigratableRecord",
+    "asset_label",
+    "asset_present",
+    "migrate_record",
+    "missing_from_presence",
+    "new_part_id",
+    "record_version",
+    "tool_assets_ready",
+    "tool_place_ready",
+]
