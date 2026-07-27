@@ -1,4 +1,107 @@
 {
+  "alternates": {
+    "Capacitance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1 nF"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "1000 pF"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "100"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±10%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 1 nF, 10%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: GCM155R71H102KA37D Multilayer Ceramic Capacitors MLCC - SMD/SMT – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 1000PF 50V X7R 0402"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +125,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "high",
+      "source": "digikey"
+    }
+  },
   "hashes": null,
   "id": "gcm155r71h102ka37d",
   "manufacturer": "muRata",
@@ -37,8 +145,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T03:58:36.293666+00:00",
+      "part_number": "81-GCM155R71H102KA7D",
       "price_breaks": [
         {
           "price": 0.003342857,
@@ -68,6 +176,40 @@
       "stock": 287849,
       "url": "https://www.mouser.com/c/?q=GCM155R71H102KA37D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T03:58:36.293666+00:00",
+      "part_number": "490-4761-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.00503,
+          "qty": 10000
+        },
+        {
+          "price": 0.00454,
+          "qty": 20000
+        },
+        {
+          "price": 0.0043,
+          "qty": 30000
+        },
+        {
+          "price": 0.00404,
+          "qty": 50000
+        },
+        {
+          "price": 0.00388,
+          "qty": 70000
+        },
+        {
+          "price": 0.00373,
+          "qty": 100000
+        }
+      ],
+      "stock": 632742,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -117,7 +259,7 @@
     "LCSC Product Name": "CAP CER 1nF 50V X7R 0402",
     "LCSC Title": "muRata GCM155R71H102KA37D",
     "LCSC Warehouse Category": "Ceramic Capacitors",
-    "Lead Time": "98 Days",
+    "Lead Time": "21",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "100",
     "Moisture Sensitivity Level": "1 (Unlimited)",
