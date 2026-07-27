@@ -97,3 +97,66 @@ def test_commit_for_an_unknown_part_is_an_honest_404(client):
     })
     assert r.status_code == 404
     assert r.json()["error"] == "FileNotFoundError"
+
+
+# ------------------------------------------------------- WHERE an asset came from, over the wire
+#
+# Owner: *"a lot of our symbols, footprints, and 3d models are broken so its not trusted where
+# we've gotten them"*. Only the guided flow knows which vendor page the person actually downloaded
+# from, so the vendor and URL cross the wire; the TIMESTAMP does not.
+
+
+def test_an_attach_records_the_vendor_the_capture_came_from(client, library_root):
+    from stockroom.model.part import PartRecord
+
+    resp = client.post(
+        "/api/library/parts/mystery/symbol",
+        json={
+            "lib": "SR-ICs", "name": "MYSTERY",
+            "origin": {"vendor": "ultralibrarian", "url": "https://ultralibrarian.com/x"},
+        },
+    )
+    assert resp.status_code == 200
+
+    rec = PartRecord.loads(
+        (library_root / "Main" / "parts" / "mystery.json").read_text(encoding="utf-8")
+    )
+    origin = rec.assets_for("kicad").symbol.origin
+    assert (origin.vendor, origin.url) == ("ultralibrarian", "https://ultralibrarian.com/x")
+    assert origin.captured_at, "the server must stamp when it was captured"
+
+
+def test_the_capture_TIMESTAMP_is_the_servers_and_not_the_callers(client, library_root):
+    """A provenance timestamp a client can set is not evidence of anything."""
+    from stockroom.model.part import PartRecord
+
+    client.post(
+        "/api/library/parts/mystery/symbol",
+        json={
+            "lib": "SR-ICs", "name": "MYSTERY",
+            "origin": {
+                "vendor": "snapmagic", "url": "https://snapeda.com/x",
+                "captured_at": "1999-01-01T00:00:00Z",
+            },
+        },
+    )
+
+    rec = PartRecord.loads(
+        (library_root / "Main" / "parts" / "mystery.json").read_text(encoding="utf-8")
+    )
+    assert not rec.assets_for("kicad").symbol.origin.captured_at.startswith("1999")
+
+
+def test_an_attach_with_no_origin_leaves_the_asset_unattributed(client, library_root):
+    """NEGATIVE CONTROL. `None` and "vendor is the empty string" are different claims, and only
+    one of them is honest about an asset nobody recorded a source for."""
+    from stockroom.model.part import PartRecord
+
+    client.post(
+        "/api/library/parts/mystery/footprint", json={"lib": "SR-ICs", "name": "MYSTERY"}
+    )
+
+    rec = PartRecord.loads(
+        (library_root / "Main" / "parts" / "mystery.json").read_text(encoding="utf-8")
+    )
+    assert rec.assets_for("kicad").footprint.origin is None

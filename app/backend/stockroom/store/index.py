@@ -280,6 +280,25 @@ class LibraryIndex:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM parts").fetchone()[0]
 
+    def assets_by_vendor(self) -> dict[str, int]:
+        """How many PRESENT assets each vendor supplied, vendor -> count.
+
+        The owner's complaint made answerable: *"its not trusted where we've gotten them"*. An
+        asset attached before anything recorded a source counts under `""` -- reported rather than
+        hidden, because "we do not know where this came from" is the single most important answer
+        this query can give and folding it into a vendor would erase it.
+
+        Counts only assets that are actually PRESENT: an empty slot has no provenance to report.
+        """
+        with self._lock:
+            return {
+                r[0]: r[1]
+                for r in self._conn.execute(
+                    "SELECT origin_vendor, COUNT(*) FROM part_assets WHERE present = 1 "
+                    "GROUP BY origin_vendor ORDER BY COUNT(*) DESC, origin_vendor"
+                )
+            }
+
     def derivation_counts(self) -> dict[str, int]:
         """How many parts each derivation ruleset produced, stamp -> count.
 
