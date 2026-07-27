@@ -15,7 +15,8 @@
 #   scripts/gates.sh quick        # typecheck + a serial-safe backend subset, for a tight loop
 #   scripts/gates.sh types        # ty (advisory: NOT a gate yet, see the punch list)
 #   scripts/gates.sh bg           # start the backend suite detached, print the log path
-#   scripts/gates.sh await        # block until the detached run finishes, print its summary line
+#   scripts/gates.sh bg all      # detach ANY scope (default: backend), not just the suite
+#   scripts/gates.sh await       # block until the detached run finishes, print its summary line
 #
 # `bg` + `await` exist because the backend suite takes ~2m and the useful thing to do meanwhile is
 # keep working. That was being hand-written every time as a nohup plus a sleep-and-grep loop, three
@@ -49,7 +50,11 @@ run() {  # run <label> <cmd...>
 # `-n auto` reads LOGICAL cores and oversubscribes 12 physical ones, and this suite is dominated by
 # git subprocess I/O rather than CPU, so more workers meant more contention, not more throughput.
 # PYTEST_WORKERS overrides; SERIAL_TESTS=1 still forces one process.
-TMPBASE="${GATES_TMPDIR:-/dev/shm/pytest-stockroom}"
+# PER-RUN, not shared. `backend()` wipes its basetemp when it finishes, so two runs sharing one
+# directory means whichever ends first deletes the other's temp files out from under it. Measured
+# 2026-07-27, the moment `bg` made concurrent runs easy: a second suite started while one was
+# running produced **1655 errors** that had nothing to do with the code. $$ is this shell's pid.
+TMPBASE="${GATES_TMPDIR:-/dev/shm/pytest-stockroom-$$}"
 backend() {
   local n=(-n "${PYTEST_WORKERS:-12}")
   [[ "${SERIAL_TESTS:-0}" == "1" ]] && n=()
@@ -103,15 +108,33 @@ case "${1:-all}" in
   lint)     run "ruff" lint ;;
   backend)  run "backend suite" backend ;;
   since)    since "${2:-HEAD}" ;;
-  bg)       mkdir -p "$(dirname "$BG_LOG")"
+  bg)       # `bg [scope]` detaches ANY scope, not just the backend. It used to hardcode `backend`,
+            # so a FULL gate run had no detached mode at all -- and the way round that was to
+            # redirect it to a file and hand-poll with an `until grep` loop, which is a step
+            # nothing verifies and which got retyped three times in one session before the
+            # repeat-detector called it. `await` reads the same log either way.
+            scope="${2:-backend}"
+            case "$scope" in
+              all|lint|backend|frontend|quick|types) ;;
+              *) echo "usage: $0 bg [all|lint|backend|frontend|quick|types]" >&2; exit 2 ;;
+            esac
+            mkdir -p "$(dirname "$BG_LOG")"
             : > "$BG_LOG"
-            # The child re-invokes THIS script's own `backend` mode from an absolute path, so there
-            # is exactly one pytest invocation to maintain and the child's $0 resolves correctly.
-            # Sourcing it with a flag instead looked tidier and was broken: in a sourced script $0 is
-            # "bash", so `cd $(dirname $0)/..` walked OUT of the repo and .venv/bin/python vanished.
-            setsid nohup "$ROOT/scripts/gates.sh" backend >>"$BG_LOG" 2>&1 &
+            # The child re-invokes THIS script from an absolute path, so there is exactly one
+            # pytest invocation to maintain and the child's $0 resolves correctly. Sourcing it with
+            # a flag instead looked tidier and was broken: in a sourced script $0 is "bash", so
+            # `cd $(dirname $0)/..` walked OUT of the repo and .venv/bin/python vanished.
+            # A COMPLETION MARKER, written by the work itself, is the terminal signal.
+            # `$!` here is SETSID's pid, and setsid forks and exits the moment it has made the
+            # child a session leader -- so `kill -0 $!` goes false within milliseconds and any
+            # await built on it returns almost immediately. Measured 2026-07-27: a `bg all`
+            # awaited that way came back green in 45s on a run that needs ~3min.
+            rm -f "$BG_LOG.done"
+            setsid nohup bash -c \
+              '"$1" "$2" >>"$3" 2>&1; echo $? > "$3.done"' _ \
+              "$ROOT/scripts/gates.sh" "$scope" "$ROOT/$BG_LOG" &
             echo $! > "$BG_LOG.pid"
-            echo "backend suite started detached; log: $BG_LOG"
+            echo "$scope started detached; log: $BG_LOG"
             echo "wait for it with: $0 await"
             exit 0 ;;
   await)    [[ -f "$BG_LOG" ]] || { echo "no detached run: $BG_LOG is absent" >&2; exit 2; }
@@ -125,28 +148,27 @@ case "${1:-all}" in
             # The check is a FACT, not a heuristic: a live pid means a real run; no live pid plus
             # an already-complete log means the log describes a PREVIOUS run and there is nothing
             # to await. Say so and exit non-zero rather than answering the wrong question.
-            if [[ "$pid" == 0 ]] || ! kill -0 "$pid" 2>/dev/null; then
-              if grep -qE '[0-9]+ (passed|failed|error)' "$BG_LOG"; then
-                echo "no detached run is in flight; $BG_LOG is a COMPLETED earlier run" >&2
-                echo "  (last written: $(date -r "$BG_LOG" '+%Y-%m-%d %H:%M:%S'))" >&2
-                echo "  start one with: $0 bg" >&2
-                exit 2
-              fi
+            # REFUSE A STALE LOG: a marker that already exists means the log describes a run
+            # that FINISHED, so there is nothing to await. Answering from it would report an old
+            # result as the current one -- measured 2026-07-27, when this printed "3037 passed"
+            # from the previous afternoon's log while a different suite was still running.
+            if [[ -f "$BG_LOG.done" ]]; then
+              echo "no detached run is in flight; $BG_LOG is a COMPLETED earlier run" >&2
+              echo "  (last written: $(date -r "$BG_LOG" '+%Y-%m-%d %H:%M:%S'))" >&2
+              echo "  start one with: $0 bg [scope]" >&2
+              exit 2
             fi
             deadline=$(( $(date +%s) + ${GATES_AWAIT_TIMEOUT:-900} ))
             while (( $(date +%s) < deadline )); do
-              # SUCCESS signal: pytest's own summary line.
-              if grep -qE '[0-9]+ (passed|failed|error)' "$BG_LOG"; then
-                grep -E '^FAILED|[0-9]+ (passed|failed|error)' "$BG_LOG" | tail -20
-                grep -qE '[0-9]+ (failed|error)' "$BG_LOG" && exit 1
-                exit 0
-              fi
-              # FAILURE signal, checked every cycle so a child that died never costs the ceiling.
-              # This is the whole point: waiting out a clock tells you only that time passed.
-              if [[ "$pid" != 0 ]] && ! kill -0 "$pid" 2>/dev/null; then
-                echo "the detached run exited without a pytest summary:" >&2
-                tail -20 "$BG_LOG" >&2
-                exit 1
+              # THE TERMINAL SIGNAL IS THE MARKER THE RUN WRITES WHEN IT EXITS, carrying its
+              # exit code. Not a line in the log: a scope that runs several gates prints an
+              # INTERMEDIATE summary partway through, and polling for one returned 0 on a `bg all`
+              # while the backend suite was still going. Not the pid either: `$!` is setsid's, and
+              # setsid exits immediately. The marker is written BY THE WORK, after the work.
+              if [[ -f "$BG_LOG.done" ]]; then
+                grep -aE '^FAILED|^PASS  |^FAIL  |All gates passed|[0-9]+ (passed|failed|error)' \
+                  "$BG_LOG" | tail -20
+                exit "$(cat "$BG_LOG.done")"
               fi
               sleep 5
             done
@@ -167,7 +189,8 @@ case "${1:-all}" in
             run "frontend tests" fe test:run
             run "backend suite" backend
             run "build" fe build ;;
-  *) echo "usage: $0 [all|lint|backend|frontend|quick|types|bg|await]" >&2; exit 2 ;;
+  *) echo "usage: $0 [all|lint|backend|frontend|quick|types|since <ref>|bg [scope]|await]" >&2
+     exit 2 ;;
 esac
 
 # The build must be the LAST thing that ran before a commit, because app/frontend-dist/ is what the

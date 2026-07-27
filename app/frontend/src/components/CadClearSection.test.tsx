@@ -139,7 +139,10 @@ it("offers nothing when there is no CAD to remove", async () => {
   renderSection();
 
   expect(await screen.findByText(/holds no CAD files/)).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Remove All CAD Files" })).toBeDisabled();
+  // ABSENT, not merely disabled: a destructive-looking control at 50% opacity still reads as
+  // available, and the sentence beside it would describe an action that cannot happen.
+  expect(screen.queryByRole("button", { name: "Remove All CAD Files" })).toBeNull();
+  expect(screen.queryByText(/Lands as one change/)).toBeNull();
 });
 
 it("names a component it could not clear instead of swallowing it", async () => {
