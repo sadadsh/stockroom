@@ -1,4 +1,119 @@
 {
+  "alternates": {
+    "Capacitance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "100 nF"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "0.1 µF"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "17"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "100"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±10%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 100 nF, 10%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: GRM155R71E104KE14D Multilayer Ceramic Capacitors MLCC - SMD/SMT – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 0.1UF 25V X7R 0402"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +137,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "grm155r71e104ke14d",
   "manufacturer": "muRata",
@@ -37,8 +157,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:00:06.105362+00:00",
+      "part_number": "81-GRM155R71E104KE4D",
       "price_breaks": [
         {
           "price": 0.0026,
@@ -65,9 +185,43 @@
           "qty": 1004000
         }
       ],
-      "stock": 307878,
+      "stock": 1787938,
       "url": "https://www.mouser.com/c/?q=GRM155R71E104KE14D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:00:06.105362+00:00",
+      "part_number": "490-10698-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.00503,
+          "qty": 10000
+        },
+        {
+          "price": 0.00454,
+          "qty": 20000
+        },
+        {
+          "price": 0.0043,
+          "qty": 30000
+        },
+        {
+          "price": 0.00404,
+          "qty": 50000
+        },
+        {
+          "price": 0.00388,
+          "qty": 70000
+        },
+        {
+          "price": 0.00373,
+          "qty": 100000
+        }
+      ],
+      "stock": 3978701,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -117,7 +271,7 @@
     "LCSC Product Name": "CAP CER 100nF 25V X7R 0402",
     "LCSC Title": "muRata GRM155R71E104KE14D",
     "LCSC Warehouse Category": "Ceramic Capacitors",
-    "Lead Time": "70 Days",
+    "Lead Time": "10 Weeks",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "100",
     "Moisture Sensitivity Level": "1 (Unlimited)",
