@@ -1,5 +1,17 @@
 {
   "alternates": {
+    "Function": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Boost"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Step-Up"
+      }
+    ],
     "HTS Code (CA)": [
       {
         "confidence": "medium",
@@ -34,6 +46,35 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8542310030"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_SOT-5X3-6_DRL_t.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6147/296%7E4223266%7EDRL%7E6.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "16"
       }
     ],
     "Minimum Order Quantity": [
@@ -46,6 +87,23 @@
         "confidence": "medium",
         "source": "mouser",
         "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "4000"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+125℃@(TJ)"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 125°C (TJ)"
       }
     ],
     "Order Multiple": [
@@ -72,6 +130,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Switching Voltage Regulators"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -82,6 +152,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
       }
     ],
     "description": [
@@ -94,6 +169,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Switching Voltage Regulators 3.7-A boost converte r with 0.5-V ultra- A 595-TPS61023DRLT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC REG BOOST ADJ 3A SOT563"
       }
     ],
     "manufacturer": [
@@ -184,6 +264,10 @@
     "Currency Type": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Current - Output": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "ECCN": {
       "confidence": "medium",
@@ -321,6 +405,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of Outputs": {
       "confidence": "medium",
       "source": "lcsc"
@@ -336,6 +428,10 @@
     "Order Multiple": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Output Configuration": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Output Current": {
       "confidence": "medium",
@@ -353,6 +449,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -360,6 +460,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -397,6 +501,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -425,9 +533,17 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Switch tube (built-in/external)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Synchronous Rectifier": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Topology": {
       "confidence": "medium",
@@ -440,6 +556,22 @@
     "Unit Weight (kg)": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Voltage - Input (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Input (Min)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Output (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Output (Min/Fixed)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Weight": {
       "confidence": "medium",
@@ -498,6 +630,74 @@
       "stock": 3329,
       "url": "https://www.lcsc.com/product-detail/C919459.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:20.544685+00:00",
+      "part_number": "595-TPS61023DRLR",
+      "price_breaks": [
+        {
+          "price": 1.21,
+          "qty": 1
+        },
+        {
+          "price": 0.879,
+          "qty": 10
+        },
+        {
+          "price": 0.796,
+          "qty": 25
+        },
+        {
+          "price": 0.703,
+          "qty": 100
+        },
+        {
+          "price": 0.659,
+          "qty": 250
+        },
+        {
+          "price": 0.632,
+          "qty": 500
+        },
+        {
+          "price": 0.604,
+          "qty": 1000
+        },
+        {
+          "price": 0.587,
+          "qty": 2000
+        },
+        {
+          "price": 0.573,
+          "qty": 4000
+        }
+      ],
+      "stock": 12248,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:20.544685+00:00",
+      "part_number": "296-TPS61023DRLRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.57775,
+          "qty": 4000
+        },
+        {
+          "price": 0.56556,
+          "qty": 8000
+        },
+        {
+          "price": 0.55946,
+          "qty": 12000
+        }
+      ],
+      "stock": 23863,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -511,6 +711,7 @@
     "Country of Origin": "United States",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Current - Output": "3A",
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/12ec04a02cb54b98af05fc74f16c8bc5.svg?t=1744220071",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/18ca651bb59148e5ba9f416596dc3e39.svg?t=1744220071",
@@ -545,16 +746,21 @@
     "Lead Time": "112 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "5",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
     "Number of Outputs": "1",
     "Operating Temperature": "-40℃~+125℃@(TJ)",
     "Operating Voltage": "500mV~5.5V",
     "Order Multiple": "5",
+    "Output Configuration": "Positive",
     "Output Current": "3A",
     "Output Type": "Adjustable",
     "Output Voltage": "2.2V~5.5V",
     "Package": "SOT-563",
+    "Package / Case": "SOT-563, SOT-666",
     "Package Quantity": "4000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "380",
     "Popular Part": "Yes",
@@ -564,6 +770,7 @@
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230130_Texas-Instruments-TPS61023DRLR_C919459_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230130_Texas-Instruments-TPS61023DRLR_C919459_blank.jpg",
     "Quiescent Current": "3uA",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "RoHS": "Yes",
     "Standard Pack Qty": "4000",
@@ -571,10 +778,16 @@
     "Stock (Domestic)": "11710",
     "Stock (Overseas)": "11710",
     "Stock (Shenzhen)": "11710",
+    "Supplier Device Package": "SOT-563",
     "Switch tube (built-in/external)": "Built-in",
+    "Synchronous Rectifier": "Yes",
     "Topology": "Boost",
     "Unit": "Piece",
     "Unit Weight (kg)": "8.30000001e-06",
+    "Voltage - Input (Max)": "5.5V",
+    "Voltage - Input (Min)": "0.5V",
+    "Voltage - Output (Max)": "5.5V",
+    "Voltage - Output (Min/Fixed)": "2.2V",
     "Weight": "0.028",
     "Weight (kg)": "2.7725e-05",
     "Weight Foreign (kg)": "0",
