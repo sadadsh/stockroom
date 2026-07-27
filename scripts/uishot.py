@@ -405,25 +405,30 @@ def _dismiss_onboarding(page, base_url: str, token: str) -> None:
     page.request.post(f"{base_url.rstrip('/')}/api/onboarding/complete",
                       headers={"Authorization": f"Bearer {token}"})
     page.reload(wait_until="networkidle")
-    page.wait_for_timeout(1500)
+    # Poll for the nav rail, which is what "onboarding is dismissed" actually LOOKS like. A fixed
+    # sleep here turned a slow machine into a false "the rail is not reachable" report several
+    # calls later, far from its cause.
+    _appears(page.locator('[data-dev-id="rail.nav-projects"]').first)
 
 
 def _register_seed(page, proj: Path) -> bool:
     """Register the seeded project through the REAL register control, then select it. Driving the app's
     own affordance (rather than posting to the API) keeps this a genuine end-to-end path."""
     page.locator('[data-dev-id="rail.nav-projects"]').first.click()
-    page.wait_for_timeout(800)
     box = page.locator('[data-dev-id="projects.register-input"]')
-    if not box.count():
+    # Each step polls for the thing the PREVIOUS step was supposed to produce. Sleep-then-count
+    # reports "the control is not there" for a control that simply had not rendered yet, which on a
+    # loaded machine is indistinguishable from the surface being broken.
+    if not _appears(box.first):
         return False
     box.first.fill(str(proj))
     page.locator('[data-dev-id="projects.register-action"]').first.click()
-    page.wait_for_timeout(2500)
     rows = page.locator('[data-dev-id="projects.row"]')
-    if not rows.count():
+    if not _appears(rows.first):
         return False
     rows.first.click()
-    page.wait_for_timeout(1500)
+    # The selected project's Health tab is the first thing that proves the row click landed.
+    _appears(page.get_by_role("tab", name="Health").first)
     return True
 
 
@@ -448,11 +453,14 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
         if not tab.count():
             return False
         tab.first.click()
-        page.wait_for_timeout(2000)
         section = page.locator(f'[data-dev-id="{_HEALTH_SECTIONS[surface]}"]')
-        if not section.count():
+        # Poll for the section itself: that is what "the Health tab opened" means here, and it
+        # returns the moment it renders instead of always paying 2s.
+        if not _appears(section.first):
             return False
         section.first.scroll_into_view_if_needed()
+        # A settle, not a detector: the scroll has already been requested and this only lets the
+        # smooth-scroll finish before the capture, so the shot is not taken mid-glide.
         page.wait_for_timeout(800)
         return True
     if surface in {"components", "part-vendor-data"}:
@@ -553,15 +561,19 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
         return True
     if surface == "search":
         page.keyboard.press("Control+k")
-        page.wait_for_timeout(1200)
-        return page.locator('[data-dev-id="search.root"]').count() > 0
+        # The overlay's own root IS the success signal, so poll it rather than sleeping and then
+        # counting - the count was being taken before a slow render had finished.
+        return _appears(page.locator('[data-dev-id="search.root"]').first)
     if surface in {"projects", "settings"}:
         nav = page.locator(f'[data-dev-id="rail.nav-{surface}"]')
         if not nav.count():
             return False
         nav.first.click()
-        page.wait_for_timeout(1500)
-        return True
+        # Wait for the surface to actually be on screen. Returning True off a sleep meant a shot
+        # could be captured mid-navigation and still be reported as that surface.
+        return _appears(page.locator(f'[data-dev-id="{surface}.root"]').first) or _appears(
+            page.locator("main, [role=main]").first
+        )
     raise SystemExit(f"unknown surface: {surface}")
 
 
@@ -783,7 +795,9 @@ def _hover_dev_ids(page, dev_ids: list[str]) -> list[str]:
 def _close_surface(page, surface: str) -> None:
     if surface == "search":
         page.keyboard.press("Escape")
-        page.wait_for_timeout(600)
+        # Wait for the overlay to be GONE, not for a clock. `_vanishes` polls for detachment, which
+        # is what lets the next click reach whatever the overlay was covering.
+        _vanishes(page.locator('[data-dev-id="search.root"]').first)
 
 
 def run(args) -> int:
@@ -874,7 +888,10 @@ def run(args) -> int:
             page.on("requestfailed", _note_failed)
 
             page.goto(base_url, wait_until="networkidle")
-            page.wait_for_timeout(1200)
+            # The app has BOOTED once its nav rail exists. `networkidle` only says the network went
+            # quiet, which on a React shell happens before the first paint - so a fixed sleep here
+            # was the difference between shooting the app and shooting an empty root div.
+            _appears(page.locator('[data-dev-id="rail.nav-components"], main, #root > *').first)
 
             if seed_project is not None:
                 _dismiss_onboarding(page, base_url, token)
