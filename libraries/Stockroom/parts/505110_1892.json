@@ -1,0 +1,785 @@
+{
+  "alternates": {
+    "HTS Code (CA)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8536900090"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8536690020"
+      }
+    ],
+    "HTS Code (MX)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8536.90.11"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8536699999"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8536908585"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8536694040"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "8536.69.4051"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "https://www.mouser.com/images/molex/images/5051101892.36_SPL.jpg"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/1212/5051101892.jpg"
+      }
+    ],
+    "Locking Feature": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Hinged Lid"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "Flip Lock, Backlock"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "5"
+      },
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "1"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "3000"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "-40℃~+105℃"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "-40°C ~ 105°C"
+      }
+    ],
+    "Order Multiple": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "5"
+      },
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "1"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "Pitch": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "0.5mm"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "0.020\" (0.50mm)"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "FFC & FPC Connectors"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "Connectors, Interconnects"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "datasheet_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://datasheet.lcsc.com/datasheet/pdf/43c273367ba7f1495370ece6460bb1a4.pdf?productCode=C3036269"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/1187/FFC-FPC_Connectors.pdf"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Hinged Lid -40℃~+105℃ 18P 0.5mm 500mA 50V Gold Bottom Contact Surface Mount, Right Angle Phosphor bronze SMD,P=0.5mm FFC, FPC (Flat Flexible) Connector Assemblies RoHS"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "FFC & FPC Connectors 0.5 FPC ZIF BTM CONT EMBT PKG 18Ckt"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "CONN FFC BOTTOM 18POS 0.5MM R/A"
+      }
+    ],
+    "lead_time": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "91 Days"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "5"
+      }
+    ],
+    "mpn": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "5051101892"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "505110-1892"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C3036269.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/search?q=505110-1892"
+      }
+    ]
+  },
+  "category": "Connectors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "505110_1892.pdf",
+    "source_url": ""
+  },
+  "description": "Hinged Lid -40℃~+105℃ 18P 0.5mm 500mA 50V Gold Bottom Contact Surface Mount, Right Angle Phosphor bronze SMD,P=0.5mm FFC, FPC (Flat Flexible) Connector Assemblies RoHS",
+  "display_name": "Connector 1x18 0.5mm SMD",
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Connectors",
+        "name": "505110-1892"
+      },
+      "model": null,
+      "symbol": {
+        "file": "",
+        "lib": "SR-Connectors",
+        "name": "505110-1892"
+      }
+    }
+  },
+  "enrichment": {
+    "Actuator Material": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "BRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Cable End Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Connector/Contact Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Contact Finish": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Contact Material": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contact Plating": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contact Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Current Rating": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "FFC, FCB Thickness": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Features": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Flat Flex Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Height Above Board": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Housing Material": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "KRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Ladder Discount Rate": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Locking Feature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Material Flammability Rating": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Number of Contacts": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Number of Positions": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pitch": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Termination": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Voltage Rating": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage Rating (Max)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "505110_1892",
+  "manufacturer": "MOLEX",
+  "mpn": "505110-1892",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.852857143,
+          "qty": 1
+        },
+        {
+          "price": 0.832857143,
+          "qty": 10
+        },
+        {
+          "price": 0.82,
+          "qty": 30
+        },
+        {
+          "price": 0.805714286,
+          "qty": 100
+        },
+        {
+          "price": 0.805714286,
+          "qty": 102
+        },
+        {
+          "price": 0.805714286,
+          "qty": 104
+        }
+      ],
+      "stock": 181,
+      "url": "https://www.lcsc.com/product-detail/C3036269.html",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Actuator Material": "Polyamide (PA), Nylon, Glass Filled",
+    "Assembly Country of Origin": "Not available",
+    "Available On Reel": "No",
+    "BRHTS": "85366990",
+    "Brand Id": "787",
+    "Cable End Type": "Tabbed, Tapered",
+    "Catalog Id": "755",
+    "Connector/Contact Type": "Contacts, Bottom",
+    "Contact Finish": "Gold",
+    "Contact Material": "Phosphor bronze",
+    "Contact Plating": "Gold",
+    "Contact Type": "Bottom Contact",
+    "Contains Battery": "No",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Vietnam",
+    "Currency Symbol": "$",
+    "Currency Type": "USD",
+    "Current Rating": "500mA",
+    "ECCN": "EAR99",
+    "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/2334d8b3aa664100b5f2c4570a5dd398.svg?t=1747074545",
+    "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/e28e92cf2bb84816b4966a34c5a137ab.svg?t=1747074545",
+    "FFC, FCB Thickness": "0.30mm",
+    "Features": "Solder Retention, Zero Insertion Force (ZIF)",
+    "Flat Flex Type": "FFC, FPC",
+    "HTS Code (BR)": "85369010",
+    "HTS Code (CA)": "8536900090",
+    "HTS Code (CN)": "8536901100",
+    "HTS Code (EU TARIC)": "8536693000",
+    "HTS Code (IN)": "85369010",
+    "HTS Code (JP)": "853669000",
+    "HTS Code (MX)": "8536.90.11",
+    "HTS Code (TARIC)": "8536901000",
+    "HTS Code (US)": "8536908585",
+    "Has Third Party Stock": "No",
+    "Height Above Board": "0.075\" (1.90mm)",
+    "Housing Material": "Liquid Crystal Polymer (LCP), Glass Filled",
+    "Image": "https://www.mouser.com/images/molex/images/5051101892.36_SPL.jpg",
+    "Is Cable Category": "Yes",
+    "Is Foreign Display": "Yes",
+    "Is Foreign Onsale": "Yes",
+    "Is Infringement": "No",
+    "Is Mro": "No",
+    "Is Not Overstock": "No",
+    "Is Real Price": "Yes",
+    "Is Show Foreign Price": "Yes",
+    "KRHTS": "8536691000",
+    "Key Attributes": "0.5 FPC ZIF 2 CONT EMBT PKG",
+    "LCSC Category": "FFC, FPC (Flat Flexible) Connector Assemblies",
+    "LCSC Category Path": "Connectors, Interconnects > FFC, FPC (Flat Flexible) Connectors",
+    "LCSC Parent Category": "Connectors",
+    "LCSC Product ID": "3587282",
+    "LCSC Product Name": "0.5 FPC ZIF 2 CONT EMBT PKG",
+    "LCSC Title": "MOLEX 5051101892",
+    "LCSC Warehouse Category": "FFC, FPC (Flat Flexible) Connector Assemblies",
+    "Ladder Discount Rate": "1~1.00,10~1.00,30~1.00,200~0.82,400~0.82,1000~0.82,",
+    "Lead Time": "91 Days",
+    "Lifecycle": "Active",
+    "Locking Feature": "Hinged Lid",
+    "Material Flammability Rating": "UL94 V-0",
+    "Minimum Order Quantity": "5",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount, Right Angle",
+    "Number of Contacts": "18P",
+    "Number of Positions": "18",
+    "Operating Temperature": "-40℃~+105℃",
+    "Order Multiple": "5",
+    "Package": "SMD,P=0.5mm",
+    "Package Quantity": "1000",
+    "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
+    "Packaging": "Tape & Reel (TR)",
+    "Parent Catalog Id": "365",
+    "Pitch": "0.5mm",
+    "Popular Part": "No",
+    "Pre-Sale": "No",
+    "Product Category": "FFC & FPC Connectors",
+    "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20260311_MOLEX-5051101892_C3036269_front.jpg",
+    "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20260311_MOLEX-5051101892_C3036269_back.jpg",
+    "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20260311_MOLEX-5051101892_C3036269_blank.jpg",
+    "REACH": "REACH Unaffected",
+    "Reel Setup Fee": "0",
+    "RoHS": "Yes",
+    "Series": "Easy-On FD19 505110",
+    "Standard Pack Qty": "3000",
+    "Standard Package": "3000",
+    "Stock": "45",
+    "Stock (Domestic)": "45",
+    "Stock (Overseas)": "45",
+    "Stock (Shenzhen)": "45",
+    "Termination": "Solder",
+    "Unit": "Piece",
+    "Unit Weight (kg)": "0.0001694",
+    "Voltage Rating": "50V",
+    "Voltage Rating (Max)": "50V",
+    "Weight": "0.392",
+    "Weight (kg)": "0.000392",
+    "Wm Catalog Id": "755"
+  },
+  "tags": [],
+  "value": ""
+}
