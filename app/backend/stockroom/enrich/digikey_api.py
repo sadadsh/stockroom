@@ -258,6 +258,18 @@ class DigiKeyAdapter:
     def enabled(self) -> bool:
         return bool(self.client_id and self.client_secret)
 
+    def fetch_payload(self, mpn: str) -> dict | None:
+        """The RAW response body, for storing under `sourced/` verbatim. See the Mouser twin."""
+        if not self.enabled or not mpn or self._requester is None:
+            return None
+        try:
+            body = self._requester(mpn)
+        except EnrichError as exc:
+            self.last_status = status_from_error(exc)
+            return None
+        self.last_status = "ok" if body else "not_found"
+        return body if isinstance(body, dict) else None
+
     def lookup(self, mpn: str) -> EnrichmentResult:
         if not self.enabled or not mpn or self._requester is None:
             return EnrichmentResult()
