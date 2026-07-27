@@ -154,8 +154,8 @@
             },
             {
               "t": "Normalization moved from import time to derive time - HALF DONE, and the rest is BLOCKED: it now RUNS at derive time (derive/engine.py normalize_specs, mutation-proven), but REMOVING it from enrich/pipeline.py:83,87 + enrich/refresh.py:109,112 + library_ops.py:1138,1144 is only safe once the importer writes sourced/. Strip it first and raw labels land in records with NO evidence to re-derive from, which is strictly worse than today. Unblocks with the wave-2 importer.",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "Normalization now RUNS at derive time and is mutation-proven (removing normalize_specs from derive_block fails a test that asserts on the engine's own return value, not through the record - which was itself a fix, since PartRecord.derived normalizes in both its getter and setter and masked the engine entirely). The IMPORT PATH still normalizes too, and that is now HARMLESS rather than lossy: every one of the 158 records carries its raw vendor payloads under sourced/, so the pre-normalization answer survives and is re-derivable. PROVEN END TO END: a derivation bug (canonical fields being dropped) was fixed by re-deriving all 158 records from stored evidence in 0.4s with ZERO API calls, where before the split it would have needed a full ~25min quota-paced re-import. Lifecycle went from absent-on-all-158 to present-on-158."
             },
             {
               "t": "Merged to main, gate green",
@@ -763,7 +763,7 @@
       ]
     }
   ],
-  "updated": "2026-07-27 11:50 UTC",
-  "now": "158-part import DONE (imported=158, failed=0). All acceptance properties pass across all 158 real records. Next: the derived index schema (last wave-1 item), then guided capture for the 72 components still missing CAD files.",
-  "now_updated": "2026-07-27 08:15 UTC"
+  "updated": "2026-07-27 11:55 UTC",
+  "now": "Wave 1 complete except the index schema. 158 records imported + re-derived from stored evidence. Next: the derived SQLite index (per-tool assets, multiple purchase rows, incremental sync, trust), then guided capture for the 72 components still missing CAD files.",
+  "now_updated": "2026-07-27 08:40 UTC"
 }
