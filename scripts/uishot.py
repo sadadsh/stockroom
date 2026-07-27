@@ -155,6 +155,18 @@ def _api_path(url: str) -> str:
     return parts.path or url
 
 
+def _vanishes(locator, timeout_ms: int = _UI_TIMEOUT_MS) -> bool:
+    """True once `locator` is gone. The closing twin of `_appears`: dismissing a modal and then
+    clicking what it covered has to wait on the modal ACTUALLY being gone, not on a sleep."""
+    from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
+    try:
+        locator.wait_for(state="detached", timeout=timeout_ms)
+        return True
+    except PlaywrightTimeoutError:
+        return False
+
+
 def _appears(locator, timeout_ms: int = _UI_TIMEOUT_MS) -> bool:
     """True once `locator` is actually visible, polled. False if it never shows within the ceiling.
 
@@ -507,6 +519,31 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
             print(f"  part-vendor-data: these controls are not on the page: {', '.join(missing)}")
             return False
         return True
+    if surface == "ingest":
+        # Add-A-Part is a MODAL over Components, not a rail destination, so it is reached by
+        # driving the real button - the same path a user takes. Without this surface the whole
+        # add lane (and the bulk import panel inside it) could not be seen at all, and a UI you
+        # cannot see is a defect in the harness, not an excuse to ship it unlooked-at.
+        dialog = page.locator('[data-dev-id="addpart.root"]')
+        # A second theme pass runs against the SAME page, where the dialog is already open and its
+        # scrim swallows every click. Clicking the trigger again then times out for 30 s and reports
+        # a failure that is really "already there", so the open state is checked first.
+        if dialog.count():
+            return True
+        nav = page.locator('[data-dev-id="rail.nav-components"]')
+        if not nav.count():
+            return False
+        nav.first.click()
+        trigger = page.locator('[data-dev-id="components.add-parts"]')
+        if not _appears(trigger.first):
+            print("  ingest: the Add Parts button never rendered")
+            return False
+        trigger.first.click()
+        # The SUCCESS signal is the dialog itself, never a sleep.
+        if not _appears(page.locator('[data-dev-id="addpart.root"]').first):
+            print("  ingest: the Add-A-Part dialog did not open")
+            return False
+        return True
     if surface == "search":
         page.keyboard.press("Control+k")
         page.wait_for_timeout(1200)
@@ -657,6 +694,28 @@ def _park_pointer_off_rail(page) -> str | None:
     except PlaywrightTimeoutError:
         return "the rail stayed expanded over the page and would cover the components list"
     return None
+
+
+def _fill_dev_ids(page, pairs: list[str]) -> list[str]:
+    """Fill each `DEV_ID=TEXT` input, so a shot can show a surface in its WORKING state.
+
+    An empty form tells you almost nothing: a disabled primary and an enabled one are
+    indistinguishable when every control is disabled because the field is blank. Measured on the
+    bulk-import panel - its accent primary looked perfectly ready while it was disabled, which is
+    the misleading state a reviewer needs to SEE to catch.
+
+    Returns the `DEV_ID=TEXT` entries whose element was never found, never a silent skip. `\n` in
+    TEXT is a real newline, so a multi-line paste can be reproduced.
+    """
+    missing: list[str] = []
+    for pair in pairs:
+        dev_id, _, value = pair.partition("=")
+        target = page.locator(f'[data-dev-id="{dev_id}"]')
+        if not _appears(target.first):
+            missing.append(pair)
+            continue
+        target.first.fill(value.replace("\\n", "\n"))
+    return missing
 
 
 def _click_dev_ids(page, dev_ids: list[str]) -> list[str]:
@@ -842,8 +901,21 @@ def run(args) -> int:
                         print(f"  !! no such data-dev-id: {', '.join(absent)}")
                         failures.append(f"{surface}:click")
                 for theme in themes:
+                    # The theme toggle lives on the RAIL, which a modal surface covers with a
+                    # scrim - so on a modal surface the toggle is unclickable and the run died
+                    # with a 30 s timeout on the second theme. Close the modal, switch, reopen.
+                    # `_goto_surface` is idempotent and already re-drives the real button.
+                    modal = page.locator('[data-dev-id="addpart.root"]')
+                    reopen = bool(modal.count())
+                    if reopen:
+                        page.keyboard.press("Escape")
+                        _vanishes(modal.first)
                     # Through the real toggle, never by stamping the attribute: see _set_theme.
                     theme_err = _set_theme(page, theme)
+                    if reopen and not theme_err and not _goto_surface(page, surface, args.select):
+                        print(f"  !! could not reopen {surface} after the theme switch")
+                        failures.append(f"{surface}:{theme}")
+                        continue
                     if theme_err:
                         print(f"  !! {theme_err}")
                         failures.append(f"{surface}:{theme}")
@@ -855,6 +927,16 @@ def run(args) -> int:
                     # Hover LAST and per theme, unlike --click: a theme switch does not unmount
                     # anything, but moving the pointer is not sticky the way an open popover is, and
                     # the hovered state is what needs to appear in BOTH shots.
+                    # PER THEME, like --hover and unlike --click. A modal surface is closed and
+                    # reopened around the theme toggle, which UNMOUNTS the form and resets its
+                    # React state - so a fill done once before the loop was silently wiped and the
+                    # shot showed an empty field with a disabled primary. Measured: the first
+                    # --fill run produced exactly the empty state it was added to escape.
+                    if args.fill:
+                        absent = _fill_dev_ids(page, args.fill)
+                        if absent:
+                            print(f"  !! no such data-dev-id to fill: {', '.join(absent)}")
+                            failures.append(f"{surface}:fill")
                     if args.hover:
                         gone = _hover_dev_ids(page, args.hover)
                         if gone:
@@ -939,7 +1021,13 @@ def main() -> int:
     )
     ap.add_argument("--surface", default="components",
                     choices=["components", "search", "projects", "project-health", "project-hygiene",
-                             "project-library-pin", "part-vendor-data", "settings", "all"])
+                             "project-library-pin", "part-vendor-data", "ingest", "settings", "all"])
+    ap.add_argument(
+        "--fill", action="append", default=[], metavar="DEV_ID=TEXT",
+        help="type TEXT into this data-dev-id before each capture, so a form is shot in its "
+             "WORKING state rather than empty (an empty form hides whether a control is enabled). "
+             "Repeatable; use \\n for a newline. An id that does not exist is reported.",
+    )
     ap.add_argument(
         "--hover", action="append", default=[], metavar="DEV_ID",
         help="hover this data-dev-id before each capture, so a control whose label only appears on "
