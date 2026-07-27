@@ -1,4 +1,90 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/integratedsiliconsolutioninc/images/QFN_44_t.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/909/706%3B-44QFN-.8-5x5%3B-%3B-44.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "140 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "30"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2500"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "LED Lighting Driver ICs"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "LED Lighting Driver ICs 36-Channel LED Driver, QFN-44 (5.0mm x 5.0mm), T&R, selectable clock"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC LED DRIVER LINEAR 38MA 44QFN"
+      }
+    ]
+  },
   "category": "ICs",
   "datasheet": {
     "fetched_at": "",
@@ -9,6 +95,10 @@
   "display_name": "LED Lighting Driver IC",
   "eda": {},
   "enrichment": {
+    "Applications": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Assembly Country of Origin": {
       "confidence": "high",
       "source": "mouser"
@@ -21,9 +111,17 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "Current - Output / Channel": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "ECCN": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Frequency": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "HTS Code (CA)": {
       "confidence": "high",
@@ -49,17 +147,49 @@
       "confidence": "medium",
       "source": "mouser"
     },
+    "Internal Switch(s)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Lead Time": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Minimum Order Quantity": {
       "confidence": "medium",
       "source": "mouser"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number of Outputs": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Order Multiple": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "high",
@@ -69,6 +199,10 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "RoHS": {
       "confidence": "high",
       "source": "mouser"
@@ -77,9 +211,33 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Topology": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Unit Weight (kg)": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Voltage - Supply (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Supply (Min)": {
+      "confidence": "high",
+      "source": "digikey"
     }
   },
   "hashes": null,
@@ -130,28 +288,114 @@
       "stock": 33692,
       "url": "https://www.lcsc.com/category/1618.html?scene=FULL_MATCH&globalKeyword=IS31FL3236A-QFLS4-TR&s_z=n_q_IS31FL3236A-QFLS4-TR",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:06.871290+00:00",
+      "part_number": "870-I31FL3236AQFLS4T",
+      "price_breaks": [
+        {
+          "price": 1.64,
+          "qty": 1
+        },
+        {
+          "price": 1.21,
+          "qty": 10
+        },
+        {
+          "price": 1.1,
+          "qty": 25
+        },
+        {
+          "price": 0.971,
+          "qty": 100
+        },
+        {
+          "price": 0.913,
+          "qty": 250
+        },
+        {
+          "price": 0.878,
+          "qty": 500
+        },
+        {
+          "price": 0.872,
+          "qty": 1000
+        },
+        {
+          "price": 0.818,
+          "qty": 2500
+        }
+      ],
+      "stock": 33661,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:06.871290+00:00",
+      "part_number": "2521-IS31FL3236A-QFLS4-TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.81945,
+          "qty": 2500
+        },
+        {
+          "price": 0.80117,
+          "qty": 5000
+        },
+        {
+          "price": 0.79202,
+          "qty": 7500
+        },
+        {
+          "price": 0.78188,
+          "qty": 12500
+        }
+      ],
+      "stock": 14673,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
+    "Applications": "LED Lighting",
     "Assembly Country of Origin": "Not available",
     "Country of Diffusion": "Not available",
     "Country of Origin": "China",
+    "Current - Output / Channel": "38mA",
     "ECCN": "EAR99",
+    "Frequency": "3kHz, 22kHz",
     "HTS Code (CA)": "8542390000",
     "HTS Code (CN)": "8542399000",
     "HTS Code (EU TARIC)": "8542399000",
     "HTS Code (MX)": "8542399999",
     "HTS Code (US)": "8542390090",
     "Image": "https://www.mouser.com/images/integratedsiliconsolutioninc/images/QFN_44_t.jpg",
+    "Internal Switch(s)": "No",
     "Lead Time": "140 Days",
+    "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "3 (168 Hours)",
+    "Mounting Type": "Surface Mount",
+    "Number of Outputs": "36",
+    "Operating Temperature": "-40°C ~ 125°C (TA)",
     "Order Multiple": "1",
+    "Package / Case": "44-PowerWFQFN",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Reel, Cut Tape, MouseReel",
     "Product Category": "LED Lighting Driver ICs",
+    "REACH": "REACH Unaffected",
     "RoHS": "RoHS Compliant",
     "Standard Pack Qty": "2500",
-    "Unit Weight (kg)": "0.0014305"
+    "Standard Package": "2500",
+    "Supplier Device Package": "44-QFN (5x5)",
+    "Topology": "Constant Current",
+    "Type": "Linear",
+    "Unit Weight (kg)": "0.0014305",
+    "Voltage - Supply (Max)": "5.5V",
+    "Voltage - Supply (Min)": "2.7V"
   },
   "tags": [],
   "value": ""
