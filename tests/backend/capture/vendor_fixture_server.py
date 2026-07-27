@@ -78,6 +78,18 @@ _FOOTPRINT = """(footprint "RVZ0014A" (version 20211014) (generator stockroom_te
 # A real STEP header, so a classifier or reader that sniffs content sees a plausible model.
 _STEP = "ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((''),'2;1');\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n"
 
+# A P-CAD ASCII library shaped like the real one: ACCEL_ASCII header, one symbolDef (the schematic
+# symbol) and one patternDef (the PCB footprint), so ONE file satisfies BOTH Altium requirements.
+# This is what Ultra Librarian's PCAD row actually delivers - see UltraLibrarianAdapter.
+_LIA = """ACCEL_ASCII "TEST.LIA"
+(asciiHeader (asciiVersion 3 0))
+(library (libraryName "TPD6E05U06RVZR")
+  (symbolDef "TPD6E05U06RVZR" (pin (pinNum 1)))
+  (patternDef "RVZ0014A" (pad (padNum 1)))
+  (compDef "TPD6E05U06RVZR")
+)
+"""
+
 
 def _kicad_altium_zip() -> bytes:
     """A bundle shaped like a real two-format export: KiCad symbol + footprint + STEP, and the
@@ -87,8 +99,12 @@ def _kicad_altium_zip() -> bytes:
         zf.writestr("TPD6E05U06RVZR.kicad_sym", _SYMBOL_LIB)
         zf.writestr("footprints.pretty/RVZ0014A.kicad_mod", _FOOTPRINT)
         zf.writestr("RVZ0014A.stp", _STEP)
-        zf.writestr("TPD6E05U06RVZR.SchLib", "altium-symbol")
-        zf.writestr("TPD6E05U06RVZR.PcbLib", "altium-footprint")
+        # What Ultra Librarian ACTUALLY delivers for Altium: a P-CAD ASCII library nested under
+        # AltiumV15/, carrying the symbol AND the footprint in one file. NOT .SchLib/.PcbLib - the
+        # fixture claimed those for a while, and no vendor this app drives produces them that way,
+        # so the fixture was testing a shape that does not exist.
+        zf.writestr("AltiumV15/2026-07-27_20-52-11.lia", _LIA)
+        zf.writestr("AltiumV15/ImportGuide.html", "<html></html>")
     return buffer.getvalue()
 
 
@@ -115,7 +131,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         so a test can tell 'both formats were selected' from 'only one was'."""
         length = int(self.headers.get("Content-Length") or 0)
         payload = self.rfile.read(length).decode("utf-8", "replace") if length else ""
-        wants_altium = "AltiumDesigner" in payload or "exports=0" in payload
+        # `2` is #AltiumPCADV15's value on the real panel - the PCAD row, the one that yields a
+        # .lia. `0` is the script row, which ships no libraries and must NOT count as Altium.
+        wants_altium = "AltiumPCAD" in payload or "exports=2" in payload
         blob = _kicad_altium_zip() if wants_altium else _kicad_only_zip()
         self._send(blob, "application/octet-stream", attachment="TPD6E05U06RVZR.zip")
 

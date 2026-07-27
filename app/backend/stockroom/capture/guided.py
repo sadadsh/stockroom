@@ -31,6 +31,7 @@ exactly as it was, because a capture that fabricates a partial answer is worse t
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,8 +43,40 @@ from stockroom.model.asset import AssetOrigin
 
 # How long to wait for the vendor's file after the adapter submits. Generous because a heavy part's
 # export genuinely generates server-side for tens of seconds (measured live on DigiKey, 2026-07-23),
-# and this is a BACKSTOP: the wait ends the instant the download event arrives.
+# and this is a BACKSTOP: the wait ends the instant the file appears in the saved list.
 _DOWNLOAD_TIMEOUT_MS = 120_000
+
+
+def _wait_for_capture(browser, page, before: int, timeout_s: float, gap: float = 0.25) -> bool:
+    """True once a NEW file has actually been SAVED. Polls the saved list, not the event.
+
+    The saved list is the observation; the download event is only a promise. See the call site for
+    the race this exists to avoid.
+
+    IT MUST SLEEP THROUGH THE PAGE, NOT THROUGH `time.sleep`. Playwright's SYNC api uses greenlet to
+    switch between the caller's synchronous code and its async internals, and that switch only
+    happens inside a Playwright call. A bare `time.sleep()` blocks the whole THREAD, so incoming
+    browser messages sit unread in the socket buffer: `on("download")` is never invoked, `captured`
+    can never grow, and the wait burns its full timeout on a download that completed immediately.
+    `page.wait_for_timeout` IS a Playwright call, so it yields to that loop.
+
+    Playwright's own docs say the same thing and are the reason this is stated as mechanism rather
+    than as a guess - they recommend `wait_for_timeout` over the time module "because internally
+    Playwright relies on asynchronous operations and when using time.sleep() they can't get
+    processed correctly" (playwright.dev/python/docs/api/class-page, `wait_for_timeout`).
+
+    Measured 2026-07-27: with `time.sleep` the localhost end-to-end tests passed (their download was
+    already dispatched during `drive`) while the API-driven capture failed every time at the full
+    120 s backstop with nothing attached - the same symptom as the event race this function replaced,
+    from the opposite cause.
+    """
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if len(browser.captured) > before:
+            return True
+        page.wait_for_timeout(gap * 1000)
+    # One last look: a file that landed inside the final gap still counts.
+    return len(browser.captured) > before
 
 
 @dataclass
@@ -69,9 +102,11 @@ class GuidedCaptureSource:
     def provides(self) -> frozenset:
         """What this source can actually deliver, derived from the ADAPTER's measured pins.
 
-        Never a hardcoded set: Ultra Librarian supplies KiCad symbol/footprint and a STEP but NOT
-        Altium files (its Altium export is a script), and the engine must not schedule a part for
-        a source that cannot help it.
+        Never a hardcoded set, and never keyed on a tool NAME: the honest answer to "what can you
+        really fetch" is which export controls the adapter has measured AND this app can then
+        STORE - which is what `version_pins` records. A vendor that pins none of a part's needs is
+        never scheduled for it, so a pin that cannot be attached would make the engine chase a
+        requirement forever (see UltraLibrarianAdapter on why altium is not pinned yet).
         """
         adapter = get_adapter(self._vendor_key)
         if adapter is None:
@@ -94,6 +129,7 @@ class GuidedCaptureSource:
         download_root: Path,
         profile_dir: Path | None = None,
         headless: bool = False,
+        engine: str = "chromium",
         run_write=None,
         now_iso=None,
     ) -> None:
@@ -102,6 +138,7 @@ class GuidedCaptureSource:
         self._download_root = Path(download_root)
         self._profile_dir = profile_dir
         self._headless = headless
+        self._engine = engine
         self._run_write = run_write or (lambda fn: fn())
         self._now_iso = now_iso
         self._session: _Session | None = None
@@ -117,6 +154,7 @@ class GuidedCaptureSource:
         if self._session is not None:
             return self._session
         browser = PlaywrightCaptureBrowser(
+            engine=self._engine,
             download_dir=self._download_root,
             profile_dir=self._profile_dir,
             headless=self._headless,
@@ -173,9 +211,25 @@ class GuidedCaptureSource:
             report = adapter.drive(session.page, formats)
             if not report.submitted:
                 return SourceOutcome(skipped=report.message or "the vendor offered no download")
-            # Wait on the FILE, never on a clock: this returns the moment the download event
-            # fires, and the timeout is only a backstop for a vendor that never answers.
-            session.page.wait_for_event("download", timeout=_DOWNLOAD_TIMEOUT_MS)
+            # Wait for the FILE TO BE SAVED, not for the download EVENT.
+            #
+            # `wait_for_event("download")` RACES the `on("download")` handler the browser session
+            # registers up front. Whichever listener is active when the event fires consumes it, so
+            # a download that completes quickly is taken by the handler and the wait then runs to
+            # its full timeout - reporting a failure for a file that is already on disk. Measured
+            # 2026-07-27: this timed out at 60s on a download that had landed correctly, which was
+            # briefly and wrongly read as "Camoufox cannot download".
+            #
+            # `browser.captured` grows only AFTER `save_as` returns, so polling it observes the file
+            # genuinely existing. The timeout stays a backstop for a vendor that never answers,
+            # never the thing that decides success.
+            if not _wait_for_capture(
+                session.browser, session.page, before, _DOWNLOAD_TIMEOUT_MS / 1000.0
+            ):
+                return SourceOutcome(
+                    error=f"{adapter.capability.label} did not deliver a file within "
+                    f"{_DOWNLOAD_TIMEOUT_MS // 1000}s"
+                )
         except Exception as exc:  # noqa: BLE001 - one part's failure is a row, not a crash
             return SourceOutcome(error=f"{adapter.capability.label}: {exc}")
 

@@ -62,6 +62,11 @@ def headless(monkeypatch):
 
     def patched(ctx, **kwargs):
         kwargs["headless"] = True
+        # ...and the FAST engine. Production asks for camoufox because that is what clears real
+        # vendors' bot walls; these tests drive a LOCALHOST fixture with no bot protection, where
+        # stealth buys nothing and costs ~15x. Without this pin, adding the camoufox default to
+        # run_guided_capture would silently launch a full Firefox from the API suite.
+        kwargs["engine"] = "chromium"
         return original(ctx, **kwargs)
 
     monkeypatch.setattr(runner, "run_guided_capture", patched)
@@ -101,7 +106,9 @@ def test_the_route_exposes_only_vendors_that_have_an_implementation(client):
     ul = next(v for v in body["vendors"] if v["key"] == "ultralibrarian")
     # measured: UL's own site gives both formats in ONE export
     assert ul["one_download_for_all_formats"] is True
-    assert set(ul["tools"]) == {"kicad"}  # UL ships a SCRIPT for Altium, not library files
+    # UL's PCAD row really does serve Altium a `.lia`, but nothing downstream can ATTACH one yet
+    # (see UltraLibrarianAdapter's comment), so the capability must not claim it.
+    assert set(ul["tools"]) == {"kicad"}
 
 
 def test_capture_needs_a_token(anon_client):

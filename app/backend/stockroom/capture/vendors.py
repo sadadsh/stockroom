@@ -122,24 +122,45 @@ class UltraLibrarianAdapter:
     capability = VendorCapability(
         key="ultralibrarian",
         label="Ultra Librarian",
-        # NOT "altium" YET, and the reason is narrower than it first looked.
+        # Altium IS supplied - through the PCAD row, NOT the script row.
         #
-        # OWNER, 2026-07-27: *"in ul when u download the altium pcad files it gives u a lia"* - and
-        # a `.LIA` is a P-CAD ASCII library, which Altium Designer IMPORTS directly. So Ultra
-        # Librarian very likely CAN supply Altium-usable libraries after all, via the
-        # `#AltiumPCADv14` / `#AltiumPCADV15` rows rather than the script row. That is recorded as
-        # the next thing to verify, NOT assumed: an attempt to download it headlessly failed when
-        # the UL session expired mid-run, so nobody has yet opened a PCAD export and confirmed a
-        # `.LIA` is inside. Until someone has, claiming altium here would repeat the exact mistake
-        # this comment replaced.
+        # The Altium accordion holds THREE rows and they are not interchangeable. From the real
+        # export panel captured at tests/backend/host/fixtures/ul-export-panel.html:
+        #     #AltiumDesigner  value=0  "Altium Designer (script based)"
+        #     #AltiumPCADv14   value=1  "PCAD v14"
+        #     #AltiumPCADV15   value=2  "PCAD v15"
+        # The script row ships `AltiumDesigner/UL_Import.pas` + a `.PrjScr` - a Delphi script that
+        # builds the libraries INSIDE Altium - and no library files at all. The PCAD rows ship
+        # `AltiumV15/<stamp>.lia`, a P-CAD ASCII library Altium imports directly, carrying one
+        # symbolDef AND one patternDef, so ONE file satisfies altium_symbol and altium_footprint
+        # together (see capture/classify.py and its tests).
         #
-        # What IS verified: the "Altium Designer (script based)" row
-        # and the delivered zip contains `AltiumDesigner/UL_Import.pas` + a `.PrjScr` - a Delphi
-        # script that builds the libraries INSIDE Altium - and no `.SchLib`/`.PcbLib` at all
-        # (inspected on a real download, 2026-07-27). So it cannot satisfy `altium_symbol` /
-        # `altium_footprint` as FILES, and claiming it can made the engine report a success that
-        # attached nothing. Running that script through the existing Altium driver is a real
-        # future capability; until it exists, this says the true thing.
+        # THE VENDOR CAN SUPPLY IT; THIS APP CANNOT YET STORE IT. Both halves matter, so read on
+        # before flipping this to ("kicad", "altium") - that flip was tried on 2026-07-27 and is
+        # what this comment exists to stop being retried blind.
+        #
+        # What is TRUE about the vendor: measuring only the script row and concluding "Ultra
+        # Librarian cannot supply Altium" was WRONG, an over-generalisation from one row of three.
+        # Owner, 2026-07-27: *"in ul when u download the altium pcad files it gives u a lia"*.
+        # Ticking #AltiumPCADV15 really does deliver `AltiumV15/<stamp>.lia`, and
+        # `capture/classify.py` correctly reads a P-CAD ASCII library as BOTH Altium assets. That
+        # much is verified end to end against the fixture.
+        #
+        # WHY THE CAPABILITY STILL SAYS ("kicad",): `version_pins` is what `GuidedCaptureSource.
+        # provides()` derives from, so adding "altium" here makes the engine SCHEDULE parts for
+        # altium_symbol/altium_footprint - and nothing downstream can satisfy them:
+        #   * `capture/guided.py::_attach` only ever offers the three KiCad requirements;
+        #   * `ingest/staging.py::StagingCandidate` carries no Altium field at all;
+        #   * `library_ops.attach_altium_assets` -> `altium/extract.py::normalize_altium_source`
+        #     accepts .SchLib/.PcbLib/.IntLib and raises ValueError on anything else, so a `.lia`
+        #     is refused outright.
+        # The result would be a part requested, downloaded and then never satisfied: a run that
+        # reports progress forever, which is precisely the "success that attached nothing" this
+        # file already got burned by once.
+        #
+        # DONE LOOKS LIKE: a `.lia` reaching the record's altium bundle, which needs a decision on
+        # HOW (Altium itself imports P-CAD, so converting outside it is the hard part). Logged in
+        # the punch list rather than half-wired here.
         tools=("kicad",),
         formats_exclusive=False,
         aggregator=False,
@@ -147,6 +168,8 @@ class UltraLibrarianAdapter:
         instruction="Pick the part, then Download Now. Symbol, footprint and 3D come together.",
         # measured element ids on the export panel. `model` is separate from `kicad`: the STEP
         # sits behind its own "3D CAD Model" accordion and is missed entirely if not ticked.
+        # When altium IS wired, its pin must be "AltiumPCADV15" (the PCAD row) and never
+        # "AltiumDesigner" (the script row, which ships UL_Import.pas and no libraries).
         version_pins={"kicad": "KiCADv6", "model": "MfrThreeDModel"},
     )
 
@@ -270,16 +293,36 @@ def _click_accordion(page, label: str) -> bool:
 
 
 def _check_box(page, selector: str) -> bool:
-    """Tick a checkbox and READ ITS STATE BACK.
+    """Tick a checkbox and READ ITS STATE BACK, with a real fallback when the first way fails.
 
     Never trusts the click: a handler can refuse it, a collapsed panel can swallow it. The same
     verify-after-click lesson the DigiKey driver learned the expensive way.
+
+    THE FALLBACK IS NOT DEFENSIVE PADDING - it is load-bearing. Ultra Librarian's export options are
+    Bootstrap `custom-control-input`s: the real input is visually replaced by a styled label, and
+    Playwright's `check()` raises "Clicking the checkbox did not change its state" on them even with
+    force. A direct `.click()` in page context does toggle them. Measured 2026-07-27: the KiCad and
+    3D rows happened to accept `check()` and `#AltiumPCADV15` did not - so relying on one mechanism
+    silently lost Altium while appearing to work for everything else. That is the worst shape of
+    failure here, because the run still reports success for the formats that did tick.
+
+    Either way the RETURN is the state read back off the element, so a miss is reported honestly.
     """
     box = page.locator(selector).first
     if box.count() == 0:
         return False
     if not box.is_checked():
-        box.check(force=True)
+        try:
+            box.check(force=True, timeout=5_000)
+        except Exception:  # noqa: BLE001 - a styled control refuses the synthetic check; try JS
+            pass
+    if not box.is_checked():
+        try:
+            page.evaluate(
+                "sel => { const el = document.querySelector(sel); if (el) el.click(); }", selector
+            )
+        except Exception:  # noqa: BLE001 - report the honest miss rather than raising
+            pass
     return box.is_checked()
 
 
