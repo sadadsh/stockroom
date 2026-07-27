@@ -1,0 +1,158 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://datasheet.lcsc.com/datasheet/pdf/b426be3ce22c6de3e0c3a2248e49159e.pdf?productCode=C137976"
+  },
+  "description": "Resistor, 470 kOhm, 1%, 0402",
+  "display_name": "470 kOhm 1% 0402 Resistor",
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "Resistor_SMD",
+        "name": "R_0402_1005Metric"
+      },
+      "model": null,
+      "symbol": {
+        "file": "",
+        "lib": "Device",
+        "name": "R"
+      }
+    }
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "rc0402fr_07470kl",
+  "manufacturer": "Yageo",
+  "mpn": "RC0402FR-07470KL",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=RC0402FR-07470KL"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.0006,
+          "qty": 20
+        },
+        {
+          "price": 0.000457143,
+          "qty": 20000
+        },
+        {
+          "price": 0.000385714,
+          "qty": 60000
+        },
+        {
+          "price": 0.000357143,
+          "qty": 200000
+        },
+        {
+          "price": 0.000285714,
+          "qty": 1000000
+        },
+        {
+          "price": 0.000285714,
+          "qty": 1004000
+        }
+      ],
+      "stock": 109806,
+      "url": "https://www.mouser.com/c/?q=RC0402FR-07470KL",
+      "vendor": "Mouser"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "3D Model": "Resistor_SMD.3dshapes/R_0402_1005Metric.wrl",
+    "Assembly Country of Origin": "Not available",
+    "Available On Reel": "Yes",
+    "BRHTS": "85332120",
+    "Brand Id": "396",
+    "Catalog Id": "1199",
+    "Contains Battery": "No",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "Currency Symbol": "$",
+    "Currency Type": "USD",
+    "ECCN": "EAR99",
+    "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/fafd024f554e426eb74cf4a204aa88b0.svg?t=1732100504",
+    "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/212349ed53274d20b34027a2925f2a2a.svg?t=1732100504",
+    "Footprint": "Resistor_SMD:R_0402_1005Metric",
+    "HTS Code (BR)": "85332110",
+    "HTS Code (CA)": "8533210000",
+    "HTS Code (CN)": "8533211000",
+    "HTS Code (EU TARIC)": "8533210000",
+    "HTS Code (IN)": "85332111",
+    "HTS Code (JP)": "853321000",
+    "HTS Code (MX)": "8533.21.01",
+    "HTS Code (TARIC)": "8533210000",
+    "HTS Code (US)": "8533210020",
+    "Has Third Party Stock": "No",
+    "Image": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg",
+    "Is Asian Brand": "Yes",
+    "Is Cable Category": "No",
+    "Is Foreign Display": "Yes",
+    "Is Foreign Onsale": "Yes",
+    "Is Infringement": "No",
+    "Is Mro": "No",
+    "Is Not Overstock": "No",
+    "Is Real Price": "Yes",
+    "Is Show Foreign Price": "Yes",
+    "KRHTS": "8533219000",
+    "Key Attributes": "RES 470kΩ ±1% 62.5mW 0402",
+    "LCSC Category": "Chip Resistor - Surface Mount",
+    "LCSC Category Path": "Passives > Resistors",
+    "LCSC Parent Category": "Resistors",
+    "LCSC Product ID": "149292",
+    "LCSC Product Name": "RES 470kΩ ±1% 62.5mW 0402",
+    "LCSC Title": "YAGEO RC0402FR-07470KL",
+    "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
+    "Lead Time": "56 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "100",
+    "Order Multiple": "100",
+    "Package": "0402",
+    "Package Quantity": "10000",
+    "Package Quantity Unit": "Reel",
+    "Packaging": "Tape & Reel (TR)",
+    "Parent Catalog Id": "308",
+    "Popular Part": "No",
+    "Power": "0.063 W",
+    "Power(Watts)": "62.5mW",
+    "Pre-Sale": "No",
+    "Product Category": "Thick Film Resistors - SMD",
+    "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20251009_YAGEO-RC0402FR-07470KL_C137976_front.jpg",
+    "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20251009_YAGEO-RC0402FR-07470KL_C137976_back.jpg",
+    "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20251009_YAGEO-RC0402FR-07470KL_C137976_blank.jpg",
+    "Reel Setup Fee": "3",
+    "Resistance": "470 kOhm",
+    "RoHS": "Yes",
+    "Standard Pack Qty": "10000",
+    "Stock": "17500",
+    "Stock (Domestic)": "17500",
+    "Stock (Overseas)": "17500",
+    "Stock (Shenzhen)": "17500",
+    "Symbol": "Device:R",
+    "Temperature Coefficient": "±100ppm/℃",
+    "Tolerance": "1%",
+    "Type": "Thick Film Resistor",
+    "Unit": "Piece",
+    "Unit Weight (kg)": "6.5e-07",
+    "Voltage Rating": "50V",
+    "Weight": "0.009",
+    "Weight (kg)": "9e-06",
+    "Weight Foreign (kg)": "0",
+    "Wm Catalog Id": "1199"
+  },
+  "tags": [],
+  "value": ""
+}
