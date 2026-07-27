@@ -158,3 +158,17 @@ def test_the_3d_model_is_its_own_export_category():
     assert formats_for([Requirement.KICAD_SYMBOL, Requirement.KICAD_MODEL]) == ["kicad", "model"]
     assert formats_for([Requirement.ALTIUM_FOOTPRINT]) == ["altium"]
     assert formats_for([]) == []
+
+
+def test_the_drive_report_never_claims_a_file_it_cannot_have_seen(tmp_path, vendor):
+    """A drive can observe two things: which controls it SELECTED, and that it clicked submit.
+    Whether files arrived is decided later by `classify_asset` on the real download.
+
+    The wording used to be "Downloading kicad and altium together", and on the live vendor that
+    was FALSE - the zip carried no Altium libraries at all. So the message must state intent, and
+    the word "download" must not appear in it: the engine reports what landed, from the record.
+    """
+    report, _ = _capture(tmp_path, vendor, ["kicad", "model"])
+    assert report.submitted is True
+    assert "download" not in report.message.lower(), report.message
+    assert "requested" in report.message.lower(), report.message
