@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { CaptureProvider, useCapture } from "./capture";
+import { mockCapture, sseStream } from "../test/captureMocks";
 
 function wrap(qc: QueryClient) {
   return ({ children }: { children: ReactNode }) =>
@@ -36,14 +37,6 @@ function mockSource(url: string | null = "https://app.ultralibrarian.com/x") {
   } as never);
 }
 
-function mockHost() {
-  const open = vi.fn().mockResolvedValue("tok");
-  (window as unknown as { pywebview: { api: { open_cad_download: typeof open } } }).pywebview = {
-    api: { open_cad_download: open },
-  };
-  return open;
-}
-
 afterEach(() => {
   vi.restoreAllMocks();
   delete (window as { pywebview?: unknown }).pywebview;
@@ -53,7 +46,7 @@ afterEach(() => {
 describe("CaptureProvider store", () => {
   it("holds one active capture and replaces it when a different part starts", async () => {
     mockSource();
-    mockHost();
+    mockCapture();
     const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
 
     await act(async () => {
@@ -61,7 +54,9 @@ describe("CaptureProvider store", () => {
     });
     expect(result.current.active.partId).toBe("p1");
     expect(result.current.active.partName).toBe("Part One");
-    expect(result.current.active.status).toBe("receiving");
+    // `start` now awaits the whole job, so a finished run reports `done`. It used to hand off to a
+    // Windows-only host callback and sit in `receiving` waiting to be told.
+    expect(result.current.active.status).toBe("done");
 
     await act(async () => {
       await result.current.start("p2", "Part Two", ["kicad_symbol"]);
@@ -72,7 +67,7 @@ describe("CaptureProvider store", () => {
 
   it("keepWorking backgrounds the active capture so the pill can take over", async () => {
     mockSource();
-    mockHost();
+    mockCapture();
     const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
 
     await act(async () => {
@@ -87,7 +82,7 @@ describe("CaptureProvider store", () => {
 
   it("requestReopen exposes the part id and unbackgrounds; clearReopen clears it", async () => {
     mockSource();
-    mockHost();
+    mockCapture();
     const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
 
     await act(async () => {
@@ -110,7 +105,7 @@ describe("CaptureProvider store", () => {
 
   it("reset clears the active capture back to idle", async () => {
     mockSource();
-    mockHost();
+    mockCapture();
     const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
 
     await act(async () => {
@@ -123,120 +118,76 @@ describe("CaptureProvider store", () => {
     expect(result.current.active.status).toBe("idle");
   });
 
-  // -- Phase 3 (DONE-02, HUD-01): the host done signal + the part-name pass-through --
+  // -- The behaviours that still matter now the host callback is gone -----------------------
+  //
+  // The old tests here drove `window.__STOCKROOM_CAD_DOWNLOAD__`: a token-guarded "done" signal
+  // forwarded from a Windows-only host. That protocol no longer exists - the backend owns the
+  // capture and reports through the job stream. What DOES still matter is kept, driven through
+  // the real route.
 
-  it("a done signal lands done only after every need actually attached", async () => {
+  it("captures through the cross-platform route, not a Windows-only host object", async () => {
     mockSource();
-    mockHost();
+    const capture = mockCapture();
     const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
 
-    vi.spyOn(api, "altiumAttach").mockResolvedValue({} as never);
-    vi.spyOn(api, "altiumRegenerate").mockResolvedValue({} as never);
     await act(async () => {
-      await result.current.start("p1", "One", ["altium_symbol"]);
-    });
-    expect(result.current.active.status).toBe("receiving");
-
-    // the file ATTACHES via the per-file forward: that alone completes the capture
-    // (the host's later done signal is redundant by then, and its absence can no
-    // longer fabricate one)
-    await act(async () => {
-      await window.__STOCKROOM_CAD_DOWNLOAD__!({
-        path: "C:/dl/a.SchLib", token: "tok",
-        requirements: ["altium_symbol"], altiumPaths: ["C:/dl/a.SchLib"],
-      });
+      await result.current.start("p1", "Part One", ["kicad_symbol"]);
     });
 
-    expect(result.current.active.status).toBe("done");
-    expect(window.__STOCKROOM_CAD_DOWNLOAD__).toBeUndefined();
+    expect(capture.run).toHaveBeenCalledWith(
+      expect.objectContaining({ partIds: ["p1"], vendor: "ultralibrarian" }),
+    );
+    // and nothing reached for the host bridge that used to exist
+    expect((window as { pywebview?: unknown }).pywebview).toBeUndefined();
   });
 
-  it("a done signal with needs still unattached is honest, never a fabricated done (live 2026-07-24)", async () => {
+  it("a capture whose part was replaced mid-flight never marks the new part", async () => {
+    // The B4 guard, preserved. Its mechanism changed (a token from the host -> comparing the part
+    // the run was started for) but the failure it prevents is identical: one part's result landing
+    // on another part's checklist.
     mockSource();
-    mockHost();
-    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+    vi.spyOn(api, "runCapture").mockResolvedValue({ job_id: "job-1" });
+    let release: (() => void) | null = null;
+    vi.spyOn(api, "openJobStream").mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve(sseStream([{ event: "done", data: {} }]) as never);
+        }) as never,
+    );
 
-    vi.spyOn(api, "altiumAttach").mockResolvedValue({} as never);
-    vi.spyOn(api, "altiumRegenerate").mockResolvedValue({} as never);
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+    let first: Promise<void>;
     await act(async () => {
-      await result.current.start("p1", "One", ["kicad_symbol", "altium_symbol", "altium_footprint"]);
-    });
-    // only the altium files ever attached; the host still closes the window and says done
-    await act(async () => {
-      await window.__STOCKROOM_CAD_DOWNLOAD__!({
-        path: "C:/dl/a.zip", token: "tok",
-        requirements: ["altium_symbol", "altium_footprint"],
-        altiumPaths: ["C:/x/a.SchLib", "C:/x/a.PcbLib"],
-      });
-    });
-    await act(async () => {
-      window.__STOCKROOM_CAD_DOWNLOAD__!({ signal: "done", token: "tok" });
+      first = result.current.start("p1", "Part One", ["kicad_symbol"]);
       await Promise.resolve();
     });
+    // a second part takes over while the first run is still streaming
+    mockCapture();
+    await act(async () => {
+      await result.current.start("p2", "Part Two", ["kicad_symbol"]);
+    });
+    await act(async () => {
+      release?.();
+      await first!;
+    });
 
-    expect(result.current.active.status).toBe("receiving");
-    expect(result.current.active.message).toMatch(/KiCad Symbol/);
-    // the handler stays armed so a late forward / Browse For Files can still finish it
-    expect(window.__STOCKROOM_CAD_DOWNLOAD__).toBeDefined();
+    expect(result.current.active.partId).toBe("p2");
+    expect(result.current.active.partName).toBe("Part Two");
   });
 
-  it("ignores a done whose token does not match the active capture (B4 guard)", async () => {
+  it("an error frame from the run surfaces as an error, never a silent done", async () => {
     mockSource();
-    mockHost();
+    mockCapture([
+      { event: "error", data: { detail: "Ultra Librarian has no model for this part." } },
+      { event: "done", data: {} },
+    ]);
     const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
 
     await act(async () => {
-      await result.current.start("p1", "One", ["kicad_symbol"]);
-    });
-    await act(async () => {
-      window.__STOCKROOM_CAD_DOWNLOAD__!({ signal: "done", token: "STALE" });
-      await Promise.resolve();
+      await result.current.start("p1", "Part One", ["kicad_symbol"]);
     });
 
-    expect(result.current.active.status).toBe("receiving"); // never marked the replaced part done
-  });
-
-  it("treats a repeated done as a no-op once the capture is already done", async () => {
-    mockSource();
-    mockHost();
-    vi.spyOn(api, "altiumAttach").mockResolvedValue({} as never);
-    vi.spyOn(api, "altiumRegenerate").mockResolvedValue({} as never);
-    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
-
-    await act(async () => {
-      await result.current.start("p1", "One", ["altium_symbol"]);
-    });
-    const handler = window.__STOCKROOM_CAD_DOWNLOAD__!;
-    await act(async () => {
-      await handler({
-        path: "C:/dl/a.SchLib", token: "tok",
-        requirements: ["altium_symbol"], altiumPaths: ["C:/dl/a.SchLib"],
-      });
-    });
-    expect(result.current.active.status).toBe("done");
-    // a LATE host done (the handler reference survived in the host) stays a no-op
-    await act(async () => {
-      handler({ signal: "done", token: "tok" });
-      await Promise.resolve();
-    });
-    expect(result.current.active.status).toBe("done");
-
-    await act(async () => {
-      handler({ signal: "done", token: "tok" }); // a duplicate late done must not corrupt the state
-      await Promise.resolve();
-    });
-    expect(result.current.active.status).toBe("done");
-  });
-
-  it("passes the active part name to the host open so the HUD can show it (HUD-01)", async () => {
-    mockSource();
-    const open = mockHost();
-    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
-
-    await act(async () => {
-      await result.current.start("p1", "BQ24074", ["kicad_symbol"]);
-    });
-
-    expect(open).toHaveBeenCalledWith("https://app.ultralibrarian.com/x", ["kicad_symbol"], "BQ24074");
+    expect(result.current.active.status).toBe("error");
+    expect(result.current.active.message).toContain("no model");
   });
 });

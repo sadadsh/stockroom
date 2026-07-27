@@ -1203,6 +1203,39 @@ export const api = {
     });
   },
 
+  // GUIDED CAPTURE, through the SAME route on Windows and Linux. A job: it opens a real browser,
+  // the person signs in to the vendor ONCE (the profile is persistent), and every part is its own
+  // atomic commit so stopping is safe and resuming is just running it again.
+  //
+  // `partIds: [one]` is per-component; omitting it captures every part still missing files. Both
+  // are the same backend path deliberately, so verifying one verifies the other.
+  //
+  // This REPLACED `window.pywebview.api.open_cad_download`, which existed only on Windows - so the
+  // whole flow was untestable off Windows and silently degraded to "pick the files yourself".
+  runCapture(input: { partIds?: string[]; vendor?: string; limit?: number } = {}): Promise<{
+    job_id: string;
+  }> {
+    return request<{ job_id: string }>("POST", "/api/library/capture/run", {
+      body: { part_ids: input.partIds, vendor: input.vendor, limit: input.limit },
+    });
+  },
+
+  // The vendors guided capture can actually drive, read off the adapter registry so a surface can
+  // never offer one with no implementation behind it.
+  captureVendors(): Promise<{
+    vendors: {
+      key: string;
+      label: string;
+      tools: string[];
+      needs_login: boolean;
+      aggregator: boolean;
+      instruction: string;
+      one_download_for_all_formats: boolean;
+    }[];
+  }> {
+    return apiGet("/api/library/capture/vendors");
+  },
+
   // What CAD this library holds. Read-only: it runs the real walk with `dry_run`, so the number
   // the surface states before offering the action is the number the action will act on.
   cadInventory(): Promise<CadInventory> {

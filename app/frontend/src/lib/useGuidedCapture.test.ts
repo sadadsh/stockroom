@@ -1,9 +1,10 @@
 import { createElement, type ReactNode } from "react";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { Requirement, StagingCandidate } from "../api/types";
+import type { Requirement } from "../api/types";
 import { useGuidedCapture } from "./useGuidedCapture";
+import { mockCapture } from "../test/captureMocks";
 import { CaptureProvider } from "./capture";
 
 function wrapperWith(qc: QueryClient) {
@@ -15,59 +16,44 @@ function wrapperWith(qc: QueryClient) {
     );
 }
 
+
+const KICAD_NEEDS: Requirement[] = ["kicad_symbol", "kicad_footprint"];
+const ALL_NEEDS: Requirement[] = ["kicad_symbol", "kicad_footprint", "altium_symbol"];
+
+const CANDIDATE = {
+  entry_name: "BQ24074",
+  symbol_lib_path: "s.kicad_sym",
+  footprint_variants: [{ name: "F", path: "f.kicad_mod" }],
+  model_path: "m.step",
+} as unknown as import("../api/types").StagingCandidate;
+
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
-  const enc = new TextEncoder();
+  const encoder = new TextEncoder();
   return new ReadableStream<Uint8Array>({
-    start(controller) {
-      for (const c of chunks) controller.enqueue(enc.encode(c));
-      controller.close();
+    start(c) {
+      for (const chunk of chunks) c.enqueue(encoder.encode(chunk));
+      c.close();
     },
   });
 }
 
-const CANDIDATE: StagingCandidate = {
-  vendor: "ultralibrarian",
-  symbol_lib_path: "/tmp/staging/x.kicad_sym",
-  symbol_name: "BQ24074",
-  footprint_variants: ["/tmp/staging/BQ24074.pretty/QFN-16.kicad_mod"],
-  chosen_footprint_index: 0,
-  model_path: "/tmp/staging/BQ24074.step",
-  datasheet_path: null,
-  display_name: "BQ24074",
-  entry_name: "BQ24074",
-  category: "IC",
-  mpn: "BQ24074",
-  manufacturer: "Texas Instruments",
-  description: "Li-Ion charger",
-  tags: [],
-  purchase: [],
-  gaps: [],
-};
-
-function inspectResultStream(candidates: StagingCandidate[]): ReadableStream<Uint8Array> {
+function inspectResultStream(candidates: unknown[]): ReadableStream<Uint8Array> {
   return streamOf([
     `event: result\ndata: {"result":${JSON.stringify(candidates)}}\n\n`,
     "event: done\ndata: {}\n\n",
   ]);
 }
 
-const UL_URL = "https://app.ultralibrarian.com/search?queryText=BQ24074";
-const KICAD_NEEDS: Requirement[] = ["kicad_symbol", "kicad_footprint", "kicad_model"];
-const ALL_NEEDS: Requirement[] = [
-  "kicad_symbol",
-  "kicad_footprint",
-  "kicad_model",
-  "altium_symbol",
-  "altium_footprint",
-];
-
-function mockHost(returnToken: string | undefined = "tok") {
-  const open = vi.fn().mockResolvedValue(returnToken);
-  (window as unknown as { pywebview: { api: { open_cad_download: typeof open } } }).pywebview = {
-    api: { open_cad_download: open },
-  };
-  return open;
+/** The MANUAL browse path: inspect the picked file, then commit it. Untouched by the capture
+ *  rewrite - "Browse For Files" is still how a person hands the app a file they already have. */
+function mockKicadAttach() {
+  vi.spyOn(api, "assetsInspect").mockResolvedValue({ job_id: "j1" });
+  vi.spyOn(api, "openJobStream").mockResolvedValue(inspectResultStream([CANDIDATE]));
+  vi.spyOn(api, "assetsCommit").mockResolvedValue({} as never);
 }
+
+const UL_URL = "https://app.ultralibrarian.com/search?queryText=BQ24074";
+
 
 // partCadSource still resolves the URL; needs are now passed into the hook by the caller.
 function _cadSources(url: string | null) {
@@ -97,12 +83,6 @@ function mockCadSourceUrl(url: string | null = UL_URL) {
   } as never);
 }
 
-function mockKicadAttach() {
-  vi.spyOn(api, "assetsInspect").mockResolvedValue({ job_id: "j1" });
-  vi.spyOn(api, "openJobStream").mockResolvedValue(inspectResultStream([CANDIDATE]));
-  vi.spyOn(api, "assetsCommit").mockResolvedValue({} as never);
-}
-
 function render(needs: Requirement[], qc = new QueryClient()) {
   return {
     qc,
@@ -118,230 +98,90 @@ afterEach(() => {
 });
 
 describe("useGuidedCapture", () => {
-  it("resolves the page, opens it through the host bridge, and waits (receiving)", async () => {
-    const open = mockHost("tok");
+  it("runs a capture for its own part through the cross-platform route", async () => {
     mockCadSourceUrl();
-    const { result } = render(KICAD_NEEDS);
+    const capture = mockCapture();
+    const { result } = render(["kicad_symbol", "kicad_footprint"]);
 
     await act(async () => {
       await result.current.start();
     });
 
-    expect(api.partCadSource).toHaveBeenCalledWith("part1");
-    // start() now threads the part name (empty here, since this adapter render passes none) as the
-    // third arg so the HUD can display part name + DigiKey (HUD-01).
-    expect(open).toHaveBeenCalledWith(UL_URL, KICAD_NEEDS, "");
-    expect(result.current.status).toBe("receiving");
-    expect(result.current.needs).toEqual(KICAD_NEEDS);
-    expect(typeof window.__STOCKROOM_CAD_DOWNLOAD__).toBe("function");
-  });
-
-  it("transitions to timed-out when nothing lands within the watchdog window (B1 fix)", async () => {
-    vi.useFakeTimers();
-    mockHost("tok");
-    mockCadSourceUrl();
-    const { result } = render(KICAD_NEEDS);
-
-    await act(async () => {
-      await result.current.start();
-    });
-    expect(result.current.status).toBe("receiving");
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(180_001);
-    });
-    expect(result.current.status).toBe("timed-out");
-  });
-
-  it("marks KiCad requirements received and attaches via the ingest pipeline", async () => {
-    mockHost("tok");
-    mockCadSourceUrl();
-    mockKicadAttach();
-    const { result, qc } = render(KICAD_NEEDS);
-    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
-
-    await act(async () => {
-      await result.current.start();
-    });
-    await act(async () => {
-      window.__STOCKROOM_CAD_DOWNLOAD__!({
-        path: "C:\\Downloads\\BQ24074.zip",
-        token: "tok",
-        requirements: ["kicad_symbol", "kicad_footprint", "kicad_model"],
-      });
-      await Promise.resolve();
-    });
-
-    await waitFor(() => expect(result.current.status).toBe("done"));
-    expect(api.assetsInspect).toHaveBeenCalledWith("part1", ["C:\\Downloads\\BQ24074.zip"]);
-    // The attach carries WHERE the files came from: the vendor key and the exact page this
-    // capture opened. Without it every guided capture lands unattributed, which is the state the
-    // owner's "its not trusted where we've gotten them" complaint is about.
-    expect(api.assetsCommit).toHaveBeenCalledWith("part1", CANDIDATE, {
-      vendor: "ultralibrarian",
-      url: UL_URL,
-    });
-    expect(result.current.received.kicad_symbol).toBe(true);
-    expect(result.current.received.kicad_model).toBe(true);
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["cad-source", "part1"] });
-    expect(window.__STOCKROOM_CAD_DOWNLOAD__).toBeUndefined();
-  });
-
-  it("attaches Altium requirements via altiumAttach with the extracted loose paths", async () => {
-    mockHost("tok");
-    mockCadSourceUrl();
-    const altiumSpy = vi.spyOn(api, "altiumAttach").mockResolvedValue(undefined);
-    const regenSpy = vi
-      .spyOn(api, "altiumRegenerate")
-      .mockResolvedValue({ emitted: 1, skipped: [] } as never);
-    const { result } = render(["altium_symbol", "altium_footprint"]);
-
-    await act(async () => {
-      await result.current.start();
-    });
-    await act(async () => {
-      window.__STOCKROOM_CAD_DOWNLOAD__!({
-        path: "C:\\Downloads\\BQ24074.zip",
-        token: "tok",
-        requirements: ["altium_symbol", "altium_footprint"],
-        altiumPaths: ["C:\\tmp\\BQ24074.SchLib", "C:\\tmp\\BQ24074.PcbLib"],
-      });
-      await Promise.resolve();
-    });
-
-    await waitFor(() => expect(result.current.status).toBe("done"));
-    expect(altiumSpy).toHaveBeenCalledWith("part1", [
-      "C:\\tmp\\BQ24074.SchLib",
-      "C:\\tmp\\BQ24074.PcbLib",
-    ]);
-    // The library must be placeable from Altium without a separate visit to the Altium
-    // window: a capture that attached Altium assets refreshes the DbLib data source itself.
-    expect(regenSpy).toHaveBeenCalled();
-    expect(result.current.altiumComplete).toBe(true);
-  });
-
-  it("still completes the capture when the DbLib regenerate fails after the attach", async () => {
-    mockHost("tok");
-    mockCadSourceUrl();
-    vi.spyOn(api, "altiumAttach").mockResolvedValue(undefined);
-    vi.spyOn(api, "altiumRegenerate").mockRejectedValue(new Error("busy"));
-    const { result } = render(["altium_symbol", "altium_footprint"]);
-
-    await act(async () => {
-      await result.current.start();
-    });
-    await act(async () => {
-      window.__STOCKROOM_CAD_DOWNLOAD__!({
-        path: "C:\\Downloads\\BQ24074.zip",
-        token: "tok",
-        requirements: ["altium_symbol", "altium_footprint"],
-        altiumPaths: ["C:\\tmp\\BQ24074.SchLib", "C:\\tmp\\BQ24074.PcbLib"],
-      });
-      await Promise.resolve();
-    });
-
-    // The files are attached; a regenerate hiccup must not fail the capture (the Altium
-    // window still offers a manual regenerate).
-    await waitFor(() => expect(result.current.status).toBe("done"));
-    expect(result.current.altiumComplete).toBe(true);
-  });
-
-  it("ignores a capture whose session token does not match (B4 guard)", async () => {
-    mockHost("tok");
-    mockCadSourceUrl();
-    const inspectSpy = vi.spyOn(api, "assetsInspect");
-    const { result } = render(["kicad_symbol"]);
-
-    await act(async () => {
-      await result.current.start();
-    });
-    await act(async () => {
-      window.__STOCKROOM_CAD_DOWNLOAD__!({
-        path: "stale.zip",
-        token: "STALE",
-        requirements: ["kicad_symbol"],
-      });
-      await Promise.resolve();
-    });
-
-    expect(inspectSpy).not.toHaveBeenCalled();
-    expect(result.current.status).toBe("receiving");
-    expect(result.current.received.kicad_symbol).toBeUndefined();
-  });
-
-  it("honors a host timeout signal forward", async () => {
-    mockHost("tok");
-    mockCadSourceUrl();
-    const { result } = render(["kicad_symbol"]);
-
-    await act(async () => {
-      await result.current.start();
-    });
-    await act(async () => {
-      window.__STOCKROOM_CAD_DOWNLOAD__!({ signal: "timeout", token: "tok" });
-      await Promise.resolve();
-    });
-
-    expect(result.current.status).toBe("timed-out");
-  });
-
-  it("projects done only once the needs actually attached; a bare host done stays honest (DONE-02)", async () => {
-    mockHost("tok");
-    mockCadSourceUrl();
-    vi.spyOn(api, "altiumAttach").mockResolvedValue({} as never);
-    vi.spyOn(api, "altiumRegenerate").mockResolvedValue({} as never);
-    const { result } = render(["altium_symbol"]);
-
-    await act(async () => {
-      await result.current.start();
-    });
-    // a done with nothing attached is NOT done (live 2026-07-24)
-    await act(async () => {
-      window.__STOCKROOM_CAD_DOWNLOAD__!({ signal: "done", token: "tok" });
-      await Promise.resolve();
-    });
-    expect(result.current.status).not.toBe("done");
-
-    // the attach forward completes it
-    await act(async () => {
-      await window.__STOCKROOM_CAD_DOWNLOAD__!({
-        path: "C:/dl/a.SchLib", token: "tok",
-        requirements: ["altium_symbol"], altiumPaths: ["C:/dl/a.SchLib"],
-      });
-    });
+    expect(capture.run).toHaveBeenCalledWith(
+      expect.objectContaining({ partIds: ["part1"] }),
+    );
     expect(result.current.status).toBe("done");
   });
 
-  it("accepts a legacy bare-path forward and runs the KiCad pipeline", async () => {
-    mockHost(undefined); // an old host that echoes no token and forwards a bare path
+  it("passes the vendor the user picked", async () => {
     mockCadSourceUrl();
-    mockKicadAttach();
-    const { result } = render(KICAD_NEEDS);
+    const capture = mockCapture();
+    const { result } = render(["kicad_symbol", "kicad_footprint"]);
 
     await act(async () => {
-      await result.current.start();
-    });
-    await act(async () => {
-      window.__STOCKROOM_CAD_DOWNLOAD__!("C:\\Downloads\\legacy.zip");
-      await Promise.resolve();
+      await result.current.start("ultralibrarian");
     });
 
-    await waitFor(() => expect(result.current.status).toBe("done"));
-    expect(api.assetsInspect).toHaveBeenCalledWith("part1", ["C:\\Downloads\\legacy.zip"]);
+    expect(capture.run).toHaveBeenCalledWith(
+      expect.objectContaining({ vendor: "ultralibrarian" }),
+    );
   });
 
-  it("reports unavailable and never opens the host bridge when no source resolves", async () => {
-    const open = mockHost("tok");
+  it("reports unavailable when no source resolves, and starts nothing", async () => {
     mockCadSourceUrl(null);
-    const { result } = render([]);
+    const capture = mockCapture();
+    const { result } = render(["kicad_symbol", "kicad_footprint"]);
 
     await act(async () => {
       await result.current.start();
     });
 
     expect(result.current.status).toBe("unavailable");
-    expect(open).not.toHaveBeenCalled();
+    expect(capture.run).not.toHaveBeenCalled();
   });
+
+  it("surfaces a failed run as an error rather than a quiet done", async () => {
+    mockCadSourceUrl();
+    mockCapture([
+      { event: "error", data: { detail: "Ultra Librarian has no model for this part." } },
+      { event: "done", data: {} },
+    ]);
+    const { result } = render(["kicad_symbol", "kicad_footprint"]);
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(result.current.status).toBe("error");
+  });
+
+  it("projects idle for a part that is not the active capture", async () => {
+    mockCadSourceUrl();
+    mockCapture();
+    const { result } = render(["kicad_symbol", "kicad_footprint"]);
+    expect(result.current.status).toBe("idle");
+    // and it still exposes the caller's needs, so the checklist renders before any run starts
+    expect(result.current.needs).toEqual(["kicad_symbol", "kicad_footprint"]);
+  });
+
+  it("reset returns the hook to idle", async () => {
+    mockCadSourceUrl();
+    mockCapture();
+    const { result } = render(["kicad_symbol", "kicad_footprint"]);
+    await act(async () => {
+      await result.current.start();
+    });
+    act(() => {
+      result.current.reset();
+    });
+    expect(result.current.status).toBe("idle");
+  });
+
+  // -- the MANUAL path, still live and still covered ----------------------------------------
+  //
+  // These came back after the capture rewrite briefly deleted them along with the host-bridge
+  // tests. "Browse For Files" is not part of guided capture and was never changed, so dropping
+  // its tests was a real loss of coverage rather than the relocation it looked like.
 
   it("submitPaths serves the manual-pick fallback through the KiCad pipeline", async () => {
     mockKicadAttach();
@@ -355,25 +195,17 @@ describe("useGuidedCapture", () => {
     expect(result.current.status).toBe("done");
   });
 
-  it("browse-first stays receiving (not falsely done) and re-arms the watchdog", async () => {
-    // A part missing BOTH KiCad and Altium: a manual KiCad browse must mark only the
-    // KiCad rows, report "receiving" (not "done"), and re-arm the watchdog so the
-    // remaining Altium file can never hang forever.
-    vi.useFakeTimers();
+  it("a manual KiCad browse never reports done while Altium is still missing", async () => {
     mockKicadAttach();
     const { result } = render(ALL_NEEDS);
 
     await act(async () => {
       await result.current.submitPaths(["k.zip"]);
     });
+
     expect(result.current.status).toBe("receiving");
     expect(result.current.received.kicad_symbol).toBe(true);
     expect(result.current.received.altium_symbol).toBeUndefined();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(180_001);
-    });
-    expect(result.current.status).toBe("timed-out");
   });
 
   it("surfaces an empty inspect result as an honest error instead of attaching nothing", async () => {
@@ -389,23 +221,5 @@ describe("useGuidedCapture", () => {
     expect(result.current.status).toBe("error");
     expect(result.current.message).toContain("No usable");
     expect(commitSpy).not.toHaveBeenCalled();
-  });
-
-  it("reset returns the hook to idle and tears down any armed capture handler", async () => {
-    mockHost("tok");
-    mockCadSourceUrl();
-    const { result } = render(["kicad_symbol"]);
-
-    await act(async () => {
-      await result.current.start();
-    });
-    expect(typeof window.__STOCKROOM_CAD_DOWNLOAD__).toBe("function");
-
-    act(() => {
-      result.current.reset();
-    });
-
-    expect(result.current.status).toBe("idle");
-    expect(window.__STOCKROOM_CAD_DOWNLOAD__).toBeUndefined();
   });
 });

@@ -93,23 +93,11 @@ export function subsetComplete(needs: Requirement[], received: Received, subset:
   return needs.filter((n) => subset.includes(n)).every((n) => received[n]);
 }
 
-function hostOpenCadDownload():
-  | ((url: string, needs?: Requirement[], partName?: string) => Promise<string | void> | string | void)
-  | undefined {
-  return (
-    window as unknown as {
-      pywebview?: {
-        api?: {
-          open_cad_download?: (
-            url: string,
-            needs?: Requirement[],
-            partName?: string,
-          ) => Promise<string | void> | string | void;
-        };
-      };
-    }
-  ).pywebview?.api?.open_cad_download;
-}
+// `hostOpenCadDownload` lived here: it read `window.pywebview.api.open_cad_download`, which exists
+// ONLY on Windows. Off Windows the whole guided flow degraded to "pick the files yourself", so
+// nothing below the URL layer was verifiable and every claim about capture was made from an
+// adjacent layer. Capture now goes through `api.runCapture` - one route, one engine, identical on
+// both platforms - so this is DELETED rather than kept as a fallback that would drift.
 
 export interface CaptureApi {
   active: CaptureState;
@@ -389,31 +377,52 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       }
       originRef.current = { vendor: picked.key, url: picked.url };
       setState((s) => ({ ...s, url: picked.url, vendor: picked.label, received: {} }));
-      const open = hostOpenCadDownload();
-      const url = picked.url;
-      if (!open) {
-        armCapture(onCaptureRef.current);
+      // THE capture path, identical on Windows and Linux. The backend opens a real browser, drives
+      // the vendor page, catches the download, classifies it and attaches it with provenance - one
+      // job, and testable off Windows.
+      //
+      // This replaced `window.pywebview.api.open_cad_download`, which existed ONLY on Windows: off
+      // it the flow silently degraded to "pick the files yourself", so nothing below the URL layer
+      // could be verified and every claim about capture came from an adjacent layer.
+      try {
+        const { job_id } = await api.runCapture({ partIds: [partId], vendor: picked.key });
         setState((s) => ({
           ...s,
-          status: "window-open",
-          message: "Open the page, download the files, then pick them below.",
+          status: "receiving",
+          message: "Working through the vendor page. Sign in there if it asks; it is remembered.",
         }));
-        return;
+        const body = await api.openJobStream(job_id);
+        let failure: string | null = null;
+        for await (const ev of streamEvents(body)) {
+          if (ev.event === "progress") {
+            const message = (ev.data as { message?: string }).message;
+            if (message) setState((s) => (s.status === "done" ? s : { ...s, message }));
+          } else if (ev.event === "error") {
+            failure = (ev.data as { detail?: string }).detail ?? "The capture failed.";
+          } else if (ev.event === "done") {
+            break;
+          }
+        }
+        if (failure) throw new Error(failure);
+        if (partIdRef.current !== partId) return;
+        // The RECORD is the truth, never the job's own summary: re-read the part so the checklist
+        // reports what ACTUALLY attached.
+        invalidate();
+        setState((s) => ({
+          ...s,
+          status: "done",
+          message: "Capture finished. The part shows whatever actually attached.",
+        }));
+      } catch (err) {
+        if (partIdRef.current !== partId) return;
+        setState((s) => ({
+          ...s,
+          status: "error",
+          message: err instanceof ApiError ? err.message : errMsg(err, "Capture failed."),
+        }));
       }
-      try {
-        const returned = await open(url, needsRef.current, partName);
-        tokenRef.current = typeof returned === "string" && returned ? returned : null;
-      } catch {
-        // best-effort; the host may not echo a token, and the widened watch still fires.
-      }
-      armCapture(onCaptureRef.current);
-      setState((s) => ({
-        ...s,
-        status: "receiving",
-        message: "Waiting for the files. Follow the guidance in the window.",
-      }));
     },
-    [clearWatchdog, clearHandler, armCapture],
+    [clearWatchdog, clearHandler, invalidate],
   );
 
   const submitPaths = useCallback(

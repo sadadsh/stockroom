@@ -19,13 +19,13 @@ import json
 # OWNER-VALIDATE: confirm against the live pages (Phase C). First-guess selectors below.
 _VENDORS: dict[str, dict] = {
     # Ultra Librarian is NOT here any more: its selectors were first guesses and MEASUREMENT
-    # (2026-07-27, scripts/vendorprobe.py against the live signed-in page) showed all of them match
+    # (2026-07-27, scripts/webread.py --controls against the live signed-in page) showed all of them match
     # nothing. It now has a measured driver of its own, `_ultralibrarian_driver_js`, tested against
     # a captured fixture of the real page. The stale entry was deleted rather than left behind,
     # because a wrong selector that LOOKS validated is worse than an absent one.
     #
     # SnapEDA's entry below is still OWNER-VALIDATE - unmeasured first guesses, same as Ultra
-    # Librarian's were. `scripts/vendorprobe.py` is the tool that settles it; nobody has run it
+    # Librarian's were. `scripts/webread.py --controls` is the tool that settles it; nobody has run it
     # against SnapEDA yet, and this comment is the honest record of that gap rather than silence.
     "snapeda": {
         "label": "SnapEDA",

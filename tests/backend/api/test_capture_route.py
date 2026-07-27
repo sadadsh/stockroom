@@ -139,7 +139,12 @@ def test_a_captured_asset_records_where_it_came_from(client, fake_vendor, headle
     ).json()["job_id"]
     _drain(client, job)
 
-    symbol = client.get(f"/api/library/parts/{target['id']}").json()["assets"]["kicad"]["symbol"]
+    assets = client.get(f"/api/library/parts/{target['id']}").json().get("assets") or {}
+    kicad = assets.get("kicad") or {}
+    # Say WHY when nothing attached, instead of a bare KeyError that hides whether the capture
+    # failed, timed out, or attached under a different tool.
+    assert kicad.get("symbol"), f"capture attached no KiCad symbol; assets were {assets}"
+    symbol = kicad["symbol"]
     origin = symbol.get("origin") or {}
     assert origin.get("vendor") == "ultralibrarian", symbol
     assert origin.get("url"), symbol

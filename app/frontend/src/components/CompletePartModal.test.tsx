@@ -1,8 +1,9 @@
 import { createElement, type ReactNode } from "react";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { mockCapture } from "../test/captureMocks";
 import type { PartDetail, StagingCandidate } from "../api/types";
 import { makeAsset, makeEdaAssets, makePartDetail } from "../test/partFixture";
 import { ToastProvider } from "../lib/toast";
@@ -153,10 +154,7 @@ describe("CompletePartModal - guided capture", () => {
   it("marks a requirement received when a capture lands", async () => {
     const user = userEvent.setup();
     mockCadSource(["kicad_symbol", "altium_symbol"]);
-    const open = vi.fn().mockResolvedValue("tok");
-    (window as unknown as { pywebview: { api: { open_cad_download: typeof open } } }).pywebview = {
-      api: { open_cad_download: open },
-    };
+    const capture = mockCapture();
     vi.spyOn(api, "assetsInspect").mockResolvedValue({ job_id: "j1" });
     vi.spyOn(api, "openJobStream").mockResolvedValue(
       streamOf([
@@ -170,18 +168,14 @@ describe("CompletePartModal - guided capture", () => {
     await screen.findByText("Files");
     await user.click(screen.getByRole("button", { name: "Get Files" }));
 
-    await act(async () => {
-      window.__STOCKROOM_CAD_DOWNLOAD__!({
-        path: "C:\\Downloads\\BQ24074.zip",
-        token: "tok",
-        requirements: ["kicad_symbol"],
-      });
-      await Promise.resolve();
-    });
-
-    await waitFor(() => {
-      expect(within(track("KiCad")).getByText("Received")).toBeInTheDocument();
-    });
+    // The host callback this used to push into is gone; capture runs in the backend now. So this
+    // asserts the modal actually STARTS a capture for this part. What each requirement becomes is
+    // decided by the RECORD and is asserted end to end in the backend tests, never by a forward
+    // fabricated here.
+    await waitFor(() => expect(capture.run).toHaveBeenCalled());
+    expect(capture.run).toHaveBeenCalledWith(
+      expect.objectContaining({ partIds: [DETAIL.id] }),
+    );
   });
 
   it("names DigiKey in the guided-capture subline, never a placeholder vendor", async () => {
@@ -232,10 +226,12 @@ describe("CompletePartModal - guided capture", () => {
   it("hands the capture to the background and closes on Keep Working", async () => {
     const user = userEvent.setup();
     mockCadSource(["kicad_symbol", "altium_symbol"]);
-    const open = vi.fn().mockResolvedValue("tok");
-    (window as unknown as { pywebview: { api: { open_cad_download: typeof open } } }).pywebview = {
-      api: { open_cad_download: open },
-    };
+    // The run must still be IN FLIGHT for the hand-off control to exist: "Keep Working" is what
+    // you press to leave a capture running and get on with something else. A mock that finished
+    // instantly would take the modal straight to done and the button would never render - which
+    // would make this test fail for a reason that has nothing to do with the behaviour it guards.
+    vi.spyOn(api, "runCapture").mockResolvedValue({ job_id: "job-1" });
+    vi.spyOn(api, "openJobStream").mockImplementation(() => new Promise(() => {}) as never);
     const onClose = vi.fn();
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={onClose} />, { wrapper });
     await screen.findByText("Files");
@@ -359,22 +355,17 @@ describe("CompletePartModal - vendor choice", () => {
 
   it("opens the vendor that was CHOSEN, not the default", async () => {
     mockCadSource(["kicad_symbol"]);
-    const opened: string[] = [];
-    const open = vi.fn((url: string) => {
-      opened.push(url);
-      return Promise.resolve("tok");
-    });
-    (window as unknown as { pywebview: { api: { open_cad_download: typeof open } } }).pywebview = {
-      api: { open_cad_download: open },
-    };
+    const capture = mockCapture();
     RENDER();
     await screen.findByText("Download From");
 
     await userEvent.click(vendorButton(/Ultra Librarian/));
     await userEvent.click(screen.getByRole("button", { name: "Get Files" }));
 
-    await waitFor(() => expect(opened).toHaveLength(1));
-    expect(opened[0]).toContain("ultralibrarian.com");
+    await waitFor(() => expect(capture.run).toHaveBeenCalled());
+    expect(capture.run).toHaveBeenCalledWith(
+      expect.objectContaining({ vendor: "ultralibrarian" }),
+    );
   });
 
   it("remembers the choice, because over 90 parts one decision beats ninety", async () => {
