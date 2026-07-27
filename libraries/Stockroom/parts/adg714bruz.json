@@ -12,6 +12,30 @@
         "value": "8542.39.0070"
       }
     ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/adi/images/ITP_ADI_TSSOP-24_RU-24_t.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4994/505%7ERU-24%7ERU%7E24.JPG"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "19 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "15"
+      }
+    ],
     "Product Category": [
       {
         "confidence": "",
@@ -34,6 +58,18 @@
         "confidence": "",
         "source": "digikey",
         "value": "ROHS3 Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Details"
+      }
+    ],
+    "US Tariff %": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "0.0"
       }
     ],
     "datasheet_url": [
@@ -58,6 +94,11 @@
         "confidence": "high",
         "source": "digikey",
         "value": "IC SW SPST-NOX8 4.5OHM 24TSSOP"
+      },
+      {
+        "confidence": "",
+        "source": "jsonld",
+        "value": "ADG714BRUZ Analog Devices Analog Switch ICs SERIAL SPI, OCTAL SPST datasheet, inventory, & pricing."
       }
     ],
     "lead_time": [
@@ -112,7 +153,116 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Brand": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Configuration": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Factory Pack Quantity": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Manufacturer": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Maximum Dual Supply Voltage": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Maximum Operating Temperature": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Minimum Dual Supply Voltage": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Minimum Operating Temperature": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Mounting Style": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Number of Channels": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Off Time - Max": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "On Resistance - Max": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "On Time - Max": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Pd - Power Dissipation": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Product Type": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Series": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Subcategory": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Supply Current - Max": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Supply Type": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Supply Voltage - Max": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Supply Voltage - Min": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Switch Continuous Current": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "US Tariff %": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Unit Weight": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "adg714bruz",
   "manufacturer": "Analog Devices",
@@ -126,47 +276,39 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:15.232996+00:00",
       "part_number": "584-ADG714BRUZ",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 6.18,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 4.74,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 4.22,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 3.98,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 3.79,
           "qty": 248
         },
         {
-          "currency": "USD",
           "price": 3.68,
           "qty": 558
         },
         {
-          "currency": "USD",
           "price": 3.64,
           "qty": 1054
         },
         {
-          "currency": "USD",
           "price": 3.58,
           "qty": 2542
         }
@@ -176,47 +318,39 @@
       "vendor": "Mouser"
     },
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:15.232996+00:00",
       "part_number": "505-ADG714BRUZ-ND",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 6.34,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 4.867,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 4.21565,
           "qty": 62
         },
         {
-          "currency": "USD",
           "price": 4.04323,
           "qty": 124
         },
         {
-          "currency": "USD",
           "price": 3.86129,
           "qty": 310
         },
         {
-          "currency": "USD",
           "price": 3.76695,
           "qty": 558
         },
         {
-          "currency": "USD",
           "price": 3.68099,
           "qty": 1054
         },
         {
-          "currency": "USD",
           "price": 3.58473,
           "qty": 2542
         }
@@ -230,13 +364,16 @@
   "specs": {
     "-3db Bandwidth": "155MHz",
     "Assembly Country of Origin": "Not available",
+    "Brand": "Analog Devices",
     "Channel Capacitance (CS(off), CD(off))": "11pF, 11pF",
     "Charge Injection": "3pC",
+    "Configuration": "8 x SPST",
     "Country of Diffusion": "Not available",
     "Country of Origin": "Taiwan",
     "Crosstalk": "-90dB @ 1MHz",
     "Current - Leakage (IS(off)) (Max)": "100pA",
     "ECCN": "EAR99",
+    "Factory Pack Quantity": "62",
     "HTS Code (CA)": "8542390000",
     "HTS Code (CN)": "8542399000",
     "HTS Code (EU TARIC)": "8542399000",
@@ -244,24 +381,48 @@
     "HTS Code (MX)": "8542399999",
     "HTS Code (US)": "8542390090",
     "Image": "https://www.mouser.com/images/adi/images/ITP_ADI_TSSOP-24_RU-24_t.jpg",
+    "Lead Time": "19 Weeks",
+    "Lifecycle": "Active",
+    "Manufacturer": "Analog Devices Inc.",
+    "Maximum Dual Supply Voltage": "2.75 V",
+    "Maximum Operating Temperature": "+ 85 C",
+    "Minimum Dual Supply Voltage": "2.25 V",
+    "Minimum Operating Temperature": "- 40 C",
     "Minimum Order Quantity": "1",
     "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Style": "SMD/SMT",
     "Mounting Type": "Surface Mount",
     "Multiplexer/Demultiplexer Circuit": "1:1",
+    "Number of Channels": "8 Channel",
     "Number of Circuits": "8",
+    "Off Time - Max": "15 ns",
+    "On Resistance - Max": "5 Ohms",
+    "On Time - Max": "32 ns",
     "On-State Resistance (Max)": "4.5Ohm",
     "Operating Temperature": "-40°C ~ 85°C (TA)",
     "Order Multiple": "1",
+    "Package": "TSSOP-24",
     "Package / Case": "24-TSSOP (0.173\", 4.40mm Width)",
     "Package Type": "Tube",
     "Packaging": "Tube",
+    "Pd - Power Dissipation": "125 uW",
     "Product Category": "Analog Switch ICs",
+    "Product Type": "Analog Switch ICs",
     "REACH": "REACH Unaffected",
     "RoHS": "RoHS Compliant",
+    "Series": "ADG714",
     "Standard Pack Qty": "62",
+    "Subcategory": "Switch ICs",
     "Supplier Device Package": "24-TSSOP",
+    "Supply Current - Max": "20 uA",
+    "Supply Type": "Single Supply, Dual Supply",
+    "Supply Voltage - Max": "5.5 V",
+    "Supply Voltage - Min": "2.7 V",
     "Switch Circuit": "SPST - NO",
+    "Switch Continuous Current": "30 mA",
     "Switch Time (Ton, Toff) (Max)": "20ns, 8ns (Typ)",
+    "US Tariff %": "0.0",
+    "Unit Weight": "0.007478 oz",
     "Unit Weight (kg)": "0.000212",
     "Voltage - Supply, Dual (V±)": "±2.5V",
     "Voltage - Supply, Single (V+)": "2.7V ~ 5.5V"
