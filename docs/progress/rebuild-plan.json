@@ -10,8 +10,8 @@
     "Everything done within the app, not some third party manipulation u do.",
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either."
   ],
-  "updated": "2026-07-27 19:18 UTC",
-  "now": "PROVEN this session: both broken CAD vendor URLs fixed (Ultra Librarian 404'd, SamacSys never searched) and UL's driver picks the right controls incl. KiCAD v6+, tested against a captured fixture of the real page. NOT YET PROVEN at the layer you see: that a guided capture inside the real app ends with files attached to a part - jsdom is not WebView2 and no real download was exercised. NEXT, first: deploy HEAD, run guided capture on a real part, and check the RECORD carries the refs with an ultralibrarian origin.",
+  "updated": "2026-07-27 19:41 UTC",
+  "now": "Guided capture now has ONE engine that runs identically on Linux and Windows: Playwright (already bundled) replaces the Windows-only WebView2 download intercept, and the vendor logic moved from injected JS into testable Python. Proven end to end on Linux - real browser, real vendor markup, real download, real classification (8 tests, tamper-proven). Ultra Librarian's duplicate JS driver was DELETED and a gate now fails if any vendor grows a second implementation. LEFT: the frontend still enters via a Windows-only pywebview call; making that an HTTP route is what finishes the unification.",
   "now_updated": "",
   "projects": [
     {
