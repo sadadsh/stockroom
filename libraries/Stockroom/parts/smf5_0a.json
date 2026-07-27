@@ -1,0 +1,735 @@
+{
+  "alternates": {
+    "HTS Code (MX)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8541.10.01"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8541100199"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8541100040"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8541100080"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "8541.10.0080"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "https://www.mouser.com/images/littelfuse/images/SOD_123_FL_2_SPL.jpg"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6535/1801%7ESOD123W%7E%7E2.jpg"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "20"
+      },
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "1"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "-55℃~+150℃"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "-55°C ~ 175°C (TJ)"
+      }
+    ],
+    "Order Multiple": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "20"
+      },
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "1"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "ESD Protection Diodes / TVS Diodes"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "Circuit Protection"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "datasheet_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://datasheet.lcsc.com/datasheet/pdf/b4e3a5aa7abf8ca791aaf2f56f13158d.pdf?productCode=C19077497"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "https://services.taiwansemi.com/storage/resources/datasheet/SMF5.0A SERIES_D2103.pdf"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "9.2VC Clamp 21.7A@10/1000us Ipp TVS DIODE SOD-123FL"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "ESD Protection Diodes / TVS Diodes 200W 5V 5% Uni-directional"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "TVS DIODE 5VWM 9.2VC SOD123W"
+      }
+    ],
+    "lead_time": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "119 Days"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "20"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "R+O"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Littelfuse"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "Taiwan Semiconductor Corporation"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C19077497.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/search?q=SMF5.0A"
+      }
+    ]
+  },
+  "category": "Diodes",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "smf5_0a.pdf",
+    "source_url": ""
+  },
+  "description": "9.2VC Clamp 21.7A@10/1000us Ipp TVS DIODE SOD-123FL",
+  "display_name": "ESD Protection Diode SOD-123FL",
+  "eda": {},
+  "enrichment": {
+    "Applications": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "BRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Clamping Voltage": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Current - Peak Pulse (10/1000µs)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Is Asian Brand": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "KRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number of Channels": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Operating Temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Peak Pulse Current (Ipp)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Peak Pulse Power Dissipation (Ppp)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Polarity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Power - Peak Pulse": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Power Line Protection": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reverse Leakage Current (Ir)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reverse Stand-Off Voltage (Vrwm)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Unidirectional Channels": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Voltage - Breakdown": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Voltage - Breakdown (Min)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Clamping (Max) @ Ipp": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Reverse Standoff (Typ)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "smf5_0a",
+  "manufacturer": "R+O",
+  "mpn": "SMF5.0A",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.023571429,
+          "qty": 15
+        },
+        {
+          "price": 0.019285714,
+          "qty": 3000
+        },
+        {
+          "price": 0.017428571,
+          "qty": 9000
+        },
+        {
+          "price": 0.013142857,
+          "qty": 45000
+        },
+        {
+          "price": 0.012571429,
+          "qty": 135000
+        },
+        {
+          "price": 0.012185714,
+          "qty": 315000
+        }
+      ],
+      "stock": 199361,
+      "url": "https://www.lcsc.com/product-detail/C19077497.html",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Applications": "General Purpose",
+    "Assembly Country of Origin": "Not available",
+    "Available On Reel": "Yes",
+    "BRHTS": "85411029",
+    "Brand Id": "15352",
+    "Catalog Id": "702",
+    "Clamping Voltage": "9.2V",
+    "Contains Battery": "No",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
+    "Currency Symbol": "$",
+    "Currency Type": "USD",
+    "Current - Peak Pulse (10/1000µs)": "21.7A",
+    "ECCN": "EAR99",
+    "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/9a1dcdbe55124b3a9a6968961332b55b.svg?t=1757067020",
+    "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/2afbc72380b648e8a33aa6211a01650f.svg?t=1757067020",
+    "HTS Code (BR)": "85411011",
+    "HTS Code (CA)": "8541100090",
+    "HTS Code (CN)": "8541100000",
+    "HTS Code (EU TARIC)": "8541100000",
+    "HTS Code (IN)": "85411000",
+    "HTS Code (JP)": "854110090",
+    "HTS Code (MX)": "8541.10.01",
+    "HTS Code (TARIC)": "8541100000",
+    "HTS Code (US)": "8541100040",
+    "Has Third Party Stock": "No",
+    "Image": "https://www.mouser.com/images/littelfuse/images/SOD_123_FL_2_SPL.jpg",
+    "Is Asian Brand": "Yes",
+    "Is Cable Category": "No",
+    "Is Foreign Display": "Yes",
+    "Is Foreign Onsale": "Yes",
+    "Is Infringement": "No",
+    "Is Mro": "No",
+    "Is Not Overstock": "No",
+    "Is Real Price": "Yes",
+    "Is Show Foreign Price": "Yes",
+    "KRHTS": "8541109000",
+    "Key Attributes": "TVS DIODE 5VWM 9.2VC SOD-123FL",
+    "LCSC Category": "TVS Diodes",
+    "LCSC Category Path": "Circuit Protection > Transient Voltage Suppressors (TVS)",
+    "LCSC Parent Category": "Transistors/Thyristors",
+    "LCSC Product ID": "20275582",
+    "LCSC Product Name": "TVS DIODE 5VWM 9.2VC SOD-123FL",
+    "LCSC Title": "R+O SMF5.0A",
+    "LCSC Warehouse Category": "TVS Diodes",
+    "Lead Time": "119 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "20",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
+    "Number of Channels": "1",
+    "Operating Temperature": "-55℃~+150℃",
+    "Order Multiple": "20",
+    "Package": "SOD-123FL",
+    "Package / Case": "SOD-123W",
+    "Package Quantity": "3000",
+    "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
+    "Packaging": "Tape & Reel (TR)",
+    "Parent Catalog Id": "320",
+    "Peak Pulse Current (Ipp)": "21.7A@10/1000us",
+    "Peak Pulse Power Dissipation (Ppp)": "200W@10/1000us",
+    "Polarity": "Unidirectional",
+    "Popular Part": "No",
+    "Power - Peak Pulse": "200W",
+    "Power Line Protection": "No",
+    "Pre-Sale": "No",
+    "Product Category": "ESD Protection Diodes / TVS Diodes",
+    "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20231227_hongjiacheng-SMF5-0A_C19077497_front.jpg",
+    "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20231227_hongjiacheng-SMF5-0A_C19077497_back.jpg",
+    "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20231227_hongjiacheng-SMF5-0A_C19077497_blank.jpg",
+    "REACH": "REACH Affected",
+    "Reel Setup Fee": "3",
+    "Reverse Leakage Current (Ir)": "400uA",
+    "Reverse Stand-Off Voltage (Vrwm)": "5V",
+    "RoHS": "Yes",
+    "Series": "SMF",
+    "Standard Pack Qty": "3000",
+    "Standard Package": "10000",
+    "Stock": "263360",
+    "Stock (Domestic)": "263360",
+    "Stock (Overseas)": "263360",
+    "Stock (Shenzhen)": "263360",
+    "Supplier Device Package": "SOD-123W",
+    "Type": "Zener",
+    "Unidirectional Channels": "1",
+    "Unit": "Piece",
+    "Unit Weight (kg)": "8.414700001e-05",
+    "Voltage - Breakdown": "7V",
+    "Voltage - Breakdown (Min)": "6.4V",
+    "Voltage - Clamping (Max) @ Ipp": "9.2V",
+    "Voltage - Reverse Standoff (Typ)": "5V",
+    "Weight": "0.04",
+    "Weight (kg)": "4.0333e-05",
+    "Wm Catalog Id": "702",
+    "type": "TVS"
+  },
+  "tags": [],
+  "value": ""
+}
