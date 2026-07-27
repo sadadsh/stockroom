@@ -228,6 +228,24 @@ class MouserAdapter:
     def enabled(self) -> bool:
         return bool(self.api_key)
 
+    def fetch_payload(self, mpn: str) -> dict | None:
+        """The RAW response body, for storing under `sourced/` verbatim as evidence.
+
+        `lookup` parses and discards the body; an IMPORT has to keep it, because the whole point of
+        the sourced layer is that the derivation can be re-run later against what the vendor
+        actually said. Returns None when the call could not be made or failed - a failed fetch is
+        "no evidence from this source", never an empty payload written over a good one.
+        """
+        if not self.enabled or not mpn or self._requester is None:
+            return None
+        try:
+            body = self._requester(mpn)
+        except EnrichError as exc:
+            self.last_status = status_from_error(exc)
+            return None
+        self.last_status = "ok" if body else "not_found"
+        return body if isinstance(body, dict) else None
+
     def lookup(self, mpn: str) -> EnrichmentResult:
         if not self.enabled or not mpn or self._requester is None:
             return EnrichmentResult()
