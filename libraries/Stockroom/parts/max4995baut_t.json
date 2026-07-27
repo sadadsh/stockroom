@@ -46,6 +46,59 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_6_t.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4277/175%7E21-0058%7EUT%7E6.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "98 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2500"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+125℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 125°C"
       }
     ],
     "Packaging": [
@@ -60,6 +113,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Power Switch ICs - Power Distribution"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -70,6 +135,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
       }
     ],
     "description": [
@@ -82,6 +152,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Power Switch ICs - Power Distribution 50mA to 600mA Programmable Current-Limit"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC CURRENT SWITCH 10% SOT6"
       }
     ],
     "manufacturer": [
@@ -137,6 +212,10 @@
     }
   },
   "enrichment": {
+    "Accuracy": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Assembly Country of Origin": {
       "confidence": "high",
       "source": "mouser"
@@ -177,6 +256,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Current - Output": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "ECCN": {
       "confidence": "medium",
       "source": "lcsc"
@@ -192,6 +275,10 @@
     "Features": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Function": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "HTS Code (BR)": {
       "confidence": "medium",
@@ -317,6 +404,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of Channels": {
       "confidence": "medium",
       "source": "lcsc"
@@ -333,6 +428,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -340,6 +439,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -365,6 +468,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -376,6 +483,10 @@
     "Standard Pack Qty": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Stock": {
       "confidence": "medium",
@@ -393,6 +504,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Type": {
       "confidence": "medium",
       "source": "lcsc"
@@ -404,6 +519,10 @@
     "Unit Weight (kg)": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Voltage - Input": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Voltage - Supply": {
       "confidence": "medium",
@@ -466,10 +585,67 @@
       "stock": 42,
       "url": "https://www.lcsc.com/product-detail/C2155763.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:09.719573+00:00",
+      "part_number": "700-MAX4995BAUTT",
+      "price_breaks": [
+        {
+          "price": 6.9,
+          "qty": 1
+        },
+        {
+          "price": 5.29,
+          "qty": 10
+        },
+        {
+          "price": 4.89,
+          "qty": 25
+        },
+        {
+          "price": 4.45,
+          "qty": 100
+        },
+        {
+          "price": 4.24,
+          "qty": 250
+        },
+        {
+          "price": 4.11,
+          "qty": 500
+        },
+        {
+          "price": 4.06,
+          "qty": 1000
+        },
+        {
+          "price": 3.99,
+          "qty": 2500
+        }
+      ],
+      "stock": 3740,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:09.719573+00:00",
+      "part_number": "MAX4995BAUT+TTR-ND",
+      "price_breaks": [
+        {
+          "price": 3.9949,
+          "qty": 2500
+        }
+      ],
+      "stock": 4239,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
+    "Accuracy": "±10%",
     "Assembly Country of Origin": "Not available",
     "Available On Reel": "Yes",
     "Brand Id": "234",
@@ -480,10 +656,12 @@
     "Country of Origin": "Thailand",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Current - Output": "Adjustable",
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/f3d2a2ecf658447dac746eb15158a989.svg?t=1697018917",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/b6027c3abb4842fba4fedf55e9878c11.svg?t=1697018917",
     "Features": "Overcurrent Protection;Short-Circuit Protection;Over temperature protection;Reverse current blocking;Latch protection",
+    "Function": "Current Switch",
     "HTS Code (BR)": "85365090",
     "HTS Code (CA)": "8536501000",
     "HTS Code (CN)": "8536500090",
@@ -515,28 +693,36 @@
     "Lifecycle": "Active",
     "Maximum Continuous Current": "600mA",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
     "Number of Channels": "1",
     "Operating Temperature": "-40℃~+125℃",
     "Order Multiple": "1",
     "Package": "SOT-23-6",
+    "Package / Case": "SOT-23-6",
     "Package Quantity": "2500",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "380",
     "Popular Part": "No",
     "Pre-Sale": "No",
     "Product Category": "Power Switch ICs - Power Distribution",
     "RDS(on)": "130mΩ",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "RoHS": "Yes",
     "Standard Pack Qty": "2500",
+    "Standard Package": "2500",
     "Stock": "36",
     "Stock (Domestic)": "36",
     "Stock (Overseas)": "36",
     "Stock (Shenzhen)": "36",
+    "Supplier Device Package": "SOT-23-6",
     "Type": "Load Switch",
     "Unit": "Piece",
     "Unit Weight (kg)": "3.6e-05",
+    "Voltage - Input": "1.7V ~ 5.5V",
     "Voltage - Supply": "1.7V~5.5V",
     "Weight": "0.001",
     "Weight (kg)": "1e-06",
