@@ -21,6 +21,8 @@ from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.category import category_nickname
 from stockroom.model.part import (
+    Asset,
+    AssetOrigin,
     AssetRef,
     Datasheet,
     EdaAssets,
@@ -140,6 +142,14 @@ def staged_missing_fields(staged: "StagedPart") -> list[str]:
         "purchase": any(bool(p.url) for p in staged.purchase),
     }
     return missing_from_presence(present)
+
+
+def _utc_now() -> str:
+    """Now, as the ISO-8601 Z string the records use. One helper so every provenance stamp in this
+    module has the same shape and the same clock."""
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def derivation_status(index) -> dict:
@@ -534,18 +544,27 @@ class LibraryOps:
             txn.commit(_reference_commit_message(record))
         return record
 
-    def attach_symbol(self, part_id: str, lib: str, name: str, tool: str = "kicad") -> PartRecord:
+    def attach_symbol(
+        self, part_id: str, lib: str, name: str, tool: str = "kicad",
+        *, origin: AssetOrigin | None = None, now_iso: str = "",
+    ) -> PartRecord:
         """Attach (or repoint) a symbol REFERENCE on an existing record, tagged with the EDA
         `tool` ("kicad" today, "altium" later). Reference-only: no symbol file is copied
         (the lib_id points at an existing library). One atomic commit."""
-        return self._attach_libref(part_id, "symbol", lib, name, tool)
+        return self._attach_libref(part_id, "symbol", lib, name, tool, origin, now_iso)
 
-    def attach_footprint(self, part_id: str, lib: str, name: str, tool: str = "kicad") -> PartRecord:
+    def attach_footprint(
+        self, part_id: str, lib: str, name: str, tool: str = "kicad",
+        *, origin: AssetOrigin | None = None, now_iso: str = "",
+    ) -> PartRecord:
         """Attach (or repoint) a footprint REFERENCE on an existing record, tagged with the
         EDA `tool`. Reference-only (lib_id, no file copied). One atomic commit."""
-        return self._attach_libref(part_id, "footprint", lib, name, tool)
+        return self._attach_libref(part_id, "footprint", lib, name, tool, origin, now_iso)
 
-    def _attach_libref(self, part_id: str, field: str, lib: str, name: str, tool: str) -> PartRecord:
+    def _attach_libref(
+        self, part_id: str, field: str, lib: str, name: str, tool: str,
+        origin: AssetOrigin | None = None, now_iso: str = "",
+    ) -> PartRecord:
         if not name.strip():
             raise ValueError(f"a {field} reference needs a name")
         # Storage is symmetric now (every tool has its own symbol/footprint/model slot), so
@@ -563,7 +582,20 @@ class LibraryOps:
                 f"POST /api/altium/parts/{{id}}/attach, which copies the real files."
             )
         record = self.load_record(part_id)
-        record.assets_for(tool).set(field, AssetRef(lib=lib, name=name))
+        # Assigning a bare AssetRef REPLACES the whole slot, which drops any previous origin and
+        # checks with it -- correct, and load-bearing: provenance describes a FILE, so a repointed
+        # reference must not keep the old vendor's name on a different vendor's file. An attach
+        # that names no vendor therefore leaves the asset honestly UNATTRIBUTED rather than
+        # inheriting the last one's.
+        asset = Asset(ref=AssetRef(lib=lib, name=name))
+        if origin is not None:
+            # `captured_at` is stamped HERE, never taken from the caller: a provenance timestamp a
+            # client can set is not evidence of when anything was captured.
+            asset.origin = AssetOrigin(
+                vendor=origin.vendor, url=origin.url,
+                captured_at=now_iso or _utc_now(), extra=dict(origin.extra),
+            )
+        record.assets_for(tool).set(field, asset)
         json_path = self.lib.parts_dir / f"{part_id}.json"
         with Transaction(self.repo) as txn:
             json_path.write_text(record.dumps(), encoding="utf-8")

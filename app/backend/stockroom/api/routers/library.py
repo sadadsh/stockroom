@@ -42,6 +42,28 @@ _HISTORY_MAX = 100
 _rescan_lock = threading.Lock()
 
 
+def _origin_from(body: dict):
+    """The provenance a caller claims for an asset, or None.
+
+    `vendor` and `url` are the caller's to state -- only the guided flow knows which page the
+    person actually downloaded from. `captured_at` is NOT accepted: `LibraryOps` stamps it from
+    the server clock, because a provenance timestamp a client can set is not evidence.
+
+    A body with no vendor AND no url returns None rather than an empty origin, so an attach that
+    records nothing leaves the asset honestly UNATTRIBUTED instead of claiming a blank vendor.
+    """
+    from stockroom.model.asset import AssetOrigin
+
+    raw = body.get("origin")
+    if not isinstance(raw, dict):
+        return None
+    vendor = str(raw.get("vendor") or "").strip()
+    url = str(raw.get("url") or "").strip()
+    if not (vendor or url):
+        return None
+    return AssetOrigin(vendor=vendor, url=url)
+
+
 def _part_json_path(ctx, part_id: str):
     return ctx.profile.library.parts_dir / f"{part_id}.json"
 
@@ -484,7 +506,10 @@ def library_router(require_token) -> APIRouter:
         lib, name = (body.get("lib") or "").strip(), (body.get("name") or "").strip()
         if not name:
             raise ApiError(422, "a symbol reference needs a name")
-        rec = ctx.ops.attach_symbol(part_id, lib, name, tool=(body.get("tool") or "kicad").strip())
+        rec = ctx.ops.attach_symbol(
+            part_id, lib, name, tool=(body.get("tool") or "kicad").strip(),
+            origin=_origin_from(body),
+        )
         ctx.rebuild_index()
         ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return rec.to_dict()
@@ -499,7 +524,10 @@ def library_router(require_token) -> APIRouter:
         lib, name = (body.get("lib") or "").strip(), (body.get("name") or "").strip()
         if not name:
             raise ApiError(422, "a footprint reference needs a name")
-        rec = ctx.ops.attach_footprint(part_id, lib, name, tool=(body.get("tool") or "kicad").strip())
+        rec = ctx.ops.attach_footprint(
+            part_id, lib, name, tool=(body.get("tool") or "kicad").strip(),
+            origin=_origin_from(body),
+        )
         ctx.rebuild_index()
         ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return rec.to_dict()
