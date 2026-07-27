@@ -22,6 +22,35 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8533210030"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8533.21.0030"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/yageo/images/CQ_x_NPO_DSL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4205/AC-Series--SMD-Chip-Resistor.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "84 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "20"
       }
     ],
     "Minimum Order Quantity": [
@@ -34,6 +63,11 @@
         "confidence": "medium",
         "source": "mouser",
         "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
       }
     ],
     "Order Multiple": [
@@ -60,6 +94,30 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Thick Film Resistors - SMD"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Resistors"
+      }
+    ],
+    "Resistance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "680Ω"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "680 Ohms"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -70,6 +128,23 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant By Exemption"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Temperature Coefficient": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "±100ppm/℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±100ppm/°C"
       }
     ],
     "datasheet_url": [
@@ -94,6 +169,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Thick Film Resistors - SMD 680 Ohms 1/16 W 50 V 1 % 0402 100 PPM / C - 55 C /  + 155 C AEC-Q200"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "RES SMD 680 OHM 1% 1/16W 0402"
       }
     ],
     "product_url": [
@@ -157,6 +237,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Composition": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Contains Battery": {
       "confidence": "medium",
       "source": "lcsc"
@@ -188,6 +272,10 @@
     "EDA Symbol SVG": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Features": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "HTS Code (BR)": {
       "confidence": "medium",
@@ -228,6 +316,10 @@
     "Has Third Party Stock": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Height - Seated (Max)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Image": {
       "confidence": "medium",
@@ -317,6 +409,18 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number of Terminations": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Order Multiple": {
       "confidence": "medium",
       "source": "lcsc"
@@ -325,6 +429,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -332,6 +440,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -344,6 +456,10 @@
     "Popular Part": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Power (Watts)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Power(Watts)": {
       "confidence": "medium",
@@ -369,6 +485,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -381,9 +501,21 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Size / Dimension": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Standard Pack Qty": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Stock": {
       "confidence": "medium",
@@ -400,6 +532,10 @@
     "Stock (Shenzhen)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Temperature Coefficient": {
       "confidence": "medium",
@@ -482,6 +618,70 @@
       "stock": 20104,
       "url": "https://www.lcsc.com/product-detail/C227187.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:04:56.590130+00:00",
+      "part_number": "603-AC0402FR-07680RL",
+      "price_breaks": [
+        {
+          "price": 0.1,
+          "qty": 1
+        },
+        {
+          "price": 0.011,
+          "qty": 10
+        },
+        {
+          "price": 0.007,
+          "qty": 100
+        },
+        {
+          "price": 0.005,
+          "qty": 1000
+        },
+        {
+          "price": 0.002,
+          "qty": 10000
+        }
+      ],
+      "stock": 769135,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:04:56.590130+00:00",
+      "part_number": "YAG3505TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00379,
+          "qty": 10000
+        },
+        {
+          "price": 0.00338,
+          "qty": 20000
+        },
+        {
+          "price": 0.00318,
+          "qty": 30000
+        },
+        {
+          "price": 0.00297,
+          "qty": 50000
+        },
+        {
+          "price": 0.00284,
+          "qty": 70000
+        },
+        {
+          "price": 0.00273,
+          "qty": 100000
+        }
+      ],
+      "stock": 13165,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -491,6 +691,7 @@
     "BRHTS": "85332120",
     "Brand Id": "396",
     "Catalog Id": "1199",
+    "Composition": "Thick Film",
     "Contains Battery": "No",
     "Country of Diffusion": "Not available",
     "Country of Origin": "Taiwan",
@@ -499,6 +700,7 @@
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/fafd024f554e426eb74cf4a204aa88b0.svg?t=1732211421",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/1a28f35362f8498bb6f7b7f2af8afd2b.svg?t=1732211421",
+    "Features": "Automotive AEC-Q200, Moisture Resistant",
     "HTS Code (BR)": "85332110",
     "HTS Code (CA)": "8533210000",
     "HTS Code (CN)": "8533211000",
@@ -509,6 +711,7 @@
     "HTS Code (TARIC)": "8533210000",
     "HTS Code (US)": "8533210020",
     "Has Third Party Stock": "No",
+    "Height - Seated (Max)": "0.015\" (0.37mm)",
     "Image": "https://www.mouser.com/images/yageo/images/CQ_x_NPO_DSL.jpg",
     "Is Asian Brand": "Yes",
     "Is Cable Category": "No",
@@ -531,27 +734,38 @@
     "Lead Time": "84 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "100",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Number of Terminations": "2",
+    "Operating Temperature": "-55°C ~ 155°C",
     "Order Multiple": "100",
     "Package": "0402",
+    "Package / Case": "0402 (1005 Metric)",
     "Package Quantity": "10000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "308",
     "Popular Part": "No",
+    "Power (Watts)": "0.063W, 1/16W",
     "Power(Watts)": "62.5mW",
     "Pre-Sale": "No",
     "Product Category": "Thick Film Resistors - SMD",
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20250904_YAGEO-AC0402FR-07680RL_C227187_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20250904_YAGEO-AC0402FR-07680RL_C227187_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20250904_YAGEO-AC0402FR-07680RL_C227187_blank.jpg",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "Resistance": "680Ω",
     "RoHS": "Yes",
+    "Series": "AC",
+    "Size / Dimension": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)",
     "Standard Pack Qty": "10000",
+    "Standard Package": "10000",
     "Stock": "0",
     "Stock (Domestic)": "0",
     "Stock (Overseas)": "0",
     "Stock (Shenzhen)": "0",
+    "Supplier Device Package": "0402",
     "Temperature Coefficient": "±100ppm/℃",
     "Tolerance": "±1%",
     "Type": "Thick Film Resistor",
