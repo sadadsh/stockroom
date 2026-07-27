@@ -129,7 +129,25 @@
   },
   "description": "Polymeric PTC Resettable Fuse 6V 500mA Surface Mount 1206",
   "display_name": "Resettable Fuse 1206",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "1206L050YR"
+      },
+      "model": {
+        "file": "models/1206L050YR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "1206L050YR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
