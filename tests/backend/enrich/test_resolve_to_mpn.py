@@ -97,3 +97,41 @@ def test_a_category_the_user_already_chose_is_never_overwritten(tmp_path):
                          mpn="TPD6E05U06RVZR", display_name="x", entry_name="x")
     p.enrich_candidate(c)
     assert c.category == "Connectors & Sockets"
+
+
+def test_a_resolved_stock_number_is_cached_so_a_re_run_costs_nothing(tmp_path):
+    """Mouser's Search API is capped at 1000 calls/DAY (practitioner-documented; the 30/minute
+    figure is already hardcoded in the limiter). A register import spends up to two Mouser calls
+    per part, so 166 parts is ~332 - and an uncached resolve makes every re-run, and every
+    preview-then-import pair, pay that half again. Two full runs would be most of a day's budget.
+
+    The enrich leg is already TTL-cached; this closes the other half.
+    """
+    mouser = _Adapter({"595-TPD6E05U06RVZR": _res("TPD6E05U06RVZR", "https://m/x")})
+    p = EnrichmentPipeline(tmp_path, mouser=mouser)
+    first = p.resolve_to_mpn("595-TPD6E05U06RVZR")
+    second = p.resolve_to_mpn("595-TPD6E05U06RVZR")
+    assert first.mpn == second.mpn == "TPD6E05U06RVZR"
+    assert second.vendor == "mouser" and second.resolved is True
+    assert second.product_url == "https://m/x"
+    assert mouser.queries == ["595-TPD6E05U06RVZR"], "the second call must not hit the API"
+
+
+def test_a_second_pipeline_reads_the_same_cache(tmp_path):
+    """The preview and the import are separate pipeline objects built per request, so an
+    in-memory memo would have cached nothing across them - the exact pair this is for."""
+    mouser = _Adapter({"595-X": _res("REALPART")})
+    EnrichmentPipeline(tmp_path, mouser=mouser).resolve_to_mpn("595-X")
+    again = EnrichmentPipeline(tmp_path, mouser=mouser).resolve_to_mpn("595-X")
+    assert again.mpn == "REALPART"
+    assert mouser.queries == ["595-X"]
+
+
+def test_a_failed_resolve_is_not_cached(tmp_path):
+    """A miss is usually a transient network or rate-limit failure, and caching it would make one
+    bad minute stick for the whole TTL. Only a real answer is worth remembering."""
+    mouser = _Adapter({})
+    p = EnrichmentPipeline(tmp_path, mouser=mouser)
+    p.resolve_to_mpn("999-NOTHING")
+    p.resolve_to_mpn("999-NOTHING")
+    assert mouser.queries == ["999-NOTHING", "999-NOTHING"]
