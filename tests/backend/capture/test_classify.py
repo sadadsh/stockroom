@@ -169,3 +169,37 @@ def test_zip_nested_inside_a_zip_classifies_its_members(tmp_path):
     got = classify_asset(outer)
     assert Requirement.ALTIUM_SYMBOL in got.requirements
     assert Requirement.ALTIUM_FOOTPRINT in got.requirements
+
+
+def test_a_pcad_lia_satisfies_BOTH_altium_requirements(tmp_path):
+    """MEASURED 2026-07-27 by downloading Ultra Librarian's PCAD v15 export for a real part.
+
+    OWNER'S CORRECTION, and they were right: *"in ul when u download the altium pcad files it gives
+    u a lia"*. A `.LIA` is a P-CAD ASCII library, which Altium Designer imports directly. The
+    downloaded file carries `ACCEL_ASCII` plus exactly one `symbolDef` (the schematic symbol), one
+    `patternDef` (the PCB footprint) and one `compDef` - 69 pads and 212 pin references - so ONE
+    file satisfies altium_symbol AND altium_footprint, the same shape as a compiled `.IntLib`.
+
+    This corrects a conclusion that had been coded as capability: measuring only the "Altium
+    Designer (script based)" row (which ships a Delphi script and no libraries) had produced
+    "Ultra Librarian cannot supply Altium", which was over-generalised from one row of three.
+    """
+    lia = tmp_path / "TPD6E05U06RVZR.lia"
+    lia.write_text('ACCEL_ASCII "TEST.LIA"\n(symbolDef "S")\n(patternDef "P")\n', encoding="utf-8")
+    got = classify_asset(lia)
+    assert Requirement.ALTIUM_SYMBOL in got.requirements
+    assert Requirement.ALTIUM_FOOTPRINT in got.requirements
+    assert got.tool == "altium"
+
+
+def test_a_lia_inside_a_vendor_zip_is_found_too(tmp_path):
+    """Ultra Librarian delivers it nested under `AltiumV15/`, never loose."""
+    import zipfile
+
+    bundle = tmp_path / "ul.zip"
+    with zipfile.ZipFile(bundle, "w") as zf:
+        zf.writestr("AltiumV15/2026-07-27_20-52-11.lia", 'ACCEL_ASCII "X"\n(symbolDef "S")\n')
+        zf.writestr("AltiumV15/ImportGuide.html", "<html></html>")
+    got = classify_asset(bundle)
+    assert Requirement.ALTIUM_SYMBOL in got.requirements
+    assert Requirement.ALTIUM_FOOTPRINT in got.requirements

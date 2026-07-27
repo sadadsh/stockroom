@@ -25,6 +25,15 @@ _SUFFIX_REQ: dict[str, Requirement] = {
 }
 # A compiled Altium IntLib carries both symbol and footprint.
 _INTLIB_REQS = frozenset({Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT})
+# A P-CAD ASCII library (.LIA) does too, and Altium Designer imports it directly. MEASURED
+# 2026-07-27 on Ultra Librarian's PCAD v15 export for a real part: `ACCEL_ASCII` header, exactly
+# one `symbolDef` (schematic symbol), one `patternDef` (PCB footprint) and one `compDef`, with 69
+# pads and 212 pin references. It is delivered nested under `AltiumV15/`, never loose.
+#
+# This is how Ultra Librarian supplies Altium at all. Its other Altium row, "Altium Designer
+# (script based)", ships a Delphi script and NO libraries - and measuring only that row had
+# produced the over-general conclusion that UL could not serve Altium.
+_LIA_REQS = _INTLIB_REQS
 
 _TOOL_FOR_REQ = {
     Requirement.KICAD_SYMBOL: "kicad",
@@ -43,6 +52,7 @@ _KIND_FOR_SUFFIX = {
     ".schlib": ("altium", "symbol"),
     ".pcblib": ("altium", "footprint"),
     ".intlib": ("altium", "symbol"),
+    ".lia": ("altium", "symbol"),
 }
 
 
@@ -57,6 +67,8 @@ def _reqs_for_suffix(suffix: str) -> frozenset[Requirement]:
     s = suffix.lower()
     if s == ".intlib":
         return _INTLIB_REQS
+    if s == ".lia":
+        return _LIA_REQS
     req = _SUFFIX_REQ.get(s)
     return frozenset({req}) if req is not None else frozenset()
 
