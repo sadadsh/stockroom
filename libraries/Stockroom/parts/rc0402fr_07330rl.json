@@ -1,4 +1,119 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8533210020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8533.21.0030"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4849/13_0402-%281005-metric%29.jpg"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "100"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Thick Film Resistors - SMD"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Resistors"
+      }
+    ],
+    "Resistance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "330 Ohm"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "330 Ohms"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Temperature Coefficient": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "±100ppm/℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±100ppm/°C"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±1%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Resistor, 330 Ohm, 1%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: RC0402FR-07330RL Thick Film Resistors - SMD – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "RES 330 OHM 1% 1/16W 0402"
+      }
+    ]
+  },
   "category": "Resistors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +137,64 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Composition": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Features": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Height - Seated (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number of Terminations": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Power (Watts)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Size / Dimension": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    }
+  },
   "hashes": null,
   "id": "rc0402fr_07330rl",
   "manufacturer": "Yageo",
@@ -37,8 +209,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:03:09.460687+00:00",
+      "part_number": "603-RC0402FR-07330RL",
       "price_breaks": [
         {
           "price": 0.000571429,
@@ -68,6 +240,40 @@
       "stock": 790740,
       "url": "https://www.mouser.com/c/?q=RC0402FR-07330RL",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:09.460687+00:00",
+      "part_number": "311-330LRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0031,
+          "qty": 10000
+        },
+        {
+          "price": 0.00275,
+          "qty": 20000
+        },
+        {
+          "price": 0.00257,
+          "qty": 30000
+        },
+        {
+          "price": 0.00239,
+          "qty": 50000
+        },
+        {
+          "price": 0.00228,
+          "qty": 70000
+        },
+        {
+          "price": 0.00218,
+          "qty": 100000
+        }
+      ],
+      "stock": 1316276,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -78,6 +284,7 @@
     "BRHTS": "85332120",
     "Brand Id": "396",
     "Catalog Id": "1199",
+    "Composition": "Thick Film",
     "Contains Battery": "No",
     "Country of Diffusion": "Not available",
     "Country of Origin": "Taiwan",
@@ -86,6 +293,7 @@
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/fafd024f554e426eb74cf4a204aa88b0.svg?t=1706581212",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/c34613b941674bcbac73ccaa843a6500.svg?t=1706581212",
+    "Features": "Moisture Resistant",
     "Footprint": "Resistor_SMD:R_0402_1005Metric",
     "HTS Code (BR)": "85332110",
     "HTS Code (CA)": "8533210000",
@@ -97,6 +305,7 @@
     "HTS Code (TARIC)": "8533210000",
     "HTS Code (US)": "8533210020",
     "Has Third Party Stock": "No",
+    "Height - Seated (Max)": "0.016\" (0.40mm)",
     "Image": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg",
     "Is Asian Brand": "Yes",
     "Is Cable Category": "No",
@@ -116,31 +325,41 @@
     "LCSC Product Name": "RES 330Ω ±1% 62.5mW 0402",
     "LCSC Title": "YAGEO RC0402FR-07330RL",
     "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
-    "Lead Time": "56 Days",
+    "Lead Time": "17",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "100",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Number of Terminations": "2",
+    "Operating Temperature": "-55°C ~ 155°C",
     "Order Multiple": "100",
     "Package": "0402",
+    "Package / Case": "0402 (1005 Metric)",
     "Package Quantity": "10000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "308",
     "Popular Part": "No",
     "Power": "0.063 W",
+    "Power (Watts)": "0.063W, 1/16W",
     "Power(Watts)": "62.5mW",
     "Pre-Sale": "No",
     "Product Category": "Thick Film Resistors - SMD",
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20260525_YAGEO-RC0402FR-07330RL_C105875_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20260525_YAGEO-RC0402FR-07330RL_C105875_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20260525_YAGEO-RC0402FR-07330RL_C105875_blank.jpg",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "Resistance": "330 Ohm",
     "RoHS": "Yes",
+    "Series": "RC_L",
+    "Size / Dimension": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)",
     "Standard Pack Qty": "10000",
     "Stock": "5211500",
     "Stock (Domestic)": "5211500",
     "Stock (Overseas)": "5211500",
     "Stock (Shenzhen)": "5211500",
+    "Supplier Device Package": "0402",
     "Symbol": "Device:R",
     "Temperature Coefficient": "±100ppm/℃",
     "Tolerance": "1%",
