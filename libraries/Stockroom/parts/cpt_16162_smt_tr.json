@@ -1,4 +1,90 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8518298000"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8531.80.9041"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/samesky/images/CPT-16162-SMT-TR_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8910/MFG_CPT-16162-SMT-TR.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "91 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "13"
+      }
+    ],
+    "Lifecycle": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "New Product"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Active"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Buzzers & Audio Indicators - Board Mount"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Audio Products"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Buzzers & Audio Indicators - Board Mount buzzer, 16mmx16mmx2.5 mm deep, P, 3 V, 75 dB, Surface Mount, Audio Transducer"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "BUZZER, 16MMX16MMX2.5 MM DEEP, P"
+      }
+    ]
+  },
   "category": "Electromechanical",
   "datasheet": {
     "fetched_at": "",
@@ -21,17 +107,37 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "Current - Supply": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Driver Circuitry": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "ECCN": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Frequency": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "HTS Code (US)": {
       "confidence": "high",
       "source": "mouser"
     },
+    "Height - Seated (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Image": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Input Type": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Lead Time": {
       "confidence": "high",
@@ -45,17 +151,73 @@
       "confidence": "medium",
       "source": "mouser"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Mode": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Order Multiple": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Port Location": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Product Category": {
       "confidence": "high",
       "source": "mouser"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "RoHS": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Size / Dimension": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Sound Pressure Level (SPL)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Technology": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Termination": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Rated": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage Range": {
+      "confidence": "high",
+      "source": "digikey"
     }
   },
   "hashes": null,
@@ -106,6 +268,82 @@
       "stock": 780,
       "url": "https://www.lcsc.com/search?q=CPT-16162-SMT-TR",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:38.631677+00:00",
+      "part_number": "179-CPT-16162-SMT-TR",
+      "price_breaks": [
+        {
+          "price": 2.28,
+          "qty": 1
+        },
+        {
+          "price": 1.77,
+          "qty": 10
+        },
+        {
+          "price": 1.56,
+          "qty": 25
+        },
+        {
+          "price": 1.45,
+          "qty": 50
+        },
+        {
+          "price": 1.35,
+          "qty": 100
+        },
+        {
+          "price": 1.16,
+          "qty": 250
+        },
+        {
+          "price": 1.06,
+          "qty": 500
+        },
+        {
+          "price": 1.03,
+          "qty": 1000
+        }
+      ],
+      "stock": 780,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:38.631677+00:00",
+      "part_number": "2223-CPT-16162-SMT-TRCT-ND",
+      "price_breaks": [
+        {
+          "price": 1.92,
+          "qty": 1
+        },
+        {
+          "price": 1.506,
+          "qty": 10
+        },
+        {
+          "price": 1.3704,
+          "qty": 25
+        },
+        {
+          "price": 1.277,
+          "qty": 50
+        },
+        {
+          "price": 1.1912,
+          "qty": 100
+        },
+        {
+          "price": 1.1016,
+          "qty": 250
+        }
+      ],
+      "stock": 775,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -113,15 +351,34 @@
     "Assembly Country of Origin": "Not available",
     "Country of Diffusion": "Not available",
     "Country of Origin": "China",
+    "Current - Supply": "5mA",
+    "Driver Circuitry": "Transducer, Externally Driven",
     "ECCN": "EAR99",
+    "Frequency": "4kHz",
     "HTS Code (US)": "8518298000",
+    "Height - Seated (Max)": "0.106\" (2.70mm)",
     "Image": "https://www.mouser.com/images/samesky/images/CPT-16162-SMT-TR_SPL.jpg",
+    "Input Type": "Peak-Peak Signal",
     "Lead Time": "91 Days",
     "Lifecycle": "New Product",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
+    "Operating Mode": "Single Tone",
+    "Operating Temperature": "-40°C ~ 85°C",
     "Order Multiple": "1",
+    "Package Type": "Cut Tape (CT)",
+    "Port Location": "Top",
     "Product Category": "Buzzers & Audio Indicators - Board Mount",
-    "RoHS": "RoHS Compliant"
+    "REACH": "REACH Affected",
+    "RoHS": "RoHS Compliant",
+    "Series": "CPT",
+    "Size / Dimension": "0.630\" L x 0.630\" W (16.00mm x 16.00mm)",
+    "Sound Pressure Level (SPL)": "75dB @ 3V, 10cm",
+    "Technology": "Piezo",
+    "Termination": "Solder Pads",
+    "Voltage - Rated": "3 V",
+    "Voltage Range": "1 ~ 25V"
   },
   "tags": [],
   "value": ""
