@@ -34,6 +34,35 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_SOIC-16_D_t.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/3982/296%7E4040047-6%7ED%7E16.JPG"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "16"
       }
     ],
     "Minimum Order Quantity": [
@@ -46,6 +75,23 @@
         "confidence": "medium",
         "source": "mouser",
         "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2500"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+85℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 85°C (TA)"
       }
     ],
     "Order Multiple": [
@@ -72,6 +118,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Analog Switch ICs"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -82,6 +140,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
       }
     ],
     "description": [
@@ -94,6 +157,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Analog Switch ICs 10-Ohm Quad SPDT Ana log Switch A 595-TS A 595-TS3A5018D"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC SWITCH SPDT X 4 10OHM 16SOIC"
       }
     ],
     "manufacturer": [
@@ -161,6 +229,10 @@
     }
   },
   "enrichment": {
+    "-3db Bandwidth": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Assembly Country of Origin": {
       "confidence": "high",
       "source": "mouser"
@@ -176,6 +248,18 @@
     "Catalog Id": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Channel Capacitance (CS(off), CD(off))": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Channel-to-Channel Matching (ΔRon)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Charge Injection": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Con": {
       "confidence": "medium",
@@ -193,6 +277,10 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "Crosstalk": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Currency Symbol": {
       "confidence": "medium",
       "source": "lcsc"
@@ -200,6 +288,10 @@
     "Currency Type": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Current - Leakage (IS(off)) (Max)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "ECCN": {
       "confidence": "medium",
@@ -333,9 +425,29 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Multiplexer/Demultiplexer Circuit": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of Channels": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Number of Circuits": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "On-State Resistance (Max)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Operating Temperature": {
       "confidence": "medium",
@@ -349,6 +461,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -356,6 +472,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -389,6 +509,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -404,6 +528,10 @@
     "Standard Pack Qty": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Stock": {
       "confidence": "medium",
@@ -421,6 +549,18 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Switch Circuit": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Switch Time (Ton, Toff) (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Unit": {
       "confidence": "medium",
       "source": "lcsc"
@@ -432,6 +572,10 @@
     "Voltage - Supply": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Voltage - Supply, Single (V+)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Weight": {
       "confidence": "medium",
@@ -486,20 +630,106 @@
       "stock": 495,
       "url": "https://www.lcsc.com/product-detail/C50314384.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:22.505364+00:00",
+      "part_number": "595-TS3A5018DR",
+      "price_breaks": [
+        {
+          "price": 0.77,
+          "qty": 1
+        },
+        {
+          "price": 0.55,
+          "qty": 10
+        },
+        {
+          "price": 0.494,
+          "qty": 25
+        },
+        {
+          "price": 0.433,
+          "qty": 100
+        },
+        {
+          "price": 0.404,
+          "qty": 250
+        },
+        {
+          "price": 0.386,
+          "qty": 500
+        },
+        {
+          "price": 0.372,
+          "qty": 1000
+        },
+        {
+          "price": 0.356,
+          "qty": 2500
+        },
+        {
+          "price": 0.347,
+          "qty": 5000
+        }
+      ],
+      "stock": 11394,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:22.505364+00:00",
+      "part_number": "296-17611-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.35618,
+          "qty": 2500
+        },
+        {
+          "price": 0.34696,
+          "qty": 5000
+        },
+        {
+          "price": 0.34234,
+          "qty": 7500
+        },
+        {
+          "price": 0.33722,
+          "qty": 12500
+        },
+        {
+          "price": 0.33423,
+          "qty": 17500
+        },
+        {
+          "price": 0.33135,
+          "qty": 25000
+        }
+      ],
+      "stock": 8976,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
+    "-3db Bandwidth": "300MHz",
     "Assembly Country of Origin": "Not available",
     "Available On Reel": "Yes",
     "Brand Id": "12241",
     "Catalog Id": "947",
+    "Channel Capacitance (CS(off), CD(off))": "4.5pF, 9pF",
+    "Channel-to-Channel Matching (ΔRon)": "300mOhm",
+    "Charge Injection": "2pC",
     "Con": "9pF",
     "Contains Battery": "No",
     "Country of Diffusion": "Not available",
     "Country of Origin": "Mexico",
+    "Crosstalk": "-48dB @ 10MHz",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Current - Leakage (IS(off)) (Max)": "100nA",
     "ECCN": "-",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/405ef91df9aa4857a93f9762e211a45b.svg?t=1763010483",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/ffc43b6d72c348f3bd5aa65cf6f25391.svg?t=1763010483",
@@ -533,12 +763,19 @@
     "Lead Time": "112 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "5",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
+    "Multiplexer/Demultiplexer Circuit": "2:1",
     "Number of Channels": "4",
+    "Number of Circuits": "4",
+    "On-State Resistance (Max)": "10Ohm",
     "Operating Temperature": "-40℃~+85℃",
     "Order Multiple": "5",
     "Package": "SOP-16",
+    "Package / Case": "16-SOIC (0.154\", 3.90mm Width)",
     "Package Quantity": "3000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "575",
     "Popular Part": "No",
@@ -547,17 +784,23 @@
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20260411_TECH-PUBLIC-TPTS3A5018DR_C50314384_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20260411_TECH-PUBLIC-TPTS3A5018DR_C50314384_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20260411_TECH-PUBLIC-TPTS3A5018DR_C50314384_blank.jpg",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "RoHS": "Yes",
     "Ron": "6Ω@3.0V",
     "Standard Pack Qty": "2500",
+    "Standard Package": "2500",
     "Stock": "350",
     "Stock (Domestic)": "350",
     "Stock (Overseas)": "350",
     "Stock (Shenzhen)": "350",
+    "Supplier Device Package": "16-SOIC",
+    "Switch Circuit": "SPDT",
+    "Switch Time (Ton, Toff) (Max)": "8ns, 6.5ns",
     "Unit": "Piece",
     "Unit Weight (kg)": "0.0001417",
     "Voltage - Supply": "1.5V~5.5V",
+    "Voltage - Supply, Single (V+)": "1.65V ~ 3.6V",
     "Weight": "1",
     "Weight (kg)": "0.001",
     "Wm Catalog Id": "947"
