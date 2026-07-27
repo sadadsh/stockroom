@@ -11,7 +11,7 @@ def _part():
         description="Li-Ion charger, VQFN-16",
         datasheet=Datasheet(source_url="https://ti.com/ds.pdf"),
         purchase=[Purchase(vendor="DigiKey", part_number="296-1", url="https://dk/1", stock=42)],
-        eda={"altium": EdaAssets(
+        assets={"altium": EdaAssets(
             symbol=AssetRef(lib="BQ24074RGTT.SchLib", name="BQ24074RGTT"),
             footprint=AssetRef(lib="BQ24074RGTT.PcbLib", name="VQFN-16"),
         )},
@@ -24,7 +24,7 @@ def _passive():
         mpn="RC0603FR-0710KL", manufacturer="Yageo", value="",
         description="10 kOhm 1% 0603",
         specs={"Resistance": "10 kOhms"},
-        eda={"altium": EdaAssets(
+        assets={"altium": EdaAssets(
             symbol=AssetRef(lib="rc0603.SchLib", name="RC0603"),
             footprint=AssetRef(lib="rc0603.PcbLib", name="R0603"),
         )},

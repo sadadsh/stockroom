@@ -39,7 +39,7 @@ def test_part_detail_returns_full_record(client):
     assert r.status_code == 200
     body = r.json()
     assert body["mpn"] == "TPS62130"
-    assert body["eda"]["kicad"]["symbol"]["name"] == "TPS62130"
+    assert body["assets"]["kicad"]["symbol"]["ref"]["name"] == "TPS62130"
 
 
 def test_missing_part_detail_is_404(client):
@@ -64,7 +64,7 @@ def test_edit_field_updates_the_record_and_index(client):
 def test_move_category_changes_the_category(client):
     r = client.post("/api/library/parts/tps62130/move", json={"category": "Modules"})
     assert r.status_code == 200
-    assert r.json()["category"] == "Modules"
+    assert r.json()["derived"]["category"] == "Modules"
 
 
 def test_delete_part_removes_it(client):
@@ -85,10 +85,10 @@ def test_set_specs_persists_pinout(client):
         json={"specs": {"pinout": {"value": pins, "source": "datasheet", "confidence": "high"}}},
     )
     assert r.status_code == 200
-    assert r.json()["specs"]["pinout"] == pins
+    assert r.json()["derived"]["specs"]["pinout"] == pins
     # the read surface reflects it
     detail = client.get("/api/library/parts/tps62130").json()
-    assert detail["specs"]["pinout"] == pins
+    assert detail["derived"]["specs"]["pinout"] == pins
     assert detail["enrichment"]["pinout"]["source"] == "datasheet"
 
 
@@ -133,14 +133,14 @@ def test_attach_footprint_endpoint_files_it_under_kicad_and_nowhere_else(client)
     r = client.post("/api/library/parts/mystery/footprint",
                     json={"lib": "Package_SO", "name": "SOIC-8"})
     assert r.status_code == 200
-    eda = r.json()["eda"]
-    assert eda["kicad"]["footprint"] == {"lib": "Package_SO", "name": "SOIC-8", "file": ""}
+    eda = r.json()["assets"]
+    assert eda["kicad"]["footprint"]["ref"] == {"lib": "Package_SO", "name": "SOIC-8", "file": ""}
     # A reference can no longer carry a `tool` tag that disagrees with the slot it sits in,
     # so "which tool got this" is answered by the slot: nothing was filed for Altium.
     assert "altium" not in eda
     # persisted through the index rebuild
     detail = client.get("/api/library/parts/mystery").json()
-    assert detail["eda"]["kicad"]["footprint"]["name"] == "SOIC-8"
+    assert detail["assets"]["kicad"]["footprint"]["ref"]["name"] == "SOIC-8"
 
 
 def test_attach_symbol_endpoint_requires_a_name(client):
@@ -151,12 +151,12 @@ def test_attach_symbol_endpoint_requires_a_name(client):
 def test_detach_asset_removes_one_element_and_400s_when_absent(client):
     # the fixture library's tps62130 carries a symbol; removing it nulls the ref
     detail = client.get("/api/library/parts/tps62130").json()
-    assert detail["eda"]["kicad"]["symbol"] is not None
+    assert detail["assets"]["kicad"]["symbol"] is not None
     # The kind names WHOSE symbol: `<tool>_<asset kind>` from the EDA registry, the same
     # vocabulary capture requirements speak.
     r = client.delete("/api/library/parts/tps62130/assets/kicad_symbol")
     assert r.status_code == 200
-    assert r.json()["eda"]["kicad"]["symbol"] is None
+    assert r.json()["assets"]["kicad"]["symbol"] is None
     # removing it again is an honest 400, never a silent no-op
     assert client.delete("/api/library/parts/tps62130/assets/kicad_symbol").status_code == 400
     # unknown kind -> 400; unknown part -> 404

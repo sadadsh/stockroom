@@ -11,9 +11,14 @@ import shutil
 from pathlib import Path
 
 from stockroom.model.category import category_footprint_lib, category_symbol_lib
+from stockroom.model.sourced import SOURCED_DIRNAME
 from stockroom.vcs.repo import GitRepo
 
-_SUBDIRS = ("parts", "symbols", "footprints", "models", "datasheets")
+# `sourced` holds the raw distributor payloads, one directory per part. It is COMMITTED, not
+# cached: device parity (spec section 10) settles it, because a per-machine cache would let two
+# devices derive different display_name, category and specs for the same part, and a re-derive on
+# a fresh clone would need a full re-fetch from every distributor.
+_SUBDIRS = ("parts", "symbols", "footprints", "models", "datasheets", SOURCED_DIRNAME)
 
 
 def _validate_name(name: str) -> None:
@@ -37,6 +42,12 @@ class ProfileLibrary:
     @property
     def parts_dir(self) -> Path:
         return self.root / "parts"
+
+    @property
+    def sourced_dir(self) -> Path:
+        """The root of the raw-payload tree. One subdirectory per part id; see model/sourced.py,
+        which owns every read and the only write."""
+        return self.root / SOURCED_DIRNAME
 
     @property
     def symbols_dir(self) -> Path:

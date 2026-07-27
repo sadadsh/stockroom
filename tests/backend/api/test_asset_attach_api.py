@@ -67,9 +67,9 @@ def test_inspect_and_commit_assets_onto_an_existing_part(client, app_ctx, tmp_pa
     r = client.post(f"/api/parts/{part_id}/assets/commit", json=candidate)
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["eda"]["kicad"]["symbol"]["name"] == "TESTPART"
-    assert body["eda"]["kicad"]["footprint"]["name"] == "TESTPART"
-    assert body["eda"]["kicad"]["model"] is not None  # the snapeda fixture zip carries a .step file
+    assert body["assets"]["kicad"]["symbol"]["ref"]["name"] == "TESTPART"
+    assert body["assets"]["kicad"]["footprint"]["ref"]["name"] == "TESTPART"
+    assert body["assets"]["kicad"]["model"] is not None  # the snapeda fixture zip carries a .step file
 
     persisted = app_ctx.ops.load_record(part_id)
     assert persisted.assets_for("kicad").symbol is not None and persisted.assets_for("kicad").symbol.name == "TESTPART"

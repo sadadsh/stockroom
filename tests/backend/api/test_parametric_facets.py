@@ -117,7 +117,7 @@ def test_package_codes_are_options_not_a_numeric_range(spec_client, tmp_path):
     parts = tmp_path / "libraries" / "Main" / "parts"
     for pid, case in (("r1", "0603"), ("r2", "0402")):
         rec = json.loads((parts / f"{pid}.json").read_text(encoding="utf-8"))
-        rec["specs"]["Package"] = case
+        rec["derived"]["specs"]["Package"] = case
         (parts / f"{pid}.json").write_text(json.dumps(rec), encoding="utf-8")
 
     facets = _facets_by_key(spec_client.get("/api/library/facets/parametric").json())
@@ -146,7 +146,7 @@ def test_a_brand_new_spec_key_yields_a_facet_with_no_code_change(spec_client, tm
 
     part = tmp_path / "libraries" / "Main" / "parts" / "r1.json"
     rec = json.loads(part.read_text(encoding="utf-8"))
-    rec["specs"]["Whimsy Factor"] = "Sparkly"
+    rec["derived"]["specs"]["Whimsy Factor"] = "Sparkly"
     part.write_text(json.dumps(rec), encoding="utf-8")
 
     facets = _facets_by_key(spec_client.get("/api/library/facets/parametric").json())

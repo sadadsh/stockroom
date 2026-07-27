@@ -11,6 +11,7 @@ import shutil
 import pytest
 
 from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord
+from stockroom.model.part_class import PartClass
 from stockroom.mutation.project_ops import ProjectOps
 from stockroom.store.project_store import ProjectStore
 from stockroom.vcs.repo import GitRepo
@@ -68,7 +69,7 @@ def _parts():
         PartRecord(
             id="lm358", display_name="LM358 Op-Amp", category="ICs",
             description="Dual op-amp", mpn="LM358DR", manufacturer="TI",
-            eda={"kicad": EdaAssets(
+            assets={"kicad": EdaAssets(
                 symbol=AssetRef(lib="SR-ICs", name="LM358"),
                 footprint=AssetRef(lib="SR-ICs", name="SOIC-8"),
             )},
@@ -77,7 +78,7 @@ def _parts():
         PartRecord(
             id="r10k", display_name="10k 0402", category="Resistors",
             description="10k 1% 0402", mpn="RC0402FR-0710KL", manufacturer="Yageo",
-            eda={"kicad": EdaAssets(
+            assets={"kicad": EdaAssets(
                 symbol=AssetRef(lib="SR-Resistors", name="R_10k"),
                 footprint=AssetRef(lib="SR-Resistors", name="R_0402"),
             )},
@@ -459,8 +460,8 @@ def _stock_passives():
     def res(pid, mpn, value, package, metric):
         return PartRecord(
             id=pid, display_name=f"{value} {package}", category="Resistors",
-            description=f"{value} 1% {package}", mpn=mpn, manufacturer="Yageo", passive=True,
-            eda={"kicad": EdaAssets(
+            description=f"{value} 1% {package}", mpn=mpn, manufacturer="Yageo", part_class=PartClass.PASSIVE,
+            assets={"kicad": EdaAssets(
                 symbol=AssetRef(lib="Device", name="R"),
                 footprint=AssetRef(lib="Resistor_SMD", name=f"R_{package}_{metric}"),
             )},
@@ -753,8 +754,8 @@ def _altium_project(dir_path):
 def _altium_passives():
     return [PartRecord(
         id="r10k", display_name="10 kOhm 0402", category="Resistors",
-        description="10k 1% 0402", mpn="RC0402FR-0710KL", manufacturer="Yageo", passive=True,
-        eda={"altium": EdaAssets(symbol=AssetRef(lib="SR.SchLib", name="RES"),
+        description="10k 1% 0402", mpn="RC0402FR-0710KL", manufacturer="Yageo", part_class=PartClass.PASSIVE,
+        assets={"altium": EdaAssets(symbol=AssetRef(lib="SR.SchLib", name="RES"),
                                  footprint=AssetRef(lib="SR.PcbLib", name="RESC1005X40"))},
         specs={"Resistance": "10 kOhm", "Package": "0402"},
     )]

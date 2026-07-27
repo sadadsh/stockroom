@@ -15,6 +15,7 @@ from stockroom.ingest.passive_add import (
     mouser_search_url,
     parse_mouser_product_url,
 )
+from stockroom.model.part_id import make_part_id
 from stockroom.mutation.library_ops import LibraryOps
 from stockroom.store.profile import ProfileStore
 from stockroom.vcs.repo import GitRepo
@@ -276,10 +277,10 @@ def test_add_passive_part_commits_only_the_json_record(tmp_path):
     before = repo.head()
     record = ops.add_passive_part(build.record)
 
-    assert record.id == "erj_p03f1101v"
+    assert record.id == make_part_id("ERJ-P03F1101V")
     assert record.passive is True
     # exactly one new file: the JSON record (no symbol/footprint/model copied)
-    json_path = profile.library.parts_dir / "erj_p03f1101v.json"
+    json_path = profile.library.parts_dir / f"{make_part_id('ERJ-P03F1101V')}.json"
     assert json_path.is_file()
     assert repo.head() != before  # a real scoped commit landed
     assert repo.is_clean()  # atomic: no stray untracked files

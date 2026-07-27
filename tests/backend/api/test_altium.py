@@ -56,7 +56,7 @@ def test_attach_then_status_marks_ready(client):
     )
     assert r.status_code == 200
     rec = r.json()
-    assert rec["eda"]["altium"]["symbol"]["name"] and rec["eda"]["altium"]["footprint"]["name"]
+    assert rec["assets"]["altium"]["symbol"]["ref"]["name"] and rec["assets"]["altium"]["footprint"]["ref"]["name"]
 
     status = client.get("/api/altium/status").json()
     assert status["ready"] == 1

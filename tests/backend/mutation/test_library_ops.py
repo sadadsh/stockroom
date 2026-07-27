@@ -5,6 +5,8 @@ import pytest
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.part import Datasheet, PartRecord, Purchase
+from stockroom.model.part_class import PartClass
+from stockroom.model.part_id import make_part_id
 from stockroom.mutation.library_ops import (
     IncompleteError,
     LibraryOps,
@@ -13,6 +15,9 @@ from stockroom.mutation.library_ops import (
 )
 from stockroom.store.profile import ProfileStore
 from stockroom.vcs.repo import GitRepo
+
+TPS_ID = make_part_id("TPS62130RGTR")
+STM_ID = make_part_id("STM32H753ZIT6")
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
 
@@ -78,12 +83,12 @@ def test_add_part_places_everything_and_commits(tmp_path, fixtures_dir):
     ops = LibraryOps(profile, repo)
     record = ops.add_part(staged)
 
-    assert record.id == "tps62130rgtr"
-    assert record.eda == PartRecord.from_dict(record.to_dict()).eda  # round-trips
+    assert record.id == make_part_id("TPS62130RGTR")
+    assert record.assets == PartRecord.from_dict(record.to_dict()).assets  # round-trips
 
     lib = profile.library
     # JSON written
-    json_path = lib.parts_dir / "tps62130rgtr.json"
+    json_path = lib.parts_dir / f"{make_part_id('TPS62130RGTR')}.json"
     assert json_path.exists()
 
     # symbol merged and named
@@ -101,7 +106,7 @@ def test_add_part_places_everything_and_commits(tmp_path, fixtures_dir):
 
     # model + datasheet copied
     assert (lib.models_dir / "TPS62130RGTR.step").exists()
-    assert (lib.datasheets_dir / "tps62130rgtr.pdf").exists()
+    assert (lib.datasheets_dir / f"{make_part_id('TPS62130RGTR')}.pdf").exists()
 
     # exactly one new commit, clean tree
     assert repo.head() != before_head
@@ -214,8 +219,8 @@ def test_add_reference_part_lands_asset_less_record_json_only(tmp_path, fixtures
     ops = LibraryOps(profile, repo)
     before = repo.head()
     rec = ops.add_reference_part(_refless_record())
-    assert rec.id == "stm32h753zit6"
-    jp = profile.library.parts_dir / "stm32h753zit6.json"
+    assert rec.id == make_part_id("STM32H753ZIT6")
+    jp = profile.library.parts_dir / f"{make_part_id('STM32H753ZIT6')}.json"
     assert jp.exists()
     saved = PartRecord.loads(jp.read_text(encoding="utf-8"))
     assert saved.assets_for("kicad").symbol is None and saved.assets_for("kicad").footprint is None and saved.assets_for("kicad").model is None
@@ -242,28 +247,28 @@ def test_edit_datasheet_coerces_a_url_string_into_a_datasheet_ref(tmp_path, fixt
     repo, profile, _ = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_reference_part(_refless_record())
-    edited = ops.edit_field("stm32h753zit6", "datasheet", "https://example.com/ds.pdf")
+    edited = ops.edit_field(make_part_id("STM32H753ZIT6"), "datasheet", "https://example.com/ds.pdf")
     assert edited.datasheet is not None
     assert edited.datasheet.source_url == "https://example.com/ds.pdf"
     # round-trips through disk as a real Datasheet, not a bare string
     saved = PartRecord.loads(
-        (profile.library.parts_dir / "stm32h753zit6.json").read_text(encoding="utf-8")
+        (profile.library.parts_dir / f"{make_part_id('STM32H753ZIT6')}.json").read_text(encoding="utf-8")
     )
     assert saved.datasheet.source_url == "https://example.com/ds.pdf"
-    assert ops.edit_field("stm32h753zit6", "datasheet", "  ").datasheet is None
+    assert ops.edit_field(make_part_id("STM32H753ZIT6"), "datasheet", "  ").datasheet is None
 
 
 def test_attach_symbol_and_footprint_tag_the_tool_and_commit(tmp_path, fixtures_dir):
     repo, profile, _ = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_reference_part(_refless_record())
-    rec = ops.attach_symbol("stm32h753zit6", "SR-ICs", "STM32H753ZIT6")
+    rec = ops.attach_symbol(STM_ID, "SR-ICs", "STM32H753ZIT6")
     assert rec.assets_for("kicad").symbol.lib == "SR-ICs" and rec.assets_for("kicad").symbol.name == "STM32H753ZIT6"
     assert rec.assets_for("altium").symbol is None  # filed for KiCad only
-    rec = ops.attach_footprint("stm32h753zit6", "SR-ICs", "LQFP-144", tool="kicad")
+    rec = ops.attach_footprint(STM_ID, "SR-ICs", "LQFP-144", tool="kicad")
     assert rec.assets_for("kicad").footprint.name == "LQFP-144"
     # persisted + still just the JSON touched, tree clean after each atomic commit
-    saved = PartRecord.loads((profile.library.parts_dir / "stm32h753zit6.json").read_text())
+    saved = PartRecord.loads((profile.library.parts_dir / f"{make_part_id('STM32H753ZIT6')}.json").read_text())
     assert saved.assets_for("altium").symbol is None and saved.assets_for("altium").footprint is None
     assert saved.missing_assets("kicad") == ["3D model"]
     assert repo.is_clean()
@@ -294,7 +299,7 @@ def test_archive_profile_grandfathers_incomplete_parts(tmp_path, fixtures_dir):
     )
     archive.library.footprint_lib_path("ICs").mkdir(parents=True, exist_ok=True)
     record = LibraryOps(archive, repo).add_part(staged)
-    assert record.id == "tps62130rgtr"
+    assert record.id == make_part_id("TPS62130RGTR")
     assert not record.is_complete()  # grandfathered, intentionally incomplete
     assert repo.is_clean()
 
@@ -318,7 +323,7 @@ def test_edit_field_updates_json_and_mirror(tmp_path, fixtures_dir):
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
-    rec = ops.edit_field("tps62130rgtr", "manufacturer", "Texas Instruments")
+    rec = ops.edit_field(TPS_ID, "manufacturer", "Texas Instruments")
     assert rec.manufacturer == "Texas Instruments"
     sym = SymbolLib.load(profile.library.symbol_lib_path("ICs")).get_symbol("TPS62130RGTR")
     assert sym.get_property("Manufacturer") == "Texas Instruments"
@@ -332,7 +337,7 @@ def test_set_specs_persists_value_and_provenance(tmp_path, fixtures_dir):
     before = repo.head()
     pins = [{"pin": "1", "name": "VIN"}, {"pin": "2", "name": "GND"}]
     rec = ops.set_specs(
-        "tps62130rgtr",
+        TPS_ID,
         {"pinout": {"value": pins, "source": "datasheet", "confidence": "high"}},
     )
     # the value lands in record.specs; its provenance lands in record.enrichment
@@ -340,7 +345,7 @@ def test_set_specs_persists_value_and_provenance(tmp_path, fixtures_dir):
     assert rec.enrichment["pinout"].source == "datasheet"
     assert rec.enrichment["pinout"].confidence == "high"
     # persisted to disk (reload proves it) and committed atomically
-    assert ops.load_record("tps62130rgtr").specs["pinout"] == pins
+    assert ops.load_record(TPS_ID).specs["pinout"] == pins
     assert repo.head() != before
     assert repo.is_clean()
 
@@ -350,14 +355,14 @@ def test_set_specs_does_not_clobber_without_overwrite(tmp_path, fixtures_dir):
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
     first = [{"pin": "1", "name": "VIN"}]
-    ops.set_specs("tps62130rgtr", {"pinout": {"value": first, "source": "datasheet"}})
+    ops.set_specs(TPS_ID, {"pinout": {"value": first, "source": "datasheet"}})
     second = [{"pin": "1", "name": "WRONG"}]
     # merge (default): an existing key is kept, never silently overwritten
-    rec = ops.set_specs("tps62130rgtr", {"pinout": {"value": second, "source": "scrape"}})
+    rec = ops.set_specs(TPS_ID, {"pinout": {"value": second, "source": "scrape"}})
     assert rec.specs["pinout"] == first
     # overwrite=True replaces it
     rec = ops.set_specs(
-        "tps62130rgtr", {"pinout": {"value": second, "source": "scrape"}}, overwrite=True
+        TPS_ID, {"pinout": {"value": second, "source": "scrape"}}, overwrite=True
     )
     assert rec.specs["pinout"] == second
 
@@ -371,20 +376,20 @@ def test_set_specs_normalizes_a_duplicated_label_key_onto_the_clean_key(tmp_path
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
-    ops.set_specs("tps62130rgtr", {"Factory Pack Quantity": {"value": "100", "source": "mouser_web"}})
+    ops.set_specs(TPS_ID, {"Factory Pack Quantity": {"value": "100", "source": "mouser_web"}})
     twin = "Factory Pack Quantity: Factory Pack Quantity"
     # overwrite=True with the raw twin + a different value updates the CLEAN key
-    rec = ops.set_specs("tps62130rgtr", {twin: {"value": "999", "source": "mouser_web"}}, overwrite=True)
+    rec = ops.set_specs(TPS_ID, {twin: {"value": "999", "source": "mouser_web"}}, overwrite=True)
     assert rec.specs["Factory Pack Quantity"] == "999"  # updated, not silently dropped
     assert twin not in rec.specs  # no twin
     assert twin not in rec.enrichment  # no orphan provenance
     assert rec.enrichment["Factory Pack Quantity"].source == "mouser_web"
     # overwrite=False keeps the existing clean value and still never adds a twin
-    rec2 = ops.set_specs("tps62130rgtr", {twin: {"value": "777", "source": "x"}})
+    rec2 = ops.set_specs(TPS_ID, {twin: {"value": "777", "source": "x"}})
     assert rec2.specs["Factory Pack Quantity"] == "999"
     assert twin not in rec2.specs
     # persisted
-    reloaded = ops.load_record("tps62130rgtr")
+    reloaded = ops.load_record(TPS_ID)
     assert reloaded.specs["Factory Pack Quantity"] == "999"
     assert twin not in reloaded.specs
 
@@ -394,10 +399,10 @@ def test_set_specs_noop_writes_no_commit(tmp_path, fixtures_dir):
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
     pins = [{"pin": "1", "name": "VIN"}]
-    ops.set_specs("tps62130rgtr", {"pinout": {"value": pins, "source": "datasheet"}})
+    ops.set_specs(TPS_ID, {"pinout": {"value": pins, "source": "datasheet"}})
     head_after_first = repo.head()
     # re-applying the same specs without overwrite changes nothing -> no empty commit
-    ops.set_specs("tps62130rgtr", {"pinout": {"value": pins, "source": "datasheet"}})
+    ops.set_specs(TPS_ID, {"pinout": {"value": pins, "source": "datasheet"}})
     assert repo.head() == head_after_first
     assert repo.is_clean()
 
@@ -411,7 +416,7 @@ def test_move_category_relocates_symbol_and_footprint(tmp_path, fixtures_dir):
     profile.library.footprint_lib_path("Modules").mkdir(parents=True, exist_ok=True)
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
-    rec = ops.move_category("tps62130rgtr", "Modules")
+    rec = ops.move_category(TPS_ID, "Modules")
 
     assert rec.category == "Modules"
     assert rec.assets_for("kicad").symbol.lib == "SR-Modules"
@@ -429,13 +434,13 @@ def test_delete_part_removes_everything(tmp_path, fixtures_dir):
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
-    ops.delete_part("tps62130rgtr")
+    ops.delete_part(TPS_ID)
     lib = profile.library
-    assert not (lib.parts_dir / "tps62130rgtr.json").exists()
+    assert not (lib.parts_dir / f"{make_part_id('TPS62130RGTR')}.json").exists()
     assert "TPS62130RGTR" not in SymbolLib.load(lib.symbol_lib_path("ICs")).symbol_names
     assert not (lib.footprint_lib_path("ICs") / "TPS62130RGTR.kicad_mod").exists()
     assert not (lib.models_dir / "TPS62130RGTR.step").exists()
-    assert not (lib.datasheets_dir / "tps62130rgtr.pdf").exists()
+    assert not (lib.datasheets_dir / f"{make_part_id('TPS62130RGTR')}.pdf").exists()
     assert repo.is_clean()
 
 
@@ -461,7 +466,7 @@ def test_detect_drift_finds_behind_the_back_edit(tmp_path, fixtures_dir):
     report = ops.detect_drift()
     assert len(report.items) == 1
     item = report.items[0]
-    assert item.part_id == "tps62130rgtr"
+    assert item.part_id == make_part_id("TPS62130RGTR")
     assert item.property == "Manufacturer"
     assert item.json_value == "TI"
     assert item.symbol_value == "WRONG"
@@ -482,17 +487,17 @@ def test_refresh_procurement_writes_atomically_and_no_ops_when_unchanged(tmp_pat
 
     before = repo.head()
     rec = ops.refresh_procurement(
-        "tps62130rgtr", [("Mouser", result(99))], "2026-07-18T00:00:00+00:00")
+        TPS_ID, [("Mouser", result(99))], "2026-07-18T00:00:00+00:00")
     assert any(p.vendor == "Mouser" and p.stock == 99 for p in rec.purchase)
     assert repo.head() != before                                              # a commit happened
-    assert any(p.stock == 99 for p in ops.load_record("tps62130rgtr").purchase)  # persisted
+    assert any(p.stock == 99 for p in ops.load_record(TPS_ID).purchase)  # persisted
 
     head = repo.head()
     # identical data but a LATER timestamp - as the live endpoint always passes (a fresh
     # microsecond now_iso every call). fetched_at means "when the data last CHANGED", so an
     # advancing clock alone must NOT manufacture a commit.
     ops.refresh_procurement(
-        "tps62130rgtr", [("Mouser", result(99))], "2026-07-18T09:59:59+00:00")
+        TPS_ID, [("Mouser", result(99))], "2026-07-18T09:59:59+00:00")
     assert repo.head() == head                                                # no empty commit
 
 
@@ -506,16 +511,16 @@ def test_rebuild_part_renames_to_the_spec_aware_name_atomically(tmp_path, fixtur
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
-    rec0 = ops.load_record("tps62130rgtr")
+    rec0 = ops.load_record(TPS_ID)
     expected = propose_component_name_from_record(rec0)
     before = repo.head()
-    rec = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    rec = ops.rebuild_part(TPS_ID, [], datetime.now(timezone.utc).isoformat())
     assert rec.display_name == expected
     if expected != rec0.display_name:
         assert repo.head() != before  # renamed -> one atomic commit
-        assert ops.load_record("tps62130rgtr").display_name == expected
+        assert ops.load_record(TPS_ID).display_name == expected
     mid = repo.head()
-    ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    ops.rebuild_part(TPS_ID, [], datetime.now(timezone.utc).isoformat())
     assert repo.head() == mid  # no-op second pass
 
 
@@ -677,7 +682,7 @@ def test_delete_part_removes_the_altium_libs_it_owns(tmp_path, fixtures_dir):
 
     ops.edit_field(
         record.id,
-        "eda",
+        "assets",
         {"altium": EdaAssets(symbol=AssetRef(lib="altium", name=record.id))},
     )
     ops.delete_part(record.id)
@@ -859,22 +864,22 @@ def test_rebuild_refiles_a_FILE_LESS_part_its_vendors_can_name(tmp_path, fixture
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
     _seed_category_lib(profile, "Diodes")
-    rec = ops.load_record("tps62130rgtr")
+    rec = ops.load_record(TPS_ID)
     rec.category = "Other"
     # The FILE-LESS case, which is the primary add flow: a part landed from a purchase link with
     # its capture still pending owns no symbol or footprint, so re-filing it really is only a
     # field change. The sibling test below covers the part that DOES own files, where the same
     # re-file has to relocate them.
-    rec.passive = True
+    rec.part_class = PartClass.PASSIVE
     rec.specs["Product Category"] = "ESD Protection Diodes / TVS Diodes"
-    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    (profile.library.parts_dir / f"{TPS_ID}.json").write_text(rec.dumps(), encoding="utf-8")
     repo.commit("stage an unclassified record",
-                [profile.library.parts_dir / "tps62130rgtr.json"])
+                [profile.library.parts_dir / f"{TPS_ID}.json"])
 
-    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    out = ops.rebuild_part(TPS_ID, [], datetime.now(timezone.utc).isoformat())
 
     assert out.category == "Diodes", f"the rebuild left it filed as {out.category!r}"
-    assert ops.load_record("tps62130rgtr").category == "Diodes"  # and it PERSISTED
+    assert ops.load_record(TPS_ID).category == "Diodes"  # and it PERSISTED
 
 
 def test_rebuild_never_overwrites_a_category_a_person_chose(tmp_path, fixtures_dir):
@@ -886,14 +891,14 @@ def test_rebuild_never_overwrites_a_category_a_person_chose(tmp_path, fixtures_d
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
-    rec = ops.load_record("tps62130rgtr")
+    rec = ops.load_record(TPS_ID)
     rec.category = "ICs"
     rec.specs["Product Category"] = "ESD Protection Diodes / TVS Diodes"
-    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    (profile.library.parts_dir / f"{TPS_ID}.json").write_text(rec.dumps(), encoding="utf-8")
     repo.commit("stage a deliberately filed record",
-                [profile.library.parts_dir / "tps62130rgtr.json"])
+                [profile.library.parts_dir / f"{TPS_ID}.json"])
 
-    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    out = ops.rebuild_part(TPS_ID, [], datetime.now(timezone.utc).isoformat())
     assert out.category == "ICs"
 
 
@@ -914,19 +919,19 @@ def test_rebuild_prefers_the_spelled_out_manufacturer_a_source_already_gave(tmp_
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
-    rec = ops.load_record("tps62130rgtr")
+    rec = ops.load_record(TPS_ID)
     rec.manufacturer = "TI"
     rec.alternates["manufacturer"] = [
         SourcedValue(value="TI", source="lcsc", confidence="high"),
         SourcedValue(value="Texas Instruments", source="mouser", confidence="high"),
     ]
-    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    (profile.library.parts_dir / f"{TPS_ID}.json").write_text(rec.dumps(), encoding="utf-8")
     repo.commit("stage an abbreviated maker",
-                [profile.library.parts_dir / "tps62130rgtr.json"])
+                [profile.library.parts_dir / f"{TPS_ID}.json"])
 
-    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    out = ops.rebuild_part(TPS_ID, [], datetime.now(timezone.utc).isoformat())
     assert out.manufacturer == "Texas Instruments"
-    assert ops.load_record("tps62130rgtr").manufacturer == "Texas Instruments"
+    assert ops.load_record(TPS_ID).manufacturer == "Texas Instruments"
 
 
 def test_rebuild_leaves_a_maker_alone_when_no_source_offered_a_fuller_name(tmp_path, fixtures_dir):
@@ -937,13 +942,13 @@ def test_rebuild_leaves_a_maker_alone_when_no_source_offered_a_fuller_name(tmp_p
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
-    rec = ops.load_record("tps62130rgtr")
+    rec = ops.load_record(TPS_ID)
     rec.manufacturer = "TI"
-    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    (profile.library.parts_dir / f"{TPS_ID}.json").write_text(rec.dumps(), encoding="utf-8")
     repo.commit("stage a lone abbreviation",
-                [profile.library.parts_dir / "tps62130rgtr.json"])
+                [profile.library.parts_dir / f"{TPS_ID}.json"])
 
-    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    out = ops.rebuild_part(TPS_ID, [], datetime.now(timezone.utc).isoformat())
     assert out.manufacturer == "TI"
 
 
@@ -966,24 +971,24 @@ def test_refiling_during_a_rebuild_RELOCATES_the_assets_not_just_the_field(tmp_p
     from stockroom.mutation.library_ops import _kicad
 
     ops.add_part(staged)
-    name = _kicad(ops.load_record("tps62130rgtr")).symbol.name
+    name = _kicad(ops.load_record(TPS_ID)).symbol.name
     # Both categories ship a (possibly empty) `SR-*.kicad_sym` in a real library, so both are
     # seeded here rather than worked around: the test must exercise the shape the owner has.
     _seed_category_lib(profile, "Other")
     _seed_category_lib(profile, "Diodes")
     # File it under "Other" the way a real mis-filed part is filed: through the real move, so its
     # symbol and footprint genuinely LIVE under that category rather than only claiming to.
-    ops.move_category("tps62130rgtr", "Other")
-    rec = ops.load_record("tps62130rgtr")
+    ops.move_category(TPS_ID, "Other")
+    rec = ops.load_record(TPS_ID)
     rec.specs["Product Category"] = "ESD Protection Diodes / TVS Diodes"
-    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    (profile.library.parts_dir / f"{TPS_ID}.json").write_text(rec.dumps(), encoding="utf-8")
     repo.commit("stage a filed-wrong part that OWNS files",
-                [profile.library.parts_dir / "tps62130rgtr.json"])
+                [profile.library.parts_dir / f"{TPS_ID}.json"])
     # its files must actually be under the old category for the move to be observable
     old_sym = profile.library.symbol_lib_path("Other")
     assert old_sym.exists() and name in old_sym.read_text(encoding="utf-8")
 
-    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    out = ops.rebuild_part(TPS_ID, [], datetime.now(timezone.utc).isoformat())
 
     assert out.category == "Diodes"
     new_sym = profile.library.symbol_lib_path("Diodes")
@@ -1012,13 +1017,13 @@ def test_rebuild_takes_the_spelled_out_maker_from_the_vendor_SPECS_too(tmp_path,
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
-    rec = ops.load_record("tps62130rgtr")
+    rec = ops.load_record(TPS_ID)
     rec.manufacturer = "TI"
     rec.specs["Manufacturer"] = "Texas Instruments"
-    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
-    repo.commit("stage the real shape", [profile.library.parts_dir / "tps62130rgtr.json"])
+    (profile.library.parts_dir / f"{TPS_ID}.json").write_text(rec.dumps(), encoding="utf-8")
+    repo.commit("stage the real shape", [profile.library.parts_dir / f"{TPS_ID}.json"])
 
-    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    out = ops.rebuild_part(TPS_ID, [], datetime.now(timezone.utc).isoformat())
     assert out.manufacturer == "Texas Instruments"
 
 
@@ -1030,11 +1035,11 @@ def test_a_vendor_spec_naming_a_DIFFERENT_company_never_replaces_the_maker(tmp_p
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
-    rec = ops.load_record("tps62130rgtr")
+    rec = ops.load_record(TPS_ID)
     rec.manufacturer = "TI"
     rec.specs["Brand"] = "Toshiba"
-    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
-    repo.commit("stage a disagreeing brand", [profile.library.parts_dir / "tps62130rgtr.json"])
+    (profile.library.parts_dir / f"{TPS_ID}.json").write_text(rec.dumps(), encoding="utf-8")
+    repo.commit("stage a disagreeing brand", [profile.library.parts_dir / f"{TPS_ID}.json"])
 
-    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    out = ops.rebuild_part(TPS_ID, [], datetime.now(timezone.utc).isoformat())
     assert out.manufacturer == "TI"

@@ -288,7 +288,7 @@ class LibraryOps:
         # category lib; refuse honestly before any write.
         if staged.symbol_source is not None and not staged.entry_name:
             raise ValueError("a staged symbol needs an entry name to merge under")
-        part_id = new_part_id(self.lib.parts_dir, staged.mpn or staged.display_name)
+        part_id = new_part_id(self.lib.parts_dir, staged.mpn, staged.display_name)
         nickname = category_nickname(staged.category)
         sym_lib_path = self.lib.symbol_lib_path(staged.category)
         pretty_dir = self.lib.footprint_lib_path(staged.category)
@@ -390,7 +390,7 @@ class LibraryOps:
                 mpn=staged.mpn,
                 manufacturer=staged.manufacturer,
                 datasheet=datasheet,
-                eda={
+                assets={
                     "kicad": EdaAssets(
                         symbol=AssetRef(lib=nickname, name=staged.entry_name)
                         if staged.symbol_source is not None else None,
@@ -463,7 +463,7 @@ class LibraryOps:
             display_name=record.display_name, description=record.description,
             mpn=record.mpn, manufacturer=record.manufacturer,
         )
-        part_id = new_part_id(self.lib.parts_dir, record.mpn or record.display_name)
+        part_id = new_part_id(self.lib.parts_dir, record.mpn, record.display_name)
         record.id = part_id
         fresh_dirs = [self.lib.parts_dir] if not self.lib.parts_dir.exists() else []
         self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
@@ -499,7 +499,7 @@ class LibraryOps:
             display_name=record.display_name, description=record.description,
             mpn=record.mpn, manufacturer=record.manufacturer,
         )
-        part_id = new_part_id(self.lib.parts_dir, record.mpn or record.display_name)
+        part_id = new_part_id(self.lib.parts_dir, record.mpn, record.display_name)
         record.id = part_id
         fresh_dirs = [self.lib.parts_dir] if not self.lib.parts_dir.exists() else []
         self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
