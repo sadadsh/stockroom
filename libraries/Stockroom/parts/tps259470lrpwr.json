@@ -93,7 +93,25 @@
   },
   "description": "Surge Protection IC 2.7V~23V VQFN-10-HR(2x2)",
   "display_name": "Hot Swap Voltage Controller VQFN-10-HR",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "TPS259470LRPWR"
+      },
+      "model": {
+        "file": "models/TPS259470LRPWR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "TPS259470LRPWR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
