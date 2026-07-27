@@ -1,5 +1,123 @@
 {
   "alternates": {
+    "HTS Code (MX)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8504.50.01"
+      },
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "8504509199"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8504508000"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8504.50.8000"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/coilcraft/images/xel4030_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5530/MFG_XEL4030-122MEC.jpg"
+      }
+    ],
+    "Inductance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1uH"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "1 µH"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "280 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "0"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Power Inductors - SMD"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Inductors, Coils, Chokes"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10.7A 1uH ±20% 8.89mΩ 9A SMD,4x4mm Fixed Inductors RoHS"
+      },
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "Power Inductors - SMD 1uH Shld 20% 10.7A 9.78mOhms AECQ2"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "FIXED IND 1UH 10.7A 9.78 MOHM"
+      }
+    ],
     "product_url": [
       {
         "confidence": "medium",
@@ -41,9 +159,17 @@
     }
   },
   "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
     "Available On Reel": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "BRHTS": {
+      "confidence": "high",
+      "source": "mouser"
     },
     "Brand Id": {
       "confidence": "medium",
@@ -57,6 +183,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
     "Currency Symbol": {
       "confidence": "medium",
       "source": "lcsc"
@@ -65,6 +199,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Current - Saturation (Isat)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Current - Saturation(Isat)": {
       "confidence": "medium",
       "source": "lcsc"
@@ -72,6 +210,14 @@
     "Current Rating": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Current Rating (Amps)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "DC Resistance (DCR)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "DC Resistance(DCR)": {
       "confidence": "medium",
@@ -89,6 +235,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Frequency - Self Resonant": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "HTS Code (BR)": {
       "confidence": "medium",
       "source": "lcsc"
@@ -101,9 +251,17 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
     "HTS Code (IN)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
     },
     "HTS Code (MX)": {
       "confidence": "medium",
@@ -121,9 +279,21 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Height - Seated (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
     "Inductance": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Inductance Frequency - Test": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Is Cable Category": {
       "confidence": "medium",
@@ -157,6 +327,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "KRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
     "Key Attributes": {
       "confidence": "medium",
       "source": "lcsc"
@@ -189,13 +363,29 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
     "Lifecycle": {
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Material - Core": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Minimum Order Quantity": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Order Multiple": {
       "confidence": "medium",
@@ -205,6 +395,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -212,6 +406,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -229,6 +427,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
     "Product Image": {
       "confidence": "medium",
       "source": "lcsc"
@@ -241,6 +443,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Ratings": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -248,6 +458,26 @@
     "RoHS": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Shielding": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Size / Dimension": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Stock": {
       "confidence": "medium",
@@ -265,13 +495,25 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Tolerance": {
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
     },
     "Weight": {
       "confidence": "medium",
@@ -326,31 +568,91 @@
       "stock": 471,
       "url": "https://www.lcsc.com/product-detail/C5441341.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:32.111363+00:00",
+      "part_number": "994-XEL4030-102MEC",
+      "price_breaks": [
+        {
+          "price": 3.27,
+          "qty": 1
+        },
+        {
+          "price": 2.79,
+          "qty": 10
+        },
+        {
+          "price": 2.57,
+          "qty": 25
+        },
+        {
+          "price": 1.91,
+          "qty": 100
+        },
+        {
+          "price": 1.86,
+          "qty": 250
+        },
+        {
+          "price": 1.43,
+          "qty": 500
+        },
+        {
+          "price": 1.04,
+          "qty": 5000
+        }
+      ],
+      "stock": 1546,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "",
+      "fetched_at": "2026-07-27T04:01:32.111363+00:00",
+      "part_number": "2457-XEL4030-102MEC-ND",
+      "price_breaks": [],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Available On Reel": "Yes",
+    "BRHTS": "85045000",
     "Brand Id": "826",
     "Catalog Id": "1181",
     "Contains Battery": "No",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Indonesia",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Current - Saturation (Isat)": "9A",
     "Current - Saturation(Isat)": "9A",
     "Current Rating": "10.7A",
+    "Current Rating (Amps)": "10.7 A",
+    "DC Resistance (DCR)": "9.78mOhm Max",
     "DC Resistance(DCR)": "8.89mΩ",
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/1f4eba2989374f709c4492fffcfbdd9f.svg?t=1773209167",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/33cadb8b6a0e426d93ce47a4da23bf46.svg?t=1773209167",
+    "Frequency - Self Resonant": "65MHz",
     "HTS Code (BR)": "85045000",
     "HTS Code (CA)": "8504500000",
     "HTS Code (CN)": "8504500000",
+    "HTS Code (EU TARIC)": "8504500090",
     "HTS Code (IN)": "85045010",
+    "HTS Code (JP)": "850450000",
     "HTS Code (MX)": "8504.50.01",
     "HTS Code (TARIC)": "8504500010",
     "HTS Code (US)": "8504508000",
     "Has Third Party Stock": "No",
+    "Height - Seated (Max)": "0.122\" (3.10mm)",
+    "Image": "https://www.mouser.com/images/coilcraft/images/xel4030_SPL.jpg",
     "Inductance": "1uH",
+    "Inductance Frequency - Test": "1 MHz",
     "Is Cable Category": "No",
     "Is Foreign Display": "Yes",
     "Is Foreign Onsale": "No",
@@ -359,6 +661,7 @@
     "Is Not Overstock": "No",
     "Is Real Price": "Yes",
     "Is Show Foreign Price": "Yes",
+    "KRHTS": "8504502090",
     "Key Attributes": "FIXED IND 1000nH SMD,4x4mm",
     "LCSC Category": "Fixed Inductors",
     "LCSC Category Path": "Passives > Inductors, Coils, Chokes",
@@ -367,27 +670,44 @@
     "LCSC Product Name": "FIXED IND 1000nH SMD,4x4mm",
     "LCSC Title": "Coilcraft XEL4030-102MEC",
     "LCSC Warehouse Category": "Fixed Inductors",
+    "Lead Time": "280 Days",
     "Lifecycle": "Active",
+    "Material - Core": "Metal Composite",
     "Minimum Order Quantity": "1",
+    "Mounting Type": "Surface Mount",
+    "Operating Temperature": "-40°C ~ 125°C",
     "Order Multiple": "1",
     "Package": "SMD,4x4mm",
+    "Package / Case": "1616 (4040 Metric)",
     "Package Quantity": "500",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Strip",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "316",
     "Popular Part": "No",
     "Pre-Sale": "No",
+    "Product Category": "Power Inductors - SMD",
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20231220_Coilcraft-XEL4030-102MEC_C5441341_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20231220_Coilcraft-XEL4030-102MEC_C5441341_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20231220_Coilcraft-XEL4030-102MEC_C5441341_blank.jpg",
+    "REACH": "REACH Unknown",
+    "Ratings": "AEC-Q200",
     "Reel Setup Fee": "3",
     "RoHS": "Yes",
+    "Series": "XEL4030",
+    "Shielding": "Shielded",
+    "Size / Dimension": "0.157\" L x 0.157\" W (4.00mm x 4.00mm)",
+    "Standard Pack Qty": "500",
+    "Standard Package": "1",
     "Stock": "4362",
     "Stock (Domestic)": "4362",
     "Stock (Overseas)": "4362",
     "Stock (Shenzhen)": "4362",
+    "Supplier Device Package": "1616",
     "Tolerance": "±20%",
+    "Type": "Molded",
     "Unit": "Piece",
+    "Unit Weight (kg)": "0.00028",
     "Weight": "0.34",
     "Weight (kg)": "0.00034",
     "Wm Catalog Id": "1181"
