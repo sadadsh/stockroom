@@ -9,6 +9,8 @@
 #   scripts/gates.sh              # everything
 #   scripts/gates.sh lint         # ruff (fast; run it first, it fails in under a second)
 #   scripts/gates.sh backend      # backend suite only
+#   scripts/gates.sh since [REF]  # ONLY the tests for files changed vs REF (default HEAD).
+#                                 # Seconds, not minutes. A LOOP tool, never a gate.
 #   scripts/gates.sh frontend     # frontend tests + typecheck + build
 #   scripts/gates.sh quick        # typecheck + a serial-safe backend subset, for a tight loop
 #   scripts/gates.sh types        # ty (advisory: NOT a gate yet, see the punch list)
@@ -39,10 +41,53 @@ run() {  # run <label> <cmd...>
   fi
 }
 
+# MEASURED 2026-07-27 on the owner's box (Ryzen 9 7900X, 12 physical cores / 24 threads, /tmp on
+# ext4). Same slice, three runs:
+#   -n auto (=24 workers) on disk-backed /tmp .... 51.5 s
+#   -n 24   on RAM-backed tmp .................... 51.5 s -> tmpfs alone bought ~15% on a git-heavy slice
+#   -n 12   on RAM-backed tmp .................... 46.7 s  <- best
+# `-n auto` reads LOGICAL cores and oversubscribes 12 physical ones, and this suite is dominated by
+# git subprocess I/O rather than CPU, so more workers meant more contention, not more throughput.
+# PYTEST_WORKERS overrides; SERIAL_TESTS=1 still forces one process.
+TMPBASE="${GATES_TMPDIR:-/dev/shm/pytest-stockroom}"
 backend() {
-  local n=(-n auto)
+  local n=(-n "${PYTEST_WORKERS:-12}")
   [[ "${SERIAL_TESTS:-0}" == "1" ]] && n=()
-  QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/backend -q -p no:randomly "${n[@]}"
+  mkdir -p "$TMPBASE"
+  # A RAM-backed temp dir is safe to wipe: pytest owns everything under it. If /dev/shm is too
+  # small on some other machine, GATES_TMPDIR points this back at a disk path.
+  QT_QPA_PLATFORM=offscreen TMPDIR="$TMPBASE" \
+    .venv/bin/python -m pytest tests/backend -q -p no:randomly "${n[@]}" --basetemp="$TMPBASE/bt"
+  local rc=$?
+  rm -rf "${TMPBASE:?}/bt" 2>/dev/null
+  return $rc
+}
+
+# The single biggest time sink is not the suite, it is running the WHOLE suite after every small
+# edit. `since` runs only the test files touching what git says changed, which is seconds instead
+# of minutes. It is a LOOP tool, never a gate: it can miss a caller it does not know about, so the
+# full suite still has to pass before a commit.
+since() {
+  local base="${1:-HEAD}"
+  mapfile -t changed < <(git diff --name-only "$base" -- '*.py' | grep -E '^(app/backend|tests)/' || true)
+  if [[ ${#changed[@]} -eq 0 ]]; then echo "no python changes vs $base"; return 0; fi
+  local targets=()
+  for f in "${changed[@]}"; do
+    [[ "$f" == tests/* ]] && { targets+=("$f"); continue; }
+    # map app/backend/stockroom/<pkg>/<mod>.py -> tests/backend/<pkg>/test_<mod>.py when it exists
+    local pkg mod
+    pkg="$(basename "$(dirname "$f")")"; mod="$(basename "$f" .py)"
+    for cand in "tests/backend/$pkg/test_$mod.py" "tests/backend/$pkg"; do
+      [[ -e "$cand" ]] && { targets+=("$cand"); break; }
+    done
+  done
+  mapfile -t targets < <(printf '%s\n' "${targets[@]}" | sort -u)
+  printf 'running %d target(s) for %d changed file(s): %s\n' \
+    "${#targets[@]}" "${#changed[@]}" "${targets[*]}"
+  mkdir -p "$TMPBASE"
+  QT_QPA_PLATFORM=offscreen TMPDIR="$TMPBASE" \
+    .venv/bin/python -m pytest "${targets[@]}" -q -p no:randomly -n "${PYTEST_WORKERS:-12}" \
+    --basetemp="$TMPBASE/bt-since"
 }
 fe() { npm --prefix app/frontend run "$1"; }
 # ruff was CONFIGURED in pyproject.toml and enforced by nothing until 2026-07-26. Its first
@@ -57,6 +102,7 @@ BG_LOG="${GATES_BG_LOG:-build/gates-backend.log}"
 case "${1:-all}" in
   lint)     run "ruff" lint ;;
   backend)  run "backend suite" backend ;;
+  since)    since "${2:-HEAD}" ;;
   bg)       mkdir -p "$(dirname "$BG_LOG")"
             : > "$BG_LOG"
             # The child re-invokes THIS script's own `backend` mode from an absolute path, so there
