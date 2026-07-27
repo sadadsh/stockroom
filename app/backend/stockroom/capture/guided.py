@@ -31,13 +31,14 @@ exactly as it was, because a capture that fabricates a partial answer is worse t
 
 from __future__ import annotations
 
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 from stockroom.capture.browser import PlaywrightCaptureBrowser
 from stockroom.capture.complete import SourceOutcome
-from stockroom.capture.requirements import Requirement, capture_needs
+from stockroom.capture.requirements import Requirement, asset_present, capture_needs
 from stockroom.capture.vendors import formats_for, get_adapter
 from stockroom.model.asset import AssetOrigin
 
@@ -77,6 +78,39 @@ def _wait_for_capture(browser, page, before: int, timeout_s: float, gap: float =
         page.wait_for_timeout(gap * 1000)
     # One last look: a file that landed inside the final gap still counts.
     return len(browser.captured) > before
+
+
+# What `altium/extract.py::normalize_altium_source` can actually take. `.lia` is deliberately NOT
+# here: Ultra Librarian's PCAD row ships one and Altium imports it directly, but nothing in this app
+# can convert it, so listing it would hand normalize_altium_source a file it raises on. See
+# UltraLibrarianAdapter for the whole story.
+_ALTIUM_LIBRARY_SUFFIXES = (".schlib", ".pcblib", ".intlib")
+
+
+def _altium_libraries(landed) -> list[Path]:
+    """Altium library files inside the download, unpacked with the ingest sandbox.
+
+    Uses `unpack_inputs` rather than a second unzip: it already handles a directory, a loose file
+    and a zip identically, and its `_safe_extract` refuses path traversal. A private zip reader
+    here would be a second implementation of the one thing the ingest layer already does safely.
+
+    The temp tree is intentionally NOT cleaned up here - the paths are handed to
+    `attach_altium_assets`, which copies them into the library inside its own transaction, and
+    tearing the tree down first would pull the files out from under it. It lives under the system
+    temp dir and is reclaimed there.
+    """
+    from stockroom.ingest.sandbox import unpack_inputs
+
+    workdir = Path(tempfile.mkdtemp(prefix="sr-capture-altium-"))
+    found: list[Path] = []
+    try:
+        for unpacked in unpack_inputs([item.path for item in landed], workdir):
+            for path in sorted(unpacked.root.rglob("*")):
+                if path.is_file() and path.suffix.lower() in _ALTIUM_LIBRARY_SUFFIXES:
+                    found.append(path)
+    except Exception:  # noqa: BLE001 - an unreadable download is the KiCad path's error to report
+        return []
+    return found
 
 
 @dataclass
@@ -130,6 +164,7 @@ class GuidedCaptureSource:
         profile_dir: Path | None = None,
         headless: bool = False,
         engine: str = "chromium",
+        attach_altium=None,
         run_write=None,
         now_iso=None,
     ) -> None:
@@ -139,6 +174,9 @@ class GuidedCaptureSource:
         self._profile_dir = profile_dir
         self._headless = headless
         self._engine = engine
+        # `library_ops.attach_altium_assets`, injected rather than imported, so this module stays
+        # free of the mutation layer and a test can drive the Altium path without a real library.
+        self._attach_altium = attach_altium
         self._run_write = run_write or (lambda fn: fn())
         self._now_iso = now_iso
         self._session: _Session | None = None
@@ -244,6 +282,13 @@ class GuidedCaptureSource:
 
         Reuses the ingest pipeline the rest of the app already attaches through, so a guided
         capture and a hand-dropped zip land identically - there is no second attach path to drift.
+
+        BOTH TOOLS, through their own existing seams. KiCad assets go through `IngestPipeline`;
+        Altium libraries go through `library_ops.attach_altium_assets`, which was already written
+        and already atomic but which guided capture never called - so a vendor shipping real
+        `.SchLib`/`.PcbLib` had them downloaded and then silently dropped. Each attach is its own
+        atomic commit (two commits when a download carries both), because that is what the two
+        underlying seams each guarantee; neither can leave a partial write behind.
         """
         adapter = get_adapter(self._vendor_key)
         origin = AssetOrigin(
@@ -251,39 +296,76 @@ class GuidedCaptureSource:
             url=url,
             captured_at=self._now_iso() if self._now_iso else "",
         )
+        offered: list[Requirement] = []
+        failures: list[str] = []
         pipeline = self._make_pipeline()
         try:
             try:
                 candidates = pipeline.inspect(inputs=[item.path for item in landed])
             except Exception as exc:  # noqa: BLE001
                 return SourceOutcome(error=f"could not read the download: {exc}")
-            if not candidates:
-                return SourceOutcome(
-                    error=(
-                        f"{adapter.capability.label} delivered a file with no symbol, footprint "
-                        "or 3D model in it"
-                    )
-                )
-            candidate = candidates[0]
-            candidate.entry_name = record.mpn or candidate.entry_name or candidate.mpn
 
-            offered: list[Requirement] = []
-            if candidate.symbol_lib_path is not None:
-                offered.append(Requirement.KICAD_SYMBOL)
-            if candidate.footprint_variants:
-                offered.append(Requirement.KICAD_FOOTPRINT)
-            if candidate.model_path is not None:
-                offered.append(Requirement.KICAD_MODEL)
-            if not offered:
-                return SourceOutcome(
-                    error=f"{adapter.capability.label} delivered nothing this part can use"
-                )
-            try:
-                self._run_write(
-                    lambda: pipeline.attach_assets(record.id, candidate, origin=origin)
-                )
-            except Exception as exc:  # noqa: BLE001 - the attach is atomic; a failure is a row
-                return SourceOutcome(error=str(exc))
-            return SourceOutcome(satisfied=tuple(offered))
+            kicad_offered: list[Requirement] = []
+            candidate = candidates[0] if candidates else None
+            if candidate is not None:
+                candidate.entry_name = record.mpn or candidate.entry_name or candidate.mpn
+                if candidate.symbol_lib_path is not None:
+                    kicad_offered.append(Requirement.KICAD_SYMBOL)
+                if candidate.footprint_variants:
+                    kicad_offered.append(Requirement.KICAD_FOOTPRINT)
+                if candidate.model_path is not None:
+                    kicad_offered.append(Requirement.KICAD_MODEL)
+            if kicad_offered:
+                try:
+                    self._run_write(
+                        lambda: pipeline.attach_assets(record.id, candidate, origin=origin)
+                    )
+                    offered.extend(kicad_offered)
+                except Exception as exc:  # noqa: BLE001 - each attach is atomic; a failure is a row
+                    failures.append(str(exc))
         finally:
             pipeline.cleanup()
+
+        offered.extend(self._attach_altium_assets(record, landed, failures))
+
+        if offered:
+            return SourceOutcome(satisfied=tuple(offered))
+        if failures:
+            return SourceOutcome(error="; ".join(failures))
+        return SourceOutcome(
+            error=(
+                f"{adapter.capability.label} delivered a file with nothing this part can use "
+                "in it"
+            )
+        )
+
+    def _attach_altium_assets(self, record, landed, failures: list[str]) -> list[Requirement]:
+        """Attach any Altium libraries in the download, and report what the RECORD then holds.
+
+        Reports from the record rather than from what was requested, because
+        `attach_altium_assets` decides per side which of symbol/footprint it could actually bind -
+        a vendor may ship only one. Reading it back is the difference between "we sent the files"
+        and "the part has them", and only the second is a success worth reporting.
+
+        Silent no-op when the runner supplied no attach callable or the download carries no Altium
+        library, so a KiCad-only vendor is completely unaffected.
+        """
+        if self._attach_altium is None:
+            return []
+        sources = _altium_libraries(landed)
+        if not sources:
+            return []
+        try:
+            updated = self._run_write(lambda: self._attach_altium(record.id, *sources))
+        except Exception as exc:  # noqa: BLE001 - atomic: a failure leaves the part untouched
+            failures.append(f"could not attach the Altium libraries: {exc}")
+            return []
+        if updated is None:
+            return []
+        bundle = updated.assets_for("altium") or {}
+        got: list[Requirement] = []
+        if asset_present(bundle.get("symbol")):
+            got.append(Requirement.ALTIUM_SYMBOL)
+        if asset_present(bundle.get("footprint")):
+            got.append(Requirement.ALTIUM_FOOTPRINT)
+        return got
