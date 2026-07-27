@@ -3176,4 +3176,171 @@
     (property "Description" "14VC Clamp 2.5A@8/20us Ipp TVS DIODE USON-10(1x2.5)" (at 0 0 0) (effects (hide yes)))
     (property "Purchase" "https://www.lcsc.com/product-detail/C138714.html" (at 0 0 0) (effects (hide yes)))
   )
+	(symbol "TSD03DYFR"
+    (in_bom yes)
+    (on_board yes)
+    (property
+      "Reference"
+      "D"
+      (id 0)
+      (at 0 5.08 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Value"
+      "TSD03DYFR-TP"
+      (id 1)
+      (at 0 -5.08 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Footprint"
+      "SR-Diodes:TSD03DYFR"
+      (id 2)
+      (at 0 -7.62 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Datasheet"
+      "${SR_LIB}/datasheets/tsd03dyfr.pdf"
+      (id 3)
+      (at 0 -10.16 0)
+      (effects (font (size 1.27 1.27) ) hide (hide yes))
+    )
+    (property
+      "Manufacturer"
+      "TECH PUBLIC"
+      (id 4)
+      (at 0 -12.70 0)
+      (effects (font (size 1.27 1.27) ) hide (hide yes))
+    )
+    (property
+      "MPN"
+      "TSD03DYFR"
+      (id 5)
+      (at 0 -15.24 0)
+      (effects (font (size 1.27 1.27) ) hide (hide yes))
+    )
+    (property
+      "LCSC Part"
+      "C52098188"
+      (id 6)
+      (at 0 -17.78 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (symbol "TSD03DYFR-TP_0_1"
+      (polyline
+        (pts
+          (xy 1.27 4.32) (xy -1.27 2.54) (xy 1.27 0.76) (xy 1.27 4.32)
+        )
+        (stroke (width 0) (type default))
+        (fill (type background))
+      )
+      (polyline
+        (pts
+          (xy 1.27 -4.32) (xy 3.81 -2.54) (xy 1.27 -0.76) (xy 1.27 -4.32)
+        )
+        (stroke (width 0) (type default))
+        (fill (type background))
+      )
+      (polyline
+        (pts
+          (xy -1.27 -0.76) (xy -3.81 -2.54) (xy -1.27 -4.32) (xy -1.27 -0.76)
+        )
+        (stroke (width 0) (type default))
+        (fill (type background))
+      )
+      (polyline
+        (pts
+          (xy -1.27 4.32) (xy -1.27 4.32) (xy -1.27 4.32) (xy -1.27 0.76) (xy -1.27 0.76) (xy -1.27 0.76)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 2.54 2.54) (xy 1.27 2.54)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -1.27 2.54) (xy -2.54 2.54)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 3.81 -2.54) (xy 5.08 -2.54)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 0.00 -2.54) (xy 1.27 -2.54)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 3.81 -4.32) (xy 3.81 -4.32) (xy 3.81 -4.32) (xy 3.81 -0.76) (xy 3.81 -0.76) (xy 3.81 -0.76)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -3.81 -2.54) (xy -5.08 -2.54)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 0.00 -2.54) (xy -1.27 -2.54)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -3.30 -0.00) (xy -3.81 -0.51) (xy -3.81 -4.32) (xy -4.32 -5.08)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy -2.54 2.54) (xy -5.08 2.54) (xy -5.08 -2.54)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (polyline
+        (pts
+          (xy 2.54 2.54) (xy 5.08 2.54) (xy 5.08 -2.54)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (pin unspecified line
+        (at 7.62 -0.00 180)
+        (length 2.54)
+        (name "A" (effects (font (size 1.27 1.27))))
+        (number "2" (effects (font (size 1.27 1.27))))
+      )
+      (pin unspecified line
+        (at -7.62 -0.00 0)
+        (length 2.54)
+        (name "C" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27))))
+      )
+    )
+    (property "Description" "16V 20A@8/20us 350W@8/20us 6V Unidirectional 3.3V SOD-323 TVS Diodes RoHS" (at 0 0 0) (effects (hide yes)))
+    (property "Purchase" "https://www.lcsc.com/product-detail/C52098188.html" (at 0 0 0) (effects (hide yes)))
+  )
 )
