@@ -201,31 +201,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Diodes",
-          "name": "TPD1E05U06DPYR"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/TPD1E05U06DPYR.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Diodes",
-          "name": "TPD1E05U06DPYR"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "tpd1e05u06dpyr-6943.pdf",

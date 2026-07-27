@@ -85,31 +85,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "BQ24074RGTR"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/BQ24074RGTR.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "BQ24074RGTR"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "bq24074rgtr-5c1c.pdf",

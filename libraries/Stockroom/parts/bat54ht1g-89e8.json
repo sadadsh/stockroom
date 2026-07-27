@@ -97,31 +97,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Diodes",
-          "name": "BAT54HT1G"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/BAT54HT1G.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Diodes",
-          "name": "BAT54HT1G"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "bat54ht1g-89e8.pdf",

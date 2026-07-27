@@ -201,31 +201,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Connectors",
-          "name": "TSW-112-07-G-D"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/TSW-112-07-G-D.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Connectors",
-          "name": "TSW-112-07-G-D"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "tsw-112-07-g-d-5751.pdf",

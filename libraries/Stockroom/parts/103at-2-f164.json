@@ -169,31 +169,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Diodes",
-          "name": "103AT-2"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/103AT-2.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Diodes",
-          "name": "103AT-2"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "103at-2-f164.pdf",

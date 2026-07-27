@@ -133,31 +133,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Diodes",
-          "name": "TSD03DYFR"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/TSD03DYFR.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Diodes",
-          "name": "TSD03DYFR"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "tsd03dyfr-e555.pdf",

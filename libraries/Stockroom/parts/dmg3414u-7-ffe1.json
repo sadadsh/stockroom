@@ -196,31 +196,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Transistors",
-          "name": "DMG3414U-7"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/DMG3414U-7.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Transistors",
-          "name": "DMG3414U-7"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "dmg3414u-7-ffe1.pdf",

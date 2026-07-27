@@ -85,31 +85,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Switches",
-          "name": "ADG714BRUZ"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/ADG714BRUZ.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Switches",
-          "name": "ADG714BRUZ"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "",

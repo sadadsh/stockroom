@@ -225,31 +225,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Capacitors",
-          "name": "EMK212BB7106KG-T"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/EMK212BB7106KG-T.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Capacitors",
-          "name": "EMK212BB7106KG-T"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "emk212bb7106kg-t-396c.pdf",
