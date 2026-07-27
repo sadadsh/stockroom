@@ -65,6 +65,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/932/73251-2120.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "84 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "9"
+      }
+    ],
     "Packaging": [
       {
         "confidence": "medium",
@@ -598,6 +610,94 @@
       "stock": 27,
       "url": "https://www.lcsc.com/product-detail/C19807503.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:50.140348+00:00",
+      "part_number": "538-73251-2120",
+      "price_breaks": [
+        {
+          "price": 6.29,
+          "qty": 1
+        },
+        {
+          "price": 5.92,
+          "qty": 10
+        },
+        {
+          "price": 5.73,
+          "qty": 25
+        },
+        {
+          "price": 5.24,
+          "qty": 50
+        },
+        {
+          "price": 5.08,
+          "qty": 100
+        },
+        {
+          "price": 4.76,
+          "qty": 250
+        },
+        {
+          "price": 4.6,
+          "qty": 500
+        },
+        {
+          "price": 4.47,
+          "qty": 1000
+        },
+        {
+          "price": 4.24,
+          "qty": 1600
+        }
+      ],
+      "stock": 3320,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:50.140348+00:00",
+      "part_number": "WM5536-ND",
+      "price_breaks": [
+        {
+          "price": 7.17,
+          "qty": 1
+        },
+        {
+          "price": 6.097,
+          "qty": 10
+        },
+        {
+          "price": 5.7148,
+          "qty": 25
+        },
+        {
+          "price": 5.26413,
+          "qty": 80
+        },
+        {
+          "price": 5.01288,
+          "qty": 160
+        },
+        {
+          "price": 4.77372,
+          "qty": 320
+        },
+        {
+          "price": 4.58902,
+          "qty": 560
+        },
+        {
+          "price": 4.39307,
+          "qty": 1040
+        }
+      ],
+      "stock": 11116,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
