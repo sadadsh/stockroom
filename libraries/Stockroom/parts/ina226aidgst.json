@@ -1,5 +1,17 @@
 {
   "alternates": {
+    "Accuracy": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "±0.02%"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "0.1%"
+      }
+    ],
     "HTS Code (US)": [
       {
         "confidence": "",
@@ -12,6 +24,30 @@
         "value": "8542.39.0070"
       }
     ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_MSOP-10_DGS_t.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4190/296%7E4073272%7EDGS%7E10.JPG"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "16 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "16"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "",
@@ -22,6 +58,18 @@
         "confidence": "",
         "source": "digikey",
         "value": "250"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Reel, Cut Tape, MouseReel"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Reel"
       }
     ],
     "Product Category": [
@@ -46,6 +94,30 @@
         "confidence": "",
         "source": "digikey",
         "value": "ROHS3 Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Details"
+      }
+    ],
+    "Sensing Method": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "High/Low-Side"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "High or Low Side"
+      }
+    ],
+    "US Tariff %": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8.01"
       }
     ],
     "description": [
@@ -58,6 +130,11 @@
         "confidence": "high",
         "source": "digikey",
         "value": "IC CURRENT MONITOR 0.02% 10VSSOP"
+      },
+      {
+        "confidence": "",
+        "source": "jsonld",
+        "value": "INA226AIDGST Texas Instruments Current & Power Monitors & Regulators Hi-Side Msmt Bi-Dir Current/Pwr Mon A 59 A 595-INA226AIDGSR datasheet, inventory, & pricing."
       }
     ],
     "lead_time": [
@@ -113,7 +190,92 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Brand": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Development Kit": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Factory Pack Quantity": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Input Voltage Range": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Manufacturer": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Maximum Operating Temperature": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Minimum Operating Temperature": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Moisture Sensitive": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Mounting Style": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Operating Supply Current": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Product": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Product Type": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Series": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Subcategory": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Supply Voltage - Max": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Supply Voltage - Min": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "US Tariff %": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Unit Weight": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "ina226aidgst",
   "manufacturer": "Texas Instruments",
@@ -127,72 +289,61 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:31.077840+00:00",
       "part_number": "595-INA226AIDGST",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 4.27,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 3.24,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 2.98,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 2.69,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 2.69,
           "qty": 250
         }
       ],
-      "stock": 11852,
+      "stock": 11235,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/INA226AIDGST?qs=tQG3bEuiOZB3Ay2BJOjnEQ%3D%3D",
       "vendor": "Mouser"
     },
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:31.077840+00:00",
       "part_number": "296-29100-2-ND",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 2.55308,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 2.47104,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 2.42996,
           "qty": 750
         },
         {
-          "currency": "USD",
           "price": 2.38442,
           "qty": 1250
         },
         {
-          "currency": "USD",
           "price": 2.35782,
           "qty": 1750
         },
         {
-          "currency": "USD",
           "price": 2.33224,
           "qty": 2500
         }
@@ -206,10 +357,13 @@
   "specs": {
     "Accuracy": "±0.02%",
     "Assembly Country of Origin": "China",
+    "Brand": "Texas Instruments",
     "Country of Diffusion": "Japan",
     "Country of Origin": "China",
     "Current - Output": "10mA",
+    "Development Kit": "INA226EVM",
     "ECCN": "EAR99",
+    "Factory Pack Quantity": "250",
     "Function": "Current Monitor",
     "HTS Code (CA)": "8542390000",
     "HTS Code (CN)": "8542399000",
@@ -218,21 +372,39 @@
     "HTS Code (MX)": "8542399999",
     "HTS Code (US)": "8542390090",
     "Image": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_MSOP-10_DGS_t.jpg",
+    "Input Voltage Range": "0 V to 36 V",
+    "Lead Time": "16 Weeks",
+    "Lifecycle": "Active",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 125 C",
     "Maximum Order Quantity": "160",
+    "Minimum Operating Temperature": "- 40 C",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitive": "Yes",
     "Moisture Sensitivity Level": "2 (1 Year)",
+    "Mounting Style": "SMD/SMT",
     "Mounting Type": "Surface Mount",
+    "Operating Supply Current": "420 uA",
     "Operating Temperature": "-40°C ~ 125°C",
     "Order Multiple": "1",
+    "Package": "MSOP-10",
     "Package / Case": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)",
     "Package Type": "Tape & Reel (TR)",
     "Packaging": "Reel, Cut Tape, MouseReel",
+    "Product": "Current and Power Monitors",
     "Product Category": "Current & Power Monitors & Regulators",
+    "Product Type": "Current & Power Monitors & Regulators",
     "REACH": "REACH Unaffected",
     "RoHS": "RoHS Compliant",
     "Sensing Method": "High/Low-Side",
+    "Series": "INA226",
     "Standard Pack Qty": "250",
+    "Subcategory": "PMIC - Power Management ICs",
     "Supplier Device Package": "10-VSSOP",
+    "Supply Voltage - Max": "5.5 V",
+    "Supply Voltage - Min": "2.7 V",
+    "US Tariff %": "8.01",
+    "Unit Weight": "0.000836 oz",
     "Unit Weight (kg)": "2.37e-05",
     "Voltage - Input": "0V ~ 36V"
   },
