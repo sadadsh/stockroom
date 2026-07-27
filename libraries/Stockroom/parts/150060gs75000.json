@@ -117,7 +117,25 @@
   },
   "description": "Single Color LEDs WL-SMCW SMDMono TpVw Waterclr 0603 Green",
   "display_name": "Single Color LED 0603",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "150060GS75000"
+      },
+      "model": {
+        "file": "models/150060GS75000.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "150060GS75000"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
