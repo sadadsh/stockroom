@@ -41,6 +41,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8898/MFG_31%7ESOD123%7E%7E2.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "280 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "40"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -614,6 +626,74 @@
       "stock": 388818,
       "url": "https://www.lcsc.com/product-detail/C82544.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:47.370944+00:00",
+      "part_number": "621-1N5819HW-F",
+      "price_breaks": [
+        {
+          "price": 0.29,
+          "qty": 1
+        },
+        {
+          "price": 0.178,
+          "qty": 10
+        },
+        {
+          "price": 0.111,
+          "qty": 100
+        },
+        {
+          "price": 0.082,
+          "qty": 500
+        },
+        {
+          "price": 0.072,
+          "qty": 1000
+        },
+        {
+          "price": 0.055,
+          "qty": 3000
+        }
+      ],
+      "stock": 93322,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:47.370944+00:00",
+      "part_number": "1N5819HW-FDITR-ND",
+      "price_breaks": [
+        {
+          "price": 0.05547,
+          "qty": 3000
+        },
+        {
+          "price": 0.0498,
+          "qty": 6000
+        },
+        {
+          "price": 0.04691,
+          "qty": 9000
+        },
+        {
+          "price": 0.04366,
+          "qty": 15000
+        },
+        {
+          "price": 0.04174,
+          "qty": 21000
+        },
+        {
+          "price": 0.03986,
+          "qty": 30000
+        }
+      ],
+      "stock": 843012,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
