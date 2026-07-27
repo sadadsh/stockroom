@@ -1,4 +1,90 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8548000000"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8548.00.0000"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/BLM15PX-series_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/409-Ceramic-Capacitor-Black-Field.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "84 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "23"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Ferrite Beads"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Filters"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Ferrite Beads 0402 600ohm 25% 5A AEC-Q200 DC PWR Line"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "FERRITE BEAD 600 OHM 0402 1LN"
+      }
+    ]
+  },
   "category": "Inductors",
   "datasheet": {
     "fetched_at": "",
@@ -21,9 +107,25 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "Current Rating (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "DC Resistance (DCR) (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "ECCN": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Features": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Filter Type": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "HTS Code (CA)": {
       "confidence": "high",
@@ -45,21 +147,57 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "Height (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Image": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Impedance @ Frequency": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Lead Time": {
       "confidence": "high",
       "source": "mouser"
     },
+    "Lifecycle": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Minimum Order Quantity": {
       "confidence": "medium",
       "source": "mouser"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number of Lines": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Order Multiple": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "high",
@@ -69,9 +207,25 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Ratings": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "RoHS": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Size / Dimension": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Standard Pack Qty": {
       "confidence": "high",
@@ -134,6 +288,70 @@
       "stock": 108674,
       "url": "https://www.lcsc.com/search?q=BLM15PX601SH1D",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:38.546883+00:00",
+      "part_number": "81-BLM15PX601SH1D",
+      "price_breaks": [
+        {
+          "price": 0.27,
+          "qty": 1
+        },
+        {
+          "price": 0.184,
+          "qty": 10
+        },
+        {
+          "price": 0.16,
+          "qty": 25
+        },
+        {
+          "price": 0.143,
+          "qty": 50
+        },
+        {
+          "price": 0.128,
+          "qty": 100
+        },
+        {
+          "price": 0.11,
+          "qty": 250
+        },
+        {
+          "price": 0.094,
+          "qty": 500
+        },
+        {
+          "price": 0.083,
+          "qty": 1000
+        },
+        {
+          "price": 0.082,
+          "qty": 5000
+        },
+        {
+          "price": 0.082,
+          "qty": 10000
+        }
+      ],
+      "stock": 108683,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:38.546883+00:00",
+      "part_number": "490-BLM15PX601SH1DTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.06375,
+          "qty": 10000
+        }
+      ],
+      "stock": 4671,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -141,19 +359,36 @@
     "Assembly Country of Origin": "Japan",
     "Country of Diffusion": "Not available",
     "Country of Origin": "Japan",
+    "Current Rating (Max)": "900mA",
+    "DC Resistance (DCR) (Max)": "230mOhm",
     "ECCN": "EAR99",
+    "Features": "Automotive",
+    "Filter Type": "Power, Signal Line",
     "HTS Code (CA)": "8548000000",
     "HTS Code (CN)": "8548000001",
     "HTS Code (EU TARIC)": "8504509590",
     "HTS Code (JP)": "854800000",
     "HTS Code (US)": "8548000000",
+    "Height (Max)": "0.022\" (0.55mm)",
     "Image": "https://www.mouser.com/images/murata/images/BLM15PX-series_SPL.jpg",
-    "Lead Time": "112 Days",
+    "Impedance @ Frequency": "600 Ohms @ 100 MHz",
+    "Lead Time": "84 Days",
+    "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
+    "Number of Lines": "1",
+    "Operating Temperature": "-55°C ~ 125°C",
     "Order Multiple": "1",
+    "Package / Case": "0402 (1005 Metric)",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Reel, Cut Tape, MouseReel",
     "Product Category": "Ferrite Beads",
+    "REACH": "REACH Unaffected",
+    "Ratings": "AEC-Q200",
     "RoHS": "RoHS Compliant",
+    "Series": "BLM15PX",
+    "Size / Dimension": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)",
     "Standard Pack Qty": "10000"
   },
   "tags": [],
