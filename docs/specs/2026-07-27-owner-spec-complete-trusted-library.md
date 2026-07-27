@@ -119,3 +119,50 @@ Data quality of the import itself is SOUND: 0 records missing description, manuf
 datasheet; 25-82 specs each; 9 unclassified. The problem is ASSETS and REPORTING, not the import.
 One real defect found by eye: `103AT-2` is an NTC thermistor filed under Diodes and described as a
 diode - a wrong-part failure the automated checks did not catch.
+
+---
+
+## 4. SEPARATE THE SOURCED LAYER FROM THE PRESENTATION LAYER (owner, 2026-07-27)
+
+Owner, granting the architecture explicitly:
+
+> *"if we have to separate the app ui side layer of each component from the data layer so we dont
+> manipulate the authenticly pulled information, thats fine"*
+
+This is the mechanism item (1) needs. *"Import everything so we can change the way the data's
+manipulated later (human naming scheme for example)"* is only possible if the authentic pull is
+still there to re-derive from.
+
+### The rule
+- **SOURCED is immutable.** Exactly what each source returned, per source, per field, byte for
+  byte. Never normalized, never overwritten, never merged. It is the evidence.
+- **DERIVED is disposable.** `display_name`, `value`, `category`, normalized spec keys/values, the
+  human naming scheme - all computed FROM sourced, and safe to recompute at any time because
+  recomputing destroys nothing.
+- A naming-scheme change then becomes a re-derive, not a re-import, and never a data loss.
+
+### Measured state of the current schema (owner's real record `103at_2.json`, 2026-07-27)
+Partly there already, which makes this a migration rather than a rewrite:
+
+| field | holds | verdict |
+|---|---|---|
+| `specs` (76 entries) | the NORMALIZED winning value | **mutated - raw winner is LOST** |
+| `enrichment` (76) | `{source, confidence}` per key | attribution kept, value not |
+| `alternates` (14) | the LOSING values, raw, with source | already sourced-layer shaped |
+| `display_name`, `value`, `category`, `description` | derived, stored flat | **no separation** |
+
+So per-source attribution and the losing values already survive. What is lost is (a) the winning
+value as it was actually returned, because `spec_hygiene.normalize_spec_key/value` rewrites it at
+import, and (b) any boundary between derived presentation fields and sourced truth.
+
+### What "done" looks like
+1. A `sourced` block: per source, the raw payload as returned, keyed by source name. Additive, so
+   nothing existing breaks; `schema_version` already exists to carry the migration.
+2. `specs`/`display_name`/`category`/`value` become explicitly DERIVED, recomputed from `sourced`
+   by one function, with the existing `rebuild_part` as the re-derive entry point.
+3. Normalization moves from IMPORT time to DERIVE time. Nothing is normalized on the way in.
+4. A re-derive over the whole library is idempotent and provably lossless: run it twice, get the
+   same records; run it after a naming-scheme change, get new names and identical sourced data.
+
+**NOT STARTED.** Recorded here at the end of the 2026-07-27 session; a schema migration should not
+be begun at exhausted context.
