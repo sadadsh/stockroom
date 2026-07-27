@@ -139,9 +139,9 @@ function CoverageBody({
         <p className="text-sm text-t3">
           {needsFiles > 0 ? (
             <>
-              {needsFiles} {needsFiles === 1 ? "component" : "components"} can be filled
-              automatically, {estimate(needsFiles)}. You can stop it at any point and pick up
-              where it left off.
+              {needsFiles} {needsFiles === 1 ? "component has a gap" : "components have gaps"} a
+              source can try, {estimate(needsFiles)}. Not every one will find files. You can stop
+              it at any point and pick up where it left off.
             </>
           ) : total === 0 ? (
             "Add a component first."
