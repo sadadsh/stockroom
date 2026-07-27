@@ -362,7 +362,7 @@ export function Rail() {
                 <Icon id="nav.up-to-date" className="h-4 w-4 flex-none" />
               </span>
               <span className={collapsed ? PEEK_LABEL + " whitespace-nowrap" : ""}>
-                <Text id="nav.up-to-date">Up to Date!</Text>
+                <Text id="nav.up-to-date">Up To Date</Text>
               </span>
             </div>
           )}
