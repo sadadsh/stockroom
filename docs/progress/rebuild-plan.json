@@ -617,14 +617,14 @@
      "why": "Element-by-element pass over the 2026-07-27 real-Windows shots (dark Components, light Settings) at HEAD, per the standing screenshot directive. Split into DEFECTS (unambiguous, fix them) and DESIGN TENSIONS (need the owner to choose, because unilaterally re-laying-out a surface is what produced 'AHH the new ui sucks it moved everything').",
      "steps": [
       {
-       "t": "DEFECT: hover and selected are indistinguishable in the Settings nav - 'Application' has an accent bar + fill, 'Sourcing' has fill only, so TWO items read as active and the user cannot tell which section they are in",
+       "t": "DEFECT, MEASURED: hover and selected are indistinguishable in LIGHT theme only. styles/index.css - dark: --c-acc-soft rgba(255,255,255,0.11) vs --c-hover rgba(255,255,255,0.03), ratio 0.27 (clearly distinct). light: --c-acc-soft rgba(0,0,0,0.06) vs --c-hover rgba(0,0,0,0.04), ratio 0.67 (nearly identical). So light theme diverges from the ratio the WORKING theme already proves. RECOMMENDED FIX, needs owner approval because --c-acc-soft has 30 uses across 12+ files and this repaints every selected state in light theme: raise light --c-acc-soft to 0.11 to match dark, giving ratio 0.36 and making the selected state the louder of the two (the correct direction). NOT applied unilaterally. CONFIRMED BY RE-SHOOT: on a shot with nothing hovered, ONLY the selected item carries a fill - so the second 'active-looking' item in the Windows shot was hover, exactly as the 0.67 ratio predicts.",
        "done": false,
        "evidence": ""
       },
       {
        "t": "DEFECT: the same state is spelled two ways on ONE screen - 'Up to Date!' (bottom-left, exclamation) vs 'Up To Date' (right). Design contract says Title Case for interactive labels",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "FIXED: Rail.tsx 'Up to Date!' -> 'Up To Date', so the rail button and the Settings summary now spell the state identically and both obey the Title-Case-for-controls contract. Pure copy, zero layout change."
       },
       {
        "t": "DEFECT: the only two VALUES on the Settings page ('Light', 'Up To Date') are rendered in the dimmest text token, right-aligned on white. Same washout class that 02945c51 fixed elsewhere",
@@ -663,8 +663,8 @@
       },
       {
        "t": "TENSION (ask the owner): the four green Machine Setup chips read as an undifferentiated wall; and 'Trade And Compliance' is stranded at the bottom of the Sourcing column after a large gap",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "RETRACTED - I criticised a CORRECT state. Re-shot on a machine with unmet steps: the band reads '2 Setup Steps Remaining' with AMBER, clickable chips ('Add A Distributor Key', 'Connect GitHub') beside a quiet green 'KiCad Wired'. The chips do differentiate by state; on the owner's machine all four are green because all four are genuinely met. The 'undifferentiated wall' reading came from only ever seeing the fully-set-up case. The 'Trade And Compliance stranded' half of this step stands and is folded into the dead-space tension below."
       },
       {
        "t": "Fix the DEFECTS above, then RE-SHOOT both themes on real Windows and re-critique",
@@ -676,5 +676,5 @@
    ]
   }
  ],
- "updated": "2026-07-27 05:55 UTC"
+ "updated": "2026-07-27 06:10 UTC"
 }
