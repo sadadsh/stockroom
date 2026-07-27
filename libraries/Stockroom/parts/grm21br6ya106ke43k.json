@@ -1,0 +1,131 @@
+{
+  "category": "Capacitors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/8942/490_Chip_Multilayer_CAT2021_MLCC.pdf"
+  },
+  "description": "Capacitor, 10 µF, 10%, 0805",
+  "display_name": "10 µF 10% 0805 Capacitor",
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "Capacitor_SMD",
+        "name": "C_0805_2012Metric"
+      },
+      "model": null,
+      "symbol": {
+        "file": "",
+        "lib": "Device",
+        "name": "C"
+      }
+    }
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "grm21br6ya106ke43k",
+  "manufacturer": "Murata Electronics",
+  "mpn": "GRM21BR6YA106KE43K",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=GRM21BR6YA106KE43K"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.31,
+          "qty": 1
+        },
+        {
+          "price": 0.133,
+          "qty": 10
+        },
+        {
+          "price": 0.115,
+          "qty": 100
+        },
+        {
+          "price": 0.092,
+          "qty": 500
+        },
+        {
+          "price": 0.084,
+          "qty": 1000
+        },
+        {
+          "price": 0.076,
+          "qty": 2500
+        },
+        {
+          "price": 0.071,
+          "qty": 5000
+        },
+        {
+          "price": 0.061,
+          "qty": 10000
+        },
+        {
+          "price": 0.059,
+          "qty": 20000
+        }
+      ],
+      "stock": 10172,
+      "url": "https://www.mouser.com/c/?q=GRM21BR6YA106KE43K",
+      "vendor": "Mouser"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "3D Model": "Capacitor_SMD.3dshapes/C_0805_2012Metric.wrl",
+    "Applications": "General Purpose",
+    "Assembly Country of Origin": "Not available",
+    "BRHTS": "85322410",
+    "Capacitance": "10 µF",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Japan",
+    "ECCN": "EAR99",
+    "Footprint": "Capacitor_SMD:C_0805_2012Metric",
+    "HTS Code (CA)": "8532240010",
+    "HTS Code (CN)": "8532241000",
+    "HTS Code (EU TARIC)": "8532240000",
+    "HTS Code (JP)": "853224000",
+    "HTS Code (MX)": "8532240400",
+    "HTS Code (US)": "8532240020",
+    "Image": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
+    "KRHTS": "8532240000",
+    "Lead Time": "70 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount, MLCC",
+    "Operating Temperature": "-55°C ~ 85°C",
+    "Order Multiple": "1",
+    "Package": "0805",
+    "Package / Case": "0805 (2012 Metric)",
+    "Package Type": "Tape & Reel (TR)",
+    "Packaging": "Reel, Cut Tape, MouseReel",
+    "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "REACH": "REACH Unaffected",
+    "RoHS": "RoHS Compliant",
+    "Series": "GRM",
+    "Size / Dimension": "0.079\" L x 0.049\" W (2.00mm x 1.25mm)",
+    "Standard Pack Qty": "10000",
+    "Standard Package": "10000",
+    "Symbol": "Device:C",
+    "Temperature Coefficient": "X5R",
+    "Thickness (Max)": "0.057\" (1.45mm)",
+    "Tolerance": "10%",
+    "Unit Weight (kg)": "6.4e-06",
+    "Voltage - Rated": "35V"
+  },
+  "tags": [],
+  "value": ""
+}
