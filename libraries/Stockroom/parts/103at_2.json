@@ -177,7 +177,25 @@
   },
   "description": "Diode 40V 175mA Surface Mount SOT-363",
   "display_name": "NTC Thermistor SOT-363",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "103AT-2"
+      },
+      "model": {
+        "file": "models/103AT-2.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "103AT-2"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
