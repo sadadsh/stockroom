@@ -1,0 +1,124 @@
+{
+  "category": "Other",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "hd_la1307_sm.pdf",
+    "source_url": ""
+  },
+  "description": "Solenoids & Actuators Surface Mount Haptic 13mm 154Hz 2Vrms",
+  "display_name": "Solenoid",
+  "eda": {},
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "ECCN": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (US)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Packaging": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    }
+  },
+  "hashes": null,
+  "id": "hd_la1307_sm",
+  "manufacturer": "PUI Audio",
+  "mpn": "HD-LA1307-SM",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 7.09,
+          "qty": 1
+        },
+        {
+          "price": 6.83,
+          "qty": 10
+        },
+        {
+          "price": 6.51,
+          "qty": 25
+        },
+        {
+          "price": 6.28,
+          "qty": 50
+        },
+        {
+          "price": 5.84,
+          "qty": 100
+        },
+        {
+          "price": 5.5,
+          "qty": 400
+        },
+        {
+          "price": 5.43,
+          "qty": 800
+        }
+      ],
+      "stock": 219,
+      "url": "https://www.lcsc.com/search?q=HD-LA1307-SM",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
+    "ECCN": "EAR99",
+    "HTS Code (US)": "8501104020",
+    "Image": "https://www.mouser.com/images/puiaudio/images/HD-LA1307-SM_SPL.jpg",
+    "Lead Time": "90 Days",
+    "Minimum Order Quantity": "1",
+    "Order Multiple": "1",
+    "Packaging": "Reel, Cut Tape",
+    "Product Category": "Solenoids & Actuators",
+    "Standard Pack Qty": "400"
+  },
+  "tags": [],
+  "value": ""
+}
