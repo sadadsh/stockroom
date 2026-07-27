@@ -93,7 +93,25 @@
   },
   "description": "Switching Voltage Regulators 17V VIN 4.5A low-no ise low-ripple buck",
   "display_name": "Switching Voltage Regulator 14-VQFN-HR",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "TPS62914RPYR"
+      },
+      "model": {
+        "file": "models/TPS62914RPYR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "TPS62914RPYR"
+      }
+    }
+  },
   "enrichment": {},
   "hashes": null,
   "id": "tps62914rpyr",
