@@ -105,7 +105,25 @@
   },
   "description": "600Ω@100MHz 1 Line Ferrite Bead 0603 500mA 380mΩ",
   "display_name": "±25% Power Inductor 0603",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Inductors",
+        "name": "BLM18AG601SN1D"
+      },
+      "model": {
+        "file": "models/BLM18AG601SN1D.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Inductors",
+        "name": "BLM18AG601SN1D"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
