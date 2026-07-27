@@ -24,8 +24,14 @@
  * meaning, which is the rule.
  */
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { BulkImportItem, BulkImportResult } from "../api/types";
-import { useBulkImport } from "../api/queries";
+import {
+  setBulkImportText,
+  startBulkImport,
+  useBulkImportState,
+  type BulkImportInput,
+} from "../lib/bulkImportStore";
 import { Button } from "./primitives";
 import { Text } from "../lib/copy";
 
@@ -99,9 +105,25 @@ function Summary({ result }: { result: BulkImportResult }) {
 }
 
 export function BulkImportSection() {
-  const [text, setText] = useState("");
   const [showAll, setShowAll] = useState(false);
-  const job = useBulkImport();
+  // State lives OUTSIDE React (lib/bulkImportStore): this panel sits inside the Add-A-Part
+  // dialog, and a 166-part register import runs about 25 minutes. With the state in useState,
+  // dismissing the dialog unmounted the reader and threw the finished report away while the job
+  // kept running server-side. The paste survives too, which matters for a 166-line list.
+  const job = useBulkImportState();
+  const qc = useQueryClient();
+  const text = job.text;
+  const setText = setBulkImportText;
+
+  async function run(input: BulkImportInput) {
+    const final = await startBulkImport(input);
+    // Invalidate only on a run that actually wrote. A preview changes nothing.
+    if (input.dryRun || final.status !== "done") return;
+    for (const key of [["parts"], ["part"], ["altium-status"], ["duplicates"]]) {
+      qc.invalidateQueries({ queryKey: key });
+    }
+  }
+
   const csv = useMemo(() => looksLikeCsv(text), [text]);
   const count = useMemo(() => countEntries(text, csv), [text, csv]);
   const busy = job.status === "running";
@@ -152,7 +174,7 @@ export function BulkImportSection() {
           data-dev-id="ingest.bulk-import"
           variant="accent"
           disabled={busy || count === 0}
-          onClick={() => job.start({ text, format: csv ? "csv" : "list" })}
+          onClick={() => run({ text, format: csv ? "csv" : "list" })}
         >
           {count > 0 ? `Import ${count} ${count === 1 ? "Part" : "Parts"}` : "Import"}
         </Button>
@@ -161,7 +183,7 @@ export function BulkImportSection() {
         <Button
           data-dev-id="ingest.bulk-preview"
           disabled={busy || count === 0}
-          onClick={() => job.start({ text, format: csv ? "csv" : "list", dryRun: true })}
+          onClick={() => run({ text, format: csv ? "csv" : "list", dryRun: true })}
         >
           <Text id="bulk.preview">Preview Without Writing</Text>
         </Button>

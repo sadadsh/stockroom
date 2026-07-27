@@ -1147,31 +1147,11 @@ export function useAltiumAttach() {
   });
 }
 
-// Import a pasted list of part numbers into the library. A JOB, because a register-sized list is
-// minutes of network work and the stream names the part it is on. On completion it invalidates the
-// surfaces the run changed - the parts list, each detail, and the Altium status, which counts
-// place-ready parts. A dry run changes nothing, so it invalidates nothing.
-export function useBulkImport() {
-  const qc = useQueryClient();
-  const job = useJob<import("./types").BulkImportResult>();
-  const start = useCallback(
-    async (input: {
-      text?: string;
-      partNumbers?: string[];
-      format?: "list" | "csv";
-      dryRun?: boolean;
-      category?: string;
-    }) => {
-      await job.start(() => api.bulkImport(input));
-      if (input.dryRun) return;
-      for (const key of [["parts"], ["part"], ["altium-status"], ["duplicates"]]) {
-        qc.invalidateQueries({ queryKey: key });
-      }
-    },
-    [job, qc],
-  );
-  return { ...job, start };
-}
+// Bulk import deliberately has NO hook here. Its state lives in `lib/bulkImportStore`, outside
+// React, because the panel sits inside the Add-A-Part dialog and a register-sized run takes about
+// 25 minutes: a `useJob` hook unmounts with the dialog and throws the finished report away. A dead
+// hook left beside the real one is exactly the defect that made `enrich/bulk.py` look shipped for
+// months, so it is removed rather than kept "just in case".
 
 // The parts a bulk 3D embed would work on. Polled on window focus like the other Altium probes:
 // the count changes when parts are added or captured elsewhere in the app, and an action that
