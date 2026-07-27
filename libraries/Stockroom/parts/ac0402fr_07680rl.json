@@ -117,7 +117,25 @@
   },
   "description": "62.5mW 680Ω 50V Thick Film Resistor ±100ppm/℃ ±1% 0402 Chip Resistor - Surface Mount RoHS",
   "display_name": "680Ω ±1% 0402",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Resistors",
+        "name": "AC0402FR-07680RL"
+      },
+      "model": {
+        "file": "models/AC0402FR-07680RL.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Resistors",
+        "name": "AC0402FR-07680RL"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
