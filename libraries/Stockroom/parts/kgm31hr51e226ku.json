@@ -24,6 +24,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/7204/MFG_478_KGM-X5R_series_1206%283216Metric%29.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "133 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "19"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -304,6 +316,78 @@
       "stock": 3748,
       "url": "https://www.lcsc.com/search?q=KGM31HR51E226KU",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:40.289254+00:00",
+      "part_number": "581-KGM31HR51E226KU",
+      "price_breaks": [
+        {
+          "price": 1.17,
+          "qty": 1
+        },
+        {
+          "price": 0.677,
+          "qty": 10
+        },
+        {
+          "price": 0.512,
+          "qty": 100
+        },
+        {
+          "price": 0.436,
+          "qty": 500
+        },
+        {
+          "price": 0.411,
+          "qty": 1000
+        },
+        {
+          "price": 0.399,
+          "qty": 2000
+        },
+        {
+          "price": 0.368,
+          "qty": 24000
+        }
+      ],
+      "stock": 3748,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:40.289254+00:00",
+      "part_number": "478-KGM31HR51E226KUTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.39495,
+          "qty": 2000
+        },
+        {
+          "price": 0.37756,
+          "qty": 4000
+        },
+        {
+          "price": 0.36884,
+          "qty": 6000
+        },
+        {
+          "price": 0.35919,
+          "qty": 10000
+        },
+        {
+          "price": 0.35354,
+          "qty": 14000
+        },
+        {
+          "price": 0.34811,
+          "qty": 20000
+        }
+      ],
+      "stock": 191778,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
