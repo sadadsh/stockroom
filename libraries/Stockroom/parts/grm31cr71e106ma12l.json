@@ -1,4 +1,107 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "17"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "5"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "20%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±20%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 10 µF, 20%, 1206"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: GRM31CR71E106MA12L Multilayer Ceramic Capacitors MLCC - SMD/SMT – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 10UF 25V X7R 1206"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +125,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "grm31cr71e106ma12l",
   "manufacturer": "muRata",
@@ -37,8 +145,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T03:59:50.820269+00:00",
+      "part_number": "81-GRM31CR71E106MA2L",
       "price_breaks": [
         {
           "price": 0.084857143,
@@ -65,9 +173,43 @@
           "qty": 20000
         }
       ],
-      "stock": 1517,
+      "stock": 157,
       "url": "https://www.mouser.com/c/?q=GRM31CR71E106MA12L",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T03:59:50.820269+00:00",
+      "part_number": "490-6519-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.07629,
+          "qty": 2000
+        },
+        {
+          "price": 0.07105,
+          "qty": 4000
+        },
+        {
+          "price": 0.06843,
+          "qty": 6000
+        },
+        {
+          "price": 0.06552,
+          "qty": 10000
+        },
+        {
+          "price": 0.06382,
+          "qty": 14000
+        },
+        {
+          "price": 0.06218,
+          "qty": 20000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -117,7 +259,7 @@
     "LCSC Product Name": "CAP CER 10uF 25V X7R 1206",
     "LCSC Title": "muRata GRM31CR71E106MA12L",
     "LCSC Warehouse Category": "Ceramic Capacitors",
-    "Lead Time": "70 Days",
+    "Lead Time": "10 Weeks",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "5",
     "Moisture Sensitivity Level": "1 (Unlimited)",
