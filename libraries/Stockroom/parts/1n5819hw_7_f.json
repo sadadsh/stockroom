@@ -197,7 +197,25 @@
   },
   "description": "1 Independent 40V 450mV@1A 1A SOD-123 Single Diodes RoHS",
   "display_name": "Schottky Diode SOD-123",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "1N5819HW-7-F"
+      },
+      "model": {
+        "file": "models/1N5819HW-7-F.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "1N5819HW-7-F"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
