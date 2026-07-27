@@ -209,6 +209,10 @@ def run_guided_capture(
         # fast engine instead of silently launching a full Firefox and hanging the suite - which is
         # exactly what a camoufox constructor default did on 2026-07-27.
         engine=engine,
+        # The Altium seam, which already existed and was already atomic but which guided capture
+        # never called - so a vendor shipping real .SchLib/.PcbLib had them downloaded and dropped.
+        # Passed in rather than imported so capture/ stays clear of the mutation layer.
+        attach_altium=ctx.ops.attach_altium_assets,
         run_write=ctx.jobs.run_write,
         now_iso=_utc_now_iso,
     )

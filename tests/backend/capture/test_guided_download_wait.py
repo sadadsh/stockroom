@@ -153,7 +153,7 @@ def test_a_download_consumed_by_the_session_handler_still_counts_as_delivered(
     assert "did not deliver a file" not in (outcome.error or ""), (
         f"the wait reported a failure for a file that was on disk: {outcome.error!r}"
     )
-    assert "no symbol, footprint" in (outcome.error or ""), (
+    assert "nothing this part can use" in (outcome.error or ""), (
         "expected to reach the attach stage and report the fixture's empty candidate list, "
         f"got {outcome!r}"
     )
@@ -251,3 +251,159 @@ def test_the_wait_sees_a_file_that_lands_while_it_is_polling(tmp_path, grows_aft
 
     threading.Thread(target=land, daemon=True).start()
     assert guided._wait_for_capture(browser, _FakePage(), before=0, timeout_s=10.0) is True
+
+
+# --------------------------------------------------------------------------------------------
+# The ALTIUM attach. Guided capture could download Altium libraries and then silently drop them,
+# because `_attach` only ever offered the three KiCad requirements while
+# `library_ops.attach_altium_assets` sat written, atomic, and uncalled.
+# --------------------------------------------------------------------------------------------
+
+
+class _BoundAsset:
+    """The surface `asset_present` actually reads. A bare dict would pass a shape the real
+    `PartRecord` never returns, so the fake would be testing something that cannot happen."""
+
+    def is_present(self) -> bool:
+        return True
+
+
+class _AltiumRecord(_Record):
+    """A part that still needs its Altium pair, and can report what it holds afterwards."""
+
+    def __init__(self):
+        self.altium: dict = {}
+
+    def capturable(self, tool_key: str) -> set[str]:
+        return {"symbol", "footprint"}
+
+    def assets_for(self, tool_key: str) -> dict:
+        return self.altium if tool_key == "altium" else {}
+
+
+def _zip_with(tmp_path, members: dict[str, bytes]):
+    import zipfile
+
+    path = tmp_path / "vendor.zip"
+    with zipfile.ZipFile(path, "w") as zf:
+        for name, blob in members.items():
+            zf.writestr(name, blob)
+    return path
+
+
+def test_altium_libraries_in_a_download_are_attached_not_dropped(monkeypatch, tmp_path):
+    """THE GAP. A download carrying .SchLib/.PcbLib must reach `attach_altium_assets`."""
+    browser = _FakeBrowser()
+    bundle = _zip_with(tmp_path, {
+        "AltiumLibs/PART.SchLib": b"altium-symbol",
+        "AltiumLibs/PART.PcbLib": b"altium-footprint",
+    })
+
+    record = _AltiumRecord()
+    seen: dict = {}
+
+    def fake_attach(part_id, *sources):
+        seen["part_id"] = part_id
+        seen["suffixes"] = sorted(p.suffix.lower() for p in sources)
+        # what the real seam does: bind each side it could read, then hand back the record
+        record.altium = {"symbol": _BoundAsset(), "footprint": _BoundAsset()}
+        return record
+
+    class _Pipeline:
+        def inspect(self, inputs):
+            return []          # no KiCad content at all - Altium must still be attached
+
+        def cleanup(self):
+            return None
+
+    src = _source(monkeypatch, tmp_path, browser,
+                  on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
+                  pipeline=_Pipeline())
+    src._attach_altium = fake_attach
+    outcome = src.supply(record)
+
+    assert seen.get("part_id") == record.id, "attach_altium_assets was never called"
+    assert seen["suffixes"] == [".pcblib", ".schlib"], seen
+    assert set(outcome.satisfied) == {Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT}, (
+        f"an Altium-only download must report Altium requirements, got {outcome!r}"
+    )
+
+
+def test_only_the_side_the_record_actually_holds_is_reported(monkeypatch, tmp_path):
+    """Report from the RECORD, never from what was requested.
+
+    `attach_altium_assets` binds each side independently - a vendor may ship only the symbol. If
+    this reported what it SENT rather than what landed, a half-delivery would read as complete,
+    which is the "success that attached nothing" failure in miniature.
+    """
+    browser = _FakeBrowser()
+    bundle = _zip_with(tmp_path, {"PART.SchLib": b"altium-symbol"})
+    record = _AltiumRecord()
+
+    def fake_attach(part_id, *sources):
+        record.altium = {"symbol": _BoundAsset()}  # footprint deliberately NOT bound
+        return record
+
+    class _Pipeline:
+        def inspect(self, inputs):
+            return []
+
+        def cleanup(self):
+            return None
+
+    src = _source(monkeypatch, tmp_path, browser,
+                  on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
+                  pipeline=_Pipeline())
+    src._attach_altium = fake_attach
+    outcome = src.supply(record)
+
+    assert set(outcome.satisfied) == {Requirement.ALTIUM_SYMBOL}, outcome
+    assert Requirement.ALTIUM_FOOTPRINT not in outcome.satisfied
+
+
+def test_a_kicad_only_vendor_is_completely_unaffected(monkeypatch, tmp_path):
+    """The regression guard. No Altium files means the seam is never invoked at all."""
+    browser = _FakeBrowser()
+    bundle = _zip_with(tmp_path, {"PART.kicad_sym": b"(kicad_symbol_lib)"})
+    called = []
+
+    class _Pipeline:
+        def inspect(self, inputs):
+            return []
+
+        def cleanup(self):
+            return None
+
+    src = _source(monkeypatch, tmp_path, browser,
+                  on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
+                  pipeline=_Pipeline())
+    src._attach_altium = lambda *a, **k: called.append(a)
+    src.supply(_Record())
+
+    assert not called, "attach_altium_assets was called for a download with no Altium libraries"
+
+
+def test_a_failing_altium_attach_is_a_row_not_a_crash(monkeypatch, tmp_path):
+    """Atomic seam: a failure leaves the part untouched and must surface as an error string."""
+    browser = _FakeBrowser()
+    bundle = _zip_with(tmp_path, {"PART.SchLib": b"altium-symbol"})
+
+    class _Pipeline:
+        def inspect(self, inputs):
+            return []
+
+        def cleanup(self):
+            return None
+
+    src = _source(monkeypatch, tmp_path, browser,
+                  on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
+                  pipeline=_Pipeline())
+
+    def boom(part_id, *sources):
+        raise RuntimeError("normalize refused the file")
+
+    src._attach_altium = boom
+    outcome = src.supply(_AltiumRecord())
+
+    assert outcome.error and "Altium" in outcome.error, outcome
+    assert "normalize refused the file" in outcome.error
