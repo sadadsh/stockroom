@@ -106,9 +106,19 @@ def _url_for(key: str, mpn: str, digikey_product_url: str) -> str:
             f"https://www.digikey.com/en/products/result?keywords={quote_plus(mpn)}"
         )
     if key == "ultralibrarian":
-        return f"https://www.ultralibrarian.com/search?queryText={quote_plus(mpn)}"
+        # `app.`, NOT `www.` - MEASURED 2026-07-27 on the owner's machine (scripts/vendorprobe.py):
+        # www.ultralibrarian.com/search?queryText=... returns a 404 "PAGE NOT FOUND" page since the
+        # site became part of Cadence. The query PARAMETER was right; only the host was wrong, and
+        # it was read off Ultra Librarian's own search form (action="https://app.ultralibrarian.com
+        # /search", name="queryText"), which is the authoritative source for it.
+        return f"https://app.ultralibrarian.com/search?queryText={quote_plus(mpn)}"
     if key == "samacsys":
-        return f"https://componentsearchengine.com/search/{quote(mpn, safe='')}"
+        # A QUERY, not a path segment - MEASURED the same session. `/search/<MPN>` is parsed by
+        # Component Search Engine as a part page for a part named "search", redirects to
+        # /model-request/search/<MPN>, and claims "ECAD model is currently unavailable for this
+        # part" even when SamacSys HAS the part. Their own form: action="/search" method="get"
+        # name="term".
+        return f"https://componentsearchengine.com/search?term={quote_plus(mpn)}"
     if key == "snapmagic":
         return f"https://www.snapeda.com/search/?q={quote_plus(mpn)}"
     raise ValueError(f"unknown cad source: {key!r}")

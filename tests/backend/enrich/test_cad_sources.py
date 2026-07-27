@@ -151,6 +151,43 @@ def test_the_part_number_actually_appears_in_every_url():
         assert "TPS62130RGTR" in source.url
 
 
+def test_ultra_librarian_search_lives_on_the_app_subdomain_not_www():
+    """MEASURED on the owner's machine 2026-07-27, driving the real page with scripts/vendorprobe.py.
+
+    `https://www.ultralibrarian.com/search?queryText=<MPN>` returns a 404 "PAGE NOT FOUND" - the
+    site is now part of Cadence and the search app moved to the `app.` subdomain. Every guided
+    capture that picked Ultra Librarian, the owner's FIRST-choice vendor, opened a dead page.
+
+    The host is the fact under test, and the old test could not catch this: it asserted only that
+    `"ultralibrarian.com" in url`, which is true of the 404 host too. An assertion that passes for
+    the broken value is not a test.
+
+    NEGATIVE CONTROL for the corrected URL, run the same session: the real MPN returns 4 result
+    links with saysNoResults=false, an invented `ZZZNOTAREALPART123` returns 0 with
+    saysNoResults=true. So a 200 here means a real hit, not "the host answers".
+    """
+    url = {s.key: s.url for s in resolve_cad_sources("TPD6E05U06RVZR")}["ultralibrarian"]
+    assert url.startswith("https://app.ultralibrarian.com/search?queryText=")
+    assert "//www.ultralibrarian.com" not in url
+
+
+def test_samacsys_search_is_a_query_parameter_not_a_path_segment():
+    """MEASURED on the owner's machine 2026-07-27, same session.
+
+    `componentsearchengine.com/search/<MPN>` does NOT search. It is parsed as a part page for a
+    part literally named "search", redirects to `/model-request/search/<MPN>`, and renders
+    "ECAD model is currently unavailable for this part" - for EVERY part, including parts SamacSys
+    actually has. Read off their own search form: `action="/search"`, `method="get"`, `name="term"`.
+
+    Verified with the corrected URL: the same MPN returns "TPD6E05U06RVZR Model Download Search
+    Results", "Showing 2 of 2 results", with a live Download Model button. So the old URL was
+    reporting a part as unavailable while the vendor had it.
+    """
+    url = {s.key: s.url for s in resolve_cad_sources("TPD6E05U06RVZR")}["samacsys"]
+    assert url.startswith("https://componentsearchengine.com/search?term=")
+    assert "/search/TPD6E05U06RVZR" not in url
+
+
 def test_a_source_carries_what_the_user_must_do_there():
     # The guided window shows this, so it must be per-vendor rather than one generic instruction.
     for source in resolve_cad_sources("TPS62130RGTR"):

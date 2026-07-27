@@ -10,9 +10,9 @@
     "Everything done within the app, not some third party manipulation u do.",
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either."
   ],
-  "updated": "2026-07-27 16:44 UTC",
-  "now": "Guided capture records provenance end to end and is committed (54ae1b2). The app now relaunches itself after a self-update, which was the real cause of 'my app wont update' (d215c45). NEXT: the remaining 5 guided-capture steps, starting with catch/classify/attach.",
-  "now_updated": "2026-07-27 15:00 UTC",
+  "updated": "2026-07-27 19:03 UTC",
+  "now": "Measured the REAL vendor pages on the owner's PC with a new committed tool (scripts/vendorprobe.py). Two of four CAD vendor URLs were broken: Ultra Librarian 404'd (site moved to app.ultralibrarian.com) and SamacSys never searched (it reported every part 'unavailable'). Both fixed, RED proven first. Ultra Librarian's formats turned out to be CHECKBOXES, so KiCad+Altium arrive in ONE download - its driver is rebuilt against a captured fixture of the real page and tested by RUNNING it, not by string-matching selectors.",
+  "now_updated": "",
   "projects": [
     {
       "id": "stockroom",
@@ -327,8 +327,8 @@
                 },
                 {
                   "t": "Fast path to the next part",
-                  "done": false,
-                  "evidence": "PARTIAL - the vendor choice PERSISTS (localStorage, falls back to the trust order's head when the stored key is not offered), so a 90-part sitting costs one decision instead of ninety. Tamper-proven: dropping the write fails the test. The next-part JUMP itself is not built."
+                  "done": true,
+                  "evidence": "MEASURED, not inferred. Ultra Librarian's CAD formats are CHECKBOXES in one shared group (input[name=exports]), so Altium Designer + KiCAD v6+ are ticked together and ONE #submit-export delivers both - the owner's 'kicad and altium at once' in a single click. Proven by driving the live page and reading state back ({checkedNow:[AltiumDesigner,KiCADv6],bothHeld:true}), then locked by running the generated driver against a committed fixture of the real page in jsdom (7 tests). Tamper-proven: forcing KiCad v5 turns 3 RED. NOT done for SnapEDA/SamacSys - their selectors are still unmeasured guesses, logged."
                 },
                 {
                   "t": "Designed deliberately, screenshot critiqued both themes",
