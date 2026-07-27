@@ -261,7 +261,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Connectors",
+          "name": "USB4105-GF-A"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/USB4105-GF-A.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Connectors",
+          "name": "USB4105-GF-A"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "usb4105-gf-a-b5d9.pdf",

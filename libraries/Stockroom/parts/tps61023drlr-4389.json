@@ -121,7 +121,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-ICs",
+          "name": "TPS61023DRLR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/TPS61023DRLR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-ICs",
+          "name": "TPS61023DRLR"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "tps61023drlr-4389.pdf",

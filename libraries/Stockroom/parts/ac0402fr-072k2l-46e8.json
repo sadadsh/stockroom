@@ -109,7 +109,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "AC0402FR-072K2L"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/AC0402FR-072K2L.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "AC0402FR-072K2L"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "ac0402fr-072k2l-46e8.pdf",

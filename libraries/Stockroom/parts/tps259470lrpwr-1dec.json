@@ -85,7 +85,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-ICs",
+          "name": "TPS259470LRPWR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/TPS259470LRPWR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-ICs",
+          "name": "TPS259470LRPWR"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "tps259470lrpwr-1dec.pdf",

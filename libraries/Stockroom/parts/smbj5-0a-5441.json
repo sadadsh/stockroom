@@ -199,7 +199,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "SMBJ5.0A"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/SMBJ5.0A.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "SMBJ5.0A"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "smbj5-0a-5441.pdf",

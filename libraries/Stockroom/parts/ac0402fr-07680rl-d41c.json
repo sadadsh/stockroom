@@ -109,7 +109,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "AC0402FR-07680RL"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/AC0402FR-07680RL.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "AC0402FR-07680RL"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "ac0402fr-07680rl-d41c.pdf",

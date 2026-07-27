@@ -218,7 +218,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Connectors",
+          "name": "U.FL-R-SMT-1(10)"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/U.FL-R-SMT-1(10).step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Connectors",
+          "name": "U.FL-R-SMT-1(10)"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "u-fl-r-smt-1-10-14a8.pdf",

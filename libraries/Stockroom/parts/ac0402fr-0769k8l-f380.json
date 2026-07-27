@@ -194,7 +194,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "AC0402FR-0769K8L"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/AC0402FR-0769K8L.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "AC0402FR-0769K8L"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "ac0402fr-0769k8l-f380.pdf",

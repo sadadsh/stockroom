@@ -109,7 +109,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "150060GS75000"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/150060GS75000.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "150060GS75000"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "150060gs75000-9b8f.pdf",

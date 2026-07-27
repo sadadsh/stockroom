@@ -225,7 +225,25 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Connectors",
+          "name": "505110-1892"
+        }
+      },
+      "model": null,
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Connectors",
+          "name": "505110-1892"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "505110-1892-d8cb.pdf",

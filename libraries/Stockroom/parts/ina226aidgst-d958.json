@@ -73,7 +73,48 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "altium": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "ina226aidgst.PcbLib",
+          "name": "DGS10"
+        }
+      },
+      "model": null,
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "ina226aidgst.SchLib",
+          "name": "INA226AIDGST"
+        }
+      }
+    },
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-ICs",
+          "name": "INA226AIDGST"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/INA226AIDGST.stp",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-ICs",
+          "name": "INA226AIDGST"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "",

@@ -133,7 +133,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "TPD2E009DBZR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/TPD2E009DBZR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "TPD2E009DBZR"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "tpd2e009dbzr-575d.pdf",

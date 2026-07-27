@@ -133,7 +133,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Switches",
+          "name": "TS3A5018DR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/TS3A5018DR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Switches",
+          "name": "TS3A5018DR"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "ts3a5018dr-7dd0.pdf",

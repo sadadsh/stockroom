@@ -201,7 +201,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Connectors",
+          "name": "FTS-103-01-L-D"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/FTS-103-01-L-D.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Connectors",
+          "name": "FTS-103-01-L-D"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "fts-103-01-l-d-990e.pdf",

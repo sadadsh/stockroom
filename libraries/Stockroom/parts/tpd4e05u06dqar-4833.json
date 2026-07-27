@@ -121,7 +121,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "TPD4E05U06DQAR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/TPD4E05U06DQAR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "TPD4E05U06DQAR"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "tpd4e05u06dqar-4833.pdf",

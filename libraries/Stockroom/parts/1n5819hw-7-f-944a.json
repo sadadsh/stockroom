@@ -189,7 +189,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "1N5819HW-7-F"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/1N5819HW-7-F.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "1N5819HW-7-F"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "1n5819hw-7-f-944a.pdf",

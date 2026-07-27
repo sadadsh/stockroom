@@ -153,7 +153,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Switches",
+          "name": "EG1218"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/EG1218.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Switches",
+          "name": "EG1218"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "eg1218-e159.pdf",
