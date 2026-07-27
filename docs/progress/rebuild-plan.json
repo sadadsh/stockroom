@@ -10,8 +10,8 @@
     "Everything done within the app, not some third party manipulation u do.",
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either."
   ],
-  "updated": "2026-07-27 19:09 UTC",
-  "now": "Guided capture now opens vendor pages that exist: Ultra Librarian's URL was a 404 and SamacSys's never searched (it called every part 'unavailable'). Both fixed and pushed (7c49f6a), suite 3636 green. Ultra Librarian's driver is rebuilt against a captured fixture of its REAL page - KiCad + Altium in one download. NEXT: SnapEDA's driver, whose format buttons are measured but whose post-click behaviour still needs a signed-in look.",
+  "updated": "2026-07-27 19:17 UTC",
+  "now": "Vendor pages are now MEASURED, not guessed. Fixed: Ultra Librarian's URL 404'd and SamacSys's never searched. Ultra Librarian's driver rebuilt against its real page (KiCad+Altium in one download). SnapEDA fully measured too - its KiCad is a TWO-step version chooser (take 'V6 & Later'), and it needs two downloads for two formats. Its driver is the next thing to write; the fixture is committed.",
   "now_updated": "",
   "projects": [
     {
