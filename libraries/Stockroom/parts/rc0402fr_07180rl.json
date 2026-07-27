@@ -1,4 +1,119 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8533210020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8533.21.0030"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4849/13_0402-%281005-metric%29.jpg"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "100"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Thick Film Resistors - SMD"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Resistors"
+      }
+    ],
+    "Resistance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "180 Ohm"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "180 Ohms"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Temperature Coefficient": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "±100ppm/℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±100ppm/°C"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±1%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Resistor, 180 Ohm, 1%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: RC0402FR-07180RL Thick Film Resistors - SMD – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "RES 180 OHM 1% 1/16W 0402"
+      }
+    ]
+  },
   "category": "Resistors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +137,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "high",
+      "source": "digikey"
+    }
+  },
   "hashes": null,
   "id": "rc0402fr_07180rl",
   "manufacturer": "Yageo",
@@ -37,8 +157,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:01:25.907431+00:00",
+      "part_number": "603-RC0402FR-07180RL",
       "price_breaks": [
         {
           "price": 0.000557143,
@@ -68,6 +188,40 @@
       "stock": 96594,
       "url": "https://www.mouser.com/c/?q=RC0402FR-07180RL",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:25.907431+00:00",
+      "part_number": "311-180LRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0031,
+          "qty": 10000
+        },
+        {
+          "price": 0.00275,
+          "qty": 20000
+        },
+        {
+          "price": 0.00257,
+          "qty": 30000
+        },
+        {
+          "price": 0.00239,
+          "qty": 50000
+        },
+        {
+          "price": 0.00228,
+          "qty": 70000
+        },
+        {
+          "price": 0.00218,
+          "qty": 100000
+        }
+      ],
+      "stock": 1463200,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -119,7 +273,7 @@
     "LCSC Product Name": "RES 180Ω ±1% 62.5mW 0402",
     "LCSC Title": "YAGEO RC0402FR-07180RL",
     "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
-    "Lead Time": "63 Days",
+    "Lead Time": "17",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "100",
     "Moisture Sensitivity Level": "1 (Unlimited)",
