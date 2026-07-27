@@ -22,6 +22,59 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/mouserelectronics/images/TSSOP_28_t.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6258/568%7ESOT1172-3%7E%7E28.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "16"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2500"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+105℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 85°C (TA)"
       }
     ],
     "Packaging": [
@@ -36,6 +89,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "LED Lighting Driver ICs"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -46,6 +111,23 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Type": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "DC-DC"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Linear"
       }
     ],
     "datasheet_url": [
@@ -70,6 +152,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "LED Lighting Driver ICs 16-bit 57 mA Constant current LED Driver with 1 MHz I2C interface in HTSSOP28 package"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC LED DRVR LINEAR 65MA 28HTSSOP"
       }
     ],
     "manufacturer": [
@@ -125,6 +212,10 @@
     }
   },
   "enrichment": {
+    "Applications": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Assembly Country of Origin": {
       "confidence": "high",
       "source": "mouser"
@@ -164,6 +255,10 @@
     "Currency Type": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Current - Output / Channel": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Dimming": {
       "confidence": "medium",
@@ -232,6 +327,10 @@
     "Image": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Internal Switch(s)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Is Cable Category": {
       "confidence": "medium",
@@ -309,9 +408,21 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of Channels": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Number of Outputs": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Operating Temperature": {
       "confidence": "medium",
@@ -333,6 +444,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -340,6 +455,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -373,6 +492,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -401,6 +524,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Switch tube (built-in/external)": {
       "confidence": "medium",
       "source": "lcsc"
@@ -428,6 +555,14 @@
     "Voltage - Input(DC)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Voltage - Supply (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Supply (Min)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Weight": {
       "confidence": "medium",
@@ -486,10 +621,75 @@
       "stock": 16,
       "url": "https://www.lcsc.com/product-detail/C2678563.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:07.658177+00:00",
+      "part_number": "771-PCA9955BTWJ",
+      "price_breaks": [
+        {
+          "price": 2.66,
+          "qty": 1
+        },
+        {
+          "price": 1.98,
+          "qty": 10
+        },
+        {
+          "price": 1.81,
+          "qty": 25
+        },
+        {
+          "price": 1.63,
+          "qty": 100
+        },
+        {
+          "price": 1.54,
+          "qty": 250
+        },
+        {
+          "price": 1.49,
+          "qty": 500
+        },
+        {
+          "price": 1.46,
+          "qty": 1000
+        },
+        {
+          "price": 1.39,
+          "qty": 2500
+        },
+        {
+          "price": 1.36,
+          "qty": 5000
+        }
+      ],
+      "stock": 21494,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:07.658177+00:00",
+      "part_number": "568-12427-2-ND",
+      "price_breaks": [
+        {
+          "price": 1.4141,
+          "qty": 2500
+        },
+        {
+          "price": 1.38544,
+          "qty": 5000
+        }
+      ],
+      "stock": 6151,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
+    "Applications": "Backlight",
     "Assembly Country of Origin": "Thailand",
     "Available On Reel": "Yes",
     "Brand Id": "89",
@@ -500,6 +700,7 @@
     "Country of Origin": "Thailand",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Current - Output / Channel": "65mA",
     "Dimming": "PWM;I2C",
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/bbcccfaba88346379e3a158860e447a5.svg?t=1730986807",
@@ -517,6 +718,7 @@
     "HTS Code (US)": "8542390001",
     "Has Third Party Stock": "No",
     "Image": "https://www.mouser.com/images/mouserelectronics/images/TSSOP_28_t.jpg",
+    "Internal Switch(s)": "Yes",
     "Is Cable Category": "No",
     "Is Foreign Display": "Yes",
     "Is Foreign Onsale": "Yes",
@@ -536,14 +738,19 @@
     "Lead Time": "112 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
     "Number of Channels": "16",
+    "Number of Outputs": "16",
     "Operating Temperature": "-40℃~+105℃",
     "Order Multiple": "1",
     "Output Current": "57mA",
     "Output Voltage": "-",
     "Package": "HTSSOP-28-EP",
+    "Package / Case": "28-TSSOP (0.173\", 4.40mm Width) Exposed Pad",
     "Package Quantity": "2500",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "582",
     "Popular Part": "No",
@@ -552,6 +759,7 @@
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20230130_NXP-Semicon-PCA9955BTWJ_C2678563_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230130_NXP-Semicon-PCA9955BTWJ_C2678563_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230130_NXP-Semicon-PCA9955BTWJ_C2678563_blank.jpg",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "RoHS": "Yes",
     "Standard Pack Qty": "2500",
@@ -559,6 +767,7 @@
     "Stock (Domestic)": "0",
     "Stock (Overseas)": "0",
     "Stock (Shenzhen)": "0",
+    "Supplier Device Package": "28-HTSSOP",
     "Switch tube (built-in/external)": "-",
     "Topology": "-",
     "Type": "DC-DC",
@@ -566,6 +775,8 @@
     "Unit Weight (kg)": "0.000104052304",
     "Voltage - Input(AC)": "-",
     "Voltage - Input(DC)": "3V~5.5V",
+    "Voltage - Supply (Max)": "5.5V",
+    "Voltage - Supply (Min)": "3V",
     "Weight": "0.22",
     "Weight (kg)": "0.00022",
     "Weight Foreign (kg)": "0",
