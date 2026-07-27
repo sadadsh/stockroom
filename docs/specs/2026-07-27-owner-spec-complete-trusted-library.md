@@ -166,3 +166,84 @@ import, and (b) any boundary between derived presentation fields and sourced tru
 
 **NOT STARTED.** Recorded here at the end of the 2026-07-27 session; a schema migration should not
 be begun at exhausted context.
+
+---
+
+## 5. SCHEMA DISCIPLINE (owner, 2026-07-27) - a rule, and the gate that must enforce it
+
+> *"i think from now on we have to properly think out our schemas before coding fully or be able to
+> have modular schemas we always remember to update"*
+
+> *"we need to think of the best schema for everything i want, i feel like we are building on a
+> shitty schema"* / *"i meant in general, look at every schema in our app too."*
+
+**"Always remember to update" is the failure mode, not the fix.** Per the self-optimizing rule in
+`~/.claude/CLAUDE.md`, an objectively checkable rule belongs in a HOOK, because a hook cannot be
+skipped or forgotten. What is mechanically checkable here, and therefore gateable:
+
+- a persisted dataclass gained/lost/renamed a field while its `SCHEMA_VERSION` did not change
+- a `to_dict` / `from_dict` pair no longer covers every field of its own dataclass
+- a new persisted schema was introduced carrying no version at all
+- two schemas that must agree (record <-> index columns <-> DTO <-> TS type) drifted apart
+
+**DECIDES A FACT, so it may block.** Not a judgement. Proposed as `hooks/schema-guard.py`, run at
+edit time on the model/store/schema files and again in the gate script.
+
+### Measured schema defects across the app, 2026-07-27
+Found by reading, with the owner's scopes (10k parts, multi-EDA, trust, sourced-vs-derived) as the
+yardstick. This is the backlog, ordered as the owner chose.
+
+| # | schema | defect | evidence |
+|---|---|---|---|
+| 1 | `store/index.py` parts table | **single-tool and single-asset.** `footprint_name`, `model_file`, `datasheet_file`, `purchase_url` are all singular and implicitly KiCad; there is NO Altium column, so the index cannot express "has an Altium footprint". Exactly the flat-implicitly-KiCad anti-pattern this repo's CLAUDE.md forbids. | the DDL |
+| 2 | same | `DROP TABLE IF EXISTS parts` - full rebuild, no incremental path. ~100 MB of JSON re-read per sync at 10k parts. | the DDL |
+| 3 | same | `is_complete INTEGER` + `missing TEXT` bake presence-as-completeness into SQL, the defect the owner hit as "not trusted". | the DDL |
+| 4 | `model/part.py` | `passive: bool` is a two-valued part class. The register already contains mechanical parts (M3 holes) and a ring LED integral to its button, both excluded BY HAND because they fit neither value. | record + register |
+| 5 | `model/project.py` | `audit_digest: dict \| None` - an untyped blob as a schema field. No shape, no version. | the dataclass |
+| 6 | `model/project.py` | `eda: str = "kicad"` plus `pro_path` / `board_paths` / `sheet_paths`: KiCad-shaped names carrying Altium meanings by comment, instead of per-tool file sets read from the EDA registry. | the dataclass |
+| 7 | versioning | three independent `SCHEMA_VERSION`s (part=2, enrich=2, library_pin=1) with no coordinated migration, and `PartRecord.from_dict` does `max(SCHEMA_VERSION, ...)` - which **relabels a v1 record as v2 without migrating its data**. A stale record silently claims to be current. | `part.py:468` |
+
+### Build order, owner-chosen
+1. **PART RECORD** - sourced/derived split, part CLASS, assets with origin + evidence
+2. **INDEX** - per-tool columns, incremental, trust-aware, no DROP TABLE
+3. **PROJECTS** - per-tool file sets, typed audit digest
+4. **VERSIONING** - one migration story, real upgrades not relabels
+
+---
+
+## 6. PART RECORD - decisions made so far (owner-approved, 2026-07-27)
+
+**D1. Sourced data lives BESIDE the record, one file per source.**
+`parts/<id>.json` stays small, readable and mergeable (derived fields + refs). Raw pulls go to
+`sourced/<id>/{mouser,digikey,lcsc}.json`, byte-for-byte as returned. A re-pull rewrites one file
+and never touches the record; raw payloads can move to LFS later with no schema change, because
+they are re-fetchable evidence rather than authored truth. Rejected: everything inline (~300 MB at
+10k parts, unreviewable diffs) and a per-machine cache (breaks device parity - a fresh clone could
+not re-derive).
+
+**D2. Trust = STORE THE EVIDENCE, DERIVE THE VERDICT.**
+An asset records facts: origin (which trusted vendor, when), what checks ran, what each measured,
+and against what (datasheet revision, package spec). PASS/FAIL/UNKNOWN is computed from those facts
+on read. Same principle as D1: facts stored and immutable, judgements recomputed. Tightening a
+check re-judges the whole library with no re-audit, and a verdict can never silently disagree with
+its own evidence. Rejected: a stored verdict (goes stale, can contradict reality) and compute-
+everything-live (unusable at 10k, no history of what was checked when).
+
+**D3. Four part classes, each with different file needs, plus a per-part override.**
+
+| class | needs | notes |
+|---|---|---|
+| `passive` | nothing | both EDAs ship them; exists for app UI + BOM only |
+| `component` | trusted symbol + footprint + 3D, per EDA tool | the acquisition case |
+| `mechanical` | footprint only, no symbol | M3 screw; may or may not be orderable |
+| `virtual` | nothing, and no BOM line | test point, fiducial, logo |
+
+Requirements become `f(part class, EDA tool)` read off the registry, which is what
+`capture/requirements.py` should compute instead of the current per-tool-only loop. The per-part
+override handles the exception so an odd part never forces a new class. Rejected: keeping the
+binary passive flag (M3 holes and the button-integral ring LED already have no home, and are
+excluded by hand today) and per-part explicit requirements (a decision per part, 10,000 times -
+the manual work the owner wants removed).
+
+**STILL TO DECIDE:** the concrete asset record shape; which fields are derived and how a re-derive
+is proven lossless; the migration path for the 158 live records.
