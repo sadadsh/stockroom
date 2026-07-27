@@ -117,7 +117,25 @@
   },
   "description": "1.71V~3.6V 200MHz CMOS 3 MSOP-10 Clock Generators, PLLs, Frequency Synthesizers RoHS",
   "display_name": "Clock Generator MSOP-10",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "SI5351A-B-GT"
+      },
+      "model": {
+        "file": "models/SI5351A-B-GT.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "SI5351A-B-GT"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
