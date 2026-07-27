@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Re-render the progress page on EVERY commit.
+#
+# Owner, 2026-07-27: *"make the page show everything youre doing moving forward"*. "Moving forward"
+# is the load-bearing word: a feed I have to remember to regenerate is a feed that goes stale the
+# first busy session, and the complaint that produced this was precisely that real work was
+# invisible. A hook cannot be skipped, skimmed or forgotten.
+#
+# Deliberately silent and non-fatal: a status page must never be able to fail a commit.
+set -u
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+[[ -x "$root/.venv/bin/python" ]] || exit 0
+"$root/.venv/bin/python" "$root/scripts/progress.py" render >/dev/null 2>&1 || true
+exit 0

@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -110,6 +111,89 @@ def pct(done: int, total: int) -> int:
 
 # ---------------------------------------------------------------------------------------- html
 
+# ---------------------------------------------------------------------------- the activity feed
+#
+# Owner, 2026-07-27: *"make the page show everything youre doing moving forward"*, after a session
+# that landed six commits of real work and moved this page by one step -- so from the page it read
+# as idle. The plan tracks the DESTINATION; it had no way to show the WORK. Fixing a defect,
+# hardening a gate, or building a tool is invisible to a step counter, and most of a real session
+# is exactly that.
+#
+# Derived from `git log`, deliberately, so it is AUTOMATIC and cannot drift: a commit is a real,
+# timestamped, verifiable unit of work that already exists. Nothing here is hand-maintained, so
+# there is no bookkeeping step to forget -- which is the only way "everything, moving forward" can
+# be true. `scripts/hooks/post-commit` re-renders on every commit; `scripts/install-hooks.sh`
+# wires it.
+#
+# REJECTED: a hand-written changelog in the JSON (drifts the moment anyone forgets, and the whole
+# complaint was about invisible work); parsing the vault ledger (not in this repo, so a fresh
+# clone could not render its own page); a CI feed (needs a network round trip for a static file).
+
+_KIND_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    # (label, substrings that identify it). First match wins, so the order is the priority.
+    ("fix", ("fix", "stop ", "repair", "defect", "instead of", "no longer", "follow the reference")),
+    ("tool", ("gate", "script", "harness", "shot", "tooling", "waitable", "detach")),
+    ("record", ("record ", "log ", "document")),
+    ("build", ()),
+)
+
+
+def _commit_kind(subject: str) -> str:
+    """What KIND of work a commit was, so the feed can show that most of a session is not steps.
+
+    A heuristic over the subject line, and labelled as one: it decides a LABEL on a feed, never a
+    number anyone relies on. Getting it wrong mis-tints one row and misleads nobody about progress,
+    which is why a rough rule is acceptable here and would not be inside `overall()`.
+    """
+    low = subject.lower()
+    for label, needles in _KIND_RULES:
+        if any(n in low for n in needles):
+            return label
+    return "build"
+
+
+def activity(limit: int = 40) -> list[dict]:
+    """Recent commits, newest first: when, what, how much, and what kind of work it was.
+
+    Returns [] on ANY git failure rather than raising. This is a feed on a status page; a repo
+    without git history, or a shallow clone, must still render the plan.
+    """
+    import subprocess
+
+    sep = "\x1f"
+    fmt = sep.join(["%H", "%h", "%cI", "%s"])
+    try:
+        out = subprocess.run(
+            ["git", "log", f"-{limit}", f"--format={fmt}", "--shortstat"],
+            cwd=ROOT, capture_output=True, text=True, timeout=20, check=True,
+        ).stdout
+    except Exception:  # noqa: BLE001 - a feed must never take the page down
+        return []
+    rows: list[dict] = []
+    current: dict | None = None
+    for line in out.splitlines():
+        if sep in line:
+            if current:
+                rows.append(current)
+            full, short, when, subject = line.split(sep, 3)
+            current = {
+                "sha": short, "full": full, "when": when, "subject": subject,
+                "kind": _commit_kind(subject), "files": 0, "ins": 0, "dels": 0,
+            }
+        elif current and line.strip():
+            # " 7 files changed, 120 insertions(+), 3 deletions(-)"
+            for count, noun in re.findall(r"(\d+) (files? changed|insertions?|deletions?)", line):
+                if noun.startswith("file"):
+                    current["files"] = int(count)
+                elif noun.startswith("insertion"):
+                    current["ins"] = int(count)
+                else:
+                    current["dels"] = int(count)
+    if current:
+        rows.append(current)
+    return rows
+
+
 def render_html(plan: dict) -> str:
     e = html.escape
     d, t = overall(plan)
@@ -156,6 +240,42 @@ def render_html(plan: dict) -> str:
             f'<p class="nowtext">{e(now)}</p>',
             "</section>",
         ]
+
+    # EVERYTHING BEING DONE, not just what moves a step (owner: "make the page show everything
+    # youre doing moving forward"). Sits directly under Working-on-now and ABOVE the waves,
+    # because the question "is anything happening" is answered by this and cannot be answered by a
+    # step counter: most of a real session is defects, tooling and verification, none of which the
+    # plan has a box for.
+    feed = activity()
+    if feed:
+        kinds = {}
+        for row in feed:
+            kinds[row["kind"]] = kinds.get(row["kind"], 0) + 1
+        tally = " / ".join(f"{n} {k}" for k, n in sorted(kinds.items(), key=lambda kv: -kv[1]))
+        p += [
+            '<section class="feed">',
+            '<div class="feedhead"><h2>Everything being done</h2>'
+            f'<span class="feedtally">{e(tally)}</span></div>',
+            '<p class="why">Every change that landed, newest first, straight from the repository. '
+            'A step counter only moves when a plan item completes; most of the work is fixing '
+            'defects, hardening gates and building tools, and this is where that shows.</p>',
+            '<ol class="acts">',
+        ]
+        for row in feed:
+            when = row["when"][:16].replace("T", " ")
+            churn = (
+                f'{row["files"]} file{"" if row["files"] == 1 else "s"} '
+                f'+{row["ins"]}/-{row["dels"]}'
+            ) if row["files"] else ""
+            p.append(
+                f'<li class="act k-{row["kind"]}">'
+                f'<span class="akind">{e(row["kind"])}</span>'
+                f'<span class="asub">{e(row["subject"])}</span>'
+                f'<span class="ameta"><code>{e(row["sha"])}</code>'
+                + (f'<span class="achurn">{e(churn)}</span>' if churn else "")
+                + f'<time>{e(when)}</time></span></li>'
+            )
+        p += ["</ol>", "</section>"]
 
     p.append('<details class="reqs"><summary>The owner\'s five requirements, verbatim</summary><ol>')
     for r in plan["owner_requirements"]:
@@ -295,6 +415,29 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
 @media (max-width:520px){
   .wrap{padding:18px 12px 48px} h1{font-size:18px} .frac{display:none}
   .whead{flex-wrap:wrap} h2{width:100%}
+}
+
+.feed{margin:18px 0 22px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.feedhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.feedhead h2{margin:0;font-size:15px}
+.feedtally{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.acts{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column}
+.act{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:baseline;
+  padding:7px 0;border-top:1px solid var(--line)}
+.act:first-child{border-top:0}
+.akind{font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;
+  padding:2px 6px;border-radius:4px;text-align:center}
+.k-fix .akind{background:rgba(224,138,42,.16);color:#e08a2a}
+.k-tool .akind{background:rgba(90,140,255,.16);color:#6f9bff}
+.k-build .akind{background:rgba(58,170,110,.16);color:#3aaa6e}
+.k-record .akind{background:rgba(140,140,150,.16);color:var(--dim)}
+.asub{min-width:0;font-size:13px;line-height:1.45}
+.ameta{display:flex;align-items:baseline;gap:10px;white-space:nowrap;font-size:11px;color:var(--dim);
+  font-variant-numeric:tabular-nums}
+.ameta code{font-size:11px}
+@media(max-width:640px){
+  .act{grid-template-columns:56px 1fr;grid-template-areas:"k s" ". m"}
+  .akind{grid-area:k}.asub{grid-area:s}.ameta{grid-area:m;margin-top:2px}
 }
 </style>"""
 
