@@ -1,4 +1,78 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8501104020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8501.10.4020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/puiaudio/images/HD-LA1307-SM_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5773/MFG_HD-LA1307-SM.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "90 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "21"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "200"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Solenoids & Actuators"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Motors, Actuators, Solenoids and Drivers"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Solenoids & Actuators Surface Mount Haptic 13mm 154Hz 2Vrms"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "SURFACE MOUNT HAPTIC 13MM 154HZ"
+      }
+    ]
+  },
   "category": "Other",
   "datasheet": {
     "fetched_at": "",
@@ -25,6 +99,10 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "Function": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "HTS Code (US)": {
       "confidence": "high",
       "source": "mouser"
@@ -37,13 +115,29 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "Lifecycle": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Minimum Order Quantity": {
       "confidence": "medium",
       "source": "mouser"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Order Multiple": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "high",
@@ -53,9 +147,41 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "RoHS": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Size / Dimension": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Standard Pack Qty": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Termination Style": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Rated": {
+      "confidence": "high",
+      "source": "digikey"
     }
   },
   "hashes": null,
@@ -102,6 +228,74 @@
       "stock": 219,
       "url": "https://www.lcsc.com/search?q=HD-LA1307-SM",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:05.343172+00:00",
+      "part_number": "665-HD-LA1307-SM",
+      "price_breaks": [
+        {
+          "price": 7.09,
+          "qty": 1
+        },
+        {
+          "price": 6.83,
+          "qty": 10
+        },
+        {
+          "price": 6.51,
+          "qty": 25
+        },
+        {
+          "price": 6.28,
+          "qty": 50
+        },
+        {
+          "price": 5.84,
+          "qty": 100
+        },
+        {
+          "price": 5.5,
+          "qty": 400
+        },
+        {
+          "price": 5.43,
+          "qty": 800
+        }
+      ],
+      "stock": 219,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:05.343172+00:00",
+      "part_number": "668-HD-LA1307-SMTR-ND",
+      "price_breaks": [
+        {
+          "price": 5.83565,
+          "qty": 200
+        },
+        {
+          "price": 5.6272,
+          "qty": 400
+        },
+        {
+          "price": 5.5087,
+          "qty": 600
+        },
+        {
+          "price": 5.36302,
+          "qty": 1000
+        },
+        {
+          "price": 5.26916,
+          "qty": 1400
+        }
+      ],
+      "stock": 135,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -110,14 +304,27 @@
     "Country of Diffusion": "Not available",
     "Country of Origin": "China",
     "ECCN": "EAR99",
+    "Function": "Vibration, LRA (Haptic)",
     "HTS Code (US)": "8501104020",
     "Image": "https://www.mouser.com/images/puiaudio/images/HD-LA1307-SM_SPL.jpg",
     "Lead Time": "90 Days",
+    "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "2 (1 Year)",
+    "Operating Temperature": "-20°C ~ 65°C",
     "Order Multiple": "1",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Reel, Cut Tape",
     "Product Category": "Solenoids & Actuators",
-    "Standard Pack Qty": "400"
+    "REACH": "REACH Unaffected",
+    "RoHS": "ROHS3 Compliant",
+    "Series": "Haptics",
+    "Size / Dimension": "Square - 0.512\" x 0.512\" (13.00mm x 13.00mm)",
+    "Standard Pack Qty": "400",
+    "Standard Package": "200",
+    "Termination Style": "Solder Pad",
+    "Type": "AC Motor",
+    "Voltage - Rated": "1VAC"
   },
   "tags": [],
   "value": ""
