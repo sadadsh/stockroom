@@ -34,6 +34,35 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/diodesinc/images/sot25.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6285/31%7ESOT25%7EDA%2CHR%2CHT%2CW%7E5.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "168 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "24"
       }
     ],
     "Minimum Order Quantity": [
@@ -46,6 +75,11 @@
         "confidence": "medium",
         "source": "mouser",
         "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "3000"
       }
     ],
     "Order Multiple": [
@@ -60,6 +94,18 @@
         "value": "1"
       }
     ],
+    "Output Type": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Tri-State"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "3-State"
+      }
+    ],
     "Packaging": [
       {
         "confidence": "medium",
@@ -72,6 +118,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Buffers & Line Drivers"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -82,6 +140,23 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Voltage - Supply": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1.65V~5.5V"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "1.65V ~ 5.5V"
       }
     ],
     "datasheet_url": [
@@ -106,6 +181,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Buffers & Line Drivers LOGILVC3 STA BUF1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC BUFF 1.65V SOT-25"
       }
     ],
     "manufacturer": [
@@ -212,6 +292,10 @@
     "Current - Output High(IOH)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Current - Output High, Low": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Current - Output Low(IOL)": {
       "confidence": "medium",
@@ -353,6 +437,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Logic Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Maximum Order Quantity": {
       "confidence": "medium",
       "source": "mouser"
@@ -361,6 +449,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of Bits per Element": {
       "confidence": "medium",
       "source": "lcsc"
@@ -368,6 +464,10 @@
     "Number of Elements": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Order Multiple": {
       "confidence": "medium",
@@ -381,6 +481,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -388,6 +492,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -429,6 +537,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -460,6 +572,10 @@
     "Stock (Shenzhen)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Unit": {
       "confidence": "medium",
@@ -522,6 +638,62 @@
       "stock": 2861,
       "url": "https://www.lcsc.com/product-detail/C52098142.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:36.337269+00:00",
+      "part_number": "621-74LVC1G125W5-7",
+      "price_breaks": [
+        {
+          "price": 0.13,
+          "qty": 1
+        },
+        {
+          "price": 0.083,
+          "qty": 10
+        },
+        {
+          "price": 0.073,
+          "qty": 25
+        },
+        {
+          "price": 0.065,
+          "qty": 100
+        },
+        {
+          "price": 0.06,
+          "qty": 250
+        },
+        {
+          "price": 0.056,
+          "qty": 500
+        },
+        {
+          "price": 0.052,
+          "qty": 3000
+        }
+      ],
+      "stock": 9210,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:36.337269+00:00",
+      "part_number": "74LVC1G125W5-7DITR-ND",
+      "price_breaks": [
+        {
+          "price": 0.05689,
+          "qty": 3000
+        },
+        {
+          "price": 0.05393,
+          "qty": 9000
+        }
+      ],
+      "stock": 214,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -537,6 +709,7 @@
     "Currency Symbol": "$",
     "Currency Type": "USD",
     "Current - Output High(IOH)": "32mA",
+    "Current - Output High, Low": "32mA, 32mA",
     "Current - Output Low(IOL)": "-",
     "ECCN": "-",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/d0975602fba64271932776f46e46b930.svg?t=1762236599",
@@ -572,15 +745,21 @@
     "Ladder Discount Rate": "1~0.95,10~0.95,30~0.95,300~0.95,600~0.95,900~0.95,",
     "Lead Time": "168 Days",
     "Lifecycle": "Active",
+    "Logic Type": "Buffer, Non-Inverting",
     "Maximum Order Quantity": "3000",
     "Minimum Order Quantity": "10",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
     "Number of Bits per Element": "1",
     "Number of Elements": "1",
+    "Operating Temperature": "-40°C ~ 125°C (TA)",
     "Order Multiple": "10",
     "Output Type": "Tri-State",
     "Package": "SOT-23-5",
+    "Package / Case": "SC-74A, SOT-753",
     "Package Quantity": "3000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "487",
     "Popular Part": "No",
@@ -591,6 +770,7 @@
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20251027_TECH-PUBLIC-74LVC1G125W5-TP_C52098142_blank.jpg",
     "Propagation Delay": "3ns@5V,50pF",
     "Quiescent Current": "10uA",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "RoHS": "Yes",
     "Series": "74LVC",
@@ -599,6 +779,7 @@
     "Stock (Domestic)": "3340",
     "Stock (Overseas)": "3340",
     "Stock (Shenzhen)": "3340",
+    "Supplier Device Package": "SOT-25",
     "Unit": "Piece",
     "Voltage - Supply": "1.65V~5.5V",
     "Weight": "0.036",
