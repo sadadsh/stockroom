@@ -116,7 +116,11 @@ def _import_report_dto(report) -> dict:
         "items": [
             {"query": i.query, "mpn": i.mpn, "part_id": i.part_id, "status": i.status,
              "display_name": i.display_name, "category": i.category,
-             "missing": list(i.missing), "error": i.error, "resolved_by": i.resolved_by}
+             "missing": list(i.missing), "error": i.error, "resolved_by": i.resolved_by,
+             # "kicad-stock" = a real placeable symbol + footprint + 3D landed; "none" = the
+             # record landed on identity alone. This is the column that answers "did I get the
+             # FILES", which a status of "added" on its own cannot.
+             "assets": i.assets}
             for i in report.items
         ],
     }
@@ -191,6 +195,12 @@ def enrich_router(require_token) -> APIRouter:
             @staticmethod
             def add_part(staged):
                 return ctx.jobs.run_write(lambda: ctx.ops.add_part(staged))
+
+            @staticmethod
+            def add_passive_part(record):
+                """The passive lane: a record carrying KiCad stock symbol/footprint/3D refs.
+                Same write lane, same atomic commit; only the seam differs."""
+                return ctx.jobs.run_write(lambda: ctx.ops.add_passive_part(record))
 
         def work(progress):
             pipeline = _make_pipeline(ctx)

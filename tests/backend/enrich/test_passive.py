@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 
 from stockroom.enrich.passive import (
+    _EIA_TO_METRIC,
     decode_resistance,
     detect_passive,
     parse_passive_mpn,
@@ -241,3 +242,72 @@ def test_resolve_presence_check_against_a_footprints_root(tmp_path):
 def test_resolve_unknown_package_returns_none():
     assert resolve_passive_assets("resistor", "", footprints_root=None) is None
     assert resolve_passive_assets("resistor", "9999", footprints_root=None) is None
+
+
+# --------------------------------------------------------------------------- #
+# Murata MLCC (GRM/GCM/GRT/GXT) - the world's most common capacitor families, and the
+# ones the owner's Component Register is almost entirely built from.
+#
+# The dimension code -> EIA case mapping below is not taken on a vendor doc alone. It was
+# CROSS-CHECKED against an independent oracle: the register states each capacitor's case in
+# its own text ("100 nF X7R 0402"), and across 28 real Murata parts the decode agreed with
+# what the register said every time, with no contradictions. Two web sources agree on the
+# same table. Only the KIND and the CASE are decoded here, because those are what select the
+# stock KiCad symbol / footprint / 3D model; value and tolerance already arrive from the
+# distributor specs, and a confidently-wrong value is worse than a blank one.
+# --------------------------------------------------------------------------- #
+
+_MURATA_REAL = [
+    # (MPN as Mouser returns it, EIA case the register independently states)
+    ("GRM155R71C104KA88D", "0402"),
+    ("GCM1555C1H102JA16J", "0402"),
+    ("GCM155R71H332KA37J", "0402"),
+    ("GRT155R61C105KE01D", "0402"),
+    ("GXT155R61C474KE01D", "0402"),
+    ("GRM1555C1H1R5CA01J", "0402"),   # 1R5 = 1.5 pF: the value field is not plain digits
+    ("GCM188R71E105KA64D", "0603"),
+    ("GRM188C71C475KE21D", "0603"),
+    ("GRM188R61A475MAAJJ", "0603"),
+    ("GCM21BR71E225KA73L", "0805"),
+    ("GRM219R61A226MEA0D", "0805"),   # numeric thickness code
+    ("GRM21BR6YA106KE43K", "0805"),   # letter thickness code
+    ("GRT21BC81C226ME13L", "0805"),
+    ("GRM3195C1H104JA05J", "1206"),
+    ("GRM31CR71E106MA12L", "1206"),
+    ("GRT31CC81C226KE01L", "1206"),
+]
+
+
+@pytest.mark.parametrize("mpn,case", _MURATA_REAL)
+def test_murata_mlcc_decodes_to_the_case_the_register_states(mpn, case):
+    spec = parse_passive_mpn(mpn)
+    assert spec is not None, f"{mpn} was not recognised as a passive at all"
+    assert spec.kind == "capacitor"
+    assert spec.package == case
+    assert spec.manufacturer == "Murata"
+
+
+@pytest.mark.parametrize("mpn,case", _MURATA_REAL)
+def test_murata_mlcc_resolves_stock_kicad_assets(mpn, case):
+    """The whole point: an MPN alone yields a placeable symbol, footprint and 3D model with no
+    vendor download and no network at all."""
+    spec = parse_passive_mpn(mpn)
+    assets = resolve_passive_assets(spec.kind, spec.package)
+    assert assets is not None
+    assert assets.symbol == "Device:C"
+    assert assets.footprint == f"Capacitor_SMD:C_{case}_{_EIA_TO_METRIC[case]}"
+    assert assets.model_3d.endswith(f"C_{case}_{_EIA_TO_METRIC[case]}.wrl")
+
+
+def test_a_murata_inductor_is_not_swallowed_by_the_capacitor_family():
+    """GRM and LQ both start with G/L but the MLCC pattern must not claim an LQ inductor, or a
+    ferrite would silently acquire a capacitor symbol."""
+    spec = parse_passive_mpn("LQW15AN10NJ00D")
+    assert spec is not None
+    assert spec.kind == "inductor"
+
+
+def test_a_non_murata_part_that_merely_starts_with_g_is_not_decoded():
+    """The pattern is anchored and full-length: a random G-prefixed IC must not decode as an
+    0402 capacitor. A wrong footprint is worse than no footprint."""
+    assert parse_passive_mpn("G5Q-1A4-DC12") is None

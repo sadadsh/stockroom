@@ -267,6 +267,34 @@ _CL_SAMSUNG = _Family(
               "31": "1206", "32": "1210", "43": "1812", "55": "2220"},
 )
 
+# Murata chip MLCC (GRM / GCM / GRT / GXT / GJM / GQM). The single most common capacitor
+# family there is, and nearly every capacitor in the owner's Component Register.
+#
+# Layout, confirmed against 28 real parts: SERIES(3) DIM(2) THICK(1) TEMPCHAR(2) VOLT(2)
+# VALUE(3) TOL(1) then Murata's internal + packaging codes.
+#   GRM 15 5 R7 1C 104 K A88D   ->  0402, 100 nF, +/-10%
+#   GRM 15 5 5C 1H 1R5 C A01J   ->  0402, 1.5 pF   (VALUE is not always plain digits)
+#   GRM 21 B R6 YA 106 K E43K   ->  0805           (THICK and VOLT can both be letters)
+#
+# The dimension code -> EIA case table is NOT taken on a vendor doc alone: the register states
+# each capacitor's case in its own text, and the decode agreed with it on all 28, with zero
+# contradictions. Two independent web sources give the same table.
+#
+# Only KIND and CASE are decoded, deliberately. Those two are what select the stock KiCad
+# symbol / footprint / 3D model, which is the whole point of this path; value and tolerance
+# already arrive from the distributor specs, and the docstring's rule holds - an honest gap
+# beats confident-wrong data. The tolerance group is matched only to ANCHOR the pattern (it is
+# what separates the value from Murata's internal codes), not to be trusted as a spec.
+_GRM_MURATA = _Family(
+    "GRM", "Murata", "capacitor",
+    re.compile(
+        r"^(?:GRM|GCM|GRT|GXT|GJM|GQM)(?P<size>\d{2})[0-9A-Z][0-9A-Z]{2}[0-9A-Z]{2}"
+        r"(?P<value>[0-9R]{3})(?P<tol>[BCDFGJKMZ])[A-Z0-9]*$"
+    ),
+    size_map={"03": "0201", "15": "0402", "18": "0603", "21": "0805",
+              "31": "1206", "32": "1210", "43": "1812", "55": "2220"},
+)
+
 # Inductors -------------------------------------------------------------------
 # Murata LQ-series (LQW/LQG/LQM/LQH/LQP). Only the KIND is decoded offline: the
 # inductance encoding differs across these families (the RF nano-henry "N"-decimal
@@ -281,7 +309,8 @@ _LQ_MURATA = _Family(
 )
 
 FAMILIES: tuple[_Family, ...] = (
-    _RC_YAGEO, _RMCF_STACKPOLE, _CRCW_VISHAY, _ERJ_PANASONIC, _CL_SAMSUNG, _LQ_MURATA,
+    _RC_YAGEO, _RMCF_STACKPOLE, _CRCW_VISHAY, _ERJ_PANASONIC, _CL_SAMSUNG, _GRM_MURATA,
+    _LQ_MURATA,
 )
 
 _DISTRIBUTOR_PREFIX = re.compile(r"^\d{1,4}-")

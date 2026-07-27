@@ -81,6 +81,17 @@ function Row({ item }: { item: BulkImportItem }) {
       <td className="whitespace-nowrap py-1.5 pr-3 text-xs">
         <span className={tier?.tone ?? "text-t2"}>{tier?.label ?? item.status}</span>
       </td>
+      {/* The column that answers "did I get the FILES". A status of "Added" alone cannot:
+          a part can land complete on its identity and still have no symbol, footprint or 3D. */}
+      <td className="whitespace-nowrap py-1.5 pr-3 text-xs">
+        {item.assets === "kicad-stock" ? (
+          <span className="text-ok">Symbol, Footprint, 3D</span>
+        ) : item.status === "added" || item.status === "would-add" ? (
+          <span className="text-warn">Needs Capture</span>
+        ) : (
+          <span className="text-t3">&mdash;</span>
+        )}
+      </td>
       <td className="py-1.5 text-xs text-t3">
         {item.error || (item.missing.length ? `Missing ${item.missing.join(", ")}` : "")}
       </td>
@@ -231,6 +242,7 @@ export function BulkImportSection() {
                     <th className="pb-1.5 pr-3 font-normal">Resolved To</th>
                     <th className="pb-1.5 pr-3 font-normal">Part</th>
                     <th className="pb-1.5 pr-3 font-normal">Outcome</th>
+                    <th className="pb-1.5 pr-3 font-normal">CAD</th>
                     <th className="pb-1.5 font-normal">Detail</th>
                   </tr>
                 </thead>
