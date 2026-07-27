@@ -497,14 +497,30 @@ a constraint on the HOST (`host/`, WebView2) and the updater route, not only on 
 at minimum the frontend bundle must be reloadable in place, and a backend change must either be
 hot-swappable or restart without the user seeing a closed window.
 
-> *"library should always also be linked"*
+> *"library should always also be linked"* -> clarified by the owner: **"i meant libraries linked
+> between devices"**
 
-**Linking is an INVARIANT, not a step.** This supersedes "automatic linking" as build step 5 in the
-order above. The EDA linkage (the Altium DbLib + its data source, the KiCad tables) must be
-regenerated whenever the library changes — on add, on capture, on re-derive — rather than when
-someone remembers to run it. Same shape as the derived index: if it can be stale, it will be, and
-a stale link is a library that silently does not place.
+**NOT EDA linkage. DEVICE PARITY.** (First recorded here as "the EDA tables regenerate on every
+change" - that was a misreading, corrected in the same session.) The library must be continuously
+and automatically in sync across every machine the owner uses: same parts, same files, same specs,
+with nobody clicking Sync. This is the standing DEVICE PARITY rule - *"same update, same files,
+same info"* - applied to the library itself.
 
-**Implication for the schema:** anything the linkage is generated FROM must be derivable without a
-network call and without user input, or the invariant cannot hold. That is already true of
-`derived` + `assets`, which is why this is recorded here rather than as a separate subsystem.
+**What that requires beyond what exists today:**
+- **Auto-PULL, not just auto-push.** `auto_push` fires on write today; nothing pulls, so a part
+  added on device A stays invisible on device B until a human remembers. One-directional sync is
+  divergence with extra steps.
+- **A real merge story.** Two devices adding different parts is a genuine git merge, and the
+  **9 empty `SR-*.kicad_sym` files have blocked every merge FOUR separate times** (4 of them are
+  sitting untracked in this very checkout). That is the concrete blocker between here and this
+  invariant, and it has been deferred repeatedly rather than fixed.
+- **No per-device state that changes what the user sees.** The enrich cache lives beside the library
+  per-machine today, so two machines can show DIFFERENT specs for the same part.
+
+### THIS RESOLVES AN OPEN SCHEMA QUESTION
+Section 9 left `sourced/` as tracked-vs-LFS-vs-ignored, undecided. **Device parity settles it:
+`sourced/` MUST BE COMMITTED.** If the raw pulls were a per-machine cache, two devices would derive
+from different evidence and produce different `display_name`, `category` and `specs` for the same
+part - "same info" broken by construction - and a re-derive on a fresh clone would need a full
+re-fetch from every distributor. LFS stays available later for size, since an LFS object still
+travels; IGNORING it is now ruled out.
