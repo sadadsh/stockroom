@@ -31,7 +31,6 @@ returns a `Derived` and mutates nothing but the block it is handed.
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,6 +38,7 @@ from stockroom.derive.naming import DEFAULT_SCHEME, NameInputs, get_scheme
 from stockroom.derive.payloads import known_sources, parse_one
 from stockroom.enrich.schema import EnrichmentResult
 from stockroom.model.derived import DERIVED_BY, Derived
+from stockroom.model.part_id import is_valid_part_id
 from stockroom.model.sourced import list_sources, read_json
 from stockroom.model.spec_hygiene import normalize_specs
 
@@ -190,10 +190,24 @@ def load_payloads(sourced_root: Path, part_id: str) -> dict[str, dict | None]:
     (what this build can read), so a payload from a source a newer build wrote is skipped and left
     untouched rather than crashing an older peer.
     """
+    # An id `sourced/` refuses (pre-v3, containing an underscore) is NOT the same fact as "this
+    # part has no evidence yet", and conflating them was a real defect (cold-eyes finding 7,
+    # 2026-07-27): `list_sources` raises ValueError for such an id, and swallowing it here made
+    # `rederive()` silently BLANK the derived block of a record it could not actually check
+    # evidence for - display_name, description and specs all wiped with no error raised.
+    # `import_part` already guards its OWN call path against this (it inspects the id before
+    # ever reaching here), but `rederive()` is a public entry point callers can and do use
+    # directly (see tests/backend/derive/test_engine.py), so THIS function must refuse loudly
+    # rather than let an invalid id look identical to "nothing pulled yet".
+    if not is_valid_part_id(part_id):
+        raise ValueError(
+            f"cannot load evidence for {part_id!r}: not a valid v3 part id "
+            f"(slug(mpn)+'-'+sha256(mpn)[:4]); sourced/ refuses it as a path"
+        )
     out: dict[str, dict | None] = {}
     try:
         available = set(list_sources(sourced_root, part_id))
-    except (OSError, ValueError):
+    except OSError:
         return out
     for source in known_sources():
         if source not in available:
@@ -234,6 +248,56 @@ def rederive(record, sourced_root: Path, *, derived_at: str, scheme: str = DEFAU
     return record
 
 
+# `replace` and `rename` are deliberately NOT in this list (cold-eyes finding 10, 2026-07-27): both
+# are also plain `str`/`dict` method names (`text.replace(...)`), and the AST walk below sees only
+# the attribute NAME, never the receiver's type. Convicting every `.replace()` call in the derive
+# path - which normalizes strings for a living - would be exactly the false-positive machine the
+# owner's rule warns against ("a package-vs-pad check reported 16 mismatches and ALL 16 were false
+# positives"). `unlink`/`rmtree` stay: neither is a method any object in this path's actual
+# vocabulary (str, dict, dataclass) exposes, so they carry no such collision.
+FORBIDDEN_CALLS: frozenset[str] = frozenset({"unlink", "rmtree"})
+
+
+def _scan_modules_for_writes(modules, writer) -> None:
+    """The core of the losslessness check, taking its inputs as PARAMETERS.
+
+    Split out of `assert_no_writer_imported` (cold-eyes finding 2, 2026-07-27) because the
+    original test claiming to prove this check "can actually fail" built a synthetic AST from a
+    bare string and asserted `ast.walk` finds a call in it - which tests the `ast` module, not
+    this one, and stayed green when the real gate was disabled entirely (verified: an early
+    `return` at the top of `assert_no_writer_imported` left the whole `tests/backend/derive`
+    suite passing, including the test claiming to guard against exactly that).
+
+    Taking `modules` and `writer` as arguments is what makes the gate itself testable: a test can
+    now hand this a synthetic module object whose `__file__` points at a temp file containing a
+    genuine `write_payload(...)` call, and watch THIS function convict it - proving the mechanism,
+    not a restatement of it.
+    """
+    import ast
+
+    for module in modules:
+        for attr, value in vars(module).items():
+            if value is writer:
+                raise AssertionError(
+                    f"{module.__name__}.{attr} IS the writer - the derive path must never be able "
+                    f"to write under sourced/, which is append-only evidence."
+                )
+
+    for module in modules:
+        tree = ast.parse(Path(module.__file__ or "").read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            fn = node.func
+            name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+            if name.startswith("write") or name in FORBIDDEN_CALLS:
+                raise AssertionError(
+                    f"{module.__name__} line {node.lineno} calls {name!r}. The derive path READS "
+                    f"evidence and writes nothing: sourced/ is the only copy of what a vendor "
+                    f"actually returned."
+                )
+
+
 def assert_no_writer_imported() -> None:
     """LOSSLESSNESS, as a check rather than a promise: the derive path CANNOT write evidence.
 
@@ -248,35 +312,13 @@ def assert_no_writer_imported() -> None:
     The AST is what makes this honest. A `"write_payload" in source` test cannot tell a docstring
     that says "must never call write_payload" from a line that calls it, so it would either convict
     this very docstring or have to exempt this file - and an exemption for the file most likely to
-    break the rule is not a check. Called by the gate in tests/backend/derive/.
+    break the rule is not a check. The scanning logic itself lives in `_scan_modules_for_writes`,
+    so `tests/backend/derive/test_payload_registry.py` can drive it against an injected module
+    and prove the mechanism can fail, not just call this wrapper and trust it.
     """
-    import ast
-
     import stockroom.derive.engine as engine
     import stockroom.derive.naming as naming
     import stockroom.derive.payloads as payloads_mod
     from stockroom.model.sourced import write_payload
 
-    modules = (engine, naming, payloads_mod)
-
-    for module in modules:
-        for attr, value in vars(module).items():
-            if value is write_payload:
-                raise AssertionError(
-                    f"{module.__name__}.{attr} IS model.sourced.write_payload - the derive path "
-                    f"must never be able to write under sourced/, which is append-only evidence."
-                )
-
-    for module in modules:
-        tree = ast.parse(Path(module.__file__ or "").read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            fn = node.func
-            name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
-            if name.startswith("write") or name in {"unlink", "rmtree", "replace", "rename"}:
-                raise AssertionError(
-                    f"{module.__name__} line {node.lineno} calls {name!r}. The derive path READS "
-                    f"evidence and writes nothing: sourced/ is the only copy of what a vendor "
-                    f"actually returned."
-                )
+    _scan_modules_for_writes((engine, naming, payloads_mod), write_payload)

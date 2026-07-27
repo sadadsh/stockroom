@@ -18,7 +18,7 @@ from stockroom.importer.engine import (
 )
 from stockroom.model.part import PartRecord
 from stockroom.model.part_class import PartClass
-from stockroom.model.sourced import sourced_file
+from stockroom.model.sourced import sourced_file, write_payload
 
 AT = "2026-07-27T05:00:00Z"
 
@@ -288,6 +288,29 @@ def test_the_pass_paces_every_usable_source_per_part(tmp_path):
     assert seen.count("mouser") == 2, f"the pacer was not consulted once per part: {seen}"
 
 
+def test_pacing_is_skipped_for_a_part_that_already_has_all_its_evidence(tmp_path):
+    """Regression pin for cold-eyes finding 8 (2026-07-27). Pacing used to run for EVERY record
+    before `import_part` decided anything, so a resumed pass over 158 parts with 150 already
+    imported still paid the full per-provider quota delay 158 times over - throttling for work it
+    was never going to do."""
+    rec = _record()
+    import_part(rec, library_root=tmp_path, sources=[("mouser", FakeFetcher(MOUSER_BODY))],
+                derived_at=AT)  # rec now has full mouser evidence already
+
+    seen: list[str] = []
+    run_import([rec], library_root=tmp_path, config=FakeConfig(), derived_at=AT,
+               pace=seen.append, sources=[("mouser", FakeFetcher(MOUSER_BODY))])
+    assert seen == [], f"pacing fired for a part with nothing left to fetch: {seen}"
+
+    # NEGATIVE CONTROL: a part that DOES still need a fetch must still be paced, so the assertion
+    # above is measuring the skip-when-done behaviour and not "pacing never fires".
+    seen.clear()
+    run_import([_record(part_id="fresh-0000", mpn="FRESH")], library_root=tmp_path,
+               config=FakeConfig(), derived_at=AT, pace=seen.append, dry_run=True,
+               sources=[("mouser", FakeFetcher(MOUSER_BODY))])
+    assert seen == ["mouser"]
+
+
 def test_the_importer_SUITE_never_reaches_the_network(tmp_path, monkeypatch):
     """A guard on the whole module, not just on the test above.
 
@@ -305,3 +328,103 @@ def test_the_importer_SUITE_never_reaches_the_network(tmp_path, monkeypatch):
     report = run_import([_record()], library_root=tmp_path, config=FakeConfig(), derived_at=AT,
                         sources=[("mouser", FakeFetcher(MOUSER_BODY))])
     assert report.count(Outcome.IMPORTED) == 1
+
+
+# ---------------------------------------------------- regression pin: finding 4 (exception scope)
+
+class RaisingFetcher:
+    """A source whose fetch always raises - the malformed-response / proxy-returns-HTML case."""
+
+    enabled = True
+    last_status = ""
+
+    def fetch_payload(self, mpn: str):
+        raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+
+def test_a_raising_fetcher_fails_only_that_part_never_the_whole_run(tmp_path):
+    """Regression pin for cold-eyes finding 4 (2026-07-27). MEASURED: before this fix, a fetcher
+    raising `json.JSONDecodeError` (a `ValueError`, from a proxy answering a 200 with HTML) escaped
+    the per-source loop entirely - it was not wrapped in any try/except - and killed `run_import`
+    with no `ImportReport` produced at all, silently dropping every part after the one that broke."""
+    good_a = _record(part_id="a-0000", mpn="A")
+    bad = _record(part_id="bad-0000", mpn="BAD")
+    good_c = _record(part_id="c-0000", mpn="C")
+
+    calls: list[str] = []
+
+    def save(rec):
+        calls.append(rec.id)
+
+    report = run_import(
+        [good_a, bad, good_c], library_root=tmp_path, config=FakeConfig(), derived_at=AT,
+        sources=[("mouser", RaisingFetcher())], save=save,
+    )
+    # Nothing escaped: a report exists and covers all three parts.
+    assert len(report.results) == 3
+    assert report.count(Outcome.FAILED) == 3, (
+        "every part used the same raising fetcher and no other source, so all three legitimately "
+        "have nothing to import from - but the point is that all THREE were even attempted."
+    )
+    ids = [r.part_id for r in report.results]
+    assert ids == ["a-0000", "bad-0000", "c-0000"], "a raising source must not stop the pass early"
+
+
+def test_an_unknown_naming_scheme_fails_the_one_part_not_the_batch(tmp_path):
+    """The other escape route finding 4 named: `UnknownNamingScheme` subclasses `Exception`
+    directly, not `ValueError`, so the original narrow catch tuple missed it - and by the time it
+    raised, the payload had ALREADY been written to sourced/, leaving orphaned evidence."""
+    rec = _record()
+    other = _record(part_id="other-0000", mpn="OTHER")
+    report = run_import(
+        [rec, other], library_root=tmp_path, config=FakeConfig(), derived_at=AT,
+        scheme="humna-readable", sources=[("mouser", FakeFetcher(MOUSER_BODY))],
+    )
+    assert len(report.results) == 2
+    assert report.count(Outcome.FAILED) == 2
+    for r in report.results:
+        assert "UnknownNamingScheme" in r.detail
+
+
+# ------------------------------------------------------- regression pin: finding 5 (orphaned evidence)
+
+def test_orphaned_evidence_is_recovered_without_a_new_fetch(tmp_path):
+    """Regression pin for cold-eyes finding 5 (2026-07-27). Simulates the crash this guards
+    against: a payload write that succeeded, followed by a failure BEFORE the record was
+    persisted - so on the next pass the file exists but `record.sources` does not know about it.
+    Resumability is keyed purely on file existence (`needs_sources`), so without this fix the
+    source would read as "already done" and never be finished - permanently, silently, forever in
+    the `skipped` bucket.
+    """
+    rec = _record()
+    # Write the payload directly, bypassing import_part, to simulate the write having already
+    # succeeded on a PRIOR pass that then failed before persisting the record.
+    write_payload(tmp_path, rec.id, "mouser", __import__("json").dumps(MOUSER_BODY))
+    assert rec.sources == {}, "the record must NOT already know about this evidence"
+
+    # A fetcher that raises if called at all - proves the recovery path does NOT re-fetch.
+    class ExplodingFetcher:
+        enabled = True
+        last_status = ""
+
+        def fetch_payload(self, mpn: str):
+            raise AssertionError("orphaned evidence must be recovered WITHOUT a new fetch")
+
+    res = import_part(rec, library_root=tmp_path, sources=[("mouser", ExplodingFetcher())],
+                      derived_at=AT)
+    assert res.outcome is Outcome.IMPORTED
+    assert res.recovered == ["mouser"]
+    assert res.written == []
+    assert "mouser" in rec.sources
+    assert rec.description.startswith("Thick Film"), "the orphaned evidence was not re-derived"
+
+
+def test_a_second_pass_after_recovery_is_a_clean_skip(tmp_path):
+    """Once recovered, the part must read as genuinely done - not re-recovered forever."""
+    rec = _record()
+    write_payload(tmp_path, rec.id, "mouser", __import__("json").dumps(MOUSER_BODY))
+    import_part(rec, library_root=tmp_path, sources=[("mouser", FakeFetcher(MOUSER_BODY))],
+                derived_at=AT)
+    res2 = import_part(rec, library_root=tmp_path, sources=[("mouser", FakeFetcher(MOUSER_BODY))],
+                       derived_at=AT)
+    assert res2.outcome is Outcome.SKIPPED

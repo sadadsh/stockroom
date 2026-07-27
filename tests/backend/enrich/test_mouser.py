@@ -173,6 +173,46 @@ def test_last_status_defaults_to_empty_before_any_lookup():
     assert MouserAdapter(api_key="k").last_status == ""
 
 
+# ------------------------------------------------------------------------ fetch_payload
+#
+# Regression pin for cold-eyes finding 1 (2026-07-27). `fetch_payload` exists to store the RAW
+# body for a re-derive, and its first version used HTTP-level truthiness ("ok" if body else
+# "not_found") to decide whether a lookup succeeded - but a genuine "no such part" answer from
+# Mouser is HTTP 200 with an EMPTY Parts list, which IS a truthy dict. So every not-found lookup
+# was reported "ok", the importer wrote the empty-results response as evidence, indexed it, and
+# counted the part `imported`. A fabricated MPN was indistinguishable from a real hit.
+
+def test_fetch_payload_is_ok_on_a_real_hit():
+    body = json.loads((FIX / "mouser_partnumber.json").read_text())
+    a = MouserAdapter(api_key="k", requester=lambda mpn: body)
+    got = a.fetch_payload("TPS62130RGTR")
+    assert got is not None
+    assert a.last_status == "ok"
+
+
+def test_fetch_payload_is_NOT_FOUND_and_returns_NONE_on_empty_results():
+    """THE bug. An empty Parts list is a genuine not-found, not a hit - and must return None so
+    the importer never stores it as evidence."""
+    a = MouserAdapter(api_key="k", requester=lambda mpn: {"SearchResults": {"Parts": []}})
+    got = a.fetch_payload("ZZZNOTAREALPART123")
+    assert got is None
+    assert a.last_status == "not_found"
+
+
+def test_a_fabricated_mpn_is_distinguishable_from_a_real_one():
+    """The negative control, run directly against the two cases side by side: a fake MPN must
+    produce a DIFFERENT observable outcome than a real one, or fetch_payload is not measuring
+    anything."""
+    real = MouserAdapter(api_key="k", requester=lambda mpn: json.loads(
+        (FIX / "mouser_partnumber.json").read_text()
+    ))
+    fake = MouserAdapter(api_key="k", requester=lambda mpn: {"SearchResults": {"Parts": []}})
+    real_body = real.fetch_payload("TPS62130RGTR-NEAR")
+    fake_body = fake.fetch_payload("ZZZNOTAREALPART123")
+    assert (real_body is not None) != (fake_body is not None)
+    assert real.last_status != fake.last_status
+
+
 def test_default_requester_raises_enricherror_with_status_code_on_http_error(monkeypatch):
     def _boom(req, timeout=8):
         raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", None, None)
