@@ -567,4 +567,45 @@ def library_router(require_token) -> APIRouter:
         ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return Response(status_code=204)
 
+    @r.get("/completion")
+    def completion_coverage(request: Request) -> dict:
+        """Is my library complete, and what is missing?
+
+        The owner's central question, and until now it lived in a script only Claude could
+        run -- which by the owner's own standing rule (*"everything u do manually the app
+        should do by itself"*) made it a missing feature rather than a tool. Read-only and
+        network-free: it counts the records on disk.
+        """
+        from stockroom.capture.runner import coverage
+
+        return coverage(request.app.state.ctx)
+
+    @r.post("/completion/run")
+    def completion_run(request: Request, body: dict | None = None) -> dict:
+        """Give every part the files it still needs, from sources that need no human.
+
+        A cancellable background job. It has to be cancellable: at the measured catalogue
+        pace a 10,000-part library is around 21 hours, and starting a run you cannot stop is
+        a commitment nobody should have to make. Stopping is safe at any moment because every
+        part is its own atomic commit, and resuming is just running it again -- the worklist
+        is derived from the library, never bookkept.
+        """
+        from stockroom.capture.runner import run_completion
+
+        ctx = request.app.state.ctx
+        payload = body or {}
+        part_ids = payload.get("part_ids") or None
+        limit = payload.get("limit")
+
+        def work(progress, should_stop):
+            return run_completion(
+                ctx,
+                progress=progress,
+                should_stop=should_stop,
+                part_ids=part_ids,
+                limit=(int(limit) if limit else None),
+            )
+
+        return {"job_id": ctx.jobs.submit_cancellable(work)}
+
     return r

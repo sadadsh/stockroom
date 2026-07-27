@@ -42,6 +42,9 @@ class Job:
     result: object | None = None
     error: str = ""
     queue: "queue.Queue[JobEvent]" = field(default_factory=lambda: queue.Queue(maxsize=1000))
+    # Set by request_stop; READ by the worker, which decides where stopping is safe. A plain
+    # bool needs no lock: one writer, one reader, and a missed flip is seen on the next check.
+    stop_requested: bool = False
 
 
 def to_sse(event: JobEvent) -> dict:
@@ -135,6 +138,27 @@ class JobRunner:
         pool = self._write_pool if write else self._read_pool
         pool.submit(self._drive, job, fn)
         return job.id
+
+    def submit_cancellable(self, fn, *, write: bool = False) -> str:
+        """Queue a job that can be asked to stop. `fn(progress, should_stop)`.
+
+        The job is REGISTERED before it is scheduled, so its id exists the instant this
+        returns and a stop issued in the first moments of a slow-starting run cannot fall
+        into a gap. Stopping is cooperative: the worker chooses the safe point, which for a
+        library-wide run means between two parts, never inside one.
+        """
+        job = self._new_job()
+        pool = self._write_pool if write else self._read_pool
+        pool.submit(self._drive, job, lambda progress: fn(progress, lambda: job.stop_requested))
+        return job.id
+
+    def request_stop(self, job_id: str) -> None:
+        """Ask a running job to stop at its next safe point. A job that already finished (or
+        never existed) is not an error: the UI legitimately races a run that just ended."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+        if job is not None:
+            job.stop_requested = True
 
     def run_write(self, fn):
         """Run fn() on the serialized write lane and BLOCK until it returns, propagating its result
