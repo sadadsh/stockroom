@@ -412,6 +412,52 @@
       "stock": 3290,
       "url": "https://www.lcsc.com/product-detail/C3716550.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:30.379521+00:00",
+      "part_number": "81-BLE18PS080BH1D",
+      "price_breaks": [
+        {
+          "price": 0.36,
+          "qty": 1
+        },
+        {
+          "price": 0.251,
+          "qty": 10
+        },
+        {
+          "price": 0.217,
+          "qty": 25
+        },
+        {
+          "price": 0.194,
+          "qty": 50
+        },
+        {
+          "price": 0.173,
+          "qty": 100
+        },
+        {
+          "price": 0.147,
+          "qty": 250
+        },
+        {
+          "price": 0.13,
+          "qty": 500
+        },
+        {
+          "price": 0.113,
+          "qty": 1000
+        },
+        {
+          "price": 0.091,
+          "qty": 4000
+        }
+      ],
+      "stock": 2020,
+      "url": "",
+      "vendor": "Mouser"
     }
   ],
   "schema_version": 2,
