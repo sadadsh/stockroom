@@ -65,6 +65,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6164/488%7EMKT-MA03D%7E%7E3.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "182 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "26"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -670,6 +682,58 @@
       "stock": 124853,
       "url": "https://www.lcsc.com/product-detail/C7420339.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:22.404425+00:00",
+      "part_number": "512-BSS138",
+      "price_breaks": [
+        {
+          "price": 0.38,
+          "qty": 1
+        },
+        {
+          "price": 0.267,
+          "qty": 10
+        },
+        {
+          "price": 0.169,
+          "qty": 100
+        },
+        {
+          "price": 0.106,
+          "qty": 500
+        },
+        {
+          "price": 0.093,
+          "qty": 1000
+        },
+        {
+          "price": 0.081,
+          "qty": 3000
+        }
+      ],
+      "stock": 723162,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:22.404425+00:00",
+      "part_number": "BSS138TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.06203,
+          "qty": 3000
+        },
+        {
+          "price": 0.0558,
+          "qty": 6000
+        }
+      ],
+      "stock": 1303457,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
