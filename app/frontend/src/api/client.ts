@@ -11,6 +11,7 @@ import type {
   AltiumEmbedCapability,
   AltiumEmbedResult,
   AltiumModelsPending,
+  LibraryCoverage,
   AltiumRegenerateResult,
   DevSaveBody,
   DevSaveResult,
@@ -1177,6 +1178,29 @@ export const api = {
         category: input.category,
       },
     });
+  },
+
+  // "Is my library complete?" Counted from the records on disk, network-free.
+  libraryCoverage(): Promise<LibraryCoverage> {
+    return apiGet<LibraryCoverage>("/api/library/completion");
+  },
+
+  // Give every part the files it still needs. A JOB, and a long one: at the measured catalogue
+  // pace a 10,000-part library is around 21 hours, which is exactly why it is stoppable and why
+  // resuming is free (the worklist is derived from the library, never bookkept).
+  runCompletion(input: { partIds?: string[]; limit?: number } = {}): Promise<{ job_id: string }> {
+    return request<{ job_id: string }>("POST", "/api/library/completion/run", {
+      body: { part_ids: input.partIds, limit: input.limit },
+    });
+  },
+
+  // Ask a running job to stop at its next safe point. Cooperative: for a completion run that is
+  // between two parts, never inside one, so the library is left exactly as a finished run would.
+  stopJob(jobId: string): Promise<{ job_id: string; stopping: boolean }> {
+    return request<{ job_id: string; stopping: boolean }>(
+      "POST",
+      `/api/jobs/${encodeURIComponent(jobId)}/stop`,
+    );
   },
 
   // How many parts a bulk embed would actually work on, so the action can state a number it will

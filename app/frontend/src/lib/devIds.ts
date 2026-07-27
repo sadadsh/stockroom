@@ -243,6 +243,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "settings.library-lfs.adopt", label: "Store the library binaries in Git LFS", area: "settings" },
   { id: "settings.library-hygiene", label: "Files the library shares that it should not", area: "settings" },
   { id: "settings.library-hygiene.sync", label: "Stop sharing the library per-user files", area: "settings" },
+  { id: "settings.completion", label: "Library Completion section", area: "settings" },
   { id: "settings.health", label: "Library Health section", area: "settings" },
   { id: "settings.health-repair", label: "Repair Components button", area: "settings" },
   { id: "settings.rescan", label: "Procurement Rescan section", area: "settings" },

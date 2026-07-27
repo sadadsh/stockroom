@@ -12,6 +12,7 @@ import type { SettingsPatch, WiringReport } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { AltiumDbLibSection } from "../components/AltiumDbLibSection";
 import { SettingsDisclosure } from "../components/SettingsDisclosure";
+import { LibraryCompletionSection } from "../components/LibraryCompletionSection";
 import { LibraryHealthSection } from "../components/LibraryHealthSection";
 import { LibrarySyncSection } from "../components/LibrarySyncSection";
 import { RescanSection } from "../components/RescanSection";
@@ -327,6 +328,15 @@ export function SettingsPage() {
                     data-dev-id="settings.github"
                   >
                     <GitHubSection />
+                  </SettingsDisclosure>
+                  <SettingsDisclosure
+                    title="Library Completion" titleId="settings.completion.title"
+                    hint="Whether every component holds the files you need to place it, per EDA tool. Filling the gaps runs against the parts catalogue, so it is paced, stoppable, and safe to run again."
+                    hintId="settings.completion.hint"
+                    open={open("completion")} onToggle={() => toggle("completion")}
+                    data-dev-id="settings.completion"
+                  >
+                    <LibraryCompletionSection />
                   </SettingsDisclosure>
                   <SettingsDisclosure
                     title="Library Health" titleId="settings.health.title"
