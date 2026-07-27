@@ -30,11 +30,43 @@ def _resolve_all_families_source() -> Path | None:
 
 _SOURCE = _resolve_all_families_source()
 
-pytestmark = pytest.mark.skipif(
-    _SOURCE is None,
-    reason="no reachable all-families CubeMX source (STM32_CUBEMX unset and the "
-    "confirmed Windows-side default is absent or looks F-only on this machine)",
-)
+pytestmark = [
+    pytest.mark.skipif(
+        _SOURCE is None,
+        reason="no reachable all-families CubeMX source (STM32_CUBEMX unset and the "
+        "confirmed Windows-side default is absent or looks F-only on this machine)",
+    ),
+    # Keep every real-source STM test on ONE xdist worker (see gates.sh --dist loadgroup).
+    # The index is a ~235 MB build over ~2,100 device XML; scattered across 12 workers it would be
+    # built up to 12 times. test_af_join.py carries the same group for the same reason.
+    pytest.mark.xdist_group("stm-real-index"),
+]
+
+
+def _ensure_real_index() -> Path:
+    """The real all-families index, built if it is not already there. Returns its path.
+
+    EXPLICIT, because the implicit version broke. These tests used to assume
+    `test_build_against_the_real_source_...` had run first in the same process and left the index
+    behind. That held only by accident: `default_index_path()` used to resolve to the developer's
+    REAL `~/.config/stockroom`, a directory every xdist worker shares and which survives between
+    runs. Isolating config (tests/backend/conftest.py, 2026-07-27) removed that accidental shared
+    state and the assumption failed -- measured under `-n 12`,
+    `test_second_build_with_unchanged_source_skips_reparse` landed on a different worker from the
+    build and saw no index at all.
+
+    A plain helper rather than a fixture ON PURPOSE: a module-scoped fixture is instantiated BEFORE
+    function-scoped ones, so it would call `default_index_path()` before the autouse isolation
+    fixture had pointed STOCKROOM_STM_INDEX anywhere -- resolving to, and rebuilding into, the real
+    user config dir. Called from the test body, the environment is already correct.
+    """
+    path = source_mod.default_index_path()
+    existing = db_mod.StmIndex.load(path)
+    if existing is not None:
+        existing.close()
+        return path
+    db_mod.StmIndex.build(_SOURCE, db_path=path, require_all_families=True).close()
+    return path
 
 
 def test_check_availability_reports_all_families_against_the_real_source():
@@ -92,7 +124,7 @@ def test_build_against_the_real_source_passes_self_audit_and_stamps_honestly():
 
 
 def test_load_round_trips_the_real_all_families_index():
-    index_path = source_mod.default_index_path()
+    index_path = _ensure_real_index()
     loaded = db_mod.StmIndex.load(index_path)
     assert loaded is not None
     assert loaded.mcu_count() > 2000
@@ -100,7 +132,7 @@ def test_load_round_trips_the_real_all_families_index():
 
 
 def test_second_build_with_unchanged_source_skips_reparse():
-    index_path = source_mod.default_index_path()
+    index_path = _ensure_real_index()
     first = db_mod.StmIndex.load(index_path)
     assert first is not None
     first_built_at = first.meta()["built_at"]

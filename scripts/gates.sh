@@ -61,8 +61,14 @@ backend() {
   mkdir -p "$TMPBASE"
   # A RAM-backed temp dir is safe to wipe: pytest owns everything under it. If /dev/shm is too
   # small on some other machine, GATES_TMPDIR points this back at a disk path.
+  # --dist loadgroup, not the default load. pytest-xdist 3.8's own --help: "Like 'load', but sends
+  # tests marked with 'xdist_group' to the same worker" - so UNGROUPED tests distribute exactly as
+  # before and nothing else changes. It exists for the real-source STM tests, which share one ~235 MB
+  # index; scattered across workers they each saw an empty directory and failed (measured
+  # 2026-07-27).
   QT_QPA_PLATFORM=offscreen TMPDIR="$TMPBASE" \
-    .venv/bin/python -m pytest tests/backend -q -p no:randomly "${n[@]}" --basetemp="$TMPBASE/bt"
+    .venv/bin/python -m pytest tests/backend -q -p no:randomly --dist loadgroup "${n[@]}" \
+    --basetemp="$TMPBASE/bt"
   local rc=$?
   rm -rf "${TMPBASE:?}/bt" 2>/dev/null
   return $rc
@@ -91,8 +97,8 @@ since() {
     "${#targets[@]}" "${#changed[@]}" "${targets[*]}"
   mkdir -p "$TMPBASE"
   QT_QPA_PLATFORM=offscreen TMPDIR="$TMPBASE" \
-    .venv/bin/python -m pytest "${targets[@]}" -q -p no:randomly -n "${PYTEST_WORKERS:-12}" \
-    --basetemp="$TMPBASE/bt-since"
+    .venv/bin/python -m pytest "${targets[@]}" -q -p no:randomly --dist loadgroup \
+    -n "${PYTEST_WORKERS:-12}" --basetemp="$TMPBASE/bt-since"
 }
 fe() { npm --prefix app/frontend run "$1"; }
 # ruff was CONFIGURED in pyproject.toml and enforced by nothing until 2026-07-26. Its first

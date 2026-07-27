@@ -105,3 +105,28 @@ def _has_glb_tooling() -> bool:
 requires_glb_tooling = pytest.mark.skipif(
     not _has_glb_tooling(), reason="trimesh/cascadio (3D GLB tooling) not installed"
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_machine_config_suitewide(tmp_path, monkeypatch):
+    """Keep EVERY test's config reads and writes inside its own tmp dir.
+
+    THIS LIVES AT THE SUITE ROOT ON PURPOSE. An identical fixture existed only in
+    `tests/backend/api/conftest.py`, which left the other twenty test directories completely
+    unisolated -- and on 2026-07-27 that hole was found the expensive way: the owner's real
+    `~/.config/stockroom/config.json` had been overwritten with a pytest tmp path and every vendor
+    credential blanked. The protection had been placed where the first bug appeared instead of at
+    the root, which is a hand-listed coverage set, and those grow silent holes by construction.
+
+    `config_dir()` re-reads these on every call, so this governs `load()` and `save()` alike.
+    XDG_CONFIG_HOME and APPDATA are pinned too, because config_dir() falls back to them when the
+    explicit override is absent -- pinning only STOCKROOM_CONFIG_DIR would leave the fallback path
+    pointing at the developer's real directory, which is precisely the case that caused the damage.
+
+    Tests that deliberately exercise real-path RESOLUTION (tests/backend/store/test_machine_config
+    .py) monkeypatch these themselves and are unaffected: they assert on `config_dir()` and never
+    call `save()`.
+    """
+    monkeypatch.setenv("STOCKROOM_CONFIG_DIR", str(tmp_path / "sr-config"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
