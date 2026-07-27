@@ -10,8 +10,8 @@
     "Everything done within the app, not some third party manipulation u do.",
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either."
   ],
-  "updated": "2026-07-27 19:41 UTC",
-  "now": "Guided capture now has ONE engine that runs identically on Linux and Windows: Playwright (already bundled) replaces the Windows-only WebView2 download intercept, and the vendor logic moved from injected JS into testable Python. Proven end to end on Linux - real browser, real vendor markup, real download, real classification (8 tests, tamper-proven). Ultra Librarian's duplicate JS driver was DELETED and a gate now fails if any vendor grows a second implementation. LEFT: the frontend still enters via a Windows-only pywebview call; making that an HTTP route is what finishes the unification.",
+  "updated": "2026-07-27 20:13 UTC",
+  "now": "Guided capture now WORKS against the live Ultra Librarian from Linux: symbol + footprint + a real 345KB STEP (the 3D was silently never requested before). Reports state intent, not achievement, so it can no longer claim a format that did not land. NEW: scripts/capturerec.py lets the owner drive a real browser - clearing Cloudflare walls a bot cannot - while recording every click, so adapters are authored from a real journey instead of guessed selectors. NEXT: record UL's PCAD export to confirm the .LIA is the Altium route, then wire the frontend to the cross-platform capture route.",
   "now_updated": "",
   "projects": [
     {
