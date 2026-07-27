@@ -105,7 +105,25 @@
   },
   "description": "Diode 30V 200mA Surface Mount SOD-323",
   "display_name": "Schottky Diode SOD-323",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "BAT54HT1G"
+      },
+      "model": {
+        "file": "models/BAT54HT1G.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "BAT54HT1G"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
