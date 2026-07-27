@@ -2149,6 +2149,19 @@ export interface LibraryCoverage {
   can_provide: string[];
 }
 
+// What CAD this library holds, and what a clear would remove.
+//
+// `cleared` counts STOCKROOM-AUTHORED assets: an entry in an SR- library, a `.kicad_mod`, a
+// `.step`, an Altium `.SchLib`/`.PcbLib`. `kept_stock` counts references to KiCad's OWN installed
+// libraries (`Device:R`), which name no file this app holds and are therefore never removed --
+// clearing one would empty a passive permanently, since nothing can refill it.
+export interface CadInventory {
+  cleared: number;
+  kept_stock: number;
+  items: { part_id: string; assets: string[] }[];
+  failed: { id: string; error: string }[];
+}
+
 // Which derivation ruleset produced the presentation data the library is currently showing.
 //
 // A part's `derived` block (display name, description, category, normalized specs) is computed

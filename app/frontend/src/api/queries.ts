@@ -1203,6 +1203,14 @@ export function useLibraryCoverage() {
   });
 }
 
+// What CAD the library holds, and what a clear would remove.
+export function useCadInventory() {
+  return useQuery({
+    queryKey: ["library-cad"],
+    queryFn: () => api.cadInventory(),
+  });
+}
+
 // Which derivation ruleset produced the presentation data currently on screen.
 export function useLibraryDerivation() {
   return useQuery({

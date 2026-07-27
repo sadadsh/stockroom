@@ -14,6 +14,7 @@ import { AltiumDbLibSection } from "../components/AltiumDbLibSection";
 import { SettingsDisclosure } from "../components/SettingsDisclosure";
 import { LibraryCompletionSection } from "../components/LibraryCompletionSection";
 import { DerivationSection } from "../components/DerivationSection";
+import { CadClearSection } from "../components/CadClearSection";
 import { LibraryHealthSection } from "../components/LibraryHealthSection";
 import { LibrarySyncSection } from "../components/LibrarySyncSection";
 import { RescanSection } from "../components/RescanSection";
@@ -347,6 +348,15 @@ export function SettingsPage() {
                     data-dev-id="settings.derivation"
                   >
                     <DerivationSection />
+                  </SettingsDisclosure>
+                  <SettingsDisclosure
+                    title="Clear CAD Files" titleId="settings.cad-clear.title"
+                    hint="Remove every symbol, footprint and 3D model your library holds, so a fresh capture pass starts from nothing. The components, their specs, their datasheets and the imported distributor data all stay."
+                    hintId="settings.cad-clear.hint"
+                    open={open("cad-clear")} onToggle={() => toggle("cad-clear")}
+                    data-dev-id="settings.cad-clear"
+                  >
+                    <CadClearSection />
                   </SettingsDisclosure>
                   <SettingsDisclosure
                     title="Library Health" titleId="settings.health.title"

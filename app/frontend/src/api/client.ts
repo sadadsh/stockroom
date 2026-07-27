@@ -13,6 +13,7 @@ import type {
   AltiumModelsPending,
   LibraryCoverage,
   LibraryDerivation,
+  CadInventory,
   AltiumRegenerateResult,
   DevSaveBody,
   DevSaveResult,
@@ -1192,6 +1193,20 @@ export const api = {
   runCompletion(input: { partIds?: string[]; limit?: number } = {}): Promise<{ job_id: string }> {
     return request<{ job_id: string }>("POST", "/api/library/completion/run", {
       body: { part_ids: input.partIds, limit: input.limit },
+    });
+  },
+
+  // What CAD this library holds. Read-only: it runs the real walk with `dry_run`, so the number
+  // the surface states before offering the action is the number the action will act on.
+  cadInventory(): Promise<CadInventory> {
+    return apiGet<CadInventory>("/api/library/cad");
+  },
+
+  // Remove every CAD asset this library holds. A JOB, and DESTRUCTIVE, so `dryRun` defaults to
+  // true on the backend too: the write has to be asked for explicitly at both ends.
+  clearCad(input: { dryRun?: boolean } = {}): Promise<{ job_id: string }> {
+    return request<{ job_id: string }>("POST", "/api/library/cad/clear", {
+      body: { dry_run: input.dryRun ?? true },
     });
   },
 

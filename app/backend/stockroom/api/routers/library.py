@@ -608,6 +608,42 @@ def library_router(require_token) -> APIRouter:
 
         return {"job_id": ctx.jobs.submit_cancellable(work)}
 
+    @r.get("/cad")
+    def cad_inventory(request: Request) -> dict:
+        """What CAD this library holds, and how much of it this app could remove.
+
+        Read-only. `dry_run` on the clear route answers the same question by doing the real walk,
+        and this exists so the surface can state the number BEFORE offering a destructive action
+        rather than after.
+        """
+        return request.app.state.ctx.ops.clear_cad_assets(dry_run=True)
+
+    @r.post("/cad/clear")
+    def cad_clear(request: Request, body: dict | None = None) -> dict:
+        """Remove every CAD asset this library holds, files and references, in ONE commit.
+
+        Owner, 2026-07-27: *"remove all the current cad files before guided capture"* -- the point
+        is to start the trusted-capture pass from nothing, because what is there came from sources
+        they have since ruled out.
+
+        DESTRUCTIVE, so: `dry_run` defaults to TRUE. A caller has to ask for the write explicitly,
+        and the dry run returns the identical report. KiCad-stock references (`Device:R`) are
+        counted and LEFT: they name no file this app owns, and clearing them would empty a passive
+        permanently.
+        """
+        ctx = request.app.state.ctx
+        dry_run = bool((body or {}).get("dry_run", True))
+
+        def work(progress):
+            progress({"pct": 5, "message": "finding the CAD this library holds"})
+            report = ctx.ops.clear_cad_assets(dry_run=dry_run)
+            if not dry_run and report["cleared"]:
+                ctx.rebuild_index()
+                ctx.auto_push()
+            return report
+
+        return {"job_id": ctx.jobs.submit(work, write=not dry_run)}
+
     @r.get("/derivation")
     def derivation(request: Request) -> dict:
         """Which derivation ruleset this library's parts carry, and how many are behind.
