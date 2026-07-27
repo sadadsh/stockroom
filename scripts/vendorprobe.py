@@ -238,10 +238,90 @@ def _print_survey(data: dict) -> None:
             print(f"        attrs: {json.dumps(interesting)[:220]}")
 
 
-def _navigate(client: CDPClient, url: str, *, settle: float) -> None:
+def _sel(value: str | None) -> str | None:
+    """A CSS selector from argv, with any surrounding quotes cmd.exe left on it removed.
+
+    WSL -> cmd.exe interop re-splits the command line and a quoted selector arrives WITH its
+    quotes, producing `document.querySelector('"a[name=x]"')` - a SyntaxError, not a match.
+    Observed 2026-07-27 on `--click "a[name=download-modal]"`.
+    """
+    if value is None:
+        return None
+    value = value.strip()
+    for quote in ('"', "'"):
+        if len(value) >= 2 and value.startswith(quote) and value.endswith(quote):
+            value = value[1:-1]
+    return value or None
+
+
+def _poll(client: CDPClient, expression: str, *, timeout: float, gap: float = 0.25) -> bool:
+    """Poll a JS predicate until it is TRUE, or the timeout backstops it.
+
+    A TIMEOUT IS A BACKSTOP, NEVER A DETECTOR. The first version of this file slept a flat
+    `--settle` after every navigate and called the page ready, and that bug bit this very session:
+    the export-panel dump ran before the panel existed and captured the site's NAV SEARCH FORM
+    instead. A fixed sleep is simultaneously too slow for a fast page and too fast for a slow one,
+    and it can never say WHY it gave up.
+
+    A JS ERROR IS NOT A SATISFIED CONDITION. `CDPClient.evaluate` returns the exception's
+    *description string* when the expression throws (cdp_probe.py:236), and a non-empty string is
+    truthy - so an earlier version of this function reported "ready after 0.0s" for the INVALID
+    selector `"[data-format]"` (cmd.exe had left the quotes on). That is the same
+    instrument-that-cannot-fail bug this whole function exists to remove, so the predicate must
+    return a real boolean and nothing else counts.
+    """
+    deadline = time.time() + timeout
+    last_error: str | None = None
+    while time.time() < deadline:
+        try:
+            value = client.evaluate(expression, timeout=5.0)
+        except Exception:  # noqa: BLE001 - mid-navigation the context can vanish; keep polling
+            value = None
+        if value is True:
+            return True
+        if isinstance(value, str) and value:
+            last_error = value  # a thrown JS exception, reported by cdp_probe as its description
+        time.sleep(gap)
+    if last_error:
+        print(f"  the check kept throwing: {last_error.splitlines()[0][:120]}")
+    return False
+
+
+_READY = "document.readyState === 'complete'"
+# The DOM has stopped changing: the same size twice in a row. Cheap, and unlike a fixed sleep it
+# ends the moment a fast page settles and keeps waiting for a slow one.
+_STABLE = (
+    "(function(){var n=document.documentElement.outerHTML.length;"
+    "var p=window.__SR_PROBE_LEN__;window.__SR_PROBE_LEN__=n;return p===n;})()"
+)
+
+
+def _settle(client: CDPClient, *, expect: str | None, timeout: float, what: str) -> None:
+    """Wait on REAL signals and say which one ended the wait, or that none did."""
+    started = time.time()
+    if not _poll(client, _READY, timeout=timeout):
+        print(f"  WARNING: {what} never reached readyState=complete within {timeout:.0f}s")
+        return
+    if expect:
+        selector = json.dumps(expect)
+        if _poll(client, f"!!document.querySelector({selector})", timeout=timeout):
+            print(f"  ready: {expect} present after {time.time() - started:.1f}s")
+            return
+        print(f"  WARNING: {what} loaded but {expect} never appeared within {timeout:.0f}s")
+        return
+    client.evaluate("window.__SR_PROBE_LEN__ = -1")
+    if _poll(client, _STABLE, timeout=timeout):
+        print(f"  ready: DOM stable after {time.time() - started:.1f}s")
+        return
+    print(f"  WARNING: {what} was still changing after {timeout:.0f}s; the survey may be partial")
+
+
+def _navigate(
+    client: CDPClient, url: str, *, timeout: float = 30.0, expect: str | None = None
+) -> None:
     client.send("Page.enable", {})
     client.send("Page.navigate", {"url": url}, timeout=20.0)
-    time.sleep(settle)
+    _settle(client, expect=expect, timeout=timeout, what="the page")
 
 
 def _resolve_url(mpn: str, vendor: str) -> tuple[str, str]:
@@ -298,7 +378,7 @@ def cmd_goto(args) -> int:
     try:
         print(f"vendor   {label} ({args.vendor})")
         print(f"url      {url}")
-        _navigate(client, url, settle=args.settle)
+        _navigate(client, url, timeout=args.timeout, expect=_sel(args.expect))
         data = _survey(client)
         print()
         _print_survey(data)
@@ -310,15 +390,26 @@ def cmd_goto(args) -> int:
 def cmd_survey(args) -> int:
     client = _connect(args.port)
     try:
-        if args.click:
+        click_selector = _sel(args.click)
+        if click_selector:
             clicked = client.evaluate(
                 "(function(){var el=document.querySelector("
-                + json.dumps(args.click)
+                + json.dumps(click_selector)
                 + ");if(!el)return 'NOT FOUND';el.click();return 'clicked';})()",
                 timeout=10.0,
             )
-            print(f"click    {args.click} -> {clicked}")
-            time.sleep(args.settle)
+            print(f"click    {click_selector} -> {clicked}")
+        expect = _sel(args.expect)
+        # Honoured with OR without a click: surveying a page that is still rendering is the
+        # commonest way to get a partial answer, and waiting is the caller's whole intent in
+        # passing --expect. Gating it on --click made `--expect` silently do nothing.
+        if expect or click_selector:
+            _settle(
+                client,
+                expect=expect,
+                timeout=args.timeout,
+                what="the click" if click_selector else "the page",
+            )
         data = _survey(client)
         _print_survey(data)
         if args.json:
@@ -373,8 +464,8 @@ def cmd_eval(args) -> int:
     try:
         value = client.evaluate(expression, timeout=20.0)
         print(value if isinstance(value, str) else json.dumps(value, indent=2, default=str))
-        if args.settle:
-            time.sleep(args.settle)
+        if args.expect:
+            _settle(client, expect=_sel(args.expect), timeout=args.timeout, what="the expression")
     finally:
         client.close()
     return 0
@@ -388,7 +479,7 @@ def cmd_url(args) -> int:
     """
     client = _connect(args.port)
     try:
-        _navigate(client, args.target, settle=args.settle)
+        _navigate(client, args.target, timeout=args.timeout, expect=_sel(args.expect))
         landed = client.evaluate(
             "JSON.stringify({url:location.href,title:document.title,"
             "notFound:/404|not found|page not found/i.test(document.title||'')})",
@@ -430,12 +521,14 @@ def main() -> int:
     p_goto = sub.add_parser("goto", help="navigate the open browser to another vendor/MPN, then survey")
     p_goto.add_argument("mpn")
     p_goto.add_argument("--vendor", default="ultralibrarian")
-    p_goto.add_argument("--settle", type=float, default=6.0)
+    p_goto.add_argument("--expect", default=None, help="CSS selector that marks the page ready")
+    p_goto.add_argument("--timeout", type=float, default=30.0)
     p_goto.set_defaults(func=cmd_goto)
 
     p_survey = sub.add_parser("survey", help="report the download/format controls on the open page")
     p_survey.add_argument("--click", default=None, help="CSS selector to click first (e.g. a Download button that opens the format dialog)")
-    p_survey.add_argument("--settle", type=float, default=2.5)
+    p_survey.add_argument("--expect", default=None, help="CSS selector that marks the click done")
+    p_survey.add_argument("--timeout", type=float, default=30.0)
     p_survey.add_argument("--json", default=None, help="also write the raw survey here")
     p_survey.set_defaults(func=cmd_survey)
 
@@ -451,12 +544,14 @@ def main() -> int:
 
     p_eval = sub.add_parser("eval", help="evaluate a JS expression read from a FILE, on the open page")
     p_eval.add_argument("file", help="path to a file holding the expression")
-    p_eval.add_argument("--settle", type=float, default=0.0, help="seconds to wait after evaluating")
+    p_eval.add_argument("--expect", default=None, help="CSS selector to wait for after evaluating")
+    p_eval.add_argument("--timeout", type=float, default=30.0)
     p_eval.set_defaults(func=cmd_eval)
 
     p_url = sub.add_parser("url", help="navigate the open page to a literal URL, then report where it landed")
     p_url.add_argument("target")
-    p_url.add_argument("--settle", type=float, default=6.0)
+    p_url.add_argument("--expect", default=None, help="CSS selector that marks the page ready")
+    p_url.add_argument("--timeout", type=float, default=30.0)
     p_url.set_defaults(func=cmd_url)
 
     args = ap.parse_args()
