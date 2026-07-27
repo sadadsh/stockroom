@@ -22,6 +22,47 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8541100080"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8541.10.0080"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/texasinstruments/images/TSD03DYFR_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6184/296%7E4228484%7EDYF%7E2.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "16"
+      }
+    ],
+    "Lifecycle": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "New Product"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Active"
       }
     ],
     "Minimum Order Quantity": [
@@ -34,6 +75,23 @@
         "confidence": "medium",
         "source": "mouser",
         "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "3000"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-55℃~+125℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-55°C ~ 150°C (TA)"
       }
     ],
     "Order Multiple": [
@@ -60,6 +118,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "ESD Protection Diodes / TVS Diodes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Circuit Protection"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -70,6 +140,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
       }
     ],
     "description": [
@@ -82,6 +157,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "ESD Protection Diodes / TVS Diodes 3.3V unidirectional surge protection dev"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "3.3V UNIDIRECTIONAL SURGE PROTEC"
       }
     ],
     "lifecycle": [
@@ -161,6 +241,10 @@
     }
   },
   "enrichment": {
+    "Applications": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Assembly Country of Origin": {
       "confidence": "high",
       "source": "mouser"
@@ -172,6 +256,10 @@
     "Brand Id": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Capacitance @ Frequency": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Catalog Id": {
       "confidence": "medium",
@@ -200,6 +288,10 @@
     "Currency Type": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Current - Peak Pulse (10/1000µs)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "ECCN": {
       "confidence": "medium",
@@ -322,12 +414,20 @@
       "source": "mouser"
     },
     "Lifecycle": {
-      "confidence": "medium",
-      "source": "lcsc"
+      "confidence": "high",
+      "source": "mouser"
     },
     "Minimum Order Quantity": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Number of Channels": {
       "confidence": "medium",
@@ -345,6 +445,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -352,6 +456,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -377,6 +485,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Power - Peak Pulse": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Power Line Protection": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Pre-Sale": {
       "confidence": "medium",
       "source": "lcsc"
@@ -396,6 +512,10 @@
     "Product Image 3": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Reel Setup Fee": {
       "confidence": "medium",
@@ -417,6 +537,10 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
     "Stock": {
       "confidence": "medium",
       "source": "lcsc"
@@ -433,6 +557,18 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Unidirectional Channels": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Unit": {
       "confidence": "medium",
       "source": "lcsc"
@@ -440,6 +576,18 @@
     "Voltage - Breakdown": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Voltage - Breakdown (Min)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Clamping (Max) @ Ipp": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Reverse Standoff (Typ)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Weight": {
       "confidence": "medium",
@@ -498,13 +646,95 @@
       "stock": 2996,
       "url": "https://www.lcsc.com/product-detail/C52098188.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:48.921660+00:00",
+      "part_number": "595-TSD03DYFR",
+      "price_breaks": [
+        {
+          "price": 0.64,
+          "qty": 1
+        },
+        {
+          "price": 0.393,
+          "qty": 10
+        },
+        {
+          "price": 0.251,
+          "qty": 100
+        },
+        {
+          "price": 0.2,
+          "qty": 500
+        },
+        {
+          "price": 0.17,
+          "qty": 1000
+        },
+        {
+          "price": 0.153,
+          "qty": 3000
+        },
+        {
+          "price": 0.139,
+          "qty": 6000
+        },
+        {
+          "price": 0.116,
+          "qty": 9000
+        },
+        {
+          "price": 0.11,
+          "qty": 24000
+        }
+      ],
+      "stock": 2762,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:48.921660+00:00",
+      "part_number": "296-TSD03DYFRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.14786,
+          "qty": 3000
+        },
+        {
+          "price": 0.13487,
+          "qty": 6000
+        },
+        {
+          "price": 0.12825,
+          "qty": 9000
+        },
+        {
+          "price": 0.12081,
+          "qty": 15000
+        },
+        {
+          "price": 0.11641,
+          "qty": 21000
+        },
+        {
+          "price": 0.11212,
+          "qty": 30000
+        }
+      ],
+      "stock": 2197,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
+    "Applications": "USB",
     "Assembly Country of Origin": "China",
     "Available On Reel": "Yes",
     "Brand Id": "12241",
+    "Capacitance @ Frequency": "4.5pF @ 1MHz",
     "Catalog Id": "702",
     "Clamping Voltage": "16V",
     "Contains Battery": "No",
@@ -512,6 +742,7 @@
     "Country of Origin": "China",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Current - Peak Pulse (10/1000µs)": "25A (8/20µs)",
     "ECCN": "-",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/f9d6ac50eef446cf92e8efad085097d5.svg?t=1761576508",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/6e3f17eae06348a78718c75d3469ec88.svg?t=1761576508",
@@ -542,36 +773,50 @@
     "LCSC Warehouse Category": "TVS Diodes",
     "Ladder Discount Rate": "1~0.95,10~0.95,30~0.95,300~0.95,600~0.95,900~0.95,",
     "Lead Time": "112 Days",
-    "Lifecycle": "Active",
+    "Lifecycle": "New Product",
     "Minimum Order Quantity": "10",
+    "Moisture Sensitivity Level": "3 (168 Hours)",
+    "Mounting Type": "Surface Mount",
     "Number of Channels": "1",
     "Operating Temperature": "-55℃~+125℃",
     "Order Multiple": "10",
     "Package": "SOD-323",
+    "Package / Case": "SC-76, SOD-323",
     "Package Quantity": "3000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "320",
     "Peak Pulse Current (Ipp)": "20A@8/20us",
     "Peak Pulse Power Dissipation (Ppp)": "350W@8/20us",
     "Polarity": "Unidirectional",
     "Popular Part": "No",
+    "Power - Peak Pulse": "170W",
+    "Power Line Protection": "No",
     "Pre-Sale": "No",
     "Product Category": "ESD Protection Diodes / TVS Diodes",
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20251024_TECH-PUBLIC-TSD03DYFR-TP_C52098188_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20251024_TECH-PUBLIC-TSD03DYFR-TP_C52098188_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20251024_TECH-PUBLIC-TSD03DYFR-TP_C52098188_blank.jpg",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "Reverse Leakage Current (Ir)": "200nA",
     "Reverse Stand-Off Voltage (Vrwm)": "3.3V",
     "RoHS": "Yes",
     "Standard Pack Qty": "3000",
+    "Standard Package": "3000",
     "Stock": "1690",
     "Stock (Domestic)": "1690",
     "Stock (Overseas)": "1690",
     "Stock (Shenzhen)": "1690",
+    "Supplier Device Package": "SOD-323",
+    "Type": "Zener",
+    "Unidirectional Channels": "1",
     "Unit": "Piece",
     "Voltage - Breakdown": "6V",
+    "Voltage - Breakdown (Min)": "4.5V",
+    "Voltage - Clamping (Max) @ Ipp": "7.7V (Typ)",
+    "Voltage - Reverse Standoff (Typ)": "3.6V (Max)",
     "Weight": "0.028",
     "Weight (kg)": "2.7567e-05",
     "Wm Catalog Id": "702",
