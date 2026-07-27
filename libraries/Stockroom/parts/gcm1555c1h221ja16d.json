@@ -1,4 +1,119 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "14 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "21"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "50"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Temperature Coefficient": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "C0G"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "C0G, NP0"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "5%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±5%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 220 pF, 5%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: GCM1555C1H221JA16D Multilayer Ceramic Capacitors MLCC - SMD/SMT – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 220PF 50V C0G/NP0 0402"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +137,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "gcm1555c1h221ja16d",
   "manufacturer": "muRata",
@@ -37,8 +157,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:02:32.147913+00:00",
+      "part_number": "81-GCM1555C1H221J16D",
       "price_breaks": [
         {
           "price": 0.007228571,
@@ -65,9 +185,43 @@
           "qty": 2000000
         }
       ],
-      "stock": 5678,
+      "stock": 86457,
       "url": "https://www.mouser.com/c/?q=GCM1555C1H221JA16D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:32.147913+00:00",
+      "part_number": "490-4927-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.00867,
+          "qty": 10000
+        },
+        {
+          "price": 0.00793,
+          "qty": 20000
+        },
+        {
+          "price": 0.00756,
+          "qty": 30000
+        },
+        {
+          "price": 0.00715,
+          "qty": 50000
+        },
+        {
+          "price": 0.00691,
+          "qty": 70000
+        },
+        {
+          "price": 0.00668,
+          "qty": 100000
+        }
+      ],
+      "stock": 331142,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -117,7 +271,7 @@
     "LCSC Product Name": "CAP CER 220pF 50V C0G 0402",
     "LCSC Title": "muRata GCM1555C1H221JA16D",
     "LCSC Warehouse Category": "Ceramic Capacitors",
-    "Lead Time": "98 Days",
+    "Lead Time": "14 Weeks",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "50",
     "Moisture Sensitivity Level": "1 (Unlimited)",
