@@ -2160,6 +2160,11 @@ export interface CadInventory {
   kept_stock: number;
   items: { part_id: string; assets: string[] }[];
   failed: { id: string; error: string }[];
+  // References whose backing FILE was not where the reference said it would be. The reference is
+  // still cleared (a dangling one is worse than none), but this must be reported rather than
+  // folded into `cleared`: a count that cannot be wrong is how six Altium libraries survived a
+  // clear that claimed to have deleted them.
+  missing_files: { part_id: string; asset: string; expected: string }[];
 }
 
 // Which derivation ruleset produced the presentation data the library is currently showing.

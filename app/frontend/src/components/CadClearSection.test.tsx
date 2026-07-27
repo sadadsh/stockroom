@@ -36,6 +36,7 @@ function inventory(over: Partial<CadInventory> = {}): CadInventory {
       assets: ["kicad_symbol"],
     })),
     failed: [],
+    missing_files: [],
     ...over,
   };
 }
@@ -171,4 +172,34 @@ it("surfaces a failure to even start the clear", async () => {
 
   expect(await screen.findByText("library is locked")).toBeInTheDocument();
   expect(screen.queryAllByText(/^Removed/)).toEqual([]);
+});
+
+it("reports a reference whose FILE was not there, instead of counting it as deleted", async () => {
+  // The defect this field exists for, measured on the owner's real library: a clear reported 6
+  // Altium libraries removed and touched the directory zero times, because the removal rebuilt
+  // the filename from the record id while the file is named for the id it had when attached.
+  mockApi.cadInventory.mockResolvedValue(inventory());
+  mockApi.clearCad.mockResolvedValue({ job_id: "j1" });
+  mockApi.openJobStream.mockResolvedValue(
+    jobStream(
+      inventory({
+        cleared: 2,
+        items: [{ part_id: "ina226aidgst-d958", assets: ["altium_symbol"] }],
+        missing_files: [
+          {
+            part_id: "ina226aidgst-d958",
+            asset: "altium_symbol",
+            expected: "altium/ina226aidgst-d958.SchLib",
+          },
+        ],
+      }),
+    ),
+  );
+  renderSection();
+
+  await userEvent.click(await screen.findByRole("button", { name: "Remove All CAD Files" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Remove Them" }));
+
+  expect(await screen.findByText(/pointed at a file/)).toBeInTheDocument();
+  expect(screen.getByText("altium/ina226aidgst-d958.SchLib")).toBeInTheDocument();
 });

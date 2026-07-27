@@ -1032,7 +1032,10 @@ class LibraryOps:
         Touches CAD only. Identity, the derived block, `sourced/` evidence and the datasheet all
         stand - this removes assets, not parts.
         """
-        report: dict = {"cleared": 0, "kept_stock": 0, "items": [], "failed": []}
+        report: dict = {
+            "cleared": 0, "kept_stock": 0, "items": [], "failed": [], "missing_files": [],
+            "orphans": 0, "orphan_files": [],
+        }
         paths = sorted(self.lib.parts_dir.glob("*.json"))
         # One transaction around the whole sweep, opened before the walk so nothing accumulates
         # and a failure anywhere restores every touched path. `dry_run` opens none at all: a run
@@ -1063,15 +1066,96 @@ class LibraryOps:
                     continue
                 try:
                     for kind in removed:
-                        self._detach_eda_asset(record, kind, txn)
+                        missing = self._detach_eda_asset(record, kind, txn)
+                        if missing is not None:
+                            report["missing_files"].append({
+                                "part_id": record.id,
+                                "asset": kind,
+                                "expected": missing.relative_to(
+                                    self.lib.parts_dir.parent
+                                ).as_posix(),
+                            })
                     path.write_text(record.dumps(), encoding="utf-8")
                     txn.track(path)
                 except Exception as exc:  # noqa: BLE001 - reported, and the transaction still holds
                     report["failed"].append({"id": record.id, "error": str(exc)})
-            if txn is not None and report["items"]:
-                report_n = report["cleared"]
-                txn.commit(f"Remove {report_n} CAD assets from {len(report['items'])} parts")
+            # THEN the orphans: CAD files under this profile that no record points at, once the
+            # references above are gone. Without this the operation would report a library holding
+            # no CAD while CAD files sat on disk - which is exactly what happened on the owner's
+            # library, where 6 Altium libraries and 2 KiCad files survived a "successful" clear.
+            for orphan in self._orphan_cad_files():
+                report["orphans"] += 1
+                report["orphan_files"].append(
+                    orphan.relative_to(self.lib.parts_dir.parent).as_posix()
+                )
+                if txn is not None:
+                    txn.track(orphan)
+                    orphan.unlink()
+            if txn is not None and (report["items"] or report["orphans"]):
+                what = []
+                if report["cleared"]:
+                    what.append(f"{report['cleared']} CAD assets from {len(report['items'])} parts")
+                if report["orphans"]:
+                    what.append(f"{report['orphans']} orphaned files")
+                txn.commit("Remove " + " and ".join(what))
         return report
+
+    # Files under the profile that are ASSETS rather than scaffolding. `SR-*.kicad_sym` is the
+    # CONTAINER entries live in, not an asset - `rebuild_part` writes passive symbols into it, so
+    # deleting it would break the next add. The Altium `.DbLib`/`.db`/`.xlsx` are DERIVED from the
+    # records and regenerate; they are not captured CAD.
+    _ORPHAN_SWEEP: tuple[tuple[str, str], ...] = (
+        ("footprints", "*.pretty/*.kicad_mod"),
+        ("models", "*"),
+        ("altium", "*.SchLib"),
+        ("altium", "*.PcbLib"),
+    )
+
+    def _referenced_files(self) -> set[Path]:
+        """Every on-disk path any record still points at, resolved. Read fresh from the records
+        so the sweep keys on the state AFTER the clear, never on what was there before."""
+        root = self.lib.parts_dir.parent
+        keep: set[Path] = set()
+        for path in self.lib.parts_dir.glob("*.json"):
+            try:
+                record = PartRecord.loads(path.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001 - an unreadable record protects nothing, and is
+                continue       # already reported by the caller; a sweep must not delete on a guess
+            for tool in all_tools():
+                assets = record.assets_for(tool.key)
+                for kind in tool.asset_kinds:
+                    ref = assets.get(kind)
+                    if ref is None or not ref.is_present():
+                        continue
+                    if ref.file:
+                        keep.add((root / ref.file).resolve())
+                    if tool.key != "kicad" and ref.lib:
+                        keep.add((root / "altium" / ref.lib).resolve())
+                    if tool.key == "kicad" and kind == "footprint" and ref.name:
+                        keep.add(
+                            (
+                                self.lib.footprint_lib_path(record.category)
+                                / f"{ref.name}.kicad_mod"
+                            ).resolve()
+                        )
+        return keep
+
+    def _orphan_cad_files(self) -> list[Path]:
+        """CAD files under this profile that no record references, sorted for a stable report."""
+        root = self.lib.parts_dir.parent
+        keep = self._referenced_files()
+        found: list[Path] = []
+        for sub, pattern in self._ORPHAN_SWEEP:
+            base = root / sub
+            if not base.is_dir():
+                continue
+            for path in base.glob(pattern):
+                if not path.is_file() or path.name == ".gitkeep":
+                    continue
+                if path.resolve() in keep:
+                    continue
+                found.append(path)
+        return sorted(set(found))
 
     def _detach_eda_asset(self, record: PartRecord, kind: str, txn) -> None:
         """Remove one tool's asset: its on-disk file(s) and its record reference.
@@ -1102,8 +1186,12 @@ class LibraryOps:
                 f"{spec.label} assets cannot be removed through Stockroom yet "
                 f"(no file-removal adapter is registered for {tool!r})"
             )
-        remove(record, asset_kind, ref, txn)
+        missing = remove(record, asset_kind, ref, txn)
         assets.set(asset_kind, None)
+        # The path the adapter EXPECTED and did not find, or None. Returned rather than swallowed
+        # so a caller can never report a file as removed when nothing was: that silence is exactly
+        # how six Altium libraries survived a clear that claimed to have deleted them.
+        return missing
 
     def _remove_kicad_asset(self, record: PartRecord, asset_kind: str, ref, txn) -> None:
         """KiCad file removal: a symbol is an entry inside the category `.kicad_sym`, a
@@ -1117,16 +1205,24 @@ class LibraryOps:
                     sym_lib.remove_symbol(ref.name)
                     sym_lib.save(sym_lib_path)
                     txn.track(sym_lib_path)
+                else:
+                    return sym_lib_path / ref.name  # the entry the library does not hold
+            else:
+                return sym_lib_path
         elif asset_kind == "footprint":
             fp_path = self.lib.footprint_lib_path(record.category) / f"{ref.name}.kicad_mod"
             if fp_path.exists():
                 txn.track(fp_path)
                 fp_path.unlink()
+            else:
+                return fp_path
         elif asset_kind == "model":
             model_path = self.lib.parts_dir.parent / ref.file
             if model_path.exists():
                 txn.track(model_path)
                 model_path.unlink()
+            else:
+                return model_path
             # strip the now-dangling (model ...) link from the footprint, if one stands
             fp_ref = _kicad(record).footprint
             if fp_ref is not None:
@@ -1139,6 +1235,7 @@ class LibraryOps:
                         fp.set_model_path("")
                         fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
                         txn.track(fp_path)
+        return None
 
     def _remove_altium_asset(self, record: PartRecord, asset_kind: str, ref, txn) -> None:
         """Altium file removal: each asset is its own OLE2 compound file in the profile's
@@ -1148,11 +1245,21 @@ class LibraryOps:
         if suffix is None:
             # A 3D body lives INSIDE the .PcbLib, so there is no standalone file to unlink;
             # clearing the reference is the whole removal.
-            return
-        path = altium_dir / f"{record.id}.{suffix}"
+            return None
+        # FOLLOW THE REFERENCE, never reconstruct it. `attach_altium_assets` stores the real
+        # filename in `ref.lib`, and it is named for the id the part had WHEN IT WAS ATTACHED.
+        # Rebuilding it from `record.id` broke the moment the v3 part-id migration (`2966668`)
+        # renamed every record and left the Altium files alone: a record now called
+        # `ina226aidgst-d958` points at `ina226aidgst.PcbLib`, so the old path missed, unlinked
+        # nothing, and said nothing -- MEASURED on the owner's library, where a clear reported 6
+        # Altium assets removed and touched `altium/` zero times.
+        name = ref.lib.strip() or f"{record.id}.{suffix}"
+        path = altium_dir / name
         if path.exists():
             txn.track(path)
             path.unlink()
+            return None
+        return path
 
     def load_record(self, part_id: str) -> PartRecord:
         path = self.lib.parts_dir / f"{part_id}.json"

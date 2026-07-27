@@ -232,3 +232,166 @@ def test_a_library_with_no_cad_at_all_is_a_true_no_op(tmp_path, fixtures_dir):
 
     assert report["cleared"] == 0
     assert repo.head() == head
+
+
+# ------------------------------------------------- the file a reference actually names
+#
+# MEASURED on the owner's real library, 2026-07-27, AFTER the first clear ran: the report said
+# `altium_symbol: 3, altium_footprint: 3` cleared and the commit touched `altium/` ZERO times.
+# Six `.SchLib`/`.PcbLib` files were still tracked and on disk.
+#
+# Root cause: `_remove_altium_asset` rebuilt the filename from `record.id`, while the file is
+# named for the id the part had WHEN IT WAS ATTACHED. The v3 part-id migration (`2966668`)
+# renamed every record and left the Altium files alone, so a record with id
+# `ina226aidgst-d958` points at `ina226aidgst.PcbLib` -- and the removal looked for
+# `ina226aidgst-d958.PcbLib`, found nothing, and said nothing.
+#
+# The reference already CARRIES the filename (`attach_altium_assets` stores `lib=sch_dst.name`).
+# Reading it is both the fix and the general rule: follow the reference, never reconstruct it.
+
+
+def _altium_pair(profile, rec: PartRecord, stem: str):
+    """Attach Altium libraries named for `stem`, which may differ from the record's id -- exactly
+    what the v3 id migration produced across the owner's whole library."""
+    from stockroom.model.asset import AssetRef
+
+    altium = profile.library.parts_dir.parent / "altium"
+    altium.mkdir(parents=True, exist_ok=True)
+    sch = altium / f"{stem}.SchLib"
+    pcb = altium / f"{stem}.PcbLib"
+    sch.write_bytes(b"\xd0\xcf\x11\xe0fake-schlib")
+    pcb.write_bytes(b"\xd0\xcf\x11\xe0fake-pcblib")
+    rec.assets_for("altium").symbol = AssetRef(lib=sch.name, name="U1")
+    rec.assets_for("altium").footprint = AssetRef(lib=pcb.name, name="DGS10")
+    return sch, pcb
+
+
+def test_an_altium_library_is_removed_by_the_name_its_REFERENCE_carries(tmp_path, fixtures_dir):
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    # id and filename DISAGREE, which is the real state of every Altium part in the owner's
+    # library after the v3 id migration.
+    rec = _seed(profile, repo, "ina226aidgst-d958")
+    sch, pcb = _altium_pair(profile, rec, "ina226aidgst")
+    _write(profile, repo, rec, [sch, pcb])
+
+    report = ops.clear_cad_assets(dry_run=False)
+
+    assert report["cleared"] == 2
+    assert not sch.exists(), "the .SchLib the reference named is still on disk"
+    assert not pcb.exists(), "the .PcbLib the reference named is still on disk"
+    assert report["missing_files"] == []
+
+
+def test_a_reference_whose_FILE_IS_GONE_is_reported_not_silently_counted(tmp_path, fixtures_dir):
+    """The honesty half. A dangling reference is a real state, so clearing it is right -- but the
+    report must not imply a file was deleted when none was there. Reporting a number that cannot
+    be wrong is exactly how the Altium miss above went unnoticed."""
+    from stockroom.model.asset import AssetRef
+
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    rec = _seed(profile, repo, "aaa-1111")
+    rec.assets_for("altium").symbol = AssetRef(lib="nowhere.SchLib", name="U1")
+    _write(profile, repo, rec)
+
+    report = ops.clear_cad_assets(dry_run=False)
+
+    assert report["cleared"] == 1
+    assert report["missing_files"] == [
+        {"part_id": "aaa-1111", "asset": "altium_symbol", "expected": "altium/nowhere.SchLib"}
+    ]
+    assert ops.load_record("aaa-1111").assets_for("altium").symbol is None
+
+
+# --------------------------------------------------------------- files nothing references
+#
+# "Remove all the current cad files" includes the ORPHANS. Measured on the owner's library after
+# the first clear: 6 Altium libraries and 2 KiCad files sat on disk with no record pointing at
+# them -- some left by the v3 id migration, some by an MPN whose spelling drifted
+# (`TPD6E05U06RVZR.stp` against a record referencing `models/TPD6E05U06RVZ.step`). Clearing only
+# what is REFERENCED would leave the library still holding CAD files while reporting none.
+#
+# What is deliberately NOT swept, because it is not a captured asset:
+#   symbols/SR-*.kicad_sym   the CATEGORY LIBRARIES themselves. Entries inside them are removed
+#                            one at a time; the container is library scaffolding `rebuild_part`
+#                            writes into, and deleting it would break the next passive add.
+#   altium/Stockroom.DbLib, stockroom-parts.db, .xlsx   the DERIVED Altium data source.
+#   any .gitkeep             layout scaffolding.
+
+
+def test_an_orphaned_cad_file_is_swept_too(tmp_path, fixtures_dir):
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    _write(profile, repo, _seed(profile, repo, "aaa-1111"))
+    lib = profile.library
+    (lib.models_dir).mkdir(parents=True, exist_ok=True)
+    orphan_model = lib.models_dir / "NOBODY.step"
+    orphan_model.write_bytes(b"ISO-10303-21;\n")
+    pretty = lib.footprint_lib_path("ICs")
+    pretty.mkdir(parents=True, exist_ok=True)
+    orphan_fp = pretty / "NOBODY.kicad_mod"
+    orphan_fp.write_text('(footprint "NOBODY")\n', encoding="utf-8", newline="")
+    altium = lib.parts_dir.parent / "altium"
+    altium.mkdir(parents=True, exist_ok=True)
+    orphan_lib = altium / "nobody.PcbLib"
+    orphan_lib.write_bytes(b"\xd0\xcf\x11\xe0")
+    repo.commit("seed orphans", [orphan_model, orphan_fp, orphan_lib])
+
+    report = ops.clear_cad_assets(dry_run=False)
+
+    assert report["orphans"] == 3
+    assert not orphan_model.exists()
+    assert not orphan_fp.exists()
+    assert not orphan_lib.exists()
+
+
+def test_the_category_libraries_and_the_altium_data_source_are_NOT_swept(tmp_path, fixtures_dir):
+    """NEGATIVE CONTROL. An `SR-*.kicad_sym` is the container entries live in, not an asset, and
+    the Altium `.DbLib`/`.db` are derived from the records. Sweeping either would break the next
+    add and the Altium handoff respectively."""
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    _write(profile, repo, _seed(profile, repo, "aaa-1111"))
+    lib = profile.library
+    sym_lib = lib.symbol_lib_path("ICs")
+    altium = lib.parts_dir.parent / "altium"
+    altium.mkdir(parents=True, exist_ok=True)
+    dblib = altium / "Stockroom.DbLib"
+    dblib.write_text("[OutputDatabaseLinkFile]\n", encoding="utf-8")
+    db = altium / "stockroom-parts.db"
+    db.write_bytes(b"SQLite format 3\x00")
+    repo.commit("seed the derived altium data source", [dblib, db])
+
+    ops.clear_cad_assets(dry_run=False)
+
+    assert sym_lib.exists()
+    assert dblib.exists()
+    assert db.exists()
+
+
+def test_a_file_a_record_STILL_references_is_never_swept_as_an_orphan(tmp_path, fixtures_dir):
+    """The sweep keys on what the records reference RIGHT NOW, so a file still pointed at is never
+    counted as an orphan.
+
+    Driven as a DRY RUN deliberately, because that is the state in which the distinction is real:
+    nothing has been dereferenced yet, so a sweep that ignored `_referenced_files` would report
+    every referenced model and footprint as an orphan. A passive would NOT exercise this -- its
+    `Device:R` names no file under the profile, so there would be nothing to protect and the test
+    would pass however the sweep behaved. That vacuous first version was caught by a tamper."""
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    keeper = _seed(profile, repo, "keep-1111")
+    kept_fp = _own_footprint(profile, repo, keeper, "KEEP")
+    kept_model = _own_model(profile, repo, keeper, "KEEP")
+    _write(profile, repo, keeper, [kept_fp, kept_model])
+    orphan = profile.library.models_dir / "NOBODY.step"
+    orphan.write_bytes(b"x")
+    repo.commit("seed an orphan", [orphan])
+
+    report = ops.clear_cad_assets(dry_run=True)
+
+    # Exactly ONE orphan: the two files `keep-1111` still points at are not orphans.
+    assert report["orphan_files"] == ["models/NOBODY.step"]
+    assert report["orphans"] == 1
+    assert orphan.exists() and kept_fp.exists() and kept_model.exists()  # dry run

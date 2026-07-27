@@ -129,6 +129,30 @@ export function CadClearSection() {
             <span className="tnum">{report.items.length}</span>{" "}
             {report.items.length === 1 ? "component" : "components"}.
           </p>
+          {report.missing_files.length > 0 ? (
+            <div>
+              <p>
+                <span className="tnum">{report.missing_files.length}</span>{" "}
+                {report.missing_files.length === 1 ? "reference" : "references"} pointed at a file
+                that was not there. The {report.missing_files.length === 1 ? "reference is" : "references are"}{" "}
+                cleared either way, and the {report.missing_files.length === 1 ? "path is" : "paths are"} listed
+                so nothing is quietly counted as deleted.
+              </p>
+              <ul className="mt-1 list-disc pl-5">
+                {report.missing_files.slice(0, 10).map((m) => (
+                  <li key={`${m.part_id}:${m.asset}`}>
+                    <span className="font-medium text-t1">{m.part_id}</span> {m.asset}:{" "}
+                    <span className="font-mono">{m.expected}</span>
+                  </li>
+                ))}
+              </ul>
+              {report.missing_files.length > 10 ? (
+                <p className="mt-1">
+                  and <span className="tnum">{report.missing_files.length - 10}</span> more.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           {report.failed.length > 0 ? (
             <div>
               <Badge tone="err" size="sm">
