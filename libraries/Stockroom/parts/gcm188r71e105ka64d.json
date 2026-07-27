@@ -1,4 +1,95 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "4000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±10%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 1 µF, 10%, 0603"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: GCM188R71E105KA64D Multilayer Ceramic Capacitors MLCC - SMD/SMT – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 1UF 25V X7R 0603"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +113,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "high",
+      "source": "digikey"
+    }
+  },
   "hashes": null,
   "id": "gcm188r71e105ka64d",
   "manufacturer": "muRata",
@@ -37,8 +133,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T03:59:01.238451+00:00",
+      "part_number": "81-GCM188R71E105KA4D",
       "price_breaks": [
         {
           "price": 0.014714286,
@@ -68,6 +164,40 @@
       "stock": 231955,
       "url": "https://www.mouser.com/c/?q=GCM188R71E105KA64D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T03:59:01.238451+00:00",
+      "part_number": "490-10673-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.03557,
+          "qty": 4000
+        },
+        {
+          "price": 0.03299,
+          "qty": 8000
+        },
+        {
+          "price": 0.0317,
+          "qty": 12000
+        },
+        {
+          "price": 0.03027,
+          "qty": 20000
+        },
+        {
+          "price": 0.02944,
+          "qty": 28000
+        },
+        {
+          "price": 0.02863,
+          "qty": 40000
+        }
+      ],
+      "stock": 1010868,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -117,7 +247,7 @@
     "LCSC Product Name": "CAP CER 1uF 25V X7R 0603",
     "LCSC Title": "muRata GCM188R71E105KA64D",
     "LCSC Warehouse Category": "Ceramic Capacitors",
-    "Lead Time": "98 Days",
+    "Lead Time": "21",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "10",
     "Moisture Sensitivity Level": "1 (Unlimited)",
