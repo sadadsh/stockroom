@@ -129,7 +129,25 @@
   },
   "description": "14VC Clamp 2.5A@8/20us Ipp TVS DIODE USON-10(1x2.5)",
   "display_name": "ESD Protection Diode USON-10",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "TPD4E05U06DQAR"
+      },
+      "model": {
+        "file": "models/TPD4E05U06DQAR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "TPD4E05U06DQAR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
