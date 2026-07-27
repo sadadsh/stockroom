@@ -1,0 +1,159 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://datasheet.lcsc.com/datasheet/pdf/b426be3ce22c6de3e0c3a2248e49159e.pdf?productCode=C60491"
+  },
+  "description": "Resistor, 100 kOhm, 1%, 0402",
+  "display_name": "100 kOhm 1% 0402 Resistor",
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "Resistor_SMD",
+        "name": "R_0402_1005Metric"
+      },
+      "model": null,
+      "symbol": {
+        "file": "",
+        "lib": "Device",
+        "name": "R"
+      }
+    }
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "rc0402fr_07100kl",
+  "manufacturer": "Yageo",
+  "mpn": "RC0402FR-07100KL",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=RC0402FR-07100KL"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.0005,
+          "qty": 20
+        },
+        {
+          "price": 0.000385714,
+          "qty": 20000
+        },
+        {
+          "price": 0.000314286,
+          "qty": 60000
+        },
+        {
+          "price": 0.000285714,
+          "qty": 200000
+        },
+        {
+          "price": 0.000228571,
+          "qty": 1000000
+        },
+        {
+          "price": 0.000228571,
+          "qty": 1004000
+        }
+      ],
+      "stock": 2068667,
+      "url": "https://www.mouser.com/c/?q=RC0402FR-07100KL",
+      "vendor": "Mouser"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "3D Model": "Resistor_SMD.3dshapes/R_0402_1005Metric.wrl",
+    "Assembly Country of Origin": "Not available",
+    "Available On Reel": "Yes",
+    "BRHTS": "85332120",
+    "Brand Id": "396",
+    "Catalog Id": "1199",
+    "Contains Battery": "No",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "Currency Symbol": "$",
+    "Currency Type": "USD",
+    "ECCN": "EAR99",
+    "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/fafd024f554e426eb74cf4a204aa88b0.svg?t=1672383302",
+    "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/7e257627779b4f4da446e4fac2e01600.svg?t=1672383302",
+    "Faqs": "[{\"question\": \"What Reliability Standards and Certifications Does the RC0402FR‑07100KL Meet?\", \"answer\": \"This resistor is RoHS compliant and manufactured to meet industry reliability standards for surface‑mount components. Its proven thick‑film construction ensures stable electrical performance across common operating temperatures.\"}, {\"question\": \"What Is the Price and Availability of the RC0402FR‑07100KL at LCSCLLCSCCLCSCSLCSCCLCSC?LCSC\", \"answer\": \"The RC0402FR‑07100KL resistor is in stock at LCSC and available for immediate ordering. Competitive, tiered pricing supports both small‑quantity prototyping and high‑volume production purchases from a reliable electronic component supplier.\"}, {\"question\": \"Is the RC0402FR‑07100KL Compatible with Equivalent 0402 Resistors?\", \"answer\": \"Yes, the RC0402FR‑07100KL is compatible with most standard 0402 package resistors with the same resistance value and tolerance. Engineers should always confirm power rating and datasheet specifications before selecting an equivalent part from another supplier.\"}, {\"question\": \"What Applications Is the RC0402FR‑07100KL Commonly Used For?\", \"answer\": \"This SMD resistor is widely used in consumer electronics, industrial control boards, and portable devices for signal conditioning, voltage division, and pull‑up or pull‑down circuits. Its small size and stable performance make it ideal for space‑constrained electronic applications.\"}, {\"question\": \"What Are the Specifications of the RC0402FR‑07100KL Resistor?\", \"answer\": \"The RC0402FR‑07100KL is a 100 kΩ ±1% thick‑film chip resistor in a compact 0402 SMD package from YAGEO. This electronic component features ±1% tolerance, 62.5 mW power rating, and is designed for high‑density PCB layouts requiring precision resistance.\"}]",
+    "Footprint": "Resistor_SMD:R_0402_1005Metric",
+    "HTS Code (BR)": "85332110",
+    "HTS Code (CA)": "8533210000",
+    "HTS Code (CN)": "8533211000",
+    "HTS Code (EU TARIC)": "8533210000",
+    "HTS Code (IN)": "85332111",
+    "HTS Code (JP)": "853321000",
+    "HTS Code (MX)": "8533.21.01",
+    "HTS Code (TARIC)": "8533210000",
+    "HTS Code (US)": "8533210020",
+    "Has Third Party Stock": "No",
+    "Image": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg",
+    "Is Asian Brand": "Yes",
+    "Is Cable Category": "No",
+    "Is Foreign Display": "Yes",
+    "Is Foreign Onsale": "Yes",
+    "Is Infringement": "No",
+    "Is Mro": "No",
+    "Is Not Overstock": "No",
+    "Is Real Price": "Yes",
+    "Is Show Foreign Price": "Yes",
+    "KRHTS": "8533219000",
+    "Key Attributes": "RES 100kΩ ±1% 62.5mW 0402",
+    "LCSC Category": "Chip Resistor - Surface Mount",
+    "LCSC Category Path": "Passives > Resistors",
+    "LCSC Parent Category": "Resistors",
+    "LCSC Product ID": "61543",
+    "LCSC Product Name": "RES 100kΩ ±1% 62.5mW 0402",
+    "LCSC Title": "YAGEO RC0402FR-07100KL",
+    "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
+    "Lead Time": "63 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "100",
+    "Order Multiple": "100",
+    "Package": "0402",
+    "Package Quantity": "10000",
+    "Package Quantity Unit": "Reel",
+    "Packaging": "Tape & Reel (TR)",
+    "Parent Catalog Id": "308",
+    "Popular Part": "Yes",
+    "Power": "0.063 W",
+    "Power(Watts)": "62.5mW",
+    "Pre-Sale": "No",
+    "Product Category": "Thick Film Resistors - SMD",
+    "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20251016_YAGEO-RC0402FR-07100KL_C60491_front.jpg",
+    "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20251016_YAGEO-RC0402FR-07100KL_C60491_back.jpg",
+    "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20251016_YAGEO-RC0402FR-07100KL_C60491_blank.jpg",
+    "Reel Setup Fee": "3",
+    "Resistance": "100 kOhm",
+    "RoHS": "Yes",
+    "Standard Pack Qty": "10000",
+    "Stock": "686900",
+    "Stock (Domestic)": "686900",
+    "Stock (Overseas)": "686900",
+    "Stock (Shenzhen)": "686900",
+    "Symbol": "Device:R",
+    "Temperature Coefficient": "±100ppm/℃",
+    "Tolerance": "1%",
+    "Type": "Thick Film Resistor",
+    "Unit": "Piece",
+    "Unit Weight (kg)": "6.5e-07",
+    "Voltage Rating": "50V",
+    "Weight": "0.009",
+    "Weight (kg)": "1.0427e-05",
+    "Weight Foreign (kg)": "9e-06",
+    "Wm Catalog Id": "1199"
+  },
+  "tags": [],
+  "value": ""
+}
