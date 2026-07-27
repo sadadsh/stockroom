@@ -1,4 +1,155 @@
 {
+  "alternates": {
+    "Capacitance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "2.2 nF"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "2200 pF"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "17"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Package": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "0402"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "0402 (1005 metric)"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Reel, Cut Tape, MouseReel"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Reel"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Details"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±10%"
+      }
+    ],
+    "US Tariff %": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "30.0"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 2.2 nF, 10%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "jsonld",
+        "value": "GRM155R71E222KA01D Murata Electronics Multilayer Ceramic Capacitors MLCC - SMD/SMT 2200 pF 25 VDC 10% 0402 X7R datasheet, inventory, & pricing."
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 2200PF 25V X7R 0402"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +173,96 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Brand": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Case Code - in": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Case Code - mm": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Class": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Dielectric": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Factory Pack Quantity": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Height": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Length": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Manufacturer": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Maximum Operating Temperature": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Minimum Operating Temperature": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Product": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Product Type": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Subcategory": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Termination": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Termination Style": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Type": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "US Tariff %": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Unit Weight": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Voltage Rating DC": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Width": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "grm155r71e222ka01d",
   "manufacturer": "Murata Electronics",
@@ -36,20 +276,20 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:38.213061+00:00",
+      "part_number": "81-GRM155R71E222KA1D",
       "price_breaks": [
         {
           "price": 0.1,
           "qty": 1
         },
         {
-          "price": 0.013,
+          "price": 0.014,
           "qty": 10
         },
         {
-          "price": 0.011,
+          "price": 0.012,
           "qty": 100
         },
         {
@@ -69,13 +309,47 @@
           "qty": 5000
         },
         {
-          "price": 0.003,
+          "price": 0.004,
           "qty": 10000
         }
       ],
       "stock": 107172,
       "url": "https://www.mouser.com/c/?q=GRM155R71E222KA01D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:38.213061+00:00",
+      "part_number": "490-5419-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.00416,
+          "qty": 10000
+        },
+        {
+          "price": 0.00374,
+          "qty": 20000
+        },
+        {
+          "price": 0.00354,
+          "qty": 30000
+        },
+        {
+          "price": 0.00331,
+          "qty": 50000
+        },
+        {
+          "price": 0.00317,
+          "qty": 70000
+        },
+        {
+          "price": 0.00304,
+          "qty": 100000
+        }
+      ],
+      "stock": 145622,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -84,20 +358,31 @@
     "Applications": "General Purpose",
     "Assembly Country of Origin": "Not available",
     "BRHTS": "85322410",
+    "Brand": "Murata Electronics",
     "Capacitance": "2.2 nF",
+    "Case Code - in": "0402",
+    "Case Code - mm": "1005",
+    "Class": "Class 2",
     "Country of Diffusion": "Not available",
     "Country of Origin": "China",
+    "Dielectric": "X7R",
     "ECCN": "EAR99",
+    "Factory Pack Quantity": "10000",
     "Footprint": "Capacitor_SMD:C_0402_1005Metric",
     "HTS Code (CA)": "8532240010",
     "HTS Code (CN)": "8532241000",
     "HTS Code (EU TARIC)": "8532240000",
     "HTS Code (JP)": "853224000",
     "HTS Code (US)": "8532240020",
+    "Height": "0.5 mm (0.02 in)",
     "Image": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
     "KRHTS": "8532240000",
-    "Lead Time": "70 Days",
+    "Lead Time": "10 Weeks",
+    "Length": "1 mm (0.039 in)",
     "Lifecycle": "Active",
+    "Manufacturer": "Murata",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 55 C",
     "Minimum Order Quantity": "1",
     "Moisture Sensitivity Level": "1 (Unlimited)",
     "Mounting Type": "Surface Mount, MLCC",
@@ -107,19 +392,29 @@
     "Package / Case": "0402 (1005 Metric)",
     "Package Type": "Tape & Reel (TR)",
     "Packaging": "Reel, Cut Tape, MouseReel",
+    "Product": "General Type MLCCs",
     "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "Product Type": "Ceramic Capacitors",
     "REACH": "REACH Unaffected",
     "RoHS": "RoHS Compliant",
     "Series": "GRM",
     "Size / Dimension": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)",
     "Standard Pack Qty": "10000",
     "Standard Package": "10000",
+    "Subcategory": "Capacitors",
     "Symbol": "Device:C",
     "Temperature Coefficient": "X7R",
+    "Termination": "Standard",
+    "Termination Style": "SMD/SMT",
     "Thickness (Max)": "0.022\" (0.55mm)",
     "Tolerance": "10%",
+    "Type": "Chip Multilayer Ceramic Capacitor for General Purpose",
+    "US Tariff %": "30.0",
+    "Unit Weight": "0.000053 oz",
     "Unit Weight (kg)": "1.5e-06",
-    "Voltage - Rated": "25V"
+    "Voltage - Rated": "25V",
+    "Voltage Rating DC": "25 VDC",
+    "Width": "0.5 mm (0.02 in)"
   },
   "tags": [],
   "value": ""
