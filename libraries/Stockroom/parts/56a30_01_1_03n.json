@@ -24,6 +24,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6455/MFG_56A30-01-1-02N.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "105 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "12"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -328,6 +340,54 @@
       "stock": 28,
       "url": "https://www.lcsc.com/category/648.html?scene=FULL_MATCH&globalKeyword=56A30-01-1-03N&s_z=n_q_56A30-01-1-03N",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:44.246083+00:00",
+      "part_number": "706-56A30-01-1-03N",
+      "price_breaks": [
+        {
+          "price": 31.64,
+          "qty": 1
+        },
+        {
+          "price": 22.86,
+          "qty": 25
+        },
+        {
+          "price": 21.85,
+          "qty": 50
+        },
+        {
+          "price": 20.06,
+          "qty": 100
+        },
+        {
+          "price": 18.95,
+          "qty": 250
+        },
+        {
+          "price": 18.76,
+          "qty": 500
+        }
+      ],
+      "stock": 28,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:44.246083+00:00",
+      "part_number": "56A30-01-1-03N-ND",
+      "price_breaks": [
+        {
+          "price": 21.8556,
+          "qty": 25
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
