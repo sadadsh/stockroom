@@ -610,9 +610,71 @@
        "evidence": ""
       }
      ]
+    },
+    {
+     "id": "ui-critique",
+     "name": "Ruthless Critique Of The Real Windows Shots",
+     "why": "Element-by-element pass over the 2026-07-27 real-Windows shots (dark Components, light Settings) at HEAD, per the standing screenshot directive. Split into DEFECTS (unambiguous, fix them) and DESIGN TENSIONS (need the owner to choose, because unilaterally re-laying-out a surface is what produced 'AHH the new ui sucks it moved everything').",
+     "steps": [
+      {
+       "t": "DEFECT: hover and selected are indistinguishable in the Settings nav - 'Application' has an accent bar + fill, 'Sourcing' has fill only, so TWO items read as active and the user cannot tell which section they are in",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "DEFECT: the same state is spelled two ways on ONE screen - 'Up to Date!' (bottom-left, exclamation) vs 'Up To Date' (right). Design contract says Title Case for interactive labels",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "DEFECT: the only two VALUES on the Settings page ('Light', 'Up To Date') are rendered in the dimmest text token, right-aligned on white. Same washout class that 02945c51 fixed elsewhere",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "DEFECT: the Top Specifications grid leaves an ORPHANED EMPTY CELL when the spec count is odd (5 specs, 2 columns), which reads as missing data inside a border",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "DEFECT: the pin/star affordance appears on only some spec rows (4 of 6) with no visible rule for which",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "DEFECT: section dividers appear BETWEEN the two Settings rows but not above the first or below the last, so the group has no boundary",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "DEFECT: footer ('158 Components', 'Profile Stockroom') is near-illegible dim grey on a grey bar, and 'Profile Stockroom' has no label/value separator",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "ALIGNMENT: three different left edges in one column - the Machine Setup card and nav list at x=214, the section rows at x=437. The nav and detail columns do not share a grid with the card above them",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "TENSION (ask the owner): light Settings uses ~220px of an ~800px column, so ~70% of the window is empty. The Components assets column dead-ends ~200px early too. Filling it means moving things, which they have reverted before - offer 2-3 concrete options with previews rather than redesigning it",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "TENSION (ask the owner): the four green Machine Setup chips read as an undifferentiated wall; and 'Trade And Compliance' is stranded at the bottom of the Sourcing column after a large gap",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "Fix the DEFECTS above, then RE-SHOOT both themes on real Windows and re-critique",
+       "done": false,
+       "evidence": ""
+      }
+     ]
     }
    ]
   }
  ],
- "updated": "2026-07-27 05:45 UTC"
+ "updated": "2026-07-27 05:55 UTC"
 }
