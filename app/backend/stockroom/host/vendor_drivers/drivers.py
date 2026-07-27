@@ -588,182 +588,18 @@ def _digikey_driver_js(formats: list[str], target_url: str = "") -> str:
     return f"(function(){{{body}}})();"
 
 
-# -- Ultra Librarian, MEASURED 2026-07-27 on the owner's machine with scripts/vendorprobe.py.
-#
-# Everything below was read off the live page, signed in, and the fixture
-# tests/backend/host/fixtures/ul-export-panel.html is that page. The previous selectors here were
-# first guesses and every one of them was wrong: `[data-ecad='KiCad']` matches nothing,
-# `label[for*='KiCad']` misses because the label is spelled "KiCAD", and `a[download]` /
-# `button.download` do not exist. Running the old driver against the real DOM ticks Altium only,
-# never KiCad, never consents, and never clicks Download.
-#
-# THE SHAPE OF THE PAGE
-#   search page   /search?queryText=<MPN>   -> result rows link to a[href*="/details/"]
-#   part page     /details/<guid>/<mfr>/<mpn>  -> #export-selection-btn opens the export panel,
-#                 which is also reachable directly by appending &open=exports
-#   export panel  an accordion per CAD tool (a.accordion-toggle -> #ef-2 Altium, #ef-6 KiCAD),
-#                 each holding CHECKBOXES in one shared group `input[name=exports]`, plus a
-#                 required per-manufacturer consent `input[id^=consent-]`, plus #submit-export.
-#
-# THE FACT THAT DECIDES THE DESIGN: those are CHECKBOXES, not radios. Both formats can be selected
-# at once and ONE submit delivers both - proven by driving them and reading the state back
-# ({"checkedNow":["AltiumDesigner","KiCADv6"],"bothHeld":true}). So Ultra Librarian needs NO
-# per-format sequencing, unlike DigiKey's models page, where the very same vendor's export modal
-# uses mutually exclusive RADIO groups. Same vendor, two different surfaces, opposite mechanics -
-# which is exactly why this was measured rather than assumed.
-_UL_FORMAT_TARGETS: dict[str, tuple[str, str, str]] = {
-    # format -> (checkbox id, accordion label text, human name)
-    # KiCAD v6+ and NOT v5: KiCad 5 emits `(module ...)` footprints, which this repo's
-    # Footprint.load refuses outright (recorded trap). The v5 row is `#KiCAD`, one line above.
-    "kicad": ("KiCADv6", "KiCAD", "KiCad"),
-    "altium": ("AltiumDesigner", "Altium", "Altium"),
-}
-
-_UL_HELPERS = (
-    "function trace(){try{var a=['[SRDRV]'].concat([].slice.call(arguments));"
-    "console.log.apply(console,a);}catch(e){}}"
-    "function report(step,ok,msg){trace('report',step,ok,msg);"
-    "try{var o=window.__STOCKROOM_OVERLAY__;o&&o.report({step:step,ok:ok,message:msg});}catch(e){}}"
-    "function vis(el){try{return !!(el&&el.offsetParent!==null&&el.getClientRects().length);}"
-    "catch(e){return false;}}"
-    "function observe(cb){var s=0;var o=new MutationObserver(function(){if(s)return;"
-    "s=requestAnimationFrame(function(){s=0;cb();});});"
-    "try{o.observe(document.documentElement,{childList:true,subtree:true,attributes:true});}"
-    "catch(e){}return o;}"
-    # until() checks IMMEDIATELY first, so a panel already on the page is driven synchronously.
-    "function until(pred,cb,wd){var done=false,o=null;function fin(v){if(done)return;done=true;"
-    "try{o&&o.disconnect();}catch(e){}clearTimeout(t);cb(v);}"
-    "function chk(){var v=null;try{v=pred();}catch(e){v=null;}if(v)fin(v);}"
-    "o=observe(chk);var t=setTimeout(function(){fin(null);},wd||20000);chk();}"
-    "function txt(el){try{return (el.textContent||'').replace(/\\s+/g,' ').trim();}catch(e){return '';}}"
-)
-
-# Tick a checkbox and READ THE STATE BACK. A click handler can refuse, a hidden control can ignore
-# it, and an accordion can swallow the event - so `set` never reports success it did not observe.
-# This is the pickVerified lesson from the DigiKey driver, which was learned the expensive way.
-_UL_SELECT = (
-    "function setChecked(el){if(!el)return false;"
-    "try{if(!el.checked)el.click();}catch(e){}"
-    "if(!el.checked){try{el.checked=true;"
-    "el.dispatchEvent(new Event('change',{bubbles:true}));}catch(e){}}"
-    "return !!el.checked;}"
-    "function expand(labelText){try{var ts=document.querySelectorAll('a.accordion-toggle');"
-    "for(var i=0;i<ts.length;i++){if(txt(ts[i])===labelText){"
-    "try{ts[i].click();}catch(e){}return true;}}}catch(e){}return false;}"
-    # The checkbox by its measured id, falling back to a label-text match inside the export group.
-    # The fallback is anchored (the label must START with the tool name and not be the v5 row), so
-    # a future re-id degrades to a slower match instead of ticking the wrong export.
-    "function formatBox(spec){var el=document.getElementById(spec.id);if(el)return el;"
-    "var all=document.querySelectorAll('input[name=exports]');"
-    "for(var i=0;i<all.length;i++){var lab=null;"
-    "try{lab=all[i].id?document.querySelector('label[for=\"'+all[i].id+'\"]'):null;}catch(e){}"
-    "var t=lab?txt(lab):'';"
-    "if(spec.re.test(t))return all[i];}return null;}"
-    # Every consent the panel marks required. Owner's decision 2026-07-27, asked and answered:
-    # "Always auto-tick". Ultra Librarian will not export without it and it is per-manufacturer,
-    # so leaving it would cost one manual tick on every part of a 90-part sitting.
-    "function consent(){var cs=document.querySelectorAll("
-    "'input[type=checkbox][id^=consent-],input[type=checkbox][name^=consent-]');"
-    "var n=0;for(var i=0;i<cs.length;i++){if(setChecked(cs[i]))n++;}return n;}"
-)
-
-_UL_RUN = (
-    # Phase 1 - a search result page: open the first part. A fresh document re-injects the driver.
-    "function onSearch(){return /\\/search/i.test(location.pathname);}"
-    "function openFirstResult(){until(function(){"
-    "var as=document.querySelectorAll('a[href*=\"/details/\"]');"
-    "for(var i=0;i<as.length;i++){if(vis(as[i]))return as[i];}return null;},function(a){"
-    "if(!a){report('search',false,'No Ultra Librarian result for this part; try another vendor.');"
-    "return;}"
-    "report('search',true,'Opening the part page.');"
-    "var h=a.getAttribute('href');"
-    "location.href=(h.charAt(0)==='/')?(location.origin+h):h;},15000);}"
-    # Phase 2 - a part page with the panel closed: open it (the panel is also a deep link).
-    "function openPanel(){until(function(){"
-    "return document.querySelector('input[name=exports]')?'panel':"
-    "(document.querySelector('#export-selection-btn')||null);},function(hit){"
-    "if(!hit){report('panel',false,'Could not open the CAD format list; use Download Now here.');"
-    "return;}"
-    "if(hit==='panel'){drivePanel();return;}"
-    "report('panel',true,'Opening the CAD format list.');"
-    "try{hit.click();}catch(e){}"
-    "until(function(){return document.querySelector('input[name=exports]');},"
-    "function(ok){if(ok)drivePanel();"
-    "else report('panel',false,'The CAD format list did not open; use Download Now here.');},15000);"
-    "},15000);}"
-    # Phase 3 - the panel: tick every requested format, consent, submit, and say what landed.
-    "function drivePanel(){"
-    "if(document.querySelector('a[href*=\"/Account/Login\"]')&&!document.querySelector('#submit-export')){"
-    "report('login',false,'Sign in to Ultra Librarian here (free); I will continue right after.');"
-    "try{var o=window.__STOCKROOM_OVERLAY__;o&&o.action({needsUser:true,"
-    "message:'Sign in to Ultra Librarian to download; the sign-in is remembered.'});}catch(e){}"
-    "return;}"
-    "var got=[],missed=[];"
-    "for(var i=0;i<SPECS.length;i++){var spec=SPECS[i];"
-    "expand(spec.accordion);"
-    "var box=formatBox(spec);"
-    "if(box&&setChecked(box)){got.push(spec.name);report(spec.key,true,spec.name+' selected');}"
-    "else{missed.push(spec.name);report(spec.key,false,'Could not select '+spec.name+' here.');}}"
-    "var okc=consent();"
-    "if(okc)report('consent',true,'Accepted the download consent.');"
-    # SUCCESS IS REPORTED BY WHAT OBSERVES IT: submit only when something is actually selected,
-    # and never claim a download for a format that was not ticked.
-    "if(!got.length){report('done',false,'Could not select '+missed.join(' or ')"
-    "+' on this page; pick the format and click Download Now.');return;}"
-    "var btn=document.querySelector('#submit-export');"
-    "if(!btn){report('done',false,'Selected '+got.join(' and ')"
-    "+', but the Download button is not on this page; click Download Now.');return;}"
-    "try{btn.click();}catch(e){}"
-    "if(missed.length){report('done',false,'Downloading '+got.join(' and ')+', but could NOT select '"
-    "+missed.join(' and ')+'. Grab that one by hand.');}"
-    "else{report('done',true,'Downloading '+got.join(' and ')+' together.');}}"
-    "if(onSearch())openFirstResult();else openPanel();"
-)
-
-
-def _ultralibrarian_format_specs_js(formats: list[str]) -> str:
-    """The requested formats as JS `{key,id,accordion,name,re}`. Only requested formats are
-    emitted, so a KiCad-only capture never mentions Altium (the only-requested-formats contract
-    the DigiKey driver already keeps)."""
-    out = []
-    for fmt in ("kicad", "altium"):
-        if fmt not in (formats or []):
-            continue
-        box_id, accordion, name = _UL_FORMAT_TARGETS[fmt]
-        # Anchored label fallback. `^KiCAD v6` deliberately excludes the "KiCAD v5" row above it.
-        pattern = "^KiCAD v6" if fmt == "kicad" else "^Altium Designer"
-        out.append(
-            "{key:%s,id:%s,accordion:%s,name:%s,re:/%s/i}"
-            % (json.dumps(fmt), json.dumps(box_id), json.dumps(accordion), json.dumps(name), pattern)
-        )
-    return "[" + ",".join(out) + "]"
-
-
-def _ultralibrarian_driver_js(formats: list[str]) -> str:
-    fmts = [f for f in ("kicad", "altium") if f in (formats or [])]
-    if not fmts:
-        return (
-            "(function(){try{var o=window.__STOCKROOM_OVERLAY__;"
-            "o&&o.report({step:'driver',ok:false,message:'Nothing to download for this part.'});}"
-            "catch(e){}})();"
-        )
-    body = (
-        _UL_HELPERS
-        + _UL_SELECT
-        + "var SPECS="
-        + _ultralibrarian_format_specs_js(fmts)
-        + ";"
-        + _UL_RUN
-    )
-    return f"(function(){{{body}}})();"
-
+# Ultra Librarian is NOT driven from here any more. Its capture lives in
+# `stockroom.capture.vendors.UltraLibrarianAdapter`, as ordinary Python driven by Playwright, so
+# there is exactly ONE Ultra Librarian implementation and it is the one the tests exercise on both
+# Linux and Windows. The JS driver that used to sit here was never proven end to end; the Python
+# one is (tests/backend/capture/test_capture_end_to_end.py, real browser + real download).
+# `tests/backend/capture/test_one_implementation_per_vendor.py` fails if a vendor ever grows a
+# second implementation again.
 
 def build_driver_js(vendor: str, formats: list[str], target_url: str = "") -> str:
     key = (vendor or "").strip().lower()
     if key == "digikey":
         return _digikey_driver_js(formats, target_url)
-    if key == "ultralibrarian":
-        return _ultralibrarian_driver_js(formats)
     spec = _VENDORS.get(key)
     if spec is None:
         # Guidance-only: never click anything, but tell the overlay so it can guide manually.

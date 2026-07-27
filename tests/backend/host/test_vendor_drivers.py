@@ -1,13 +1,19 @@
 from stockroom.host.vendor_drivers.drivers import build_driver_js
 
 
-def test_ultralibrarian_driver_targets_both_formats_and_is_guarded():
+def test_ultralibrarian_is_no_longer_driven_from_here():
+    """Ultra Librarian moved to `stockroom.capture.vendors.UltraLibrarianAdapter` - real Python,
+    driven by Playwright, tested against a captured fixture with a REAL download on Linux AND
+    Windows. There must be exactly one implementation per vendor, so asking this layer for it now
+    yields the guidance-only noop rather than a second, drifting copy.
+
+    The old test here asserted only that the strings "KiCad" and "Altium" appeared in a generated
+    script. It passed for months while every one of those selectors matched NOTHING on the real
+    page - which is precisely why the vendor was ported.
+    """
     js = build_driver_js("ultralibrarian", ["kicad", "altium"])
-    assert "KiCad" in js and "Altium" in js  # both format selections attempted
-    assert js.count("try") >= 3 and js.count("catch") >= 3  # each step guarded
-    assert "__STOCKROOM_OVERLAY__" in js  # reports back to the overlay bridge
-    stripped = js.strip()
-    assert stripped.startswith("(") and stripped.rstrip(";").endswith(")()")  # a self-contained IIFE
+    assert "__STOCKROOM_OVERLAY__" in js  # still tells the overlay something useful
+    assert ".click()" not in js  # but drives nothing: no second implementation lives here
 
 
 def test_snapeda_driver_is_built_for_snapeda():
@@ -199,8 +205,9 @@ def test_unknown_vendor_is_a_guidance_only_noop():
 
 
 def test_only_requested_formats_are_gated_in():
-    only_kicad = build_driver_js("ultralibrarian", ["kicad"])
-    # the config the script reads carries exactly the requested formats
+    # Re-pointed at DigiKey when Ultra Librarian moved to the Python adapter. The contract is the
+    # same and still worth guarding: a KiCad-only capture must never mention Altium.
+    only_kicad = build_driver_js("digikey", ["kicad"])
     assert '"kicad"' in only_kicad
     assert '"altium"' not in only_kicad
 
