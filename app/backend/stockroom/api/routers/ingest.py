@@ -220,7 +220,18 @@ def ingest_router(require_token) -> APIRouter:
             raise FileNotFoundError(f"no such part: {part_id}")
         pipeline = _make_pipeline(ctx)
         candidate = dto_to_candidate(body)
-        record = pipeline.attach_assets(part_id, candidate)
+        # WHERE these files came from. The guided flow knows which vendor page the person actually
+        # downloaded from; the server supplies the clock, because a provenance timestamp a client
+        # can set is not evidence.
+        from datetime import datetime, timezone
+
+        from stockroom.api.routers.library import _origin_from
+
+        record = pipeline.attach_assets(
+            part_id, candidate,
+            origin=_origin_from(body),
+            now_iso=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        )
         ctx.rebuild_index()
         ctx.auto_push()  # attaching assets changes the part, so push it like any other mutation
         return record.to_dict()

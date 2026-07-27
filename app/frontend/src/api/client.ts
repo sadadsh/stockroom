@@ -610,11 +610,18 @@ export const api = {
   // Attach a reviewed candidate's symbol/footprint/3D onto the existing part,
   // synchronously (one atomic Transaction). Only the assets the candidate actually
   // carries are touched; an already-present asset is left alone.
-  assetsCommit(partId: string, candidate: StagingCandidate): Promise<PartDetail> {
+  // `origin` records WHICH vendor page the files were downloaded from. The backend stamps the
+  // time; only the guided flow knows the vendor, so only it can send this. Omitted means the
+  // assets land honestly unattributed rather than claiming a blank source.
+  assetsCommit(
+    partId: string,
+    candidate: StagingCandidate,
+    origin?: { vendor: string; url: string },
+  ): Promise<PartDetail> {
     return request<PartDetail>(
       "POST",
       `/api/parts/${encodeURIComponent(partId)}/assets/commit`,
-      { body: candidate },
+      { body: origin ? { ...candidate, origin } : candidate },
     );
   },
 

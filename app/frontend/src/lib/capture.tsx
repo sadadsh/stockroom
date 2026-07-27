@@ -195,7 +195,11 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     if (!candidates || candidates.length === 0) {
       throw new Error("No usable KiCad symbol, footprint, or 3D model found in the download.");
     }
-    await api.assetsCommit(pid, candidates[0]);
+    // The vendor + page this capture actually opened, so the attached files record where they
+    // came from. Read from a ref rather than from `state`, because this callback is created once
+    // and would otherwise close over the state as it was at mount.
+    const src = originRef.current;
+    await api.assetsCommit(pid, candidates[0], src ?? undefined);
   }, []);
 
   const attachAltium = useCallback(async (paths: string[]) => {
@@ -342,6 +346,9 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     [attachKicad, attachAltium, markReceived, allReceived, invalidate, clearWatchdog, clearHandler, armCapture],
   );
 
+  // WHERE the active capture is downloading from, for provenance on whatever it attaches.
+  const originRef = useRef<{ vendor: string; url: string } | null>(null);
+
   const onCaptureRef = useRef(onCapture);
   useEffect(() => {
     onCaptureRef.current = onCapture;
@@ -380,6 +387,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, status: "unavailable", message: "No CAD source page for this part." }));
         return;
       }
+      originRef.current = { vendor: picked.key, url: picked.url };
       setState((s) => ({ ...s, url: picked.url, vendor: picked.label, received: {} }));
       const open = hostOpenCadDownload();
       const url = picked.url;

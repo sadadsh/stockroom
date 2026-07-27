@@ -300,3 +300,62 @@ def test_inspect_merges_a_bare_model_file_into_the_sole_candidate(tmp_path, fixt
     assert c.symbol_name == "TESTPART"
     assert c.model_path is not None
     assert not any("3D model" in g for g in c.gaps)
+
+
+# ------------------------------------------------- the guided capture path records its PROVENANCE
+#
+# `attach_symbol`/`attach_footprint` learned to record an origin, but the GUIDED flow does not use
+# them: it commits a downloaded archive through `attach_assets`, which files symbol + footprint +
+# 3D together. So every part captured through the surface the owner will spend a 90-part sitting
+# in still landed with `origin: None` -- which is the exact state their complaint is about
+# (*"its not trusted where we've gotten them"*). Wiring one attach path and not the one people
+# actually use is a half-shipped feature.
+
+
+def test_attach_assets_records_the_vendor_every_asset_came_from(tmp_path, fixtures_dir):
+    from stockroom.model.asset import AssetOrigin
+
+    pipe = _pipeline(tmp_path)
+    z = make_vendor_zip(tmp_path / "ul.zip", "ultralibrarian", fixtures_dir)
+    [c] = [x for x in pipe.inspect(inputs=[z], workdir=tmp_path / "work")][:1]
+    c.category = "ICs"
+    c.entry_name = "PROVENANCE"
+    _complete(c)
+    record = pipe.commit(c)
+
+    z2 = make_vendor_zip(tmp_path / "ul2.zip", "ultralibrarian", fixtures_dir)
+    [again] = [x for x in pipe.inspect(inputs=[z2], workdir=tmp_path / "work2")][:1]
+    again.entry_name = "PROVENANCE_V2"
+    updated = pipe.attach_assets(
+        record.id, again,
+        origin=AssetOrigin(vendor="ultralibrarian", url="https://ultralibrarian.com/x"),
+        now_iso="2026-07-27T13:00:00Z",
+    )
+
+    kicad = updated.assets_for("kicad")
+    for kind in ("symbol", "footprint", "model"):
+        asset = kicad.get(kind)
+        if asset is None or not asset.is_present():
+            continue
+        assert asset.origin is not None, f"{kind} landed unattributed"
+        assert asset.origin.vendor == "ultralibrarian"
+        assert asset.origin.captured_at == "2026-07-27T13:00:00Z"
+
+
+def test_attach_assets_with_no_origin_leaves_the_assets_unattributed(tmp_path, fixtures_dir):
+    """NEGATIVE CONTROL. A capture that recorded no vendor must not claim one -- `None` and "the
+    vendor is the empty string" are different assertions and only one of them is honest."""
+    pipe = _pipeline(tmp_path)
+    z = make_vendor_zip(tmp_path / "ul.zip", "ultralibrarian", fixtures_dir)
+    [c] = [x for x in pipe.inspect(inputs=[z], workdir=tmp_path / "work")][:1]
+    c.category = "ICs"
+    c.entry_name = "NOPROV"
+    _complete(c)
+    record = pipe.commit(c)
+
+    z2 = make_vendor_zip(tmp_path / "ul2.zip", "ultralibrarian", fixtures_dir)
+    [again] = [x for x in pipe.inspect(inputs=[z2], workdir=tmp_path / "work2")][:1]
+    again.entry_name = "NOPROV_V2"
+    updated = pipe.attach_assets(record.id, again)
+
+    assert updated.assets_for("kicad").symbol.origin is None
