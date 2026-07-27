@@ -1,0 +1,718 @@
+{
+  "alternates": {
+    "HTS Code (MX)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8533.21.01"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8533210100"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8533210020"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8533210030"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "8533.21.0030"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "https://www.mouser.com/images/yageo/images/CQ_x_NPO_DSL.jpg"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4205/AC-Series--SMD-Chip-Resistor.jpg"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "100"
+      },
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "1"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Order Multiple": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "100"
+      },
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "1"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Thick Film Resistors - SMD"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "Resistors"
+      }
+    ],
+    "Resistance": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "22Ω"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "22 Ohms"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant By Exemption"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Temperature Coefficient": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "±100ppm/℃"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "±100ppm/°C"
+      }
+    ],
+    "datasheet_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://datasheet.lcsc.com/datasheet/pdf/3511efb0564cb1711d9237ab09d6e97b.pdf?productCode=C226359"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "https://www.mouser.com/datasheet/3/508/1/PYU_AC_51_ROHS_L.pdf"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "https://yageogroup.com/content/datasheet/asset/file/PYU-AC_51_ROHS_L"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "22Ω 62.5mW 50V Thick Film Resistor ±100ppm/℃ ±1% 0402 Chip Resistor - Surface Mount RoHS"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Thick Film Resistors - SMD 22 Ohms 1/16 W 50 V 1% 0402 100 PPM / C - 55 C + 155 C AEC-Q200"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "RES SMD 22 OHM 1% 1/16W 0402"
+      }
+    ],
+    "lead_time": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "84 Days"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "20"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C226359.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/category/1199.html?scene=FULL_MATCH&globalKeyword=AC0402FR-0722RL&s_z=n_q_AC0402FR-0722RL"
+      }
+    ]
+  },
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "ac0402fr_0722rl.pdf",
+    "source_url": ""
+  },
+  "description": "22Ω 62.5mW 50V Thick Film Resistor ±100ppm/℃ ±1% 0402 Chip Resistor - Surface Mount RoHS",
+  "display_name": "22Ω ±1% 0402",
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Resistors",
+        "name": "AC0402FR-0722RL"
+      },
+      "model": {
+        "file": "models/AC0402FR-0722RL.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Resistors",
+        "name": "AC0402FR-0722RL"
+      }
+    }
+  },
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "BRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Composition": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Features": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Height - Seated (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Is Asian Brand": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "KRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number of Terminations": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Power (Watts)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Power(Watts)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Resistance": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Size / Dimension": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Temperature Coefficient": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Tolerance": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Voltage Rating": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight Foreign (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "ac0402fr_0722rl",
+  "manufacturer": "YAGEO",
+  "mpn": "AC0402FR-0722RL",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.001057143,
+          "qty": 20
+        },
+        {
+          "price": 0.000828571,
+          "qty": 20000
+        },
+        {
+          "price": 0.0007,
+          "qty": 60000
+        },
+        {
+          "price": 0.000557143,
+          "qty": 200000
+        },
+        {
+          "price": 0.000471429,
+          "qty": 1000000
+        },
+        {
+          "price": 0.000471429,
+          "qty": 1004000
+        }
+      ],
+      "stock": 44801,
+      "url": "https://www.lcsc.com/product-detail/C226359.html",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Assembly Country of Origin": "Not available",
+    "Available On Reel": "Yes",
+    "BRHTS": "85332120",
+    "Brand Id": "396",
+    "Catalog Id": "1199",
+    "Composition": "Thick Film",
+    "Contains Battery": "No",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "Currency Symbol": "$",
+    "Currency Type": "USD",
+    "ECCN": "EAR99",
+    "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/fafd024f554e426eb74cf4a204aa88b0.svg?t=1732211419",
+    "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/328b8eb43262423bb89b1aa1c4e4ac20.svg?t=1732211419",
+    "Features": "Automotive AEC-Q200, Moisture Resistant",
+    "HTS Code (BR)": "85332110",
+    "HTS Code (CA)": "8533210000",
+    "HTS Code (CN)": "8533211000",
+    "HTS Code (EU TARIC)": "8533210000",
+    "HTS Code (IN)": "85332111",
+    "HTS Code (JP)": "853321000",
+    "HTS Code (MX)": "8533.21.01",
+    "HTS Code (TARIC)": "8533210000",
+    "HTS Code (US)": "8533210020",
+    "Has Third Party Stock": "No",
+    "Height - Seated (Max)": "0.015\" (0.37mm)",
+    "Image": "https://www.mouser.com/images/yageo/images/CQ_x_NPO_DSL.jpg",
+    "Is Asian Brand": "Yes",
+    "Is Cable Category": "No",
+    "Is Foreign Display": "Yes",
+    "Is Foreign Onsale": "Yes",
+    "Is Infringement": "No",
+    "Is Mro": "No",
+    "Is Not Overstock": "No",
+    "Is Real Price": "Yes",
+    "Is Show Foreign Price": "Yes",
+    "KRHTS": "8533219000",
+    "Key Attributes": "RES 22Ω ±1% 62.5mW 0402",
+    "LCSC Category": "Chip Resistor - Surface Mount",
+    "LCSC Category Path": "Passives > Resistors",
+    "LCSC Parent Category": "Resistors",
+    "LCSC Product ID": "227129",
+    "LCSC Product Name": "RES 22Ω ±1% 62.5mW 0402",
+    "LCSC Title": "YAGEO AC0402FR-0722RL",
+    "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
+    "Lead Time": "84 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "100",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Number of Terminations": "2",
+    "Operating Temperature": "-55°C ~ 155°C",
+    "Order Multiple": "100",
+    "Package": "0402",
+    "Package / Case": "0402 (1005 Metric)",
+    "Package Quantity": "10000",
+    "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
+    "Packaging": "Tape & Reel (TR)",
+    "Parent Catalog Id": "308",
+    "Popular Part": "No",
+    "Power (Watts)": "0.063W, 1/16W",
+    "Power(Watts)": "62.5mW",
+    "Pre-Sale": "No",
+    "Product Category": "Thick Film Resistors - SMD",
+    "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20251111_YAGEO-AC0402FR-0722RL_C226359_front.jpg",
+    "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20251111_YAGEO-AC0402FR-0722RL_C226359_back.jpg",
+    "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20251111_YAGEO-AC0402FR-0722RL_C226359_blank.jpg",
+    "REACH": "REACH Unaffected",
+    "Reel Setup Fee": "3",
+    "Resistance": "22Ω",
+    "RoHS": "Yes",
+    "Series": "AC",
+    "Size / Dimension": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)",
+    "Standard Pack Qty": "10000",
+    "Stock": "0",
+    "Stock (Domestic)": "0",
+    "Stock (Overseas)": "0",
+    "Stock (Shenzhen)": "0",
+    "Supplier Device Package": "0402",
+    "Temperature Coefficient": "±100ppm/℃",
+    "Tolerance": "±1%",
+    "Type": "Thick Film Resistor",
+    "Unit": "Piece",
+    "Unit Weight (kg)": "6.5e-07",
+    "Voltage Rating": "50V",
+    "Weight": "0.009",
+    "Weight (kg)": "9e-06",
+    "Weight Foreign (kg)": "0",
+    "Wm Catalog Id": "1199"
+  },
+  "tags": [],
+  "value": ""
+}
