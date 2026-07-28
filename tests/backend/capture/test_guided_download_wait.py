@@ -302,7 +302,7 @@ def test_altium_libraries_in_a_download_are_attached_not_dropped(monkeypatch, tm
     record = _AltiumRecord()
     seen: dict = {}
 
-    def fake_attach(part_id, *sources):
+    def fake_attach(part_id, *sources, origin=None, now_iso=""):
         seen["part_id"] = part_id
         seen["suffixes"] = sorted(p.suffix.lower() for p in sources)
         # what the real seam does: bind each side it could read, then hand back the record
@@ -340,7 +340,7 @@ def test_only_the_side_the_record_actually_holds_is_reported(monkeypatch, tmp_pa
     bundle = _zip_with(tmp_path, {"PART.SchLib": b"altium-symbol"})
     record = _AltiumRecord()
 
-    def fake_attach(part_id, *sources):
+    def fake_attach(part_id, *sources, origin=None, now_iso=""):
         record.altium = {"symbol": _BoundAsset()}  # footprint deliberately NOT bound
         return record
 
@@ -399,7 +399,7 @@ def test_a_failing_altium_attach_is_a_row_not_a_crash(monkeypatch, tmp_path):
                   on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
                   pipeline=_Pipeline())
 
-    def boom(part_id, *sources):
+    def boom(part_id, *sources, origin=None, now_iso=""):
         raise RuntimeError("normalize refused the file")
 
     src._attach_altium = boom

@@ -69,19 +69,29 @@ _CONTROLS_JS = r"""
     if (seen.indexOf(el) >= 0) return;
     seen.push(el);
     const attrs = {};
+    const secret = el.tagName === 'INPUT'
+      && /^(password|hidden)$/i.test(el.getAttribute('type') || '');
     try {
       for (const a of el.attributes) {
-        if (/^(id|name|type|href|value|for|aria-label|role|checked|disabled)$/.test(a.name)
+        // NEVER read the value of a password or hidden field. `value` is otherwise the most useful
+        // attribute here (it names a radio's choice), so it is excluded per-element rather than
+        // dropped for everyone - the same rule capturerec.py already applies to recorded fields.
+        if (a.name === 'value' && secret) continue;
+        if (/^(id|name|type|href|value|for|aria-label|role|checked|disabled|placeholder)$/.test(a.name)
             || a.name.indexOf('data-') === 0) attrs[a.name] = String(a.value).slice(0, 120);
       }
     } catch (e) {}
     out.push({why, tag: el.tagName.toLowerCase(), selector: sel(el), visible: vis(el),
               text: txt(el), attrs});
   };
-  for (const el of document.querySelectorAll('a,button,input,select,label,[role=button],[role=tab]')) {
+  // EVERY field, unconditionally. Filtering inputs through the keyword regex made this tool blind
+  // to exactly the controls a sign-in needs: a bare `input[type=email]` carries no matching text,
+  // so a login form surveyed as "12 controls, all marketing links" while its two fields sat right
+  // there (measured on SnapMagic's login page, 2026-07-27). A field is a control by definition.
+  for (const el of document.querySelectorAll('a,button,input,select,textarea,label,[role=button],[role=tab]')) {
     const type = (el.getAttribute('type') || '').toLowerCase();
-    if (el.tagName === 'INPUT' && (type === 'radio' || type === 'checkbox')) { push(el, 'choice:' + type); continue; }
-    if (el.tagName === 'SELECT') { push(el, 'choice:select'); continue; }
+    if (el.tagName === 'INPUT') { push(el, 'field:' + (type || 'text')); continue; }
+    if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') { push(el, 'field:' + el.tagName.toLowerCase()); continue; }
     if (KEY.test(txt(el) + ' ' + el.outerHTML.slice(0, 300))) push(el, 'keyword');
   }
   const groups = {};
@@ -112,10 +122,18 @@ def _print_controls(data: dict) -> None:
             print(f"  {count:>3}x  name={name!r}")
     else:
         print("\nRADIO GROUPS  none (choices here are not mutually exclusive)")
-    shown = [c for c in (data.get("controls") or []) if c.get("visible")]
-    hidden = len(data.get("controls") or []) - len(shown)
-    print(f"\nCONTROLS  {len(shown)} visible ({hidden} hidden)")
-    for c in shown:
+    all_controls = data.get("controls") or []
+    shown = [c for c in all_controls if c.get("visible")]
+    hidden = [c for c in all_controls if not c.get("visible")]
+    # A hidden FIELD is the interesting kind of hidden: a sign-in form sitting inside a modal that
+    # has not been opened is invisible and is exactly what a survey is looking for. Hidden links
+    # stay collapsed to a count, because a page carries dozens and none of them explain anything.
+    hidden_fields = [c for c in hidden if str(c.get("why", "")).startswith("field:")]
+    print(f"\nCONTROLS  {len(shown)} visible ({len(hidden)} hidden, "
+          f"{len(hidden_fields)} of them fields)")
+    for c in shown + hidden_fields:
+        if not c.get("visible"):
+            print("  (hidden)")
         print(f"  [{c['why']}] {c['selector']}")
         if c.get("text"):
             print(f"        text: {c['text']}")
@@ -251,6 +269,12 @@ def main() -> int:
     ap.add_argument("--profile", default="", help="persistent profile dir (keeps a sign-in)")
     ap.add_argument("--headed", action="store_true", help="show the browser (to sign in by hand)")
     ap.add_argument(
+        "--panel",
+        action="store_true",
+        help="with --vendor/--mpn: run the adapter's own open_panel() first, so --controls reports "
+        "the DOWNLOAD MODAL rather than the landing page the modal sits behind",
+    )
+    ap.add_argument(
         "--drive",
         default="",
         metavar="FORMATS",
@@ -305,6 +329,27 @@ def main() -> int:
                       "what follows may be a partial page")
         else:
             page.wait_for_load_state("networkidle", timeout=int(args.timeout * 1000))
+
+        if args.panel:
+            # Through the ADAPTER'S OWN open_panel, never a hand-written click here. A vendor's
+            # format controls live behind a search hit and a modal, so a survey of the landing page
+            # reports 12 marketing links and says nothing about the buttons an adapter targets -
+            # which is how SnapMagic's KiCad selectors stayed a guess. Using the production method
+            # also means what is surveyed is what the app will actually see.
+            from stockroom.capture.vendors import get_adapter
+
+            adapter = get_adapter(args.vendor)
+            if adapter is None:
+                raise SystemExit(f"no capture adapter for vendor {args.vendor!r}")
+            _sign_in_if_saved(adapter, page)
+            # BACK TO THE PART. Signing in navigates to the vendor's own landing page, so opening
+            # the panel straight afterwards surveys the home page and reports "no download control
+            # for this part" - true of the page it was looking at, and nothing to do with the part.
+            # Production does not hit this because it signs in once when the session opens and
+            # `drive_formats` navigates per format; the tool has to do the same by hand.
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            blocked = adapter.open_panel(page)
+            print(f"PANEL  {blocked or 'open'}")
 
         text = re.sub(r"\n{2,}", "\n", page.inner_text("body"))
         print(f"url: {page.url}")

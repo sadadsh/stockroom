@@ -557,14 +557,109 @@ class SnapMagicAdapter:
                 return source.url
         return ""
 
+    _LOGIN_URL = "https://www.snapeda.com/account/login/"
+
     def signed_in(self, page) -> bool:
-        """A signed-in SnapEDA session shows an account menu instead of a Login link."""
+        """A signed-in SnapMagic session shows a logout link and no login link.
+
+        BOTH halves are required, and the reason is the same one Ultra Librarian's `signed_in`
+        records: a check built on the ABSENCE of one element cannot tell a signed-in page from a
+        page that simply has no header. The logout link is the positive signal.
+        """
         try:
             if page.locator("a[href*='/account/login']").count() > 0:
                 return False
             return page.locator("a[href*='/account/logout'], a[href*='logout']").count() > 0
         except Exception:  # noqa: BLE001 - an unreadable page is not a signed-in one
             return False
+
+    def sign_in(self, page, username: str, password: str) -> str:
+        """Sign in so a whole-library run is unattended. "" on success, else a readable reason.
+
+        WHY THIS EXISTS, and it is not a nicety. Measured live 2026-07-27 with `scripts/webread.py
+        --vendor snapmagic --panel --controls`: signed OUT, the download modal opens and renders
+        every format button - but EVERY ONE of them is an anchor whose href is
+        `/account/signup/?next=...`. So a signed-out drive clicks "Altium", navigates to a signup
+        page, and waits out its full 120s backstop having downloaded nothing. The adapter declared
+        `needs_login=True` and shipped no `sign_in` at all, so saved credentials were never used and
+        the failure looked like a vendor limitation. It is not one.
+
+        MEASURED FORM (enumerated on the live page, 2026-07-27): a Django login carrying
+        `#id_username` ("Username or Email"), `#id_password` and `input[type=submit].btn-submit`,
+        all HIDDEN until the header's `a.ls-btn.login-btn` opens the panel - which is why they were
+        invisible to a control survey that only reported visible elements. Filling and submitting
+        the REAL form is deliberate: Django posts a `csrfmiddlewaretoken` with it, so a hand-built
+        POST would be rejected and would also be a second implementation of signing in.
+        """
+        if not username or not password:
+            return "no SnapMagic credentials are saved in Settings"
+        try:
+            page.goto(self._LOGIN_URL, wait_until="domcontentloaded")
+            if self.signed_in(page):
+                return ""
+            user_box = page.locator("#id_username").first
+            if user_box.count() == 0:
+                return "SnapMagic showed no sign-in form"
+            if not user_box.is_visible():
+                # the fields exist in the DOM but live behind the header's Log In control
+                opener = page.locator("a.ls-btn.login-btn").first
+                if opener.count():
+                    opener.click()
+            user_box.wait_for(state="visible", timeout=20_000)
+            user_box.fill(username)
+            page.locator("#id_password").first.fill(password)
+            # The click's OWN navigation wait must not decide anything: navigating away IS the
+            # expected outcome, and letting a click timeout stand for a verdict is how a successful
+            # login gets reported as a failure. `_await_sign_in` polls signals that mean something.
+            try:
+                page.locator("input[type=submit].btn-submit").first.click(timeout=15_000)
+            except Exception:  # noqa: BLE001 - navigating away IS the point of this click
+                pass
+            return self._await_sign_in(page)
+        except Exception as exc:  # noqa: BLE001 - a failed sign-in is a row, not a crash
+            return f"could not sign in to SnapMagic: {exc}"
+
+    def _await_sign_in(self, page, timeout_s: float = 30.0) -> str:
+        """Poll the two REAL signals after submitting. "" once signed in.
+
+        NEVER a fixed sleep followed by one look, and never the absence of one element on its own.
+        Both signals are what the live pages actually do:
+          * SUCCESS - a logout link is present and no login link is (`signed_in`). Ends the wait the
+            instant it is true, so a fast login costs nothing.
+          * FAILURE - the password field is on screen AGAIN. Django re-renders the login form with
+            an error on a rejected credential, so the field coming back IS the rejection, available
+            immediately rather than at the end of a clock.
+        The timeout is only a backstop for a site that never answers either way.
+        """
+        import time as _time
+
+        # LET THE SUBMIT LAND FIRST. The failure signal is "the login form is on screen again", and
+        # the form is ALSO on screen for the fraction of a second between clicking submit and the
+        # response rendering - so polling immediately reads the PRE-navigation DOM and returns
+        # "did not accept the saved credentials" for a login still in flight. Measured 2026-07-27:
+        # the verdict came back while `page.title()` still read "Loading ...".
+        try:
+            page.wait_for_load_state("domcontentloaded", timeout=int(timeout_s * 1000))
+        except Exception:  # noqa: BLE001 - a slow settle is not a verdict either
+            pass
+
+        deadline = _time.monotonic() + timeout_s
+        while _time.monotonic() < deadline:
+            if self.signed_in(page):
+                return ""
+            try:
+                # Both halves, because a visible password box alone is just the form. Django
+                # re-renders it WITH an error, and on success the URL leaves /account/login.
+                on_login = "/account/login" in (page.url or "")
+                box = page.locator("#id_password")
+                if on_login and box.count() > 0 and box.first.is_visible():
+                    body = (page.inner_text("body") or "").lower()
+                    if "correct username" in body or "incorrect" in body or "invalid" in body:
+                        return "SnapMagic did not accept the saved credentials"
+            except Exception:  # noqa: BLE001 - a page mid-navigation is not a verdict
+                pass
+            page.wait_for_timeout(400)
+        return "SnapMagic did not confirm the sign-in"
 
     def open_panel(self, page) -> str:
         """Search -> part page -> the "Choose Download Format" modal. "" when the formats are up."""

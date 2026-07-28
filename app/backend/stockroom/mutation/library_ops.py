@@ -757,13 +757,24 @@ class LibraryOps:
             "migration_blocked": migration_blocked,
         }
 
-    def attach_altium_assets(self, part_id: str, *sources) -> PartRecord:
+    def attach_altium_assets(
+        self, part_id: str, *sources,
+        origin: AssetOrigin | None = None, now_iso: str = "",
+    ) -> PartRecord:
         """Store a part's Altium assets verbatim under <profile>/altium/ and set
         altium_symbol/altium_footprint. `*sources` is EITHER a loose .SchLib + .PcbLib pair OR
         a single compiled .IntLib (auto-extracted in pure Python, no Altium). Only the loose
         .SchLib/.PcbLib are stored; the .IntLib is not. One atomic commit; on any error every
         touched path is restored (zero trace). Fails loud if the source cannot be normalized or
-        an entry name cannot be read (part left untouched)."""
+        an entry name cannot be read (part left untouched).
+
+        `origin` records WHERE these files came from, exactly as `attach_symbol` and
+        `IngestPipeline.attach_assets` already do for KiCad. Without it a guided capture filed a
+        real Altium library with `origin: None` - the same unattributed state the owner objected to
+        (*"its not trusted where we've gotten them"*) - so the provenance story held for one tool
+        and quietly did not for the other. Omitted still means honestly UNATTRIBUTED, and
+        `captured_at` is stamped HERE rather than taken from a caller, because a timestamp the
+        caller chooses is not evidence of when anything was captured."""
         from stockroom.altium.extract import normalize_altium_source
         from stockroom.altium.oleread import pick_entry, read_footprint_names, read_symbol_names
 
@@ -795,19 +806,39 @@ class LibraryOps:
                 landed: list[str] = []
                 # track EACH file right after its copy so a failure of the second copy still
                 # rolls back the first (no leaked .SchLib on a partial failure)
+                def _filed(ref: AssetRef):
+                    """The asset to file: bare when nobody recorded a source, attributed when
+                    they did. A bare ref is `Asset.of`-wrapped with `origin=None` downstream,
+                    which is the honest shape for "attached, provenance unknown" - an empty
+                    vendor string would read as a vendor named "".
+                    """
+                    if origin is None:
+                        return ref
+                    return Asset(
+                        ref=ref,
+                        origin=AssetOrigin(
+                            vendor=origin.vendor, url=origin.url,
+                            captured_at=now_iso or _utc_now(), extra=dict(origin.extra),
+                        ),
+                    )
+
                 if sch_src is not None:
                     sch_dst = altium_dir / f"{part_id}.SchLib"
                     shutil.copyfile(sch_src, sch_dst)
                     txn.track(sch_dst)
                     # pick_entry returns None when the library names no entry; an AssetRef holds
                     # strings, and a None name would read as "attached but unnamed".
-                    _altium(record).symbol = AssetRef(lib=sch_dst.name, name=sym_name or "")
+                    _altium(record).symbol = _filed(
+                        AssetRef(lib=sch_dst.name, name=sym_name or "")
+                    )
                     landed.append(sym_name or sch_dst.name)
                 if pcb_src is not None:
                     pcb_dst = altium_dir / f"{part_id}.PcbLib"
                     shutil.copyfile(pcb_src, pcb_dst)
                     txn.track(pcb_dst)
-                    _altium(record).footprint = AssetRef(lib=pcb_dst.name, name=fp_name or "")
+                    _altium(record).footprint = _filed(
+                        AssetRef(lib=pcb_dst.name, name=fp_name or "")
+                    )
                     landed.append(fp_name or pcb_dst.name)
                 json_path.write_text(record.dumps(), encoding="utf-8")
                 txn.track(json_path)

@@ -448,7 +448,7 @@ class GuidedCaptureSource:
         finally:
             pipeline.cleanup()
 
-        offered.extend(self._attach_altium_assets(record, landed, failures))
+        offered.extend(self._attach_altium_assets(record, landed, failures, origin))
 
         if offered:
             return SourceOutcome(satisfied=tuple(offered))
@@ -461,7 +461,9 @@ class GuidedCaptureSource:
             )
         )
 
-    def _attach_altium_assets(self, record, landed, failures: list[str]) -> list[Requirement]:
+    def _attach_altium_assets(
+        self, record, landed, failures: list[str], origin=None
+    ) -> list[Requirement]:
         """Attach any Altium libraries in the download, and report what the RECORD then holds.
 
         Reports from the record rather than from what was requested, because
@@ -478,7 +480,12 @@ class GuidedCaptureSource:
         if not sources:
             return []
         try:
-            updated = self._run_write(lambda: self._attach_altium(record.id, *sources))
+            # The SAME origin the KiCad half files. Without it a guided capture recorded where its
+            # symbol came from and left the Altium library beside it unattributed, which is the
+            # provenance story holding for one tool and quietly not the other.
+            updated = self._run_write(
+                lambda: self._attach_altium(record.id, *sources, origin=origin)
+            )
         except Exception as exc:  # noqa: BLE001 - atomic: a failure leaves the part untouched
             failures.append(f"could not attach the Altium libraries: {exc}")
             return []
