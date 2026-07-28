@@ -679,6 +679,31 @@ describe("IngestPage — unified Add A Part", () => {
     );
     await user.click(screen.getByRole("button", { name: "Look Up" }));
     expect(await screen.findByText(/Nothing was pulled/i)).toBeInTheDocument();
+    expect(screen.queryByText("Review and Add")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add to Components" })).toBeNull();
+  });
+
+  it("rejects a near or identity-free MPN result without staging a blank replacement", async () => {
+    mockApi.enrichPart.mockResolvedValue({ job_id: "e1" });
+    mockApi.openJobStream.mockResolvedValue(
+      enrichStream({
+        ...EMPTY_RESULT,
+        add_plan: null,
+        mpn: sf("US1M"),
+        manufacturer: sf("R+O"),
+        specs: { product_url: sf("https://www.lcsc.com/product-detail/C7420317.html") },
+      }),
+    );
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Product link or part number"), "S1M");
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+
+    expect(await screen.findByText(/No exact manufacturer and part-number match was proven/i))
+      .toBeInTheDocument();
+    expect(screen.getByText("S1M")).toBeInTheDocument();
+    expect(screen.queryByText("Review and Add")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add to Components" })).toBeNull();
   });
 
   it("names the missing API key when a Mouser link pulls nothing and no key is set", async () => {
