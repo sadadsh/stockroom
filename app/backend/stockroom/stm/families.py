@@ -18,7 +18,7 @@ import re
 
 # routing-identity -> canonical destination net (confirm against the vault
 # Connector Contract / Net Naming Contract). Defaults to the switch-engine map.
-# NOT ported here: the legacy routing-identity net map is NETDECK switch-fabric
+# NOT ported here: the legacy project-specific routing-identity net map is
 # vocabulary, explicitly excluded from stm/ per INTERFACES.md section 6's
 # reuse map (its DO-NOT-REUSE row) - the import-boundary test greps stm/ for
 # the literal legacy identifier, so it is deliberately not spelled out here.

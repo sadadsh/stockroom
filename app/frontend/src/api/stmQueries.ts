@@ -12,7 +12,12 @@
 import { useCallback } from "react";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { api, type StmMcusArgs } from "./client";
-import type { AfCheckBody, CompatUnionBody, StmStatusDTO } from "./types";
+import type {
+  AfCheckBody,
+  CompatUnionBody,
+  StmStatusDTO,
+  TargetDefinitionBody,
+} from "./types";
 import { useJob } from "../lib/useJob";
 
 // The build/source/stamp state. retry:false so a 409 (index not built) resolves to an error
@@ -81,6 +86,15 @@ export function useBuildStmIndex() {
 export function useStmCompatUnion() {
   return useMutation({
     mutationFn: (body: CompatUnionBody) => api.postStmCompatUnion(body),
+  });
+}
+
+// A target definition is a synchronous, content-addressed computation over an
+// explicit part set and policy. Like the compatibility union it is ephemeral
+// server state, so the caller owns when it is compiled and exported.
+export function useStmTargetDefinition() {
+  return useMutation({
+    mutationFn: (body: TargetDefinitionBody) => api.postStmTargetDefinition(body),
   });
 }
 

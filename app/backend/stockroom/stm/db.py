@@ -320,7 +320,7 @@ def parse_gpio_ip_xml(ip_dir: Path, version: str) -> dict[str, list[tuple[str, i
 # ─────────────────────────────────────────────────────────────────────────────
 # Classify — a pin's electrical class, canonical name, and roles
 # (REUSE VERBATIM from legacy/tools/stm32_db.py:143-250 - generic per-pin-nature
-# classifiers, nothing NETDECK/switch-fabric-specific)
+# classifiers, nothing project-specific)
 # ─────────────────────────────────────────────────────────────────────────────
 _PORT = re.compile(r"^P([A-Z])(\d{1,2})")
 

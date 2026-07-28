@@ -25,7 +25,8 @@ Usage
 the Specifications column collapses below ~1166px, so shooting at 1100 reproduces the
 clipping the owner reported without touching a real window.
 
-Exit code is non-zero if a requested surface could not be reached, so this can gate.
+Exit code is non-zero if a requested surface could not be reached or the browser reports an
+uncaught console error, failed request, or server error, so this can gate.
 """
 from __future__ import annotations
 
@@ -38,6 +39,15 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = REPO / "build" / "shots"
 DEFAULT_LIB = REPO / "libraries"
+_SURFACE_CHOICES = (
+    "components",
+    "search",
+    "part-vendor-data",
+    "ingest",
+    "settings",
+    "all",
+)
+_ALL_SURFACES = ("components", "search", "settings")
 
 # Token probe: the values a visual regression most often silently breaks. Reported with
 # every run so a shot is never interpreted against an unknown token state.
@@ -156,6 +166,22 @@ def _api_path(url: str) -> str:
     return parts.path or url
 
 
+def _browser_failures(console: list[str], http: dict[str, int]) -> list[str]:
+    """Return browser observations that invalidate a screenshot as passing evidence.
+
+    A 4xx can be an honest missing-preview state and remains diagnostic-only.  An uncaught console
+    error, transport failure, or 5xx means the app broke underneath the pixels and must affect the
+    process exit status rather than merely appearing in a line a caller can miss.
+    """
+    failures = [f"browser console errors ({len(console)})"] if console else []
+    failures.extend(
+        f"{label} x{count}"
+        for label, count in sorted(http.items())
+        if label.startswith("FAILED ") or label.startswith("5")
+    )
+    return failures
+
+
 def _vanishes(locator, timeout_ms: int = _UI_TIMEOUT_MS) -> bool:
     """True once `locator` is gone. The closing twin of `_appears`: dismissing a modal and then
     clicking what it covered has to wait on the modal ACTUALLY being gone, not on a sleep."""
@@ -186,30 +212,8 @@ def _appears(locator, timeout_ms: int = _UI_TIMEOUT_MS) -> bool:
         return False
 
 
-# The `lib_symbols` block a real .kicad_sch always carries: KiCad copies every symbol it places
-# INTO the file, so the sheet stands alone. The seed omitted it, and kicanvas threw
-# `Cannot read properties of undefined (reading 'by_name')` out of `get lib_symbol` on EVERY
-# Projects shot - so the viewer in those screenshots had crashed mid-paint and nobody could tell.
-# Proven not to be a viewer bug: the same vendored bundle paints KiCad 10's own pic_programmer
-# demo (.kicad_sch 20260101 and .kicad_pcb 20260206) with zero console errors.
-# Text is Device:R and Device:C verbatim from KiCad 10.0.4's `Device.kicad_sym`, whitespace
-# collapsed and renamed to the lib-id form a schematic uses.
-_LIB_SYMBOLS = (
-    "\t(lib_symbols\n"
-    "\t\t(symbol \"Device:R\" (pin_numbers (hide yes)) (pin_names (offset 0)) (exclude_from_sim no) (in_bom yes) (on_board yes) (property \"Reference\" \"R\" (at 2.032 0 90) (effects (font (size 1.27 1.27)))) (property \"Value\" \"R\" (at 0 0 90) (effects (font (size 1.27 1.27)))) (property \"Footprint\" \"\" (at -1.778 0 90) (effects (font (size 1.27 1.27)) (hide yes))) (property \"Datasheet\" \"~\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"Description\" \"Resistor\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"ki_keywords\" \"R res resistor\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"ki_fp_filters\" \"R_*\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (symbol \"R_0_1\" (rectangle (start -1.016 -2.54) (end 1.016 2.54) (stroke (width 0.254) (type default)) (fill (type none)))) (symbol \"R_1_1\" (pin passive line (at 0 3.81 270) (length 1.27) (name \"~\" (effects (font (size 1.27 1.27)))) (number \"1\" (effects (font (size 1.27 1.27))))) (pin passive line (at 0 -3.81 90) (length 1.27) (name \"~\" (effects (font (size 1.27 1.27)))) (number \"2\" (effects (font (size 1.27 1.27)))))) (embedded_fonts no))\n"
-    "\t\t(symbol \"Device:C\" (pin_numbers (hide yes)) (pin_names (offset 0.254)) (exclude_from_sim no) (in_bom yes) (on_board yes) (property \"Reference\" \"C\" (at 0.635 2.54 0) (effects (font (size 1.27 1.27)) (justify left))) (property \"Value\" \"C\" (at 0.635 -2.54 0) (effects (font (size 1.27 1.27)) (justify left))) (property \"Footprint\" \"\" (at 0.9652 -3.81 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"Datasheet\" \"~\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"Description\" \"Unpolarized capacitor\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"ki_keywords\" \"cap capacitor\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"ki_fp_filters\" \"C_*\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (symbol \"C_0_1\" (polyline (pts (xy -2.032 0.762) (xy 2.032 0.762)) (stroke (width 0.508) (type default)) (fill (type none))) (polyline (pts (xy -2.032 -0.762) (xy 2.032 -0.762)) (stroke (width 0.508) (type default)) (fill (type none)))) (symbol \"C_1_1\" (pin passive line (at 0 3.81 270) (length 2.794) (name \"~\" (effects (font (size 1.27 1.27)))) (number \"1\" (effects (font (size 1.27 1.27))))) (pin passive line (at 0 -3.81 90) (length 2.794) (name \"~\" (effects (font (size 1.27 1.27)))) (number \"2\" (effects (font (size 1.27 1.27)))))) (embedded_fonts no))\n"
-    "\t)\n"
-)
-
-
-def _seed_workspace(base: Path, source: Path | None = None) -> tuple[Path, Path]:
-    """Build a throwaway library + KiCad project so the PROJECT surfaces can actually be shot.
-
-    Without this, `--surface projects` only ever reaches "No projects are registered.", so the Health
-    tab (Prepare, Assign Components, Rules Check, BOM) was not visually verifiable at all and a
-    screenshot of it proved nothing. The seed is deliberately the awkward real-world case rather than
-    a tidy one: the schematic's passives are placed from KiCad's DEFAULT library, so they carry the
-    generic `Device:R` symbol that identifies no part, which is exactly what the assign surface is for.
+def _seed_workspace(base: Path, source: Path | None = None) -> Path:
+    """Build a throwaway component library for safe, representative screenshots.
 
     `source` is the library to COPY (default: the real one). It exists because `--library` used to
     be accepted and then silently ignored whenever the seed ran -- and `--click` implies the seed,
@@ -218,7 +222,7 @@ def _seed_workspace(base: Path, source: Path | None = None) -> tuple[Path, Path]
     "holds no CAD files of its own", which looked like a backend bug and was the flag being dropped.
     A flag that is accepted and ignored is worse than no flag.
 
-    Returns (libraries_root, project_dir). Both live under `base`, never in the owner's real library.
+    The returned library lives under `base`, never in the owner's real library.
     """
     import shutil
     import subprocess
@@ -227,6 +231,7 @@ def _seed_workspace(base: Path, source: Path | None = None) -> tuple[Path, Path]
     shutil.copytree(source or DEFAULT_LIB, libs)
     parts = libs / "Stockroom" / "parts"
     parts.mkdir(parents=True, exist_ok=True)
+    profile = libs / "Stockroom"
     # Two library resistors that are genuinely hard to tell apart: same value and package, different
     # tolerance. Neither may ever be auto-assigned, and both must be offered as candidates.
     for pid, mpn, tol, tier in (("r10k1", "RC0402FR-0710KL", "1%", "1005Metric"),
@@ -247,6 +252,43 @@ def _seed_workspace(base: Path, source: Path | None = None) -> tuple[Path, Path]
                           "footprint": {"lib": "Capacitor_SMD", "name": "C_0402_1005Metric"}}},
         "specs": {"Capacitance": "100 nF", "Package": "0402"},
     }, indent=2), encoding="utf-8")
+
+    # A REAL all-projection probe. Layout-only seed parts made the inspection workspace look busy
+    # while leaving Symbol, Footprint and 3D impossible to exercise. The first attempt copied the
+    # repository's `minimal` fixtures; those are parser fixtures, deliberately valid but carrying
+    # NO symbol graphics and only two anonymous pads. The modal therefore rendered an honestly
+    # blank Symbol stage and a Footprint that could not prove silk, labels, or scaling.
+    #
+    # Reference KiCad's installed production Device:R and real 0603 footprint, then copy only its
+    # STEP into the disposable library (the model endpoint intentionally serves owned files). This
+    # exercises the same stock-library resolution and toolchain a passive user record sees.
+    kicad_share = Path(r"C:\Program Files\KiCad\10.0\share\kicad")
+    installed_model = (
+        kicad_share / "3dmodels" / "Resistor_SMD.3dshapes" / "R_0603_1608Metric.step"
+    )
+    if installed_model.exists():
+        model_dir = profile / "models"
+        model_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(installed_model, model_dir / installed_model.name)
+        (parts / "renderprobe.json").write_text(json.dumps({
+            "id": "renderprobe",
+            "display_name": "Inspection Render Probe",
+            "category": "ICs",
+            "description": "Real symbol, footprint and STEP model for projection acceptance",
+            "mpn": "R-0603-INSPECTION",
+            "manufacturer": "Stockroom",
+            "passive": True,
+            "eda": {
+                "kicad": {
+                    "symbol": {"lib": "Device", "name": "R"},
+                    "footprint": {"lib": "Resistor_SMD", "name": "R_0603_1608Metric"},
+                    "model": {"file": f"models/{installed_model.name}"},
+                },
+            },
+            "specs": {"Package": "0603", "Resistance": "10 kOhm"},
+        }, indent=2), encoding="utf-8")
+    else:
+        print(f"  note: installed KiCad render-probe model not found at {installed_model}")
 
     # A part carrying the data Batch 3 stopped discarding, so the surfaces that show it can actually
     # be SEEN. Nothing in a real library has any of this yet (no part has been re-enriched since),
@@ -279,6 +321,15 @@ def _seed_workspace(base: Path, source: Path | None = None) -> tuple[Path, Path]
         "specs": {
             "Package": "WSON-8", "Product Category": "Buck Converters",
             "Output Current": "3 A", "Tolerance": "1%",
+            # Datasheet-extracted pinout depth for the specimen-rail acceptance shot. This is a
+            # UI probe rather than a component-authoring fixture: its job is to exercise a useful
+            # number of rows, provenance, filtering, and the card's own bounded scroll region.
+            "pinout": [
+                {"pin": "1", "name": "VIN"}, {"pin": "2", "name": "EN"},
+                {"pin": "3", "name": "AGND"}, {"pin": "4", "name": "FB"},
+                {"pin": "5", "name": "VOS"}, {"pin": "6", "name": "PG"},
+                {"pin": "7", "name": "SW"}, {"pin": "8", "name": "PGND"},
+            ],
             "Lifecycle": "Active", "Lead Time": "16 Weeks",
             "Country of Origin": "Japan", "US Tariff %": 0.0,
             "ECCN": "3A991",
@@ -293,6 +344,7 @@ def _seed_workspace(base: Path, source: Path | None = None) -> tuple[Path, Path]
             "Product Category": {"source": "mouser", "confidence": "high"},
             "Lead Time": {"source": "digikey", "confidence": "high"},
             "US Tariff %": {"source": "mouser", "confidence": "high"},
+            "pinout": {"source": "datasheet", "confidence": "high"},
         },
         "alternates": {
             "description": [
@@ -308,91 +360,13 @@ def _seed_workspace(base: Path, source: Path | None = None) -> tuple[Path, Path]
         },
     }, indent=2), encoding="utf-8")
 
-    # The in-repo library is backed by the ENCLOSING app repo, so a copy in a temp directory has no
-    # git at all and registering a project (which commits the project record) fails. Give the seeded
-    # library its own repo so every library-side mutation behaves as it does for real.
+    # Give the copied library its own repository so any deliberately driven library-side mutation
+    # behaves as it does for real while remaining disposable.
     for cmd in (["init", "-b", "main"], ["config", "user.email", "shot@local"],
                 ["config", "user.name", "shot"], ["add", "-A"], ["commit", "-m", "seed library"]):
         subprocess.run(["git", "-C", str(libs), *cmd], check=True, capture_output=True)
 
-    proj = base / "SeedBoard"
-    proj.mkdir(parents=True, exist_ok=True)
-    (proj / "SeedBoard.kicad_pro").write_text("{}", encoding="utf-8")
-
-    # The field a KiCad placement carries its durable Stockroom binding in. Read from the registry so
-    # the seed cannot drift from the app it is shooting.
-    sys.path.insert(0, str(REPO / "app" / "backend"))
-    from stockroom.projects.binding import field_for  # noqa: E402
-
-    bind_field = field_for("kicad")
-
-    placed = [0]  # placement index, so no two symbols land on the same coordinate
-
-    def sym(ref, lib_id, value, footprint, uid, *, bound="", mpn=""):
-        """One placed symbol. `bound` stamps the durable binding an earlier assignment would have
-        left; `mpn` writes an MPN property, so a bound placement whose MPN disagrees with its part
-        renders the DRIFT state. `uid=""` omits the uuid entirely, which is the legacy file that can
-        only be bound by designator (the weak-link state)."""
-        # Laid out on a real grid. Every symbol used to be written `(at 10 10 0)`, so the viewer
-        # drew ten parts stacked on one another - which no KiCad-authored sheet ever looks like,
-        # and which made the Projects screenshot useless as a picture of the viewer working.
-        i = placed[0]
-        placed[0] += 1
-        x, y = 25.4 + (i % 5) * 25.4, 25.4 + (i // 5) * 25.4
-        extra = ""
-        if bound:
-            extra += f'\t\t(property "{bind_field}" "{bound}" (at 0 0 0) (hide yes))\n'
-        if mpn:
-            extra += f'\t\t(property "MPN" "{mpn}" (at 0 0 0) (hide yes))\n'
-        return (
-            "\t(symbol\n"
-            f'\t\t(lib_id "{lib_id}")\n\t\t(at {x} {y} 0)\n\t\t(unit 1)\n'
-            "\t\t(in_bom yes)\n\t\t(dnp no)\n"
-            + (f'\t\t(uuid "{uid}")\n' if uid else "")
-            + f'\t\t(property "Reference" "{ref}" (at {x} {y - 2.54} 0))\n'
-            f'\t\t(property "Value" "{value}" (at {x + 2.54} {y} 0))\n'
-            f'\t\t(property "Footprint" "{footprint}" (at {x} {y} 0) (effects (font (size 1.27 1.27)) (hide yes)))\n'
-            f'\t\t(property "Datasheet" "~" (at {x} {y} 0) (effects (font (size 1.27 1.27)) (hide yes)))\n'
-            + extra
-            + '\t\t(instances\n\t\t\t(project "SeedBoard"\n'
-            f'\t\t\t\t(path "/seed"\n\t\t\t\t\t(reference "{ref}")\n\t\t\t\t\t(unit 1)\n'
-            "\t\t\t\t)\n\t\t\t)\n\t\t)\n\t)\n"
-        )
-
-    r_fp, c_fp = "Resistor_SMD:R_0402_1005Metric", "Capacitor_SMD:C_0402_1005Metric"
-    body = "".join([
-        # Three unassigned 10k resistors: one group, two indistinguishable candidates.
-        *[sym(f"R{n}", "Device:R", "10k", r_fp, f"s-r{n}") for n in (1, 2, 3)],
-        # A 47k group nothing in the library matches, so the honest no-candidate state renders too.
-        sym("R11", "Device:R", "47k", r_fp, "s-r11"),
-        # Already assigned, and the four states the record has to tell apart. Without these the
-        # bound ledger could only ever be shot empty, which would prove nothing about it.
-        sym("R9", "Device:R", "10k", r_fp, "s-r9", bound="r10k1", mpn="RC0402FR-0710KL"),
-        sym("R10", "Device:R", "10k", r_fp, "s-r10", bound="r10k1", mpn="WRONG-MPN"),
-        sym("R12", "Device:R", "10k", r_fp, "", bound="r10k1", mpn="RC0402FR-0710KL"),
-        *[sym(f"C{n}", "Device:C", "100n", c_fp, f"s-c{n}",
-              bound="c100n", mpn="CL05B104KO5NNNC") for n in (1, 2)],
-        sym("C3", "Device:C", "100n", c_fp, "s-c3", bound="c100n-deleted"),
-    ])
-    (proj / "SeedBoard.kicad_sch").write_text(
-        "(kicad_sch\n\t(version 20260306)\n" + _LIB_SYMBOLS + body + ")\n", encoding="utf-8")
-
-    # The per-user files a real KiCad project accumulates and, crucially, COMMITS: `.kicad_prl` is
-    # one person's window layout and `fp-info-cache` is a regenerated machine cache, so both change
-    # on every open and are what make two peers conflict on every pull. Seeded committed on purpose:
-    # without them the Sync Hygiene surface could only ever be shot in its empty state, which would
-    # prove nothing about it.
-    (proj / "SeedBoard.kicad_prl").write_text('{"board":{"visible_layers":"fffffff"}}\n',
-                                              encoding="utf-8")
-    (proj / "fp-info-cache").write_text("# regenerated footprint cache\n", encoding="utf-8")
-    backups = proj / "SeedBoard-backups"
-    backups.mkdir(exist_ok=True)
-    (backups / "SeedBoard-2026.zip").write_text("archive\n", encoding="utf-8")
-
-    for cmd in (["init", "-b", "main"], ["config", "user.email", "shot@local"],
-                ["config", "user.name", "shot"], ["add", "."], ["commit", "-m", "seed board"]):
-        subprocess.run(["git", "-C", str(proj), *cmd], check=True, capture_output=True)
-    return libs, proj
+    return libs
 
 
 def _dismiss_onboarding(page, base_url: str, token: str) -> None:
@@ -409,66 +383,14 @@ def _dismiss_onboarding(page, base_url: str, token: str) -> None:
     # Poll for the nav rail, which is what "onboarding is dismissed" actually LOOKS like. A fixed
     # sleep here turned a slow machine into a false "the rail is not reachable" report several
     # calls later, far from its cause.
-    _appears(page.locator('[data-dev-id="rail.nav-projects"]').first)
-
-
-def _register_seed(page, proj: Path) -> bool:
-    """Register the seeded project through the REAL register control, then select it. Driving the app's
-    own affordance (rather than posting to the API) keeps this a genuine end-to-end path."""
-    page.locator('[data-dev-id="rail.nav-projects"]').first.click()
-    box = page.locator('[data-dev-id="projects.register-input"]')
-    # Each step polls for the thing the PREVIOUS step was supposed to produce. Sleep-then-count
-    # reports "the control is not there" for a control that simply had not rendered yet, which on a
-    # loaded machine is indistinguishable from the surface being broken.
-    if not _appears(box.first):
-        return False
-    box.first.fill(str(proj))
-    page.locator('[data-dev-id="projects.register-action"]').first.click()
-    rows = page.locator('[data-dev-id="projects.row"]')
-    if not _appears(rows.first):
-        return False
-    rows.first.click()
-    # The selected project's Health tab is the first thing that proves the row click landed.
-    _appears(page.get_by_role("tab", name="Health").first)
-    return True
-
-
-# Health-tab surfaces, mapped to the dev-id they scroll to. The Health tab is far taller than one
-# viewport, so "shoot the Health tab" is not a single shot and pretending otherwise means whatever is
-# below the fold never gets looked at.
-_HEALTH_SECTIONS = {
-    "project-health": "projects.assign",
-    "project-hygiene": "projects.hygiene",
-    "project-library-pin": "projects.library-pin",
-}
+    _appears(page.locator('[data-dev-id="rail.nav-components"]').first)
 
 
 def _goto_surface(page, surface: str, select: str = "") -> bool:
     """Navigate to a named surface. Returns False if it could not be reached."""
-    if surface in _HEALTH_SECTIONS:
-        # The seeded project is already selected by _register_seed; open its Health tab and scroll the
-        # requested section into view. `--full-page` cannot substitute for this: the app's #root is
-        # `overflow:hidden` and the real scroller is an inner pane, so a full-page capture is still
-        # exactly one viewport tall and silently misses everything below the fold.
-        tab = page.get_by_role("tab", name="Health")
-        if not tab.count():
-            return False
-        tab.first.click()
-        section = page.locator(f'[data-dev-id="{_HEALTH_SECTIONS[surface]}"]')
-        # Poll for the section itself: that is what "the Health tab opened" means here, and it
-        # returns the moment it renders instead of always paying 2s.
-        if not _appears(section.first):
-            return False
-        section.first.scroll_into_view_if_needed()
-        # A settle, not a detector: the scroll has already been requested and this only lets the
-        # smooth-scroll finish before the capture, so the shot is not taken mid-glide.
-        page.wait_for_timeout(800)
-        return True
     if surface in {"components", "part-vendor-data"}:
-        # Navigate EXPLICITLY, never assume the app is still where it booted: when the run seeds a
-        # project it registers it through the real Projects surface, so by the time a surface driver
-        # runs the app is sitting on Projects. Without this, `--surface components --seed` produced a
-        # screenshot of the PROJECTS page and reported success.
+        # Navigate explicitly, never assume the app is still where it booted. This keeps an `all`
+        # run and a seeded run deterministic even after another surface changed the current route.
         nav = page.locator('[data-dev-id="rail.nav-components"]')
         if not nav.count():
             return False
@@ -505,15 +427,17 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
             _await_land_pattern(page)
             return True
         # part-vendor-data: the seeded probe part is the only one carrying alternates and an HTS
-        # family, and it is named to sort first. Both disclosures are OPENED, because what is behind
-        # them is the entire point of the shot.
+        # family, and it is named to sort first. Trade opens FIRST because the schema deliberately
+        # keeps tariff families with sourcing instead of physical specifications; only then does
+        # the nested HTS family exist in the DOM. All three disclosures are opened because what is
+        # behind them is the entire point of the shot.
         probe = rows.filter(has_text="AAA Vendor Data Probe")
         if not probe.count():
             print("  part-vendor-data: the seeded probe part is not in the list")
             return False
         probe.first.click()
         missing = []
-        for dev_id in ("detail.spec-family", "detail.alternates"):
+        for dev_id in ("detail.trade", "detail.spec-family", "detail.alternates"):
             control = page.locator(f'[data-dev-id="{dev_id}"] button').first
             if not _appears(control):
                 missing.append(dev_id)
@@ -530,7 +454,7 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
                 print(f"  part-vendor-data: {dev_id} did not open when clicked")
                 return False
         if missing:
-            # Name WHICH control is absent: "1/2 present" sends the next reader hunting, and the
+            # Name WHICH control is absent: a partial count sends the next reader hunting, and the
             # whole reason this surface exists is to make the new controls observable.
             print(f"  part-vendor-data: these controls are not on the page: {', '.join(missing)}")
             return False
@@ -565,7 +489,7 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
         # The overlay's own root IS the success signal, so poll it rather than sleeping and then
         # counting - the count was being taken before a slow render had finished.
         return _appears(page.locator('[data-dev-id="search.root"]').first)
-    if surface in {"projects", "settings"}:
+    if surface == "settings":
         nav = page.locator(f'[data-dev-id="rail.nav-{surface}"]')
         if not nav.count():
             return False
@@ -680,18 +604,18 @@ def _park_pointer_off_rail(page) -> str | None:
     rail = page.locator('[data-dev-id="rail.root"]')
     if not _appears(rail, 1000):
         return None  # no rail on this surface; nothing to park away from
-    # FOCUS, not hover - and it took three wrong answers to find that, so all three are recorded:
+    # VISIBILITY STATE, not width alone - and it took three wrong answers to find that, so all
+    # three are recorded:
     #   * "wait for the width to return to its resting value" - the resting value has to be sampled
     #     BEFORE parking, when the rail is already open, so the target WAS the open width and the
     #     condition passed instantly. A check that cannot fail is worse than none; it shipped a shot
     #     with the rail wide open while reporting success.
     #   * "wait for width < 120px" - a rail the user PINNED open is legitimately 190px, so width
     #     alone cannot tell open-by-accident from open-on-purpose, and this would hang on the latter.
-    #   * "wait for :hover to clear" - measured `railHovered: false` while the rail sat at 190px, so
-    #     hover was never the mechanism at all. Moving the mouse could not have helped.
-    # The collapsed rail carries `focus-within:w-[190px]` so a keyboard user can reach it, and
-    # `toggle.click()` leaves the browser's focus ON the theme button, which lives in the rail. So
-    # the rail expands and stays expanded, and it is the FOCUS that has to leave.
+    #   * "wait for :hover to clear" - before the pointer-focus fix, measured `railHovered: false`
+    #     while the rail sat at 190px because `focus-within` kept it open. The product now uses
+    #     `:has(:focus-visible)`: keyboard focus still reveals the rail, while a pointer click no
+    #     longer leaves it covering the destination. The harness asks those same two CSS states.
     box = page.viewport_size or {"width": 1600, "height": 1000}
     page.mouse.move(box["width"] - 40, box["height"] // 2)
     page.evaluate(
@@ -707,7 +631,7 @@ def _park_pointer_off_rail(page) -> str | None:
                  if (!r) return true;
                  // both states that widen a COLLAPSED rail, asked of the browser directly rather
                  // than inferred from a width that a pinned rail shares
-                 return !r.matches(':hover') && !r.contains(document.activeElement);
+                 return !r.matches(':hover') && !r.matches(':has(:focus-visible)');
                }""",
             timeout=_UI_TIMEOUT_MS,
         )
@@ -808,30 +732,21 @@ def run(args) -> int:
 
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    surfaces = (
-        ["components", "search", "projects", "settings"]
-        if args.surface == "all"
-        else [args.surface]
-    )
+    surfaces = list(_ALL_SURFACES) if args.surface == "all" else [args.surface]
     themes = [t.strip() for t in args.themes.split(",") if t.strip()]
     failures: list[str] = []
 
-    # A project surface needs a project. `project-health` implies the seed, so the surface can never be
-    # requested in a state where it silently degrades to the "No projects are registered" empty view
-    # and a green shot proves nothing.
-    #
     # A --click ALSO implies the seed, and that one was learned the hard way on 2026-07-25: a
     # settings shot ran `--click settings.library-lfs.adopt` against the DEFAULT library, which is
     # the owner's real in-repo one, and the click did exactly what the button says - it wrote
     # workspace hygiene rules and committed them to the real repository. A screenshot tool must not
     # be able to mutate the thing it is photographing. The seed COPIES the real library, so the shot
     # still shows real content; only the writes are thrown away.
-    # `part-vendor-data` implies the seed for the same reason a project surface does: the data it
-    # exists to show (alternates, an HTS family) is on the seeded probe part and nowhere in a real
-    # library, so without the seed the shot would silently photograph an ordinary part.
+    # `part-vendor-data` implies the seed because the data it exists to show (alternates, an HTS
+    # family) is on the seeded probe part and nowhere in a real library, so without the seed the
+    # shot would silently photograph an ordinary part.
     clicking = bool(args.click)
-    seed = (args.seed or clicking
-            or any(s.startswith("project-") or s == "part-vendor-data" for s in surfaces))
+    seed = args.seed or clicking or "part-vendor-data" in surfaces
     if clicking and not args.seed:
         print("  --click implies --seed: clicks can mutate, and the default library is the real one")
     # NO SHOT MAY CHANGE A SETTING. `--seed` isolates the LIBRARY but never isolated the MACHINE
@@ -852,11 +767,10 @@ def run(args) -> int:
 
     scratch: tempfile.TemporaryDirectory | None = None
     library = Path(args.library)
-    seed_project: Path | None = None
     if seed:
         scratch = tempfile.TemporaryDirectory(prefix="uishot-seed-")
-        library, seed_project = _seed_workspace(Path(scratch.name), Path(args.library))
-        print(f"  seeded library + project under {scratch.name}")
+        library = _seed_workspace(Path(scratch.name), Path(args.library))
+        print(f"  seeded library under {scratch.name}")
 
     def opener(base_url: str, token: str) -> None:
         with sync_playwright() as p:
@@ -874,8 +788,7 @@ def run(args) -> int:
             console: list[str] = []
             page.on("console", lambda m: console.append(m.text) if m.type == "error" else None)
             # WITH the stack. An uncaught "Cannot read properties of undefined" names neither the
-            # file nor the frame, so the message alone cannot start a diagnosis - and the kicanvas
-            # throw sat unread in every Projects shot for exactly that reason.
+            # file nor the frame, so the message alone cannot start a diagnosis.
             page.on(
                 "pageerror",
                 lambda e: console.append(
@@ -895,6 +808,7 @@ def run(args) -> int:
                     )
 
             page.on("response", _note_response)
+
             def _note_failed(req) -> None:
                 # `requestfailed` hands back a Request, NOT a Response - so `.request` does not
                 # exist on it and reaching for it raised INSIDE the event handler, which surfaced
@@ -910,13 +824,8 @@ def run(args) -> int:
             # was the difference between shooting the app and shooting an empty root div.
             _appears(page.locator('[data-dev-id="rail.nav-components"], main, #root > *').first)
 
-            if seed_project is not None:
+            if seed:
                 _dismiss_onboarding(page, base_url, token)
-            if seed_project is not None and not _register_seed(page, seed_project):
-                print("  !! could not register the seeded project")
-                failures.append("seed")
-                browser.close()
-                return
 
             for surface in surfaces:
                 if not _goto_surface(page, surface, args.select):
@@ -942,9 +851,9 @@ def run(args) -> int:
                         print(f"  !! no such data-dev-id: {', '.join(absent)}")
                         failures.append(f"{surface}:click")
                 for theme in themes:
-                    # The theme toggle lives on the RAIL, which a modal surface covers with a
-                    # scrim - so on a modal surface the toggle is unclickable and the run died
-                    # with a 30 s timeout on the second theme. Close the modal, switch, reopen.
+                    # The theme toggle lives on the RAIL, which a modal surface OR the full-screen
+                    # Search workspace covers - so on either surface the toggle is unclickable.
+                    # Close the blocker, switch, then reopen the requested surface.
                     # `_goto_surface` is idempotent and already re-drives the real button.
                     # ANY modal, not just Add A Part. Every modal in this app lays a fixed
                     # full-bleed scrim over the shell, and the theme toggle lives on the RAIL
@@ -955,8 +864,13 @@ def run(args) -> int:
                     # then timed out with "scrim intercepts pointer events", producing no shot at
                     # all. Keyed on the scrim itself, so a modal added later needs no edit here.
                     modal = page.locator('div.fixed.inset-0[role="presentation"]')
-                    reopen = bool(modal.count())
-                    if reopen:
+                    search_overlay = page.locator('[data-dev-id="search.root"]')
+                    reopen_search = surface == "search" and bool(search_overlay.count())
+                    reopen_modal = bool(modal.count())
+                    reopen = reopen_search or reopen_modal
+                    if reopen_search:
+                        _close_surface(page, surface)
+                    elif reopen_modal:
                         page.keyboard.press("Escape")
                         _vanishes(modal.first)
                     # Through the real toggle, never by stamping the attribute: see _set_theme.
@@ -969,6 +883,19 @@ def run(args) -> int:
                         print(f"  !! {theme_err}")
                         failures.append(f"{surface}:{theme}")
                         continue
+                    # `_goto_surface` restores the PAGE, not the modal opened by `--click`.
+                    # Re-apply the click sequence after a modal had to close for the rail theme
+                    # toggle; otherwise the screenshot silently captures the page behind the
+                    # requested modal and every modal measurement reports "not found".
+                    if reopen_modal and args.click:
+                        absent = _click_dev_ids(page, args.click)
+                        if absent:
+                            print(
+                                "  !! could not reopen clicked modal; missing data-dev-id: "
+                                + ", ".join(absent)
+                            )
+                            failures.append(f"{surface}:{theme}:click")
+                            continue
                     # No settle wait here on purpose. `_set_theme` has already confirmed the
                     # COMPUTED `--c-canvas` changed, and the context runs with reduced motion so
                     # transitions are `none` - so there is no state left in flight to sleep toward.
@@ -1040,6 +967,7 @@ def run(args) -> int:
                 # without the alarm rather than hidden.
                 mark = "  !! " if label.startswith("5") or label.startswith("FAILED") else "  http "
                 print(f"{mark}{label} x{n}")
+            failures.extend(_browser_failures(console, http))
             browser.close()
 
     sys.path.insert(0, str(REPO / "app" / "backend"))
@@ -1049,10 +977,17 @@ def run(args) -> int:
     try:
         run_windowed(libraries_root=library, open_window=opener)
     finally:
-        if scratch is not None:
-            scratch.cleanup()
+        try:
+            if scratch is not None:
+                scratch.cleanup()
+        finally:
+            # Explicit rather than destructor-driven: the host has promised to release the STM and
+            # library indexes before returning, so Windows must be able to remove this directory.
+            # A leaked handle now fails the harness at the exact boundary instead of printing an
+            # ignored TemporaryDirectory cleanup exception during interpreter shutdown.
+            config_scratch.cleanup()
     if failures:
-        print(f"FAILED to reach: {', '.join(failures)}")
+        print(f"FAILED: {', '.join(failures)}")
         return 1
     print(f"ok -> {out}")
     return 0
@@ -1068,9 +1003,7 @@ def main() -> int:
         help="click this data-dev-id before shooting (repeatable), to reach a control behind a "
         "popover. An id that does not exist is reported, never silently skipped.",
     )
-    ap.add_argument("--surface", default="components",
-                    choices=["components", "search", "projects", "project-health", "project-hygiene",
-                             "project-library-pin", "part-vendor-data", "ingest", "settings", "all"])
+    ap.add_argument("--surface", default="components", choices=_SURFACE_CHOICES)
     ap.add_argument(
         "--fill", action="append", default=[], metavar="DEV_ID=TEXT",
         help="type TEXT into this data-dev-id before each capture, so a form is shot in its "
@@ -1097,8 +1030,11 @@ def main() -> int:
              "bottom edge. This is how a column-balance or dead-space claim is backed by a number "
              "instead of an impression. An id that does not exist is reported, never skipped.",
     )
-    ap.add_argument("--seed", action="store_true",
-                    help="seed a throwaway library + KiCad project (implied by a project-* surface)")
+    ap.add_argument(
+        "--seed",
+        action="store_true",
+        help="seed a throwaway component library (implied by --click and part-vendor-data)",
+    )
     ap.add_argument("--themes", default="dark,light", help="comma list: dark,light")
     ap.add_argument("--width", type=int, default=1600)
     ap.add_argument("--height", type=int, default=1000)

@@ -75,8 +75,8 @@ export function Glb3DView({
    * with the one group that is genuinely per-part, the layers.
    */
   showShading?: boolean;
-  /** Narrow host (the detail tile): chips render as ICONS so ten controls fit one row instead of
-   *  wrapping to three and eating a third of the stage. Names survive via title + aria-label. */
+  /** Narrow host (the detail tile): a passive, auto-rotating specimen with no embedded controls.
+   *  All deliberate inspection controls live in the expanded viewer where they have room. */
   compact?: boolean;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -103,7 +103,6 @@ export function Glb3DView({
   const [selectedPlacementSource, setSelectedPlacementSource] = useState<"kicad" | "model">(
     "model",
   );
-  const [compactControlsOpen, setCompactControlsOpen] = useState(false);
   // The scene is imported asynchronously. Keep one current snapshot so the handle receives the
   // state visible in React at the moment it becomes available, rather than the values captured by
   // an older render that began the import.
@@ -210,10 +209,12 @@ export function Glb3DView({
     // reverted. Overlaying controls on the subject is a bet that the subject will stay small, and
     // that bet is what the camera-fit work exists to lose.
     //
-    // A bar costs ~28px of stage height and can never collide. It also means the model can be
-    // framed edge to edge without a chip covering a lead.
+    // The full inspection bar deliberately spends space on visible grouping and credible targets.
+    // Compact is a passive auto-rotating specimen; opening the inspection modal is its one action.
     <div className="relative flex h-full w-full flex-col">
       <div ref={mountRef} className="relative min-h-0 w-full flex-1" data-testid="model-canvas" />
+      {!compact && showViews ? <div aria-hidden="true" className="h-[82px] flex-none" /> : null}
+      {!compact ? (
       <div
         onClick={(e) => e.stopPropagation()}
         // pointer-events-auto is LOAD-BEARING: the detail panel wraps this whole view in a
@@ -225,14 +226,26 @@ export function Glb3DView({
         // are all just pushed to one corner" - which was literally the CSS: every cluster crammed left
         // with the rest of the bar empty. Now the layer + shading clusters hold the left and the view
         // cluster holds the right, so the bar reads as two ends rather than one heap.
-        className="pointer-events-auto flex flex-none flex-wrap items-center justify-between gap-x-1 gap-y-0.5 border-t border-line bg-[var(--c-popover)]/60 px-1.5 py-1"
+        className={
+          "pointer-events-auto flex items-center " +
+          (compact
+            ? "h-[38px] flex-none justify-between gap-2 border-t border-line2 bg-band px-2 py-1"
+            : "absolute bottom-3 left-1/2 z-10 w-max max-w-[calc(100%-24px)] -translate-x-1/2 gap-0 overflow-x-auto rounded-card border border-line2 bg-popover/95 p-2 shadow-pop backdrop-blur-sm")
+        }
       >
-      {/* flex-wrap + min-w-0: this inner group holds the layer chips AND the shading chips, and
-          without wrapping it forced both onto ONE line - measured 262px of content inside a 226px
-          stage, i.e. a horizontal overflow the tile then clipped. The outer bar wrapping is not
-          enough when a child refuses to break. */}
-      <div data-dev-id="detail.model-layers" className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1">
-        <div className="flex items-center gap-px">
+      {/* Compact has only layer icons here. The full inspection stage has room for explicit
+          Layers / Appearance / Placement groups, so the user does not have to decode one heap. */}
+      <div
+        data-dev-id="detail.model-layers"
+        className={"flex min-w-0 items-center " + (compact ? "gap-1" : "gap-0")}
+      >
+        <div
+          className={compact ? "flex items-center gap-1.5" : "flex flex-col items-start gap-1 pr-3"}
+          role="group"
+          aria-label="Layers"
+        >
+          {!compact ? <ControlLabel>Layers</ControlLabel> : null}
+          <div className="flex items-center gap-0.5 rounded-control border border-line2 bg-field p-0.5">
           <LayerToggle
             devId="detail.model-show-model"
             icon="layer.model"
@@ -278,15 +291,20 @@ export function Glb3DView({
               />
             </>
           ) : null}
+          </div>
         </div>
         {showShading && !compact ? (
         <div
           data-dev-id="detail.model-shading"
+          role="group"
+          aria-label="Appearance"
           // NO border-l. On a bar that wraps, a left border on a flex child becomes a stray vertical
           // tick floating at the start of the new row - visible in the owner's real shot as a glitch
           // beside "Realistic". Grouping is carried by the gap instead, which cannot wrap wrongly.
-          className="flex items-center gap-px"
+          className="flex flex-col items-start gap-1 border-l border-line pl-3 pr-3"
         >
+          <ControlLabel>Appearance</ControlLabel>
+          <div className="flex items-center gap-0.5 rounded-control border border-line2 bg-field p-0.5">
           {SHADING.map((r) => (
             <LayerToggle
               key={r.mode}
@@ -302,6 +320,7 @@ export function Glb3DView({
               }}
             />
           ))}
+          </div>
         </div>
         ) : null}
         {showViews && !compact && land?.model_placement ? (
@@ -317,39 +336,40 @@ export function Glb3DView({
         ) : null}
       </div>
       {showViews ? (
-        <div className="flex items-center gap-2">
-          <LayerToggle
-            devId="detail.model-spin"
-            icon="action.refresh"
-            compact={compact}
-            label="Spin"
-            on={spinning}
-            hint="Stop or resume the idle rotation"
-            onToggle={() => {
-              const next = !spinning;
-              // trust the SCENE's answer, not the request: under prefers-reduced-motion it stays off
-              const inForce = sceneRef.current?.setSpin(next) ?? next;
-              setSpinning(inForce);
-            }}
-          />
-          {compact ? (
-            <button
-              type="button"
-              data-dev-id="detail.model-settings"
-              aria-label="3D view settings"
-              aria-expanded={compactControlsOpen}
-              title="View, shading, and placement settings"
-              onClick={() => setCompactControlsOpen((open) => !open)}
-              className={
-                "flex h-[22px] w-[22px] items-center justify-center rounded-[2px] transition-colors " +
-                (compactControlsOpen
-                  ? "bg-raise2 text-t1"
-                  : "text-t3 hover:bg-[var(--c-hover)] hover:text-t1")
-              }
-            >
-              <Icon id="action.settings" className="h-3.5 w-3.5" />
-            </button>
-          ) : (
+        <div className={"flex items-center " + (compact ? "gap-1" : "gap-0")}>
+          <div
+            className={
+              compact
+                ? "flex items-center gap-1.5"
+                : "flex flex-col items-start gap-1 border-l border-line pl-3 pr-3"
+            }
+            role="group"
+            aria-label="Motion"
+          >
+            {!compact ? <ControlLabel>Motion</ControlLabel> : null}
+            <div className="flex items-center rounded-control border border-line2 bg-field p-0.5">
+              <LayerToggle
+                devId="detail.model-spin"
+                icon="action.refresh"
+                compact={compact}
+                label="Auto rotate"
+                on={spinning}
+                hint="Stop or resume automatic rotation"
+                onToggle={() => {
+                  const next = !spinning;
+                  // trust the SCENE's answer, not the request: under prefers-reduced-motion it stays off
+                  const inForce = sceneRef.current?.setSpin(next) ?? next;
+                  setSpinning(inForce);
+                }}
+              />
+            </div>
+          </div>
+          <div
+            className="flex flex-col items-start gap-1 border-l border-line pl-3"
+            role="group"
+            aria-label="Camera view"
+          >
+            <ControlLabel>View</ControlLabel>
             <ViewControls
               active={view}
               onPick={(mode) => {
@@ -357,94 +377,42 @@ export function Glb3DView({
                 sceneRef.current?.setView(mode);
               }}
             />
-          )}
+          </div>
         </div>
       ) : null}
       </div>
-      {compact && compactControlsOpen ? (
-        <div
-          data-dev-id="detail.model-settings-popover"
-          onClick={(event) => event.stopPropagation()}
-          className="pointer-events-auto absolute bottom-9 right-1 z-20 w-[238px] rounded-card border border-line2 bg-popover p-2 shadow-pop"
-        >
-          <ControlSection label="View">
-            <ViewControls
-              active={view}
-              onPick={(mode) => {
-                setView(mode);
-                sceneRef.current?.setView(mode);
-              }}
-            />
-          </ControlSection>
-          {showShading ? (
-            <ControlSection label="Shading">
-              <div className="flex items-center gap-px">
-                {SHADING.map((item) => (
-                  <LayerToggle
-                    key={item.mode}
-                    devId={item.devId}
-                    label={item.label}
-                    on={renderMode === item.mode}
-                    hint={item.hint}
-                    onToggle={() => {
-                      setRenderMode(item.mode);
-                      sceneRef.current?.setRenderMode(item.mode);
-                    }}
-                  />
-                ))}
-              </div>
-            </ControlSection>
-          ) : null}
-          {land?.model_placement ? (
-            <ControlSection label="Placement">
-              <PlacementControls
-                active={placementMode}
-                assessment={placementAssessment}
-                selectedSource={selectedPlacementSource}
-                showLabel={false}
-                onPick={(mode) => {
-                  setPlacementMode(mode);
-                  sceneRef.current?.setPlacementMode(mode);
-                }}
-              />
-            </ControlSection>
-          ) : null}
-        </div>
       ) : null}
     </div>
   );
 }
 
-function ControlSection({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2 border-b border-line py-1.5 last:border-b-0">
-      <span className="flex-none text-2xs font-medium text-t3">{label}</span>
-      <div className="min-w-0">{children}</div>
-    </div>
-  );
+function ControlLabel({ children }: { children: React.ReactNode }) {
+  return <span className="flex-none text-2xs font-semibold text-t3">{children}</span>;
 }
 
-const PLACEMENT_MODES: { mode: PlacementMode; label: string; hint: string }[] = [
+const PLACEMENT_MODES: {
+  mode: PlacementMode;
+  label: string;
+  hint: string;
+  icon: string;
+}[] = [
   {
     mode: "auto",
     label: "Auto",
     hint: "Use KiCad placement when it passes conservative sanity checks; otherwise show the model frame",
+    icon: "action.enrich",
   },
   {
     mode: "kicad",
     label: "Source",
     hint: "Show the KiCad model placement exactly, even when it is flagged",
+    icon: "layer.pads",
   },
   {
     mode: "model",
     label: "Model",
     hint: "Ignore footprint placement and inspect the model's own frame",
+    icon: "layer.model",
   },
 ];
 
@@ -464,40 +432,56 @@ function PlacementControls({
   const suspect = assessment?.status === "suspect";
   const issueText = assessment?.issues.join(". ");
   return (
-    <div className={"flex items-center gap-1 " + (showLabel ? "border-l border-line pl-1.5" : "")}>
-      {showLabel ? <span className="text-2xs font-medium text-t3">Placement</span> : null}
-      <div className="flex items-center gap-px">
-        {PLACEMENT_MODES.map((item) => (
-          <button
-            key={item.mode}
-            type="button"
-            aria-pressed={active === item.mode}
-            title={item.hint}
-            onClick={() => onPick(item.mode)}
-            className={
-              "rounded-[2px] px-1.5 py-0.5 text-2xs font-medium transition-colors " +
-              (active === item.mode
-                ? "bg-raise2 text-t1"
-                : "text-t3 hover:bg-[var(--c-hover)] hover:text-t1")
-            }
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-      <span
-        title={
-          suspect
-            ? `${issueText}. Auto is showing the ${selectedSource} frame.`
-            : `Auto is showing the ${selectedSource} frame.`
-        }
+    <div
+      className={
+        showLabel
+          ? "flex flex-col items-start gap-1 border-l border-line pl-3 pr-3"
+          : "flex w-full flex-col items-start gap-1.5"
+      }
+      role="group"
+      aria-label="Placement"
+    >
+      {showLabel ? <ControlLabel>Placement</ControlLabel> : null}
+      <div
         className={
-          "rounded-[2px] px-1 py-0.5 text-2xs font-semibold " +
-          (suspect ? "bg-warn/15 text-warn" : "bg-ok/15 text-ok")
+          showLabel ? "flex items-center gap-1.5" : "flex w-full flex-col items-start gap-1.5"
         }
       >
-        {suspect ? "Check" : selectedSource === "kicad" ? "Source" : "Model"}
-      </span>
+        <div className="flex items-center gap-0.5 rounded-control border border-line2 bg-field p-0.5">
+          {PLACEMENT_MODES.map((item) => (
+            <button
+              key={item.mode}
+              type="button"
+              aria-pressed={active === item.mode}
+              title={item.hint}
+              onClick={() => onPick(item.mode)}
+              className={
+                "inline-flex min-h-[32px] items-center gap-1.5 rounded-control px-2.5 text-xs font-semibold transition-[transform,background-color,color] active:scale-[0.97] " +
+                "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+                (active === item.mode
+                  ? "bg-raise2 text-t1 shadow-card"
+                  : "text-t2 hover:bg-raise hover:text-t1")
+              }
+            >
+              <Icon id={item.icon} className="h-4 w-4" />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+        <span
+          title={
+            suspect
+              ? `${issueText}. Auto is showing the ${selectedSource} frame.`
+              : `Auto is showing the ${selectedSource} frame.`
+          }
+          className={
+            "flex min-h-[32px] items-center rounded-control px-2 text-xs font-semibold " +
+            (suspect ? "bg-warn/15 text-warn" : "bg-ok/15 text-ok")
+          }
+        >
+          {suspect ? "Check" : selectedSource === "kicad" ? "Source" : "Model"}
+        </span>
+      </div>
     </div>
   );
 }
@@ -528,7 +512,7 @@ const SHADING: { mode: RenderMode; label: string; hint: string; devId: string; i
   },
 ];
 
-/** One quiet toggle. Pressed state carries the answer; `aria-pressed` makes it audible too. */
+/** One visible, comfortably sized toggle. Pressed state carries the answer audibly and visually. */
 function LayerToggle({
   devId,
   label,
@@ -563,21 +547,28 @@ function LayerToggle({
         onToggle();
       }}
       className={
-        "rounded-[2px] font-medium transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
+        "rounded-control font-semibold transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
         "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
         (iconOnly
-          ? "flex h-[22px] w-[22px] items-center justify-center "
-          : "px-1.5 py-0.5 text-2xs ") +
-        (on ? "bg-raise2 text-t1" : "text-t3 hover:bg-[var(--c-hover)] hover:text-t1")
+          ? "flex h-[30px] w-[30px] items-center justify-center "
+          : "inline-flex min-h-[32px] items-center gap-1.5 px-2.5 text-xs ") +
+        (on ? "bg-raise2 text-t1 shadow-card" : "text-t2 hover:bg-raise hover:text-t1")
       }
     >
-      {iconOnly ? <Icon id={icon} className="h-3.5 w-3.5" /> : label}
+      {icon ? <Icon id={icon} className="h-4 w-4 flex-none" /> : null}
+      {!iconOnly ? <span>{label}</span> : null}
     </button>
   );
 }
 
 const VIEWS: { mode: ViewMode; label: string; hint: string; devId: string; icon: string }[] = [
-  { mode: "iso", label: "3D", hint: "Three-quarter view", devId: "detail.model-view-iso", icon: "view.iso" },
+  {
+    mode: "iso",
+    label: "Isometric",
+    hint: "Three-quarter view",
+    devId: "detail.model-view-iso",
+    icon: "view.iso",
+  },
   {
     mode: "top",
     label: "Top",
@@ -595,12 +586,12 @@ const VIEWS: { mode: ViewMode; label: string; hint: string; devId: string; icon:
 ];
 
 /**
- * The canonical views, as a quiet segmented control resting on the canvas.
+ * The canonical views, as a visible segmented control in the reserved toolbar.
  *
  * Deliberately ALWAYS VISIBLE rather than revealed on hover: this is the only affordance telling
  * anyone the viewer has more than one view, and a control nobody can find is the same as a control
- * that does not exist. It stays quiet instead (low contrast until hovered or focused) so it never
- * competes with the render.
+ * that does not exist. A bordered track plus a raised selected state makes both the hit region and
+ * the current answer legible without competing with the render.
  */
 function ViewControls({
   active,
@@ -619,7 +610,7 @@ function ViewControls({
       data-dev-id="detail.model-views"
       // the whole strip swallows the tile's open-on-click, not just the buttons
       onClick={(e) => e.stopPropagation()}
-      className="flex items-center gap-px"
+      className="flex items-center gap-0.5 rounded-control border border-line2 bg-field p-0.5"
     >
       {VIEWS.map((v) => (
         <button
@@ -639,17 +630,18 @@ function ViewControls({
           className={
             // 160ms ease-out + a 0.97 press: a control with no press feedback does not feel like
             // it heard the click. transform/opacity only, so it stays off the layout path.
-            "rounded-[2px] font-medium transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
+            "rounded-control font-semibold transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
             "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
             (compact
-              ? "flex h-[22px] w-[22px] items-center justify-center "
-              : "px-1.5 py-0.5 text-2xs ") +
+              ? "flex h-[30px] w-[30px] items-center justify-center "
+              : "inline-flex min-h-[32px] items-center gap-1.5 px-2.5 text-xs ") +
             (active === v.mode
-              ? "bg-raise2 text-t1"
-              : "text-t3 hover:bg-[var(--c-hover)] hover:text-t1")
+              ? "bg-raise2 text-t1 shadow-card"
+              : "text-t2 hover:bg-raise hover:text-t1")
           }
         >
-          {compact ? <Icon id={v.icon} className="h-3.5 w-3.5" /> : v.label}
+          <Icon id={v.icon} className="h-4 w-4 flex-none" />
+          {!compact ? <span>{v.label}</span> : null}
         </button>
       ))}
     </div>

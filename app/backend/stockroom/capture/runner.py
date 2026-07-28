@@ -26,6 +26,7 @@ from stockroom.capture.complete import complete_library, iter_incomplete, source
 from stockroom.capture.pacing import CircuitBreaker, PacedSource
 from stockroom.capture.sources import LcscSource
 from stockroom.enrich.ratelimit import SlidingWindowLimiter
+from stockroom.text import counted
 
 # See the module docstring: 8 parts x ~2 calls = ~16 calls per 60s, under the measured ~20.
 _PARTS_PER_WINDOW = 8
@@ -393,7 +394,8 @@ def _vendor_chain(vendor) -> list[str]:
         unknown = [key for key in wanted if get_adapter(key) is None]
         if unknown:
             raise ValueError(
-                "no network capture adapter for provider(s): " + ", ".join(map(repr, unknown))
+                f"no network capture adapter for {counted(len(unknown), 'provider')}: "
+                + ", ".join(map(repr, unknown))
             )
     keys = list(dict.fromkeys(wanted))
     if not keys:

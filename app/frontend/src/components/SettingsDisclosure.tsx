@@ -1,14 +1,18 @@
 /**
- * One collapsible settings row (the Settings IA remake): a full-width header the
- * user can scan without scrolling a wall of open cards - the title, a LIVE summary
- * of the section's state on the right, and a caret. The content card mounts only
- * while open, so a collapsed section costs nothing. Controlled by the page (the
- * Machine Setup band jumps sections open), with aria-expanded carrying the state
- * for tests and assistive tech alike.
+ * One permanent settings capability card.
+ *
+ * Settings used to render every capability as an identical collapsed row. That made a theme
+ * choice, an automatic health check, a credential form, and destructive recovery look like the
+ * same kind of button. The category navigation already limits how much is visible, so a second
+ * disclosure layer only hid meaning. Cards now state scope, live status, and consequence before
+ * exposing their controls.
  */
 import { type ReactNode } from "react";
-import { Card } from "./primitives";
 import { Text } from "../lib/copy";
+
+function cx(...parts: Array<string | false | null | undefined>): string {
+  return parts.filter(Boolean).join(" ");
+}
 
 export function SettingsDisclosure({
   title,
@@ -16,9 +20,8 @@ export function SettingsDisclosure({
   hint,
   hintId,
   summary,
-  open,
-  onToggle,
   children,
+  className,
   "data-dev-id": devId,
 }: {
   title: string;
@@ -26,55 +29,42 @@ export function SettingsDisclosure({
   hint?: string;
   hintId?: string;
   summary?: ReactNode;
-  open: boolean;
-  onToggle: () => void;
   children: ReactNode;
+  className?: string;
   "data-dev-id"?: string;
 }) {
   return (
-    <section className="border-b border-line last:border-b-0" data-dev-id={devId}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={onToggle}
+    <section
+      className={cx(
+        "flex min-w-0 flex-col overflow-hidden rounded-card border border-line bg-raise",
+        className,
+      )}
+      data-dev-id={devId}
+    >
+      <div
         data-testid={devId ? `${devId}.header` : undefined}
-        className="flex h-[44px] w-full items-center gap-2.5 rounded-control px-1.5 text-left transition-colors hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+        className="flex min-h-[54px] items-start gap-3 border-b border-line bg-band px-3.5 py-3"
       >
-        <span
-          aria-hidden
-          className={
-            "flex-none text-t3 transition-transform duration-150 " +
-            (open ? "rotate-90" : "")
-          }
-        >
-          {/* a small right-pointing caret, rotated down when open */}
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M3 1.5 7 5 3 8.5" stroke="currentColor" strokeWidth="1.5"
-                  strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-t1">
-          {titleId ? <Text id={titleId}>{title}</Text> : title}
-        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-t1">
+            {titleId ? <Text id={titleId}>{title}</Text> : title}
+          </h2>
+          {hint ? (
+            <p className="mt-0.5 max-w-[72ch] text-xs leading-relaxed text-t3">
+              {hintId ? <Text id={hintId}>{hint}</Text> : hint}
+            </p>
+          ) : null}
+        </div>
         {summary ? (
           <span
-            className="flex flex-none items-center gap-1.5 text-xs text-t3"
+            className="mt-0.5 flex flex-none items-center gap-1.5 whitespace-nowrap rounded-control border border-line bg-field px-2 py-1 text-2xs font-medium text-t2"
             data-testid="settings.summary"
           >
             {summary}
           </span>
         ) : null}
-      </button>
-      {open ? (
-        <div className="pb-4 pl-6 pr-1.5 pt-0.5">
-          {hint ? (
-            <p className="mb-2.5 text-xs text-t3">
-              {hintId ? <Text id={hintId}>{hint}</Text> : hint}
-            </p>
-          ) : null}
-          <Card className="px-4 py-3.5">{children}</Card>
-        </div>
-      ) : null}
+      </div>
+      <div className="min-w-0 px-3.5 py-3.5">{children}</div>
     </section>
   );
 }

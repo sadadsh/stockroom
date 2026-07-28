@@ -78,13 +78,13 @@ def test_search_url_is_quoted_and_targets_jlcsearch():
 def test_best_row_prefers_preferred_then_basic_then_stock():
     payload = {
         "components": [
-            {"lcsc": 111, "mfr": "LOW", "package": "0402", "stock": 999999,
+            {"lcsc": 111, "mfr": "whatever", "package": "0402", "stock": 999999,
              "price": "[]", "category": "R", "subcategory": "Chip",
              "is_basic": False, "is_preferred": False},
-            {"lcsc": 222, "mfr": "BASIC", "package": "0402", "stock": 10,
+            {"lcsc": 222, "mfr": "whatever", "package": "0402", "stock": 10,
              "price": "[]", "category": "R", "subcategory": "Chip",
              "is_basic": True, "is_preferred": False},
-            {"lcsc": 333, "mfr": "PREF", "package": "0402", "stock": 5,
+            {"lcsc": 333, "mfr": "whatever", "package": "0402", "stock": 5,
              "price": "[]", "category": "R", "subcategory": "Chip",
              "is_basic": False, "is_preferred": True},
         ]
@@ -94,13 +94,70 @@ def test_best_row_prefers_preferred_then_basic_then_stock():
     assert hit.lcsc == "C333"  # preferred wins over basic and over high stock
 
 
+def test_search_rejects_ranked_near_match_instead_of_replacing_the_requested_mpn():
+    payload = {
+        "components": [
+            {
+                "lcsc": 111,
+                "mfr": "US1M",
+                "package": "SMA",
+                "stock": 999999,
+                "price": "[]",
+                "category": "Diodes",
+                "subcategory": "Rectifiers",
+                "is_basic": True,
+                "is_preferred": True,
+            },
+            {
+                "lcsc": 222,
+                "mfr": "S1M",
+                "package": "SMA",
+                "stock": 0,
+                "price": "[]",
+                "category": "Diodes",
+                "subcategory": "Rectifiers",
+                "is_basic": False,
+                "is_preferred": False,
+            },
+        ]
+    }
+    client = JlcSearchClient(http_fetcher=_StubHttpFetcher(payload))
+
+    hit = client.search("s1m")
+
+    assert hit is not None
+    assert hit.mpn == "S1M"
+    assert hit.lcsc == "C222"
+
+
+def test_search_returns_none_when_the_catalogue_has_only_near_matches():
+    payload = {
+        "components": [
+            {
+                "lcsc": 111,
+                "mfr": "US1M",
+                "package": "SMA",
+                "stock": 999999,
+                "price": "[]",
+                "category": "Diodes",
+                "subcategory": "Rectifiers",
+                "is_basic": True,
+                "is_preferred": True,
+            },
+        ]
+    }
+    client = JlcSearchClient(http_fetcher=_StubHttpFetcher(payload))
+
+    assert client.search("S1M") is None
+
+
 def test_best_row_basic_beats_plain_when_no_preferred():
     payload = {
         "components": [
-            {"lcsc": 111, "mfr": "LOW", "package": "0402", "stock": 999999,
+            {"lcsc": 111, "mfr": "x", "package": "0402", "stock": 999999,
              "price": "[]", "category": "R", "subcategory": "Chip",
              "is_basic": False, "is_preferred": False},
-            {"lcsc": 222, "mfr": "BASIC", "package": "0402", "stock": 10,
+            {"lcsc": 222, "mfr": "x", "package": "0402", "stock": 10,
              "price": "[]", "category": "R", "subcategory": "Chip",
              "is_basic": True, "is_preferred": False},
         ]
@@ -112,10 +169,10 @@ def test_best_row_basic_beats_plain_when_no_preferred():
 def test_in_stock_rows_preferred_over_out_of_stock():
     payload = {
         "components": [
-            {"lcsc": 111, "mfr": "OOS_PREF", "package": "0402", "stock": 0,
+            {"lcsc": 111, "mfr": "x", "package": "0402", "stock": 0,
              "price": "[]", "category": "R", "subcategory": "Chip",
              "is_basic": True, "is_preferred": True},
-            {"lcsc": 222, "mfr": "IN_STOCK", "package": "0402", "stock": 3,
+            {"lcsc": 222, "mfr": "x", "package": "0402", "stock": 3,
              "price": "[]", "category": "R", "subcategory": "Chip",
              "is_basic": False, "is_preferred": False},
         ]
@@ -127,7 +184,7 @@ def test_in_stock_rows_preferred_over_out_of_stock():
 def test_falls_back_to_out_of_stock_when_none_in_stock():
     payload = {
         "components": [
-            {"lcsc": 111, "mfr": "OOS", "package": "0402", "stock": 0,
+            {"lcsc": 111, "mfr": "x", "package": "0402", "stock": 0,
              "price": "[]", "category": "R", "subcategory": "Chip",
              "is_basic": False, "is_preferred": True},
         ]
@@ -153,7 +210,7 @@ def test_missing_components_key_returns_none():
 def test_malformed_price_yields_empty_price_breaks(bad_price):
     payload = {
         "components": [
-            {"lcsc": 999, "mfr": "X", "package": "0402", "stock": 5,
+            {"lcsc": 999, "mfr": "x", "package": "0402", "stock": 5,
              "price": bad_price, "category": "R", "subcategory": "Chip",
              "is_basic": False, "is_preferred": False},
         ]

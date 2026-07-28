@@ -10,6 +10,7 @@ source (the datasheet) can be preferred over a lower-trust one (a scrape).
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -22,6 +23,11 @@ SCHEMA_VERSION = 2
 CONFIDENCE_RANK: dict[str, int] = {"low": 0, "medium": 1, "high": 2}
 
 _UNSAFE = re.compile(r"[\\/\s:*?\"<>|]+")
+
+
+def mpn_identity_key(mpn: object) -> str:
+    """NFC/case-tolerant, punctuation-preserving key for exact MPN comparison."""
+    return unicodedata.normalize("NFC", str(mpn or "")).strip().casefold()
 
 
 def normalize_mpn(mpn: str) -> str:

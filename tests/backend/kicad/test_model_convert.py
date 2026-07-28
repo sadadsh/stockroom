@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import glob
 import json
+import math
 import shutil
 import struct
 
@@ -14,6 +15,7 @@ from stockroom.kicad.model_convert import (
     GLB_MAGIC,
     ModelConversionError,
     ModelToolingMissing,
+    _normalise_step_basis,
     model_to_glb,
 )
 from tests.backend.conftest import requires_glb_tooling
@@ -30,6 +32,18 @@ def _gltf_json(data: bytes) -> dict:
             return json.loads(data[offset + 8 : offset + 8 + length])
         offset += 8 + length
     raise AssertionError("GLB has no JSON chunk")
+
+
+def _json_only_glb(gltf: dict) -> bytes:
+    """Build the smallest valid GLB needed to test JSON-only conversion contracts."""
+    payload = json.dumps(gltf, separators=(",", ":")).encode()
+    payload += b" " * (-len(payload) % 4)
+    return (
+        GLB_MAGIC
+        + struct.pack("<II", 2, 12 + 8 + len(payload))
+        + struct.pack("<II", len(payload), 0x4E4F534A)
+        + payload
+    )
 
 
 def _srgb(base_color):
@@ -70,6 +84,16 @@ def test_model_to_glb_converts_a_trimesh_native_mesh(tmp_path):
     data = model_to_glb(src)
     assert data[:4] == GLB_MAGIC
     assert len(data) > 100
+    frame = _gltf_json(data)["asset"]["extras"]["stockroom"]
+    assert frame == {
+        "sourceFormat": "OBJ",
+        "sourceUpAxis": "unknown",
+        "sourceUnits": "unknown",
+        "renderUpAxis": "Y",
+        "renderUnits": "m",
+        "basisTransform": "identity",
+        "frameConfidence": "unresolved",
+    }
 
 
 @requires_glb_tooling
@@ -82,6 +106,48 @@ def test_model_to_glb_converts_a_real_kicad_step(tmp_path):
     data = model_to_glb(src)
     assert data[:4] == GLB_MAGIC
     assert len(data) > 100
+
+
+def test_step_basis_normalisation_wraps_authored_roots_without_rewriting_them():
+    """STEP is Z-up while glTF is Y-up; the conversion must state that mapping.
+
+    This is a scene transform, not a vertex rewrite: geometry, normals, materials, and
+    any converter-authored node transforms stay byte-for-byte represented by their
+    original nodes beneath one explicit parent.
+    """
+    authored_nodes = [
+        {"mesh": 0, "translation": [1, 2, 3]},
+        {"mesh": 1, "rotation": [0, 0, 0, 1]},
+    ]
+    source = {
+        "asset": {"version": "2.0", "extras": {"vendor": "preserved"}},
+        "scene": 0,
+        "scenes": [{"nodes": [0, 1]}],
+        "nodes": authored_nodes,
+        "meshes": [{"primitives": []}, {"primitives": []}],
+    }
+
+    produced = _gltf_json(_normalise_step_basis(_json_only_glb(source)))
+    assert produced["nodes"][:2] == authored_nodes
+    assert produced["asset"]["extras"]["vendor"] == "preserved"
+    basis = produced["asset"]["extras"]["stockroom"]
+    assert basis == {
+        "sourceFormat": "STEP",
+        "sourceUpAxis": "Z",
+        "sourceUnits": "model-declared",
+        "renderUpAxis": "Y",
+        "renderUnits": "m",
+        "basisTransform": "rotateX(-90deg)",
+        "frameConfidence": "declared",
+    }
+    for scene in produced["scenes"]:
+        assert len(scene["nodes"]) == 1
+        wrapper = produced["nodes"][scene["nodes"][0]]
+        assert wrapper["name"].startswith("Stockroom STEP Basis")
+        assert wrapper["children"], "the wrapper must retain the converter-authored roots"
+        assert wrapper["rotation"] == pytest.approx(
+            [-math.sqrt(0.5), 0.0, 0.0, math.sqrt(0.5)]
+        )
 
 
 @requires_glb_tooling

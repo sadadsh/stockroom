@@ -1106,11 +1106,16 @@ describe("DetailPanel links row anatomy", () => {
     expect(cell.textContent).toMatch(/Not Set|Add Datasheet/);
   });
 
-  it("shows an eye glyph instead of spelling out View on an asset tile", () => {
+  it("moves the eye into a labelled Expand action over the asset stage", () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    // the word is gone; the affordance is the tile's own aria-label plus a glyph
+    // The footer is identity/status only; expansion is one large, consistent stage affordance.
     expect(screen.queryByText("View")).toBeNull();
-    expect(screen.getByRole("button", { name: "Open Symbol Preview" })).toBeTruthy();
+    const tile = document.querySelector('[data-dev-id="detail.asset-symbol"]')!;
+    const footer = tile.lastElementChild as HTMLElement;
+    expect(within(footer).queryByRole("button")).toBeNull();
+    expect(screen.getByRole("button", { name: "Open Symbol Preview" })).toHaveTextContent(
+      "Expand",
+    );
   });
 });
 
@@ -1171,39 +1176,45 @@ describe("the description lede", () => {
   });
 });
 
-// --- The 3D tile must be usable IN PLACE (owner, 2026-07-26). -----------------------------------
-// "clicking the tile must NOT expand - only the eye symbol opens the modal." The tile used to be
-// one big <button>, so every drag to orbit and every wheel to zoom landed on it and opened the
-// modal instead, which is exactly what made the mini viewer impossible to use.
+// --- Compact assets use one stage-centred inspection affordance (owner, 2026-07-28). --------------
+// The mini renderer is now a passive auto-rotating specimen. Hover/focus reveals one labelled eye
+// over every present representation; detached footer glyphs and whole-card click contracts are gone.
 
 describe("the 3D tile's click target", () => {
-  it("does NOT open the modal when the STAGE is clicked", async () => {
+  it("does NOT open the modal when the stage shell outside Inspect is clicked", async () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
     const tile = document.querySelector('[data-dev-id="detail.asset-hero"]');
     expect(tile).not.toBeNull();
-    // the stage is the region the viewer draws into; clicking it is an orbit gesture, not a command
+    // Expansion has one explicit command, not a surprising click-anywhere contract.
     const stage = tile!.firstElementChild as HTMLElement;
-    await userEvent.click(stage);
+    fireEvent.click(stage);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("is not itself a button, so pointer events reach the viewer", () => {
+  it("keeps every present representation shell out of the button role", () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    const tile = document.querySelector('[data-dev-id="detail.asset-hero"]');
-    expect(tile!.tagName).toBe("DIV");
+    for (const id of ["detail.asset-hero", "detail.asset-symbol", "detail.asset-footprint"]) {
+      expect(document.querySelector(`[data-dev-id="${id}"]`)!.tagName).toBe("DIV");
+    }
   });
 
-  it("still opens the modal from the eye", async () => {
+  it("opens the modal from the labelled Expand overlay", async () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
     await userEvent.click(screen.getByRole("button", { name: "Open 3D Model Preview" }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
-  it("leaves the STATIC tiles as whole-tile buttons", () => {
-    // symbol and footprint stages are images; whole-tile click is the better target there, and this
-    // change must not quietly shrink them to a 14px glyph.
+  it("gives all three present representations the same Expand contract", () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    expect(document.querySelector('[data-dev-id="detail.asset-symbol"]')!.tagName).toBe("BUTTON");
+    expect(screen.getByRole("button", { name: "Open 3D Model Preview" })).toHaveTextContent(
+      "Expand",
+    );
+    expect(screen.getByRole("button", { name: "Open Symbol Preview" })).toHaveTextContent(
+      "Expand",
+    );
+    expect(screen.getByRole("button", { name: "Open Footprint Preview" })).toHaveTextContent(
+      "Expand",
+    );
   });
 });
 

@@ -56,6 +56,8 @@ import type {
   PinoutDTO,
   CompatUnionBody,
   UnionDTO,
+  TargetDefinitionBody,
+  TargetDefinitionDTO,
   PinAfResponse,
   SignalCandidatesResponse,
   SuggestionsResponse,
@@ -883,6 +885,12 @@ export const api = {
   // invalidated after it resolves. A 409 raises ApiError(409) the caller routes to the build gate.
   postStmCompatUnion(body: CompatUnionBody): Promise<UnionDTO> {
     return request<UnionDTO>("POST", "/api/stm/compat/union", { body });
+  },
+
+  // Compile silicon variation plus an explicit hardware policy into the
+  // content-addressed artifact consumed by build documentation and firmware.
+  postStmTargetDefinition(body: TargetDefinitionBody): Promise<TargetDefinitionDTO> {
+    return request<TargetDefinitionDTO>("POST", "/api/stm/target-definition", { body });
   },
 
   // One pin's complete AF0-15 set (SWAP-01). `part` is a ref_name OR an MPN, passed as a query

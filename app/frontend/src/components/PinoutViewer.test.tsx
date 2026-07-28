@@ -91,7 +91,7 @@ describe("CompactPinoutCard", () => {
 
     const card = container.querySelector('[data-dev-id="detail.pinout"]');
     const list = container.querySelector('[data-dev-id="detail.pinout-list"]');
-    expect(card).toHaveClass("max-h-[300px]", "overflow-hidden");
+    expect(card).toHaveClass("h-[184px]", "flex-none", "overflow-hidden");
     expect(list).toHaveClass("grid-cols-2", "overflow-y-auto");
     expect(screen.getByText("64 Pins")).toBeInTheDocument();
   });

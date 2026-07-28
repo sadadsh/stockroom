@@ -399,16 +399,21 @@ def cmd_up(args) -> int:
 
 
 def _host_pids() -> list[int]:
-    """Every running Stockroom host, by pid.
+    """Every independent running Stockroom host tree, by its root pid.
 
     PowerShell CIM, never `wmic` (removed from current Windows) and never the webview IMAGE NAME:
     measured on this machine, only 5 of 17 `msedgewebview2.exe` belonged to Stockroom and the rest
-    were Windows Widgets and SearchHost.
+    were Windows Widgets and SearchHost. A Windows uv-managed virtualenv starts a tiny python.exe
+    launcher whose child is the real python.exe; both command lines contain stockroom.host.run.
+    Count only candidates whose parent is not another candidate or one window is falsely reported
+    as two independent hosts.
     """
     out = subprocess.run(
         ["powershell.exe", "-NoProfile", "-Command",
-         "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
-         "Where-Object { $_.CommandLine -like '*stockroom.host.run*' } | "
+         "$hosts = @(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+         "Where-Object { $_.CommandLine -like '*stockroom.host.run*' }); "
+         "$ids = @($hosts | Select-Object -ExpandProperty ProcessId); "
+         "$hosts | Where-Object { $ids -notcontains $_.ParentProcessId } | "
          "Select-Object -ExpandProperty ProcessId"],
         capture_output=True, text=True,
     ).stdout
@@ -501,7 +506,7 @@ def cmd_tour(args) -> int:
         print(f"NO WINDOW: {exc}")
         return 2
 
-    surfaces = args.surface or ["rail.nav-components", "rail.nav-projects", "rail.nav-stm"]
+    surfaces = args.surface or ["rail.nav-components", "rail.nav-stm", "rail.nav-settings"]
     findings: list[str] = []
     skipped: list[str] = []
     pressed = 0
@@ -706,7 +711,7 @@ def main() -> int:
             return _run_steps(drive, args.steps, out_dir)
         if args.single == "eval" and getattr(args, "js_file", ""):
             args.arg = Path(args.js_file).read_text(encoding="utf-8")
-        if not args.arg and args.single in ("click", "text", "eval"):
+        if not getattr(args, "arg", "") and args.single in ("click", "text", "eval"):
             print(f"{args.single}: nothing to run (pass an argument, or --js-file for eval)")
             return 2
         if args.single == "console":
@@ -714,7 +719,8 @@ def main() -> int:
             for line in drive.console or ["(nothing logged)"]:
                 print(line)
             return 0
-        steps = [f"{args.single}:{args.arg}" if args.single != "shot" else f"shot:{args.arg}"]
+        arg = getattr(args, "arg", "")
+        steps = [f"{args.single}:{arg}" if args.single != "shot" else f"shot:{arg}"]
         if getattr(args, "shot", False):
             steps.append("shot")
         return _run_steps(drive, steps, out_dir)

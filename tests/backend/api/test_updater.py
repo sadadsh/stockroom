@@ -120,6 +120,11 @@ def test_check_fetches_so_a_fresh_remote_commit_is_seen(tmp_path):
     info = AppUpdater(c, uv_runner=lambda: None, restart=lambda: None).check()
     assert info["update_available"] is True
     assert info["behind"] == 1
+    assert info["state"] == "update_available"
+    assert info["current_revision"] == c.head()[:12]
+    assert info["channel"] == c.current_branch()
+    assert info["automatic_on_launch"] is True
+    assert info["check_interval_seconds"] == 120
 
 
 def test_check_reports_an_unreachable_remote_honestly(tmp_path):
@@ -129,3 +134,23 @@ def test_check_reports_an_unreachable_remote_honestly(tmp_path):
     assert info["update_available"] is False
     assert info["state"] == UpdateState.OFFLINE
     assert info["detail"]  # the reason is carried, never a silent Up To Date
+    assert info["current_revision"] == c.head()[:12]
+    assert info["channel"] == c.current_branch()
+
+
+def test_check_reports_an_unmanaged_checkout_instead_of_calling_it_current(tmp_path):
+    repo_path = tmp_path / "standalone"
+    repo_path.mkdir()
+    repo = GitRepo(repo_path)
+    repo.init()
+    tracked = repo_path / "app.py"
+    tracked.write_text("v1\n", encoding="utf-8")
+    repo.commit("v1", [tracked])
+
+    info = AppUpdater(repo, uv_runner=lambda: None, restart=lambda: None).check()
+
+    assert info["update_available"] is False
+    assert info["state"] == UpdateState.NO_REMOTE
+    assert info["detail"] == "no application remote is configured"
+    assert info["current_revision"] == repo.head()[:12]
+    assert info["automatic_on_launch"] is True

@@ -1,6 +1,6 @@
 /**
  * SwitchPlanTable: the Bench's socket switch plan (owner redesign 2026-07-23). For a ZIF-socket
- * board hosting every part in the set (the NETDECK build-card architecture), this is the readout
+ * adapter hosting every part in the set, this is the readout
  * that matters: every position that is NOT identical across the set, what the baseline identity
  * is, who diverges, and what it takes to reconcile - an AF swap (software), or a blocker that
  * needs real switching/isolation hardware on the socket board.

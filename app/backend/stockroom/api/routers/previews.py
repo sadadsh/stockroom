@@ -135,7 +135,9 @@ _SYM_RENDER_VERSION = "c3"  # C3: the viewBox refit applies to every preview, sy
 # measured rgb(144,144,144) - the viewer was rendering the room rather than the part.)
 # (C4: the finish is decided PER SURFACE, so a recognised pin colour - or a solid the vendor named
 # as its leadframe - is stated as metal instead of rendering as coloured plastic.)
-_MODEL_CONVERT_VERSION = "c4"
+# (C5: STEP's native Z-up coordinates are explicitly wrapped into glTF's mandated Y-up
+# basis. Without it, standards-compliant viewers stood every board-mounted part on its side.)
+_MODEL_CONVERT_VERSION = "c6"
 
 
 def _clean_symbol_svg(cli, lib_path: Path, name: str, bw: bool, td: Path) -> list:

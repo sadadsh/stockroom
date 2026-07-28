@@ -77,6 +77,21 @@ def test_enabling_is_repo_local_and_idempotent(tmp_path):
     assert "filter \"lfs\"" in local or "[filter \"lfs\"]" in local
 
 
+def test_track_output_parser_preserves_tracked_patterns_and_ignores_exclusions():
+    output = """\
+Listing tracked patterns
+    *.pcblib (.gitattributes)
+    assets/(approved)/*.STEP (.gitattributes)
+Listing excluded patterns
+    vendor/** (.git/info/attributes)
+"""
+
+    assert lfs._parse_tracked_patterns(output) == (
+        "*.pcblib",
+        "assets/(approved)/*.STEP",
+    )
+
+
 def test_a_binary_really_becomes_a_POINTER_once_the_filter_and_rules_are_both_in_place(tmp_path):
     """The end-to-end proof. Attributes ALONE are inert: git happily stores the file normally and
     reports nothing, so a test that only asserted the .gitattributes content would pass while the
@@ -99,7 +114,7 @@ def test_a_binary_really_becomes_a_POINTER_once_the_filter_and_rules_are_both_in
     st = lfs.status(repo)
     assert st.enabled is True
     assert st.objects == 1
-    assert any("PcbLib" in p for p in st.tracked_patterns)
+    assert any("pcblib" in p.casefold() for p in st.tracked_patterns)
 
 
 def test_attributes_without_the_filter_store_the_file_normally_and_say_nothing(

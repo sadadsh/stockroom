@@ -525,6 +525,67 @@ def test_compat_union_accepts_a_families_array_scope(client, app_ctx):
     assert body["family"] == "STM32F4"
 
 
+def test_target_definition_compiles_a_versioned_provenanced_artifact(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.post(
+        "/api/stm/target-definition",
+        json={
+            "parts": ["STM32F407V(E-G)Tx"],
+            "policy": {
+                "id": "api-test",
+                "revision": 1,
+                "requirements": [
+                    {
+                        "id": "uart_tx",
+                        "label": "Boot UART TX",
+                        "net": "UART_BOOT_TX",
+                        "required": True,
+                        "signal_patterns": ["USART1_TX"],
+                        "preferred_positions": ["12"],
+                        "evidence": ["fixture signal table"],
+                    }
+                ],
+                "service_groups": [
+                    {
+                        "id": "boot-uart",
+                        "label": "Boot UART",
+                        "category": "recovery",
+                        "protocol": "usart",
+                        "requirement_ids": ["uart_tx"],
+                        "required": False,
+                        "claim_scope": "pin-capability",
+                    }
+                ],
+                "safety_rules": [],
+                "channel_fabric": {
+                    "part_mpn": "TEST-SWITCH-8",
+                    "channels_per_device": 8,
+                    "max_devices": 1,
+                    "default_state": "open",
+                },
+            },
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["format"] == "stm-target-definition/1"
+    assert len(body["artifact_digest"]) == 64
+    assert body["scope"]["package"] == "LQFP64"
+    assert body["requirements"][0]["route_kind"] == "direct"
+    assert body["service_groups"][0]["id"] == "boot-uart"
+    assert body["functional_foundation"]["groups"]
+    assert body["provenance"]["source_sha256"] == "deadbeef"
+
+
+def test_target_definition_is_409_when_the_index_is_not_built(client, app_ctx):
+    app_ctx.stm_index = None
+    r = client.post(
+        "/api/stm/target-definition",
+        json={"parts": ["STM32F407V(E-G)Tx"], "policy": {"id": "test"}},
+    )
+    assert r.status_code == 409
+
+
 def test_compat_suggestions_accepts_a_comma_separated_family_scope(client, app_ctx):
     _seed_stm_index(app_ctx)
     r = client.get(

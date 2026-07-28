@@ -1,7 +1,10 @@
 """App-repo self-update (spec section 12; distinct from library sync in sync.py).
-A thin veneer over AppUpdater: check() is a non-blocking ahead/behind read, apply()
-runs the ff-only pull then uv sync + restart, and on a non-fast-forward it surfaces
-DIVERGED rather than guessing (spec section 2.2). Token-guarded like every route."""
+
+The route exposes the installed checkout's identity and delivery policy, fetches before deciding
+whether an update exists, and applies a fast-forward or a safe rebase of disjoint local library
+commits before syncing dependencies and requesting a graceful restart. A true conflict remains an
+honest DIVERGED state. Token-guarded like every route.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +20,15 @@ def update_router(require_token) -> APIRouter:
     def check(request: Request) -> dict:
         ctx = request.app.state.ctx
         if ctx.app_repo is None:
-            return {"update_available": False, "state": UpdateState.NO_REMOTE}
+            return {
+                "update_available": False,
+                "state": UpdateState.NO_REMOTE,
+                "detail": "this installation is not managed by an application checkout",
+                "current_revision": "",
+                "channel": "unmanaged",
+                "automatic_on_launch": False,
+                "check_interval_seconds": 120,
+            }
         return AppUpdater(ctx.app_repo).check()
 
     @r.post("/apply")

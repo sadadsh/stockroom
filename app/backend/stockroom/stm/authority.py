@@ -10,8 +10,8 @@ NEW functions the compatibility surface needs:
 `compatibility_suggestions`. No API, no SVG, no switch semantics - pure Python +
 parameterized SQL against the frozen Phase-1/2 schema. Every computation stays at
 (mcu, package, position) grain; every union is scoped by ONE package plus an
-explicit family scope - one family or several (owner amendment 2026-07-23: a
-cross-family set on one footprint IS the build-card goal), never a bare package
+  explicit family scope - one family or several (owner amendment 2026-07-23: a
+  cross-family set on one footprint is a supported adapter goal), never a bare package
 string sweeping in families nobody named. socket_union still raises on a
 cross-package set (a socket is a physical footprint).
 """
@@ -320,8 +320,8 @@ def compatibility_suggestions(
     positions where its vector differs from the baseline. `tolerance` merges a
     divergent group into the baseline when its divergence count is <= tolerance.
     The scope may span several families (owner amendment 2026-07-23) - a group is
-    then free to mix families, which is exactly the cross-family drop-in discovery
-    the build-card concept wants; the echoed `family` field joins the scope names."""
+    then free to mix families for cross-family drop-in discovery; the echoed
+    `family` field joins the scope names."""
     scope_families = list(families or ([family] if family else []))
     if not scope_families:
         raise ValueError("compatibility_suggestions requires at least one family")
@@ -482,8 +482,8 @@ def socket_union(
     the same MPN-resolution ladder as resolve_part) OR selects a whole
     (families, package) group. Every part MUST share ONE package (a socket is a
     physical footprint) - raises ValueError on a cross-package set. Families MAY
-    mix (owner amendment 2026-07-23: the build-card goal is exactly a cross-family
-    socket on one footprint); each part keeps its own per-part grain, so a
+    mix (owner amendment 2026-07-23: a cross-family adapter on one footprint is a
+    supported goal); each part keeps its own per-part grain, so a
     cross-family identity difference classifies divergent, never a silent merge.
     The result carries `families` (the sorted real scope) plus `family` (a
     joined display string, the single name when the scope is one family)."""

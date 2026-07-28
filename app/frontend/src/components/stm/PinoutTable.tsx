@@ -1,6 +1,6 @@
 /**
  * PinoutTable: the selected part's ENTIRE pinout as a flat, scrollable table (owner ask
- * 2026-07-23) - the per-pin build-card reading of the same PinoutDTO the map draws, so nothing is
+ * 2026-07-23) - the per-pin engineering reading of the same PinoutDTO the map draws, so nothing is
  * fetched. Columns: position, name, category (the shared color-is-data dot), type, 5V, and the
  * pin's AF set (each entry AF<n> SIGNAL, the mux fact the whole compatibility story runs on).
  * A row click selects the pin exactly like clicking its pad on the map (one selection model).

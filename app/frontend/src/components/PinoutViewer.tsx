@@ -190,7 +190,7 @@ export function CompactPinoutCard({
     <section
       data-dev-id="detail.pinout"
       aria-labelledby="detail-pinout-heading"
-      className="flex min-h-[112px] max-h-[300px] flex-1 flex-col overflow-hidden rounded-card border border-line bg-s1"
+      className="flex h-[184px] flex-none flex-col overflow-hidden rounded-card border border-line bg-s1"
     >
       <div className="flex-none border-b border-line px-2.5 py-2">
         <div className="flex min-w-0 items-baseline gap-2">

@@ -122,7 +122,7 @@ describe("coverage", () => {
     expect(
       await screen.findByText(/All 158 components have every file they need/i),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Complete My Library" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Fill Supported CAD Gaps" })).toBeDisabled();
   });
 
   it("says so plainly when the library is empty", async () => {
@@ -165,7 +165,7 @@ describe("running", () => {
       ]);
     });
     renderSection();
-    await userEvent.click(await screen.findByRole("button", { name: "Complete My Library" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
     // A run that cannot be stopped is a commitment the user cannot take back.
     expect(await screen.findByRole("button", { name: "Stop" })).toBeInTheDocument();
     release();
@@ -192,7 +192,7 @@ describe("running", () => {
       ]),
     );
     renderSection();
-    await userEvent.click(await screen.findByRole("button", { name: "Complete My Library" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
     expect(await screen.findByText("10 Filed")).toBeInTheDocument();
     expect(screen.getByText("33 To Retry")).toBeInTheDocument();
     expect(screen.getByText("19 No Source")).toBeInTheDocument();
@@ -218,7 +218,7 @@ describe("running", () => {
       ]),
     );
     renderSection();
-    await userEvent.click(await screen.findByRole("button", { name: "Complete My Library" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
     expect(
       await screen.findByText(/the catalogue is refusing requests/i),
     ).toBeInTheDocument();
@@ -228,7 +228,7 @@ describe("running", () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
     vi.spyOn(api, "runCompletion").mockRejectedValue(new Error("backend is down"));
     renderSection();
-    await userEvent.click(await screen.findByRole("button", { name: "Complete My Library" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
     // Reported in two places on purpose: the toast is transient, the paragraph persists.
     await waitFor(() =>
       expect(screen.getAllByText(/backend is down/i).length).toBeGreaterThan(0),
