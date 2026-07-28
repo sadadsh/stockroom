@@ -57,7 +57,12 @@ export function SettingsDisclosure({
           {titleId ? <Text id={titleId}>{title}</Text> : title}
         </span>
         {summary ? (
-          <span className="flex flex-none items-center gap-1.5 text-xs text-t3">{summary}</span>
+          <span
+            className="flex flex-none items-center gap-1.5 text-xs text-t3"
+            data-testid="settings.summary"
+          >
+            {summary}
+          </span>
         ) : null}
       </button>
       {open ? (

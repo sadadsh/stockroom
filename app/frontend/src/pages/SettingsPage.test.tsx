@@ -36,6 +36,8 @@ vi.mock("../api/client", async (importActual) => {
       libraryCoverage: vi.fn(),
       libraryDerivation: vi.fn(),
       cadInventory: vi.fn(),
+      getLibraryLfs: vi.fn(),
+      getRescanState: vi.fn(),
     },
   };
 });
@@ -192,6 +194,15 @@ beforeEach(() => {
   });
   mockApi.cadInventory.mockResolvedValue({
     cleared: 184, kept_stock: 0, items: [], failed: [], missing_files: [],
+  });
+  mockApi.getLibraryLfs.mockResolvedValue({
+    installed: true, version: "3.4.1", enabled: true,
+    tracked_patterns: ["*.step"], objects: 62, legacy_blobs: 0,
+    covers: [], adopted: true, reason: "",
+  });
+  mockApi.getRescanState.mockResolvedValue({
+    parts: { "SR-0001": { checked_at: "2026-07-20T10:00:00Z", outcome: "updated" } },
+    counts: { updated: 1 },
   });
 });
 
@@ -763,6 +774,54 @@ describe("SettingsPage - collapsed summaries state their own section", () => {
     const cadClear = screen.getByTestId("settings.cad-clear.header");
     expect(cadClear).toHaveAttribute("aria-expanded", "false");
     expect(await within(cadClear).findByText("184 Files")).toBeInTheDocument();
+
+    // The item named three; ENUMERATING the population found five. Library Health, Library Sync
+    // and Procurement Rescan were equally silent and are covered in the same pass rather than
+    // left to be rediscovered by a later critique of the same screen.
+    const health = screen.getByTestId("settings.health.header");
+    expect(await within(health).findByText("Healthy")).toBeInTheDocument();
+    const librarySync = screen.getByTestId("settings.librarysync.header");
+    expect(await within(librarySync).findByText("62 In LFS")).toBeInTheDocument();
+  });
+
+  it("EVERY disclosure states something on its collapsed row", async () => {
+    // The GATE, not another example. A summary-less section is invisible to a test that only
+    // checks the ones somebody happened to notice, which is exactly how three of these five sat
+    // silent through an element-by-element critique of this screen.
+    renderPage();
+    const user = userEvent.setup();
+    const nav = screen.getByRole("navigation", { name: /settings sections/i });
+    await screen.findByTestId("settings.appearance.header");
+
+    // The population comes from the DOM, never from a list written here. A hand-listed coverage
+    // set grows silent holes: a disclosure added later would simply not be checked, and the test
+    // would keep passing while the hole it exists to catch reopened.
+    const seen: string[] = [];
+    const silent: string[] = [];
+    for (const groupName of ["Application", "Library", "KiCad", "Altium", "Sourcing"]) {
+      await user.click(within(nav).getByRole("button", { name: new RegExp(`^${groupName}$`, "i") }));
+      await waitFor(() =>
+        expect(
+          document.querySelectorAll('[aria-expanded][data-testid$=".header"]').length,
+        ).toBeGreaterThan(0),
+      );
+      for (const header of document.querySelectorAll<HTMLElement>(
+        '[aria-expanded][data-testid$=".header"]',
+      )) {
+        const id = header.getAttribute("data-testid") || "";
+        if (!id.startsWith("settings.") || seen.includes(id)) continue;
+        seen.push(id);
+        const summary = within(header).queryByTestId("settings.summary");
+        if (!summary || !summary.textContent?.trim()) silent.push(id);
+      }
+    }
+
+    // assert the key space is non-empty BEFORE trusting an empty failure list: a selector that
+    // matched nothing would otherwise report perfect coverage of zero sections.
+    expect(seen.length, "no disclosures were found at all - the selector is wrong").toBeGreaterThan(
+      10,
+    );
+    expect(silent, `these disclosures state nothing on their collapsed row: ${silent}`).toEqual([]);
   });
 
   it("a complete library and an empty CAD inventory read as states, not as zeroes", async () => {
