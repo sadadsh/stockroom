@@ -586,21 +586,22 @@ def test_the_default_vendor_chain_is_ultra_librarian_then_snapmagic():
     assert runner._vendor_chain(None) == ["ultralibrarian", "snapmagic"]
 
 
-def test_a_single_vendor_or_an_explicit_order_still_works():
-    """The API and existing callers pass one key; a list lets the order be chosen deliberately."""
+def test_a_preferred_vendor_keeps_the_other_implemented_provider_as_fallback():
+    """A chosen provider changes priority without disabling automatic fallback."""
     from stockroom.capture import runner
 
-    assert runner._vendor_chain("snapmagic") == ["snapmagic"]
+    assert runner._vendor_chain("snapmagic") == ["snapmagic", "ultralibrarian"]
     assert runner._vendor_chain(["snapmagic", "ultralibrarian"]) == ["snapmagic", "ultralibrarian"]
 
 
-def test_an_unknown_vendor_degrades_instead_of_emptying_the_chain():
-    """A stale vendor name must not produce a run that opens no browser and reports 'nothing to
-    do' - that would look like a complete library rather than a typo."""
+def test_an_unknown_or_empty_vendor_choice_fails_honestly():
+    """A provider label must never silently execute another provider's browser adapter."""
     from stockroom.capture import runner
 
-    assert runner._vendor_chain("no-such-vendor") == ["ultralibrarian"]
-    assert runner._vendor_chain([]) == ["ultralibrarian"]
+    with pytest.raises(ValueError, match="no network capture adapter"):
+        runner._vendor_chain("no-such-vendor")
+    with pytest.raises(ValueError, match="at least one implemented provider"):
+        runner._vendor_chain([])
 
 
 def test_snapmagic_serves_native_altium_which_needs_no_conversion():

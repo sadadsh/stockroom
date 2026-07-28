@@ -60,6 +60,21 @@ def test_cad_source_offers_every_vendor_in_trust_order(client, app_ctx):
     ]
 
 
+def test_cad_source_distinguishes_a_page_link_from_an_implemented_capture_adapter(
+    client, app_ctx
+):
+    part_id = _land_bare_part(app_ctx)
+    by_key = {
+        source["key"]: source
+        for source in client.get(f"/api/library/parts/{part_id}/cad-source").json()["sources"]
+    }
+
+    assert by_key["ultralibrarian"]["capture_available"] is True
+    assert by_key["snapmagic"]["capture_available"] is True
+    assert by_key["digikey"]["capture_available"] is False
+    assert by_key["samacsys"]["capture_available"] is False
+
+
 def test_each_vendor_carries_a_real_url_for_this_part(client, app_ctx):
     """A vendor entry with no URL is a dead end the UI would still render."""
     part_id = _land_bare_part(app_ctx)
