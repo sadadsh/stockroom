@@ -46,6 +46,7 @@ def test_every_router_is_mounted_and_token_guarded(anon_client):
     assert anon_client.get("/api/health").status_code == 200
     guarded = [
         ("get", "/api/system/info", None),
+        ("get", "/api/system/workflow-coordinator", None),
         ("get", "/api/library/parts", None),
         ("get", "/api/previews/symbol/x.svg", None),
         ("post", "/api/ingest/inspect", {"paths": [], "lcsc_ids": []}),

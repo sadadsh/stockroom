@@ -24,6 +24,7 @@ from stockroom.vcs.repo import GitRepo
 from stockroom.vcs.sync import SyncEngine
 
 if TYPE_CHECKING:
+    from stockroom.service import WorkflowCoordinator
     from stockroom.stm.db import StmIndex
 
 
@@ -55,6 +56,10 @@ class AppContext:
     # `switch_library` deliberately leaves this untouched - the CubeMX source is a
     # machine-global setting, not library-scoped.
     stm_index: "StmIndex | None" = None
+    # Read-only observability seam for the durable workflow owner. The desktop
+    # context does not acquire generation authority or start/stop this resource;
+    # the future persistent service process owns that lifecycle.
+    workflow_coordinator: "WorkflowCoordinator | None" = None
     # The last ERC/DRC run per project id (M7b), cached in-memory (never committed to
     # the library repo: an external project's check results are not library records, and
     # a git commit per check run is churn). Read by the checks GET, Overview, and the
