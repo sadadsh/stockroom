@@ -25,6 +25,7 @@ Usage:
     uv run python scripts/webread.py <url> [--grep TERM ...] [--controls] [--expect CSS]
     uv run python scripts/webread.py --vendor ultralibrarian --mpn TPD6E05U06RVZR --controls
     uv run python scripts/webread.py <url> --profile ~/.stockroom-read --headed   # signed-in page
+    uv run python scripts/webread.py --vendor snapmagic --mpn <MPN> --drive altium --engine camoufox
 """
 
 from __future__ import annotations
@@ -123,6 +124,118 @@ def _print_controls(data: dict) -> None:
             print(f"        attrs: {json.dumps(attrs)[:200]}")
 
 
+def _report_landed(landed) -> None:
+    """What ACTUALLY arrived, and what the app would make of it.
+
+    The point of `--drive`. Every earlier vendor claim in this repo was made from what was
+    SELECTED - a report built from the buttons that were clicked, which cannot tell a delivered
+    file from a silent no-op. This reads the files on disk and runs the SAME `classify_asset` the
+    ingest path runs, so "the vendor supplies Altium" is a statement about bytes.
+    """
+    import zipfile
+
+    from stockroom.capture.classify import classify_asset
+
+    if not landed:
+        print("\nDELIVERED  nothing. No file reached disk.")
+        return
+    print(f"\nDELIVERED  {len(landed)} file(s)")
+    for item in landed:
+        path = Path(item.path)
+        size = path.stat().st_size if path.exists() else 0
+        asset = classify_asset(path)
+        reqs = ", ".join(sorted(r.value for r in asset.requirements)) or "NOTHING"
+        print(f"  {path.name}  {size:,} bytes")
+        print(f"        classify: tool={asset.tool} kind={asset.kind}")
+        print(f"        satisfies: {reqs}")
+        if zipfile.is_zipfile(path):
+            with zipfile.ZipFile(path) as zf:
+                names = zf.namelist()
+            print(f"        members ({len(names)}):")
+            for name in names[:40]:
+                print(f"          {name}")
+
+
+def _sign_in_if_saved(adapter, page) -> None:
+    """Use the credentials Settings already stores, through the adapter's own `sign_in`.
+
+    A vendor that renders its Download button only for a signed-in user makes an unauthenticated
+    drive report "no download offered", which reads as a vendor limitation and is not one.
+    """
+    from stockroom.capture.guided import sign_in_adapter
+    from stockroom.capture.runner import _saved_credentials
+
+    if not getattr(adapter.capability, "needs_login", False):
+        print("SIGN-IN  not required by this vendor")
+        return
+    if getattr(adapter, "sign_in", None) is None:
+        # A REAL gap, said out loud rather than skipped silently: the vendor gates its Download
+        # button behind a login, saved credentials exist, and the adapter has no way to use them.
+        print(f"SIGN-IN  {adapter.capability.label} needs a login but its adapter has NO sign_in - "
+              "running signed out, so a missing Download button is NOT a vendor limitation")
+        return
+    if not _saved_credentials(adapter.capability.key):
+        print(f"SIGN-IN  nothing saved for {adapter.capability.key!r}; running signed out")
+        return
+    why = sign_in_adapter(adapter, page, _saved_credentials)
+    print(f"SIGN-IN  {'OK or already signed in' if not why else 'FAILED: ' + why}")
+
+
+def _drive(browser, args) -> int:
+    """Run the REAL vendor adapter for the named formats and report what landed.
+
+    It drives through `capture.guided.drive_formats`, the same function `GuidedCaptureSource` uses
+    in production, so what is measured here is what the app does - not a parallel script that
+    agrees with it by luck. Nothing is attached and no library is touched: this answers "what does
+    this vendor actually deliver", which is a question about the vendor, not about a part.
+
+    NEGATIVE CONTROL, and it is not optional: run it with an MPN the vendor cannot have
+    (`--mpn ZZZNOTAREALPART123`) and confirm it reports DELIVERED nothing. A probe that reports a
+    hit for an invented part number measures nothing, and one in this repo did exactly that on
+    2026-07-27 before anyone fed it a fake.
+    """
+    from stockroom.capture.guided import drive_formats
+    from stockroom.capture.vendors import get_adapter
+
+    adapter = get_adapter(args.vendor)
+    if adapter is None:
+        raise SystemExit(f"no capture adapter for vendor {args.vendor!r}")
+    formats = [f.strip() for f in args.drive.split(",") if f.strip()]
+    pins = adapter.capability.version_pins
+    unpinned = [f for f in formats if f not in pins]
+    if unpinned:
+        # `version_pins` is the honest answer to "what can this adapter really select". Driving an
+        # unpinned format would click nothing and then report a vendor limitation that is really an
+        # adapter gap.
+        print(f"NOT PINNED  {', '.join(unpinned)} - this adapter can only select: "
+              f"{', '.join(sorted(pins))}")
+        formats = [f for f in formats if f in pins]
+        if not formats:
+            return 2
+
+    url = adapter.resolve_url(args.mpn)
+    if not url:
+        raise SystemExit(f"no {adapter.capability.label} page for {args.mpn!r}")
+    print(f"vendor: {adapter.capability.label}  ({adapter.capability.key})")
+    print(f"url: {url}")
+    print(f"formats: {', '.join(formats)}  "
+          f"(one download per format: {adapter.capability.formats_exclusive})")
+
+    with browser.session() as page:
+        page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        _sign_in_if_saved(adapter, page)
+        report, failure = drive_formats(browser, page, adapter, formats, url)
+
+    print(f"\nSELECTED   {report.selected or 'none'}")
+    print(f"MISSED     {report.missed or 'none'}")
+    print(f"SUBMITTED  {report.submitted}")
+    print(f"MESSAGE    {report.message}")
+    if failure:
+        print(f"FAILURE    {failure}")
+    _report_landed(browser.captured)
+    return 0 if browser.captured else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("url", nargs="?", default="")
@@ -137,6 +250,13 @@ def main() -> int:
     ap.add_argument("--timeout", type=float, default=30.0)
     ap.add_argument("--profile", default="", help="persistent profile dir (keeps a sign-in)")
     ap.add_argument("--headed", action="store_true", help="show the browser (to sign in by hand)")
+    ap.add_argument(
+        "--drive",
+        default="",
+        metavar="FORMATS",
+        help="with --vendor/--mpn: actually run that vendor's adapter for these formats "
+        "(comma list of kicad,altium,model) and report WHAT ARRIVED, not what was clicked",
+    )
     ap.add_argument(
         "--engine",
         default="chromium",
@@ -168,6 +288,9 @@ def main() -> int:
         headless=not args.headed,
         engine=args.engine,
     )
+    if args.drive:
+        return _drive(browser, args)
+
     with browser.session() as page:
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
         # Readiness by a REAL signal when one is named, never a fixed wait. A page that never
