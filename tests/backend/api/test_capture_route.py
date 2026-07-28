@@ -43,9 +43,23 @@ def fake_vendor(monkeypatch):
     """Point the Ultra Librarian adapter at a local stand-in serving its REAL captured markup, so
     no test ever touches the live vendor."""
     base, shutdown = serve_fixture_vendor()
+    from stockroom.capture import identity as capture_identity
     from stockroom.capture.vendors import UltraLibrarianAdapter
 
     monkeypatch.setattr(UltraLibrarianAdapter, "resolve_url", lambda self, mpn: base)
+    real_page_identity = capture_identity.page_identity
+    monkeypatch.setattr(
+        capture_identity,
+        "page_identity",
+        lambda vendor, url: (
+            capture_identity.PageIdentity(
+                mpn="TPD6E05U06RVZR",
+                manufacturer="Texas Instruments",
+            )
+            if url.startswith(base)
+            else real_page_identity(vendor, url)
+        ),
+    )
     try:
         yield base
     finally:
@@ -89,6 +103,18 @@ def _a_part_missing_its_kicad_files(client) -> dict:
     parts = client.get("/api/library/parts").json()["parts"]
     assert parts, "the fixture library is empty"
     part_id = parts[0]["id"]
+    # The local provider fixture serves TPD6E05U06RVZR. Give the target that exact identity before
+    # capture; attaching the fixture bytes to the old blank-MPN `mystery` record would prove only
+    # that guided capture can mislabel an arbitrary download.
+    for field, value in (
+        ("mpn", "TPD6E05U06RVZR"),
+        ("manufacturer", "Texas Instruments"),
+    ):
+        response = client.patch(
+            f"/api/library/parts/{part_id}",
+            json={"field": field, "value": value},
+        )
+        assert response.status_code == 200, response.text
     for kind in ("kicad_symbol", "kicad_footprint"):
         resp = client.delete(f"/api/library/parts/{part_id}/assets/{kind}")
         assert resp.status_code == 200, f"detach {kind} failed: {resp.status_code} {resp.text[:200]}"

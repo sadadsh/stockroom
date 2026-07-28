@@ -38,6 +38,7 @@ from pathlib import Path
 
 from stockroom.capture.browser import PlaywrightCaptureBrowser
 from stockroom.capture.complete import SourceOutcome
+from stockroom.capture.identity import select_exact_candidate
 from stockroom.capture.requirements import Requirement, asset_present, capture_needs
 from stockroom.capture.vendors import formats_for, get_adapter
 from stockroom.model.asset import AssetOrigin
@@ -397,9 +398,14 @@ class GuidedCaptureSource:
         if not landed:
             return SourceOutcome(error="the vendor download did not produce a file")
 
-        return self._attach(record, landed, url)
+        return self._attach(
+            record,
+            landed,
+            url,
+            detail_url=getattr(session.page, "url", "") or "",
+        )
 
-    def _attach(self, record, landed, url: str) -> SourceOutcome:
+    def _attach(self, record, landed, url: str, *, detail_url: str = "") -> SourceOutcome:
         """Turn the downloaded file(s) into attached assets, with provenance.
 
         Reuses the ingest pipeline the rest of the app already attaches through, so a guided
@@ -420,6 +426,7 @@ class GuidedCaptureSource:
         )
         offered: list[Requirement] = []
         failures: list[str] = []
+        identity_error = ""
         pipeline = self._make_pipeline()
         try:
             try:
@@ -428,7 +435,14 @@ class GuidedCaptureSource:
                 return SourceOutcome(error=f"could not read the download: {exc}")
 
             kicad_offered: list[Requirement] = []
-            candidate = candidates[0] if candidates else None
+            selection = select_exact_candidate(
+                record,
+                candidates,
+                vendor_key=self._vendor_key,
+                detail_url=detail_url,
+            )
+            candidate = selection.candidate
+            identity_error = selection.error
             if candidate is not None:
                 candidate.entry_name = record.mpn or candidate.entry_name or candidate.mpn
                 if candidate.symbol_lib_path is not None:
@@ -447,6 +461,12 @@ class GuidedCaptureSource:
                     failures.append(str(exc))
         finally:
             pipeline.cleanup()
+
+        # A mismatched or ambiguous KiCad candidate poisons the whole browser download. Do not
+        # attach native Altium files beside it and then hide the identity failure behind a partial
+        # success: both came from the same untrusted selection.
+        if identity_error:
+            return SourceOutcome(error=identity_error)
 
         offered.extend(self._attach_altium_assets(record, landed, failures, origin))
 
