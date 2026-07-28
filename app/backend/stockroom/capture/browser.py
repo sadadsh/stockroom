@@ -92,6 +92,37 @@ _PROCESS_LOCK_GUARD = threading.Lock()
 _PROCESS_LOCKS: set[str] = set()
 _CHROMIUM_PREFERENCES = Path("Default") / "Preferences"
 _BROWSER_LAUNCH_TIMEOUT_MS = 20_000
+_DISABLE_WEBRTC_INIT_SCRIPT = """
+(() => {
+  for (const key of ["RTCPeerConnection", "webkitRTCPeerConnection"]) {
+    try {
+      Object.defineProperty(globalThis, key, {
+        value: undefined,
+        writable: false,
+        configurable: false,
+      });
+    } catch {}
+  }
+})();
+"""
+
+
+def _disable_webrtc(context) -> None:
+    """Prevent capture pages from opening inbound WebRTC UDP listeners.
+
+    Playwright controls Chromium over a pipe, so its automation transport does not need an
+    inbound firewall exception. Provider and fingerprinting scripts can still instantiate
+    ``RTCPeerConnection``, though, which makes Chromium's Network Service bind wildcard UDP
+    endpoints and can trigger Windows Defender Firewall. CAD capture does not use WebRTC.
+
+    A context init script applies before page scripts in every subsequently created document and
+    child frame. Fail closed: continuing without this boundary can surface the firewall prompt.
+    """
+
+    try:
+        context.add_init_script(_DISABLE_WEBRTC_INIT_SCRIPT)
+    except Exception as exc:  # noqa: BLE001 - browser implementations expose different errors
+        raise CaptureBrowserError("could not disable WebRTC in the capture browser") from exc
 
 
 def _normalise_provider_key(provider_key: str) -> str:
@@ -494,6 +525,7 @@ class PlaywrightCaptureBrowser:
                     launch_options.pop("accept_downloads")
                     browser = engine.launch(**launch_options)
                     context = browser.new_context(accept_downloads=True)
+                _disable_webrtc(context)
                 self.launched_browser = candidate.label
                 return context, browser
             except Exception as exc:  # noqa: BLE001 - each candidate is an independent fallback
@@ -576,6 +608,7 @@ class PlaywrightCaptureBrowser:
             else:
                 context = getattr(opened, "new_context")(accept_downloads=True)
             try:
+                _disable_webrtc(context)
                 with self._download_lock:
                     self._context = context
                 context.on("page", self._wire_downloads)
