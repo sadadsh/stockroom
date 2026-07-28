@@ -126,19 +126,21 @@ def test_foreign_cached_mpn_is_ignored_and_replaced_by_an_exact_lookup(tmp_path)
     stale.mpn = Sourced("US1M", "lcsc", "medium")
     stale.manufacturer = Sourced("R+O", "lcsc", "medium")
 
-    exact = _CatOnlySource("")
-    exact.enrich = lambda mpn, category, remaining: EnrichmentResult(
-        category=category,
-        mpn=Sourced("S1M", "mouser", "high"),
-        manufacturer=Sourced("ON Semiconductor", "mouser", "high"),
-    )
+    class _ExactSource:
+        def enrich(self, mpn, category, remaining):
+            return EnrichmentResult(
+                category=category,
+                mpn=Sourced("S1M", "mouser", "high"),
+                manufacturer=Sourced("ON Semiconductor", "mouser", "high"),
+            )
+
     pipe = EnrichmentPipeline(
         cache_dir=tmp_path / "c",
         fetcher=_StubFetcher(""),
         limiter=_NoWaitLimiter(),
         jlcsearch=_NullJlc(),
     )
-    pipe.registry = SourceRegistry([exact])
+    pipe.registry = SourceRegistry([_ExactSource()])
     pipe.cache.put("S1M", _result_to_cache(stale))
 
     result = pipe.enrich("S1M", "Diodes")
