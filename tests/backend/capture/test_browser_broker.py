@@ -7,6 +7,7 @@ import json
 import multiprocessing
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -518,6 +519,173 @@ def test_one_permanent_handler_routes_one_physical_download_to_the_bound_task(tm
     assert len(broker.receipts) == 1
     assert browser.captured[0].path == broker.receipts[0].path
     assert broker.receipts[0].path.parent == staging / "part-a"
+
+
+def test_user_capture_wires_before_navigation_and_collects_every_download_without_dom_actions(
+    tmp_path,
+):
+    actions: list[str] = []
+    finished = False
+
+    class Download:
+        def __init__(self, name: str):
+            self.suggested_filename = name
+            self.url = f"https://vendor.example.test/files/{name}"
+
+        def save_as(self, destination: str) -> None:
+            Path(destination).write_text(self.suggested_filename, encoding="utf-8")
+
+    class UserPage(_EventPage):
+        url = "about:blank"
+
+        def on(self, event: str, handler) -> None:
+            actions.append(f"on:{event}")
+            super().on(event, handler)
+
+        def goto(self, url: str, **_options) -> None:
+            nonlocal finished
+            actions.append(f"goto:{url}")
+            self.url = url
+            assert self.handlers, "download interception must be wired before navigation"
+            for name in ("symbol.kicad_sym", "footprint.kicad_mod", "model.step"):
+                self.handlers[0](Download(name))
+            finished = False
+
+        def wait_for_timeout(self, _milliseconds: int) -> None:
+            nonlocal finished
+            actions.append("wait")
+            finished = True
+
+        def is_closed(self) -> bool:
+            return False
+
+    page = UserPage()
+
+    class Context:
+        def new_page(self):
+            return page
+
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    browser._context = Context()
+
+    result = browser.capture_user_downloads(
+        "https://vendor.example.test/search?query=MPN-A",
+        broker,
+        should_finish=lambda: finished,
+        timeout_s=1,
+        poll_interval_s=0.01,
+        settle_seconds=0,
+    )
+
+    assert result.status == "completed"
+    assert [receipt.suggested_name for receipt in result.files] == [
+        "symbol.kicad_sym",
+        "footprint.kicad_mod",
+        "model.step",
+    ]
+    assert [receipt.path.read_text(encoding="utf-8") for receipt in result.files] == [
+        "symbol.kicad_sym",
+        "footprint.kicad_mod",
+        "model.step",
+    ]
+    assert actions[0] == "on:download"
+    assert actions[1] == "goto:https://vendor.example.test/search?query=MPN-A"
+    assert actions[2:] == ["wait"]
+
+
+def test_user_capture_cancel_is_bounded_and_does_not_require_a_download(tmp_path):
+    class IdlePage(_EventPage):
+        url = "about:blank"
+
+        def __init__(self):
+            super().__init__()
+            self.waits = 0
+
+        def goto(self, url: str, **_options) -> None:
+            self.url = url
+
+        def wait_for_timeout(self, milliseconds: int) -> None:
+            self.waits += 1
+            time.sleep(milliseconds / 1000)
+
+        def is_closed(self) -> bool:
+            return False
+
+    page = IdlePage()
+    context = SimpleNamespace(new_page=lambda: page)
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    browser._context = context
+
+    started = time.monotonic()
+    result = browser.capture_user_downloads(
+        "https://vendor.example.test/search?query=MPN-A",
+        broker,
+        should_cancel=lambda: page.waits >= 1,
+        timeout_s=1,
+        poll_interval_s=0.01,
+    )
+    elapsed = time.monotonic() - started
+
+    assert result.status == "cancelled"
+    assert result.files == ()
+    assert page.waits == 1
+    assert elapsed < 0.5
+
+
+def test_user_capture_timeout_is_bounded_and_returns_files_received_so_far(tmp_path):
+    class Download:
+        suggested_filename = "symbol.kicad_sym"
+        url = "https://vendor.example.test/files/symbol.kicad_sym"
+
+        def save_as(self, destination: str) -> None:
+            Path(destination).write_bytes(b"partial-capture")
+
+    class IdlePage(_EventPage):
+        url = "about:blank"
+
+        def __init__(self):
+            super().__init__()
+            self.waits = 0
+
+        def goto(self, url: str, **_options) -> None:
+            self.url = url
+            self.handlers[0](Download())
+
+        def wait_for_timeout(self, milliseconds: int) -> None:
+            self.waits += 1
+            time.sleep(milliseconds / 1000)
+
+        def is_closed(self) -> bool:
+            return False
+
+    page = IdlePage()
+    context = SimpleNamespace(new_page=lambda: page)
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    browser._context = context
+
+    started = time.monotonic()
+    result = browser.capture_user_downloads(
+        "https://vendor.example.test/search?query=MPN-A",
+        broker,
+        timeout_s=0.03,
+        poll_interval_s=0.01,
+    )
+    elapsed = time.monotonic() - started
+
+    assert result.status == "timed_out"
+    assert len(result.files) == 1
+    assert result.files[0].path.read_bytes() == b"partial-capture"
+    assert 1 <= page.waits <= 5
+    assert elapsed < 0.5
 
 
 def test_duplicate_browser_event_is_reported_once(tmp_path):

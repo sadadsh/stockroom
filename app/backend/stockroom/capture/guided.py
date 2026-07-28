@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import tempfile
 import time
+from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
@@ -365,6 +366,10 @@ class GuidedCaptureSource:
         evidence_store=None,
         cross_eda_verifier=None,
         playwright_runtime: SharedPlaywrightRuntime | None = None,
+        user_driven: bool = False,
+        user_finished: Callable[[], bool] | None = None,
+        user_cancelled: Callable[[], bool] | None = None,
+        user_capture_timeout_s: float = 600.0,
     ) -> None:
         self._make_pipeline = make_pipeline
         self._vendor_key = vendor
@@ -390,6 +395,10 @@ class GuidedCaptureSource:
         self._evidence_store = evidence_store
         self._cross_eda_verifier = cross_eda_verifier or verify_cross_eda_component
         self._playwright_runtime = playwright_runtime
+        self._user_driven = user_driven
+        self._user_finished = user_finished
+        self._user_cancelled = user_cancelled
+        self._user_capture_timeout_s = user_capture_timeout_s
         self._session: _Session | None = None
 
     # -- lifecycle -------------------------------------------------------------------------
@@ -413,7 +422,8 @@ class GuidedCaptureSource:
         manager = browser.session()
         page = manager.__enter__()
         self._session = _Session(browser=browser, ctx_manager=manager, page=page)
-        self._sign_in_once(page)
+        if not self._user_driven:
+            self._sign_in_once(page)
         return self._session
 
     def _sign_in_once(self, page) -> None:
@@ -477,6 +487,16 @@ class GuidedCaptureSource:
             return SourceOutcome(skipped=f"no {adapter.capability.label} page for {record.id}")
 
         session = self._ensure_session()
+        if self._user_driven:
+            return self._supply_user_driven(
+                record,
+                session,
+                adapter.capability.label,
+                manufacturer,
+                mpn,
+                url,
+            )
+
         open_task_page = getattr(session.browser, "task_page", None)
         broker = (
             DownloadBroker(
@@ -538,6 +558,57 @@ class GuidedCaptureSource:
             landed,
             url,
             detail_url=detail_url,
+        )
+
+    def _supply_user_driven(
+        self,
+        record,
+        session: _Session,
+        provider_label: str,
+        manufacturer: str,
+        mpn: str,
+        url: str,
+    ) -> SourceOutcome:
+        """Open the provider page without invoking any provider automation."""
+
+        broker = DownloadBroker(
+            DownloadTask(
+                task_id=record.id,
+                manufacturer_key=manufacturer,
+                mpn_canonical=mpn,
+                staging_root=self._download_root,
+            )
+        )
+        try:
+            result = session.browser.capture_user_downloads(
+                url,
+                broker,
+                should_finish=self._user_finished,
+                should_cancel=self._user_cancelled,
+                timeout_s=self._user_capture_timeout_s,
+            )
+        except Exception as exc:  # noqa: BLE001 - one part's failure is a row, not a dead run
+            return SourceOutcome(error=f"{provider_label}: {exc}")
+
+        received = len(result.files)
+        if result.status == "cancelled":
+            suffix = f" after receiving {received} file(s)" if received else ""
+            return SourceOutcome(
+                skipped=f"{provider_label} capture was cancelled{suffix}; nothing was attached"
+            )
+        if result.status == "timed_out":
+            suffix = f" after receiving {received} file(s)" if received else ""
+            return SourceOutcome(
+                error=f"{provider_label} capture timed out{suffix}; nothing was attached"
+            )
+        if not result.files:
+            return SourceOutcome(error="the vendor download did not produce a file")
+
+        return self._attach(
+            record,
+            list(result.files),
+            url,
+            detail_url=result.final_url,
         )
 
     def _attach(self, record, landed, url: str, *, detail_url: str = "") -> SourceOutcome:

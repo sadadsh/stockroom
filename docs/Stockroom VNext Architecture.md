@@ -1214,6 +1214,25 @@ providers:
 Credential targets are references only. Policy contains no username, password,
 token, cookie, or API key.
 
+### Approved browser boundary
+
+`approved_browser` is a user-driven acquisition transport unless a provider has
+a separately reviewed machine-access contract recorded in policy. Stockroom may
+resolve the exact part URL, open an isolated managed-browser profile, install
+download interception before navigation, collect every resulting file through
+the task-bound broker, validate identity and native contents, attach accepted
+artifacts, and resume the workflow. Those actions remove file handling from the
+user without impersonating provider-side choices.
+
+In the user-driven mode, Stockroom does not search or interpret the provider
+DOM, fill credentials, accept terms, select a result or export format, dismiss a
+challenge, or click a download control. The user performs those provider-side
+decisions in the Stockroom-opened window. The activity UI exposes the exact
+identity and provider, concise instructions, received files, remaining
+requirements, and **Cancel**, **Finish**, and **Try Another Provider** actions.
+Files never pass through the global Downloads folder, and one part cannot
+receive another part's late download.
+
 Adapters must ship:
 
 - contract tests against redacted immutable fixtures,

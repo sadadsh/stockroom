@@ -23,8 +23,13 @@ from pathlib import Path
 import pytest
 
 from stockroom.capture import guided
-from stockroom.capture.browser import CapturedFile, PlaywrightCaptureBrowser
+from stockroom.capture.browser import (
+    CapturedFile,
+    PlaywrightCaptureBrowser,
+    UserCaptureResult,
+)
 from stockroom.capture.complete import CompletionItem, SourceOutcome, complete_library
+from stockroom.capture.download_broker import DownloadReceipt
 from stockroom.capture.pacing import CircuitBreaker
 from stockroom.capture.requirements import Requirement
 from stockroom.capture.vendors import DriveReport, VendorCapability
@@ -129,9 +134,7 @@ def _source(monkeypatch, tmp_path, browser, *, on_drive, pipeline=None):
     return src
 
 
-def test_guided_source_reports_the_provider_without_changing_its_engine_key(
-    monkeypatch, tmp_path
-):
+def test_guided_source_reports_the_provider_without_changing_its_engine_key(monkeypatch, tmp_path):
     browser = _FakeBrowser()
     _install_adapter(monkeypatch, browser, on_drive=lambda _browser: None)
 
@@ -240,6 +243,103 @@ def test_guided_supply_attaches_only_the_exact_task_broker_receipts(monkeypatch,
     assert stale not in pipeline.inputs
     assert len(pipeline.inputs) == 1
     assert pipeline.inputs[0].read_bytes() == b"current-part"
+    assert "nothing this part can use" in (outcome.error or "")
+
+
+def test_user_driven_guided_supply_skips_provider_automation_and_validates_captured_files(
+    monkeypatch,
+    tmp_path,
+):
+    landed = tmp_path / "captured.payload"
+    landed.write_bytes(b"captured-bytes")
+    receipt = DownloadReceipt(
+        task_id=_Record.id,
+        manufacturer_key=_Record.manufacturer,
+        mpn_canonical=_Record.mpn,
+        path=landed,
+        suggested_name=landed.name,
+        source_url="https://vendor.example.test/download",
+        final_url="https://vendor.example.test/download",
+        sha256="0" * 64,
+        size_bytes=landed.stat().st_size,
+        transport="playwright",
+        attempt=1,
+    )
+
+    class Pipeline:
+        inputs = None
+
+        def inspect(self, inputs):
+            self.inputs = list(inputs)
+            return []
+
+        def cleanup(self):
+            return None
+
+    pipeline = Pipeline()
+    captured_call = {}
+
+    class Manager:
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, *_args):
+            return False
+
+    class Browser:
+        def __init__(self, **_options):
+            pass
+
+        def session(self):
+            return Manager()
+
+        def capture_user_downloads(self, url, broker, **options):
+            captured_call.update(url=url, broker=broker, options=options)
+            return UserCaptureResult(
+                status="completed",
+                files=(receipt,),
+                final_url="https://vendor.example.test/details/MPN-A",
+            )
+
+    def provider_drive_was_called(_browser):
+        raise AssertionError("user-driven capture must not invoke the provider driver")
+
+    _install_adapter(monkeypatch, object(), on_drive=provider_drive_was_called)
+    monkeypatch.setattr(guided, "PlaywrightCaptureBrowser", Browser)
+    monkeypatch.setattr(
+        guided,
+        "sign_in_adapter",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("user-driven capture must not fill or submit stored credentials")
+        ),
+    )
+    finished = lambda: True
+    cancelled = lambda: False
+    source = guided.GuidedCaptureSource(
+        lambda: pipeline,
+        vendor="faketron",
+        download_root=tmp_path / "Downloads",
+        headless=True,
+        user_driven=True,
+        user_finished=finished,
+        user_cancelled=cancelled,
+        user_capture_timeout_s=5,
+    )
+
+    try:
+        outcome = source.supply(_Record())
+    finally:
+        source.close()
+
+    assert captured_call["url"] == "https://example.invalid/part"
+    assert captured_call["broker"].task.task_id == _Record.id
+    assert captured_call["broker"].task.mpn_canonical == _Record.mpn
+    assert captured_call["options"] == {
+        "should_finish": finished,
+        "should_cancel": cancelled,
+        "timeout_s": 5,
+    }
+    assert pipeline.inputs == [landed]
     assert "nothing this part can use" in (outcome.error or "")
 
 
@@ -925,9 +1025,9 @@ def test_the_kicad_chooser_waits_for_its_member_instead_of_sleeping():
     assert report.submitted is True, f"the chooser member was never found: {report.message}"
     assert report.selected == ["kicad"]
     assert report.missed == []
-    assert (
-        '[data-format="kicad_modv6"]:visible' in page.clicked
-    ), "the pinned version was never clicked"
+    assert '[data-format="kicad_modv6"]:visible' in page.clicked, (
+        "the pinned version was never clicked"
+    )
 
 
 def test_altium_only_gap_drives_one_full_snapmagic_evidence_bundle(monkeypatch, tmp_path):
