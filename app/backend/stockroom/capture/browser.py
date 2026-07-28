@@ -38,6 +38,7 @@ provider's cookies or browser state.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -84,6 +85,8 @@ _WINDOWS_RESERVED_NAMES = {
 }
 _PROCESS_LOCK_GUARD = threading.Lock()
 _PROCESS_LOCKS: set[str] = set()
+_CHROMIUM_PREFERENCES = Path("Default") / "Preferences"
+_BROWSER_LAUNCH_TIMEOUT_MS = 20_000
 
 
 def _normalise_provider_key(provider_key: str) -> str:
@@ -97,6 +100,58 @@ def provider_profile_dir(profile_root: Path, provider_key: str) -> Path:
     """Return the provider's isolated persistent profile below ``profile_root``."""
 
     return Path(profile_root) / _normalise_provider_key(provider_key)
+
+
+def _allow_automatic_downloads(profile_dir: Path) -> None:
+    """Allow a provider page to deliver every file in one export.
+
+    SnapMagic and similar CAD providers fan one explicit "download" action out into
+    several browser downloads (symbol, footprint, model, metadata). Chromium otherwise
+    pauses after the first file behind an "allow multiple downloads" prompt while the
+    page itself reports success. This profile is isolated to one capture provider, and
+    every resulting file still has to pass Stockroom's content and identity verification.
+    """
+
+    preferences_path = Path(profile_dir) / _CHROMIUM_PREFERENCES
+    preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    preferences: dict = {}
+    if preferences_path.is_file():
+        try:
+            loaded = json.loads(preferences_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise CaptureBrowserError(
+                f"could not safely update capture browser preferences at {preferences_path}"
+            ) from exc
+        if not isinstance(loaded, dict):
+            raise CaptureBrowserError(
+                f"capture browser preferences are not an object at {preferences_path}"
+            )
+        preferences = loaded
+
+    profile = preferences.setdefault("profile", {})
+    if not isinstance(profile, dict):
+        raise CaptureBrowserError(
+            f"capture browser profile preferences are malformed at {preferences_path}"
+        )
+    defaults = profile.setdefault("default_content_setting_values", {})
+    if not isinstance(defaults, dict):
+        raise CaptureBrowserError(
+            f"capture browser content settings are malformed at {preferences_path}"
+        )
+    defaults["automatic_downloads"] = 1
+
+    temporary_path = preferences_path.with_suffix(".stockroom.tmp")
+    try:
+        temporary_path.write_text(
+            json.dumps(preferences, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        os.replace(temporary_path, preferences_path)
+    except OSError as exc:
+        temporary_path.unlink(missing_ok=True)
+        raise CaptureBrowserError(
+            f"could not enable provider multi-file downloads at {preferences_path}"
+        ) from exc
 
 
 class ProviderProfileLock:
@@ -195,9 +250,10 @@ class PlaywrightCaptureBrowser:
     check, and watches what happens. Headless exists for the tests.
 
     ENGINE IS A PARAMETER, NEVER A SECOND CLASS. Production uses ``windows``: the installed Google
-    Chrome first, then installed Microsoft Edge if Chrome cannot launch. ``camoufox`` remains an
-    explicit opt-in fallback for a provider that demonstrably requires it, never the default. A
-    vendor that resists is therefore a MODE on this class, never a
+    Chrome first, then Stockroom's version-pinned Playwright Chromium if Chrome cannot launch.
+    Microsoft Edge is never an implicit fallback. ``camoufox`` remains an explicit opt-in mode for
+    a provider that demonstrably requires it, never the default. A vendor that resists is therefore
+    a MODE on this class, never a
     `CamoufoxCaptureBrowser` beside it - that is the one-tool-per-job rule, and
     tests/backend/capture/test_one_tool_per_job.py enforces it by listing the modules allowed to
     launch a browser at all.
@@ -291,8 +347,9 @@ class PlaywrightCaptureBrowser:
         """Launch the requested browser policy and return ``(context, browser)``.
 
         ``windows`` is a deterministic policy, not an alias for bundled Chromium: prefer the
-        newest browser already managed on this machine (Chrome), then Edge. A failed candidate is
-        fully discarded before the next one is attempted.
+        preferred browser already managed on this machine (Chrome), then Stockroom's pinned
+        Playwright Chromium. A failed candidate is fully discarded before the next one is
+        attempted.
         """
 
         candidates = _browser_candidates(self.engine)
@@ -305,6 +362,7 @@ class PlaywrightCaptureBrowser:
             options = {
                 "headless": self.headless,
                 "accept_downloads": True,
+                "timeout": _BROWSER_LAUNCH_TIMEOUT_MS,
             }
             if candidate.channel is not None:
                 options["channel"] = candidate.channel
@@ -313,6 +371,7 @@ class PlaywrightCaptureBrowser:
             try:
                 if self.profile_dir is not None:
                     self.profile_dir.mkdir(parents=True, exist_ok=True)
+                    _allow_automatic_downloads(self.profile_dir)
                     context = engine.launch_persistent_context(
                         str(self.profile_dir),
                         **options,
@@ -337,7 +396,7 @@ class PlaywrightCaptureBrowser:
                 failures.append(f"{candidate.label}: {detail}")
 
         hint = (
-            "Install Google Chrome or Microsoft Edge."
+            "Install Google Chrome or run `uv run python -m playwright install chromium`."
             if self.engine == "windows"
             else "Run `uv run python -m playwright install chromium` if the bundled browser "
             "is missing."
@@ -444,7 +503,7 @@ def _browser_candidates(engine: str) -> tuple[_BrowserCandidate, ...]:
     if engine == "windows":
         return (
             _BrowserCandidate("Google Chrome", "chromium", "chrome"),
-            _BrowserCandidate("Microsoft Edge", "chromium", "msedge"),
+            _BrowserCandidate("Playwright Chromium", "chromium"),
         )
     if engine in {"chrome", "edge", "msedge"}:
         channel = "chrome" if engine == "chrome" else "msedge"

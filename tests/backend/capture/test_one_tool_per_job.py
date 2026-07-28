@@ -145,6 +145,7 @@ _TOOLS = {
     "altium.py": "Drive the installed Altium Designer (CLI entry).",
     "altium_dblib_verify.py": "Prove the shipped .DbLib actually connects through Altium's ODBC chain.",
     "altium_install.py": "Install a library into Altium's Installed Libraries list.",
+    "altium_native_authoring_proof.py": "Prove Stockroom's supported native Altium authoring profile.",
     "altium_place_verify.py": "Resolve, place and read back a component in real Altium.",
     "altium_probe.py": "Inspect Altium binary libraries from outside Altium.",
     "bake_stm_index.py": "Build the STM part index used by the stm viewer.",

@@ -39,6 +39,10 @@ from typing import Protocol
 
 from stockroom.capture.browser import PlaywrightCaptureBrowser
 from stockroom.capture.complete import SourceOutcome
+from stockroom.capture.cross_eda import (
+    CrossEdaVerificationError,
+    verify_cross_eda_component,
+)
 from stockroom.capture.evidence import (
     BROWSER_CAPTURE_ADAPTER_VERSION,
     record_browser_cad_evidence,
@@ -52,6 +56,7 @@ from stockroom.model.asset import AssetOrigin
 # export genuinely generates server-side for tens of seconds (measured live on DigiKey, 2026-07-23),
 # and this is a BACKSTOP: the wait ends the instant the file appears in the saved list.
 _DOWNLOAD_TIMEOUT_MS = 120_000
+_COHERENT_CAD_FORMATS = ("kicad", "model", "altium")
 
 
 def _wait_for_capture(browser, page, before: int, timeout_s: float, gap: float = 0.25) -> bool:
@@ -157,6 +162,10 @@ def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None 
         if not report.submitted:
             return report, None
         if not _wait_for_capture(browser, page, mark, wait_s):
+            gate = _download_gate(adapter, page)
+            if gate:
+                report.blocked = True
+                return report, gate
             return report, f"{label} did not deliver a file within {wait_s:.0f}s"
         return report, None
 
@@ -172,16 +181,51 @@ def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None 
             continue
         if not one.submitted:
             combined.missed.extend(one.missed or [fmt])
+            combined.blocked = combined.blocked or one.blocked
             if one.message:
                 combined.message = one.message
+            if one.blocked:
+                # Auth/challenge/account state is provider-wide. Trying the remaining format
+                # buttons cannot change it and only repeats the same failure.
+                return combined, None
             continue
         if not _wait_for_capture(browser, page, mark, wait_s):
+            gate = _download_gate(adapter, page)
+            if gate:
+                combined.blocked = True
+                return combined, gate
             return combined, f"{label} did not deliver {fmt} within {wait_s:.0f}s"
         combined.selected.extend(one.selected or [fmt])
         combined.submitted = True
     if combined.selected:
         combined.message = f"Requested {' and '.join(combined.selected)} from {label}."
     return combined, None
+
+
+def _download_gate(adapter, page) -> str:
+    """Provider-specific global blockage, consulted only after no file arrived."""
+    detector = getattr(adapter, "download_gate", None)
+    if detector is None:
+        return ""
+    try:
+        return detector(page) or ""
+    except Exception:  # noqa: BLE001 - a detector cannot replace the authoritative timeout
+        return ""
+
+
+def _provider_formats(adapter, needs) -> list[str]:
+    """Request one coherent bundle when a provider can supply every cross-EDA artifact.
+
+    Evidence proves a relationship between actual bytes, not between old library references and
+    one newly downloaded side. Therefore an Altium-only (or any other partial) repair through a
+    complete-bundle provider downloads KiCad symbol/footprint, STEP, and native Altium from that
+    SAME provider. Verification runs before any existing asset can be replaced.
+    """
+    selectable = set(adapter.capability.version_pins)
+    requested = [fmt for fmt in formats_for(needs) if fmt in selectable]
+    if requested and set(_COHERENT_CAD_FORMATS) <= selectable:
+        return list(_COHERENT_CAD_FORMATS)
+    return requested
 
 
 # What `altium/extract.py::normalize_altium_source` can actually take TODAY. `.lia` is not here
@@ -304,7 +348,7 @@ class GuidedCaptureSource:
         self._run_write = run_write or (lambda fn: fn())
         self._now_iso = now_iso
         self._evidence_store = evidence_store
-        self._cross_eda_verifier = cross_eda_verifier
+        self._cross_eda_verifier = cross_eda_verifier or verify_cross_eda_component
         self._session: _Session | None = None
 
     # -- lifecycle -------------------------------------------------------------------------
@@ -372,8 +416,7 @@ class GuidedCaptureSource:
         # name. Ultra Librarian nominally "does Altium", but its Altium export is a script that
         # produces no library files - so asking for it produced a confident success that attached
         # nothing. `version_pins` is the honest answer to "what can you really fetch".
-        selectable = set(adapter.capability.version_pins)
-        formats = [f for f in formats_for(needs) if f in selectable]
+        formats = _provider_formats(adapter, needs)
         if not formats:
             return SourceOutcome(
                 skipped=(
@@ -396,7 +439,7 @@ class GuidedCaptureSource:
             # vanished download as "the vendor simply had nothing". Measured live against SnapMagic
             # on 2026-07-27: `SUBMITTED False` alongside "did not deliver altium within 120s".
             if failure is not None:
-                return SourceOutcome(error=failure)
+                return SourceOutcome(error=failure, blocked=report.blocked)
             if not report.submitted:
                 why = report.message or "the vendor offered no download"
                 if self._sign_in_error:
@@ -404,6 +447,8 @@ class GuidedCaptureSource:
                     # the real cause of "no Download button" and must be said here rather than left
                     # for the owner to infer from a vendor-shaped message.
                     why = f"{why} ({self._sign_in_error})"
+                if report.blocked:
+                    return SourceOutcome(error=why, blocked=True)
                 return SourceOutcome(skipped=why)
         except Exception as exc:  # noqa: BLE001 - one part's failure is a row, not a crash
             return SourceOutcome(error=f"{adapter.capability.label}: {exc}")
@@ -476,6 +521,18 @@ class GuidedCaptureSource:
                             altium_sources=tuple(altium_sources),
                             cross_eda_verifier=self._cross_eda_verifier,
                         )
+                    except CrossEdaVerificationError as exc:
+                        # A bad/unsupported Altium binary must not poison an independently valid
+                        # KiCad set. Record only the proved KiCad artifacts, retain Altium as
+                        # unsatisfied, and surface the exact cross-EDA reason below.
+                        failures.append(f"cross-EDA verification failed: {exc}")
+                        evidence_digest, cross_eda_verified = record_browser_cad_evidence(
+                            store=self._evidence_store,
+                            record=record,
+                            candidate=candidate,
+                            provider_key=self._vendor_key,
+                            detail_url=detail_url,
+                        )
                     except Exception as exc:  # noqa: BLE001 - fail closed before any library write
                         return SourceOutcome(error=f"CAD evidence verification failed: {exc}")
             elif self._evidence_store is not None and not identity_error:
@@ -518,7 +575,7 @@ class GuidedCaptureSource:
 
         if altium_sources and self._evidence_store is not None and not cross_eda_verified:
             failures.append(
-                "native Altium files were retained in immutable evidence but not attached: "
+                "native Altium files were left unattached: "
                 "cross-EDA terminal, pad, and package equivalence is not verified"
             )
         else:

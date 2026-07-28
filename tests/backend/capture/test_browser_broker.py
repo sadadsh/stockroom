@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 import multiprocessing
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,6 +14,7 @@ from stockroom.capture.browser import (
     CaptureBrowserError,
     PlaywrightCaptureBrowser,
     ProviderProfileLock,
+    _allow_automatic_downloads,
     _browser_candidates,
     provider_profile_dir,
 )
@@ -44,15 +46,15 @@ class _BrowserType:
         return _Context()
 
 
-def test_windows_policy_prefers_installed_chrome_then_edge():
+def test_windows_policy_prefers_installed_chrome_then_managed_chromium():
     assert [candidate.channel for candidate in _browser_candidates("windows")] == [
         "chrome",
-        "msedge",
+        None,
     ]
     assert "camoufox" not in [candidate.channel for candidate in _browser_candidates("windows")]
 
 
-def test_windows_policy_falls_back_to_installed_edge_with_the_same_provider_profile(tmp_path):
+def test_windows_policy_falls_back_to_managed_chromium_with_the_same_provider_profile(tmp_path):
     browser_type = _BrowserType(fail_channels={"chrome"})
     pw = SimpleNamespace(chromium=browser_type)
     profile = tmp_path / "profiles" / "snapmagic"
@@ -68,11 +70,45 @@ def test_windows_policy_falls_back_to_installed_edge_with_the_same_provider_prof
 
     assert isinstance(context, _Context)
     assert launched is None
-    assert browser.launched_browser == "Microsoft Edge"
-    assert [call[2]["channel"] for call in browser_type.calls] == ["chrome", "msedge"]
+    assert browser.launched_browser == "Playwright Chromium"
+    assert [call[2].get("channel") for call in browser_type.calls] == ["chrome", None]
     assert all(call[1] == profile for call in browser_type.calls)
     assert all(call[2]["accept_downloads"] is True for call in browser_type.calls)
     assert all(call[2]["headless"] is False for call in browser_type.calls)
+    assert all(call[2]["timeout"] == 20_000 for call in browser_type.calls)
+    preferences = json.loads((profile / "Default" / "Preferences").read_text(encoding="utf-8"))
+    assert preferences["profile"]["default_content_setting_values"]["automatic_downloads"] == 1
+
+
+def test_automatic_download_permission_preserves_existing_profile_preferences(tmp_path):
+    profile = tmp_path / "snapmagic"
+    preferences_path = profile / "Default" / "Preferences"
+    preferences_path.parent.mkdir(parents=True)
+    preferences_path.write_text(
+        json.dumps(
+            {
+                "profile": {"name": "SnapMagic"},
+                "download": {"prompt_for_download": False},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    _allow_automatic_downloads(profile)
+
+    preferences = json.loads(preferences_path.read_text(encoding="utf-8"))
+    assert preferences["profile"]["name"] == "SnapMagic"
+    assert preferences["download"]["prompt_for_download"] is False
+    assert preferences["profile"]["default_content_setting_values"]["automatic_downloads"] == 1
+
+
+def test_malformed_profile_preferences_fail_closed(tmp_path):
+    preferences_path = tmp_path / "snapmagic" / "Default" / "Preferences"
+    preferences_path.parent.mkdir(parents=True)
+    preferences_path.write_text("{broken", encoding="utf-8")
+
+    with pytest.raises(CaptureBrowserError, match="safely update"):
+        _allow_automatic_downloads(tmp_path / "snapmagic")
 
 
 def test_the_production_runner_never_defaults_to_camoufox():
