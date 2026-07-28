@@ -41,7 +41,7 @@ function countOf(counts: Record<string, number>, key: string): number {
 // The idle-state "last refreshed" line, derived from GET /rescan/state (the last-known
 // outcome per part, uncommitted and per-machine). checked_at sorts lexically (UTC ISO-8601),
 // so the last entry after a plain string sort is the most recent check.
-function lastChecked(data: RescanStateResponse): { checkedAt: string | null; total: number } {
+export function lastChecked(data: RescanStateResponse): { checkedAt: string | null; total: number } {
   const entries = Object.values(data.parts);
   if (entries.length === 0) return { checkedAt: null, total: 0 };
   const sorted = entries.map((e) => e.checked_at).sort();

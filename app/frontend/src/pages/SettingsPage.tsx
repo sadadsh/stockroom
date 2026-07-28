@@ -17,7 +17,7 @@ import { DerivationSection } from "../components/DerivationSection";
 import { CadClearSection } from "../components/CadClearSection";
 import { LibraryHealthSection } from "../components/LibraryHealthSection";
 import { LibrarySyncSection } from "../components/LibrarySyncSection";
-import { RescanSection } from "../components/RescanSection";
+import { RescanSection, lastChecked } from "../components/RescanSection";
 import {
   useActivateProfile,
   useApplyUpdate,
@@ -35,6 +35,9 @@ import {
   useLibraryCoverage,
   useLibraryDerivation,
   useCadInventory,
+  useDoctorScan,
+  useLibraryLfs,
+  useRescanState,
 } from "../api/queries";
 import { useTheme, type Theme } from "../lib/theme";
 import { statusTone } from "../lib/statusTone";
@@ -109,6 +112,9 @@ export function SettingsPage() {
   const coverageQ = useLibraryCoverage();
   const derivationQ = useLibraryDerivation();
   const cadQ = useCadInventory();
+  const doctorQ = useDoctorScan();
+  const lfsQ = useLibraryLfs();
+  const rescanQ = useRescanState();
   const { theme } = useTheme();
 
   const [group, setGroup] = useState<GroupId>("application");
@@ -263,6 +269,43 @@ export function SettingsPage() {
     : cad.cleared > 0
       ? <span>{`${cad.cleared} ${cad.cleared === 1 ? "File" : "Files"}`}</span>
       : <Text id="settings.summary.no-cad">None</Text>;
+  // Library Health: how much needs a hand. Everything the scan reports is work, so they add up
+  // into one number rather than three the row has no space to distinguish.
+  const doc = doctorQ.data;
+  const healthSummary = !doc
+    ? null
+    : (() => {
+        const outstanding =
+          doc.fixable.length + doc.manual.length + doc.uncommitted.length;
+        return outstanding > 0
+          ? <Badge tone="warn">{`${outstanding} To Fix`}</Badge>
+          : <Text id="settings.summary.healthy">Healthy</Text>;
+      })();
+  // Library Sync: what this library carries to whoever clones it. LFS being OFF is the state that
+  // decides everything else in the section, so it wins; a legacy blob is the one warning that
+  // cannot be fixed from here (it needs a history rewrite this project forbids).
+  const lfs = lfsQ.data;
+  const librarySyncSummary = !lfs
+    ? null
+    : !lfs.installed || !lfs.enabled
+      ? <Text id="settings.summary.no-lfs">Not Using LFS</Text>
+      : lfs.legacy_blobs > 0
+        ? <Badge tone="warn">{`${lfs.legacy_blobs} Legacy`}</Badge>
+        : <span>{`${lfs.objects} In LFS`}</span>;
+  // Procurement Rescan: when prices and stock were last refreshed. Through the section's own
+  // `lastChecked`, so the collapsed row and the open body can never disagree about the date.
+  const rescanState = rescanQ.data;
+  const rescanSummary = !rescanState
+    ? null
+    : (() => {
+        const { checkedAt, total } = lastChecked(rescanState);
+        if (total === 0) return <Text id="settings.summary.never-rescanned">Never Run</Text>;
+        return checkedAt
+          ? <span>{new Date(checkedAt).toLocaleDateString(undefined, {
+              year: "numeric", month: "short", day: "numeric",
+            })}</span>
+          : <span>{`${total} Checked`}</span>;
+      })();
 
   const open = (id: string) => openSections.has(id);
 
@@ -400,6 +443,7 @@ export function SettingsPage() {
                     title="Library Health" titleId="settings.health.title"
                     hint="Reconcile every part with its record and every file with the repository. Repair heals what it safely can and lists what needs your hand."
                     hintId="settings.health.hint"
+                    summary={healthSummary}
                     open={open("health")} onToggle={() => toggle("health")}
                     data-dev-id="settings.health"
                   >
@@ -409,6 +453,7 @@ export function SettingsPage() {
                     title="Library Sync" titleId="settings.librarysync.title"
                     hint="What this library carries to whoever else clones it. Binaries can live in Git LFS so clone size stays flat as the library grows, and per-user or regenerated files can stop being shared at all."
                     hintId="settings.librarysync.hint"
+                    summary={librarySyncSummary}
                     open={open("librarysync")} onToggle={() => toggle("librarysync")}
                     data-dev-id="settings.librarysync"
                   >
@@ -474,6 +519,7 @@ export function SettingsPage() {
                     title="Procurement Rescan" titleId="settings.rescan.title"
                     hint="Refresh every part's price, stock and lifecycle status from Mouser and DigiKey. Parts checked recently are skipped unless you force a full pass."
                     hintId="settings.rescan.hint"
+                    summary={rescanSummary}
                     open={open("rescan")} onToggle={() => toggle("rescan")}
                     data-dev-id="settings.rescan"
                   >
