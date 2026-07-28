@@ -1,9 +1,11 @@
-"""Isolated native Altium authoring proof for the qualified S1M canonical slice.
+"""Isolated native Altium authoring proof for one supported canonical profile.
 
 This is deliberately a proof adapter, not the production Altium bridge. It consumes one strict
 ``CanonicalPassiveBundle`` JSON document, writes only beneath a caller-owned empty output
 directory, and asks the installed Altium Designer to author both binary libraries in one
-DelphiScript run. The script closes and reopens its own output before reporting semantics.
+DelphiScript run. The script closes and reopens its own output before reporting semantics. Exact
+manufacturer/MPN identities vary, but the admitted geometry remains the one diode/SMA shared
+template contract that this renderer and its readback have live-qualified.
 
 Python then performs an independent readback from outside Altium:
 
@@ -37,15 +39,42 @@ from .oleread import read_footprint_names, read_symbol_names
 
 Bootstrap = Literal["factory", "workspace"]
 
-_SYMBOL_NAME = "S1M"
-_FOOTPRINT_NAME = "DIOM5227X270N"
-_SUPPORTED_IDENTITY = ("ON Semiconductor", "S1M")
 _SUPPORTED_PACKAGE = "SMA (DO-214AC)"
 _SUPPORTED_TEMPLATES = (
     "shared.passive.diode.two_pin.v1",
     "shared.passive.diode.sma_do_214ac.v1",
 )
+_SUPPORTED_BODY = (-1_000_000, -500_000, 1_000_000, 500_000)
+_SUPPORTED_TERMINALS = (
+    ("1", "cathode", -2_540_000, 0, 0, "passive"),
+    ("2", "anode", 2_540_000, 0, 180_000_000, "passive"),
+)
+_SUPPORTED_TOOL_TERMINALS = {
+    "kicad": ("1", "2"),
+    "altium": ("C", "A"),
+}
+_ROLE_PIN_NAME = {"cathode": "K", "anode": "A"}
+_IDENTIFIER_SLUG_LIMIT = 40
+_MAX_ALTIUM_IDENTIFIER_LENGTH = 104
+_SAFE_IDENTIFIER = re.compile(r"[A-Za-z0-9_]+\Z")
+_SAFE_PROCEDURE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,62}\Z")
 _MODEL_PAYLOAD = re.compile(r"^Library/Models/(\d+)$", re.IGNORECASE)
+
+
+@dataclass(frozen=True, slots=True)
+class NativeAuthoringNames:
+    """Collision-safe Altium identifiers derived from one exact canonical identity."""
+
+    symbol: str
+    footprint: str
+
+    @property
+    def schlib_filename(self) -> str:
+        return f"{self.symbol}.SchLib"
+
+    @property
+    def pcblib_filename(self) -> str:
+        return f"{self.footprint}.PcbLib"
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,37 +95,169 @@ class NativeAuthoringResult:
         return self.status == "ok"
 
 
-def _qualified_bundle(path: Path) -> CanonicalPassiveBundle:
+def _template_contract_digest(template_id: str, kind: str) -> str:
+    payload = json.dumps(
+        {
+            "kind": kind,
+            "schema_version": 1,
+            "template_id": template_id,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+
+def _supported_template_contracts() -> tuple[tuple[str, str, str], tuple[str, str, str]]:
+    symbol_id, footprint_id = _SUPPORTED_TEMPLATES
+    return (
+        (symbol_id, "symbol", _template_contract_digest(symbol_id, "symbol")),
+        (
+            footprint_id,
+            "footprint",
+            _template_contract_digest(footprint_id, "footprint"),
+        ),
+    )
+
+
+def _validated_supported_bundle(
+    bundle: CanonicalPassiveBundle,
+) -> CanonicalPassiveBundle:
+    """Revalidate all links, then admit only the geometry this script really renders."""
+
+    if not isinstance(bundle, CanonicalPassiveBundle):
+        raise TypeError("bundle must be a CanonicalPassiveBundle")
+    checked = CanonicalPassiveBundle.model_validate(bundle.model_dump(mode="python"))
+    package = next(claim.value for claim in checked.claims if claim.key == "package")
+    value = next(claim.value for claim in checked.claims if claim.key == "value")
+    for text, field_name in (
+        (checked.manufacturer.authoritative_key, "manufacturer"),
+        (checked.identity.mpn_canonical, "MPN"),
+        (value, "value"),
+        (package, "package"),
+    ):
+        if not text.isascii():
+            raise ValueError(
+                f"canonical {field_name} contains non-ASCII text whose exact AD26 "
+                "round-trip has not been independently qualified"
+            )
+        if any(ord(character) < 32 or ord(character) == 127 for character in text):
+            raise ValueError(
+                f"canonical {field_name} contains a control character that DelphiScript "
+                "cannot preserve"
+            )
+    templates = tuple(
+        (template.template_id, template.kind, template.contract_digest)
+        for template in checked.artifacts.shared_templates
+    )
+    body = checked.definition.body
+    body_contract = (
+        body.min_x_nm,
+        body.min_y_nm,
+        body.max_x_nm,
+        body.max_y_nm,
+    )
+    terminal_contract = tuple(
+        (
+            terminal.number,
+            terminal.role,
+            terminal.position.x_nm,
+            terminal.position.y_nm,
+            terminal.rotation_udeg,
+            terminal.electrical_type,
+        )
+        for terminal in checked.definition.terminals
+    )
+    bindings = {binding.tool: binding for binding in checked.artifacts.tool_bindings}
+    binding_contract = {
+        tool: (
+            binding.symbol_template_id,
+            binding.footprint_template_id,
+            tuple(item.tool_terminal for item in binding.terminal_bindings),
+        )
+        for tool, binding in bindings.items()
+    }
+    expected_bindings = {
+        tool: (*_SUPPORTED_TEMPLATES, terminals)
+        for tool, terminals in _SUPPORTED_TOOL_TERMINALS.items()
+    }
+
+    if (
+        checked.definition.definition_kind != "two_pin_passive"
+        or checked.definition.functional_kind != "diode"
+        or package != _SUPPORTED_PACKAGE
+        or templates != _supported_template_contracts()
+        or body_contract != _SUPPORTED_BODY
+        or terminal_contract != _SUPPORTED_TERMINALS
+        or binding_contract != expected_bindings
+    ):
+        raise ValueError(
+            "native Altium authoring supports only the exact two-pin diode/SMA "
+            "shared-template geometry and KiCad 1/2 plus Altium C/A terminal contract"
+        )
+    return checked
+
+
+def _load_supported_bundle(path: Path) -> CanonicalPassiveBundle:
     try:
         bundle = CanonicalPassiveBundle.model_validate_json(Path(path).read_bytes())
     except Exception as exc:
         raise ValueError(f"{Path(path).name} is not a valid canonical passive bundle") from exc
+    return _validated_supported_bundle(bundle)
 
-    package = next(claim.value for claim in bundle.claims if claim.key == "package")
-    identity = (
-        bundle.manufacturer.authoritative_key,
-        bundle.identity.mpn_canonical,
+
+def _identifier_slug(value: str) -> str:
+    characters = [
+        character if character.isascii() and character.isalnum() else "_" for character in value
+    ]
+    slug = re.sub(r"_+", "_", "".join(characters)).strip("_")
+    return (slug or "PART")[:_IDENTIFIER_SLUG_LIMIT]
+
+
+def _names_for_supported_bundle(bundle: CanonicalPassiveBundle) -> NativeAuthoringNames:
+    slug = _identifier_slug(bundle.identity.mpn_canonical)
+    identity = bundle.identity.component_id
+    names = NativeAuthoringNames(
+        symbol=f"SYM_{slug}__{identity}",
+        footprint=f"FP_{slug}__{identity}",
     )
-    templates = tuple(template.template_id for template in bundle.artifacts.shared_templates)
-    roles = tuple((terminal.number, terminal.role) for terminal in bundle.definition.terminals)
-    altium_binding = next(
+    for name in (names.symbol, names.footprint):
+        if (
+            len(name) > _MAX_ALTIUM_IDENTIFIER_LENGTH
+            or _SAFE_IDENTIFIER.fullmatch(name) is None
+            or ".." in name
+        ):
+            raise AssertionError("derived Altium identifier violated its bounded safe contract")
+    if names.symbol.casefold() == names.footprint.casefold():
+        raise AssertionError("derived Altium symbol and footprint identifiers collided")
+    return names
+
+
+def native_authoring_names(bundle: CanonicalPassiveBundle) -> NativeAuthoringNames:
+    """Return bounded path-safe names carrying the full exact component identity."""
+
+    checked = _validated_supported_bundle(bundle)
+    return _names_for_supported_bundle(checked)
+
+
+def _altium_terminal_semantics(
+    bundle: CanonicalPassiveBundle,
+) -> tuple[tuple[str, str], tuple[str, str]]:
+    binding = next(
         binding for binding in bundle.artifacts.tool_bindings if binding.tool == "altium"
     )
-    terminals = tuple(binding.tool_terminal for binding in altium_binding.terminal_bindings)
-
-    if (
-        identity != _SUPPORTED_IDENTITY
-        or bundle.definition.functional_kind != "diode"
-        or package != _SUPPORTED_PACKAGE
-        or templates != _SUPPORTED_TEMPLATES
-        or roles != (("1", "cathode"), ("2", "anode"))
-        or terminals != ("C", "A")
-    ):
-        raise ValueError(
-            "native Altium proof currently accepts only the qualified exact "
-            "ON Semiconductor/S1M diode/SMA canonical slice"
+    role_by_number = {terminal.number: terminal.role for terminal in bundle.definition.terminals}
+    terminals = tuple(
+        (
+            item.tool_terminal,
+            _ROLE_PIN_NAME[role_by_number[item.canonical_terminal]],
         )
-    return bundle
+        for item in binding.terminal_bindings
+    )
+    if len(terminals) != 2:
+        raise AssertionError("validated two-pin profile produced a non-two-pin binding")
+    return terminals
 
 
 def expected_semantic_report(
@@ -106,29 +267,34 @@ def expected_semantic_report(
 ) -> dict[str, object]:
     """The exact native semantics the generated script must read back after reopen."""
 
+    checked = _validated_supported_bundle(bundle)
+    names = _names_for_supported_bundle(checked)
+    terminals = _altium_terminal_semantics(checked)
     return {
         "bootstrap": bootstrap,
-        "canonical_digest": bundle.canonical_digest(),
+        "canonical_digest": checked.canonical_digest(),
         "footprint": {
             "component_body_count": 1,
             "embedded_models": [Path(step_name).name],
-            "name": _FOOTPRINT_NAME,
+            "name": names.footprint,
             "pad_count": 2,
-            "pads": ["C", "A"],
+            "pads": [number for number, _name in terminals],
+        },
+        "identity": {
+            "component_id": checked.identity.component_id,
+            "manufacturer": checked.manufacturer.authoritative_key,
+            "mpn": checked.identity.mpn_canonical,
         },
         "schema_version": 1,
         "status": "ok",
         "symbol": {
-            "name": _SYMBOL_NAME,
+            "name": names.symbol,
             "parameters": {
-                "MF": bundle.manufacturer.authoritative_key,
-                "MP": bundle.identity.mpn_canonical,
+                "MF": checked.manufacturer.authoritative_key,
+                "MP": checked.identity.mpn_canonical,
             },
             "pin_count": 2,
-            "pins": [
-                {"name": "K", "number": "C"},
-                {"name": "A", "number": "A"},
-            ],
+            "pins": [{"name": name, "number": number} for number, name in terminals],
         },
     }
 
@@ -147,7 +313,13 @@ def render_native_authoring_script(
 
     if bootstrap not in ("factory", "workspace"):
         raise ValueError("bootstrap must be 'factory' or 'workspace'")
-    _validate_qualified_bundle_object(bundle)
+    if _SAFE_PROCEDURE.fullmatch(procedure) is None:
+        raise ValueError("procedure must be a bounded DelphiScript identifier")
+    checked = _validated_supported_bundle(bundle)
+    names = _names_for_supported_bundle(checked)
+    terminals = _altium_terminal_semantics(checked)
+    value = next(claim.value for claim in checked.claims if claim.key == "value")
+    package = next(claim.value for claim in checked.claims if claim.key == "package")
 
     if bootstrap == "factory":
         sch_create = """
@@ -214,7 +386,7 @@ def render_native_authoring_script(
 """
 
     success = json.dumps(
-        expected_semantic_report(bundle, Path(step_win).name, bootstrap),
+        expected_semantic_report(checked, Path(step_win).name, bootstrap),
         ensure_ascii=True,
         separators=(",", ":"),
         sort_keys=True,
@@ -225,10 +397,16 @@ def render_native_authoring_script(
         "__PCBLIB__": delphi_quote(pcblib_win),
         "__STEP__": delphi_quote(step_win),
         "__MARKER__": delphi_quote(marker_win),
-        "__SYMBOL__": delphi_quote(_SYMBOL_NAME),
-        "__FOOTPRINT__": delphi_quote(_FOOTPRINT_NAME),
-        "__MANUFACTURER__": delphi_quote(bundle.manufacturer.authoritative_key),
-        "__MPN__": delphi_quote(bundle.identity.mpn_canonical),
+        "__SYMBOL__": delphi_quote(names.symbol),
+        "__FOOTPRINT__": delphi_quote(names.footprint),
+        "__SYMBOL_DESCRIPTION__": delphi_quote(f"{value} diode"),
+        "__FOOTPRINT_DESCRIPTION__": delphi_quote(f"{package} diode footprint"),
+        "__MANUFACTURER__": delphi_quote(checked.manufacturer.authoritative_key),
+        "__MPN__": delphi_quote(checked.identity.mpn_canonical),
+        "__PIN1_NUMBER__": delphi_quote(terminals[0][0]),
+        "__PIN1_NAME__": delphi_quote(terminals[0][1]),
+        "__PIN2_NUMBER__": delphi_quote(terminals[1][0]),
+        "__PIN2_NAME__": delphi_quote(terminals[1][1]),
         "__STEP_NAME__": delphi_quote(Path(step_win).name),
         "__BOOTSTRAP__": bootstrap,
         "__SUCCESS_JSON__": delphi_quote(success),
@@ -237,36 +415,10 @@ def render_native_authoring_script(
         "__PCB_CREATE__": pcb_create.rstrip(),
         "__PCB_SAVE__": pcb_save.rstrip(),
     }
-    rendered = _SCRIPT_TEMPLATE
-    for token, value in replacements.items():
-        rendered = rendered.replace(token, value)
-    return rendered
-
-
-def _validate_qualified_bundle_object(bundle: CanonicalPassiveBundle) -> None:
-    """Revalidate a bundle object, including instances built through ``model_copy``."""
-
-    if not isinstance(bundle, CanonicalPassiveBundle):
-        raise TypeError("bundle must be a CanonicalPassiveBundle")
-    checked = CanonicalPassiveBundle.model_validate(bundle.model_dump(mode="python"))
-    identity = (
-        checked.manufacturer.authoritative_key,
-        checked.identity.mpn_canonical,
+    token_pattern = re.compile(
+        "|".join(re.escape(token) for token in sorted(replacements, key=len, reverse=True))
     )
-    package = next(claim.value for claim in checked.claims if claim.key == "package")
-    templates = tuple(template.template_id for template in checked.artifacts.shared_templates)
-    altium = next(
-        binding for binding in checked.artifacts.tool_bindings if binding.tool == "altium"
-    )
-    terminals = tuple(binding.tool_terminal for binding in altium.terminal_bindings)
-    if (
-        identity != _SUPPORTED_IDENTITY
-        or checked.definition.functional_kind != "diode"
-        or package != _SUPPORTED_PACKAGE
-        or templates != _SUPPORTED_TEMPLATES
-        or terminals != ("C", "A")
-    ):
-        raise ValueError("bundle is outside the qualified S1M native-authoring slice")
+    return token_pattern.sub(lambda match: replacements[match.group(0)], _SCRIPT_TEMPLATE)
 
 
 _SCRIPT_TEMPLATE = r"""{ GENERATED by stockroom.altium.native_authoring -- scratch proof only.
@@ -390,7 +542,7 @@ __SCH_CREATE__
                     SchComponent.SetState_PartCountNoPart0(1);
                     SchComponent.DisplayMode := 0;
                     SchComponent.LibReference := SymbolName;
-                    SchComponent.ComponentDescription := '1 A 1000 V rectifier diode';
+                    SchComponent.ComponentDescription := __SYMBOL_DESCRIPTION__;
                     SchLib.AddSchComponent(SchComponent);
                     SchLib.SetState_Current_SchComponent(SchComponent);
 
@@ -424,8 +576,8 @@ __SCH_CREATE__
                         SchPin.Location := Point(MMsToCoord(-2.54), 0);
                         SchPin.Orientation := eRotate0;
                         SchPin.PinLength := MMsToCoord(1.54);
-                        SchPin.Designator := 'C';
-                        SchPin.Name := 'K';
+                        SchPin.Designator := __PIN1_NUMBER__;
+                        SchPin.Name := __PIN1_NAME__;
                         SchPin.Description := 'Cathode';
                         SchPin.Electrical := eElectricPassive;
                         SchPin.ShowName := True;
@@ -449,8 +601,8 @@ __SCH_CREATE__
                         SchPin.Location := Point(MMsToCoord(2.54), 0);
                         SchPin.Orientation := eRotate180;
                         SchPin.PinLength := MMsToCoord(1.54);
-                        SchPin.Designator := 'A';
-                        SchPin.Name := 'A';
+                        SchPin.Designator := __PIN2_NUMBER__;
+                        SchPin.Name := __PIN2_NAME__;
                         SchPin.Description := 'Anode';
                         SchPin.Electrical := eElectricPassive;
                         SchPin.ShowName := True;
@@ -550,7 +702,7 @@ __PCB_CREATE__
                 Else
                 Begin
                     Footprint.Name := FootprintName;
-                    Footprint.Description := 'SMA (DO-214AC) rectifier diode';
+                    Footprint.Description := __FOOTPRINT_DESCRIPTION__;
                     If Not PcbLib.RegisterComponent(Footprint) Then
                     Begin
                         Ok := False;
@@ -583,7 +735,7 @@ __PCB_CREATE__
                 Else
                 Begin
                     PcbPad.BeginModify;
-                    PcbPad.Name := 'C';
+                    PcbPad.Name := __PIN1_NUMBER__;
                     PcbPad.X := MMsToCoord(-2.2);
                     PcbPad.Y := 0;
                     PcbPad.Layer := eTopLayer;
@@ -610,7 +762,7 @@ __PCB_CREATE__
                     Else
                     Begin
                         PcbPad.BeginModify;
-                        PcbPad.Name := 'A';
+                        PcbPad.Name := __PIN2_NUMBER__;
                         PcbPad.X := MMsToCoord(2.2);
                         PcbPad.Y := 0;
                         PcbPad.Layer := eTopLayer;
@@ -721,9 +873,11 @@ __PCB_SAVE__
                     Begin
                         SchPin := SchObject;
                         PinCount := PinCount + 1;
-                        If (SchPin.Designator = 'C') And (SchPin.Name = 'K') Then
+                        If (SchPin.Designator = __PIN1_NUMBER__) And
+                           (SchPin.Name = __PIN1_NAME__) Then
                             SeenPinC := True;
-                        If (SchPin.Designator = 'A') And (SchPin.Name = 'A') Then
+                        If (SchPin.Designator = __PIN2_NUMBER__) And
+                           (SchPin.Name = __PIN2_NAME__) Then
                             SeenPinA := True;
                     End
                     Else If SchObject.ObjectId = eParameter Then
@@ -803,8 +957,8 @@ __PCB_SAVE__
                     Begin
                         PersistedPad := PcbPrimitive;
                         PadCount := PadCount + 1;
-                        If PersistedPad.Name = 'C' Then SeenPadC := True;
-                        If PersistedPad.Name = 'A' Then SeenPadA := True;
+                        If PersistedPad.Name = __PIN1_NUMBER__ Then SeenPadC := True;
+                        If PersistedPad.Name = __PIN2_NUMBER__ Then SeenPadA := True;
                     End
                     Else If PcbPrimitive.ObjectId = eComponentBodyObject Then
                     Begin
@@ -900,7 +1054,8 @@ def author_native_component(
     if bootstrap not in ("factory", "workspace"):
         raise ValueError("bootstrap must be 'factory' or 'workspace'")
 
-    bundle = _qualified_bundle(canonical_json)
+    bundle = _load_supported_bundle(canonical_json)
+    names = _names_for_supported_bundle(bundle)
     root = Path(output_dir)
     if root.exists():
         if not root.is_dir() or any(root.iterdir()):
@@ -920,8 +1075,8 @@ def author_native_component(
     shutil.copy2(canonical_json, canonical_copy)
     shutil.copy2(step, step_copy)
 
-    schlib = artifacts / f"{_SYMBOL_NAME}.SchLib"
-    pcblib = artifacts / f"{_FOOTPRINT_NAME}.PcbLib"
+    schlib = artifacts / names.schlib_filename
+    pcblib = artifacts / names.pcblib_filename
     marker = evidence_dir / "Native Authoring Result.json"
     evidence = evidence_dir / "Independent Verification.json"
     pas = run / "SRNativeAuthoring.pas"
@@ -1023,10 +1178,10 @@ def author_native_component(
 
     source_step = step_copy.read_bytes()
     payload_match = source_step in payloads
-    if symbol_names != [_SYMBOL_NAME]:
-        failures.append(f"SchLib names are {symbol_names!r}, expected [{_SYMBOL_NAME!r}]")
-    if footprint_names != [_FOOTPRINT_NAME]:
-        failures.append(f"PcbLib names are {footprint_names!r}, expected [{_FOOTPRINT_NAME!r}]")
+    if symbol_names != [names.symbol]:
+        failures.append(f"SchLib names are {symbol_names!r}, expected [{names.symbol!r}]")
+    if footprint_names != [names.footprint]:
+        failures.append(f"PcbLib names are {footprint_names!r}, expected [{names.footprint!r}]")
     if not model_name_present(model_records, step_copy.name):
         failures.append(f"PcbLib model index does not name {step_copy.name}")
     if not payload_match:
@@ -1087,9 +1242,14 @@ def _base_evidence(
     canonical: Path,
     step: Path,
 ) -> dict[str, object]:
+    names = _names_for_supported_bundle(bundle)
     return {
         "bootstrap": bootstrap,
         "canonical_digest": bundle.canonical_digest(),
+        "native_names": {
+            "footprint": names.footprint,
+            "symbol": names.symbol,
+        },
         "inputs": {
             "canonical": _artifact_evidence(canonical),
             "step": _artifact_evidence(step),
