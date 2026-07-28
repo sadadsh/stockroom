@@ -82,19 +82,31 @@ def read_footprint_names(path) -> list[str]:
 
 
 def pick_entry(names: list[str], kind: str, prefer: str | None = None) -> str:
-    """Choose the entry to bind from a library's entry names: an exact `prefer` (the MPN)
-    wins, else a name containing it (vendor footprints often wrap the MPN:
-    "TPD6E05U06RVZR_RVZ6"; several containing it bind the first), else the FIRST entry.
-    Deliberately permissive (owner 2026-07-24): a multi-entry vendor library must never
-    fail the capture - the whole file is stored verbatim, so a wrong best-effort binding
-    is visible and re-bindable, while a refused attach silently loses the download. Only
-    an EMPTY library (nothing to bind at all) is an error."""
+    """Choose one demonstrably unambiguous library entry.
+
+    An exact requested MPN wins, followed by one unique name containing it (vendor footprints
+    commonly suffix the MPN with a package code). A single-entry library is intrinsically
+    unambiguous even when its logical entry name is a package alias. Multi-entry libraries never
+    fall back to their first member: file order is not part identity, and silently binding the
+    wrong symbol is worse than retaining the downloaded bundle as an unresolved exception.
+    """
     if not names:
         raise ValueError(f"no {kind} entry found in the library")
     if prefer:
         if prefer in names:
             return prefer
         containing = [n for n in names if prefer.lower() in n.lower()]
-        if containing:
+        if len(containing) == 1:
             return containing[0]
-    return names[0]
+        if len(containing) > 1:
+            raise ValueError(
+                f"{len(containing)} {kind} entries contain requested MPN {prefer!r}; "
+                "refusing to choose by file order"
+            )
+    if len(names) == 1:
+        return names[0]
+    requested = f" for requested MPN {prefer!r}" if prefer else ""
+    raise ValueError(
+        f"{len(names)} {kind} entries are available{requested}; "
+        "refusing to choose by file order"
+    )

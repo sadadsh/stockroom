@@ -54,15 +54,20 @@ def test_attach_rejects_symbol_only_intlib_zero_trace(library_ops):
     assert ops.load_record("x").assets_for("altium").symbol is None
 
 
-def test_attach_binds_the_first_symbol_when_the_mpn_matches_none(library_ops):
-    # permissive by owner directive (2026-07-24): a multi-symbol lib with no MPN match
-    # binds its first entry instead of refusing the capture (the lib is stored verbatim
-    # and the binding is re-attachable).
+def test_attach_refuses_multi_symbol_library_when_the_mpn_matches_none(library_ops):
     ops = library_ops
     _seed(ops, "amb", "NOMATCH")
-    record = ops.attach_altium_assets("amb", FIX / "multi_symbol.SchLib", FIX / "sample.PcbLib")
-    assert record.assets_for("altium").symbol is not None
-    assert record.assets_for("altium").symbol.name  # bound to a real entry, never empty
+
+    with pytest.raises(ValueError, match="refusing to choose by file order"):
+        ops.attach_altium_assets(
+            "amb",
+            FIX / "multi_symbol.SchLib",
+            FIX / "sample.PcbLib",
+        )
+
+    # Validation precedes directory creation and mutation: an ambiguous download leaves no trace.
+    assert not (ops.lib.parts_dir.parent / "altium").exists()
+    assert ops.load_record("amb").assets_for("altium").symbol is None
 
 
 def test_attach_picks_the_mpn_matching_symbol_from_a_multi_symbol_lib(library_ops):
