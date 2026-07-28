@@ -220,6 +220,12 @@ class UltraLibrarianAdapter:
         """
         try:
             url = page.url or ""
+            parsed = urlparse(url)
+            if parsed.scheme not in {"http", "https"} or (parsed.hostname or "").casefold() not in {
+                "app.ultralibrarian.com",
+                "www.ultralibrarian.com",
+            }:
+                return False
             if "sso." in url or "/Account/Login" in url:
                 return False
             if page.locator("#Username").count() > 0:
@@ -348,6 +354,9 @@ class UltraLibrarianAdapter:
         challenge = _challenge_issue(page, "Ultra Librarian")
         if challenge:
             return challenge
+        missing = _ultralibrarian_missing_model_issue(page)
+        if missing:
+            return missing
 
         if "/search" in (page.url or ""):
             requested_mpn = _requested_mpn(page.url, ("queryText",))
@@ -365,12 +374,18 @@ class UltraLibrarianAdapter:
             challenge = _challenge_issue(page, "Ultra Librarian")
             if challenge:
                 return challenge
+            missing = _ultralibrarian_missing_model_issue(page)
+            if missing:
+                return missing
 
         # The export panel is a real deep link on the part page - fewer clicks than the button,
         # and it survives the button being renamed.
         if "/details/" in (page.url or "") and "open=exports" not in (page.url or ""):
             joiner = "&" if "?" in page.url else "?"
             page.goto(f"{page.url}{joiner}open=exports", wait_until="domcontentloaded")
+            missing = _ultralibrarian_missing_model_issue(page)
+            if missing:
+                return missing
 
         try:
             page.locator("input[name=exports]").first.wait_for(state="attached", timeout=20_000)
@@ -378,6 +393,9 @@ class UltraLibrarianAdapter:
             challenge = _challenge_issue(page, "Ultra Librarian")
             if challenge:
                 return challenge
+            missing = _ultralibrarian_missing_model_issue(page)
+            if missing:
+                return missing
             if page.locator('a[href*="/Account/Login"]').count() > 0:
                 return "Sign in to Ultra Librarian in the window; the sign-in is remembered."
             return "the CAD format list did not open on this page"
@@ -597,6 +615,19 @@ def _absolute(page, href: str) -> str:
     return urljoin(page.url, href)
 
 
+_SNAPMAGIC_READY_FORMATS = (
+    '[data-format="kicad_options"]:visible, '
+    '[data-format="altium_native"]:visible, '
+    '[data-format="step_model"]:visible'
+)
+_SNAPMAGIC_PART_STATE = (
+    f"{_SNAPMAGIC_READY_FORMATS}, "
+    'a[name="download-modal"]:visible, '
+    'p:has-text("The 2D model for this part is not available"):visible, '
+    'a:has-text("Request 3D Model"):visible'
+)
+
+
 class SnapMagicAdapter:
     """SnapMagic (SnapEDA). Runs ALONGSIDE Ultra Librarian, never instead of it.
 
@@ -757,7 +788,7 @@ class SnapMagicAdapter:
 
     def open_panel(self, page) -> str:
         """Search -> part page -> the "Choose Download Format" modal. "" when the formats are up."""
-        if page.locator("[data-format]").count() > 0:
+        if page.locator(_SNAPMAGIC_READY_FORMATS).count() > 0:
             return ""
         challenge = _challenge_issue(page, "SnapMagic")
         if challenge:
@@ -778,15 +809,29 @@ class SnapMagicAdapter:
             challenge = _challenge_issue(page, "SnapMagic")
             if challenge:
                 return challenge
+        # The part body is client-rendered after ``domcontentloaded``. Wait for one real terminal
+        # signal instead of reading too early and turning an explicit catalogue miss into the
+        # generic "no download control" fallback.
+        try:
+            page.locator(_SNAPMAGIC_PART_STATE).first.wait_for(
+                state="visible", timeout=15_000
+            )
+        except Exception:  # noqa: BLE001 - the checks below report the fail-closed fallback
+            pass
+        missing = _snapmagic_missing_model_issue(page)
+        if missing:
+            return missing
         account_issue = _snapmagic_account_issue(page)
         if account_issue:
             return account_issue
-        opener = page.locator('a[name="download-modal"]').first
+        opener = page.locator('a[name="download-modal"]:visible').first
         if opener.count() == 0:
             return "SnapMagic showed no download control for this part."
         opener.click()
         try:
-            page.locator("[data-format]").first.wait_for(state="attached", timeout=15_000)
+            page.locator(_SNAPMAGIC_READY_FORMATS).first.wait_for(
+                state="visible", timeout=15_000
+            )
         except Exception:  # noqa: BLE001
             return "the SnapMagic format list did not open"
         return ""
@@ -823,12 +868,12 @@ class SnapMagicAdapter:
                 if opener.count():
                     opener.click()
                     try:
-                        page.locator(f'[data-format="{target}"]').first.wait_for(
-                            state="attached", timeout=10_000
+                        page.locator(f'[data-format="{target}"]:visible').first.wait_for(
+                            state="visible", timeout=10_000
                         )
                     except Exception:  # noqa: BLE001 - absence is answered by the check below
                         pass
-            button = page.locator(f'[data-format="{target}"]').first
+            button = page.locator(f'[data-format="{target}"]:visible').first
             if button.count() == 0:
                 report.missed.append(fmt)
                 continue
@@ -897,10 +942,12 @@ def _mpn_key(value: str) -> str:
 
 
 def _href_demonstrates_mpn(href: str, requested_mpn: str) -> bool:
-    """True only when one complete URL component equals the requested MPN.
+    """True only when one complete detail-path component equals the requested MPN.
 
     Deliberately no substring matching: `ABC` must not select `ABC-1`, and punctuation such as
-    `+`, `/`, or `#` remains identity-bearing.
+    `+`, `/`, or `#` remains identity-bearing. Query values are not identity evidence: live
+    SnapMagic sponsored results echo the requested MPN in a tracking ``t=`` parameter while their
+    detail path names a completely different part.
     """
     expected = _mpn_key(requested_mpn)
     if not expected or not href:
@@ -908,21 +955,39 @@ def _href_demonstrates_mpn(href: str, requested_mpn: str) -> bool:
     try:
         parsed = urlparse(href)
         path_segments = [unquote(segment) for segment in parsed.path.split("/") if segment]
-        query_values = [
-            value
-            for values in parse_qs(parsed.query, keep_blank_values=False).values()
-            for value in values
-        ]
     except Exception:  # noqa: BLE001 - malformed result URLs are not identity evidence
         return False
-    return any(_mpn_key(value) == expected for value in (*path_segments, *query_values))
+    return any(_mpn_key(value) == expected for value in path_segments)
+
+
+def _canonical_detail_identity(href: str) -> tuple[str, str, tuple[str, ...]] | None:
+    """The stable destination behind one result link.
+
+    Provider search pages repeat one part through image/title/action links and add presentation
+    state such as Ultra Librarian's ``open=Pricing``. Those are one destination, not ambiguity.
+    A provider's stable ``uid`` remains identity-bearing so genuinely distinct catalogue entries
+    still fail closed.
+    """
+    try:
+        parsed = urlparse(href)
+        path = _mpn_key(unquote(parsed.path)).rstrip("/")
+        if not path:
+            return None
+        uid = tuple(
+            _mpn_key(value)
+            for value in parse_qs(parsed.query, keep_blank_values=False).get("uid", ())
+            if value.strip()
+        )
+        return (parsed.netloc.casefold(), path, uid)
+    except Exception:  # noqa: BLE001 - malformed destinations cannot establish one identity
+        return None
 
 
 def _exact_result_href(results, requested_mpn: str) -> tuple[str, str]:
     """Choose one unique exact-MPN result, or return a fail-closed explanation."""
     if not requested_mpn:
         return "", "could not recover the requested MPN from the search URL."
-    matches: list[str] = []
+    matches: dict[tuple[str, str, tuple[str, ...]], str] = {}
     for index in range(results.count()):
         node = results.nth(index)
         href = node.get_attribute("href") or ""
@@ -936,13 +1001,47 @@ def _exact_result_href(results, requested_mpn: str) -> tuple[str, str]:
         )
         if _href_demonstrates_mpn(href, requested_mpn) or exact_text:
             absolute = href.strip()
-            if absolute and absolute not in matches:
-                matches.append(absolute)
+            identity = _canonical_detail_identity(absolute)
+            if identity is not None:
+                matches.setdefault(identity, absolute)
     if not matches:
         return "", f"showed no exact result for requested MPN {requested_mpn!r}."
     if len(matches) > 1:
         return "", f"showed multiple exact links for requested MPN {requested_mpn!r}."
-    return matches[0], ""
+    return next(iter(matches.values())), ""
+
+
+def _visible_body_text(page) -> str:
+    """Rendered body copy only; hidden provider templates are not availability evidence."""
+    try:
+        return " ".join((page.inner_text("body") or "").split()).casefold()
+    except Exception:  # noqa: BLE001 - unreadable copy establishes no terminal state
+        return ""
+
+
+def _ultralibrarian_missing_model_issue(page) -> str:
+    """A terminal exact-part miss rendered by Ultra Librarian."""
+    body = _visible_body_text(page)
+    if "no exact match found" in body:
+        return "Ultra Librarian has no model for this part."
+    unavailable = (
+        "no symbol available",
+        "no footprint available",
+        "no 3d model available",
+    )
+    if all(marker in body for marker in unavailable):
+        return "Ultra Librarian has no symbol, footprint, or 3D model for this part."
+    return ""
+
+
+def _snapmagic_missing_model_issue(page) -> str:
+    """A terminal exact-part miss rendered by SnapMagic."""
+    body = _visible_body_text(page)
+    no_2d = "the 2d model for this part is not available" in body
+    no_3d = "request 3d model" in body or "get this 3d model in" in body
+    if no_2d and no_3d:
+        return "SnapMagic has no downloadable symbol, footprint, or 3D model for this part."
+    return ""
 
 
 _CHALLENGE_MARKERS = (

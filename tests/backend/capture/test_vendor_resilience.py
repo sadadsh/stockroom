@@ -55,6 +55,10 @@ def test_result_navigation_requires_a_whole_exact_mpn_component():
     assert _href_demonstrates_mpn("/parts/analog-devices/MAX6817EUT%2BT/view-part/", "MAX6817EUT+T")
     assert not _href_demonstrates_mpn("/parts/analog-devices/ABC-1/view-part/", "ABC")
     assert not _href_demonstrates_mpn("/details/id/vendor/MCP4728-E/UN", "MCP4728-E/UN")
+    assert not _href_demonstrates_mpn(
+        "/parts/WP10-S002VA10-R15000/JAE/view-part/?t=IC51-0484-806",
+        "IC51-0484-806",
+    )
 
 
 def test_exact_result_selection_rejects_near_and_ambiguous_matches():
@@ -83,6 +87,39 @@ def test_exact_result_selection_rejects_near_and_ambiguous_matches():
     )
     assert href == ""
     assert "no exact result" in error
+
+
+def test_exact_result_collapses_repeated_actions_for_one_provider_identity():
+    base = "/details/Yamaichi/IC51-0484-806?uid=7872077"
+    href, error = _exact_result_href(
+        _Results(
+            _ResultNode(base, "IC51-0484-806"),
+            _ResultNode(f"{base}&open=Pricing", "More Pricing Details"),
+        ),
+        "IC51-0484-806",
+    )
+
+    assert href == base
+    assert error == ""
+
+
+def test_exact_result_rejects_sponsored_tracking_echoes_and_collapses_duplicate_links():
+    sponsored = (
+        "/parts/WP10-S002VA10-R15000/JAE/view-part/"
+        "?ref=jae&t=IC51-0484-806&auction_id=111111"
+    )
+    exact = "/parts/IC51-0484-806/Yamaichi/view-part/?ref=search&t=IC51-0484-806"
+    href, error = _exact_result_href(
+        _Results(
+            _ResultNode(sponsored, "WP10-S002VA10-R15000"),
+            _ResultNode(exact, "IC51-0484-806"),
+            _ResultNode(exact, "IC51-0484-806"),
+        ),
+        "IC51-0484-806",
+    )
+
+    assert href == exact
+    assert error == ""
 
 
 class _Checkbox:
@@ -200,6 +237,39 @@ class _Frames:
         return _Frame(self.sources[index])
 
 
+class _StaticLocator:
+    def __init__(self, count: int = 0) -> None:
+        self._count = count
+
+    @property
+    def first(self):
+        return self
+
+    def count(self):
+        return self._count
+
+
+class _ProviderStatePage:
+    def __init__(self, url: str, body: str, *, hidden_formats: int = 0) -> None:
+        self.url = url
+        self.body = body
+        self.hidden_formats = hidden_formats
+
+    def title(self):
+        return ""
+
+    def inner_text(self, selector: str):
+        assert selector == "body"
+        return self.body
+
+    def locator(self, selector: str):
+        if selector == "iframe":
+            return _Frames(())
+        if selector == "[data-format]":
+            return _StaticLocator(self.hidden_formats)
+        return _StaticLocator()
+
+
 def test_challenge_and_unverified_account_states_are_reported_distinctly():
     issue = _challenge_issue(
         _PageText(frames=("https://challenges.cloudflare.com/cf-chl-widget",)), "SnapMagic"
@@ -243,7 +313,10 @@ class _SignedOutFormatPage:
     url = "https://www.snapeda.com/parts/acme/ABC/view-part/"
 
     def locator(self, selector: str):
-        if selector == "[data-format]" or selector == '[data-format="altium_native"]':
+        if (
+            'data-format="kicad_options"' in selector
+            or selector == '[data-format="altium_native"]:visible'
+        ):
             return _FormatButton()
         return _CheckboxCollection([])
 
@@ -260,3 +333,77 @@ def test_snapmagic_done_page_without_saved_bytes_is_a_provider_wide_download_gat
     issue = SnapMagicAdapter().download_gate(_PageText("Done! You just downloaded S1M"))
     assert "browser received no file" in issue
     assert "multiple-file permission" in issue
+
+
+def test_snapmagic_hidden_format_scaffolding_is_not_a_downloadable_model():
+    page = _ProviderStatePage(
+        "https://www.snapeda.com/parts/IC51-0484-806/Yamaichi/view-part/",
+        "The 2D model for this part is not available. "
+        "Get this 3D Model in 1 business day! Request 3D Model",
+        hidden_formats=37,
+    )
+
+    issue = SnapMagicAdapter().open_panel(page)
+
+    assert "no downloadable symbol, footprint, or 3D model" in issue
+
+
+def test_snapmagic_waits_for_the_client_rendered_missing_model_state():
+    class _RevealsMissing(_StaticLocator):
+        def __init__(self, page) -> None:
+            super().__init__(1)
+            self.page = page
+
+        def wait_for(self, **_kwargs):
+            self.page.body = (
+                "The 2D model for this part\nis not available.\n"
+                "Get this 3D Model in 1 business day!\nRequest 3D Model"
+            )
+
+    class _DeferredMissingPage(_ProviderStatePage):
+        def locator(self, selector: str):
+            if 'a:has-text("Request 3D Model")' in selector:
+                return _RevealsMissing(self)
+            return super().locator(selector)
+
+    page = _DeferredMissingPage(
+        "https://www.snapeda.com/parts/IC51-0484-806/Yamaichi/view-part/",
+        "Loading",
+        hidden_formats=37,
+    )
+
+    issue = SnapMagicAdapter().open_panel(page)
+
+    assert "no downloadable symbol, footprint, or 3D model" in issue
+
+
+def test_snapmagic_requires_a_visible_part_specific_download_control():
+    page = _ProviderStatePage(
+        "https://www.snapeda.com/parts/ABC/Yamaichi/view-part/",
+        "Part metadata only",
+        hidden_formats=37,
+    )
+
+    assert SnapMagicAdapter().open_panel(page) == (
+        "SnapMagic showed no download control for this part."
+    )
+
+
+def test_ultra_reports_explicit_missing_model_before_a_misleading_login_prompt():
+    page = _ProviderStatePage(
+        "https://app.ultralibrarian.com/details/Yamaichi/IC51-0484-806?uid=7872077",
+        "Login Register No Exact Match Found Request Models",
+    )
+
+    assert UltraLibrarianAdapter().open_panel(page) == (
+        "Ultra Librarian has no model for this part."
+    )
+
+    alternate = _ProviderStatePage(
+        "https://app.ultralibrarian.com/details/Yamaichi/IC510484806?uid=133903962",
+        "No Symbol Available Request Footprint No Footprint Available "
+        "No 3D Model Available",
+    )
+    assert UltraLibrarianAdapter().open_panel(alternate) == (
+        "Ultra Librarian has no symbol, footprint, or 3D model for this part."
+    )
