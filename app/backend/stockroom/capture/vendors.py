@@ -32,6 +32,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
+from unicodedata import normalize
+from urllib.parse import parse_qs, unquote, urlparse
 
 from stockroom.capture.requirements import Requirement
 
@@ -104,6 +106,9 @@ class DriveReport:
     selected: list[str] = field(default_factory=list)
     missed: list[str] = field(default_factory=list)
     submitted: bool = False
+    # A provider-wide challenge/auth/account gate, not a fact about this MPN. The batch engine
+    # treats this as deferred and trips its circuit breaker instead of burning every remaining row.
+    blocked: bool = False
     message: str = ""
 
     @property
@@ -182,11 +187,14 @@ class UltraLibrarianAdapter:
         aggregator=False,
         needs_login=True,
         instruction="Pick the part, then Download Now. Symbol, footprint and 3D come together.",
-        # measured element ids on the export panel. `model` is separate from `kicad`: the STEP
+        # Measured element ids on the export panel. `model` is separate from `kicad`: the STEP
         # sits behind its own "3D CAD Model" accordion and is missed entirely if not ticked.
+        # `ThreeDModel` is the current live id (2026-07-28). Older captured panels used
+        # `MfrThreeDModel`; `_export_selectors` retains that as a compatibility fallback without
+        # making the stale id the declared production pin.
         # When altium IS wired, its pin must be "AltiumPCADV15" (the PCAD row) and never
         # "AltiumDesigner" (the script row, which ships UL_Import.pas and no libraries).
-        version_pins={"kicad": "KiCADv6", "model": "MfrThreeDModel"},
+        version_pins={"kicad": "KiCADv6", "model": "ThreeDModel"},
     )
 
     # The accordion each format hides behind, by its visible text.
@@ -337,17 +345,26 @@ class UltraLibrarianAdapter:
         """
         if page.locator("input[name=exports]").count() > 0:
             return ""  # already there
+        challenge = _challenge_issue(page, "Ultra Librarian")
+        if challenge:
+            return challenge
 
         if "/search" in (page.url or ""):
+            requested_mpn = _requested_mpn(page.url, ("queryText",))
             results = page.locator('a[href*="/details/"]')
             try:
                 results.first.wait_for(state="visible", timeout=20_000)
             except Exception:  # noqa: BLE001 - no result is an answer, not a crash
                 return "Ultra Librarian has no model for this part."
-            href = results.first.get_attribute("href") or ""
+            href, selection_error = _exact_result_href(results, requested_mpn)
+            if selection_error:
+                return f"Ultra Librarian {selection_error}"
             if not href:
                 return "the result row carried no link"
             page.goto(_absolute(page, href), wait_until="domcontentloaded")
+            challenge = _challenge_issue(page, "Ultra Librarian")
+            if challenge:
+                return challenge
 
         # The export panel is a real deep link on the part page - fewer clicks than the button,
         # and it survives the button being renamed.
@@ -358,6 +375,9 @@ class UltraLibrarianAdapter:
         try:
             page.locator("input[name=exports]").first.wait_for(state="attached", timeout=20_000)
         except Exception:  # noqa: BLE001
+            challenge = _challenge_issue(page, "Ultra Librarian")
+            if challenge:
+                return challenge
             if page.locator('a[href*="/Account/Login"]').count() > 0:
                 return "Sign in to Ultra Librarian in the window; the sign-in is remembered."
             return "the CAD format list did not open on this page"
@@ -366,8 +386,25 @@ class UltraLibrarianAdapter:
     def drive(self, page, formats: list[str]) -> DriveReport:
         blocked = self.open_panel(page)
         if blocked:
-            return DriveReport(missed=list(formats), message=blocked)
+            return DriveReport(
+                missed=list(formats),
+                blocked=_is_global_blockage(blocked),
+                message=blocked,
+            )
         report = DriveReport()
+        # Export choices persist in the page/session. A previous Altium v14 selection was measured
+        # still checked on the next live part (2026-07-28). Starting from that ambient state can
+        # silently request an obsolete or unsupported format beside the pinned one. Clear every
+        # export choice first, verify the clear, then select only this run's declared pins.
+        if not _clear_export_selections(page):
+            return DriveReport(
+                missed=list(formats),
+                blocked=True,
+                message=(
+                    "Ultra Librarian kept a previous export selection checked; refusing to submit "
+                    "an ambiguous format set."
+                ),
+            )
         for fmt in formats:
             box_id = self.capability.version_pins.get(fmt)
             if not box_id:
@@ -376,7 +413,7 @@ class UltraLibrarianAdapter:
             accordion = self._ACCORDION.get(fmt)
             if accordion:
                 _click_accordion(page, accordion)
-            if _check_box(page, f"#{box_id}"):
+            if any(_check_box(page, selector) for selector in _export_selectors(fmt, box_id)):
                 report.selected.append(fmt)
             else:
                 report.missed.append(fmt)
@@ -393,6 +430,7 @@ class UltraLibrarianAdapter:
 
         submit = page.locator("#submit-export").first
         if submit.count() == 0:
+            report.blocked = True
             report.message = (
                 "Selected " + " and ".join(report.selected) + ", but the Download button is "
                 "not on this page."
@@ -415,6 +453,10 @@ class UltraLibrarianAdapter:
             + " on this page."
         )
         return report
+
+    def download_gate(self, page) -> str:
+        """Provider-wide state explaining why a submitted export produced no browser download."""
+        return _challenge_issue(page, self.capability.label)
 
 
 def _click_accordion(page, label: str) -> bool:
@@ -461,6 +503,55 @@ def _check_box(page, selector: str) -> bool:
         except Exception:  # noqa: BLE001 - report the honest miss rather than raising
             pass
     return box.is_checked()
+
+
+def _uncheck_box(page, selector: str) -> bool:
+    """Clear one checkbox and verify its state, including styled-input fallback."""
+    box = page.locator(selector).first
+    if box.count() == 0:
+        return True
+    if box.is_checked():
+        try:
+            box.uncheck(force=True, timeout=5_000)
+        except Exception:  # noqa: BLE001 - styled controls may reject Playwright's uncheck
+            pass
+    if box.is_checked():
+        try:
+            page.evaluate(
+                "sel => { const el = document.querySelector(sel); if (el && el.checked) el.click(); }",
+                selector,
+            )
+        except Exception:  # noqa: BLE001 - the verified return below remains authoritative
+            pass
+    return not box.is_checked()
+
+
+def _clear_export_selections(page) -> bool:
+    """Clear all persisted Ultra Librarian export choices and read every state back."""
+    selected = page.locator("input[name=exports]:checked")
+    # Snapshot selectors before mutating: `:checked` is live, so indexing while clearing would skip
+    # every other node.
+    selectors: list[str] = []
+    for index in range(selected.count()):
+        node = selected.nth(index)
+        box_id = node.get_attribute("id") or ""
+        if not box_id:
+            return False
+        # Some real export ids contain spaces and punctuation (`TARGET 3001!`), so a CSS
+        # `#id` selector is not generally valid here. An escaped attribute selector is.
+        escaped = box_id.replace("\\", "\\\\").replace('"', '\\"')
+        selectors.append(f'input[name="exports"][id="{escaped}"]')
+    return all(_uncheck_box(page, selector) for selector in selectors) and (
+        page.locator("input[name=exports]:checked").count() == 0
+    )
+
+
+def _export_selectors(fmt: str, declared_id: str) -> tuple[str, ...]:
+    """Current selector first, then only measured backwards-compatible aliases."""
+    selectors = [f"#{declared_id}"]
+    if fmt == "model" and declared_id == "ThreeDModel":
+        selectors.append("#MfrThreeDModel")
+    return tuple(selectors)
 
 
 def _accept_consents(page) -> int:
@@ -529,10 +620,11 @@ class SnapMagicAdapter:
         directly, with no conversion anywhere.
       * the 3D model is a SEPARATE download (`#download_step_model`), not part of either.
 
-    THE WALL, stated because it decides the workflow: SnapEDA serves a Cloudflare Turnstile
-    interstitial to a plain browser. That is why the capture engine defaults to camoufox, which was
-    measured walking straight through it. Auto-clicking a Turnstile only trips detection harder
-    (learned 2026-07-24), so a person clears it once into the persistent profile if it ever appears.
+    THE WALL, stated because it decides the workflow: SnapEDA can serve a Cloudflare Turnstile
+    interstitial. Production uses an installed Windows Chrome/Edge channel with an isolated
+    persistent provider profile, so a person can clear the challenge once and retain that session.
+    Camoufox is an explicit fallback for a measured need, not the production default. Auto-clicking
+    a Turnstile only trips detection harder (learned 2026-07-24).
     """
 
     capability = VendorCapability(
@@ -541,8 +633,10 @@ class SnapMagicAdapter:
         # Altium is NATIVE here, unlike Ultra Librarian's PCAD `.lia`, so both tools are real.
         tools=("kicad", "altium"),
         formats_exclusive=True,
-        # It hosts community and AI-generated models as well as authored ones, so it is ordered
-        # AFTER Ultra Librarian in the source chain rather than being an equal first choice.
+        # It hosts community and AI-generated models as well as authored ones, so its bytes are
+        # lower-trust than Ultra Librarian's. It is nevertheless first for dual-EDA acquisition
+        # because only it supplies one native coherent bundle; verification, not provider prose,
+        # decides whether those bytes can attach.
         aggregator=False,
         needs_login=True,
         instruction="Clear the human check once if it appears, then the downloads run themselves.",
@@ -665,26 +759,28 @@ class SnapMagicAdapter:
         """Search -> part page -> the "Choose Download Format" modal. "" when the formats are up."""
         if page.locator("[data-format]").count() > 0:
             return ""
-        body = ""
-        try:
-            body = (page.inner_text("body") or "").lower()
-        except Exception:  # noqa: BLE001 - a page mid-navigation is not a verdict
-            pass
-        if "just a moment" in body or "security verification" in body:
-            return (
-                "SnapMagic is asking you to confirm you are human. Clear it once in this window; "
-                "it is remembered afterwards."
-            )
+        challenge = _challenge_issue(page, "SnapMagic")
+        if challenge:
+            return challenge
         if "/search" in (page.url or ""):
+            requested_mpn = _requested_mpn(page.url, ("q",))
             results = page.locator('a[href*="view-part"]')
             try:
                 results.first.wait_for(state="visible", timeout=20_000)
             except Exception:  # noqa: BLE001 - no result IS an answer, and a normal one
                 return "SnapMagic has no model for this part."
-            href = results.first.get_attribute("href") or ""
+            href, selection_error = _exact_result_href(results, requested_mpn)
+            if selection_error:
+                return f"SnapMagic {selection_error}"
             if not href:
                 return "the SnapMagic result row carried no link"
             page.goto(_absolute(page, href), wait_until="domcontentloaded")
+            challenge = _challenge_issue(page, "SnapMagic")
+            if challenge:
+                return challenge
+        account_issue = _snapmagic_account_issue(page)
+        if account_issue:
+            return account_issue
         opener = page.locator('a[name="download-modal"]').first
         if opener.count() == 0:
             return "SnapMagic showed no download control for this part."
@@ -706,6 +802,7 @@ class SnapMagicAdapter:
         blocked = self.open_panel(page)
         if blocked:
             report.missed = list(formats)
+            report.blocked = _is_global_blockage(blocked)
             report.message = blocked
             return report
         for fmt in formats[:1]:
@@ -735,15 +832,188 @@ class SnapMagicAdapter:
             if button.count() == 0:
                 report.missed.append(fmt)
                 continue
+            href = (button.get_attribute("href") or "").lower()
+            if "/account/login" in href or "/account/signup" in href:
+                report.missed.append(fmt)
+                report.blocked = True
+                report.message = (
+                    "SnapMagic requires a signed-in, verified account before it will deliver "
+                    f"{fmt}."
+                )
+                continue
             button.click()
             report.selected.append(fmt)
             report.submitted = True
-        report.message = (
-            f"Requested {' and '.join(report.selected)} from SnapMagic."
-            if report.selected
-            else f"SnapMagic does not offer {' or '.join(report.missed)} for this part."
-        )
+        if not report.message:
+            report.message = (
+                f"Requested {' and '.join(report.selected)} from SnapMagic."
+                if report.selected
+                else f"SnapMagic does not offer {' or '.join(report.missed)} for this part."
+            )
         return report
+
+    def download_gate(self, page) -> str:
+        """Explain a submitted button that changed the page but emitted no file.
+
+        Live 2026-07-28: an unverified account changed the page to "Done! You just downloaded S1M"
+        while Chrome emitted no download and no file appeared. DOM success is intent-shaped UI,
+        never delivery evidence. This is consulted only after the saved-file backstop expires.
+        """
+        issue = _challenge_issue(page, self.capability.label) or _snapmagic_account_issue(page)
+        if issue:
+            return issue
+        try:
+            body = (page.inner_text("body") or "").casefold()
+        except Exception:  # noqa: BLE001 - no readable gate evidence
+            return ""
+        if "done!" in body and "you just downloaded" in body:
+            return (
+                "SnapMagic reported that the download was done, but the browser received no file. "
+                "The browser's multiple-file permission or another provider download gate must be "
+                "resolved before continuing."
+            )
+        return ""
 
 
 _ADAPTERS[SnapMagicAdapter.capability.key] = SnapMagicAdapter()
+
+
+def _requested_mpn(url: str, names: tuple[str, ...]) -> str:
+    """Read the exact requested MPN back from a vendor search URL."""
+    try:
+        query = parse_qs(urlparse(url or "").query, keep_blank_values=False)
+    except Exception:  # noqa: BLE001 - malformed vendor navigation fails closed below
+        return ""
+    for name in names:
+        values = query.get(name) or ()
+        if values and values[0].strip():
+            return values[0].strip()
+    return ""
+
+
+def _mpn_key(value: str) -> str:
+    """Identity comparison for navigation: Unicode/case tolerant, punctuation preserving."""
+    return normalize("NFC", (value or "").strip()).casefold()
+
+
+def _href_demonstrates_mpn(href: str, requested_mpn: str) -> bool:
+    """True only when one complete URL component equals the requested MPN.
+
+    Deliberately no substring matching: `ABC` must not select `ABC-1`, and punctuation such as
+    `+`, `/`, or `#` remains identity-bearing.
+    """
+    expected = _mpn_key(requested_mpn)
+    if not expected or not href:
+        return False
+    try:
+        parsed = urlparse(href)
+        path_segments = [unquote(segment) for segment in parsed.path.split("/") if segment]
+        query_values = [
+            value
+            for values in parse_qs(parsed.query, keep_blank_values=False).values()
+            for value in values
+        ]
+    except Exception:  # noqa: BLE001 - malformed result URLs are not identity evidence
+        return False
+    return any(_mpn_key(value) == expected for value in (*path_segments, *query_values))
+
+
+def _exact_result_href(results, requested_mpn: str) -> tuple[str, str]:
+    """Choose one unique exact-MPN result, or return a fail-closed explanation."""
+    if not requested_mpn:
+        return "", "could not recover the requested MPN from the search URL."
+    matches: list[str] = []
+    for index in range(results.count()):
+        node = results.nth(index)
+        href = node.get_attribute("href") or ""
+        text = ""
+        try:
+            text = node.inner_text() or ""
+        except Exception:  # noqa: BLE001 - href evidence is sufficient
+            pass
+        exact_text = any(
+            _mpn_key(line) == _mpn_key(requested_mpn) for line in text.splitlines() if line.strip()
+        )
+        if _href_demonstrates_mpn(href, requested_mpn) or exact_text:
+            absolute = href.strip()
+            if absolute and absolute not in matches:
+                matches.append(absolute)
+    if not matches:
+        return "", f"showed no exact result for requested MPN {requested_mpn!r}."
+    if len(matches) > 1:
+        return "", f"showed multiple exact links for requested MPN {requested_mpn!r}."
+    return matches[0], ""
+
+
+_CHALLENGE_MARKERS = (
+    "access denied",
+    "attention required",
+    "challenges.cloudflare.com",
+    "cloudflare ray id",
+    "just a moment",
+    "verify you are human",
+    "verifying you are human",
+    "security verification",
+    "checking your browser",
+    "cf-chl-",
+    "challenge-platform",
+    "captcha-delivery",
+    "turnstile",
+)
+
+
+def _challenge_issue(page, label: str) -> str:
+    """Return an actionable explanation for a measured anti-bot interstitial."""
+    samples: list[str] = [getattr(page, "url", "") or ""]
+    try:
+        samples.append(page.title() or "")
+    except Exception:  # noqa: BLE001 - another signal may still identify it
+        pass
+    try:
+        samples.append(page.inner_text("body") or "")
+    except Exception:  # noqa: BLE001 - textless challenge shells are common
+        pass
+    try:
+        frames = page.locator("iframe")
+        for index in range(min(frames.count(), 20)):
+            samples.append(frames.nth(index).get_attribute("src") or "")
+    except Exception:  # noqa: BLE001 - frames are an optional signal
+        pass
+    evidence = "\n".join(samples).casefold()
+    if not any(marker in evidence for marker in _CHALLENGE_MARKERS):
+        return ""
+    return (
+        f"{label} is asking you to confirm you are human. Clear it once in this window; "
+        "the provider-specific browser profile remembers the session."
+    )
+
+
+def _snapmagic_account_issue(page) -> str:
+    """Detect account states that make format buttons redirect instead of download."""
+    try:
+        body = (page.inner_text("body") or "").casefold()
+    except Exception:  # noqa: BLE001 - absence of readable evidence is not an account verdict
+        return ""
+    if (
+        "verify your email to download" in body
+        or "email verification is required to download" in body
+    ):
+        return (
+            "SnapMagic requires this account's email to be verified before CAD downloads can run."
+        )
+    return ""
+
+
+def _is_global_blockage(message: str) -> bool:
+    """True for provider/account state that will affect the next MPN exactly the same way."""
+    text = (message or "").casefold()
+    return any(
+        marker in text
+        for marker in (
+            "confirm you are human",
+            "download button is not on this page",
+            "email to be verified",
+            "requires a signed-in, verified account",
+            "sign in to ultra librarian",
+        )
+    )

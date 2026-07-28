@@ -18,6 +18,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Protocol
 
+from stockroom.capture.cross_eda import verify_kicad_component
 from stockroom.capture.identity import page_identity, select_exact_candidate
 from stockroom.evidence import EvidenceArtifact, EvidenceStore
 from stockroom.ingest.staging import StagingCandidate
@@ -92,6 +93,7 @@ def _canonical_report(
     detail_url: str,
     candidate: StagingCandidate,
     altium_sources: tuple[Path, ...],
+    kicad_report: object,
     cross_eda_report: object | None,
 ) -> bytes:
     detail = page_identity(provider_key, detail_url)
@@ -119,6 +121,7 @@ def _canonical_report(
                 None if detail is None else {"manufacturer": detail.manufacturer, "mpn": detail.mpn}
             ),
         },
+        "kicad_readback": kicad_report,
         "operation": KICAD_CAD_OPERATION.label,
         "provider": provider_key,
         "schema": "stockroom.cad-validation/1",
@@ -182,6 +185,15 @@ def record_browser_cad_evidence(
     if not model_path.read_bytes().lstrip().startswith(b"ISO-10303-21;"):
         raise ValueError("browser CAD evidence STEP model has no ISO-10303-21 header")
 
+    kicad_report = verify_kicad_component(
+        identity=identity,
+        kicad_symbol=Path(symbol),
+        kicad_footprint=Path(footprint),
+        step_model=model_path,
+    )
+    if not isinstance(kicad_report, dict) or kicad_report.get("valid") is not True:
+        raise ValueError("KiCad artifact readback did not prove a complete component")
+
     native_altium = tuple(Path(path) for path in altium_sources)
     cross_eda_report = None
     if native_altium and cross_eda_verifier is not None:
@@ -203,6 +215,7 @@ def record_browser_cad_evidence(
         detail_url=detail_url,
         candidate=candidate,
         altium_sources=native_altium,
+        kicad_report=kicad_report,
         cross_eda_report=cross_eda_report,
     )
     artifacts = (

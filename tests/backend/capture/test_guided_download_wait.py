@@ -22,7 +22,8 @@ import time
 import pytest
 
 from stockroom.capture import guided
-from stockroom.capture.complete import SourceOutcome
+from stockroom.capture.complete import CompletionItem, SourceOutcome, complete_library
+from stockroom.capture.pacing import CircuitBreaker
 from stockroom.capture.requirements import Requirement
 from stockroom.capture.vendors import DriveReport, VendorCapability
 
@@ -294,10 +295,13 @@ def _zip_with(tmp_path, members: dict[str, bytes]):
 def test_altium_libraries_in_a_download_are_attached_not_dropped(monkeypatch, tmp_path):
     """THE GAP. A download carrying .SchLib/.PcbLib must reach `attach_altium_assets`."""
     browser = _FakeBrowser()
-    bundle = _zip_with(tmp_path, {
-        "AltiumLibs/PART.SchLib": b"altium-symbol",
-        "AltiumLibs/PART.PcbLib": b"altium-footprint",
-    })
+    bundle = _zip_with(
+        tmp_path,
+        {
+            "AltiumLibs/PART.SchLib": b"altium-symbol",
+            "AltiumLibs/PART.PcbLib": b"altium-footprint",
+        },
+    )
 
     record = _AltiumRecord()
     seen: dict = {}
@@ -311,14 +315,18 @@ def test_altium_libraries_in_a_download_are_attached_not_dropped(monkeypatch, tm
 
     class _Pipeline:
         def inspect(self, inputs):
-            return []          # no KiCad content at all - Altium must still be attached
+            return []  # no KiCad content at all - Altium must still be attached
 
         def cleanup(self):
             return None
 
-    src = _source(monkeypatch, tmp_path, browser,
-                  on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
-                  pipeline=_Pipeline())
+    src = _source(
+        monkeypatch,
+        tmp_path,
+        browser,
+        on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
+        pipeline=_Pipeline(),
+    )
     src._attach_altium = fake_attach
     outcome = src.supply(record)
 
@@ -351,9 +359,13 @@ def test_only_the_side_the_record_actually_holds_is_reported(monkeypatch, tmp_pa
         def cleanup(self):
             return None
 
-    src = _source(monkeypatch, tmp_path, browser,
-                  on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
-                  pipeline=_Pipeline())
+    src = _source(
+        monkeypatch,
+        tmp_path,
+        browser,
+        on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
+        pipeline=_Pipeline(),
+    )
     src._attach_altium = fake_attach
     outcome = src.supply(record)
 
@@ -374,9 +386,13 @@ def test_a_kicad_only_vendor_is_completely_unaffected(monkeypatch, tmp_path):
         def cleanup(self):
             return None
 
-    src = _source(monkeypatch, tmp_path, browser,
-                  on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
-                  pipeline=_Pipeline())
+    src = _source(
+        monkeypatch,
+        tmp_path,
+        browser,
+        on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
+        pipeline=_Pipeline(),
+    )
     src._attach_altium = lambda *a, **k: called.append(a)
     src.supply(_Record())
 
@@ -395,9 +411,13 @@ def test_a_failing_altium_attach_is_a_row_not_a_crash(monkeypatch, tmp_path):
         def cleanup(self):
             return None
 
-    src = _source(monkeypatch, tmp_path, browser,
-                  on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
-                  pipeline=_Pipeline())
+    src = _source(
+        monkeypatch,
+        tmp_path,
+        browser,
+        on_drive=lambda b: b.captured.append(_CapturedFile(bundle)),
+        pipeline=_Pipeline(),
+    )
 
     def boom(part_id, *sources, origin=None, now_iso=""):
         raise RuntimeError("normalize refused the file")
@@ -423,8 +443,13 @@ class _LoginAdapter:
 
     def __init__(self, already_signed_in=False, refuse=""):
         self.capability = VendorCapability(
-            key="faketron", label="Faketron", tools=("kicad",), formats_exclusive=False,
-            aggregator=False, needs_login=True, instruction="",
+            key="faketron",
+            label="Faketron",
+            tools=("kicad",),
+            formats_exclusive=False,
+            aggregator=False,
+            needs_login=True,
+            instruction="",
             version_pins={"kicad": "KiCADv6"},
         )
         self.calls: list[tuple] = []
@@ -442,15 +467,21 @@ class _LoginAdapter:
         return "https://example.invalid/part"
 
     def drive(self, page, formats):
-        return DriveReport(missed=list(formats), submitted=False,
-                           message="the Download button is not on this page.")
+        return DriveReport(
+            missed=list(formats),
+            submitted=False,
+            message="the Download button is not on this page.",
+        )
 
 
 def _source_with_adapter(monkeypatch, tmp_path, browser, adapter, credentials):
     monkeypatch.setattr(guided, "get_adapter", lambda key: adapter)
     src = guided.GuidedCaptureSource(
-        (lambda: None), vendor="faketron", download_root=tmp_path / "dl",
-        headless=True, credentials=credentials,
+        (lambda: None),
+        vendor="faketron",
+        download_root=tmp_path / "dl",
+        headless=True,
+        credentials=credentials,
     )
     src._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
     return src
@@ -458,8 +489,9 @@ def _source_with_adapter(monkeypatch, tmp_path, browser, adapter, credentials):
 
 def test_the_run_signs_in_once_using_the_saved_credentials(monkeypatch, tmp_path):
     adapter = _LoginAdapter()
-    src = _source_with_adapter(monkeypatch, tmp_path, _FakeBrowser(), adapter,
-                               lambda key: ("user@example.com", "secret"))
+    src = _source_with_adapter(
+        monkeypatch, tmp_path, _FakeBrowser(), adapter, lambda key: ("user@example.com", "secret")
+    )
     src._sign_in_once(_FakePage())
     assert adapter.calls == [("user@example.com", "secret")]
     assert src._sign_in_error == ""
@@ -469,8 +501,9 @@ def test_an_already_signed_in_profile_is_not_signed_in_again(monkeypatch, tmp_pa
     """The persistent profile carrying the session is the whole point - re-logging in every run
     would throw away that benefit and hammer the vendor's login for nothing."""
     adapter = _LoginAdapter(already_signed_in=True)
-    src = _source_with_adapter(monkeypatch, tmp_path, _FakeBrowser(), adapter,
-                               lambda key: ("user@example.com", "secret"))
+    src = _source_with_adapter(
+        monkeypatch, tmp_path, _FakeBrowser(), adapter, lambda key: ("user@example.com", "secret")
+    )
     src._sign_in_once(_FakePage())
     assert adapter.calls == []
 
@@ -491,8 +524,9 @@ def test_a_refused_sign_in_is_explained_in_the_part_row(monkeypatch, tmp_path):
     rejected password.
     """
     adapter = _LoginAdapter(refuse="Ultra Librarian did not accept the saved credentials.")
-    src = _source_with_adapter(monkeypatch, tmp_path, _FakeBrowser(), adapter,
-                               lambda key: ("user@example.com", "wrong"))
+    src = _source_with_adapter(
+        monkeypatch, tmp_path, _FakeBrowser(), adapter, lambda key: ("user@example.com", "wrong")
+    )
     src._sign_in_once(_FakePage())
     assert src._sign_in_error
 
@@ -509,7 +543,9 @@ def test_saved_credentials_refuses_a_half_filled_pair(monkeypatch):
         ul_username = "user@example.com"
         ul_password = ""
 
-    monkeypatch.setattr("stockroom.store.machine_config.MachineConfig.load", classmethod(lambda cls: _Cfg()))
+    monkeypatch.setattr(
+        "stockroom.store.machine_config.MachineConfig.load", classmethod(lambda cls: _Cfg())
+    )
     assert runner._saved_credentials("ultralibrarian") is None
     assert runner._saved_credentials("no-such-vendor") is None
 
@@ -550,16 +586,20 @@ def test_signed_in_is_false_on_the_identity_servers_login_page():
     so an absence-only check called this signed in and reported a bad password as success."""
     page = _StatePage(
         "https://sso.ultralibrarian.com/Account/Login?ReturnUrl=%2Fconnect%2F",
-        login_link=0, username=1,
+        login_link=0,
+        username=1,
     )
     assert _ul().signed_in(page) is False
 
 
 def test_signed_in_is_false_when_the_header_still_offers_a_login():
     """signed out on the app host -> #loginLink present."""
-    assert _ul().signed_in(
-        _StatePage("https://app.ultralibrarian.com/search?queryText=X", login_link=1)
-    ) is False
+    assert (
+        _ul().signed_in(
+            _StatePage("https://app.ultralibrarian.com/search?queryText=X", login_link=1)
+        )
+        is False
+    )
 
 
 def test_signed_in_needs_all_three_signals_not_any_one():
@@ -578,12 +618,15 @@ def test_signed_in_needs_all_three_signals_not_any_one():
 # --------------------------------------------------------------------------------------------
 
 
-def test_the_default_vendor_chain_is_ultra_librarian_then_snapmagic():
-    """Order is the policy: UL first (manufacturer-authored, ONE download for every format),
-    SnapMagic second (blends community/AI content, one download per format)."""
+def test_the_default_vendor_chain_prefers_the_only_complete_dual_eda_bundle():
+    """SnapMagic is lower-trust but uniquely supplies same-provider native dual-EDA evidence.
+
+    Exact identity, native readback, cross-EDA equivalence, and immutable evidence mitigate the
+    trust tradeoff; manufacturer-authored Ultra Librarian remains the availability fallback.
+    """
     from stockroom.capture import runner
 
-    assert runner._vendor_chain(None) == ["ultralibrarian", "snapmagic"]
+    assert runner._vendor_chain(None) == ["snapmagic", "ultralibrarian"]
 
 
 def test_a_preferred_vendor_keeps_the_other_implemented_provider_as_fallback():
@@ -631,8 +674,13 @@ def test_exclusive_formats_are_downloaded_one_at_a_time(monkeypatch, tmp_path):
 
     class _Exclusive:
         capability = VendorCapability(
-            key="faketron", label="Faketron", tools=("kicad", "altium"),
-            formats_exclusive=True, aggregator=False, needs_login=False, instruction="",
+            key="faketron",
+            label="Faketron",
+            tools=("kicad", "altium"),
+            formats_exclusive=True,
+            aggregator=False,
+            needs_login=False,
+            instruction="",
             version_pins={"kicad": "k", "altium": "a"},
         )
 
@@ -669,8 +717,13 @@ def test_a_submitted_format_that_never_arrives_is_an_error_not_a_skip(monkeypatc
 
     class _NeverDelivers:
         capability = VendorCapability(
-            key="vanishtron", label="Vanishtron", tools=("altium",),
-            formats_exclusive=True, aggregator=False, needs_login=False, instruction="",
+            key="vanishtron",
+            label="Vanishtron",
+            tools=("altium",),
+            formats_exclusive=True,
+            aggregator=False,
+            needs_login=False,
+            instruction="",
             version_pins={"altium": "a"},
         )
 
@@ -688,7 +741,10 @@ def test_a_submitted_format_that_never_arrives_is_an_error_not_a_skip(monkeypatc
     monkeypatch.setattr(guided, "_DOWNLOAD_TIMEOUT_MS", 300)
 
     src = guided.GuidedCaptureSource(
-        (lambda: None), vendor="vanishtron", download_root=tmp_path / "dl", headless=True,
+        (lambda: None),
+        vendor="vanishtron",
+        download_root=tmp_path / "dl",
+        headless=True,
     )
     src._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
 
@@ -766,3 +822,157 @@ def test_the_kicad_chooser_waits_for_its_member_instead_of_sleeping():
     assert report.selected == ["kicad"]
     assert report.missed == []
     assert '[data-format="kicad_modv6"]' in page.clicked, "the pinned version was never clicked"
+
+
+def test_altium_only_gap_drives_one_full_snapmagic_evidence_bundle(monkeypatch, tmp_path):
+    """A partial repair needs same-provider companion bytes for cross-EDA proof."""
+    browser = _FakeBrowser()
+    requested: list[str] = []
+
+    def fake_drive(_browser, _page, _adapter, formats, _url):
+        requested.extend(formats)
+        return (
+            DriveReport(missed=list(formats), blocked=True, message="account gate"),
+            "account gate",
+        )
+
+    monkeypatch.setattr(guided, "drive_formats", fake_drive)
+    monkeypatch.setattr(
+        guided,
+        "capture_needs",
+        lambda _record: [Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT],
+    )
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="snapmagic",
+        download_root=tmp_path / "downloads",
+        headless=True,
+    )
+    source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+
+    outcome = source.supply(_Record())
+
+    assert requested == ["kicad", "model", "altium"]
+    assert outcome.blocked is True
+
+
+def test_provider_wide_capture_gate_trips_batch_breaker_instead_of_burning_every_part(
+    monkeypatch, tmp_path
+):
+    """A challenge/auth/download gate affects the session, not one MPN."""
+
+    class _BlockedAdapter:
+        capability = VendorCapability(
+            key="blocked-provider",
+            label="Blocked Provider",
+            tools=("kicad",),
+            formats_exclusive=False,
+            aggregator=False,
+            needs_login=True,
+            instruction="",
+            version_pins={"kicad": "v6"},
+        )
+
+        def resolve_url(self, _mpn):
+            return "https://example.invalid/search"
+
+    adapter = _BlockedAdapter()
+    monkeypatch.setattr(guided, "get_adapter", lambda _key: adapter)
+    monkeypatch.setattr(
+        guided,
+        "drive_formats",
+        lambda *_args, **_kwargs: (
+            DriveReport(
+                missed=["kicad"],
+                blocked=True,
+                message="confirm you are human",
+            ),
+            "confirm you are human",
+        ),
+    )
+    browser = _FakeBrowser()
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="blocked-provider",
+        download_root=tmp_path / "downloads",
+        headless=True,
+    )
+    source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+
+    records = {f"part-{index}": _Record() for index in range(10)}
+    for part_id, record in records.items():
+        record.id = part_id
+    report = complete_library(
+        records,
+        load_record=records.__getitem__,
+        sources=[source],
+        breaker=CircuitBreaker(threshold=2),
+    )
+
+    assert report.stopped is True
+    assert len(report.items) == 2
+    assert [item.status for item in report.items] == ["deferred", "deferred"]
+    assert "confirm you are human" in report.stop_reason
+
+
+def test_partial_fallback_does_not_hide_a_repeated_provider_wide_gate(monkeypatch):
+    """KiCad progress must not reset the breaker while the dual-EDA provider stays blocked."""
+
+    def blocked_but_improved(part_id, **_kwargs):
+        return CompletionItem(
+            part_id=part_id,
+            status="improved",
+            satisfied=["kicad_symbol", "kicad_footprint", "kicad_model"],
+            remaining=["altium_symbol", "altium_footprint"],
+            error="snapmagic: multiple-file download permission is blocked",
+            provider_blocked=True,
+        )
+
+    monkeypatch.setattr("stockroom.capture.complete.complete_part", blocked_but_improved)
+    report = complete_library(
+        (f"part-{index}" for index in range(1000)),
+        load_record=lambda _part_id: None,
+        sources=[],
+        breaker=CircuitBreaker(threshold=3),
+    )
+
+    assert report.stopped is True
+    assert len(report.items) == 3
+    assert all(item.status == "improved" for item in report.items)
+    assert "multiple-file download permission" in report.stop_reason
+
+
+def test_exclusive_provider_stops_remaining_formats_after_global_account_gate():
+    attempts: list[list[str]] = []
+
+    class _BlockedExclusive:
+        capability = VendorCapability(
+            key="blocked-exclusive",
+            label="Blocked Exclusive",
+            tools=("kicad", "altium"),
+            formats_exclusive=True,
+            aggregator=False,
+            needs_login=True,
+            instruction="",
+            version_pins={"kicad": "k", "model": "m", "altium": "a"},
+        )
+
+        def drive(self, _page, formats):
+            attempts.append(list(formats))
+            return DriveReport(
+                missed=list(formats),
+                blocked=True,
+                message="account download gate",
+            )
+
+    report, failure = guided.drive_formats(
+        _FakeBrowser(),
+        _FakePage(),
+        _BlockedExclusive(),
+        ["kicad", "model", "altium"],
+        "https://example.invalid/part",
+    )
+
+    assert failure is None
+    assert report.blocked is True
+    assert attempts == [["kicad"]]

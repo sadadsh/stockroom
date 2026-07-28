@@ -99,13 +99,18 @@ class CompletionItem:
     mpn: str = ""
     display_name: str = ""
     category: str = ""
-    status: str = ""                                   # already-complete | completed |
+    status: str = ""  # already-complete | completed |
     #                                                    improved | deferred | unchanged | error
     needed: list[str] = field(default_factory=list)
     satisfied: list[str] = field(default_factory=list)
     remaining: list[str] = field(default_factory=list)
-    sources: list[str] = field(default_factory=list)   # which sources actually delivered
+    sources: list[str] = field(default_factory=list)  # which sources actually delivered
     error: str = ""
+    # Internal batch-control signal. A provider-wide gate may coexist with a useful partial
+    # fallback, so status can remain `improved` while the circuit breaker still stops repeated
+    # challenge/auth attempts. Deliberately omitted from the API shape: `status`, `remaining`, and
+    # `error` already describe the user-facing result.
+    provider_blocked: bool = field(default=False, repr=False)
 
     def to_dict(self) -> dict:
         return {
@@ -227,6 +232,9 @@ def complete_part(part_id: str, *, load_record, sources) -> CompletionItem:
     item.satisfied = [n.value for n in needs if n not in outstanding]
     item.remaining = [n.value for n in needs if n in outstanding]
     item.error = "; ".join(errors)
+    # A later fallback may fully satisfy the part. In that case the earlier gate is irrelevant to
+    # the batch outcome and must not trip the breaker.
+    item.provider_blocked = blocked and bool(outstanding)
     if not item.remaining:
         item.status = "completed"
     elif item.satisfied:
@@ -273,29 +281,31 @@ def complete_library(
         item = complete_part(part_id, load_record=load_record, sources=sources)
         report.items.append(item)
         if breaker is not None:
-            if item.status == "deferred":
+            if item.provider_blocked:
                 breaker.record_blocked(item.error)
             elif item.status in ("completed", "improved", "already-complete"):
                 breaker.record_ok()
             else:
                 breaker.record_failure()
         if on_progress is not None:
-            on_progress({
-                "stage": "completing",
-                "done": done,
-                "total": total,
-                "pct": ((done + 1) / total) if total else None,
-                "part_id": item.part_id,
-                "mpn": item.mpn,
-                "display_name": item.display_name,
-                "status": item.status,
-                "satisfied": list(item.satisfied),
-                "remaining": list(item.remaining),
-                "message": (
-                    f"{item.mpn or item.part_id}"
-                    + (f" ({done + 1} of {total})" if total else "")
-                ),
-            })
+            on_progress(
+                {
+                    "stage": "completing",
+                    "done": done,
+                    "total": total,
+                    "pct": ((done + 1) / total) if total else None,
+                    "part_id": item.part_id,
+                    "mpn": item.mpn,
+                    "display_name": item.display_name,
+                    "status": item.status,
+                    "satisfied": list(item.satisfied),
+                    "remaining": list(item.remaining),
+                    "message": (
+                        f"{item.mpn or item.part_id}"
+                        + (f" ({done + 1} of {total})" if total else "")
+                    ),
+                }
+            )
         if breaker is not None and breaker.tripped:
             report.stopped = True
             report.stop_reason = (

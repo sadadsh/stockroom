@@ -184,7 +184,9 @@ def test_the_registry_does_not_claim_altium_the_app_cannot_yet_attach(tmp_path):
     assert adapter is not None
     assert adapter.capability.formats_exclusive is False
     assert adapter.capability.version_pins["kicad"] == "KiCADv6"
-    assert adapter.capability.version_pins["model"] == "MfrThreeDModel"
+    # Current live panel (2026-07-28). The older captured fixture uses `MfrThreeDModel`; the
+    # adapter keeps that as a selector fallback but must declare the production control first.
+    assert adapter.capability.version_pins["model"] == "ThreeDModel"
 
     # NOT altium - and the reason is a missing ATTACH, not a missing vendor feature. The PCAD row
     # really does deliver a `.lia` (proved by the fixture, which serves exactly that). But

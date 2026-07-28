@@ -197,9 +197,11 @@ def run_guided_capture(
     still needs, so Ultra Librarian runs first and SnapMagic is asked only for what is STILL
     missing. A part that gets everything from the first vendor never opens the second.
 
-    Order is the policy: Ultra Librarian first because its models are manufacturer-authored and it
-    serves every format in ONE download; SnapMagic second because it blends community and
-    AI-generated content, and because it costs one download per format.
+    Order is the policy: SnapMagic first because it is the only implemented browser provider that
+    can deliver one coherent KiCad + STEP + native-Altium evidence bundle. Its community/AI sourcing
+    is lower-trust than Ultra Librarian, but exact identity, native readback, cross-EDA equivalence,
+    and immutable evidence gate every attachment. Ultra Librarian remains the manufacturer-authored
+    fallback when SnapMagic is unavailable, but currently closes only the KiCad side.
 
     The browser is opened lazily by each source (a run with nothing to do never flashes a window)
     and ALL of them are closed here, so a stopped, failed or completed run leaves no window behind.
@@ -357,12 +359,12 @@ def _saved_credentials(vendor_key: str):
     return user, secret
 
 
-# The vendor chain, in the order a run tries them. ORDER IS THE POLICY: Ultra Librarian first
-# because its models are manufacturer-authored and it serves every format in ONE download;
-# SnapMagic second because it blends community and AI-generated content and costs one download per
-# format. A part that gets everything from the first never opens the second - `complete_library`
-# skips a source whose `provides()` no longer overlaps what is still missing.
-_VENDOR_CHAIN = ("ultralibrarian", "snapmagic")
+# The vendor chain, in the order a run tries them. ORDER IS THE POLICY: SnapMagic first because it
+# alone supplies a same-provider KiCad + STEP + native-Altium bundle for the evidence join. Its
+# source quality is lower than Ultra Librarian's manufacturer-authored assets, so attachment remains
+# contingent on exact identity, native readback, cross-EDA equivalence, and immutable evidence.
+# Ultra Librarian is the availability/trust fallback, but currently cannot close native Altium.
+_VENDOR_CHAIN = ("snapmagic", "ultralibrarian")
 
 
 def _vendor_chain(vendor) -> list[str]:

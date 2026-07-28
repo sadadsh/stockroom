@@ -21,6 +21,19 @@ _CFB_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 _DETAIL_URL = "https://www.snapeda.com/parts/S1M/ON%20Semiconductor/view-part/"
 
 
+@pytest.fixture(autouse=True)
+def _deterministic_step_geometry_reader(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Evidence tests exercise the readback seam without depending on a machine KiCad install.
+
+    The real cascadio conversion is covered by ``test_cross_eda_readback_proves_real_s1m_artifacts``.
+    """
+
+    monkeypatch.setattr(
+        "stockroom.capture.cross_eda.model_to_glb",
+        lambda _path: b"glTF-test-geometry",
+    )
+
+
 @dataclass
 class _Record:
     id: str = "s1m"
@@ -32,9 +45,28 @@ def _candidate(tmp_path: Path, *, model: bool = True) -> StagingCandidate:
     symbol = tmp_path / "S1M.kicad_sym"
     footprint = tmp_path / "S1M.kicad_mod"
     step = tmp_path / "S1M.step"
-    symbol.write_bytes(b'(kicad_symbol_lib (version 20231120) (symbol "S1M"))')
-    footprint.write_bytes(b'(footprint "D_SMA" (pad "1" smd rect))')
-    step.write_bytes(b"ISO-10303-21;\nHEADER;\nENDSEC;\nEND-ISO-10303-21;\n")
+    symbol.write_text(
+        """(kicad_symbol_lib
+  (version 20240101)
+  (symbol "S1M"
+    (property "Manufacturer" "ON Semiconductor" (at 0 0 0))
+    (property "Manufacturer Part Number" "S1M" (at 0 0 0))
+    (symbol "S1M_0_1"
+      (pin passive line (at -5 0 0) (length 2.54)
+        (name "K" (effects (font (size 1 1))))
+        (number "1" (effects (font (size 1 1))))))))
+""",
+        encoding="utf-8",
+    )
+    footprint.write_text(
+        """(footprint "D_SMA"
+  (version 20240108)
+  (pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu"))
+  (model "S1M.step"))
+""",
+        encoding="utf-8",
+    )
+    step.write_bytes(b"ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n")
     return StagingCandidate(
         vendor="snapmagic",
         symbol_lib_path=symbol,
@@ -94,6 +126,7 @@ def test_browser_cad_installs_exact_actual_files_with_provider_per_artifact(
         "mpn_canonical": "S1M",
     }
     assert report["cross_eda"]["status"] == "not_verified"
+    assert report["kicad_readback"]["valid"] is True
     assert cross_eda_verified is False
 
 
@@ -117,6 +150,58 @@ def test_browser_cad_cannot_record_a_partial_or_near_match(tmp_path: Path) -> No
             store=store,
             record=_Record(),
             candidate=near,
+            provider_key="snapmagic",
+            detail_url=_DETAIL_URL,
+        )
+
+
+def test_browser_cad_validity_requires_native_kicad_readback(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path / "Evidence")
+
+    no_pins = _candidate(tmp_path)
+    no_pins.symbol_lib_path.write_text(
+        """(kicad_symbol_lib
+  (version 20240101)
+  (symbol "S1M"
+    (property "Manufacturer" "ON Semiconductor" (at 0 0 0))
+    (property "Manufacturer Part Number" "S1M" (at 0 0 0))))
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="no readable pins"):
+        record_browser_cad_evidence(
+            store=store,
+            record=_Record(),
+            candidate=no_pins,
+            provider_key="snapmagic",
+            detail_url=_DETAIL_URL,
+        )
+
+    unnumbered_pad = _candidate(tmp_path)
+    unnumbered_pad.footprint_variants[0].write_text(
+        """(footprint "D_SMA"
+  (version 20240108)
+  (pad "" smd rect (at 0 0) (size 1 1) (layers "F.Cu"))
+  (model "S1M.step"))
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="unnumbered pad"):
+        record_browser_cad_evidence(
+            store=store,
+            record=_Record(),
+            candidate=unnumbered_pad,
+            provider_key="snapmagic",
+            detail_url=_DETAIL_URL,
+        )
+
+    malformed_step = _candidate(tmp_path)
+    malformed_step.model_path.write_bytes(b"ISO-10303-21;\nHEADER;\n")
+    with pytest.raises(ValueError, match="STEP exchange structure is incomplete"):
+        record_browser_cad_evidence(
+            store=store,
+            record=_Record(),
+            candidate=malformed_step,
             provider_key="snapmagic",
             detail_url=_DETAIL_URL,
         )
