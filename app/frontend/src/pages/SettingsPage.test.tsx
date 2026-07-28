@@ -784,6 +784,25 @@ describe("SettingsPage - collapsed summaries state their own section", () => {
     expect(await within(librarySync).findByText("62 In LFS")).toBeInTheDocument();
   });
 
+  it("an LFS repo holding nothing yet reads as a state, not as the number zero", async () => {
+    // Caught by LOOKING at the rendered surface against the real library, which showed
+    // "0 In LFS" beside siblings reading "None" and "Healthy". A zero dressed as a count is
+    // the data-vomit the complaint register already names.
+    mockApi.getLibraryLfs.mockResolvedValue({
+      installed: true, version: "3.4.1", enabled: true,
+      tracked_patterns: ["*.step"], objects: 0, legacy_blobs: 0,
+      covers: [], adopted: true, reason: "",
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const nav = screen.getByRole("navigation", { name: /settings sections/i });
+    await user.click(within(nav).getByRole("button", { name: /library/i }));
+
+    const librarySync = await screen.findByTestId("settings.librarysync.header");
+    expect(await within(librarySync).findByText("Nothing In LFS")).toBeInTheDocument();
+    expect(within(librarySync).queryByText("0 In LFS")).toBeNull();
+  });
+
   it("EVERY disclosure states something on its collapsed row", async () => {
     // The GATE, not another example. A summary-less section is invisible to a test that only
     // checks the ones somebody happened to notice, which is exactly how three of these five sat
