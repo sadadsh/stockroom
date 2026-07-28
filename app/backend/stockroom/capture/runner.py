@@ -347,20 +347,27 @@ _VENDOR_CHAIN = ("ultralibrarian", "snapmagic")
 def _vendor_chain(vendor) -> list[str]:
     """Normalise `vendor` to an ordered list of adapter keys.
 
-    Accepts None (the whole chain), one key, or an explicit list, so the existing single-vendor
-    callers and the API keep working unchanged while the default becomes "try both". Unknown keys
-    are dropped rather than raising: a stale vendor name in a saved request should degrade to the
-    vendors that DO exist, not fail the run.
+    None means the whole fallback chain. One key is a preferred starting provider, not an
+    exclusive provider: every other implemented provider remains available as fallback. An
+    explicit list is honored in order. Unknown providers fail honestly instead of silently
+    running Ultra Librarian under a DigiKey or SamacSys label.
     """
     from stockroom.capture.vendors import get_adapter
 
     if vendor is None:
         wanted = list(_VENDOR_CHAIN)
     elif isinstance(vendor, str):
-        wanted = [vendor]
+        if get_adapter(vendor) is None:
+            raise ValueError(f"no network capture adapter for provider {vendor!r}")
+        wanted = [vendor, *(key for key in _VENDOR_CHAIN if key != vendor)]
     else:
         wanted = list(vendor)
-    keys = [k for k in wanted if get_adapter(k) is not None]
-    # Never return an empty chain silently - that would open no browser and report "nothing to do"
-    # for what is really a typo.
-    return keys or [_VENDOR_CHAIN[0]]
+        unknown = [key for key in wanted if get_adapter(key) is None]
+        if unknown:
+            raise ValueError(
+                "no network capture adapter for provider(s): " + ", ".join(map(repr, unknown))
+            )
+    keys = list(dict.fromkeys(wanted))
+    if not keys:
+        raise ValueError("network capture requires at least one implemented provider")
+    return keys

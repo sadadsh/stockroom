@@ -402,6 +402,9 @@ def library_router(require_token) -> APIRouter:
         digikey = next((a for a in build_refresh_adapters(ctx)
                         if getattr(a, "vendor", "") == "DigiKey"), None)
         sources = resolve_cad_sources(record.mpn, digikey)
+        from stockroom.capture.vendors import all_adapters
+
+        implemented_capture = {adapter.capability.key for adapter in all_adapters()}
         first = sources[0] if sources else None
         return {
             "mpn": record.mpn,
@@ -414,6 +417,7 @@ def library_router(require_token) -> APIRouter:
                     "tools": list(s.tools),
                     "aggregator": s.aggregator,
                     "instruction": s.instruction,
+                    "capture_available": s.key in implemented_capture,
                 }
                 for s in sources
             ],
@@ -682,7 +686,12 @@ def library_router(require_token) -> APIRouter:
         payload = body or {}
         part_ids = payload.get("part_ids") or None
         limit = payload.get("limit")
-        vendor = (payload.get("vendor") or "ultralibrarian").strip().lower()
+        requested_vendor = payload.get("vendor")
+        vendor = (
+            str(requested_vendor).strip().lower()
+            if requested_vendor is not None and str(requested_vendor).strip()
+            else None
+        )
 
         def work(progress, should_stop):
             return run_guided_capture(
