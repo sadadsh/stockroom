@@ -18,10 +18,12 @@ Two things made it expensive rather than merely wrong:
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import pytest
 
 from stockroom.capture import guided
+from stockroom.capture.browser import CapturedFile, PlaywrightCaptureBrowser
 from stockroom.capture.complete import CompletionItem, SourceOutcome, complete_library
 from stockroom.capture.pacing import CircuitBreaker
 from stockroom.capture.requirements import Requirement
@@ -31,8 +33,9 @@ from stockroom.capture.vendors import DriveReport, VendorCapability
 class _Record:
     """The slice of a record `capture_needs` actually reads."""
 
-    id = "SR-TEST-0001"
+    id = "tpd6e05u06rvzr-0001"
     mpn = "TPD6E05U06RVZR"
+    manufacturer = "Texas Instruments"
 
     def capturable(self, tool_key: str) -> set[str]:
         return {"symbol", "footprint"} if tool_key == "kicad" else set()
@@ -158,6 +161,86 @@ def test_a_download_consumed_by_the_session_handler_still_counts_as_delivered(
         "expected to reach the attach stage and report the fixture's empty candidate list, "
         f"got {outcome!r}"
     )
+
+
+def test_guided_supply_attaches_only_the_exact_task_broker_receipts(monkeypatch, tmp_path):
+    class EventPage(_FakePage):
+        def on(self, event: str, handler) -> None:
+            assert event == "download"
+            self.handler = handler
+
+        def close(self) -> None:
+            pass
+
+    class Context:
+        page = None
+
+        def new_page(self):
+            self.page = EventPage()
+            return self.page
+
+    class Download:
+        suggested_filename = "current.zip"
+        url = "https://vendor.example.test/current.zip"
+
+        def save_as(self, destination: str) -> None:
+            Path(destination).write_bytes(b"current-part")
+
+    class Pipeline:
+        def __init__(self):
+            self.inputs = None
+
+        def inspect(self, inputs):
+            self.inputs = list(inputs)
+            return []
+
+        def cleanup(self):
+            return None
+
+    context = Context()
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads")
+    browser._context = context
+    stale = tmp_path / "stale.zip"
+    stale.write_bytes(b"previous-part")
+    browser._captured.append(CapturedFile(stale, "stale.zip", "https://previous.invalid"))
+    pipeline = Pipeline()
+    _install_adapter(
+        monkeypatch,
+        browser,
+        on_drive=lambda _browser: context.page.handler(Download()),
+    )
+    source = guided.GuidedCaptureSource(
+        lambda: pipeline,
+        vendor="faketron",
+        download_root=tmp_path / "Downloads",
+        headless=True,
+    )
+    source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+
+    outcome = source.supply(_Record())
+
+    assert pipeline.inputs is not None
+    assert stale not in pipeline.inputs
+    assert len(pipeline.inputs) == 1
+    assert pipeline.inputs[0].read_bytes() == b"current-part"
+    assert "nothing this part can use" in (outcome.error or "")
+
+
+def test_guided_supply_refuses_ambiguous_identity_before_opening_a_browser(monkeypatch, tmp_path):
+    browser = _FakeBrowser()
+    _install_adapter(monkeypatch, browser, on_drive=lambda _browser: None)
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="faketron",
+        download_root=tmp_path / "Downloads",
+    )
+    record = _Record()
+    record.manufacturer = ""
+
+    outcome = source.supply(record)
+
+    assert "exact manufacturer and MPN" in (outcome.error or "")
+    assert source._session is None
 
 
 def test_a_vendor_that_never_delivers_is_still_reported_as_a_failure(monkeypatch, tmp_path):

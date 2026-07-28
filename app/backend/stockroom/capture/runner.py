@@ -181,7 +181,7 @@ def run_guided_capture(
     should_stop=None,
     limit=None,
     headless: bool = False,
-    engine: str = "windows",
+    engine: str = "chromium",
 ) -> dict:
     """Capture from a trusted vendor through a real browser: ONE component, or the whole library.
 
@@ -194,8 +194,7 @@ def run_guided_capture(
     has it, and if one download fails use the other."* `vendor` accepts a single key or a list; the
     default is the whole chain. Nothing clever implements the fallback - `complete_library` already
     walks its sources in order and skips any whose `provides()` no longer overlaps what the part
-    still needs, so Ultra Librarian runs first and SnapMagic is asked only for what is STILL
-    missing. A part that gets everything from the first vendor never opens the second.
+    still needs. A part that gets everything from the first vendor never opens the second.
 
     Order is the policy: SnapMagic first because it is the only implemented browser provider that
     can deliver one coherent KiCad + STEP + native-Altium evidence bundle. Its community/AI sourcing
@@ -206,6 +205,7 @@ def run_guided_capture(
     The browser is opened lazily by each source (a run with nothing to do never flashes a window)
     and ALL of them are closed here, so a stopped, failed or completed run leaves no window behind.
     """
+    from stockroom.capture.browser import SharedPlaywrightRuntime
     from stockroom.capture.guided import GuidedCaptureSource
     from stockroom.evidence import EvidenceStore
     from stockroom.ingest.pipeline import IngestPipeline
@@ -214,6 +214,7 @@ def run_guided_capture(
         return IngestPipeline(ctx.profile, ctx.repo, ctx.cli)
 
     evidence_store = EvidenceStore(_capture_evidence_root(ctx))
+    playwright_runtime = SharedPlaywrightRuntime() if engine != "camoufox" else None
     sources = [
         GuidedCaptureSource(
             make_pipeline,
@@ -221,9 +222,10 @@ def run_guided_capture(
             download_root=_capture_downloads(ctx, key),
             profile_dir=_capture_profile(ctx, key),
             headless=headless,
-            # Installed Chrome first, then Edge: current Windows browsers, persistent provider
-            # sessions, and first-class Playwright downloads. Camoufox remains an explicit mode
-            # for a measured provider-specific need, never the production default.
+            # Stockroom's version-pinned Playwright Chromium owns the normal path. An installed
+            # user browser is not part of the product contract and cannot silently change the
+            # automation version underneath a provider adapter. Camoufox and branded channels
+            # remain explicit provider-specific experiments, never the default.
             engine=engine,
             # The Altium seam, which already existed and was already atomic but which guided capture
             # never called - so a vendor shipping real .SchLib/.PcbLib had them downloaded and
@@ -235,6 +237,7 @@ def run_guided_capture(
             run_write=ctx.jobs.run_write,
             now_iso=_utc_now_iso,
             evidence_store=evidence_store,
+            playwright_runtime=playwright_runtime,
         )
         for key in _vendor_chain(vendor)
     ]
@@ -265,6 +268,8 @@ def run_guided_capture(
     finally:
         for source in sources:
             source.close()
+        if playwright_runtime is not None:
+            playwright_runtime.close()
 
     if report.of("completed", "improved"):
         ctx.jobs.run_write(ctx.rebuild_index)
