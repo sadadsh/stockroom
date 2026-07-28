@@ -119,6 +119,8 @@ def _isolate_machine_config_suitewide(tmp_path, monkeypatch):
     the root, which is a hand-listed coverage set, and those grow silent holes by construction.
 
     `config_dir()` re-reads these on every call, so this governs `load()` and `save()` alike.
+    Capture state gets its own override because provider profiles contain authenticated cookies
+    and must never touch either the real LocalAppData tree or a Git-backed test library.
     XDG_CONFIG_HOME and APPDATA are pinned too, because config_dir() falls back to them when the
     explicit override is absent -- pinning only STOCKROOM_CONFIG_DIR would leave the fallback path
     pointing at the developer's real directory, which is precisely the case that caused the damage.
@@ -128,6 +130,7 @@ def _isolate_machine_config_suitewide(tmp_path, monkeypatch):
     call `save()`.
     """
     monkeypatch.setenv("STOCKROOM_CONFIG_DIR", str(tmp_path / "sr-config"))
+    monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(tmp_path / "sr-capture"))
     monkeypatch.setenv("STOCKROOM_CREDENTIALS_BACKEND", "memory")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
     monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))

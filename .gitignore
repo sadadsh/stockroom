@@ -51,6 +51,10 @@ docs/research/
 # cache is the one on-disk derived dir, written beside the in-repo library at <repo>/)
 /.stockroom-enrich-cache/
 /.stockroom-previews/
+# Legacy acquisition state accidentally lived under the Git-backed library.
+# Runtime now uses %LOCALAPPDATA%\Stockroom\Capture; keep this exact guard so an
+# older open installation cannot stage provider cookies or untrusted downloads.
+/libraries/.stockroom-capture/
 .firecrawl/
 # The derived STM32 pinout/spec index RAW sqlite (config_dir()/stm/index.sqlite by default,
 # stays per-machine; the COMMITTED artifact is the compressed seed at data/stm/index.sqlite.xz,
