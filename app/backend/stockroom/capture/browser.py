@@ -47,6 +47,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from stockroom.capture.download_broker import (
+    DownloadBroker,
+    DownloadBrokerError,
+)
+
 
 class CaptureBrowserError(RuntimeError):
     """Something the caller must fix, phrased so the message names the actual blocker."""
@@ -243,24 +248,71 @@ class ProviderProfileLock:
         self.release()
 
 
+class SharedPlaywrightRuntime:
+    """One lazy synchronous Playwright owner shared by every provider in a capture run.
+
+    Playwright's synchronous API cannot nest two runtime context managers on one thread. A
+    provider fallback chain legitimately keeps several browser contexts alive so each provider
+    can preserve its signed-in session across parts; those contexts therefore share this one
+    engine runtime and retain separate browser/profile ownership.
+    """
+
+    def __init__(self) -> None:
+        self._manager = None
+        self._playwright = None
+        self._thread_id: int | None = None
+
+    def get(self):
+        thread_id = threading.get_ident()
+        if self._playwright is not None:
+            if self._thread_id != thread_id:
+                raise CaptureBrowserError(
+                    "the guided-capture browser runtime cannot move between worker threads"
+                )
+            return self._playwright
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError as exc:  # pragma: no cover - dependency is declared
+            raise CaptureBrowserError(
+                "playwright is not installed; it is a declared dependency, run `uv sync`"
+            ) from exc
+        manager = sync_playwright()
+        self._playwright = manager.__enter__()
+        self._manager = manager
+        self._thread_id = thread_id
+        return self._playwright
+
+    def close(self) -> None:
+        manager = self._manager
+        if manager is None:
+            return
+        if self._thread_id != threading.get_ident():
+            raise CaptureBrowserError(
+                "the guided-capture browser runtime must close on its owning worker thread"
+            )
+        self._manager = None
+        self._playwright = None
+        self._thread_id = None
+        manager.__exit__(None, None, None)
+
+
 class PlaywrightCaptureBrowser:
     """A real, visible browser the person can work in, whose downloads we observe.
 
     Not headless by default: this is a GUIDED capture, so the human signs in, clears a Cloudflare
     check, and watches what happens. Headless exists for the tests.
 
-    ENGINE IS A PARAMETER, NEVER A SECOND CLASS. Production uses ``windows``: the installed Google
-    Chrome first, then Stockroom's version-pinned Playwright Chromium if Chrome cannot launch.
-    Microsoft Edge is never an implicit fallback. ``camoufox`` remains an explicit opt-in mode for
-    a provider that demonstrably requires it, never the default. A vendor that resists is therefore
-    a MODE on this class, never a
+    ENGINE IS A PARAMETER, NEVER A SECOND CLASS. Production uses Stockroom's version-pinned
+    Playwright Chromium so the browser version is part of the tested application contract rather
+    than whichever branded browser happens to be installed. ``windows`` remains an explicit
+    Chrome-then-Chromium compatibility policy, and ``camoufox`` remains an explicit provider mode
+    for a measured anti-bot need. A vendor that resists is therefore a MODE on this class, never a
     `CamoufoxCaptureBrowser` beside it - that is the one-tool-per-job rule, and
     tests/backend/capture/test_one_tool_per_job.py enforces it by listing the modules allowed to
     launch a browser at all.
 
-    WHY THE CONSTRUCTOR DEFAULT IS chromium. Tests drive a LOCALHOST fixture with the bundled
-    browser, where probing installed browser channels adds machine dependence. The shipped engine
-    is named at the production call site, where it is visible and tested.
+    The constructor and production call site deliberately share the ``chromium`` default. Tests
+    drive the same bundled browser policy the product ships.
     """
 
     def __init__(
@@ -271,12 +323,14 @@ class PlaywrightCaptureBrowser:
         headless: bool = False,
         engine: str = "chromium",
         provider_key: str | None = None,
+        playwright_runtime: SharedPlaywrightRuntime | None = None,
     ) -> None:
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.profile_dir = Path(profile_dir) if profile_dir else None
         self.headless = headless
         self.engine = engine
+        self._playwright_runtime = playwright_runtime
         self.provider_key = (
             _normalise_provider_key(provider_key)
             if provider_key is not None
@@ -286,11 +340,57 @@ class PlaywrightCaptureBrowser:
         )
         self.launched_browser: str | None = None
         self._captured: list[CapturedFile] = []
-        self._download_lock = threading.Lock()
+        self._download_errors: list[CaptureBrowserError] = []
+        self._wired_pages: list[object] = []
+        self._page_brokers: list[tuple[object, DownloadBroker]] = []
+        self._context = None
+        # Playwright's synchronous API may re-enter the download callback while ``save_as`` for
+        # the previous file pumps protocol events.  A provider action that emits a symbol,
+        # footprint, and model together therefore nests callbacks on the same thread.  A plain
+        # Lock deadlocks on the second file; the RLock serializes filename allocation without
+        # blocking that legitimate re-entry.
+        self._download_lock = threading.RLock()
 
     @property
     def captured(self) -> list[CapturedFile]:
         return list(self._captured)
+
+    @property
+    def download_errors(self) -> tuple[CaptureBrowserError, ...]:
+        with self._download_lock:
+            return tuple(self._download_errors)
+
+    @contextmanager
+    def task_page(self, broker: DownloadBroker):
+        """Open one page whose downloads can belong to exactly one workflow task.
+
+        A provider context persists for the run so cookies and sign-in survive, but pages do not
+        cross task boundaries. A slow export from part A can therefore never arrive after a
+        mutable global binding has moved to part B: A's page stays permanently mapped to A and is
+        closed before B gets a new page. Popups inherit the mapping through their opener.
+        """
+        if type(broker) is not DownloadBroker:
+            raise TypeError("broker must be a DownloadBroker")
+        with self._download_lock:
+            context = self._context
+        if context is None:
+            raise CaptureBrowserError("the capture browser session is not open")
+        page = context.new_page()
+        self._wire_downloads(page)
+        with self._download_lock:
+            self._page_brokers.append((page, broker))
+        try:
+            yield page
+        finally:
+            try:
+                page.close()
+            except Exception:  # noqa: BLE001 - teardown is best effort
+                pass
+            with self._download_lock:
+                self._page_brokers = [
+                    (wired, bound) for wired, bound in self._page_brokers if wired is not page
+                ]
+                self._wired_pages = [wired for wired in self._wired_pages if wired is not page]
 
     @contextmanager
     def session(self):
@@ -315,33 +415,46 @@ class PlaywrightCaptureBrowser:
                     yield page
                 return
 
+            if self._playwright_runtime is not None:
+                with self._playwright_session(self._playwright_runtime.get()) as page:
+                    yield page
+                return
+
             try:
                 from playwright.sync_api import sync_playwright
             except ImportError as exc:  # pragma: no cover - dependency is declared
                 raise CaptureBrowserError(
                     "playwright is not installed; it is a declared dependency, run `uv sync`"
                 ) from exc
-
-            with sync_playwright() as pw:
-                context = None
-                browser = None
-                try:
-                    context, browser = self._launch_playwright(pw)
-
-                    context.on("page", self._wire_downloads)
-                    page = context.pages[0] if context.pages else context.new_page()
-                    self._wire_downloads(page)
-                    yield page
-                finally:
-                    for closable in (context, browser):
-                        if closable is not None:
-                            try:
-                                closable.close()
-                            except Exception:  # noqa: BLE001 - teardown is best effort
-                                pass
+            with sync_playwright() as pw, self._playwright_session(pw) as page:
+                yield page
         finally:
             if lock is not None:
                 lock.release()
+
+    @contextmanager
+    def _playwright_session(self, pw):
+        context = None
+        browser = None
+        try:
+            context, browser = self._launch_playwright(pw)
+            with self._download_lock:
+                self._context = context
+            context.on("page", self._wire_downloads)
+            page = context.pages[0] if context.pages else context.new_page()
+            self._wire_downloads(page)
+            yield page
+        finally:
+            for closable in (context, browser):
+                if closable is not None:
+                    try:
+                        closable.close()
+                    except Exception:  # noqa: BLE001 - teardown is best effort
+                        pass
+            with self._download_lock:
+                self._context = None
+                self._page_brokers.clear()
+                self._wired_pages.clear()
 
     def _launch_playwright(self, pw):
         """Launch the requested browser policy and return ``(context, browser)``.
@@ -463,6 +576,8 @@ class PlaywrightCaptureBrowser:
             else:
                 context = getattr(opened, "new_context")(accept_downloads=True)
             try:
+                with self._download_lock:
+                    self._context = context
                 context.on("page", self._wire_downloads)
                 page = context.pages[0] if context.pages else context.new_page()
                 self._wire_downloads(page)
@@ -472,11 +587,52 @@ class PlaywrightCaptureBrowser:
                     context.close()
                 except Exception:  # noqa: BLE001 - teardown is best effort
                     pass
+                with self._download_lock:
+                    self._context = None
+                    self._page_brokers.clear()
+                    self._wired_pages.clear()
 
     def _wire_downloads(self, page) -> None:
-        page.on("download", self._on_download)
+        with self._download_lock:
+            if any(wired is page for wired in self._wired_pages):
+                return
+            # Keep the object, not id(page): a long-lived browser can collect a closed page and
+            # later reuse its numeric id for a new popup. Remembering only the id would silently
+            # leave that new page without a download handler.
+            self._wired_pages.append(page)
 
-    def _on_download(self, download) -> None:
+        def record_download(download) -> None:
+            try:
+                self._on_download(download, page=page)
+            except CaptureBrowserError as exc:
+                # Event callbacks are a separate control-flow path. Raising here is not observed
+                # by the capture wait and used to turn an immediate save failure into a dishonest
+                # 120-second "no file arrived" timeout. Keep it for the owning attempt to read.
+                with self._download_lock:
+                    self._download_errors.append(exc)
+
+        page.on("download", record_download)
+
+    def _broker_for_page(self, page) -> DownloadBroker | None:
+        current = page
+        seen: set[int] = set()
+        while current is not None and id(current) not in seen:
+            seen.add(id(current))
+            with self._download_lock:
+                broker = next(
+                    (bound for wired, bound in self._page_brokers if wired is current),
+                    None,
+                )
+            if broker is not None:
+                return broker
+            opener = getattr(current, "opener", None)
+            try:
+                current = opener() if callable(opener) else None
+            except Exception:  # noqa: BLE001 - an unreadable opener is simply unbound
+                current = None
+        return None
+
+    def _on_download(self, download, *, page=None) -> None:
         """Save every download the moment it lands, and record where it went.
 
         Saved eagerly and unconditionally: Playwright removes a context's downloads on close, and
@@ -484,6 +640,23 @@ class PlaywrightCaptureBrowser:
         the file landed" failure the owner called out.
         """
         name = download.suggested_filename or "cad-download"
+        broker = self._broker_for_page(page) if page is not None else None
+        if broker is not None:
+            try:
+                receipt = broker.capture_playwright(download)
+            except DownloadBrokerError as exc:
+                raise CaptureBrowserError(str(exc)) from exc
+            with self._download_lock:
+                if all(captured.path != receipt.path for captured in self._captured):
+                    self._captured.append(
+                        CapturedFile(
+                            path=receipt.path,
+                            suggested_name=receipt.suggested_name,
+                            url=receipt.source_url,
+                        )
+                    )
+            return
+
         with self._download_lock:
             dest = _unique(self.download_dir, _safe_filename(name))
             try:

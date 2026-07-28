@@ -33,16 +33,18 @@ from __future__ import annotations
 
 import tempfile
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from stockroom.capture.browser import PlaywrightCaptureBrowser
+from stockroom.capture.browser import PlaywrightCaptureBrowser, SharedPlaywrightRuntime
 from stockroom.capture.complete import SourceOutcome
 from stockroom.capture.cross_eda import (
     CrossEdaVerificationError,
     verify_cross_eda_component,
 )
+from stockroom.capture.download_broker import DownloadBroker, DownloadTask
 from stockroom.capture.evidence import (
     BROWSER_CAPTURE_ADAPTER_VERSION,
     record_browser_cad_evidence,
@@ -59,7 +61,15 @@ _DOWNLOAD_TIMEOUT_MS = 120_000
 _COHERENT_CAD_FORMATS = ("kicad", "model", "altium")
 
 
-def _wait_for_capture(browser, page, before: int, timeout_s: float, gap: float = 0.25) -> bool:
+def _wait_for_capture(
+    browser,
+    page,
+    before: int,
+    timeout_s: float,
+    gap: float = 0.25,
+    *,
+    errors_before: int | None = None,
+) -> bool:
     """True once a NEW file has actually been SAVED. Polls the saved list, not the event.
 
     The saved list is the observation; the download event is only a promise. See the call site for
@@ -82,12 +92,21 @@ def _wait_for_capture(browser, page, before: int, timeout_s: float, gap: float =
     120 s backstop with nothing attached - the same symptom as the event race this function replaced,
     from the opposite cause.
     """
+    error_mark = (
+        len(getattr(browser, "download_errors", ())) if errors_before is None else errors_before
+    )
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
+        errors = getattr(browser, "download_errors", ())
+        if len(errors) > error_mark:
+            raise errors[error_mark]
         if len(browser.captured) > before:
             return True
         page.wait_for_timeout(gap * 1000)
     # One last look: a file that landed inside the final gap still counts.
+    errors = getattr(browser, "download_errors", ())
+    if len(errors) > error_mark:
+        raise errors[error_mark]
     return len(browser.captured) > before
 
 
@@ -157,11 +176,18 @@ def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None 
 
     if not adapter.capability.formats_exclusive:
         mark = len(browser.captured)
+        error_mark = len(getattr(browser, "download_errors", ()))
         page.goto(url, wait_until="domcontentloaded")
         report = adapter.drive(page, list(formats))
         if not report.submitted:
             return report, None
-        if not _wait_for_capture(browser, page, mark, wait_s):
+        if not _wait_for_capture(
+            browser,
+            page,
+            mark,
+            wait_s,
+            errors_before=error_mark,
+        ):
             gate = _download_gate(adapter, page)
             if gate:
                 report.blocked = True
@@ -172,6 +198,7 @@ def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None 
     combined = DriveReport()
     for fmt in formats:
         mark = len(browser.captured)
+        error_mark = len(getattr(browser, "download_errors", ()))
         try:
             page.goto(url, wait_until="domcontentloaded")
             one = adapter.drive(page, [fmt])
@@ -189,7 +216,13 @@ def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None 
                 # buttons cannot change it and only repeats the same failure.
                 return combined, None
             continue
-        if not _wait_for_capture(browser, page, mark, wait_s):
+        if not _wait_for_capture(
+            browser,
+            page,
+            mark,
+            wait_s,
+            errors_before=error_mark,
+        ):
             gate = _download_gate(adapter, page)
             if gate:
                 combined.blocked = True
@@ -324,17 +357,19 @@ class GuidedCaptureSource:
         download_root: Path,
         profile_dir: Path | None = None,
         headless: bool = False,
-        engine: str = "windows",
+        engine: str = "chromium",
         attach_altium=None,
         credentials=None,
         run_write=None,
         now_iso=None,
         evidence_store=None,
         cross_eda_verifier=None,
+        playwright_runtime: SharedPlaywrightRuntime | None = None,
     ) -> None:
         self._make_pipeline = make_pipeline
         self._vendor_key = vendor
         self._download_root = Path(download_root)
+        self._download_root.mkdir(parents=True, exist_ok=True)
         self._profile_dir = profile_dir
         self._headless = headless
         self._engine = engine
@@ -349,6 +384,7 @@ class GuidedCaptureSource:
         self._now_iso = now_iso
         self._evidence_store = evidence_store
         self._cross_eda_verifier = cross_eda_verifier or verify_cross_eda_component
+        self._playwright_runtime = playwright_runtime
         self._session: _Session | None = None
 
     # -- lifecycle -------------------------------------------------------------------------
@@ -367,6 +403,7 @@ class GuidedCaptureSource:
             profile_dir=self._profile_dir,
             headless=self._headless,
             provider_key=self._vendor_key,
+            playwright_runtime=self._playwright_runtime,
         )
         manager = browser.session()
         page = manager.__enter__()
@@ -409,6 +446,11 @@ class GuidedCaptureSource:
         if adapter is None:
             return SourceOutcome(error=f"no capture adapter for vendor {self._vendor_key!r}")
 
+        manufacturer = (getattr(record, "manufacturer", "") or "").strip()
+        mpn = (getattr(record, "mpn", "") or "").strip()
+        if not manufacturer or not mpn:
+            return SourceOutcome(error="browser acquisition requires an exact manufacturer and MPN")
+
         needs = list(capture_needs(record))
         if not needs:
             return SourceOutcome(skipped=f"{record.mpn or record.id} needs no captured files")
@@ -425,35 +467,64 @@ class GuidedCaptureSource:
                 )
             )
 
-        url = adapter.resolve_url(record.mpn or "")
+        url = adapter.resolve_url(mpn)
         if not url:
             return SourceOutcome(skipped=f"no {adapter.capability.label} page for {record.id}")
 
         session = self._ensure_session()
+        open_task_page = getattr(session.browser, "task_page", None)
+        broker = (
+            DownloadBroker(
+                DownloadTask(
+                    task_id=record.id,
+                    manufacturer_key=manufacturer,
+                    mpn_canonical=mpn,
+                    staging_root=self._download_root,
+                )
+            )
+            if callable(open_task_page)
+            else None
+        )
         before = len(session.browser.captured)
+        detail_url = ""
         try:
-            report, failure = drive_formats(session.browser, session.page, adapter, formats, url)
-            # FAILURE IS CHECKED FIRST, and the order is load-bearing. A vendor whose LAST format
-            # was submitted and never arrived comes back with `submitted=False` (the flag is only
-            # set after the file lands) AND an error - so testing `submitted` first would report a
-            # vanished download as "the vendor simply had nothing". Measured live against SnapMagic
-            # on 2026-07-27: `SUBMITTED False` alongside "did not deliver altium within 120s".
-            if failure is not None:
-                return SourceOutcome(error=failure, blocked=report.blocked)
-            if not report.submitted:
-                why = report.message or "the vendor offered no download"
-                if self._sign_in_error:
-                    # Everything up to the Download button works signed out, so a refused sign-in is
-                    # the real cause of "no Download button" and must be said here rather than left
-                    # for the owner to infer from a vendor-shaped message.
-                    why = f"{why} ({self._sign_in_error})"
-                if report.blocked:
-                    return SourceOutcome(error=why, blocked=True)
-                return SourceOutcome(skipped=why)
+            if broker is not None:
+                assert callable(open_task_page)
+                page_context = open_task_page(broker)
+            else:
+                page_context = nullcontext(session.page)
+            with page_context as task_page:
+                report, failure = drive_formats(session.browser, task_page, adapter, formats, url)
+                # FAILURE IS CHECKED FIRST, and the order is load-bearing. A vendor whose LAST
+                # format was submitted and never arrived comes back with `submitted=False` (the
+                # flag is only set after the file lands) AND an error - so testing `submitted`
+                # first would report a vanished download as "the vendor simply had nothing".
+                if failure is not None:
+                    return SourceOutcome(error=failure, blocked=report.blocked)
+                if not report.submitted:
+                    why = report.message or "the vendor offered no download"
+                    if self._sign_in_error:
+                        # Everything up to the Download button works signed out, so a refused
+                        # sign-in is the real cause of "no Download button" and must be explicit.
+                        why = f"{why} ({self._sign_in_error})"
+                    if report.blocked:
+                        return SourceOutcome(error=why, blocked=True)
+                    return SourceOutcome(skipped=why)
+                if broker is not None:
+                    # Keep the exact task binding through a short quiet period. One provider click
+                    # can legitimately emit symbol, footprint, and model as separate downloads;
+                    # unbinding after the first file would misfile a late sibling under the next
+                    # component in a batch.
+                    broker.wait_for_playwright(
+                        task_page,
+                        minimum=1,
+                        settle_seconds=0.75,
+                    )
+                detail_url = getattr(task_page, "url", "") or ""
         except Exception as exc:  # noqa: BLE001 - one part's failure is a row, not a crash
             return SourceOutcome(error=f"{adapter.capability.label}: {exc}")
 
-        landed = session.browser.captured[before:]
+        landed = list(broker.receipts) if broker is not None else session.browser.captured[before:]
         if not landed:
             return SourceOutcome(error="the vendor download did not produce a file")
 
@@ -461,7 +532,7 @@ class GuidedCaptureSource:
             record,
             landed,
             url,
-            detail_url=getattr(session.page, "url", "") or "",
+            detail_url=detail_url,
         )
 
     def _attach(self, record, landed, url: str, *, detail_url: str = "") -> SourceOutcome:
