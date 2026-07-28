@@ -67,6 +67,7 @@ export function mockCapture(
                     satisfied: needs,
                     remaining: [],
                     sources: ["ultralibrarian"],
+                    notes: [],
                     error: "",
                   },
                 ],

@@ -25,12 +25,23 @@ def _rec(part_id="p1", **kw) -> PartRecord:
 class FakeSource:
     """A source that fills the requirements it is told to, by mutating the record it is given."""
 
-    def __init__(self, key, provides, fills=None, error="", calls=None):
+    def __init__(
+        self,
+        key,
+        provides,
+        fills=None,
+        error="",
+        skipped="",
+        calls=None,
+        report_label="",
+    ):
         self.key = key
         self._provides = frozenset(provides)
         self._fills = frozenset(fills if fills is not None else provides)
         self._error = error
+        self._skipped = skipped
         self.calls = calls if calls is not None else []
+        self.report_label = report_label
 
     def provides(self):
         return self._provides
@@ -39,6 +50,8 @@ class FakeSource:
         self.calls.append(record.id)
         if self._error:
             return SourceOutcome(error=self._error)
+        if self._skipped:
+            return SourceOutcome(skipped=self._skipped)
         for req in self._fills:
             tool, _, kind = req.value.partition("_")
             record.assets_for(tool).set(kind, AssetRef(lib="L", name="N"))
@@ -131,6 +144,32 @@ def test_a_source_that_errors_is_a_row_not_a_lost_part():
     item = complete_part("p1", load_record=_loader({"p1": rec}), sources=[bad])
     assert item.status == "unchanged"
     assert "network down" in item.error
+
+
+def test_sources_that_decline_retain_provider_named_notes_without_becoming_errors():
+    rec = _rec()
+    snap = FakeSource(
+        "guided",
+        [Requirement.KICAD_SYMBOL],
+        skipped="no exact CAD model was found",
+        report_label="SnapMagic",
+    )
+    ultra = FakeSource(
+        "guided",
+        [Requirement.KICAD_SYMBOL],
+        skipped="the exact part has no downloadable symbol",
+        report_label="Ultra Librarian",
+    )
+
+    item = complete_part("p1", load_record=_loader({"p1": rec}), sources=[snap, ultra])
+
+    assert item.status == "unchanged"
+    assert item.error == ""
+    assert item.notes == [
+        "SnapMagic: no exact CAD model was found",
+        "Ultra Librarian: the exact part has no downloadable symbol",
+    ]
+    assert item.to_dict()["notes"] == item.notes
 
 
 def test_a_source_that_raises_is_caught_and_the_next_source_still_runs():
@@ -308,5 +347,6 @@ def test_iter_incomplete_skips_an_unreadable_record_instead_of_dying(tmp_path):
 
 
 def test_completion_item_is_json_safe():
-    item = CompletionItem(part_id="p", mpn="M", status="completed")
+    item = CompletionItem(part_id="p", mpn="M", status="completed", notes=["source: declined"])
     assert item.to_dict()["part_id"] == "p"
+    assert item.to_dict()["notes"] == ["source: declined"]

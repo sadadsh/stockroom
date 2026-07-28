@@ -360,9 +360,13 @@ function RunReport() {
   const filled = (counts.completed ?? 0) + (counts.improved ?? 0);
   const deferred = counts.deferred ?? 0;
   const stuck = (counts.unchanged ?? 0) + (counts.error ?? 0);
-  // Only the parts a person can act on. A hundred "no source" rows would bury them.
+  // Only the parts a person can act on, plus provider-declined rows that now carry an exact
+  // explanation. Anonymous "no source" rows stay collapsed so they cannot bury useful evidence.
   const actionable: CompletionItem[] = result.items.filter(
-    (i) => i.status === "improved" || i.status === "error",
+    (i) =>
+      i.status === "improved" ||
+      i.status === "error" ||
+      (i.remaining.length > 0 && (i.notes?.length ?? 0) > 0),
   );
 
   return (
@@ -401,9 +405,13 @@ function RunReport() {
               <span className="truncate text-t3">
                 {item.status === "error"
                   ? item.error
-                  : `still needs ${item.remaining
-                      .map((r) => KIND_WORD[r] ?? r)
-                      .join(", ")}`}
+                  : item.notes?.length
+                    ? `${item.notes.join("; ")}. Still needs ${item.remaining
+                        .map((r) => KIND_WORD[r] ?? r)
+                        .join(", ")}`
+                    : `still needs ${item.remaining
+                        .map((r) => KIND_WORD[r] ?? r)
+                        .join(", ")}`}
               </span>
             </li>
           ))}

@@ -129,6 +129,23 @@ def _source(monkeypatch, tmp_path, browser, *, on_drive, pipeline=None):
     return src
 
 
+def test_guided_source_reports_the_provider_without_changing_its_engine_key(
+    monkeypatch, tmp_path
+):
+    browser = _FakeBrowser()
+    _install_adapter(monkeypatch, browser, on_drive=lambda _browser: None)
+
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="faketron",
+        download_root=tmp_path / "dl",
+        headless=True,
+    )
+
+    assert source.key == "guided"
+    assert source.report_label == "Faketron"
+
+
 def test_a_download_consumed_by_the_session_handler_still_counts_as_delivered(
     monkeypatch, tmp_path
 ):

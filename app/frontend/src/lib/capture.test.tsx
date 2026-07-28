@@ -209,6 +209,7 @@ describe("CaptureProvider store", () => {
                 satisfied: [],
                 remaining: ["kicad_symbol"],
                 sources: [],
+                notes: [],
                 error: "No provider delivered an exact model.",
               },
             ],
@@ -228,5 +229,49 @@ describe("CaptureProvider store", () => {
 
     expect(result.current.active.status).toBe("error");
     expect(result.current.active.message).toContain("No provider delivered");
+  });
+
+  it("shows non-error provider explanations before the remaining CAD gaps", async () => {
+    mockSource();
+    mockCapture([
+      {
+        event: "result",
+        data: {
+          result: {
+            items: [
+              {
+                part_id: "p1",
+                mpn: "M",
+                display_name: "Part One",
+                category: "ICs",
+                status: "unchanged",
+                needed: ["kicad_symbol"],
+                satisfied: [],
+                remaining: ["kicad_symbol"],
+                sources: [],
+                notes: ["snapmagic: no exact CAD model was found"],
+                error: "",
+              },
+            ],
+            counts: { unchanged: 1 },
+            stopped: false,
+            stop_reason: "",
+          },
+        },
+      },
+      { event: "done", data: {} },
+    ]);
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      await result.current.start("p1", "Part One", ["kicad_symbol"]);
+    });
+
+    expect(result.current.active.status).toBe("error");
+    expect(result.current.active.message).toContain("snapmagic: no exact CAD model was found");
+    expect(result.current.active.message).toContain("Still missing: KiCad Symbol");
+    expect(result.current.active.message?.indexOf("snapmagic")).toBeLessThan(
+      result.current.active.message?.indexOf("Still missing") ?? 0,
+    );
   });
 });

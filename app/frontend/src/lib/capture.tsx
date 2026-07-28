@@ -435,15 +435,21 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         // Re-read server state after the result has proved what happened. The report decides
         // success; a terminal SSE `done` frame only says the worker stopped emitting events.
         invalidate();
+        const remaining = item.remaining
+          .map((requirement) => REQ_LABELS[requirement as Requirement] ?? requirement)
+          .join(", ") || "required CAD files";
+        // Keep the client compatible with an already-running pre-notes host
+        // during an update; the new backend always emits this field.
+        const notes = (item.notes ?? []).join("; ");
         setState((s) => ({
           ...s,
           status: complete ? "done" : "error",
           message: complete
             ? "All network files were verified and attached."
             : item.error ||
-              `Capture finished incomplete. Still missing: ${item.remaining
-                .map((requirement) => REQ_LABELS[requirement as Requirement] ?? requirement)
-                .join(", ") || "required CAD files"}.`,
+              (notes
+                ? `Capture finished incomplete. ${notes}. Still missing: ${remaining}.`
+                : `Capture finished incomplete. Still missing: ${remaining}.`),
         }));
       } catch (err) {
         if (partIdRef.current !== partId) return;
