@@ -6,8 +6,8 @@
   "note": "Owner outcomes are the product source of truth. The historical engineering checklist is retained below as unweighted implementation history and must never be presented as product readiness.",
   "product_scope": "Windows-only component-library management for both KiCad and Altium. A capability ships only when both EDA workflows are supported. KiCad-only project management is deferred and removed from the current frontend; its backend and Git history are preserved.",
   "active_work": {
-    "last_updated": "2026-07-28T06:27:26Z",
-    "objective": "Generalize the proven one-part Windows path into zero-touch provider-backed intake and then prove the same durable engine at 100- and 1,000-item scale.",
+    "last_updated": "2026-07-28T08:02:13Z",
+    "objective": "Replace injected proof adapters with production provider capabilities, then connect the qualified durable backend to the persistent service, authenticated API, and activity/review UI.",
     "refresh_policy": "Manually refreshed at meaningful checkpoints; this is not real-time telemetry.",
     "workstreams": [
       {
@@ -44,7 +44,7 @@
         "owner": "development tool · KiCad, Altium, and catalog projections",
         "evidence": "The exact canonical S1M bundle generates and reads back KiCad 10 native files, extracts and semantically reads the real Altium binary fixture, cross-checks KiCad 1/2 against Altium C/A, emits four full-digest-versioned artifacts, stages a semantically deterministic Catalog.sqlite, and renders portable ${SR_LIB} KiCad table fragments without mutating global tables.",
         "blocker": "",
-        "next_action": "Replace the qualified-fixture acquisition seam with production provider and native-Altium capabilities without weakening the settled projection contract."
+        "next_action": "Add separately qualified canonical render profiles beyond the live-proven ASCII two-pin diode/SMA shape; unsupported geometry and templates must continue to fail closed."
       },
       {
         "id": "one-part-vertical-slice",
@@ -60,9 +60,9 @@
         "name": "Generalized Intake And Scale",
         "status": "active",
         "owner": "development tool · provider planning and bulk execution",
-        "evidence": "The one-part correctness path is proven; the workflow store already accepts batches up to 1,000, but diverse production identities, provider fallback, native Altium generation, bounded resource scheduling, and fault-injected 100/1,000-item evidence are not yet proven.",
-        "blocker": "The current end-to-end adapter is deliberately limited to the qualified S1M fixture and reports production_ready=false.",
-        "next_action": "Define executable provider capabilities, generalize canonical preparation beyond S1M, and run bounded 100- then 1,000-item fault-injected proofs through the same persisted graph."
+        "evidence": "The provider runtime independently plans and executes metadata, datasheet, KiCad CAD, and Altium CAD with exact identity, trust/license/auth/health gates, bounded shared concurrency, deterministic fallback, policy-and-registration semantic digests, whole-batch effect-free drift preflight, and fail-closed dual-EDA coverage. Provider-backed METADATA, DATASHEET, and dual-EDA CAD_ACQUISITION handlers now persist strict-JSON policy/plan/receipt digests, immutable evidence digests, bounded rate-limit retries, compact evidence decisions, setup failures, and zero-effect drift rejection across WorkflowStore reopen; the combined focused suite passes 56 tests. The same persisted 14-stage graph settles 100 and 1,000 distinct synthetic identities with deterministic retry/fallback injection, bounded claims/workers, a mid-run store reopen, zero decisions, and exactly one terminal publication/receipt per identity. The initial exact 1,000-item run took 65.530 seconds. A measured process-local SQLite writer gate plus indexed, nonduplicated persisted-graph verification reduced the exact rerun to 28.838 seconds at 487.52 dispatches/second, preserving all 14,059 dispatches, 1,000 receipts, 49,187 events, the mid-run reopen, and terminal_exactly_once=true while meeting the 30-second budget; the workflow suite passes 73 tests. A generation-fenced Windows WorkflowCoordinator supplies bounded fair background polling, expired-claim recovery, clean stop, stale-generation refusal, and payload-free counters; four real-Windows tests pass. AD26 authored native SchLib/PcbLib files for both ON Semiconductor/S1M and a distinct Diodes Incorporated/S1M-13-F canonical identity, reopened them for exact semantic readback, and independently verified dynamic collision-safe names, OLE symbol/footprint identity, plus byte-identical embedded STEP payloads. The renderer now accepts any exact ASCII identity within the fully qualified two-pin diode/SMA template, geometry, and terminal contract while rejecting all unsupported shapes, bindings, digests, control text, and unqualified Unicode. Commit f1c31e5a moves live secrets into verified current-user Windows Credential Manager storage and removes migrated plaintext. Provider/Git/catalog effects in the scale proof remain explicitly synthetic.",
+        "blocker": "The provider handlers still receive injected proof adapters rather than production metadata, datasheet, and CAD capabilities, and they are not yet mounted by normal service launch. Native Altium authoring is qualified only for ASCII identities using the exact two-pin diode/SMA shape; other packages, component kinds, and independently verified Unicode parameters remain unsupported.",
+        "next_action": "Implement production adapters that emit immutable evidence into these persisted handlers, add separately qualified canonical render profiles, then mount the coordinator and workflow state behind the authenticated service/API/activity/review launch path."
       }
     ]
   },
@@ -119,11 +119,14 @@
       "id": "exception-only-workflow",
       "name": "Resilient Batch Automation",
       "status": "not_met",
-      "measure": "Current guided flow is per-part, slow, non-resumable, and lacks reliable fallbacks",
+      "measure": "Provider execution is bound to persisted metadata, datasheet, and dual-EDA CAD stages; production adapters, normal service launch, and exception UI are not connected",
       "acceptance": "After one list import and one-time credential setup, Stockroom processes every unambiguous part through a resumable batch pipeline, retries transient failures, falls back across allowed providers or verified generators, and asks the user only about quarantined exceptions. Repeated decisions become reusable rules.",
       "evidence": [
         "Owner direction: the current workflow is too slow and unmanageable.",
-        "The current capture design exposes vendor selection and guided interaction per part and has no durable exception queue or measured human-touch budget."
+        "The current capture design exposes vendor selection and guided interaction per part and has no durable exception queue or measured human-touch budget.",
+        "The vNext provider runtime rejects ineligible or inexact providers, falls through classified failures automatically, binds saved plans to current policy and registration semantics before effects, and fails closed unless executable KiCad and Altium routes both exist. The proof uses synthetic adapters and does not yet replace the current capture path.",
+        "Workflow handlers now persist only sanitized policy, plan, receipt, and immutable evidence digests; rate limits become bounded durable retries, evidence fixed points become one compact decision, setup failures are classified, drift has zero adapter effects, and reopening WorkflowStore reuses the exact checkpoint. The combined provider suites pass 56 tests.",
+        "The Windows WorkflowCoordinator now polls the durable runtime with bounded fair workers, reopens expired claims, rejects stale service generations, stops cleanly, and exposes only sanitized counters; four focused real-Windows tests pass."
       ],
       "blockers": [
         "Define durable, idempotent stages for identity, evidence, assets, validation, conversion, and EDA linking.",
@@ -136,14 +139,17 @@
       "id": "one-to-thousand-ux",
       "name": "One-To-Thousand Responsive UX",
       "status": "not_met",
-      "measure": "No measured 1-part and 1,000-part acceptance baseline",
+      "measure": "Synthetic durable backend correctness passes at 100 and 1,000 identities; 1,000 items now settle in 28.838 seconds against a 30-second scheduler budget",
       "acceptance": "The same workflow handles one or 1,000 parts. Submission acknowledges immediately; completed results stream incrementally; search, filtering, review, pause, resume, retry, and cancel stay responsive; restarting never repeats successful expensive work.",
       "evidence": [
         "Owner direction: the workflow must feel easy, intuitive, and responsive at both one part and 1,000 parts.",
-        "The current per-part guided flow and tests do not exercise a durable 1,000-part run."
+        "A fault-injected synthetic harness settles both 100 and 1,000 exact identities through the same persisted 14-stage graph, including a mid-run reopen, zero human decisions, and exactly-once terminal receipts. The 100-item Windows baseline is 3.290 seconds at 427.37 dispatches/second.",
+        "The initial exact 1,000-item run completed correctly but took 65.530 seconds. SQL profiling isolated same-process BEGIN IMMEDIATE contention and duplicate persisted-graph traversal; a process-local writer gate and indexed, single-pass graph verification reduced the exact rerun to 28.838 seconds at 487.52 dispatches/second.",
+        "The optimized run retained all 14,059 dispatches, 1,000 publications and receipts, 49,187 events, one mid-run reopen, terminal_exactly_once=true, WAL/FULL production-store semantics, and the four durable publication checkpoints. The workflow suite passes 73 tests.",
+        "The harness explicitly simulates provider, Git, catalog, and asset effects. Its correctness result is not evidence for production completion or UI responsiveness."
       ],
       "blockers": [
-        "Create representative 1-part, 100-part, and 1,000-part benchmarks with simulated fast, slow, blocked, and failing providers.",
+        "Qualify the 30-second scheduler budget across supported Windows hardware while production provider and EDA effects are introduced; the current measured margin is 1.16 seconds.",
         "Virtualize large UI collections and stream durable stage/result events instead of polling whole aggregates.",
         "Set latency and memory budgets from the first measured Windows baseline, then enforce them in gates."
       ]
@@ -152,7 +158,7 @@
       "id": "kicad-linking",
       "name": "KiCad Library Linking",
       "status": "not_met",
-      "measure": "0 clean-library parts linked",
+      "measure": "Two distinct ASCII identities pass native AD26 SchLib/PcbLib/STEP authoring and independent OLE readback within one qualified diode/SMA shape; 0 clean-library parts are linked",
       "acceptance": "A clean Windows install can place every eligible library part in KiCad from Stockroom-managed assets without manual file surgery.",
       "evidence": [
         "The profile is intentionally empty; prior passive references were deleted with the former library."
@@ -169,7 +175,9 @@
       "measure": "0 clean-library parts linked",
       "acceptance": "A clean Windows install can place every eligible library part in Altium from Stockroom-managed assets without manual file surgery.",
       "evidence": [
-        "The profile is intentionally empty; no Altium asset output exists in the clean library."
+        "The profile is intentionally empty; no Altium asset output exists in the clean library.",
+        "Live isolated AD26 proofs authored and reopened native libraries for both ON Semiconductor/S1M and Diodes Incorporated/S1M-13-F, verified exact MF/MP plus collision-safe dynamic names and symbol/footprint semantics, and independently decompressed byte-identical embedded STEP payloads.",
+        "The renderer is identity-general within the exact qualified ASCII two-pin diode/SMA template, geometry, and terminal contract. Other shapes, packages, component kinds, and Unicode parameter preservation fail closed until separately qualified."
       ],
       "blockers": [
         "Rebuild trusted assets first.",
@@ -249,9 +257,9 @@
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either.",
     "No person's Stockroom install should be independently maintained or remain on a different version: every supported online install must converge automatically and show changes without the person closing and reopening it, regardless of which release tier changed."
   ],
-  "updated": "2026-07-28 05:31 UTC",
-  "now": "Resetting Stockroom to an empty dual-EDA library, removing the KiCad-only Projects frontend, and hardening import, provenance, capture-result, and Windows QA contracts before any part is reintroduced.",
-  "now_updated": "2026-07-27",
+  "updated": "2026-07-28 08:02 UTC",
+  "now": "Replacing injected proof providers with production evidence-producing adapters, then mounting the qualified durable workflow behind the persistent service/API/UI; the clean library remains intentionally empty.",
+  "now_updated": "2026-07-28",
   "projects": [
     {
       "id": "stockroom",
