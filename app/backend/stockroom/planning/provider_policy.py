@@ -22,6 +22,7 @@ from stockroom.workflow.model import canonical_json
 _PROVIDER_KEY_PATTERN = re.compile(r"[a-z][a-z0-9_]{2,63}", re.ASCII)
 _SEMANTIC_DIGEST_PATTERN = re.compile(r"sha256:[0-9a-f]{64}", re.ASCII)
 _PROVIDER_PLAN_DIGEST_DOMAIN = b"stockroom.provider-plan.v1\0"
+_PROVIDER_POLICY_DIGEST_DOMAIN = b"stockroom.provider-policy.v1\0"
 _MAX_PROVIDERS = 256
 _MAX_REQUESTS = 1_000
 _MAX_PROVIDER_CONCURRENCY = 64
@@ -269,8 +270,21 @@ class AdapterOutcome:
     authoritative_manufacturer_key: str | None = None
     mpn_canonical: str | None = None
     retry_after_seconds: float | None = None
+    evidence_digests: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        if (
+            type(self.evidence_digests) is not tuple
+            or len(set(self.evidence_digests)) != len(self.evidence_digests)
+            or self.evidence_digests != tuple(sorted(self.evidence_digests))
+            or any(
+                type(digest) is not str or _SEMANTIC_DIGEST_PATTERN.fullmatch(digest) is None
+                for digest in self.evidence_digests
+            )
+        ):
+            raise ProviderPolicyError(
+                "evidence_digests must be a canonical duplicate-free digest tuple"
+            )
         if self.status is AdapterOutcomeStatus.SUCCESS:
             if (
                 self.authoritative_manufacturer_key is None
@@ -288,7 +302,11 @@ class AdapterOutcome:
             raise ProviderPolicyError(
                 "adapter outcome requires success or an executable failure classification"
             )
-        if self.authoritative_manufacturer_key is not None or self.mpn_canonical is not None:
+        if (
+            self.authoritative_manufacturer_key is not None
+            or self.mpn_canonical is not None
+            or self.evidence_digests
+        ):
             raise ProviderPolicyError("failed adapter outcome cannot claim an exact identity")
         if self.retry_after_seconds is not None and (
             self.status is not FailureClassification.RATE_LIMITED
@@ -300,11 +318,17 @@ class AdapterOutcome:
             raise ProviderPolicyError("retry_after_seconds is valid only for a positive rate limit")
 
     @classmethod
-    def success(cls, identity: ExactPartIdentity) -> AdapterOutcome:
+    def success(
+        cls,
+        identity: ExactPartIdentity,
+        *,
+        evidence_digests: tuple[str, ...] = (),
+    ) -> AdapterOutcome:
         return cls(
             AdapterOutcomeStatus.SUCCESS,
             authoritative_manufacturer_key=identity.authoritative_manufacturer_key,
             mpn_canonical=identity.mpn_canonical,
+            evidence_digests=evidence_digests,
         )
 
     @classmethod
@@ -418,19 +442,12 @@ def _operation_document(operation: ProviderOperation) -> dict[str, str | None]:
     }
 
 
-def _provider_plan_semantic_digest(
-    identity: ExactPartIdentity,
-    routes: tuple[ProviderRoute, ...],
+def _provider_policy_document(
     registrations: Sequence[ProviderRegistration],
     policies: Sequence[ProviderPolicyInput],
-) -> str:
-    """Bind one plan to every credential-free execution-relevant input."""
-
-    document = {
-        "identity": {
-            "authoritative_manufacturer_key": identity.authoritative_manufacturer_key,
-            "mpn_canonical": identity.mpn_canonical,
-        },
+) -> dict[str, object]:
+    return {
+        "planner_contract_version": 1,
         "policy": [
             {
                 "authentication": policy.authentication.value,
@@ -470,6 +487,38 @@ def _provider_plan_semantic_digest(
                 ),
             )
         ],
+    }
+
+
+def _provider_policy_semantic_digest(
+    registrations: Sequence[ProviderRegistration],
+    policies: Sequence[ProviderPolicyInput],
+) -> str:
+    encoded = _PROVIDER_POLICY_DIGEST_DOMAIN + canonical_json(
+        _provider_policy_document(registrations, policies)
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _provider_plan_semantic_digest(
+    identity: ExactPartIdentity,
+    routes: tuple[ProviderRoute, ...],
+    registrations: Sequence[ProviderRegistration],
+    policies: Sequence[ProviderPolicyInput],
+) -> str:
+    """Bind one plan to every credential-free execution-relevant input."""
+
+    policy_snapshot = _provider_policy_document(registrations, policies)
+    document = {
+        "identity": {
+            "authoritative_manufacturer_key": identity.authoritative_manufacturer_key,
+            "mpn_canonical": identity.mpn_canonical,
+        },
+        # Preserve the v1 plan document shape while reusing the same complete
+        # registry/policy projection for the independent policy checkpoint.
+        "planner_contract_version": policy_snapshot["planner_contract_version"],
+        "policy": policy_snapshot["policy"],
+        "registrations": policy_snapshot["registrations"],
         "routes": [
             {
                 "attempts": [
@@ -493,7 +542,6 @@ def _provider_plan_semantic_digest(
             }
             for route in routes
         ],
-        "planner_contract_version": 1,
     }
     encoded = _PROVIDER_PLAN_DIGEST_DOMAIN + canonical_json(document).encode("utf-8")
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
@@ -504,6 +552,7 @@ class ProviderAttemptRecord:
     attempt: ProviderAttempt
     status: AdapterOutcomeStatus | FailureClassification
     retry_after_seconds: float | None = None
+    evidence_digests: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -618,6 +667,18 @@ class ProviderPlanner:
             key: registration.declaration.max_concurrency
             for key, registration in self._registrations.items()
         }
+
+    def policy_semantic_digest(
+        self,
+        policy_inputs: Sequence[ProviderPolicyInput],
+    ) -> str:
+        """Hash the complete credential-free current registry and policy snapshot."""
+
+        policies = self._policy_index(policy_inputs)
+        return _provider_policy_semantic_digest(
+            tuple(self._registrations.values()),
+            tuple(policies.values()),
+        )
 
     def _policy_index(
         self,
@@ -938,6 +999,7 @@ class ProviderPlanner:
             return ProviderAttemptRecord(
                 attempt,
                 AdapterOutcomeStatus.SUCCESS,
+                evidence_digests=outcome.evidence_digests,
             )
         return ProviderAttemptRecord(
             attempt,

@@ -51,6 +51,7 @@ class ProviderAttemptReceipt:
     retry_after_seconds: float | None
     queue_wait_ns: int
     execution_ns: int
+    evidence_digests: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if type(self.attempt) is not ProviderAttempt:
@@ -74,6 +75,21 @@ class ProviderAttemptReceipt:
             or self.execution_ns < 0
         ):
             raise ProviderRuntimeError("attempt timing must be non-negative nanoseconds")
+        if (
+            type(self.evidence_digests) is not tuple
+            or len(set(self.evidence_digests)) != len(self.evidence_digests)
+            or self.evidence_digests != tuple(sorted(self.evidence_digests))
+            or any(
+                type(digest) is not str
+                or not digest.startswith("sha256:")
+                or len(digest) != 71
+                or any(character not in "0123456789abcdef" for character in digest[7:])
+                for digest in self.evidence_digests
+            )
+        ):
+            raise ProviderRuntimeError("attempt evidence digests must be canonical")
+        if self.status is not AdapterOutcomeStatus.SUCCESS and self.evidence_digests:
+            raise ProviderRuntimeError("failed attempts cannot claim evidence digests")
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,9 +192,9 @@ def _receipt_digest(
                 "attempts": [
                     {
                         "adapter_version": receipt.attempt.adapter_version,
+                        "evidence_digests": list(receipt.evidence_digests),
                         "max_concurrency": receipt.attempt.max_concurrency,
                         "provider_key": receipt.attempt.provider_key,
-                        "retry_after_seconds": receipt.retry_after_seconds,
                         "status": receipt.status.value,
                     }
                     for receipt in selection.attempts
@@ -192,7 +208,7 @@ def _receipt_digest(
             }
             for selection in selections
         ],
-        "version": 1,
+        "version": 2,
     }
     encoded = json.dumps(
         document,
@@ -245,6 +261,10 @@ class ProviderExecutionRuntime:
     @property
     def max_workers(self) -> int:
         return self._worker_count
+
+    @property
+    def planner(self) -> ProviderPlanner:
+        return self._planner
 
     def _validate_plan(self, plan: ProviderPlan) -> None:
         if type(plan) is not ProviderPlan:
@@ -314,6 +334,7 @@ class ProviderExecutionRuntime:
                     retry_after_seconds=record.retry_after_seconds,
                     queue_wait_ns=max(0, started_at - queued_at),
                     execution_ns=max(0, completed_at - started_at),
+                    evidence_digests=record.evidence_digests,
                 )
             )
             if record.status is AdapterOutcomeStatus.SUCCESS:
