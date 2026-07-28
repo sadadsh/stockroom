@@ -43,13 +43,18 @@ import os
 import re
 import shutil
 import threading
+import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
+from urllib.parse import urlsplit
 
 from stockroom.capture.download_broker import (
     DownloadBroker,
     DownloadBrokerError,
+    DownloadReceipt,
 )
 
 
@@ -68,6 +73,15 @@ class CapturedFile:
     path: Path
     suggested_name: str
     url: str
+
+
+@dataclass(frozen=True, slots=True)
+class UserCaptureResult:
+    """Files Stockroom intercepted while the person controlled the provider page."""
+
+    status: Literal["completed", "cancelled", "timed_out"]
+    files: tuple[DownloadReceipt, ...]
+    final_url: str
 
 
 @dataclass(frozen=True)
@@ -423,6 +437,126 @@ class PlaywrightCaptureBrowser:
                 ]
                 self._wired_pages = [wired for wired in self._wired_pages if wired is not page]
 
+    def capture_user_downloads(
+        self,
+        url: str,
+        broker: DownloadBroker,
+        *,
+        should_finish: Callable[[], bool] | None = None,
+        should_cancel: Callable[[], bool] | None = None,
+        timeout_s: float = 600.0,
+        poll_interval_s: float = 0.1,
+        settle_seconds: float = 0.75,
+    ) -> UserCaptureResult:
+        """Open one provider page and observe downloads while the person controls it.
+
+        This is deliberately a small browser lifecycle, not a provider driver. Production code
+        wires the task-bound download handler *before* navigation, opens exactly ``url``, pumps
+        Playwright, and observes only explicit completion, cancellation, page closure, or timeout.
+        It never inspects or searches the DOM, fills credentials, selects a result or format,
+        accepts terms, or clicks a provider control.
+
+        ``should_finish`` is the future UI's explicit "I am done" signal. Without one, closing the
+        capture page completes the session. A short quiet period after that signal keeps sibling
+        downloads from one user click bound to the same task. Cancellation and timeout return every
+        file already intercepted, but callers decide whether those files may be attached.
+        """
+
+        if type(broker) is not DownloadBroker:
+            raise TypeError("broker must be a DownloadBroker")
+        _validate_capture_url(url)
+        for callback, label in (
+            (should_finish, "should_finish"),
+            (should_cancel, "should_cancel"),
+        ):
+            if callback is not None and not callable(callback):
+                raise TypeError(f"{label} must be callable")
+        timeout = _bounded_seconds(timeout_s, "timeout_s", maximum=3600.0)
+        poll_interval = _bounded_seconds(
+            poll_interval_s,
+            "poll_interval_s",
+            maximum=1.0,
+        )
+        settle = _bounded_seconds(
+            settle_seconds,
+            "settle_seconds",
+            maximum=30.0,
+            allow_zero=True,
+        )
+
+        deadline = time.monotonic() + timeout
+        status: Literal["completed", "cancelled", "timed_out"] = "timed_out"
+        final_url = url
+        error_mark = len(self.download_errors)
+
+        with self.task_page(broker) as page:
+            if should_cancel is not None and should_cancel():
+                status = "cancelled"
+            else:
+                try:
+                    page.goto(
+                        url,
+                        wait_until="domcontentloaded",
+                        timeout=max(1, int(timeout * 1000)),
+                    )
+                except Exception:
+                    final_url = _page_url(page, url)
+                    if should_cancel is not None and should_cancel():
+                        status = "cancelled"
+                    elif _page_is_closed(page):
+                        status = "completed"
+                    elif time.monotonic() >= deadline:
+                        status = "timed_out"
+                    else:
+                        raise
+                else:
+                    final_url = _page_url(page, url)
+                    receipt_count = len(broker.receipts)
+                    quiet_since = time.monotonic()
+                    finish_requested = False
+                    while True:
+                        errors = self.download_errors
+                        if len(errors) > error_mark:
+                            raise errors[error_mark]
+
+                        now = time.monotonic()
+                        current_count = len(broker.receipts)
+                        if current_count != receipt_count:
+                            receipt_count = current_count
+                            quiet_since = now
+
+                        if should_cancel is not None and should_cancel():
+                            status = "cancelled"
+                            break
+                        if _page_is_closed(page):
+                            status = "completed"
+                            break
+                        if should_finish is not None and should_finish():
+                            finish_requested = True
+                        if finish_requested and (current_count == 0 or now - quiet_since >= settle):
+                            status = "completed"
+                            break
+                        if now >= deadline:
+                            status = "timed_out"
+                            break
+
+                        remaining = deadline - now
+                        wait_ms = max(1, int(min(poll_interval, remaining) * 1000))
+                        try:
+                            page.wait_for_timeout(wait_ms)
+                        except Exception:
+                            if _page_is_closed(page):
+                                status = "completed"
+                                break
+                            raise
+                        final_url = _page_url(page, final_url)
+
+        return UserCaptureResult(
+            status=status,
+            files=broker.receipts,
+            final_url=final_url,
+        )
+
     @contextmanager
     def session(self):
         """Open a browser, yield a page, and always tear it down.
@@ -736,6 +870,51 @@ def _safe_filename(name: str) -> str:
     if stem.casefold() in _WINDOWS_RESERVED_NAMES:
         stem = f"_{stem}"
     return f"{stem}{suffix}"
+
+
+def _validate_capture_url(url: str) -> None:
+    if type(url) is not str or not url or url != url.strip():
+        raise CaptureBrowserError("capture URL must be non-empty canonical text")
+    parsed = urlsplit(url)
+    if parsed.scheme.casefold() not in {"http", "https"} or not parsed.netloc:
+        raise CaptureBrowserError("capture URL must be an absolute HTTP or HTTPS provider URL")
+
+
+def _bounded_seconds(
+    value: float,
+    label: str,
+    *,
+    maximum: float,
+    allow_zero: bool = False,
+) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        valid = False
+        seconds = 0.0
+    else:
+        seconds = float(value)
+        valid = 0 <= seconds <= maximum if allow_zero else 0 < seconds <= maximum
+    if not valid:
+        lower = "zero" if allow_zero else "greater than zero"
+        raise ValueError(f"{label} must be {lower} and at most {maximum:g}")
+    return seconds
+
+
+def _page_is_closed(page) -> bool:
+    is_closed = getattr(page, "is_closed", None)
+    if not callable(is_closed):
+        return False
+    try:
+        return bool(is_closed())
+    except Exception:  # noqa: BLE001 - a torn-down page is closed for lifecycle purposes
+        return True
+
+
+def _page_url(page, fallback: str) -> str:
+    try:
+        current = getattr(page, "url", "")
+    except Exception:  # noqa: BLE001 - page closure must not erase the last known provider URL
+        return fallback
+    return current if isinstance(current, str) and current else fallback
 
 
 def _unique(directory: Path, name: str) -> Path:
