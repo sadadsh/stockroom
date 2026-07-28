@@ -291,7 +291,12 @@ export function SettingsPage() {
       ? <Text id="settings.summary.no-lfs">Not Using LFS</Text>
       : lfs.legacy_blobs > 0
         ? <Badge tone="warn">{`${lfs.legacy_blobs} Legacy`}</Badge>
-        : <span>{`${lfs.objects} In LFS`}</span>;
+        // "0 In LFS" reads as a quantity when the thing being said is a STATE: LFS is wired and
+        // holds nothing yet. Seen rendering exactly that against the real library, 2026-07-27.
+        // Its siblings say "None" and "Healthy"; a zero dressed as a count is data vomit.
+        : lfs.objects === 0
+          ? <Text id="settings.summary.lfs-empty">Nothing In LFS</Text>
+          : <span>{`${lfs.objects} In LFS`}</span>;
   // Procurement Rescan: when prices and stock were last refreshed. Through the section's own
   // `lastChecked`, so the collapsed row and the open body can never disagree about the date.
   const rescanState = rescanQ.data;
