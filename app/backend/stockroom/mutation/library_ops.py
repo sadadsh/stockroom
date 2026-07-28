@@ -787,8 +787,9 @@ class LibraryOps:
             # vendor delivery attaches one side per capture forward; the other side keeps
             # whatever the record already carries)
             sch_src, pcb_src = normalize_altium_source(*sources, out_dir=td)
-            # best-effort entry binding (exact MPN, then the name containing it, then the
-            # first entry): a multi-entry vendor library must never refuse the capture
+            # Exact or uniquely inferable entry binding. A multi-entry vendor library with no
+            # unique MPN match cannot be attached: file order is not identity and the wrong
+            # Altium entry is not a recoverable success.
             sym_name = (
                 pick_entry(read_symbol_names(sch_src), "symbol", prefer=record.mpn)
                 if sch_src is not None else None
