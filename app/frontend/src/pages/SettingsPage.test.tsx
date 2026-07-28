@@ -33,6 +33,9 @@ vi.mock("../api/client", async (importActual) => {
       loadDevCreds: vi.fn(),
       altiumRegenerate: vi.fn(),
       altiumAttach: vi.fn(),
+      libraryCoverage: vi.fn(),
+      libraryDerivation: vi.fn(),
+      cadInventory: vi.fn(),
     },
   };
 });
@@ -179,6 +182,16 @@ beforeEach(() => {
     updated: true,
     detail: "",
     restart_requested: true,
+  });
+  mockApi.libraryCoverage.mockResolvedValue({
+    total: 158, complete: 92, needs_files: 50, unsourced: 16,
+    by_requirement: {}, sources: ["ultralibrarian"], can_provide: ["kicad_symbol"],
+  });
+  mockApi.libraryDerivation.mockResolvedValue({
+    ruleset: "rules@2", counts: { "rules@2": 158 }, current: 158, stale: 0,
+  });
+  mockApi.cadInventory.mockResolvedValue({
+    cleared: 184, kept_stock: 0, items: [], failed: [], missing_files: [],
   });
 });
 
@@ -725,6 +738,58 @@ describe("SettingsPage - critique fixes", () => {
     await user.click(within(nav).getByRole("button", { name: /altium/i }));
     const header = await screen.findByTestId("settings.altium.header");
     expect(header).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+describe("SettingsPage - collapsed summaries state their own section", () => {
+  // Every other Settings disclosure says what it holds on its collapsed row. These three said
+  // NOTHING, so the only way to learn any of them was to open all three (measured on the shipped
+  // surface, 2026-07-27). The point of the summary is that it is readable while COLLAPSED, so
+  // every assertion here runs without opening anything.
+  it("Library Completion, Presentation Data and Clear CAD Files each report their state", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const nav = screen.getByRole("navigation", { name: /settings sections/i });
+    await user.click(within(nav).getByRole("button", { name: /library/i }));
+
+    const completion = await screen.findByTestId("settings.completion.header");
+    expect(completion).toHaveAttribute("aria-expanded", "false");
+    expect(await within(completion).findByText("92 of 158 Complete")).toBeInTheDocument();
+
+    const derivation = screen.getByTestId("settings.derivation.header");
+    expect(derivation).toHaveAttribute("aria-expanded", "false");
+    expect(await within(derivation).findByText("rules@2")).toBeInTheDocument();
+
+    const cadClear = screen.getByTestId("settings.cad-clear.header");
+    expect(cadClear).toHaveAttribute("aria-expanded", "false");
+    expect(await within(cadClear).findByText("184 Files")).toBeInTheDocument();
+  });
+
+  it("a complete library and an empty CAD inventory read as states, not as zeroes", async () => {
+    // "0 of 158 Complete" and "0 Files" are technically true and useless. The calm states are
+    // their own words, matching how Component Sync says "Up To Date" rather than "0 Behind".
+    mockApi.libraryCoverage.mockResolvedValue({
+      total: 158, complete: 158, needs_files: 0, unsourced: 0,
+      by_requirement: {}, sources: [], can_provide: [],
+    });
+    mockApi.cadInventory.mockResolvedValue({
+      cleared: 0, kept_stock: 0, items: [], failed: [], missing_files: [],
+    });
+    mockApi.libraryDerivation.mockResolvedValue({
+      ruleset: "rules@2", counts: {}, current: 100, stale: 58,
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const nav = screen.getByRole("navigation", { name: /settings sections/i });
+    await user.click(within(nav).getByRole("button", { name: /library/i }));
+
+    const completion = await screen.findByTestId("settings.completion.header");
+    expect(await within(completion).findByText("All Complete")).toBeInTheDocument();
+    const cadClear = screen.getByTestId("settings.cad-clear.header");
+    expect(await within(cadClear).findByText("None")).toBeInTheDocument();
+    // a stale count is the ACTIONABLE half, so it wins the row over the ruleset name
+    const derivation = screen.getByTestId("settings.derivation.header");
+    expect(await within(derivation).findByText("58 Stale")).toBeInTheDocument();
   });
 });
 

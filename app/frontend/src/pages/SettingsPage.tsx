@@ -32,6 +32,9 @@ import {
   useUpdateSettings,
   useLoadDevCreds,
   useOdbcStatus,
+  useLibraryCoverage,
+  useLibraryDerivation,
+  useCadInventory,
 } from "../api/queries";
 import { useTheme, type Theme } from "../lib/theme";
 import { statusTone } from "../lib/statusTone";
@@ -100,6 +103,12 @@ export function SettingsPage() {
   const syncQ = useSyncStatus();
   const updateQ = useUpdateCheck();
   const profilesQ = useProfiles();
+  // The three Library disclosures that used to state NOTHING on their collapsed row, so the only
+  // way to learn any of them was to open all three. Same cached queries their sections already
+  // use, so this costs one fetch each and makes opening the section instant rather than slower.
+  const coverageQ = useLibraryCoverage();
+  const derivationQ = useLibraryDerivation();
+  const cadQ = useCadInventory();
   const { theme } = useTheme();
 
   const [group, setGroup] = useState<GroupId>("application");
@@ -229,6 +238,32 @@ export function SettingsPage() {
         .filter(Boolean).length
     : 0;
 
+  // Library Completion: the count IS the answer to the owner's central question, so it is shown
+  // whatever the state; the tone is what changes. A gap some source can fill is warn, a library
+  // with nothing outstanding is calm text.
+  const cov = coverageQ.data;
+  const completionSummary = !cov
+    ? null
+    : cov.complete >= cov.total
+      ? <Text id="settings.summary.all-complete">All Complete</Text>
+      : <Badge tone="warn">{`${cov.complete} of ${cov.total} Complete`}</Badge>;
+  // Presentation Data: which ruleset built what is on screen, and whether anything is behind it.
+  // A stale count is the actionable half, so it wins the row when there is one.
+  const der = derivationQ.data;
+  const derivationSummary = !der
+    ? null
+    : der.stale > 0
+      ? <Badge tone="warn">{`${der.stale} Stale`}</Badge>
+      : <span>{der.ruleset}</span>;
+  // Clear CAD Files: how much a clear would actually remove. `None` is a real, useful state - it
+  // says the destructive action would do nothing, which is worth knowing before opening it.
+  const cad = cadQ.data;
+  const cadSummary = !cad
+    ? null
+    : cad.cleared > 0
+      ? <span>{`${cad.cleared} ${cad.cleared === 1 ? "File" : "Files"}`}</span>
+      : <Text id="settings.summary.no-cad">None</Text>;
+
   const open = (id: string) => openSections.has(id);
 
   return (
@@ -335,6 +370,7 @@ export function SettingsPage() {
                     title="Library Completion" titleId="settings.completion.title"
                     hint="Whether every component holds the files you need to place it, per EDA tool. Filling the gaps runs against the parts catalogue, so it is paced, stoppable, and safe to run again."
                     hintId="settings.completion.hint"
+                    summary={completionSummary}
                     open={open("completion")} onToggle={() => toggle("completion")}
                     data-dev-id="settings.completion"
                   >
@@ -344,6 +380,7 @@ export function SettingsPage() {
                     title="Presentation Data" titleId="settings.derivation.title"
                     hint="Which rules built the names, descriptions, categories and specs you see. They are computed from the raw distributor data stored beside each component, so improving the rules means recomputing rather than re-importing. Needs no network and no API keys."
                     hintId="settings.derivation.hint"
+                    summary={derivationSummary}
                     open={open("derivation")} onToggle={() => toggle("derivation")}
                     data-dev-id="settings.derivation"
                   >
@@ -353,6 +390,7 @@ export function SettingsPage() {
                     title="Clear CAD Files" titleId="settings.cad-clear.title"
                     hint="Remove every symbol, footprint and 3D model your library holds, so a fresh capture pass starts from nothing. The components, their specs, their datasheets and the imported distributor data all stay."
                     hintId="settings.cad-clear.hint"
+                    summary={cadSummary}
                     open={open("cad-clear")} onToggle={() => toggle("cad-clear")}
                     data-dev-id="settings.cad-clear"
                   >
