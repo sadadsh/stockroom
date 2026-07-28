@@ -15,6 +15,7 @@ import time
 from collections.abc import Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from .provider_policy import (
     AdapterOutcomeStatus,
@@ -40,6 +41,20 @@ _DEFAULT_RUNTIME_WORKERS = 64
 
 class ProviderRuntimeError(RuntimeError):
     """The concurrent runtime or a supplied saved plan violated its contract."""
+
+
+class ProviderEvidenceVerifier(Protocol):
+    """Verify that claimed evidence exists and binds the exact provider attempt."""
+
+    def verify_provider_success(
+        self,
+        digest: str,
+        *,
+        identity: ExactPartIdentity,
+        operation: ProviderOperation,
+        provider_key: str,
+        adapter_version: str,
+    ) -> object: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,6 +243,7 @@ class ProviderExecutionRuntime:
         planner: ProviderPlanner,
         *,
         max_workers: int | None = None,
+        evidence_verifier: ProviderEvidenceVerifier | None = None,
     ):
         if type(planner) is not ProviderPlanner:
             raise TypeError("planner must be ProviderPlanner")
@@ -249,6 +265,7 @@ class ProviderExecutionRuntime:
         self._planner = planner
         self._worker_count = worker_count
         self._limits = dict(concurrency_limits)
+        self._evidence_verifier = evidence_verifier
         self._admission = {
             provider_key: threading.BoundedSemaphore(limit)
             for provider_key, limit in concurrency_limits.items()
@@ -326,6 +343,28 @@ class ProviderExecutionRuntime:
                         attempt,
                         FailureClassification.ADAPTER_FAULT,
                     )
+                if (
+                    record.status is AdapterOutcomeStatus.SUCCESS
+                    and self._evidence_verifier is not None
+                ):
+                    try:
+                        if not record.evidence_digests:
+                            raise ProviderRuntimeError(
+                                "successful provider attempt omitted immutable evidence"
+                            )
+                        for digest in record.evidence_digests:
+                            self._evidence_verifier.verify_provider_success(
+                                digest,
+                                identity=identity,
+                                operation=attempt.operation,
+                                provider_key=attempt.provider_key,
+                                adapter_version=attempt.adapter_version,
+                            )
+                    except Exception:
+                        record = ProviderAttemptRecord(
+                            attempt,
+                            FailureClassification.ADAPTER_FAULT,
+                        )
                 completed_at = time.perf_counter_ns()
             receipts.append(
                 ProviderAttemptReceipt(
@@ -414,6 +453,7 @@ __all__ = [
     "ProviderAttemptReceipt",
     "ProviderExecutionReceipt",
     "ProviderExecutionRuntime",
+    "ProviderEvidenceVerifier",
     "ProviderRuntimeError",
     "ProviderSelectionReceipt",
 ]
