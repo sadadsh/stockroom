@@ -696,3 +696,72 @@ def test_a_submitted_format_that_never_arrives_is_an_error_not_a_skip(monkeypatc
     assert outcome.error, f"a vanished download must be an ERROR, got {outcome!r}"
     assert "did not deliver" in outcome.error
     assert not outcome.skipped, "reporting it as a skip hides a lost file"
+
+
+def test_the_kicad_chooser_waits_for_its_member_instead_of_sleeping():
+    """A SLEEP USED AS A DETECTOR produced a FALSE NEGATIVE that looked like a vendor limitation.
+
+    SnapMagic's KiCad row is a two-step chooser: clicking `kicad_options` renders the version
+    members. The adapter used to `wait_for_timeout(300)` and then test `count() == 0`, so a chooser
+    that took 301ms was reported as `SnapMagic does not offer kicad for this part` - a sentence
+    about the VENDOR, produced by a clock.
+
+    The fake below models exactly that: the member does not exist until something WAITS for it. Any
+    fixed sleep fails here no matter how long, because the appearance is caused by the wait, not by
+    elapsed time.
+    """
+    from stockroom.capture.vendors import SnapMagicAdapter
+
+    class _Locator:
+        def __init__(self, page, selector):
+            self._page, self._sel = page, selector
+
+        @property
+        def first(self):
+            return self
+
+        def count(self):
+            if self._sel == '[data-format="kicad_modv6"]':
+                return 1 if self._page.member_ready else 0
+            return 1
+
+        def wait_for(self, **kwargs):
+            if self._sel == '[data-format="kicad_modv6"]':
+                self._page.member_ready = True
+
+        def click(self, **kwargs):
+            self._page.clicked.append(self._sel)
+
+        def get_attribute(self, name):
+            return ""
+
+        def is_visible(self):
+            return True
+
+    class _ChooserPage:
+        url = "https://www.snapeda.com/parts/X/view-part/"
+
+        def __init__(self):
+            self.member_ready = False
+            self.clicked: list[str] = []
+
+        def locator(self, selector):
+            return _Locator(self, selector)
+
+        def wait_for_timeout(self, ms):
+            raise AssertionError(
+                "the KiCad chooser slept and then looked. A member that renders one millisecond "
+                "late is then reported as 'SnapMagic does not offer kicad for this part' - a false "
+                "negative shaped exactly like a real vendor limitation. Wait for the member."
+            )
+
+        def inner_text(self, sel):
+            return ""
+
+    page = _ChooserPage()
+    report = SnapMagicAdapter().drive(page, ["kicad"])
+
+    assert report.submitted is True, f"the chooser member was never found: {report.message}"
+    assert report.selected == ["kicad"]
+    assert report.missed == []
+    assert '[data-format="kicad_modv6"]' in page.clicked, "the pinned version was never clicked"

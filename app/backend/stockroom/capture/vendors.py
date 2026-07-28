@@ -714,11 +714,23 @@ class SnapMagicAdapter:
                 report.missed.append(fmt)
                 continue
             if fmt == "kicad":
-                # the version chooser has to be opened before its members exist in the DOM
+                # The version chooser has to be OPENED before its members exist in the DOM.
+                #
+                # This used to `wait_for_timeout(300)` and then test `count() == 0` - a SLEEP USED
+                # AS A DETECTOR, and the most expensive kind. A chooser that took 301ms was
+                # reported as `SnapMagic does not offer kicad for this part`: a false NEGATIVE,
+                # indistinguishable from a real vendor limitation, on a vendor that had the file.
+                # Waiting for the pinned member itself ends the instant it exists and turns the
+                # timeout back into a backstop.
                 opener = page.locator('[data-format="kicad_options"]').first
                 if opener.count():
                     opener.click()
-                    page.wait_for_timeout(300)
+                    try:
+                        page.locator(f'[data-format="{target}"]').first.wait_for(
+                            state="attached", timeout=10_000
+                        )
+                    except Exception:  # noqa: BLE001 - absence is answered by the check below
+                        pass
             button = page.locator(f'[data-format="{target}"]').first
             if button.count() == 0:
                 report.missed.append(fmt)
