@@ -44,6 +44,14 @@ from .windows_mutex import (
     current_user_mutex_name,
     secure_windows_mutex_factory,
 )
+from .workflow_coordinator import (
+    WorkflowCoordinator,
+    WorkflowCoordinatorError,
+    WorkflowCoordinatorLifecycleError,
+    WorkflowCoordinatorState,
+    WorkflowCoordinatorStatus,
+    WorkflowCoordinatorStopTimeout,
+)
 
 __all__ = [
     "APPLICATION_ID",
@@ -77,6 +85,12 @@ __all__ = [
     "WindowsMutexWaitFailed",
     "WindowsNamedMutexFactory",
     "WindowsNamedMutexHandle",
+    "WorkflowCoordinator",
+    "WorkflowCoordinatorError",
+    "WorkflowCoordinatorLifecycleError",
+    "WorkflowCoordinatorState",
+    "WorkflowCoordinatorStatus",
+    "WorkflowCoordinatorStopTimeout",
     "current_user_mutex_name",
     "secure_windows_mutex_factory",
 ]
