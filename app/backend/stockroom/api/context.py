@@ -82,6 +82,31 @@ class AppContext:
     # (the review-confirmed footgun that let the test suite write into ~/.config).
     # Clearing an override returns HERE, not to autodetection.
     kicad_dir_pinned: Path | None = None
+    _closed: bool = field(default=False, init=False, repr=False)
+
+    def close(self) -> None:
+        """Release the derived indexes owned by this context.
+
+        A context built by the desktop host can outlive the window because its background-sync
+        thread retains it.  Relying on garbage collection therefore leaves the SQLite files open,
+        which is observable on Windows when an isolated app directory cannot be removed after the
+        window closes.  Keep shutdown explicit and idempotent so host/test harness ownership is
+        unambiguous.
+        """
+        if self._closed:
+            return
+        errors: list[Exception] = []
+        for resource in (self.stm_index, self.index, self.project_index):
+            if resource is None:
+                continue
+            try:
+                resource.close()
+            except Exception as exc:  # noqa: BLE001 - attempt every owned close before surfacing one
+                errors.append(exc)
+        if errors:
+            raise errors[0]
+        self.stm_index = None
+        self._closed = True
 
     def rebuild_index(self) -> None:
         """Bring the index in line with the records. INCREMENTAL since 2026-07-27.
@@ -221,6 +246,12 @@ class AppContext:
         read-only disk) must not stop the app from booting. The Altium surface reports the file's
         absence honestly, which is a better failure than a dead launch.
         """
+        # An empty canonical library is a valid, intentional state during vNext rebuild and first
+        # run. Emitting an empty SQLite/DbLib pair into it just because the app was opened is still
+        # a write to canonical data, and it recreated files immediately after the owner deleted
+        # the old library. Publication owns materialization; read/boot does not.
+        if next(self.profile.library.parts_dir.glob("*.json"), None) is None:
+            return
         try:
             self.ops.ensure_altium_datasource()
         except Exception:  # noqa: BLE001 - best-effort; the surface reports the gap instead

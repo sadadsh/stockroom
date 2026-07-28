@@ -66,7 +66,12 @@ class KiCadWiring:
     def _load_or_new(self, path: Path, kind: str) -> LibTable:
         return LibTable.load(path) if path.exists() else LibTable.new(kind)
 
-    def apply(self, profile: Profile) -> WiringReport:
+    def apply(
+        self,
+        profile: Profile,
+        *,
+        create_missing_library_files: bool = True,
+    ) -> WiringReport:
         report = WiringReport()
         # KiCad installed but never run: its version config dir does not exist yet
         self.kicad_dir.mkdir(parents=True, exist_ok=True)
@@ -81,7 +86,11 @@ class KiCadWiring:
         # 2. register categories in both global tables (idempotent append), but only
         # those whose symbol lib exists or can be created: a row pointing at a file
         # that will not exist leaves KiCad showing a broken library per category.
-        can_create = self.cli is not None and getattr(self.cli, "available", True)
+        can_create = (
+            create_missing_library_files
+            and self.cli is not None
+            and getattr(self.cli, "available", True)
+        )
         sym_path = self.kicad_dir / "sym-lib-table"
         fp_path = self.kicad_dir / "fp-lib-table"
         sym_table = self._load_or_new(sym_path, "sym_lib_table")
@@ -106,8 +115,12 @@ class KiCadWiring:
         sym_table.save(sym_path)
         fp_table.save(fp_path)
 
-        # 3. category libraries on disk (LAST: the only step that needs kicad-cli)
-        self._ensure_category_libs(profile, report)
+        # 3. Category libraries on disk (LAST: the only step that needs kicad-cli).
+        # A direct, explicit wiring operation retains the legacy materialization behavior.
+        # Automatic boot/profile wiring passes False: merely opening Stockroom must never
+        # repopulate an intentionally empty or not-yet-published data repository.
+        if create_missing_library_files:
+            self._ensure_category_libs(profile, report)
 
         # 4. aware: a running KiCad must restart to pick up table changes AND an
         # SR_LIB repoint (env vars are read at startup) - the switch scenario is
@@ -153,6 +166,7 @@ def auto_wire(
     cli=None,
     running_detector=detect_running_kicad,
     explicit: bool = False,
+    create_missing_library_files: bool = False,
 ) -> WiringReport:
     """The never-raises wiring used on boot and on every profile/library switch, so
     KiCad always points at the active library without a manual Doctor click. Skips
@@ -181,7 +195,10 @@ def auto_wire(
                 return report
             kdir = kdir.parent / version
     try:
-        return KiCadWiring(kdir, cli=cli, running_detector=running_detector).apply(profile)
+        return KiCadWiring(kdir, cli=cli, running_detector=running_detector).apply(
+            profile,
+            create_missing_library_files=create_missing_library_files,
+        )
     except Exception as exc:  # noqa: BLE001 - boot/switch must survive any wiring failure
         report = WiringReport()
         report.error = f"{type(exc).__name__}: {exc}"

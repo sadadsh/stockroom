@@ -24,6 +24,36 @@ def _library(root, profile="Main"):
     return root
 
 
+def _profile_tree(root):
+    profile = root / "Main"
+    return {
+        path.relative_to(profile): (path.is_dir(), b"" if path.is_dir() else path.read_bytes())
+        for path in profile.rglob("*")
+    }
+
+
+def test_building_an_empty_context_is_read_only_for_canonical_profile_data(tmp_path):
+    """One integrated boot invariant covers every EDA adapter and future derived artifact.
+
+    KiCad category libraries and an Altium SQLite/DbLib pair were each observed being recreated by
+    a native host launch after the owner intentionally emptied the library. Machine wiring and
+    operational indexes may change elsewhere; the canonical profile tree must remain byte-exact.
+    """
+
+    root = _library(tmp_path / "empty")
+    before = _profile_tree(root)
+
+    ctx = build_context(
+        root,
+        kicad_dir=tmp_path / "kicad",
+        config=MachineConfig(active_profile="Main"),
+        token="T",
+    )
+    ctx.close()
+
+    assert _profile_tree(root) == before
+
+
 def test_switch_library_repoints_and_preserves_token_and_clears_caches(tmp_path):
     a, b = _library(tmp_path / "A"), _library(tmp_path / "B")
     cfg = MachineConfig(active_profile="Main")
@@ -113,10 +143,10 @@ def test_switch_library_rewires_sr_lib(tmp_path):
     assert str(b) in read_env_var(kdir / "kicad_common.json", "SR_LIB")
 
 
-def test_a_fresh_clone_gets_its_derived_altium_data_source_built_at_boot(tmp_path):
-    """The property that PAID for committing the derived .db until 2026-07-25: a fresh clone must
-    be placeable with no regenerate step. It is now bought by building the file at boot instead of
-    sharing an unmergeable binary, so this is the test that keeps that promise honest."""
+def test_opening_an_empty_library_does_not_materialize_altium_files(tmp_path):
+    """Read/boot is not publication. A native-host inspection regenerated an SQLite/DbLib pair
+    immediately after the owner intentionally emptied the canonical library. With no published
+    entries there is nothing for Altium to place and therefore no derived artifact to activate."""
     root = _library(tmp_path / "fresh")
     db = root / "Main" / "altium" / "stockroom-parts.db"
     assert not db.exists()
@@ -124,12 +154,12 @@ def test_a_fresh_clone_gets_its_derived_altium_data_source_built_at_boot(tmp_pat
     build_context(root, kicad_dir=tmp_path / "k", config=MachineConfig(active_profile="Main"),
                   token="T")
 
-    assert db.exists()
+    assert not db.exists()
+    assert not (db.parent / "Stockroom.DbLib").exists()
 
 
-def test_switching_profile_rebuilds_the_data_source_for_the_new_profile(tmp_path):
-    """Each profile holds different parts, so leaving the previous profile's data source in place
-    would have Altium placing parts from a library the user is no longer looking at."""
+def test_switching_to_an_empty_profile_does_not_materialize_altium_files(tmp_path):
+    """A profile switch repoints machine state but does not publish nonexistent entry data."""
     root = _library(tmp_path / "multi")
     repo = GitRepo(root)
     ProfileStore(root, repo).create("Second")
@@ -140,4 +170,5 @@ def test_switching_profile_rebuilds_the_data_source_for_the_new_profile(tmp_path
 
     ctx.switch_profile("Second")
 
-    assert second_db.exists()
+    assert not second_db.exists()
+    assert not (second_db.parent / "Stockroom.DbLib").exists()

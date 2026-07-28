@@ -83,6 +83,35 @@ def test_run_windowed_returns_false_on_a_normal_close(app_ctx):
     assert run_windowed(ctx=app_ctx, open_window=lambda base_url, token: None) is False
 
 
+def test_run_windowed_leaves_an_injected_context_open(app_ctx):
+    app_ctx.close = lambda: pytest.fail("run_windowed closed a caller-owned context")
+
+    run_windowed(ctx=app_ctx, open_window=lambda _base_url, _token: None)
+
+
+def test_app_context_close_releases_every_index_once():
+    from unittest.mock import Mock
+
+    from stockroom.api.context import AppContext
+
+    ctx = object.__new__(AppContext)
+    ctx._closed = False
+    stm_index = Mock()
+    library_index = Mock()
+    project_index = Mock()
+    ctx.stm_index = stm_index
+    ctx.index = library_index
+    ctx.project_index = project_index
+
+    ctx.close()
+    ctx.close()
+
+    stm_index.close.assert_called_once_with()
+    library_index.close.assert_called_once_with()
+    project_index.close.assert_called_once_with()
+    assert ctx.stm_index is None
+
+
 def test_run_windowed_stops_the_server_even_if_the_window_raises(app_ctx):
     base = {}
 
@@ -95,3 +124,63 @@ def test_run_windowed_stops_the_server_even_if_the_window_raises(app_ctx):
     # the server was still torn down (no orphaned listener)
     with pytest.raises(httpx.HTTPError):
         httpx.get(f"{base['url']}/api/system/info", timeout=1.0)
+
+
+def test_run_windowed_closes_only_the_context_it_builds_even_if_the_window_raises(
+    tmp_path, monkeypatch
+):
+    """The host owns contexts it constructs, including their SQLite handles and sync loop.
+
+    This is the seam the isolated UI harness exercises on Windows: after run_windowed returns,
+    its temporary APPDATA and library must be removable immediately, not eventually at GC.
+    """
+    import threading
+
+    from stockroom.api import app as app_mod
+    from stockroom.api import serve as serve_mod
+    from stockroom.host import run as run_mod
+
+    class _Context:
+        token = "owned"
+        rendered_dom_fetcher = object()
+        request_restart = None
+
+        def __init__(self):
+            self.stop = threading.Event()
+            self.closed = False
+
+        def sync_on_launch(self):
+            return None
+
+        def start_background_sync(self):
+            return self.stop
+
+        def close(self):
+            self.closed = True
+
+    class _Server:
+        should_exit = False
+
+    class _ServerThread:
+        def join(self, timeout=None):
+            return None
+
+    ctx = _Context()
+    server = _Server()
+    monkeypatch.setattr(serve_mod, "build_context", lambda *args, **kwargs: ctx)
+    monkeypatch.setattr(serve_mod, "pick_free_port", lambda: 12345)
+    monkeypatch.setattr(app_mod, "create_app", lambda _ctx: object())
+    monkeypatch.setattr(run_mod, "_install_injected_index", lambda *args: None)
+    monkeypatch.setattr(
+        run_mod, "_serve_in_thread", lambda app, port: (server, _ServerThread())
+    )
+
+    with pytest.raises(RuntimeError, match="window crashed"):
+        run_mod.run_windowed(
+            libraries_root=tmp_path,
+            open_window=lambda _url, _token: (_ for _ in ()).throw(RuntimeError("window crashed")),
+        )
+
+    assert server.should_exit is True
+    assert ctx.stop.is_set()
+    assert ctx.closed is True
