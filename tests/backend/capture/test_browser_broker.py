@@ -5,10 +5,12 @@ from __future__ import annotations
 import inspect
 import json
 import multiprocessing
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
+from urllib.parse import quote
 
 import pytest
 
@@ -33,7 +35,11 @@ from stockroom.capture.runner import (
 
 
 class _Context:
-    pass
+    def __init__(self):
+        self.init_scripts: list[str] = []
+
+    def add_init_script(self, script: str) -> None:
+        self.init_scripts.append(script)
 
 
 def _claim_profile_in_child(profile: str, result) -> None:
@@ -87,6 +93,9 @@ def test_windows_policy_falls_back_to_managed_chromium_with_the_same_provider_pr
     assert all(call[2]["accept_downloads"] is True for call in browser_type.calls)
     assert all(call[2]["headless"] is False for call in browser_type.calls)
     assert all(call[2]["timeout"] == 20_000 for call in browser_type.calls)
+    assert len(context.init_scripts) == 1
+    assert "RTCPeerConnection" in context.init_scripts[0]
+    assert "webkitRTCPeerConnection" in context.init_scripts[0]
     preferences = json.loads((profile / "Default" / "Preferences").read_text(encoding="utf-8"))
     assert preferences["profile"]["default_content_setting_values"]["automatic_downloads"] == 1
 
@@ -127,6 +136,77 @@ def test_the_production_runner_defaults_to_stockroom_managed_chromium():
     assert parameter.default == "chromium"
 
 
+@pytest.mark.parametrize("persistent", [False, True])
+def test_each_camoufox_context_disables_webrtc_before_opening_a_page(
+    monkeypatch,
+    tmp_path,
+    persistent,
+):
+    context_events: list[tuple[str, object]] = []
+
+    class Context:
+        def __init__(self):
+            self.pages = []
+
+        def add_init_script(self, script: str) -> None:
+            context_events.append(("init_script", script))
+
+        def on(self, event: str, _handler) -> None:
+            context_events.append(("on", event))
+
+        def new_page(self):
+            context_events.append(("new_page", None))
+            return _EventPage()
+
+        def close(self) -> None:
+            context_events.append(("close", None))
+
+    context = Context()
+
+    class Browser:
+        def new_context(self, **options):
+            context_events.append(("new_context", options))
+            return context
+
+    class Handle:
+        def __init__(self, options):
+            self.options = options
+
+        def __enter__(self):
+            return context if self.options.get("persistent_context") else Browser()
+
+        def __exit__(self, *_args):
+            return False
+
+    camoufox_module = ModuleType("camoufox")
+    camoufox_module.DefaultAddons = SimpleNamespace(UBO=object())
+    sync_api_module = ModuleType("camoufox.sync_api")
+    sync_api_module.Camoufox = lambda **options: Handle(options)
+    monkeypatch.setitem(sys.modules, "camoufox", camoufox_module)
+    monkeypatch.setitem(sys.modules, "camoufox.sync_api", sync_api_module)
+
+    browser = PlaywrightCaptureBrowser(
+        download_dir=tmp_path / "Downloads",
+        profile_dir=tmp_path / "Profile" if persistent else None,
+        provider_key="camoufox-probe" if persistent else None,
+        engine="camoufox",
+        headless=True,
+    )
+
+    with browser._camoufox_session():
+        pass
+
+    init_index = next(
+        index for index, event in enumerate(context_events) if event[0] == "init_script"
+    )
+    page_index = next(index for index, event in enumerate(context_events) if event[0] == "new_page")
+    script = context_events[init_index][1]
+    assert init_index < page_index
+    assert isinstance(script, str)
+    assert "RTCPeerConnection" in script
+    assert "webkitRTCPeerConnection" in script
+
+
 @pytest.mark.timeout(30)
 def test_two_provider_contexts_share_one_real_playwright_runtime(tmp_path):
     from stockroom.capture.browser import chromium_unavailable_reason
@@ -158,6 +238,49 @@ def test_two_provider_contexts_share_one_real_playwright_runtime(tmp_path):
             assert second_page.title() == "Second"
     finally:
         runtime.close()
+
+
+@pytest.mark.timeout(30)
+def test_webrtc_is_disabled_before_scripts_in_each_new_document_and_frame(tmp_path):
+    from stockroom.capture.browser import chromium_unavailable_reason
+
+    reason = chromium_unavailable_reason()
+    if reason is not None:
+        pytest.skip(reason)
+
+    browser = PlaywrightCaptureBrowser(
+        download_dir=tmp_path / "Downloads",
+        profile_dir=tmp_path / "Profile",
+        provider_key="webrtc-contract-probe",
+        headless=True,
+        engine="chromium",
+    )
+    observe_types = """
+      window.observedWebRtcTypes = [
+        typeof globalThis.RTCPeerConnection,
+        typeof globalThis.webkitRTCPeerConnection,
+      ];
+    """
+    expected = ["undefined", "undefined"]
+
+    with browser.session() as page:
+        for document_number in (1, 2):
+            document = f"<script>{observe_types}</script><p>{document_number}</p>"
+            page.goto(f"data:text/html,{quote(document)}")
+            assert page.evaluate("window.observedWebRtcTypes") == expected
+
+            page.evaluate(
+                """observeTypes => {
+                  const frame = document.createElement("iframe");
+                  frame.srcdoc = `<script>${observeTypes}<\\/script>`;
+                  document.body.appendChild(frame);
+                }""",
+                observe_types,
+            )
+            page.locator("iframe").wait_for()
+            child = next(frame for frame in page.frames if frame is not page.main_frame)
+            child.wait_for_load_state()
+            assert child.evaluate("window.observedWebRtcTypes") == expected
 
 
 def test_provider_profiles_and_downloads_are_isolated(monkeypatch, tmp_path):
