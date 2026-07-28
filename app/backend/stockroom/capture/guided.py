@@ -80,6 +80,104 @@ def _wait_for_capture(browser, page, before: int, timeout_s: float, gap: float =
     return len(browser.captured) > before
 
 
+def sign_in_adapter(adapter, page, credentials) -> str:
+    """Sign this page in for the vendor. `""` when signed in or when there is nothing to do.
+
+    Shared by `GuidedCaptureSource` and `scripts/webread.py --drive` so the live tool cannot
+    authenticate differently from the app - the first version of that tool called `sign_in`
+    unconditionally and crashed on the one adapter that does not have it.
+
+    Deliberately NOT fatal, and every no-op case is distinct from a refusal. A vendor that needs no
+    login, an adapter with NO `sign_in`, or absent credentials all return "" - because everything up
+    to the Download button works signed out (measured 2026-07-27), so a per-part outcome is far more
+    useful than a dead run. A refusal returns its reason so the caller can say WHY rather than
+    leaving the owner to infer it from a vendor-shaped "no download button".
+    """
+    if adapter is None or not getattr(adapter.capability, "needs_login", False):
+        return ""
+    sign_in = getattr(adapter, "sign_in", None)
+    if sign_in is None or credentials is None:
+        return ""
+    if getattr(adapter, "signed_in", None) and adapter.signed_in(page):
+        return ""  # the persistent profile already carries the session
+    creds = credentials(adapter.capability.key)
+    if not creds:
+        return ""
+    return sign_in(page, creds[0], creds[1]) or ""
+
+
+def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None = None):
+    """Drive a vendor for `formats` and WAIT FOR THE FILES TO LAND. `(DriveReport, error|None)`.
+
+    THE one place a vendor is driven for real. `GuidedCaptureSource.supply` runs it as part of
+    completing a part; `scripts/webread.py --drive` runs it to answer "what does this vendor
+    ACTUALLY deliver" without touching a library. Two callers, one implementation, so a fix to the
+    sequencing or the wait reaches both - the alternative was measured on 2026-07-27, when a live
+    vendor drive was done by a throwaway script and the knowledge died with the session.
+
+    ONE download, or ONE PER FORMAT - decided by the adapter's capability, never by a vendor name.
+    Ultra Librarian ticks checkboxes and exports everything together (`formats_exclusive=False`);
+    SnapMagic has a separate button per format, so asking for both in one drive would fetch only the
+    first and silently lose the other. That flag was DATA nothing read until 2026-07-27, which is
+    exactly how a half-working vendor ships.
+
+    A format the vendor simply does not carry is recorded as MISSED and the rest still run - a part
+    that can get its footprint but not its 3D model must come away with the footprint, not nothing.
+    A format that WAS submitted and never arrived is the returned error instead: calling that a miss
+    would let a vanished file read as "the vendor had nothing".
+
+    Re-navigates before each exclusive format, because taking a download generally leaves the
+    vendor's modal closed or the page changed; `open_panel` is cheap and idempotent, and assuming
+    the panel survived a download is the kind of guess that works on a fixture and fails on the
+    real site.
+
+    THE WAIT IS ON THE SAVED FILE, NEVER ON THE DOWNLOAD EVENT. `wait_for_event("download")` RACES
+    the `on("download")` handler the browser session registers up front; whichever listener is
+    active when the event fires consumes it, so a fast download is taken by the handler and the wait
+    then burns its full timeout reporting failure for a file already on disk (measured 2026-07-27,
+    briefly and wrongly read as "Camoufox cannot download"). `browser.captured` grows only AFTER
+    `save_as` returns, so polling it observes the file genuinely existing, and the timeout stays a
+    backstop for a vendor that never answers rather than the thing that decides success.
+    """
+    from stockroom.capture.vendors import DriveReport
+
+    label = adapter.capability.label
+    wait_s = _DOWNLOAD_TIMEOUT_MS / 1000.0 if timeout_s is None else timeout_s
+
+    if not adapter.capability.formats_exclusive:
+        mark = len(browser.captured)
+        page.goto(url, wait_until="domcontentloaded")
+        report = adapter.drive(page, list(formats))
+        if not report.submitted:
+            return report, None
+        if not _wait_for_capture(browser, page, mark, wait_s):
+            return report, f"{label} did not deliver a file within {wait_s:.0f}s"
+        return report, None
+
+    combined = DriveReport()
+    for fmt in formats:
+        mark = len(browser.captured)
+        try:
+            page.goto(url, wait_until="domcontentloaded")
+            one = adapter.drive(page, [fmt])
+        except Exception as exc:  # noqa: BLE001 - one format failing is a row, not a dead run
+            combined.missed.append(fmt)
+            combined.message = f"{label}: {exc}"
+            continue
+        if not one.submitted:
+            combined.missed.extend(one.missed or [fmt])
+            if one.message:
+                combined.message = one.message
+            continue
+        if not _wait_for_capture(browser, page, mark, wait_s):
+            return combined, f"{label} did not deliver {fmt} within {wait_s:.0f}s"
+        combined.selected.extend(one.selected or [fmt])
+        combined.submitted = True
+    if combined.selected:
+        combined.message = f"Requested {' and '.join(combined.selected)} from {label}."
+    return combined, None
+
+
 # What `altium/extract.py::normalize_altium_source` can actually take TODAY. `.lia` is not here
 # because normalize_altium_source raises on it, NOT because a P-CAD library is unconvertible -
 # that was a wrong conclusion reached without research (owner corrected it, 2026-07-27).
@@ -229,20 +327,9 @@ class GuidedCaptureSource:
         (measured), so the per-part outcome is a far more useful error than a dead run. The reason
         is kept on `_sign_in_error` so those per-part rows can say WHY rather than just "no button".
         """
-        adapter = get_adapter(self._vendor_key)
-        self._sign_in_error = ""
-        if adapter is None or not getattr(adapter.capability, "needs_login", False):
-            return
-        sign_in = getattr(adapter, "sign_in", None)
-        if sign_in is None or self._credentials is None:
-            return
-        if getattr(adapter, "signed_in", None) and adapter.signed_in(page):
-            return  # the persistent profile already carries the session
-        creds = self._credentials(self._vendor_key)
-        if not creds:
-            return
-        username, password = creds
-        self._sign_in_error = sign_in(page, username, password) or ""
+        self._sign_in_error = sign_in_adapter(
+            get_adapter(self._vendor_key), page, self._credentials
+        )
 
     def close(self) -> None:
         """Close the browser. Called by the runner in a finally, so a stopped or failed run never
@@ -287,18 +374,14 @@ class GuidedCaptureSource:
         session = self._ensure_session()
         before = len(session.browser.captured)
         try:
-            # ONE download, or ONE PER FORMAT - decided by the adapter's capability, never by a
-            # vendor name. Ultra Librarian ticks checkboxes and exports everything together
-            # (`formats_exclusive=False`); SnapMagic has a separate button per format, so asking for
-            # both in one drive would fetch only the first and silently lose the other. That flag
-            # was DATA nothing read until now, which is exactly how a half-working vendor ships.
-            if adapter.capability.formats_exclusive:
-                report, failure = self._drive_each_format(session, adapter, formats, url)
-                if failure is not None:
-                    return failure
-            else:
-                session.page.goto(url, wait_until="domcontentloaded")
-                report = adapter.drive(session.page, formats)
+            report, failure = drive_formats(session.browser, session.page, adapter, formats, url)
+            # FAILURE IS CHECKED FIRST, and the order is load-bearing. A vendor whose LAST format
+            # was submitted and never arrived comes back with `submitted=False` (the flag is only
+            # set after the file lands) AND an error - so testing `submitted` first would report a
+            # vanished download as "the vendor simply had nothing". Measured live against SnapMagic
+            # on 2026-07-27: `SUBMITTED False` alongside "did not deliver altium within 120s".
+            if failure is not None:
+                return SourceOutcome(error=failure)
             if not report.submitted:
                 why = report.message or "the vendor offered no download"
                 if self._sign_in_error:
@@ -307,25 +390,6 @@ class GuidedCaptureSource:
                     # for the owner to infer from a vendor-shaped message.
                     why = f"{why} ({self._sign_in_error})"
                 return SourceOutcome(skipped=why)
-            # Wait for the FILE TO BE SAVED, not for the download EVENT.
-            #
-            # `wait_for_event("download")` RACES the `on("download")` handler the browser session
-            # registers up front. Whichever listener is active when the event fires consumes it, so
-            # a download that completes quickly is taken by the handler and the wait then runs to
-            # its full timeout - reporting a failure for a file that is already on disk. Measured
-            # 2026-07-27: this timed out at 60s on a download that had landed correctly, which was
-            # briefly and wrongly read as "Camoufox cannot download".
-            #
-            # `browser.captured` grows only AFTER `save_as` returns, so polling it observes the file
-            # genuinely existing. The timeout stays a backstop for a vendor that never answers,
-            # never the thing that decides success.
-            if not _wait_for_capture(
-                session.browser, session.page, before, _DOWNLOAD_TIMEOUT_MS / 1000.0
-            ):
-                return SourceOutcome(
-                    error=f"{adapter.capability.label} did not deliver a file within "
-                    f"{_DOWNLOAD_TIMEOUT_MS // 1000}s"
-                )
         except Exception as exc:  # noqa: BLE001 - one part's failure is a row, not a crash
             return SourceOutcome(error=f"{adapter.capability.label}: {exc}")
 
@@ -334,52 +398,6 @@ class GuidedCaptureSource:
             return SourceOutcome(error="the vendor download did not produce a file")
 
         return self._attach(record, landed, url)
-
-    def _drive_each_format(self, session, adapter, formats, url):
-        """One download per format, for a vendor whose formats are mutually exclusive.
-
-        Returns `(combined_report, failure_outcome_or_None)`. A format the vendor simply does not
-        carry is recorded as MISSED and the rest still run - a part that can get its footprint but
-        not its 3D model must come away with the footprint, not with nothing.
-
-        Re-navigates to the part page before each format, because taking a download generally leaves
-        the vendor's modal closed or the page changed; `open_panel` is cheap and idempotent, and
-        assuming the panel survived a download is the kind of guess that works on a fixture and
-        fails on the real site.
-        """
-        from stockroom.capture.vendors import DriveReport
-
-        combined = DriveReport()
-        for fmt in formats:
-            mark = len(session.browser.captured)
-            try:
-                session.page.goto(url, wait_until="domcontentloaded")
-                one = adapter.drive(session.page, [fmt])
-            except Exception as exc:  # noqa: BLE001 - one format failing is a row, not a dead run
-                combined.missed.append(fmt)
-                combined.message = f"{adapter.capability.label}: {exc}"
-                continue
-            if not one.submitted:
-                combined.missed.extend(one.missed or [fmt])
-                if one.message:
-                    combined.message = one.message
-                continue
-            if not _wait_for_capture(
-                session.browser, session.page, mark, _DOWNLOAD_TIMEOUT_MS / 1000.0
-            ):
-                # A format that was submitted and never arrived is a REAL failure, not a miss:
-                # saying "missed" would let the run look partially fine while a file vanished.
-                return combined, SourceOutcome(
-                    error=f"{adapter.capability.label} did not deliver {fmt} within "
-                    f"{_DOWNLOAD_TIMEOUT_MS // 1000}s"
-                )
-            combined.selected.extend(one.selected or [fmt])
-            combined.submitted = True
-        if combined.selected:
-            combined.message = (
-                f"Requested {' and '.join(combined.selected)} from {adapter.capability.label}."
-            )
-        return combined, None
 
     def _attach(self, record, landed, url: str) -> SourceOutcome:
         """Turn the downloaded file(s) into attached assets, with provenance.

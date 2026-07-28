@@ -644,12 +644,9 @@ def test_exclusive_formats_are_downloaded_one_at_a_time(monkeypatch, tmp_path):
             return DriveReport(selected=list(formats), submitted=True, message="ok")
 
     monkeypatch.setattr(guided, "get_adapter", lambda key: _Exclusive())
-    src = guided.GuidedCaptureSource(
-        (lambda: None), vendor="faketron", download_root=tmp_path / "dl", headless=True,
-    )
-    src._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
-    report, failure = src._drive_each_format(
-        src._session, _Exclusive(), ["kicad", "altium"], "https://example.invalid/part"
+    page = _FakePage()
+    report, failure = guided.drive_formats(
+        browser, page, _Exclusive(), ["kicad", "altium"], "https://example.invalid/part"
     )
 
     assert failure is None
@@ -657,3 +654,45 @@ def test_exclusive_formats_are_downloaded_one_at_a_time(monkeypatch, tmp_path):
     assert report.selected == ["kicad", "altium"]
     assert report.submitted is True
     assert len(browser.captured) == 2, "each exclusive format must produce its OWN download"
+
+
+def test_a_submitted_format_that_never_arrives_is_an_error_not_a_skip(monkeypatch, tmp_path):
+    """MEASURED LIVE, 2026-07-27: SnapMagic clicked its Altium button and delivered nothing.
+
+    The drive comes back `submitted=False` - the flag is only set AFTER the file lands - together
+    with a hard failure. So a `supply` that tests `submitted` before `failure` reports a VANISHED
+    download as "the vendor simply had nothing", which is the exact class of lie this file exists
+    to stop: an intent-shaped report standing in for an observation.
+    """
+    browser = _FakeBrowser()
+
+    class _NeverDelivers:
+        capability = VendorCapability(
+            key="vanishtron", label="Vanishtron", tools=("altium",),
+            formats_exclusive=True, aggregator=False, needs_login=False, instruction="",
+            version_pins={"altium": "a"},
+        )
+
+        def resolve_url(self, mpn):
+            return "https://example.invalid/part"
+
+        def drive(self, page, formats):
+            # clicked, and nothing ever lands
+            return DriveReport(selected=list(formats), submitted=True, message="ok")
+
+    adapter = _NeverDelivers()
+    monkeypatch.setattr(guided, "get_adapter", lambda key: adapter)
+    monkeypatch.setattr(guided, "capture_needs", lambda record: [Requirement.ALTIUM_SYMBOL])
+    monkeypatch.setattr(guided, "formats_for", lambda needs: ["altium"])
+    monkeypatch.setattr(guided, "_DOWNLOAD_TIMEOUT_MS", 300)
+
+    src = guided.GuidedCaptureSource(
+        (lambda: None), vendor="vanishtron", download_root=tmp_path / "dl", headless=True,
+    )
+    src._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+
+    outcome = src.supply(_Record())
+
+    assert outcome.error, f"a vanished download must be an ERROR, got {outcome!r}"
+    assert "did not deliver" in outcome.error
+    assert not outcome.skipped, "reporting it as a skip hides a lost file"
