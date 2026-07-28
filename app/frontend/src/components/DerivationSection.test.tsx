@@ -3,7 +3,7 @@
  *
  * PRIOR ART: no new test infrastructure. Same harness the repo already standardises on (vitest +
  * @testing-library/react + a per-test QueryClient and the real ToastProvider), and the mock shape
- * is copied from `LibraryVersionSection.test.tsx` so both read the same. REJECTED: hoisting the
+ * uses the same explicit QueryClient defaults as the other isolated section tests. REJECTED: hoisting the
  * three-line `renderSection` into a shared helper -- every component test here keeps its own, and
  * one more instance is not yet a pattern worth reading every test through a helper for.
  *

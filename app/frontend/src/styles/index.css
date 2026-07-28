@@ -164,13 +164,13 @@
        It SHRINKS, it never CLIPS. `break-words` stays on the value rows as the last resort, since a
        value cut to "100 ..." has lost the data - this reduces how often wrapping is reached rather
        than replacing it with truncation. */
-    --fs-2xs: clamp(9.0px, calc(9.0px + (100vw - 1024px) * 0.001736), 10px);
-    --fs-xs: clamp(9.9px, calc(9.9px + (100vw - 1024px) * 0.00191), 11px);
-    --fs-sm: clamp(10.35px, calc(10.35px + (100vw - 1024px) * 0.001997), 11.5px);
-    --fs-base: clamp(10.8px, calc(10.8px + (100vw - 1024px) * 0.002083), 12px);
-    --fs-lg: clamp(12.15px, calc(12.15px + (100vw - 1024px) * 0.002344), 13.5px);
-    --fs-xl: clamp(13.5px, calc(13.5px + (100vw - 1024px) * 0.002604), 15px);
-    --fs-title: clamp(16.2px, calc(16.2px + (100vw - 1024px) * 0.003125), 18px);
+    --fs-2xs: clamp(8.55px, calc(8.55px + (100vw - 1024px) * 0.001649), 9.5px);
+    --fs-xs: clamp(9.45px, calc(9.45px + (100vw - 1024px) * 0.001823), 10.5px);
+    --fs-sm: clamp(9.9px, calc(9.9px + (100vw - 1024px) * 0.00191), 11px);
+    --fs-base: clamp(10.35px, calc(10.35px + (100vw - 1024px) * 0.001997), 11.5px);
+    --fs-lg: clamp(11.7px, calc(11.7px + (100vw - 1024px) * 0.002257), 13px);
+    --fs-xl: clamp(13.05px, calc(13.05px + (100vw - 1024px) * 0.002517), 14.5px);
+    --fs-title: clamp(15.3px, calc(15.3px + (100vw - 1024px) * 0.002951), 17px);
   }
 
   :root[data-theme="light"] {
@@ -270,7 +270,7 @@
     background: var(--body-bg);
     color: var(--c-t1);
     font-family: "Work Sans Variable", "Segoe UI", system-ui, sans-serif;
-    font-size: 13px;
+    font-size: var(--fs-base);
     line-height: 1.5;
     letter-spacing: -0.008em;
     -webkit-font-smoothing: antialiased;

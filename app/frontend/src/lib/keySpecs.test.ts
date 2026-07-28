@@ -4,6 +4,7 @@ import {
   effectiveKeySpecKeys,
   isCuratedOnly,
   keySpecRows,
+  normalizePinnedSpecs,
   togglePinned,
   withoutPromoted,
 } from "./keySpecs";
@@ -95,6 +96,26 @@ describe("keySpecRows (curated per category)", () => {
     const sparse: SpecGroup[] = [{ title: "Electrical", rows: [row("Working Voltage", "5.5 V")] }];
     expect(keySpecRows(sparse, "Diodes", {}).map((r) => r.key)).toEqual(["Working Voltage"]);
   });
+
+  it("uses semantic aliases for the actual transistor vocabulary", () => {
+    const transistor: SpecGroup[] = [
+      {
+        title: "Electrical",
+        rows: [
+          row("Drain to Source Voltage (Vdss)", "60 V"),
+          row("Current - Continuous Drain (Id) @ 25°C", "4 A"),
+          row("Rds On (Max) @ Id, Vgs", "45 mOhm"),
+          row("Vgs(th) (Max) @ Id", "2.5 V"),
+        ],
+      },
+    ];
+    expect(keySpecRows(transistor, "Transistors", {}).map((item) => item.key)).toEqual([
+      "Drain to Source Voltage (Vdss)",
+      "Current - Continuous Drain (Id) @ 25°C",
+      "Rds On (Max) @ Id, Vgs",
+      "Vgs(th) (Max) @ Id",
+    ]);
+  });
 });
 
 describe("keySpecRows (user pinning)", () => {
@@ -179,23 +200,33 @@ describe("withoutPromoted (promote, do not copy)", () => {
 });
 
 describe("togglePinned", () => {
-  it("adds a pin for a category that had none", () => {
+  it("stores canonical category and specification identities", () => {
     expect(togglePinned({}, "Diodes", "Working Voltage")).toEqual({
-      Diodes: ["Working Voltage"],
+      diodes: ["working voltage"],
     });
   });
 
   it("removes a pin that is already set, so the star is a toggle", () => {
     expect(togglePinned({ Diodes: ["Working Voltage"] }, "Diodes", "Working Voltage")).toEqual({
-      Diodes: [],
+    });
+  });
+
+  it("removes the same semantic pin from a differently worded part", () => {
+    expect(
+      togglePinned(
+        { Diodes: ["Voltage - Breakdown"] },
+        "DIODES",
+        "Breakdown Voltage",
+      ),
+    ).toEqual({
     });
   });
 
   it("leaves other categories untouched", () => {
     const before = { Resistors: ["Resistance"] };
     expect(togglePinned(before, "Diodes", "Working Voltage")).toEqual({
-      Resistors: ["Resistance"],
-      Diodes: ["Working Voltage"],
+      resistors: ["resistance"],
+      diodes: ["working voltage"],
     });
   });
 
@@ -203,6 +234,20 @@ describe("togglePinned", () => {
     const before = { Diodes: ["A"] };
     togglePinned(before, "Diodes", "B");
     expect(before).toEqual({ Diodes: ["A"] });
+  });
+});
+
+describe("normalizePinnedSpecs", () => {
+  it("migrates the legacy raw-label map and removes semantic duplicates", () => {
+    expect(
+      normalizePinnedSpecs({
+        Diodes: ["Voltage - Breakdown", "Breakdown Voltage"],
+        "Crystals & Oscillators": ["Equivalent Series Resistance"],
+      }),
+    ).toEqual({
+      diodes: ["breakdown voltage"],
+      crystals_oscillators: ["equivalent series resistance"],
+    });
   });
 });
 
@@ -303,6 +348,14 @@ describe("a pin applied to another part in the same category", () => {
   it("matches when the other part carries the pinned wording as its LABEL", () => {
     const rows = keySpecRows(other("FactoryPackQty", "Factory Pack Quantity"), "Diodes", pinnedOn);
     expect(rows.map((r) => r.key)).toEqual(["FactoryPackQty"]);
+  });
+
+  it("stays removable on the differently worded part instead of becoming a locked curated row", () => {
+    const rows = keySpecRows(other("factory  pack quantity"), "Diodes", pinnedOn);
+    const effective = effectiveKeySpecKeys(other("factory  pack quantity"), "Diodes", pinnedOn);
+    expect(
+      isCuratedOnly(effective, pinnedOn, "Diodes", rows[0].key),
+    ).toBe(false);
   });
 
   it("does NOT promote a different spec that merely shares a word", () => {

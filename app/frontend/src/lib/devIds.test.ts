@@ -21,7 +21,14 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // Sourcing panes. A deliberate re-baseline, which is what this gate is for.
 // 263 as of 2026-07-26: -detail.sourcing-qty, the amount-needed input the owner removed ("the need
 // box in the library should be removed"). The quantity-AWARE pricing it fed is untouched.
-const EXPECTED_ENTRIES = 279;
+// 238 after the Projects surface and its 41 project-only ids were removed. The
+// STM Viewer rail id replaces the former Projects rail id one-for-one.
+// 245 with the compact 3D settings/popover, interactive view cube, the cross-EDA
+// representation matrix, and the three
+// explicitly addressable Symbol / Footprint / 3D inspection tabs.
+// 245 after the standalone Pinout tab moved into the persistent specimen/CAD rail and its
+// bounded pin-list scroller became directly inspectable.
+const EXPECTED_ENTRIES = 245;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
@@ -48,7 +55,7 @@ describe("devIds catalogue", () => {
     expect(seen.size).toBe(EXPECTED_ENTRIES);
   });
 
-  it("enumerates the 15 areas in first-appearance order, and every entry is a member", () => {
+  it("enumerates the 14 areas in first-appearance order, and every entry is a member", () => {
     expect(DEV_ID_AREAS).toEqual([
       "rail",
       "about",
@@ -57,7 +64,6 @@ describe("devIds catalogue", () => {
       "search",
       "addpart",
       "ingest",
-      "projects",
       "settings",
       "altiumdb",
       "complete",
@@ -66,7 +72,7 @@ describe("devIds catalogue", () => {
       "confirm",
       "shell",
     ]);
-    expect(DEV_ID_AREAS).toHaveLength(15);
+    expect(DEV_ID_AREAS).toHaveLength(14);
 
     // Every catalogued area is declared in DEV_ID_AREAS...
     const declared = new Set(DEV_ID_AREAS);

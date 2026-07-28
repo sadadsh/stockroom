@@ -14,7 +14,13 @@
  * This is the same shape as the EDA registry the owner liked: a category's key set is DATA, so
  * supporting a new category is an entry here rather than an edit in a component.
  */
-import type { SpecGroup, SpecRow } from "./specSchema";
+import {
+  canonicalSpecId,
+  normalizeSpecKey,
+  specRowId,
+  type SpecGroup,
+  type SpecRow,
+} from "./specSchema";
 
 /** How many rows the block shows. It sits where the handoff band sat, so it has that much room. */
 export const KEY_SPEC_LIMIT = 8;
@@ -22,15 +28,18 @@ export const KEY_SPEC_LIMIT = 8;
 /**
  * Per-category key specs, in the order they should READ (not the order the sheet stores them).
  *
- * Matched as lowercase SUBSTRINGS against the spec's real key, because records name the same
- * parameter at different lengths: the registry says "peak pulse current" and a real record says
- * "Peak Pulse Current (10/1000us)". Substring matching is what makes one entry cover both.
+ * Each selector is a semantic token set, not a distributor string. A selector may match a
+ * qualified row (`peak pulse current` -> `Peak Pulse Current (10/1000us)`) but cannot match a row
+ * that merely shares one word. Pins use the stricter canonical identity below.
  */
-const KEY_SPECS_BY_CATEGORY: Record<string, readonly string[]> = {
+type KeySpecSelector = string | readonly string[];
+
+export const KEY_SPECS_BY_CATEGORY: Record<string, readonly KeySpecSelector[]> = {
   diodes: [
-    "working voltage",
+    ["reverse standoff voltage", "working voltage"],
     "breakdown voltage",
     "clamping voltage",
+    "peak pulse power",
     "peak pulse current",
     "capacitance",
     "channels",
@@ -40,20 +49,47 @@ const KEY_SPECS_BY_CATEGORY: Record<string, readonly string[]> = {
   capacitors: ["capacitance", "tolerance", "voltage rating", "dielectric", "esr", "package"],
   inductors: ["inductance", "current rating", "dc resistance", "saturation", "tolerance", "package"],
   transistors: [
-    "drain source voltage",
-    "continuous drain current",
-    "on resistance",
-    "gate threshold",
+    ["drain source voltage", "drain to source voltage", "vdss"],
+    ["continuous drain current", "current continuous drain"],
+    ["on resistance", "rds on"],
+    ["gate threshold", "vgs th"],
     "power dissipation",
+    "drive voltage",
     "package",
   ],
-  ics: ["supply voltage", "interface", "channels", "operating temperature", "package"],
+  ics: [
+    ["supply voltage", "input voltage"],
+    "output voltage",
+    "output current",
+    ["switching frequency", "frequency"],
+    "interface",
+    "channels",
+    "operating temperature",
+    "package",
+  ],
   modules: ["supply voltage", "interface", "frequency", "output power", "package"],
   sensors: ["supply voltage", "interface", "range", "accuracy", "resolution", "package"],
   crystals_oscillators: ["frequency", "frequency tolerance", "load capacitance", "esr", "package"],
   connectors: ["positions", "pitch", "current rating", "voltage rating", "mounting", "package"],
-  switches: ["current rating", "voltage rating", "actuator", "circuit", "mounting", "package"],
-  electromechanical: ["coil voltage", "contact current", "contact configuration", "mounting", "package"],
+  switches: [
+    "switch circuit",
+    "switch function",
+    "on state resistance",
+    "current rating",
+    "voltage rating",
+    "actuator",
+    "mounting",
+    "package",
+  ],
+  electromechanical: [
+    ["coil voltage", "voltage rated"],
+    ["contact current", "current supply"],
+    "contact configuration",
+    "frequency",
+    "sound pressure level",
+    "mounting",
+    "package",
+  ],
 };
 
 /**
@@ -63,7 +99,7 @@ const KEY_SPECS_BY_CATEGORY: Record<string, readonly string[]> = {
  * an empty card there would be a worse regression than showing approximately-right rows. These are
  * the parameters that matter for almost any component.
  */
-const KEY_SPECS_FALLBACK: readonly string[] = [
+const KEY_SPECS_FALLBACK: readonly KeySpecSelector[] = [
   "voltage",
   "current",
   "power",
@@ -75,7 +111,7 @@ const KEY_SPECS_FALLBACK: readonly string[] = [
 ];
 
 /** Category keys arrive as display names ("Crystals & Oscillators"); normalise to the registry's. */
-function categoryKey(category: string): string {
+export function categoryKey(category: string): string {
   return (category || "")
     .trim()
     .toLowerCase()
@@ -84,7 +120,7 @@ function categoryKey(category: string): string {
     .replace(/^_|_$/g, "");
 }
 
-function termsFor(category: string): readonly string[] {
+function termsFor(category: string): readonly KeySpecSelector[] {
   const key = categoryKey(category);
   return KEY_SPECS_BY_CATEGORY[key] ?? KEY_SPECS_FALLBACK;
 }
@@ -96,11 +132,43 @@ function termsFor(category: string): readonly string[] {
  * one term while keeping "Factory Lead Time" a different one.
  */
 export function normalizeSpecTerm(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return normalizeSpecKey(text);
 }
 
-/** Pinned spec keys, per category display name. */
+/** Canonical spec ids, per canonical category id. */
 export type PinnedSpecs = Record<string, readonly string[]>;
+
+/** Migrate legacy raw-label/display-category maps into the canonical preference shape. */
+export function normalizePinnedSpecs(pinned: PinnedSpecs | null | undefined): PinnedSpecs {
+  const out: Record<string, string[]> = {};
+  if (!pinned || typeof pinned !== "object" || Array.isArray(pinned)) return out;
+  for (const [rawCategory, rawPins] of Object.entries(pinned)) {
+    if (!Array.isArray(rawPins)) continue;
+    const category = categoryKey(rawCategory);
+    if (!category) continue;
+    const ids = out[category] ?? [];
+    for (const rawPin of rawPins) {
+      if (typeof rawPin !== "string") continue;
+      const id = canonicalSpecId(rawPin);
+      if (id && !ids.includes(id)) ids.push(id);
+    }
+    if (ids.length) out[category] = ids;
+  }
+  return out;
+}
+
+function pinsFor(pinned: PinnedSpecs, category: string): readonly string[] {
+  return normalizePinnedSpecs(pinned)[categoryKey(category)] ?? [];
+}
+
+function selectorMatches(row: SpecRow, selector: KeySpecSelector): boolean {
+  const rowTokens = new Set(specRowId(row).split(" ").filter(Boolean));
+  const alternatives = typeof selector === "string" ? [selector] : selector;
+  return alternatives.some((candidate) => {
+    const wanted = canonicalSpecId(candidate).split(" ").filter(Boolean);
+    return wanted.length > 0 && wanted.every((token) => rowTokens.has(token));
+  });
+}
 
 /**
  * The rows for the Key Specifications block: the user's pins first, then the category's curated set
@@ -120,53 +188,23 @@ export function keySpecRows(
   const out: SpecRow[] = [];
   const taken = new Set<string>();
   const take = (r: SpecRow | undefined) => {
-    if (!r || taken.has(r.key) || out.length >= KEY_SPEC_LIMIT) return;
-    taken.add(r.key);
+    if (!r || taken.has(specRowId(r)) || out.length >= KEY_SPEC_LIMIT) return;
+    taken.add(specRowId(r));
     out.push(r);
   };
 
-  // PINS FIRST. A pin is a SPECIFIC row the user chose, so it is matched by identity and never by
-  // substring - "Breakdown Voltage" must not drag in "Reverse Standoff Voltage".
-  //
-  // But identity is compared on a NORMALIZED form, not the raw string (owner, 2026-07-26: "spec
-  // pinning must persist across ALL items of that group"). Pins are already stored per CATEGORY, so
-  // the write was never the problem; the read was. Records key a spec the way the DISTRIBUTOR wrote
-  // it, and `normalize_spec_key` on the backend only trims whitespace - it does not canonicalize
-  // wording - so two parts in one category routinely differ by case, spacing or punctuation for the
-  // same spec, and an exact match silently applied the pin to only one of them. The row's LABEL is
-  // considered too, since one part can carry as its key what another carries as its label.
-  //
-  // KNOWN LIMIT, stated rather than implied: this bridges SPELLING, not vocabulary. A part whose
-  // distributor calls it "Voltage - Breakdown (Min)" against a pin on "Breakdown Voltage (Min)"
-  // still will not match, because closing that gap needs either substring matching (which
-  // reintroduces exactly the false promotion this exactness protects) or a synonym table. That is a
-  // decision, not an oversight, and it is in the punch list.
-  for (const key of pinned[category] ?? []) {
-    const wanted = normalizeSpecTerm(key);
-    take(
-      all.find(
-        (r) =>
-          r.key === key ||
-          normalizeSpecTerm(r.key) === wanted ||
-          normalizeSpecTerm(r.label ?? "") === wanted,
-      ),
-    );
+  // PINS FIRST. The preference binds to a canonical schema id, never a vendor's raw key. This is
+  // what makes a pin set on `Voltage - Breakdown` removable on a part that says
+  // `Breakdown Voltage`, and makes category casing/spacing irrelevant.
+  for (const id of pinsFor(pinned, category)) {
+    take(all.find((row) => specRowId(row) === id));
   }
 
-  // then the curated set, matched as a substring in both directions so the registry term can be
-  // shorter than the record's key (the usual case) or the record's key shorter than the term.
+  // Then the curated category schema. Token containment permits a meaningful qualifier while
+  // avoiding the old bidirectional substring rule (`power` could match almost anything).
   for (const term of termsFor(category)) {
     if (out.length >= KEY_SPEC_LIMIT) break;
-    take(
-      all.find((r) => {
-        // BOTH the raw key and the human label. Records key a spec the way the DISTRIBUTOR writes it
-        // ("Voltage - Breakdown (Min)"), while these terms are written the way a person says it
-        // ("breakdown voltage") - so matching the key alone promoted 2 of 7 curated specs on a real
-        // diode and left the rest sitting below, which is what the render showed.
-        const candidates = [r.key.toLowerCase(), (r.label ?? "").toLowerCase()];
-        return candidates.some((c) => c.length > 0 && (c.includes(term) || term.includes(c)));
-      }),
-    );
+    take(all.find((row) => selectorMatches(row, term)));
   }
   return out;
 }
@@ -210,16 +248,23 @@ export function togglePinned(
   category: string,
   specKey: string,
 ): PinnedSpecs {
-  const current = pinned[category] ?? [];
-  const next = current.includes(specKey)
-    ? current.filter((k) => k !== specKey)
-    : [...current, specKey];
-  return { ...pinned, [category]: next };
+  const normalized = normalizePinnedSpecs(pinned);
+  const categoryId = categoryKey(category);
+  const specId = canonicalSpecId(specKey);
+  const current = normalized[categoryId] ?? [];
+  const next = current.includes(specId)
+    ? current.filter((id) => id !== specId)
+    : [...current, specId];
+  if (next.length === 0) {
+    const { [categoryId]: _removed, ...rest } = normalized;
+    return rest;
+  }
+  return { ...normalized, [categoryId]: next };
 }
 
 /** Whether a spec is pinned for this category - the star's filled state. */
 export function isPinned(pinned: PinnedSpecs, category: string, specKey: string): boolean {
-  return (pinned[category] ?? []).includes(specKey);
+  return pinsFor(pinned, category).includes(canonicalSpecId(specKey));
 }
 
 /**
@@ -255,5 +300,5 @@ export function isCuratedOnly(
   category: string,
   specKey: string,
 ): boolean {
-  return effective.has(specKey) && !(pinned[category] ?? []).includes(specKey);
+  return effective.has(specKey) && !isPinned(pinned, category, specKey);
 }

@@ -2,7 +2,6 @@ import { AppShell } from "./components/AppShell";
 import { OnboardingGate } from "./components/OnboardingGate";
 import { CaptureStatusPill } from "./components/CaptureStatusPill";
 import { LibraryPage } from "./pages/LibraryPage";
-import { ProjectsPage } from "./pages/ProjectsPage";
 import { StmViewerPage } from "./pages/StmViewerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { useOnboarding } from "./api/queries";
@@ -13,7 +12,7 @@ import { useRouter, type Route } from "./lib/router";
 export default function App() {
   const { route } = useRouter();
   // First-run gate (M9c): a frozen exe ships no library, so on the very first launch the
-  // user must choose one before any library/project feature is meaningful. Flip to the
+  // user must choose one before any library feature is meaningful. Flip to the
   // gate ONLY when the backend positively reports first_run; while the status is loading,
   // errored, or already onboarded, render the app normally (no blank/flashing frame).
   const onboarding = useOnboarding();
@@ -32,11 +31,9 @@ export default function App() {
 function renderRoute(route: Route) {
   switch (route) {
     case "components":
-      // The Components flagship is just the Parts view now: BOM Coverage moved to
-      // the project BOM, Duplicates is a Parts filter, and Doctor is in Settings.
+      // The Components flagship is just the Parts view now: Duplicates is a Parts
+      // filter, and Doctor is in Settings.
       return <LibraryPage />;
-    case "projects":
-      return <ProjectsPage />;
     case "stm":
       return <StmViewerPage />;
     case "settings":

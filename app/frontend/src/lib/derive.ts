@@ -15,9 +15,11 @@ import type { PartDetail } from "../api/types";
 import {
   EMPTY_SPEC_VALUES,
   SPEC_HIDDEN_KEYS,
+  TRADE_GROUP,
   applySign,
   normalizeSpecKey,
   prettifyValue,
+  resolveFamily,
   resolveSpec,
   type SpecGroupName,
 } from "./specSchema";
@@ -114,13 +116,15 @@ const REFERENCE_ONLY_SPEC_KEYS: Set<string> = new Set(
     "ECCN",
     "HTS Code",
     "HTSUS",
+    "Unit Weight",
+    "DigiKey Programmable",
     "Number of Parts",
   ].map(normalizeSpecKey),
 );
 
 // A couple of families that vary too much to enumerate (Factory Pack Quantity, Standard Pack
 // Quantity, Quantity per Reel; Base Product Number; catalog numbers) are matched by substring.
-const _REFERENCE_ONLY_RE = /pack quantity|country of origin|base product|\bcatalog\b|packaging|tariff|\bweight\b/;
+const _REFERENCE_ONLY_RE = /pack quantity|country of origin|base product|\bcatalog\b|packaging|tariff/;
 
 /**
  * True when a spec key is catalog metadata (commerce / provenance / logistics) rather than a
@@ -129,7 +133,12 @@ const _REFERENCE_ONLY_RE = /pack quantity|country of origin|base product|\bcatal
  */
 export function isReferenceOnlySpecKey(rawKey: string): boolean {
   const nk = normalizeSpecKey(rawKey);
-  return REFERENCE_ONLY_SPEC_KEYS.has(nk) || _REFERENCE_ONLY_RE.test(nk);
+  return (
+    resolveFamily(rawKey)?.family.group === TRADE_GROUP ||
+    resolveSpec(rawKey, "").group === TRADE_GROUP ||
+    REFERENCE_ONLY_SPEC_KEYS.has(nk) ||
+    _REFERENCE_ONLY_RE.test(nk)
+  );
 }
 
 // The first presentable, non-hidden, DEFINING spec value in insertion order (commerce /

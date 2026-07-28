@@ -19,17 +19,10 @@ import type {
   DevSaveResult,
   AltiumStatus,
   OdbcStatus,
-  AuditResult,
-  BomDiffResult,
-  BomExportKind,
-  BomResult,
   CadSourceResponse,
-  ChecksResult,
   DiffResponse,
   DoctorScan,
   DuplicatesResponse,
-  FabExportOptions,
-  FabStatus,
   Facets,
   ParametricFacets,
   SearchResponse,
@@ -38,51 +31,17 @@ import type {
   PartDetail,
   PassiveAddBody,
   PassivePreview,
-  DesignResult,
-  DesignRules,
-  NetClass,
   PartsResponse,
-  ProcurementExportOptions,
-  ConformBody,
-  ConformCatalog,
-  ConformPreview,
-  ConformResult,
-  StackupBody,
-  StackupPreview,
-  StackupRead,
-  StackupResult,
-  PrepareRead,
-  AssignGroupBody,
-  AssignRead,
   HygieneRead,
   HygieneResult,
   LibraryLfsResult,
   LibraryLfsStatus,
-  LibraryPinRead,
-  LibraryPinResult,
-  AssignResult,
-  ManualFillBody,
-  ManualFillResult,
-  RestoreResult,
-  FieldsGrid,
-  FieldEdit,
-  SetFieldsResult,
-  Buildability,
   OnboardingStatus,
   ProfilesResponse,
   SetLibraryBody,
-  ProjectDetail,
-  ProjectSummary,
-  BoardSettings,
   RepairResult,
   RescanStartResponse,
   RescanStateResponse,
-  RevisionsResult,
-  SetBoardSettingsBody,
-  SetBoardSettingsResult,
-  SetDesignRulesResult,
-  SetNetclassPatternsResult,
-  SetNetClassesResult,
   SettingsInfo,
   SettingsPatch,
   StagingCandidate,
@@ -205,52 +164,6 @@ async function fetchPreviewBlob(path: string, accept: string): Promise<Blob> {
     throw new ApiError(res.status, msg);
   }
   return res.blob();
-}
-
-// Fetch a download endpoint (with the bearer) as {blob, filename}, reading the filename from
-// the Content-Disposition header the export endpoint sets. Mirrors fetchPreviewBlob's error
-// mapping so a 400 (nothing built) / 404 surfaces as an ApiError, not a corrupt file.
-async function fetchDownload(
-  path: string,
-  params: Record<string, string>,
-): Promise<{ blob: Blob; filename: string }> {
-  const token = apiToken();
-  const url = new URL(apiBase() + path);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const headers: Record<string, string> = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), { headers });
-  } catch (err) {
-    throw new ApiError(0, err instanceof Error ? err.message : "Network error");
-  }
-  if (!res.ok) {
-    let msg = `Request failed (${res.status})`;
-    try {
-      const body = await res.json();
-      msg = body.detail || body.error || body.message || msg;
-    } catch {
-      /* non-JSON error body, keep the status message */
-    }
-    throw new ApiError(res.status, msg);
-  }
-  const cd = res.headers.get("Content-Disposition") || "";
-  const m = /filename="?([^";]+)"?/.exec(cd);
-  return { blob: await res.blob(), filename: m ? m[1] : "export" };
-}
-
-// Save a blob to disk via a temporary object URL and a synthetic anchor click (the standard
-// no-dependency browser download idiom). Runs in the WebView2 host; no-op-safe in tests.
-function triggerDownload(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 export interface LandPad {
@@ -699,14 +612,6 @@ export const api = {
   // First-run library onboarding (M9b/M9c): point the app at a library (open an existing
   // one, clone a git URL, or create a fresh one) and repoint the running engine at it live.
   // A set/complete changes which library EVERY other query reads, so callers invalidate all.
-  // One ready-to-build verdict per project (M7g): completeness + ERC/DRC + BOM + git fused,
-  // with honest cold-cache states (read-only; the caches are read, never re-run here).
-  getBuildability(projectId: string): Promise<Buildability> {
-    return apiGet<Buildability>(
-      `/api/projects/${encodeURIComponent(projectId)}/buildability`,
-    );
-  },
-
   getOnboarding(): Promise<OnboardingStatus> {
     return apiGet<OnboardingStatus>("/api/onboarding");
   },
@@ -749,343 +654,6 @@ export const api = {
     return request<JobRef>("POST", "/api/doctor/wire-kicad");
   },
 
-  // Projects (M7a). A registered project is external to Stockroom (referenced by
-  // path, never owned); only its registration record lives in the library repo.
-  // List reads the warm project index; register/delete rebuild it server-side, so
-  // the caller invalidates ["projects"] (and the affected ["project", id]) after.
-  listProjects(): Promise<ProjectSummary[]> {
-    return apiGet<ProjectSummary[]>("/api/projects");
-  },
-
-  // Register an external project directory by its absolute path. The EDA is
-  // auto-detected (KiCad vs Altium); a dir holding both needs `eda` passed
-  // explicitly. A bad/nonexistent dir, a dir with no project files, an ambiguous
-  // dir, or an already-registered root each returns 400.
-  registerProject(root: string, eda?: string): Promise<ProjectDetail> {
-    return request<ProjectDetail>("POST", "/api/projects", {
-      body: eda ? { root, eda } : { root },
-    });
-  },
-
-  getProject(id: string): Promise<ProjectDetail> {
-    return apiGet<ProjectDetail>(`/api/projects/${encodeURIComponent(id)}`);
-  },
-
-  // Unregister a project (its external files are never touched). 204 on success.
-  deleteProject(id: string): Promise<void> {
-    return request<void>("DELETE", `/api/projects/${encodeURIComponent(id)}`);
-  },
-
-  // The read-only health audit over the registered sheets, resolved against the
-  // ACTIVE profile's footprint/model dirs, plus a shareable markdown report.
-  projectAudit(id: string): Promise<AuditResult> {
-    return apiGet<AuditResult>(`/api/projects/${encodeURIComponent(id)}/audit`);
-  },
-
-  // Run structured ERC + DRC (M7b) off the request path as a job (findings arrive on
-  // the job's SSE result event, openJobStream). A missing kicad-cli is an honest 502.
-  runChecks(id: string): Promise<JobRef> {
-    return request<JobRef>("POST", `/api/projects/${encodeURIComponent(id)}/checks`);
-  },
-
-  // The cached last ERC/DRC run, or an honest not-run shape (ran_at null) before the
-  // first run. Read on selecting a project so a prior run renders without re-running.
-  getChecks(id: string): Promise<ChecksResult> {
-    return apiGet<ChecksResult>(`/api/projects/${encodeURIComponent(id)}/checks`);
-  },
-
-  // Build a grouped, priced BOM (M7c) off the request path as a job (the built BOM
-  // arrives on the job's SSE result event). No kicad-cli needed; pricing is best-effort
-  // through the enrich layer, so a line that cannot be sourced stays honestly unpriced.
-  // `opts` carries the build quantity + tax/tariff rate the per-line economics cost at;
-  // both default server-side (1 board, 0% tax) when omitted.
-  runBom(id: string, opts?: { boards?: number; tax_rate?: number }): Promise<JobRef> {
-    return request<JobRef>("POST", `/api/projects/${encodeURIComponent(id)}/bom`, {
-      body: opts ?? {},
-    });
-  },
-
-  // The cached last build, or an honest not-built shape (ran_at null) before the first
-  // build. Read on selecting a project so a prior build renders without rebuilding.
-  getBom(id: string): Promise<BomResult> {
-    return apiGet<BomResult>(`/api/projects/${encodeURIComponent(id)}/bom`);
-  },
-
-  // Re-cost the CACHED BOM for a new build quantity / tax/tariff rate, purely over the
-  // already-built lines (no schematic re-read, no network, no job/SSE): synchronous.
-  // Before any build it returns the same honest not-built shape as getBom.
-  repriceBom(id: string, opts: { boards?: number; tax_rate?: number }): Promise<BomResult> {
-    return request<BomResult>("POST", `/api/projects/${encodeURIComponent(id)}/bom/reprice`, {
-      body: opts,
-    });
-  },
-
-  // The Fab panel's honest gate (M7i): whether the project has a board to fabricate and
-  // whether kicad-cli is available, plus the board file names. Read-only, no shell-out.
-  getFab(id: string): Promise<FabStatus> {
-    return apiGet<FabStatus>(`/api/projects/${encodeURIComponent(id)}/fab`);
-  },
-
-  // Raw bytes (as text) of one REGISTERED project KiCad file, for the in-app kicanvas viewer
-  // (M7 #11). Fetched WITH the bearer and inlined as a kicanvas-source, so the viewer never
-  // issues its own unauthenticated fetch. An unregistered path / unknown id / escape is a 404.
-  async projectFile(id: string, path: string): Promise<string> {
-    const token = apiToken();
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const url = new URL(apiBase() + `/api/projects/${encodeURIComponent(id)}/file`);
-    url.searchParams.set("path", path);
-    let res: Response;
-    try {
-      res = await fetch(url.toString(), { headers });
-    } catch (err) {
-      throw new ApiError(0, err instanceof Error ? err.message : "Network error");
-    }
-    if (!res.ok) {
-      let msg = `Request failed (${res.status})`;
-      try {
-        const body = await res.json();
-        msg = body.detail || body.error || body.message || msg;
-      } catch {
-        /* non-JSON error body */
-      }
-      throw new ApiError(res.status, msg);
-    }
-    return res.text();
-  },
-
-  // Download the manufacturing bundle (gerbers + drill + placement) plotted via kicad-cli as
-  // a zip (M7i). Fetches with the bearer token and saves via a temporary object URL. Options
-  // map straight to the export query params; a missing/failed kicad-cli surfaces as an
-  // ApiError (502), never a corrupt/empty file.
-  async downloadFabExport(id: string, opts: FabExportOptions): Promise<void> {
-    const params: Record<string, string> = {
-      drill_format: opts.drillFormat,
-      drill_map: String(opts.drillMap),
-      include_pos: String(opts.includePos),
-      pos_format: opts.posFormat,
-      protel_ext: String(opts.protelExt),
-    };
-    if (opts.board) params.board = opts.board;
-    const { blob, filename } = await fetchDownload(
-      `/api/projects/${encodeURIComponent(id)}/fab/export`,
-      params,
-    );
-    triggerDownload(blob, filename);
-  },
-
-  // The project's git history for the revision-diff pickers (M7d). under_git false / empty
-  // for a project not under git.
-  getRevisions(id: string): Promise<RevisionsResult> {
-    return apiGet<RevisionsResult>(`/api/projects/${encodeURIComponent(id)}/revisions`);
-  },
-
-  // Diff the BOM between revision `a` (from the project's git) and `b` (blank = the current
-  // build) (M7d). The current build's prices feed the cost/lead deltas.
-  getBomDiff(id: string, a: string, b = ""): Promise<BomDiffResult> {
-    const params: Record<string, string> = { a };
-    if (b) params.b = b;
-    return apiGet<BomDiffResult>(`/api/projects/${encodeURIComponent(id)}/bom/diff`, params);
-  },
-
-  // Download a BOM export (M7d). Fetches the named binary with the bearer token and saves it
-  // via a temporary object URL, so a CSV / XLSX / cart / JLCPCB sheet lands as a file. The
-  // optional procurement knobs (spares / PCB pack / tax / shipping / labour / assembly) are
-  // threaded to the Procurement Sheet + Mouser Cart exports; a null/undefined knob is omitted.
-  async downloadBomExport(
-    id: string,
-    kind: BomExportKind,
-    opts?: ProcurementExportOptions,
-  ): Promise<void> {
-    const params: Record<string, string> = { kind };
-    if (opts) {
-      for (const [k, v] of Object.entries(opts)) {
-        if (v != null) params[k] = String(v);
-      }
-    }
-    const { blob, filename } = await fetchDownload(
-      `/api/projects/${encodeURIComponent(id)}/bom/export`,
-      params,
-    );
-    triggerDownload(blob, filename);
-  },
-
-  // The project's current net classes + design rules read from its .kicad_pro, plus the
-  // fab-floor catalog and a validation against `floor` (M7e). Read-only.
-  getDesign(id: string, floor?: string): Promise<DesignResult> {
-    const params: Record<string, string> = {};
-    if (floor) params.floor = floor;
-    return apiGet<DesignResult>(`/api/projects/${encodeURIComponent(id)}/design`, params);
-  },
-
-  // Edit the project's net classes (M7e): the full edited set, names to delete, and the
-  // fab floor the returned validation checks against. Writes a minimal diff, one scoped
-  // commit on the project's own git.
-  setNetClasses(
-    id: string,
-    classes: NetClass[],
-    opts?: { deleted?: string[]; floor?: string },
-  ): Promise<SetNetClassesResult> {
-    return request<SetNetClassesResult>(
-      "PATCH",
-      `/api/projects/${encodeURIComponent(id)}/net-classes`,
-      { body: { classes, deleted: opts?.deleted ?? [], floor: opts?.floor ?? "none" } },
-    );
-  },
-
-  // Edit the project's board design-rule constraints (M7e). `rules` field-merges; the size
-  // lists, when given, replace their arrays wholesale.
-  setDesignRules(
-    id: string,
-    rules: DesignRules,
-    opts?: { track_widths?: unknown[]; via_dimensions?: unknown[]; diff_pair_dimensions?: unknown[] },
-  ): Promise<SetDesignRulesResult> {
-    return request<SetDesignRulesResult>(
-      "PATCH",
-      `/api/projects/${encodeURIComponent(id)}/design-rules`,
-      { body: { rules, ...opts } },
-    );
-  },
-
-  // Replace the project's netclass-pattern assignments (roadmap #4): the FULL edited list
-  // (an empty list clears every pattern). Writes a minimal diff, one scoped commit on the
-  // project's own git.
-  setNetclassPatterns(
-    id: string,
-    patterns: { netclass: string; pattern: string }[],
-  ): Promise<SetNetclassPatternsResult> {
-    return request<SetNetclassPatternsResult>(
-      "PATCH",
-      `/api/projects/${encodeURIComponent(id)}/netclass-patterns`,
-      { body: { patterns } },
-    );
-  },
-
-  // The KiField bulk-field grid: every placed component across every sheet as a rows-by-fields
-  // table, Reference read-only (M7h). Read-only.
-  getFields(id: string): Promise<FieldsGrid> {
-    return apiGet<FieldsGrid>(`/api/projects/${encodeURIComponent(id)}/fields`);
-  },
-
-  // Apply a batch of field-cell edits across the project's schematic as ONE atomic commit on its
-  // own git (M7h). `edits` is the full set of changed cells; the engine validates each against
-  // the on-disk grid and refuses the read-only Reference field / a non-editable ref.
-  setFields(id: string, edits: FieldEdit[]): Promise<SetFieldsResult> {
-    return request<SetFieldsResult>(
-      "PATCH",
-      `/api/projects/${encodeURIComponent(id)}/fields`,
-      { body: { edits } },
-    );
-  },
-
-  // The project's current board setup (mask/paste clearances, via protection, origins) +
-  // overall thickness read from its primary .kicad_pcb, plus the editable-field schema the
-  // form renders (M7f-A). Read-only.
-  getBoardSettings(id: string): Promise<BoardSettings> {
-    return apiGet<BoardSettings>(`/api/projects/${encodeURIComponent(id)}/settings`);
-  },
-
-  // Edit the project's board setup / thickness (its .kicad_pcb) and/or its .kicad_pro settings
-  // (ERC/DRC severities, ERC pin map, text variables) (M7f-A + A2). Every field is optional;
-  // whichever are given write a minimal diff as one atomic scoped commit on the project's git.
-  setBoardSettings(id: string, body: SetBoardSettingsBody): Promise<SetBoardSettingsResult> {
-    return request<SetBoardSettingsResult>(
-      "PATCH",
-      `/api/projects/${encodeURIComponent(id)}/settings`,
-      { body },
-    );
-  },
-
-  // The object-conform category catalog (Title Case labels + suggested sizes) plus the project's
-  // honest state (has a board / a sheet / under git), for the editor's initial render (M7f-B).
-  getConform(id: string): Promise<ConformCatalog> {
-    return apiGet<ConformCatalog>(`/api/projects/${encodeURIComponent(id)}/conform`);
-  },
-
-  // A dry-run of an object conform: per-file change counts for the given targets, computed
-  // without writing or touching git (M7f-B).
-  previewConform(id: string, body: ConformBody): Promise<ConformPreview> {
-    return request<ConformPreview>(
-      "POST",
-      `/api/projects/${encodeURIComponent(id)}/conform/preview`,
-      { body },
-    );
-  },
-
-  // Apply the conform across every board + sheet as one atomic commit on the project's own git
-  // (M7f-B). `committed` is null when nothing changed (an honest no-commit no-op).
-  applyConform(id: string, body: ConformBody): Promise<ConformResult> {
-    return request<ConformResult>(
-      "PATCH",
-      `/api/projects/${encodeURIComponent(id)}/conform`,
-      { body },
-    );
-  },
-
-  // The project's current physical layer stack + copper layer names + thickness + the fab-preset
-  // catalog, for the Stackup editor's render (M7f-C).
-  getStackup(id: string): Promise<StackupRead> {
-    return apiGet<StackupRead>(`/api/projects/${encodeURIComponent(id)}/stackup`);
-  },
-
-  // A dry-run of a stackup change (a fab preset OR per-field edits): the resulting stack + new
-  // thickness + whether it differs, computed without writing or touching git (M7f-C).
-  previewStackup(id: string, body: StackupBody): Promise<StackupPreview> {
-    return request<StackupPreview>(
-      "POST",
-      `/api/projects/${encodeURIComponent(id)}/stackup/preview`,
-      { body },
-    );
-  },
-
-  // Apply a stackup change as one atomic commit on the project's own git (M7f-C). `committed` is
-  // null when nothing changed (an honest no-commit no-op).
-  applyStackup(id: string, body: StackupBody): Promise<StackupResult> {
-    return request<StackupResult>(
-      "PATCH",
-      `/api/projects/${encodeURIComponent(id)}/stackup`,
-      { body },
-    );
-  },
-
-  // A dry-run of Prepare / Complete-All: what a Prepare would annotate + auto-fill (from the shared
-  // library) + leave incomplete, computed without writing or touching git (M7f-D).
-  getPrepare(id: string): Promise<PrepareRead> {
-    return apiGet<PrepareRead>(`/api/projects/${encodeURIComponent(id)}/prepare`);
-  },
-
-  // Prepare / Complete-All off the request path as a job (the counts + residual arrive on the job's
-  // SSE result event, openJobStream). Annotate + auto-fill blank identity in one atomic commit (M7f-D).
-  runPrepare(id: string): Promise<JobRef> {
-    return request<JobRef>("POST", `/api/projects/${encodeURIComponent(id)}/prepare`);
-  },
-
-  // Manually link one placed component to a chosen library part (the residual filler), one atomic
-  // commit (M7f-D). `committed` is null when nothing changed.
-  manualFill(id: string, body: ManualFillBody): Promise<ManualFillResult> {
-    return request<ManualFillResult>(
-      "POST",
-      `/api/projects/${encodeURIComponent(id)}/prepare/fill`,
-      { body },
-    );
-  },
-
-  // The bulk-assign surface: every placed component with no identified library part, grouped so
-  // identical placements are one row, each with its ranked value-matched candidates. Read-only.
-  getAssign(id: string): Promise<AssignRead> {
-    return apiGet<AssignRead>(`/api/projects/${encodeURIComponent(id)}/assign`);
-  },
-
-  // Assign one library part to a whole group of identical placements, as ONE atomic commit. Either
-  // every ref is written or none is. `committed` is null when nothing changed.
-  assignGroup(id: string, body: AssignGroupBody): Promise<AssignResult> {
-    return request<AssignResult>(
-      "POST",
-      `/api/projects/${encodeURIComponent(id)}/assign`,
-      { body },
-    );
-  },
-
   // Where the LIBRARY's binary payloads are stored (git-lfs). Read-only, no network.
   getLibraryLfs(): Promise<LibraryLfsStatus> {
     return apiGet<LibraryLfsStatus>("/api/library/lfs");
@@ -1104,31 +672,6 @@ export const api = {
 
   syncLibraryHygiene(): Promise<HygieneResult> {
     return request<HygieneResult>("POST", "/api/library/hygiene");
-  },
-
-  // Which library version this project is pinned to, versus the library on this machine.
-  getLibraryPin(id: string): Promise<LibraryPinRead> {
-    return apiGet<LibraryPinRead>(`/api/projects/${encodeURIComponent(id)}/library-pin`);
-  },
-
-  // Record the library's current commit as this project's pin (one commit on the project's git).
-  setLibraryPin(id: string): Promise<LibraryPinResult> {
-    return request<LibraryPinResult>("POST", `/api/projects/${encodeURIComponent(id)}/library-pin`);
-  },
-
-  // What syncing this project's workspace hygiene would change. Read-only.
-  getProjectHygiene(id: string): Promise<HygieneRead> {
-    return apiGet<HygieneRead>(`/api/projects/${encodeURIComponent(id)}/hygiene`);
-  },
-
-  // Write the ignore rules and untrack the per-user files they cover, as ONE commit.
-  syncProjectHygiene(id: string): Promise<HygieneResult> {
-    return request<HygieneResult>("POST", `/api/projects/${encodeURIComponent(id)}/hygiene`);
-  },
-
-  // Undo the project's last Prepare / Fill by git-reverting that commit as a new commit (M7f-D).
-  restore(id: string): Promise<RestoreResult> {
-    return request<RestoreResult>("POST", `/api/projects/${encodeURIComponent(id)}/restore`);
   },
 
   // The Altium Database Library status for the active profile: place-ready count + per-part rows.

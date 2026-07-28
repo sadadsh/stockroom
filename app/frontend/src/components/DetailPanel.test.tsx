@@ -41,7 +41,16 @@ vi.mock("../api/client", async (importActual) => {
 // tab does not need a WebGL context here.
 // the scene returns a handle ({dispose, setView}); see PartPreview.test.tsx
 vi.mock("../lib/threeScene", () => ({
-  mountModelScene: vi.fn(() => ({ dispose: vi.fn(), setView: vi.fn() })),
+  mountModelScene: vi.fn(() => ({
+    dispose: vi.fn(),
+    setView: vi.fn(),
+    setSpin: vi.fn((wanted: boolean) => wanted),
+    setLandPattern: vi.fn(),
+    setRenderMode: vi.fn(),
+    setLayers: vi.fn(),
+    setPlacementMode: vi.fn(),
+    modelInfo: vi.fn(() => null),
+  })),
 }));
 
 const mockApi = vi.mocked(api);
@@ -114,7 +123,7 @@ describe("DetailPanel files previews (M6d)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Open Symbol Preview" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "Previews for LM358" });
+    const dialog = await screen.findByRole("dialog", { name: "Inspect LM358" });
     expect(dialog).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Symbol" })).toHaveAttribute(
       "aria-selected",
@@ -219,7 +228,7 @@ describe("DetailPanel git timeline (M6k)", () => {
       count: 1,
     });
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    expect(screen.getByText("Timeline")).toBeInTheDocument();
+    expect(screen.getByText("Activity")).toBeInTheDocument();
     // the timeline is wired to this part id, so its commit renders
     expect(await screen.findByText("Add lm358")).toBeInTheDocument();
     expect(mockApi.partHistory).toHaveBeenCalledWith("lm358");
@@ -244,19 +253,27 @@ describe("DetailPanel pinout (M6i)", () => {
         {...BASE}
       />,
     );
-    expect(screen.getByText("Pinout")).toBeInTheDocument();
+    const heading = screen.getByRole("heading", { name: "Datasheet Pinout" });
+    const cad = screen.getByRole("button", { name: /CAD/ });
+    expect(heading).toBeInTheDocument();
     expect(screen.getByText("2 Pins")).toBeInTheDocument();
     expect(screen.getByText("OUT1")).toBeInTheDocument();
     expect(screen.getByText(/datasheet · high/i)).toBeInTheDocument();
+    expect(
+      cad.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Pinout" })).not.toBeInTheDocument();
   });
 
   it("shows no Pinout section when the record has no pinout", () => {
     wrap(<DetailPanel detail={detail({ derived: { specs: {} } })} {...BASE} />);
-    expect(screen.queryByText("Pinout")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Datasheet Pinout" }),
+    ).not.toBeInTheDocument();
   });
 
   it("resets the pinout filter when switching to a different part (keyed per part)", async () => {
-    // Without a per-part key the single PinoutViewer instance carries its filter
+    // Without a per-part key the single compact pinout card carries its filter
     // across a part switch (the same leak the sibling EnrichPanel is keyed to avoid).
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = (d: PartDetail) => (
@@ -278,9 +295,10 @@ describe("DetailPanel pinout (M6i)", () => {
       },
     });
     const { rerender } = render(view(A));
-    // Pinout now lives in the workbench's Pinout tab; open it before filtering.
-    await userEvent.click(screen.getByRole("tab", { name: "Pinout" }));
-    await userEvent.type(screen.getByRole("textbox", { name: /filter pins/i }), "vcc");
+    await userEvent.type(
+      screen.getByRole("searchbox", { name: /filter datasheet pins/i }),
+      "vcc",
+    );
     expect(screen.getByText("VCC")).toBeInTheDocument();
 
     rerender(view(B)); // switch parts: the filter must reset so B's pins show
@@ -461,6 +479,32 @@ describe("DetailPanel dev-mode ids (IDSYS-01)", () => {
       expect(el).not.toBeNull();
       expect(DEV_ID_BY_ID.has(id)).toBe(true);
     }
+  });
+
+  it("removes inactive workbench panels from layout even when their class sets display", async () => {
+    const user = userEvent.setup();
+    const { container } = wrap(<DetailPanel detail={detail()} {...BASE} />);
+    const overview = container.querySelector("#workbench-panel-specs") as HTMLElement;
+    const representations = container.querySelector("#workbench-panel-handoff") as HTMLElement;
+
+    expect(overview.style.display).toBe("");
+    expect(representations.style.display).toBe("none");
+    await user.click(screen.getByRole("tab", { name: "Representations" }));
+    expect(overview.style.display).toBe("none");
+    expect(representations.style.display).toBe("");
+    expect(representations).toHaveClass("overflow-hidden");
+    expect(
+      container
+        .querySelector('[data-dev-id="detail.representations"]')
+        ?.querySelector(".overflow-auto"),
+    ).not.toBeNull();
+    const representation = container.querySelector(
+      '[data-dev-id="detail.representations"]',
+    ) as HTMLElement;
+    expect(within(representation).getByText("Design Tool")).toBeInTheDocument();
+    expect(within(representation).getAllByText("Symbol").length).toBeGreaterThan(0);
+    expect(within(representation).getAllByText("Footprint").length).toBeGreaterThan(0);
+    expect(within(representation).getAllByText("3D Model").length).toBeGreaterThan(0);
   });
 
   it("emits the derived tab-strip ids via TabStrip devIdBase, resolving via DEV_ID_BY_ID", () => {
@@ -745,7 +789,7 @@ describe("DetailPanel alternates", () => {
   it("says how many answers a field has, without spending space until asked", async () => {
     wrap(<DetailPanel detail={withTwoDescriptions()} {...BASE} />);
     // description + datasheet now live on the Handoff TAB (owner's choice 2026-07-26)
-    await userEvent.click(screen.getByRole("tab", { name: "Handoff" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
     expect(screen.getByRole("button", { name: /2 Sources/i })).toBeTruthy();
     // the other distributor's wording stays out of the way until the disclosure is opened
     expect(screen.queryByText("Step-Down Regulator, 3 A")).toBeNull();
@@ -754,7 +798,7 @@ describe("DetailPanel alternates", () => {
   it("shows each answer with the distributor that gave it once opened", async () => {
     const user = userEvent.setup();
     wrap(<DetailPanel detail={withTwoDescriptions()} {...BASE} />);
-    await user.click(screen.getByRole("tab", { name: "Handoff" }));
+    await user.click(screen.getByRole("tab", { name: "Representations" }));
     await user.click(screen.getByRole("button", { name: /2 Sources/i }));
     expect(screen.getByText("Step-Down Regulator, 3 A")).toBeTruthy();
     expect(screen.getByText("DigiKey")).toBeTruthy();
@@ -769,13 +813,13 @@ describe("DetailPanel alternates", () => {
     );
     // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
     // open it before asserting on them. The assertions themselves are unchanged.
-    await userEvent.click(screen.getByRole("tab", { name: "Handoff" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
     // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
     // open it before asserting on them. The assertions themselves are unchanged.
-    await userEvent.click(screen.getByRole("tab", { name: "Handoff" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
     // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
     // open it before asserting on them. The assertions themselves are unchanged.
-    await userEvent.click(screen.getByRole("tab", { name: "Handoff" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
     await user.click(screen.getByRole("button", { name: /2 Sources/i }));
     await user.click(screen.getByRole("button", { name: /Use DigiKey/i }));
     expect(onEditField).toHaveBeenCalledWith("description", "Step-Down Regulator, 3 A");
@@ -788,7 +832,7 @@ describe("DetailPanel alternates", () => {
     );
     // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
     // open it before asserting on them. The assertions themselves are unchanged.
-    await userEvent.click(screen.getByRole("tab", { name: "Handoff" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
     await user.click(screen.getByRole("button", { name: /2 Sources/i }));
     expect(screen.queryByRole("button", { name: /Use Mouser/i })).toBeNull();
   });
@@ -920,6 +964,59 @@ describe("DetailPanel spec row pairing", () => {
   });
 });
 
+describe("DetailPanel key specifications", () => {
+  it("promotes key rows once instead of duplicating them in the full specification list", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({
+          derived: {
+            category: "Resistors",
+            specs: {
+              Resistance: "10 kOhm",
+              Tolerance: "1%",
+              Package: "0603",
+              "Pulse Duration": "1 ms",
+            },
+          },
+        })}
+        {...BASE}
+      />,
+    );
+    const key = screen.getByRole("region", { name: "Key Specifications" });
+    const full = document.querySelector('[data-dev-id="detail.specs-list"]') as HTMLElement;
+    expect(within(key).getByText("Resistance")).toBeInTheDocument();
+    expect(within(full).queryByText("Resistance")).not.toBeInTheDocument();
+    expect(within(full).getByText("Pulse Duration")).toBeInTheDocument();
+  });
+
+  it("moves a custom pin into Key Specifications and returns it when unpinned", async () => {
+    const user = userEvent.setup();
+    wrap(
+      <DetailPanel
+        detail={detail({
+          derived: {
+            category: "ICs",
+            specs: {
+              "Supply Voltage": "3.3 V",
+              Package: "QFN-16",
+              "Slew Rate": "13 V/us",
+            },
+          },
+        })}
+        {...BASE}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Pin Slew Rate" }));
+    const key = screen.getByRole("region", { name: "Key Specifications" });
+    const full = document.querySelector('[data-dev-id="detail.specs-list"]') as HTMLElement;
+    expect(within(key).getByText("Slew Rate")).toBeInTheDocument();
+    expect(within(full).queryByText("Slew Rate")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Unpin Slew Rate" }));
+    expect(within(full).getByText("Slew Rate")).toBeInTheDocument();
+  });
+});
+
 describe("DetailPanel alternates alignment", () => {
   it("lines an alternate's value up with the row it belongs to", async () => {
     // The alternates were justify-between while their PARENT row had just been changed to a grid,
@@ -987,7 +1084,7 @@ describe("DetailPanel links row anatomy", () => {
     wrap(<DetailPanel detail={withDatasheet()} {...BASE} onEditField={onEditField} />);
     // The datasheet field moved to the Handoff TAB (owner's choice, 2026-07-26); open it before
     // asserting on it. The assertions themselves are unchanged.
-    await user.click(screen.getByRole("tab", { name: "Handoff" }));
+    await user.click(screen.getByRole("tab", { name: "Representations" }));
     // OPENS: a real anchor at the FULL url, never the shortened display label.
     expect(screen.getByRole("link", { name: /Open Datasheet/i })).toHaveAttribute(
       "href",

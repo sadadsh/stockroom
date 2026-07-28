@@ -19,8 +19,9 @@ import { api } from "../api/client";
 export interface UiPrefs {
   theme?: "dark" | "light";
   rail_collapsed?: boolean;
-  /** Spec keys the user pinned into Key Specifications, per category display name. An OBJECT, unlike
-   *  the two scalars above - see the JSON handling in `writePref`. */
+  /** Canonical spec ids pinned into Key Specifications, per canonical category id. Legacy maps
+   *  containing raw distributor labels/display categories are migrated on read by keySpecs.ts.
+   *  An OBJECT, unlike the two scalars above - see the JSON handling in `writePref`. */
   pinned_specs?: Record<string, readonly string[]>;
 }
 

@@ -185,7 +185,7 @@ describe("ComponentsPage", () => {
 
     // Manufacturer is an EDA handoff field, and the handoff moved to its own tab (owner's choice,
     // 2026-07-26). Open it first; the edit-and-toast behaviour under test is unchanged.
-    await user.click(await screen.findByRole("tab", { name: "Handoff" }));
+    await user.click(await screen.findByRole("tab", { name: "Representations" }));
     const field = await screen.findByRole("button", { name: "Edit Manufacturer" });
     await user.click(field);
     const input = screen.getByLabelText("Manufacturer");
@@ -318,7 +318,7 @@ describe("ComponentsPage", () => {
     const user = userEvent.setup();
 
     // Enrich now lives in the part workbench's Enrich tab, so open it first.
-    await user.click(await screen.findByRole("tab", { name: "Enrich" }));
+    await user.click(await screen.findByRole("tab", { name: "Sources" }));
     await user.click(
       await screen.findByRole("button", { name: "Enrich From Distributor" }),
     );
@@ -362,7 +362,7 @@ describe("ComponentsPage", () => {
     const user = userEvent.setup();
 
     // Enrich now lives in the part workbench's Enrich tab, so open it first.
-    await user.click(await screen.findByRole("tab", { name: "Enrich" }));
+    await user.click(await screen.findByRole("tab", { name: "Sources" }));
     await user.click(
       await screen.findByRole("button", { name: "Enrich From Distributor" }),
     );
@@ -408,7 +408,7 @@ describe("ComponentsPage", () => {
     const user = userEvent.setup();
 
     // Enrich now lives in the part workbench's Enrich tab, so open it first.
-    await user.click(await screen.findByRole("tab", { name: "Enrich" }));
+    await user.click(await screen.findByRole("tab", { name: "Sources" }));
     await user.click(
       await screen.findByRole("button", { name: "Enrich From Distributor" }),
     );

@@ -93,24 +93,28 @@ const CAD_SOURCES = [
     url: "https://www.digikey.com/en/products/result?keywords=BQ24074",
     tools: ["kicad", "altium"], aggregator: true,
     instruction: "Open the CAD Models section, then download for KiCad and for Altium.",
+    capture_available: false,
   },
   {
     key: "ultralibrarian", label: "Ultra Librarian",
     url: "https://www.ultralibrarian.com/search?queryText=BQ24074",
     tools: ["kicad", "altium"], aggregator: false,
     instruction: "Pick the part, choose KiCad and Altium as the export formats, then Download.",
+    capture_available: true,
   },
   {
     key: "samacsys", label: "SamacSys",
     url: "https://componentsearchengine.com/search/BQ24074",
     tools: ["kicad", "altium"], aggregator: false,
     instruction: "Open the part, then download the KiCad and Altium models.",
+    capture_available: false,
   },
   {
     key: "snapmagic", label: "SnapMagic",
     url: "https://www.snapeda.com/search/?q=BQ24074",
     tools: ["kicad", "altium"], aggregator: false,
     instruction: "Check the model is manufacturer-verified, then download for KiCad and Altium.",
+    capture_available: true,
   },
 ];
 
@@ -178,11 +182,11 @@ describe("CompletePartModal - guided capture", () => {
     );
   });
 
-  it("names DigiKey in the guided-capture subline, never a placeholder vendor", async () => {
+  it("names the first implemented provider in the guided-capture subline", async () => {
     mockCadSource(["kicad_symbol", "altium_symbol"]);
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
     await screen.findByText("Files");
-    expect(screen.getByText(/from DigiKey\.?$/)).toBeInTheDocument();
+    expect(screen.getByText(/from Ultra Librarian\.?$/)).toBeInTheDocument();
     expect(screen.queryByText(/the vendor/)).toBeNull();
   });
 
@@ -333,7 +337,7 @@ describe("CompletePartModal - vendor choice", () => {
     window.localStorage.clear();
   });
 
-  it("offers every vendor, in the owner's trust order", async () => {
+  it("offers implemented capture providers in trust order", async () => {
     mockCadSource(["kicad_symbol", "altium_symbol"]);
     RENDER();
     await screen.findByText("Download From");
@@ -341,16 +345,16 @@ describe("CompletePartModal - vendor choice", () => {
     const names = within(vendorGroup())
       .getAllByRole("button")
       .map((b) => b.textContent!.replace("hosts all three", "").trim());
-    expect(names).toEqual(["DigiKey", "Ultra Librarian", "SamacSys", "SnapMagic"]);
+    expect(names).toEqual(["Ultra Librarian", "SnapMagic"]);
   });
 
-  it("says DigiKey HOSTS the others rather than implying a fourth library", async () => {
+  it("does not offer discovery-only providers as working capture routes", async () => {
     mockCadSource(["kicad_symbol"]);
     RENDER();
     await screen.findByText("Download From");
 
-    expect(vendorButton(/DigiKey/)).toHaveTextContent("hosts all three");
-    expect(vendorButton(/SamacSys/)).not.toHaveTextContent("hosts all three");
+    expect(within(vendorGroup()).queryByRole("button", { name: /DigiKey/ })).toBeNull();
+    expect(within(vendorGroup()).queryByRole("button", { name: /SamacSys/ })).toBeNull();
   });
 
   it("opens the vendor that was CHOSEN, not the default", async () => {
@@ -372,14 +376,14 @@ describe("CompletePartModal - vendor choice", () => {
     mockCadSource(["kicad_symbol"]);
     const { unmount } = RENDER();
     await screen.findByText("Download From");
-    await userEvent.click(vendorButton(/SamacSys/));
+    await userEvent.click(vendorButton(/SnapMagic/));
     unmount();
 
     mockCadSource(["kicad_symbol"]);
     RENDER();
     await screen.findByText("Download From");
 
-    expect(vendorButton(/SamacSys/)).toHaveAttribute("aria-pressed", "true");
+    expect(vendorButton(/SnapMagic/)).toHaveAttribute("aria-pressed", "true");
   });
 
   it("falls back to the trust order's head when the remembered vendor is not offered", async () => {
@@ -389,7 +393,7 @@ describe("CompletePartModal - vendor choice", () => {
     RENDER();
     await screen.findByText("Download From");
 
-    expect(vendorButton(/DigiKey/)).toHaveAttribute("aria-pressed", "true");
+    expect(vendorButton(/Ultra Librarian/)).toHaveAttribute("aria-pressed", "true");
   });
 
   it("names the CHOSEN vendor in the subline, so the sentence matches the button", async () => {

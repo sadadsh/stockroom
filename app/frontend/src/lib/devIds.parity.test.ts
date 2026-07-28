@@ -18,7 +18,7 @@
  *     derivation source below (Rail's `rail.nav-${route}`, TabStrip's `${base}.tabs` /
  *     `${base}.tab-${id}`).
  *  2. KNOWN_PROP_PASSED — passed into a child as a plain string prop (e.g. AssetTile's
- *     `devId="detail.asset-hero"`, WorkbenchPanel's `devId="detail.pinout"`) which the
+ *     `devId="detail.asset-hero"`, WorkbenchPanel's `devId="detail.enrich"`) which the
  *     child then renders as `data-dev-id={devId}`. The id string DOES exist in source,
  *     just not on a `data-dev-id="..."` attribute. Each is verified present as a quoted
  *     literal below, so this list is checked, not rubber-stamped.
@@ -72,31 +72,23 @@ function sourceContains(needle: string): boolean {
 // (1) Computed by a reusable component from a prop; the full string is never in source.
 const KNOWN_DERIVED: readonly string[] = [
   // Rail.tsx: <RailItem data-dev-id={`rail.nav-${item.route}`}> over lib/nav.ts routes,
-  // which are exactly components, projects, settings.
+  // which are exactly components, STM Viewer, and settings.
   "rail.nav-components",
-  "rail.nav-projects",
+  "rail.nav-stm",
   "rail.nav-settings",
   // primitives.tsx TabStrip: data-dev-id={`${devIdBase}.tabs`} + `${devIdBase}.tab-${t.id}`,
-  // with DetailPanel passing devIdBase="detail" over tab ids specs/sourcing/pinout/enrich/history.
+  // with DetailPanel passing devIdBase="detail" over its workbench tab ids.
   "detail.tabs",
   "detail.tab-specs",
   "detail.tab-sourcing",
-  "detail.tab-pinout",
   "detail.tab-enrich",
   "detail.tab-history",
-  // ...and ProjectsPage passing devIdBase="projects" over overview/health/bom/setup/netclasses.
-  "projects.tabs",
-  "projects.tab-overview",
-  "projects.tab-health",
-  "projects.tab-bom",
-  "projects.tab-setup",
-  "projects.tab-netclasses",
   // DetailPanel AssetTile: data-dev-id={`${devId}-open`} on the EYE. Since the 3D stage stopped
   // being one big button (so it can be orbited in place), the eye is the only opener, and it needed
   // to be addressable by the shot harness. Only the hero tile passes `interactiveStage`, so this is
   // the only `-open` id that renders.
   "detail.asset-hero-open",
-]; // 16
+]; // 9
 
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
@@ -120,13 +112,20 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "detail.model-view-iso",
   "detail.model-view-top",
   "detail.model-view-front",
+  // PreviewModal maps a typed tab table to data-dev-id={t.devId}; the exact strings
+  // remain at the table declaration so the addressable inspection modes cannot drift.
+  "preview.tab-symbol",
+  "preview.tab-footprint",
+  "preview.tab-model",
+  // three-viewport-gizmo creates its own DOM node, so threeScene attaches this id after
+  // construction with setAttribute instead of emitting it through JSX.
+  "detail.model-gizmo",
   // DetailPanel.tsx AssetTile: devId=/stageDevId= string props.
   "detail.asset-hero",
   "detail.asset-symbol",
   "detail.asset-footprint",
   "detail.asset-stage",
   // DetailPanel.tsx WorkbenchPanel: devId= string prop for the conditional workbench tabs.
-  "detail.pinout",
   "detail.enrich",
   "detail.history",
   "detail.handoff-tab",
@@ -175,12 +174,11 @@ describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   it("the derivation sources for KNOWN_DERIVED ids are present", () => {
     // Rail's per-route nav id derivation.
     expect(sourceContains("data-dev-id={`rail.nav-${item.route}`}")).toBe(true);
-    // TabStrip's generic derivation (drives both detail.* and projects.* tab ids).
+    // TabStrip's generic derivation drives the detail.* tab ids.
     expect(sourceContains("${devIdBase}.tabs")).toBe(true);
     expect(sourceContains("${devIdBase}.tab-${t.id}")).toBe(true);
-    // The two devIdBase call sites that produce the detail.* and projects.* tab ids.
+    // The detail call site produces the workbench tab ids.
     expect(sourceContains('devIdBase="detail"')).toBe(true);
-    expect(sourceContains('devIdBase="projects"')).toBe(true);
   });
 
   it("every KNOWN_DERIVED id is a catalogue id and is genuinely derived (never a literal)", () => {
@@ -227,7 +225,7 @@ describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
 // A source-level gate, because this cannot be a shared constant: a Tailwind arbitrary value built
 // from a template literal produces a class with no CSS behind it, which would delete the height.
 
-// The DOCKED PANEL headers - the rail, the list, the detail sheet, the projects sheet. These four
+// The docked panel headers for the rail, list, and detail sheet. These three
 // sit on ONE horizontal band across the window, so a difference between them reads as a
 // mis-registration rather than as variety. Modal headers are a SEPARATE family (consistently 38px)
 // and status bars a third (24px); scoping matters, because the first draft of this gate convicted
@@ -236,7 +234,6 @@ const DOCKED_PANEL_HEADERS = [
   "/src/components/primitives.tsx",
   "/src/components/Rail.tsx",
   "/src/components/DetailPanel.tsx",
-  "/src/pages/ProjectsPage.tsx",
 ];
 
 describe("panel header band height", () => {

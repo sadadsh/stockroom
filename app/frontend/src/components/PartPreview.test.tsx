@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { ApiError, api } from "../api/client";
 import { ThemeProvider } from "../lib/theme";
 import { ModelViewer } from "./ModelViewer";
+import { Glb3DView } from "./Glb3DView";
 import { PreviewImage } from "./PreviewImage";
 import { PreviewModal } from "./PreviewModal";
 import { SvgViewport } from "./SvgViewport";
@@ -24,15 +25,32 @@ vi.mock("../api/client", async (importActual) => {
 // mountModelScene returns a HANDLE ({dispose, setView}), not a bare dispose function: the viewer
 // needs a channel to move the camera to a canonical view. The mock mirrors that shape, or the
 // component's cleanup calls handle.dispose on a plain function and every 3D test dies on unmount.
-const mountSpy = vi.fn(
-  (_container: HTMLElement, _glb: ArrayBuffer, _onError?: () => void) => ({
+function sceneHandle() {
+  return {
     dispose: vi.fn(),
     setView: vi.fn(),
-  }),
+    setSpin: vi.fn((wanted: boolean) => wanted),
+    setLandPattern: vi.fn(),
+    setRenderMode: vi.fn(),
+    setLayers: vi.fn(),
+    setPlacementMode: vi.fn(),
+    modelInfo: vi.fn(() => null),
+  };
+}
+
+const mountSpy = vi.fn(
+  (
+    _container: HTMLElement,
+    _glb: ArrayBuffer,
+    _options?: { onError?: () => void },
+  ) => sceneHandle(),
 );
 vi.mock("../lib/threeScene", () => ({
-  mountModelScene: (c: HTMLElement, g: ArrayBuffer, onErr?: () => void) =>
-    mountSpy(c, g, onErr),
+  mountModelScene: (
+    c: HTMLElement,
+    g: ArrayBuffer,
+    options?: { onError?: () => void },
+  ) => mountSpy(c, g, options),
 }));
 
 const mockApi = vi.mocked(api);
@@ -118,6 +136,17 @@ describe("SvgViewport", () => {
     // dark is the default theme, so the monochrome art is inverted to near-white ink
     expect(img.style.filter).toBe("invert(1)");
     expect(screen.getByRole("button", { name: "Reset View" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Zoom level")).toHaveTextContent("100%");
+  });
+
+  it("supports explicit zoom controls and keyboard fit", async () => {
+    wrap(<SvgViewport blob={svgBlob()} alt="symbol preview" />);
+    await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(screen.getByLabelText("Zoom level")).toHaveTextContent("125%");
+    const canvas = screen.getByRole("application", { name: /symbol preview inspection canvas/i });
+    canvas.focus();
+    await userEvent.keyboard("0");
+    expect(screen.getByLabelText("Zoom level")).toHaveTextContent("100%");
   });
 
   it("recenters the view when Reset View is pressed after a pan", async () => {
@@ -163,9 +192,9 @@ describe("ModelViewer", () => {
 
   it("shows an honest message (not a blank canvas) when the GLB fails to parse", async () => {
     // simulate GLTFLoader's async onError firing after a successful fetch + mount
-    mountSpy.mockImplementation((_c, _g, onErr) => {
-      onErr?.();
-      return { dispose: vi.fn(), setView: vi.fn() };
+    mountSpy.mockImplementation((_c, _g, options) => {
+      options?.onError?.();
+      return sceneHandle();
     });
     mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
     wrap(<ModelViewer partId="tps62130" />);
@@ -178,6 +207,115 @@ describe("ModelViewer", () => {
     );
     wrap(<ModelViewer partId="led_red" />);
     expect(await screen.findByText(/supports step models/i)).toBeInTheDocument();
+  });
+});
+
+describe("Glb3DView scene synchronization", () => {
+  const bytes = new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer;
+  const land = {
+    units: "mm",
+    pads: [{
+      number: "1",
+      at: [0, 0] as [number, number],
+      size: [1, 1] as [number, number],
+      shape: "rect",
+      rotation: 0,
+      drill: 0,
+      pad_type: "smd",
+      side: "front",
+      rratio: 0,
+    }],
+    graphics: [],
+    model_placement: null,
+  };
+
+  it("delivers a land pattern that resolves after the GLB scene mounts", async () => {
+    const handle = sceneHandle();
+    mountSpy.mockReturnValue(handle);
+    const result = wrap(
+      <Glb3DView data={bytes} isLoading={false} isError={false} land={undefined} />,
+    );
+    await waitFor(() => expect(mountSpy).toHaveBeenCalled());
+
+    result.rerender(
+      <ThemeProvider>
+        <Glb3DView data={bytes} isLoading={false} isError={false} land={land} />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(handle.setLandPattern).toHaveBeenCalledWith(land));
+  });
+
+  it("replays the visible toolbar state into a newly mounted scene", async () => {
+    const handle = sceneHandle();
+    mountSpy.mockReturnValue(handle);
+    wrap(
+      <Glb3DView
+        data={bytes}
+        isLoading={false}
+        isError={false}
+        land={land}
+        showViews
+        showShading
+      />,
+    );
+    await waitFor(() => expect(mountSpy).toHaveBeenCalled());
+    expect(handle.setLandPattern).toHaveBeenCalledWith(land);
+    expect(handle.setRenderMode).toHaveBeenCalledWith("realistic");
+    expect(handle.setLayers).toHaveBeenCalledWith({
+      model: true,
+      pads: true,
+      board: true,
+    });
+    expect(handle.setView).toHaveBeenCalledWith("iso");
+    expect(handle.setPlacementMode).toHaveBeenCalledWith("auto");
+  });
+
+  it("keeps advanced controls available behind one settings control in the compact viewer", async () => {
+    const handle = sceneHandle();
+    mountSpy.mockReturnValue(handle);
+    const placedLand = {
+      ...land,
+      model_placement: {
+        offset: [0, 0, 0] as [number, number, number],
+        scale: [1, 1, 1] as [number, number, number],
+        rotate: [0, 0, 0] as [number, number, number],
+      },
+    };
+    wrap(
+      <Glb3DView
+        data={bytes}
+        isLoading={false}
+        isError={false}
+        land={placedLand}
+        showViews
+        showShading
+        compact
+      />,
+    );
+    expect(screen.queryByText("Realistic")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "3D view settings" }));
+    expect(screen.getByText("Shading")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Source" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Top" })).toBeInTheDocument();
+  });
+
+  it("does not carry a failed render across to replacement GLB bytes", async () => {
+    mountSpy.mockImplementationOnce((_c, _g, options) => {
+      options?.onError?.();
+      return sceneHandle();
+    });
+    const result = wrap(
+      <Glb3DView data={bytes} isLoading={false} isError={false} />,
+    );
+    expect(await screen.findByText(/could not render the 3d preview/i)).toBeInTheDocument();
+
+    const replacement = bytes.slice(0);
+    result.rerender(
+      <ThemeProvider>
+        <Glb3DView data={replacement} isLoading={false} isError={false} />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("model-canvas")).toBeInTheDocument());
   });
 });
 
@@ -196,7 +334,7 @@ describe("PreviewModal", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByRole("dialog", { name: "Previews for LM358" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Inspect LM358" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Symbol" })).toHaveAttribute(
       "aria-selected",
       "true",

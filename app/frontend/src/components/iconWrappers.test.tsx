@@ -17,7 +17,6 @@ import {
   GitIcon,
   InfoIcon,
   LibraryIcon,
-  ProjectsIcon,
   RefreshIcon,
   SearchIcon,
   SettingsIcon,
@@ -151,7 +150,7 @@ describe("icons.tsx wrappers - render-diff", () => {
   }
 });
 
-// Broad smoke over every one of the 24 named exports: each resolves to its registry entry and draws
+// Broad smoke over every named export: each resolves to its registry entry and draws
 // a single, non-empty svg with the right frame.
 const ALL: Array<{ Comp: (p: { className?: string }) => React.ReactElement | null; id: string }> = [
   { Comp: SearchIcon, id: "action.search" },
@@ -164,7 +163,6 @@ const ALL: Array<{ Comp: (p: { className?: string }) => React.ReactElement | nul
   { Comp: LibraryIcon, id: "nav.library" },
   { Comp: AddPartIcon, id: "action.add" },
   { Comp: DuplicateIcon, id: "action.duplicate" },
-  { Comp: ProjectsIcon, id: "nav.projects.alt" },
   { Comp: DoctorIcon, id: "action.doctor" },
   { Comp: SettingsIcon, id: "action.settings" },
   { Comp: DownloadIcon, id: "action.download" },
@@ -181,8 +179,8 @@ const ALL: Array<{ Comp: (p: { className?: string }) => React.ReactElement | nul
 ];
 
 describe("icons.tsx wrappers - coverage", () => {
-  it("maps all 24 named exports to their registry ids", () => {
-    expect(ALL).toHaveLength(24);
+  it("maps all 23 named exports to their registry ids", () => {
+    expect(ALL).toHaveLength(23);
   });
 
   for (const { Comp, id } of ALL) {

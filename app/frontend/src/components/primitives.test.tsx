@@ -40,12 +40,12 @@ describe("TabStrip devIdBase passthrough", () => {
     );
   });
 
-  it("derives from a different base to match the catalog (projects)", () => {
-    render(<Host devIdBase="projects" />);
-    expect(screen.getByRole("tablist")).toHaveAttribute("data-dev-id", "projects.tabs");
+  it("derives ids from any supplied base", () => {
+    render(<Host devIdBase="sample" />);
+    expect(screen.getByRole("tablist")).toHaveAttribute("data-dev-id", "sample.tabs");
     expect(screen.getByRole("tab", { name: "Specs" })).toHaveAttribute(
       "data-dev-id",
-      "projects.tab-specs",
+      "sample.tab-specs",
     );
   });
 

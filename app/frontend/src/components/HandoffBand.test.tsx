@@ -100,7 +100,7 @@ describe("HandoffBand", () => {
     // Category reaches Altium alone, so it is badged. MPN reaches both, so badging it would be
     // eight identical badges saying nothing.
     const category = document.querySelector('[data-dev-id="detail.handoff-category"]')!;
-    expect(category.textContent).toContain("Altium Designer");
+    expect(category.textContent).toContain("Altium Designer only");
     const mpn = document.querySelector('[data-dev-id="detail.handoff-mpn"]')!;
     expect(mpn.textContent).not.toContain("Altium Designer");
     expect(mpn.textContent).not.toContain("KiCad");

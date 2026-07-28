@@ -25,7 +25,8 @@
     "motion": "^12.42.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.169.0"
+    "three": "^0.169.0",
+    "three-viewport-gizmo": "^2.2.0"
   },
   "devDependencies": {
     "@tailwindcss/container-queries": "^0.1.1",

@@ -36,15 +36,49 @@ export interface CaptureMock {
  * as the backend would, instead of asserting on a shape no server produces.
  */
 export function mockCapture(
-  frames: { event: string; data: unknown }[] = [
-    { event: "progress", data: { message: "Working through the vendor page." } },
-    { event: "result", data: { result: { counts: { completed: 1 } } } },
-    { event: "done", data: {} },
-  ],
+  frames?: { event: string; data: unknown }[],
 ): CaptureMock {
-  const run = vi.spyOn(api, "runCapture").mockResolvedValue({ job_id: "job-1" });
+  let request: { partIds: string[]; needs?: string[] } | null = null;
+  const run = vi.spyOn(api, "runCapture").mockImplementation(async (body) => {
+    request = body as { partIds: string[]; needs?: string[] };
+    return { job_id: "job-1" };
+  });
   const stream = vi
     .spyOn(api, "openJobStream")
-    .mockImplementation(async () => sseStream(frames) as never);
+    .mockImplementation(async () => {
+      const partId = request?.partIds[0] ?? "p1";
+      const needs = request?.needs ?? ["kicad_symbol"];
+      const emitted =
+        frames ??
+        [
+          { event: "progress", data: { message: "Working through the vendor page." } },
+          {
+            event: "result",
+            data: {
+              result: {
+                items: [
+                  {
+                    part_id: partId,
+                    mpn: "M",
+                    display_name: "Captured Part",
+                    category: "ICs",
+                    status: "completed",
+                    needed: needs,
+                    satisfied: needs,
+                    remaining: [],
+                    sources: ["ultralibrarian"],
+                    error: "",
+                  },
+                ],
+                counts: { completed: 1 },
+                stopped: false,
+                stop_reason: "",
+              },
+            },
+          },
+          { event: "done", data: {} },
+        ];
+      return sseStream(emitted) as never;
+    });
   return { run, stream } as CaptureMock;
 }
