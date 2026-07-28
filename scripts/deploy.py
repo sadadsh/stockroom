@@ -66,7 +66,16 @@ def default_install() -> Path | None:
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["git", "-C", str(repo), *args], capture_output=True, text=True
+        [
+            "git",
+            "-c",
+            f"safe.directory={repo.resolve()}",
+            "-C",
+            str(repo),
+            *args,
+        ],
+        capture_output=True,
+        text=True,
     )
 
 
