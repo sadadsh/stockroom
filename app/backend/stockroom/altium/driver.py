@@ -22,7 +22,7 @@ Three facts shape the design, all measured 2026-07-25 and each one a bug that co
 
 Crossing the WSL boundary needs one specific workaround, scoped to that boundary: WSL's
 argv translation escapes the embedded quotes in `RunScript(...)` as `\"`, so Altium receives
-`\C:\path\` and cannot find the script. Routing through a generated `.bat` makes cmd.exe
+`\\C:\\path\\` and cannot find the script. Routing through a generated `.bat` makes cmd.exe
 re-parse the line correctly. A native Windows caller does not have this problem.
 """
 
@@ -49,25 +49,44 @@ _PS_PROCESSES = (
     'ForEach-Object { "$($_.Id)`t$($_.MainWindowTitle)" }'
 )
 
-# Every VISIBLE top-level window title, not just each process's main title. See fact 2 above:
-# a modal owned by a hidden parent is invisible to `MainWindowTitle`, and that is precisely the
-# failure that made a doomed run look like a slow boot.
+# Every VISIBLE Altium-owned top-level window title, not just each process's main title. See fact 2
+# above: a modal owned by a hidden parent is invisible to `MainWindowTitle`, and that is precisely
+# the failure that made a doomed run look like a slow boot. The owner-PID filter is essential:
+# unrelated applications can have titles such as "Please purchase WinRAR license", and classifying
+# every desktop window as Altium would abort a healthy run.
 _PS_WINDOWS = r"""
 Add-Type @"
-using System;using System.Text;using System.Runtime.InteropServices;
+using System;using System.Text;using System.Collections.Generic;using System.Runtime.InteropServices;
 public class E {
  public delegate bool P(IntPtr h, IntPtr l);
  [DllImport("user32.dll")] public static extern bool EnumWindows(P f, IntPtr l);
+ [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr h, P f, IntPtr l);
  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+ [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);
+ static void AddText(List<string> found, IntPtr h) {
+   StringBuilder s = new StringBuilder(2048);
+   GetWindowText(h, s, s.Capacity);
+   string text = s.ToString().Replace("\r", " ").Replace("\n", " ").Trim();
+   if (text.Length > 0 && !found.Contains(text)) found.Add(text);
+ }
+ public static string WindowTextTree(IntPtr h) {
+   List<string> found = new List<string>();
+   AddText(found, h);
+   P child = delegate(IntPtr c, IntPtr l) { AddText(found, c); return true; };
+   EnumChildWindows(h, child, IntPtr.Zero);
+   return String.Join(" | ", found.ToArray());
+ }
 }
 "@
+$x2Ids = @(Get-Process X2 -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
 $found = New-Object System.Collections.ArrayList
 $cb = [E+P]{ param($h,$l)
-  if ([E]::IsWindowVisible($h)) {
-    $sb = New-Object System.Text.StringBuilder 512
-    [void][E]::GetWindowText($h,$sb,512)
-    if ($sb.Length -gt 0) { [void]$found.Add($sb.ToString()) }
+  [uint32]$ownerPid = 0
+  [void][E]::GetWindowThreadProcessId($h,[ref]$ownerPid)
+  if (($x2Ids -contains [int]$ownerPid) -and [E]::IsWindowVisible($h)) {
+    $text = [E]::WindowTextTree($h)
+    if ($text.Length -gt 0) { [void]$found.Add($text) }
   }
   return $true
 }

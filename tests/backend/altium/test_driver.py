@@ -117,6 +117,18 @@ def test_a_visible_dialog_fails_fast_instead_of_burning_the_timeout(tmp_path: Pa
     assert out.seconds < 10  # not the 999s ceiling
 
 
+def test_visible_window_enumeration_is_scoped_to_altium_owned_windows(tmp_path: Path, x2: Path):
+    drv, host, _marker = _driver(tmp_path, x2, windows="Select Item To Run\n")
+
+    assert drv.window_titles() == ["Select Item To Run"]
+    script = host.ps_calls[-1]
+    assert "GetWindowThreadProcessId" in script
+    assert "Get-Process X2" in script
+    assert "$x2Ids -contains [int]$ownerPid" in script
+    assert "EnumChildWindows" in script
+    assert "WindowTextTree" in script
+
+
 def test_altium_dying_without_a_marker_is_reported_as_an_exit(tmp_path: Path, x2: Path):
     drv, host, marker = _driver(tmp_path, x2, process=FakeProcess(exits_after=1))
     out = drv.run_script(proc="P.pas>P", marker=marker, project=tmp_path / "P.PrjScr", timeout=999)
@@ -130,7 +142,9 @@ def test_a_marker_written_just_before_the_process_exits_still_counts_as_success(
     # Altium exits ITSELF at the end of a successful script, so the exit check must never win a
     # race against the marker. Marker lands on the same cycle the process is seen gone.
     marker = tmp_path / "marker.txt"
-    host = FakeHost(tmp_path, marker_path=marker, marker_after=1, process=FakeProcess(exits_after=1))
+    host = FakeHost(
+        tmp_path, marker_path=marker, marker_after=1, process=FakeProcess(exits_after=1)
+    )
     drv = AltiumDriver(host=host, x2=x2, env={})
     out = drv.run_script(proc="P.pas>P", marker=marker, project=tmp_path / "P.PrjScr", timeout=999)
     assert out.status == "ok"
@@ -152,9 +166,7 @@ def test_a_windowed_altium_is_refused_because_it_holds_the_license_seat(tmp_path
 
 
 def test_allow_busy_overrides_the_seat_check(tmp_path: Path, x2: Path):
-    drv, host, marker = _driver(
-        tmp_path, x2, processes="4242\tAltium Designer\n", marker_after=1
-    )
+    drv, host, marker = _driver(tmp_path, x2, processes="4242\tAltium Designer\n", marker_after=1)
     out = drv.run_script(
         proc="P.pas>P", marker=marker, project=tmp_path / "P.PrjScr", allow_busy=True, timeout=99
     )
@@ -214,9 +226,7 @@ def test_find_x2_picks_the_newest_version_and_honours_the_override(tmp_path: Pat
 
 
 def test_find_x2_returns_none_when_nothing_is_installed(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr(
-        "stockroom.altium.driver._INSTALL_ROOTS", (str(tmp_path / "absent"),)
-    )
+    monkeypatch.setattr("stockroom.altium.driver._INSTALL_ROOTS", (str(tmp_path / "absent"),))
     assert find_x2(env={}) is None
 
 
