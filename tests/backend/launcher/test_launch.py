@@ -420,6 +420,27 @@ def test_single_instance_lock_blocks_a_second_holder(tmp_path):
     third.close()
 
 
+def test_main_holds_the_single_instance_lock_through_supervision(monkeypatch, tmp_path):
+    monkeypatch.setattr(launch, "app_workdir", lambda: tmp_path / "app")
+    observed = []
+
+    def inspect_while_running(_work):
+        contender = launch.acquire_single_instance(tmp_path)
+        observed.append(contender)
+        if contender is not None:
+            contender.close()
+        return 0
+
+    monkeypatch.setattr(splash, "run", inspect_while_running)
+
+    assert launch.main() == 0
+    assert observed == [None]
+
+    after_exit = launch.acquire_single_instance(tmp_path)
+    assert after_exit is not None
+    after_exit.close()
+
+
 def test_supervise_ensures_before_first_run(tmp_path):
     order = []
     supervise(
