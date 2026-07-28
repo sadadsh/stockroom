@@ -18,6 +18,7 @@ the next person does not have to remember them.
     uv run python scripts/deploy.py
     uv run python scripts/deploy.py --expect app/backend/stockroom/altium/dblib.py=KEY_COLUMN
     uv run python scripts/deploy.py --install "/mnt/c/.../Stockroom/app"
+    uv run python scripts/deploy.py --source D:\\Workspace\\Projects\\Stockroom
 
 Exit code is non-zero when the install did not end up at this HEAD, or when an `--expect` marker is
 missing, so this can gate.
@@ -27,6 +28,7 @@ No em dashes anywhere (standing owner rule).
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -39,7 +41,13 @@ _FALLBACK = "/mnt/c/Users/{user}/AppData/Local/Stockroom/app"
 
 
 def default_install() -> Path | None:
-    """The install directory, discovered. None when this machine has no Windows side."""
+    """Discover the per-user install from native Windows or WSL."""
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        candidate = Path(local_app_data) / "Stockroom" / "app"
+        if (candidate / ".git").exists():
+            return candidate
+
     users = Path("/mnt/c/Users")
     if not users.is_dir():
         return None
@@ -94,6 +102,13 @@ def main(argv: list[str] | None = None) -> int:
         "distinguishes a real deploy from two equally stale checkouts.",
     )
     ap.add_argument("--remote", default="origin")
+    ap.add_argument(
+        "--source",
+        type=Path,
+        default=None,
+        help="fetch main directly from this verified checkout and merge FETCH_HEAD; "
+        "use this when the canonical workspace is ahead of its remote",
+    )
     a = ap.parse_args(argv)
 
     install = a.install or default_install()
@@ -112,8 +127,22 @@ def main(argv: list[str] | None = None) -> int:
         for line in dirty.splitlines()[:5]:
             print(f"    {line}")
 
-    git(install, "fetch", "--quiet", a.remote)
-    merge = git(install, "merge", "--ff-only", f"{a.remote}/main")
+    if a.source is not None:
+        source = a.source.resolve()
+        if not (source / ".git").exists():
+            print(f"FAILED: source is not a git checkout: {source}")
+            return 2
+        fetch = git(install, "fetch", "--quiet", str(source), "main")
+        merge_ref = "FETCH_HEAD"
+    else:
+        fetch = git(install, "fetch", "--quiet", a.remote)
+        merge_ref = f"{a.remote}/main"
+    if fetch.returncode:
+        print("FAILED: could not fetch the requested deployment source.")
+        print((fetch.stderr or fetch.stdout).strip()[:500])
+        return 1
+
+    merge = git(install, "merge", "--ff-only", merge_ref)
     theirs = head(install)
 
     print(f"  repo    HEAD {mine}")

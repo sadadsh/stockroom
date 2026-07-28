@@ -56,3 +56,12 @@ def test_the_install_is_DISCOVERED_not_hardcoded_to_one_username(monkeypatch, tm
         if (candidate / ".git").exists():
             found = candidate
     assert found is not None and found.name == "app"
+
+
+def test_native_windows_install_uses_local_app_data(monkeypatch, tmp_path):
+    local_app_data = tmp_path / "Local"
+    expected = local_app_data / "Stockroom" / "app"
+    (expected / ".git").mkdir(parents=True)
+    monkeypatch.setenv("LOCALAPPDATA", str(local_app_data))
+
+    assert deploy.default_install() == expected
