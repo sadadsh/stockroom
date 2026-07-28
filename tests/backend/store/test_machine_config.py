@@ -1,5 +1,8 @@
 import json
 
+import pytest
+
+from stockroom.credentials import CredentialStoreError, MemoryCredentialStore
 from stockroom.store.machine_config import MachineConfig, config_dir
 
 
@@ -34,6 +37,7 @@ def test_save_then_load_round_trip(tmp_path):
     cfg = MachineConfig(active_profile="Bench", mouser_api_key="KEY123", sync_enabled=False)
     cfg.save(path)
     assert path.exists()
+    assert "mouser_api_key" not in json.loads(path.read_text())
     again = MachineConfig.load(path)
     assert again == cfg
 
@@ -81,6 +85,10 @@ def test_vendor_login_fields_round_trip(tmp_path):
         snapeda_password="q",
     )
     cfg.save(path)
+    saved = json.loads(path.read_text())
+    assert "ul_password" not in saved
+    assert "snapeda_password" not in saved
+    assert saved["ul_username"] == "me@x.com"
     loaded = MachineConfig.load(path)
     assert loaded.ul_username == "me@x.com"
     assert loaded.ul_password == "pw"
@@ -105,6 +113,9 @@ def test_samacsys_and_digikey_account_fields_round_trip(tmp_path):
         digikey_password="dp",
     )
     cfg.save(path)
+    saved = json.loads(path.read_text())
+    assert "samacsys_password" not in saved
+    assert "digikey_password" not in saved
     loaded = MachineConfig.load(path)
     assert loaded.samacsys_username == "sam@x.com"
     assert loaded.samacsys_password == "sp"
@@ -116,3 +127,98 @@ def test_samacsys_and_digikey_account_defaults_empty():
     cfg = MachineConfig()
     assert cfg.samacsys_username == "" and cfg.samacsys_password == ""
     assert cfg.digikey_username == "" and cfg.digikey_password == ""
+
+
+def test_legacy_plaintext_secrets_migrate_before_json_is_scrubbed(tmp_path):
+    path = tmp_path / "legacy.json"
+    path.write_text(
+        json.dumps(
+            {
+                "active_profile": "Bench",
+                "mouser_api_key": "LEGACY-MOUSER",
+                "digikey_client_secret": "LEGACY-DIGIKEY",
+                "github_token": "LEGACY-GITHUB",
+            }
+        ),
+        encoding="utf-8",
+    )
+    store = MemoryCredentialStore("legacy-migration")
+
+    loaded = MachineConfig.load(path, credential_store=store)
+
+    assert loaded.mouser_api_key == "LEGACY-MOUSER"
+    assert loaded.digikey_client_secret == "LEGACY-DIGIKEY"
+    assert loaded.github_token == "LEGACY-GITHUB"
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert (
+        not {
+            "mouser_api_key",
+            "digikey_client_secret",
+            "github_token",
+        }
+        & saved.keys()
+    )
+    assert store.get("mouser_api_key") == "LEGACY-MOUSER"
+    assert store.get("digikey_client_secret") == "LEGACY-DIGIKEY"
+    assert store.get("github_token") == "LEGACY-GITHUB"
+
+
+def test_clearing_a_secret_removes_it_from_the_store(tmp_path):
+    path = tmp_path / "config.json"
+    store = MemoryCredentialStore("clear-secret")
+    config = MachineConfig(mouser_api_key="FIRST")
+    config.save(path, credential_store=store)
+    assert store.get("mouser_api_key") == "FIRST"
+
+    config.mouser_api_key = ""
+    config.save(path, credential_store=store)
+
+    assert store.get("mouser_api_key") is None
+    assert MachineConfig.load(path, credential_store=store).mouser_api_key == ""
+
+
+class _FailingStore:
+    def __init__(self):
+        self.values: dict[str, str] = {}
+
+    def get(self, name: str) -> str | None:
+        return self.values.get(name)
+
+    def set(self, name: str, value: str) -> None:
+        if name == "digikey_client_secret":
+            raise CredentialStoreError("injected credential failure")
+        self.values[name] = value
+
+    def delete(self, name: str) -> None:
+        self.values.pop(name, None)
+
+
+def test_failed_legacy_migration_preserves_the_plaintext_source(tmp_path):
+    path = tmp_path / "legacy.json"
+    original = json.dumps(
+        {
+            "mouser_api_key": "FIRST",
+            "digikey_client_secret": "SECOND",
+        }
+    )
+    path.write_text(original, encoding="utf-8")
+
+    with pytest.raises(CredentialStoreError, match="injected credential failure"):
+        MachineConfig.load(path, credential_store=_FailingStore())
+
+    assert path.read_text(encoding="utf-8") == original
+
+
+def test_failed_save_does_not_replace_existing_public_config(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text('{"active_profile":"Original"}', encoding="utf-8")
+    config = MachineConfig(
+        active_profile="Replacement",
+        mouser_api_key="FIRST",
+        digikey_client_secret="SECOND",
+    )
+
+    with pytest.raises(CredentialStoreError, match="injected credential failure"):
+        config.save(path, credential_store=_FailingStore())
+
+    assert path.read_text(encoding="utf-8") == '{"active_profile":"Original"}'

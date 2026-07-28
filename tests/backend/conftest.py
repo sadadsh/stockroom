@@ -128,5 +128,6 @@ def _isolate_machine_config_suitewide(tmp_path, monkeypatch):
     call `save()`.
     """
     monkeypatch.setenv("STOCKROOM_CONFIG_DIR", str(tmp_path / "sr-config"))
+    monkeypatch.setenv("STOCKROOM_CREDENTIALS_BACKEND", "memory")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
     monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
