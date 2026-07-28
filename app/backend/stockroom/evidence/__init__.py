@@ -1,6 +1,7 @@
 """Immutable local evidence objects and provider manifests."""
 
 from .store import (
+    EvidenceArtifact,
     EvidenceCorruption,
     EvidenceError,
     EvidenceManifestMismatch,
@@ -8,6 +9,7 @@ from .store import (
 )
 
 __all__ = [
+    "EvidenceArtifact",
     "EvidenceCorruption",
     "EvidenceError",
     "EvidenceManifestMismatch",
