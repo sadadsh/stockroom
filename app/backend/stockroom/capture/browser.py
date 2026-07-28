@@ -435,7 +435,11 @@ class PlaywrightCaptureBrowser:
             "headless": self.headless,
             "os": "windows",
             "humanize": True,
-            "geoip": True,
+            "timeout": _BROWSER_LAUNCH_TIMEOUT_MS,
+            # Capture does not need geolocation. Camoufox's automatic GeoIP mode makes a separate
+            # request to a public IP service before the browser can even launch, turning an
+            # unrelated third-party outage or firewall rule into a CAD-provider outage.
+            "geoip": False,
             "exclude_addons": [DefaultAddons.UBO],
         }
         if self.profile_dir is not None:
