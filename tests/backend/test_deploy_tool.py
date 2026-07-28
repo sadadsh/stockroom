@@ -8,6 +8,7 @@ checkouts, and a confident wrong "DEPLOY-MATCH" from exactly that situation has 
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 from pathlib import Path
 
 _SPEC = importlib.util.spec_from_file_location(
@@ -65,3 +66,23 @@ def test_native_windows_install_uses_local_app_data(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(local_app_data))
 
     assert deploy.default_install() == expected
+
+
+def test_git_scopes_safe_directory_to_the_exact_checkout(monkeypatch, tmp_path):
+    observed = {}
+
+    def fake_run(argv, **kwargs):
+        observed["argv"] = argv
+        observed["kwargs"] = kwargs
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(deploy.subprocess, "run", fake_run)
+    deploy.git(tmp_path, "status", "--short")
+
+    assert observed["argv"][:4] == [
+        "git",
+        "-c",
+        f"safe.directory={tmp_path.resolve()}",
+        "-C",
+    ]
+    assert observed["argv"][4:] == [str(tmp_path), "status", "--short"]
