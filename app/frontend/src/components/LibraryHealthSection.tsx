@@ -111,7 +111,7 @@ function HealthBody({
       {fixableCount > 0 ? (
         <div>
           <Button variant="accent" onClick={onRepair} disabled={repairing} data-dev-id="settings.health-repair">
-            {repairing ? "Repairing..." : "Repair Components"}
+            {repairing ? "Repairing..." : "Apply Safe Library Repairs"}
           </Button>
         </div>
       ) : null}

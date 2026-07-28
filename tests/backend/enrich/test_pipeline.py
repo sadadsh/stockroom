@@ -118,6 +118,38 @@ def test_enrich_result_is_cached_and_not_refetched(tmp_path):
     assert len(fetcher.urls) == n_first  # no additional fetch
 
 
+def test_foreign_cached_mpn_is_ignored_and_replaced_by_an_exact_lookup(tmp_path):
+    from stockroom.enrich.pipeline import _result_to_cache
+    from stockroom.enrich.registry import SourceRegistry
+
+    stale = EnrichmentResult(category="Diodes")
+    stale.mpn = Sourced("US1M", "lcsc", "medium")
+    stale.manufacturer = Sourced("R+O", "lcsc", "medium")
+
+    exact = _CatOnlySource("")
+    exact.enrich = lambda mpn, category, remaining: EnrichmentResult(
+        category=category,
+        mpn=Sourced("S1M", "mouser", "high"),
+        manufacturer=Sourced("ON Semiconductor", "mouser", "high"),
+    )
+    pipe = EnrichmentPipeline(
+        cache_dir=tmp_path / "c",
+        fetcher=_StubFetcher(""),
+        limiter=_NoWaitLimiter(),
+        jlcsearch=_NullJlc(),
+    )
+    pipe.registry = SourceRegistry([exact])
+    pipe.cache.put("S1M", _result_to_cache(stale))
+
+    result = pipe.enrich("S1M", "Diodes")
+
+    assert result.mpn.value == "S1M"
+    assert result.manufacturer.value == "ON Semiconductor"
+    cached = pipe.cache.get("S1M")
+    assert cached is not None
+    assert cached["mpn"]["value"] == "S1M"
+
+
 def test_cache_round_trips_the_procurement_fields():  # M7d: lifecycle/lead/product/dist P/N
     from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
 

@@ -45,6 +45,7 @@ import { useToast } from "../lib/toast";
 import { Badge, Button, Card, Dot, Eyebrow, PanelTitle } from "../components/primitives";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Text, useText } from "../lib/copy";
+import { Icon } from "../components/Icon";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -77,13 +78,49 @@ function StatusRow({
   );
 }
 
-// The five settings groups: what the machine runs (Application), the component
-// library and its git remote (Library), each EDA's wiring (KiCad, Altium), and the
-// distributor/sourcing credentials (Sourcing).
-type GroupId = "application" | "library" | "kicad" | "altium" | "sourcing";
+// Five scopes a person can reason about. Automatic behavior is separate from library sharing;
+// both EDA projections live together; destructive and repair work is isolated in Maintenance.
+type GroupId = "general" | "library" | "eda" | "sources" | "maintenance";
 
-// One unmet setup step surfaced by the Machine Setup band; clicking it jumps to the
-// owning group and opens the owning section.
+const SETTINGS_GROUPS: {
+  id: GroupId;
+  label: string;
+  description: string;
+  icon: string;
+}[] = [
+  {
+    id: "general",
+    label: "General",
+    description: "Application appearance, delivery, and the exact behavior of updates.",
+    icon: "action.settings",
+  },
+  {
+    id: "library",
+    label: "Library",
+    description: "Which component collection is active and how its changes reach collaborators.",
+    icon: "nav.library",
+  },
+  {
+    id: "eda",
+    label: "EDA Tools",
+    description: "Machine integration for KiCad and Altium, with automatic state shown first.",
+    icon: "nav.board",
+  },
+  {
+    id: "sources",
+    label: "Data Sources",
+    description: "Optional provider access and controlled refresh of commercial evidence.",
+    icon: "action.download",
+  },
+  {
+    id: "maintenance",
+    label: "Maintenance",
+    description: "Repair, rebuild, storage, and destructive recovery kept away from daily setup.",
+    icon: "action.doctor",
+  },
+];
+
+// One unmet setup step surfaced by Machine Readiness; clicking it jumps to the owning category.
 interface SetupStep {
   id: string;
   // The imperative shown while unmet ("Wire KiCad") and the achieved state shown
@@ -94,7 +131,6 @@ interface SetupStep {
   metLabelId: string;
   met: boolean;
   group: GroupId;
-  section: string;
 }
 
 export function SettingsPage() {
@@ -117,8 +153,7 @@ export function SettingsPage() {
   const rescanQ = useRescanState();
   const { theme } = useTheme();
 
-  const [group, setGroup] = useState<GroupId>("application");
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const [group, setGroup] = useState<GroupId>("general");
 
   // Hidden dev combo (Ctrl+Alt+K): load API keys / logins from the per-machine
   // dev-creds.json so live validation is not blocked on retyping them. It lives at
@@ -153,41 +188,15 @@ export function SettingsPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // A section in an attention state opens itself the first time the data lands, so
-  // the fix is one glance away instead of hidden behind a collapsed header.
-  const seededRef = useRef(false);
   const s = settingsQ.data;
   const odbcInstalled = odbc.data?.installed;
-  useEffect(() => {
-    if (seededRef.current || !s) return;
-    seededRef.current = true;
-    const auto = new Set<string>();
-    if (!s.kicad_wired) auto.add("kicad");
-    if (odbcInstalled === false) auto.add("altium");
-    if (auto.size > 0) setOpenSections((prev) => new Set([...prev, ...auto]));
-  }, [s, odbcInstalled]);
-
-  function toggle(id: string) {
-    setOpenSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
 
   function jump(step: SetupStep) {
     setGroup(step.group);
-    setOpenSections((prev) => new Set(prev).add(step.section));
   }
 
-  // A group with exactly ONE section auto-opens it on arrival: a single row hiding
-  // behind a single dropdown would be pure friction.
   function selectGroup(g: GroupId) {
     setGroup(g);
-    if (g === "kicad" || g === "altium") {
-      setOpenSections((prev) => new Set(prev).add(g));
-    }
   }
 
   // -- the Machine Setup verdict: is THIS machine fully set up? ---------------
@@ -196,36 +205,44 @@ export function SettingsPage() {
     steps.push({
       id: "kicad", label: "Wire KiCad", labelId: "settings.machine.step-kicad",
       metLabel: "KiCad Wired", metLabelId: "settings.machine.step-kicad-met",
-      met: s.kicad_wired, group: "kicad", section: "kicad",
+      met: s.kicad_wired, group: "eda",
     });
     if (odbcInstalled !== null && odbcInstalled !== undefined) {
       steps.push({
         id: "odbc", label: "Install The ODBC Driver", labelId: "settings.machine.step-odbc",
         metLabel: "ODBC Driver Installed", metLabelId: "settings.machine.step-odbc-met",
-        met: odbcInstalled, group: "altium", section: "altium",
+        met: odbcInstalled, group: "eda",
       });
     }
     steps.push({
       id: "key", label: "Add A Distributor Key", labelId: "settings.machine.step-key",
       metLabel: "Distributor Key Saved", metLabelId: "settings.machine.step-key-met",
       met: s.mouser_api_key_set || s.digikey_client_secret_set,
-      group: "sourcing", section: "distributor",
+      group: "sources",
     });
     steps.push({
       id: "github", label: "Connect GitHub", labelId: "settings.machine.step-github",
       metLabel: "GitHub Connected", metLabelId: "settings.machine.step-github-met",
-      met: s.github_token_set, group: "library", section: "github",
+      met: s.github_token_set, group: "library",
     });
   }
   const unmet = steps.filter((st) => !st.met);
 
   // -- per-group attention dots (mirror the unmet steps + an available update) --
   const groupAttention: Record<GroupId, "warn" | "neutral" | null> = {
-    application: updateQ.data?.update_available ? "neutral" : null,
+    general: updateQ.data?.update_available ? "neutral" : null,
     library: unmet.some((st) => st.group === "library") ? "warn" : null,
-    kicad: unmet.some((st) => st.group === "kicad") ? "warn" : null,
-    altium: unmet.some((st) => st.group === "altium") ? "warn" : null,
-    sourcing: unmet.some((st) => st.group === "sourcing") ? "warn" : null,
+    eda: unmet.some((st) => st.group === "eda") ? "warn" : null,
+    sources: unmet.some((st) => st.group === "sources") ? "warn" : null,
+    maintenance:
+      (coverageQ.data && coverageQ.data.complete < coverageQ.data.total) ||
+      (doctorQ.data &&
+        doctorQ.data.fixable.length +
+          doctorQ.data.manual.length +
+          doctorQ.data.uncommitted.length >
+          0)
+        ? "warn"
+        : null,
   };
 
   // -- collapsed-header summaries (live, from the same cached queries) ----------
@@ -312,229 +329,239 @@ export function SettingsPage() {
           : <span>{`${total} Checked`}</span>;
       })();
 
-  const open = (id: string) => openSections.has(id);
+  const activeMeta = SETTINGS_GROUPS.find((item) => item.id === group) ?? SETTINGS_GROUPS[0];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-dev-id="settings.root">
-      <PanelTitle data-dev-id="settings.title">
+      <PanelTitle
+        data-dev-id="settings.title"
+        right={unmet.length > 0 ? `${unmet.length} need attention` : "Machine ready"}
+      >
         <Text id="settings.title">Settings</Text>
       </PanelTitle>
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-5">
-        <div className="max-w-[980px] pb-10">
-          <MachineSetupBand loading={!s} steps={steps} onJump={jump} />
+      <div className="@container flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-4 pt-4">
+        <MachineSetupBand
+          loading={!s}
+          steps={steps}
+          onJump={jump}
+          updateAvailable={updateQ.data?.update_available ?? false}
+          updateBehind={updateQ.data?.behind ?? 0}
+          updateState={updateQ.data?.state}
+          updateFetching={updateQ.isFetching}
+          onCheckUpdate={() => void updateQ.refetch()}
+          onOpenUpdates={() => setGroup("general")}
+        />
 
-          <div className="mt-5 flex items-start gap-6">
-            {/* group nav: the five groups, an attention dot only where a setup step
-                is unmet (calm otherwise) */}
-            <nav
-              aria-label="Settings Sections"
-              className="sticky top-0 w-[188px] flex-none"
-              data-dev-id="settings.nav"
-            >
-              <GroupNavButton id="application" label="Application" labelId="settings.nav.application"
-                active={group} onSelect={selectGroup} attention={groupAttention.application}
-                data-dev-id="settings.nav-application" />
-              <GroupNavButton id="library" label="Library" labelId="settings.nav.library"
-                active={group} onSelect={selectGroup} attention={groupAttention.library}
-                data-dev-id="settings.nav-library" />
-              <GroupNavButton id="kicad" label="KiCad" labelId="settings.nav.kicad"
-                active={group} onSelect={selectGroup} attention={groupAttention.kicad}
-                data-dev-id="settings.nav-kicad" />
-              <GroupNavButton id="altium" label="Altium" labelId="settings.nav.altium"
-                active={group} onSelect={selectGroup} attention={groupAttention.altium}
-                data-dev-id="settings.nav-altium" />
-              <GroupNavButton id="sourcing" label="Sourcing" labelId="settings.nav.sourcing"
-                active={group} onSelect={selectGroup} attention={groupAttention.sourcing}
-                data-dev-id="settings.nav-sourcing" />
-            </nav>
+        <nav
+          aria-label="Settings Sections"
+          className="mt-3 flex flex-none items-center gap-1 overflow-x-auto rounded-card border border-line bg-band p-1"
+          data-dev-id="settings.nav"
+        >
+          <GroupNavButton id="general" label="General" labelId="settings.nav.general"
+            active={group} onSelect={selectGroup} attention={groupAttention.general}
+            data-dev-id="settings.nav-general" />
+          <GroupNavButton id="library" label="Library" labelId="settings.nav.library"
+            active={group} onSelect={selectGroup} attention={groupAttention.library}
+            data-dev-id="settings.nav-library" />
+          <GroupNavButton id="eda" label="EDA Tools" labelId="settings.nav.eda"
+            active={group} onSelect={selectGroup} attention={groupAttention.eda}
+            data-dev-id="settings.nav-eda" />
+          <GroupNavButton id="sources" label="Data Sources" labelId="settings.nav.sources"
+            active={group} onSelect={selectGroup} attention={groupAttention.sources}
+            data-dev-id="settings.nav-sources" />
+          <GroupNavButton id="maintenance" label="Maintenance" labelId="settings.nav.maintenance"
+            active={group} onSelect={selectGroup} attention={groupAttention.maintenance}
+            data-dev-id="settings.nav-maintenance" />
+        </nav>
 
-            <div className="min-w-0 flex-1">
-              {group === "application" ? (
-                <>
-                  <SettingsDisclosure
-                    title="Appearance" titleId="settings.appearance.title"
-                    hint="The theme is remembered the next time the window opens."
-                    hintId="settings.appearance.hint"
-                    summary={theme === "light"
-                      ? <Text id="settings.summary.light">Light</Text>
-                      : <Text id="settings.summary.dark">Dark</Text>}
-                    open={open("appearance")} onToggle={() => toggle("appearance")}
-                    data-dev-id="settings.appearance"
-                  >
-                    <AppearanceSection />
-                  </SettingsDisclosure>
-                  <SettingsDisclosure
-                    title="App Update" titleId="settings.update.title"
-                    hint="Pull the latest app from its repo. A non-fast-forward is surfaced, never force-applied."
-                    hintId="settings.update.hint"
-                    summary={updateQ.data
-                      ? updateQ.data.update_available
-                        ? <Badge tone="warn"><Text id="settings.summary.update-available">Update Available</Text></Badge>
-                        : <Text id="settings.summary.up-to-date-app">Up To Date</Text>
-                      : null}
-                    open={open("update")} onToggle={() => toggle("update")}
-                    data-dev-id="settings.update"
-                  >
-                    <UpdateSection />
-                  </SettingsDisclosure>
-                </>
-              ) : group === "library" ? (
-                <>
-                  <SettingsDisclosure
-                    title="Component Profiles" titleId="settings.profiles.title"
-                    hint="Each profile is a separate set of components on disk. Switching one reloads the whole component view."
-                    hintId="settings.profiles.hint"
-                    summary={profilesQ.data ? <span>{profilesQ.data.active}</span> : null}
-                    open={open("profiles")} onToggle={() => toggle("profiles")}
-                    data-dev-id="settings.profiles"
-                  >
-                    <ProfilesSection />
-                  </SettingsDisclosure>
-                  <SettingsDisclosure
-                    title="Component Sync" titleId="settings.sync.title"
-                    hint="Push and pull the components against the remote. Offline and divergence are reported, never guessed."
-                    hintId="settings.sync.hint"
-                    summary={syncSummary}
-                    open={open("sync")} onToggle={() => toggle("sync")}
-                    data-dev-id="settings.sync"
-                  >
-                    <SyncSection />
-                  </SettingsDisclosure>
-                  <SettingsDisclosure
-                    title="GitHub" titleId="settings.github.title"
-                    hint="Connect a GitHub personal access token so adding or editing a part pushes it to the components repo on its own, and collaborators' changes pull in at launch. The repo owner can use a fine-grained token with Contents: write. A collaborator on someone else's repo needs a CLASSIC token with the repo scope (GitHub does not let a fine-grained token reach another user's repo), and must accept the repo invitation first. Stored per machine, never shown again."
-                    hintId="settings.github.hint"
-                    summary={s
-                      ? s.github_token_set
-                        ? <Text id="settings.summary.github-connected">Connected</Text>
-                        : <Badge tone="neutral"><Text id="settings.summary.github-off">Not Connected</Text></Badge>
-                      : null}
-                    open={open("github")} onToggle={() => toggle("github")}
-                    data-dev-id="settings.github"
-                  >
-                    <GitHubSection />
-                  </SettingsDisclosure>
-                  <SettingsDisclosure
-                    title="Library Completion" titleId="settings.completion.title"
-                    hint="Whether every component holds the files you need to place it, per EDA tool. Filling the gaps runs against the parts catalogue, so it is paced, stoppable, and safe to run again."
-                    hintId="settings.completion.hint"
-                    summary={completionSummary}
-                    open={open("completion")} onToggle={() => toggle("completion")}
-                    data-dev-id="settings.completion"
-                  >
-                    <LibraryCompletionSection />
-                  </SettingsDisclosure>
-                  <SettingsDisclosure
-                    title="Presentation Data" titleId="settings.derivation.title"
-                    hint="Which rules built the names, descriptions, categories and specs you see. They are computed from the raw distributor data stored beside each component, so improving the rules means recomputing rather than re-importing. Needs no network and no API keys."
-                    hintId="settings.derivation.hint"
-                    summary={derivationSummary}
-                    open={open("derivation")} onToggle={() => toggle("derivation")}
-                    data-dev-id="settings.derivation"
-                  >
-                    <DerivationSection />
-                  </SettingsDisclosure>
-                  <SettingsDisclosure
-                    title="Clear CAD Files" titleId="settings.cad-clear.title"
-                    hint="Remove every symbol, footprint and 3D model your library holds, so a fresh capture pass starts from nothing. The components, their specs, their datasheets and the imported distributor data all stay."
-                    hintId="settings.cad-clear.hint"
-                    summary={cadSummary}
-                    open={open("cad-clear")} onToggle={() => toggle("cad-clear")}
-                    data-dev-id="settings.cad-clear"
-                  >
-                    <CadClearSection />
-                  </SettingsDisclosure>
-                  <SettingsDisclosure
-                    title="Library Health" titleId="settings.health.title"
-                    hint="Reconcile every part with its record and every file with the repository. Repair heals what it safely can and lists what needs your hand."
-                    hintId="settings.health.hint"
-                    summary={healthSummary}
-                    open={open("health")} onToggle={() => toggle("health")}
-                    data-dev-id="settings.health"
-                  >
-                    <LibraryHealthSection />
-                  </SettingsDisclosure>
-                  <SettingsDisclosure
-                    title="Library Sync" titleId="settings.librarysync.title"
-                    hint="What this library carries to whoever else clones it. Binaries can live in Git LFS so clone size stays flat as the library grows, and per-user or regenerated files can stop being shared at all."
-                    hintId="settings.librarysync.hint"
-                    summary={librarySyncSummary}
-                    open={open("librarysync")} onToggle={() => toggle("librarysync")}
-                    data-dev-id="settings.librarysync"
-                  >
-                    <LibrarySyncSection />
-                  </SettingsDisclosure>
-                </>
-              ) : group === "kicad" ? (
+        <section className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-line bg-canvas">
+          <div className="flex flex-none items-start gap-4 border-b border-line bg-band px-4 py-3">
+            <Icon id={activeMeta.icon} className="mt-0.5 h-4 w-4 flex-none text-t2" />
+            <div className="min-w-0">
+              <h1 className="text-base font-semibold text-t1">{activeMeta.label}</h1>
+              <p className="mt-0.5 text-xs text-t3">{activeMeta.description}</p>
+            </div>
+          </div>
+          <div className="grid min-h-0 flex-1 auto-rows-max grid-cols-1 gap-3 overflow-y-auto p-3 @3xl:grid-cols-2">
+            {group === "general" ? (
+              <>
                 <SettingsDisclosure
-                  title="KiCad" titleId="settings.kicad.title"
-                  hint="Where the app writes KiCad's symbol and footprint tables, and whether the command-line tools that render previews were found. Wiring runs on its own at launch and on each profile switch. Leave the overrides blank to auto-detect."
+                  title="Appearance" titleId="settings.appearance.title"
+                  hint="Choose how Stockroom renders on this machine. The choice is saved immediately."
+                  hintId="settings.appearance.hint"
+                  summary={theme === "light"
+                    ? <Text id="settings.summary.light">Light</Text>
+                    : <Text id="settings.summary.dark">Dark</Text>}
+                  className="@3xl:col-span-2"
+                  data-dev-id="settings.appearance"
+                >
+                  <AppearanceSection />
+                </SettingsDisclosure>
+                <SettingsDisclosure
+                  title="Automatic Updates" titleId="settings.update.title"
+                  hint="Stockroom updates from its configured application branch when it opens and checks again every two minutes while running. Installing a waiting update restarts the app."
+                  hintId="settings.update.hint"
+                  summary={updateQ.data
+                    ? updateQ.data.update_available
+                      ? <Badge tone="warn"><Text id="settings.summary.update-available">Update Ready</Text></Badge>
+                      : <Text id="settings.summary.up-to-date-app">Current</Text>
+                    : null}
+                  className="@3xl:col-span-2"
+                  data-dev-id="settings.update"
+                >
+                  <UpdateSection />
+                </SettingsDisclosure>
+              </>
+            ) : group === "library" ? (
+              <>
+                <SettingsDisclosure
+                  title="Component Profiles" titleId="settings.profiles.title"
+                  hint="Switch between independent component collections. Creating or switching a profile changes the active library."
+                  hintId="settings.profiles.hint"
+                  summary={profilesQ.data ? <span>{profilesQ.data.active}</span> : null}
+                  data-dev-id="settings.profiles"
+                >
+                  <ProfilesSection />
+                </SettingsDisclosure>
+                <SettingsDisclosure
+                  title="Share Library Changes" titleId="settings.sync.title"
+                  hint="Pull collaborators' component changes and push yours. This affects library data, not the Stockroom application."
+                  hintId="settings.sync.hint"
+                  summary={syncSummary}
+                  data-dev-id="settings.sync"
+                >
+                  <SyncSection />
+                </SettingsDisclosure>
+                <SettingsDisclosure
+                  title="GitHub Access" titleId="settings.github.title"
+                  hint="Connect the account allowed to push this library. The token stays in Windows Credential Manager and is never shown again."
+                  hintId="settings.github.hint"
+                  summary={s
+                    ? s.github_token_set
+                      ? <Text id="settings.summary.github-connected">Connected</Text>
+                      : <Badge tone="neutral"><Text id="settings.summary.github-off">Not Connected</Text></Badge>
+                    : null}
+                  className="@3xl:col-span-2"
+                  data-dev-id="settings.github"
+                >
+                  <GitHubSection />
+                </SettingsDisclosure>
+              </>
+            ) : group === "eda" ? (
+              <>
+                <SettingsDisclosure
+                  title="KiCad Integration" titleId="settings.kicad.title"
+                  hint="Stockroom wires the active profile into KiCad automatically. Manual paths are advanced recovery controls."
                   hintId="settings.kicad.hint"
                   summary={s
                     ? s.kicad_wired
-                      ? <Text id="settings.summary.kicad-wired">Wired</Text>
-                      : <Badge tone="warn"><Text id="settings.summary.kicad-unwired">Not Wired</Text></Badge>
+                      ? <Text id="settings.summary.kicad-wired">Ready</Text>
+                      : <Badge tone="warn"><Text id="settings.summary.kicad-unwired">Needs Attention</Text></Badge>
                     : null}
-                  open={open("kicad")} onToggle={() => toggle("kicad")}
                   data-dev-id="settings.kicad"
                 >
                   <KiCadSection />
                 </SettingsDisclosure>
-              ) : group === "altium" ? (
                 <SettingsDisclosure
-                  title="Altium Database Library" titleId="settings.altium.title"
-                  hint="One git-synced library Altium reads, regenerated from this profile's records. Install it into Altium once, then it fills as you attach each part's Altium assets."
+                  title="Altium Integration" titleId="settings.altium.title"
+                  hint="The database library follows the active profile. The SQLite ODBC driver is the one machine-level prerequisite."
                   hintId="settings.altium.hint"
                   summary={odbcInstalled === true
-                    ? <Text id="settings.summary.odbc-ok">Driver Installed</Text>
+                    ? <Text id="settings.summary.odbc-ok">Ready</Text>
                     : odbcInstalled === false
                       ? <Badge tone="warn"><Text id="settings.summary.odbc-missing">Driver Missing</Text></Badge>
                       : null}
-                  open={open("altium")} onToggle={() => toggle("altium")}
                   data-dev-id="settings.altium"
                 >
                   <AltiumDbLibSection />
                 </SettingsDisclosure>
-              ) : (
-                <>
-                  <SettingsDisclosure
-                    title="Distributor" titleId="settings.distributor.title"
-                    hint="An optional Mouser API key lets enrichment supplement scraping. Enrichment works without it; the key is stored per machine and never shown again."
-                    hintId="settings.distributor.hint"
-                    summary={s
-                      ? s.mouser_api_key_set || s.digikey_client_secret_set
-                        ? <Text id="settings.summary.key-set">Key Saved</Text>
-                        : <Badge tone="neutral"><Text id="settings.summary.key-off">Not Set</Text></Badge>
-                      : null}
-                    open={open("distributor")} onToggle={() => toggle("distributor")}
-                    data-dev-id="settings.distributor"
-                  >
-                    <DistributorSection />
-                  </SettingsDisclosure>
-                  <SettingsDisclosure
-                    title="Capture Credentials"
-                    hint="The DigiKey account login signs you into DigiKey, and the API creds resolve the exact product page for enrichment. The provider logins clear each provider's wall inside DigiKey's CAD Models section, so the guided capture window can pull files without stopping to log in. Everything is stored per machine and each secret is never shown again."
-                    summary={s ? <span>{`${vendorCount} of 4 Saved`}</span> : null}
-                    open={open("vendor-logins")} onToggle={() => toggle("vendor-logins")}
-                    data-dev-id="settings.vendor-logins"
-                  >
-                    <VendorLoginsSection />
-                  </SettingsDisclosure>
-                  <SettingsDisclosure
-                    title="Procurement Rescan" titleId="settings.rescan.title"
-                    hint="Refresh every part's price, stock and lifecycle status from Mouser and DigiKey. Parts checked recently are skipped unless you force a full pass."
-                    hintId="settings.rescan.hint"
-                    summary={rescanSummary}
-                    open={open("rescan")} onToggle={() => toggle("rescan")}
-                    data-dev-id="settings.rescan"
-                  >
-                    <RescanSection />
-                  </SettingsDisclosure>
-                </>
-              )}
-            </div>
+              </>
+            ) : group === "sources" ? (
+              <>
+                <SettingsDisclosure
+                  title="Distributor APIs" titleId="settings.distributor.title"
+                  hint="Optional API credentials improve exact part lookup. Stockroom still works without them."
+                  hintId="settings.distributor.hint"
+                  summary={s
+                    ? s.mouser_api_key_set || s.digikey_client_secret_set
+                      ? <Text id="settings.summary.key-set">Configured</Text>
+                      : <Badge tone="neutral"><Text id="settings.summary.key-off">Optional</Text></Badge>
+                    : null}
+                  data-dev-id="settings.distributor"
+                >
+                  <DistributorSection />
+                </SettingsDisclosure>
+                <SettingsDisclosure
+                  title="Refresh Procurement Data" titleId="settings.rescan.title"
+                  hint="Update price, stock, and lifecycle data. Recent parts are skipped unless you request a full refresh."
+                  hintId="settings.rescan.hint"
+                  summary={rescanSummary}
+                  data-dev-id="settings.rescan"
+                >
+                  <RescanSection />
+                </SettingsDisclosure>
+                <SettingsDisclosure
+                  title="Provider Sign-Ins"
+                  hint="Saved sign-ins let the guided capture window pass provider login walls. Secrets stay in Windows Credential Manager."
+                  summary={s ? <span>{`${vendorCount} of 4 Saved`}</span> : null}
+                  className="@3xl:col-span-2"
+                  data-dev-id="settings.vendor-logins"
+                >
+                  <VendorLoginsSection />
+                </SettingsDisclosure>
+              </>
+            ) : (
+              <>
+                <SettingsDisclosure
+                  title="Component Completeness" titleId="settings.completion.title"
+                  hint="Find parts missing required Symbol, Footprint, or 3D representations and fill supported gaps."
+                  hintId="settings.completion.hint"
+                  summary={completionSummary}
+                  data-dev-id="settings.completion"
+                >
+                  <LibraryCompletionSection />
+                </SettingsDisclosure>
+                <SettingsDisclosure
+                  title="Rebuild Presentation Data" titleId="settings.derivation.title"
+                  hint="Recompute display names, descriptions, categories, and specifications from stored evidence. No network access is used."
+                  hintId="settings.derivation.hint"
+                  summary={derivationSummary}
+                  data-dev-id="settings.derivation"
+                >
+                  <DerivationSection />
+                </SettingsDisclosure>
+                <SettingsDisclosure
+                  title="Repair Library" titleId="settings.health.title"
+                  hint="Check records, files, and Git state. Safe repairs are listed before they run; missing source files are never invented."
+                  hintId="settings.health.hint"
+                  summary={healthSummary}
+                  data-dev-id="settings.health"
+                >
+                  <LibraryHealthSection />
+                </SettingsDisclosure>
+                <SettingsDisclosure
+                  title="Binary Storage" titleId="settings.librarysync.title"
+                  hint="Control which large CAD files travel through Git LFS and which machine-generated files stay local."
+                  hintId="settings.librarysync.hint"
+                  summary={librarySyncSummary}
+                  data-dev-id="settings.librarysync"
+                >
+                  <LibrarySyncSection />
+                </SettingsDisclosure>
+                <SettingsDisclosure
+                  title="Reset Captured CAD" titleId="settings.cad-clear.title"
+                  hint="Destructive recovery: remove captured symbols, footprints, and 3D models while preserving parts, specifications, datasheets, and source evidence."
+                  hintId="settings.cad-clear.hint"
+                  summary={cadSummary}
+                  className="@3xl:col-span-2 border-err/40"
+                  data-dev-id="settings.cad-clear"
+                >
+                  <CadClearSection />
+                </SettingsDisclosure>
+              </>
+            )}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
@@ -565,13 +592,13 @@ function GroupNavButton({
       aria-current={selected ? "true" : undefined}
       data-dev-id={devId}
       className={cx(
-        "flex w-full items-center gap-2 rounded-control px-2.5 py-[7px] text-left text-sm transition-colors",
+        "flex min-w-[132px] flex-1 items-center justify-center gap-2 rounded-control px-3 py-2 text-sm transition-colors",
         selected
-          ? "bg-acc-soft font-medium text-t1 shadow-[inset_2px_0_0_var(--c-acc)]"
+          ? "bg-raise2 font-semibold text-t1 shadow-[inset_0_-2px_0_var(--c-acc)]"
           : "text-t2 hover:bg-[var(--c-hover)] hover:text-t1",
       )}
     >
-      <span className="min-w-0 flex-1 truncate"><Text id={labelId}>{label}</Text></span>
+      <span className="min-w-0 truncate"><Text id={labelId}>{label}</Text></span>
       {attention ? <Dot tone={attention} /> : null}
     </button>
   );
@@ -585,60 +612,127 @@ function MachineSetupBand({
   loading,
   steps,
   onJump,
+  updateAvailable,
+  updateBehind,
+  updateState,
+  updateFetching,
+  onCheckUpdate,
+  onOpenUpdates,
 }: {
   loading: boolean;
   steps: SetupStep[];
   onJump: (step: SetupStep) => void;
+  updateAvailable: boolean;
+  updateBehind: number;
+  updateState?: string;
+  updateFetching: boolean;
+  onCheckUpdate: () => void;
+  onOpenUpdates: () => void;
 }) {
   const unmet = steps.filter((st) => !st.met);
   return (
-    <Card className="px-4 py-3.5" data-dev-id="settings.machine-band">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Eyebrow className="mb-0.5">
-            <Text id="settings.machine.title">Machine Setup</Text>
-          </Eyebrow>
-          {loading ? (
-            <p className="text-sm text-t3">
-              <Text id="settings.machine.loading">Reading this machine...</Text>
-            </p>
-          ) : unmet.length === 0 ? (
-            <p className="text-sm font-medium text-t1">
-              <Text id="settings.machine.ready">This Machine Is Ready</Text>
-            </p>
-          ) : (
-            <p className="text-sm font-medium text-t1">
-              {unmet.length === 1 ? "1 Setup Step Remaining" : `${unmet.length} Setup Steps Remaining`}
-            </p>
-          )}
+    <div
+      className="grid flex-none grid-cols-1 gap-3 @3xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]"
+      data-dev-id="settings.machine-band"
+    >
+      <Card className="flex min-w-0 items-center gap-4 px-4 py-3.5">
+        <span className="grid h-9 w-9 flex-none place-items-center rounded-control border border-line2 bg-field text-t2">
+          <Icon id="nav.update" className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <Eyebrow className="mb-0.5">Application Delivery</Eyebrow>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-t1">Automatic On Launch</span>
+            {updateState === "offline" ? (
+              <Badge tone="warn">Offline</Badge>
+            ) : updateAvailable ? (
+              <Badge tone="warn">
+                {updateBehind > 0 ? `${updateBehind} Commits Ready` : "Update Ready"}
+              </Badge>
+            ) : (
+              <Badge tone="ok">Current</Badge>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-t3">
+            Install Stockroom.exe once. It updates from its configured application branch whenever
+            Stockroom opens and checks every two minutes while it stays open.
+          </p>
+        </div>
+        <div className="flex flex-none flex-col items-end gap-1.5">
+          {updateAvailable ? (
+            <Button small variant="accent" onClick={onOpenUpdates}>
+              Review Update
+            </Button>
+          ) : null}
+          <Button small onClick={onCheckUpdate} disabled={updateFetching}>
+            {updateFetching ? "Checking..." : "Check Now"}
+          </Button>
+          <a
+            href="https://github.com/sadadsh/stockroom/releases"
+            target="_blank"
+            rel="noreferrer"
+            className="text-2xs font-medium text-t2 underline decoration-line2 underline-offset-2 hover:text-t1"
+          >
+            Get Stockroom.exe
+          </a>
+        </div>
+      </Card>
+
+      <Card className="min-w-0 px-4 py-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <Eyebrow className="mb-0.5">
+              <Text id="settings.machine.title">Machine Readiness</Text>
+            </Eyebrow>
+            {loading ? (
+              <p className="text-sm text-t3">
+                <Text id="settings.machine.loading">Reading this machine...</Text>
+              </p>
+            ) : unmet.length === 0 ? (
+              <p className="text-sm font-semibold text-t1">
+                <Text id="settings.machine.ready">This Machine Is Ready</Text>
+              </p>
+            ) : (
+              <p className="text-sm font-semibold text-t1">
+                {unmet.length === 1
+                  ? "1 Setup Step Needs Attention"
+                  : `${unmet.length} Setup Steps Need Attention`}
+              </p>
+            )}
+          </div>
+          {!loading ? (
+            <span className="text-2xs text-t3">
+              {steps.length - unmet.length} of {steps.length} ready
+            </span>
+          ) : null}
         </div>
         {!loading ? (
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="mt-2.5 grid grid-cols-2 gap-1.5">
             {steps.map((st) =>
               st.met ? (
                 <span
                   key={st.id}
-                  className="inline-flex items-center gap-1 rounded-control border border-line px-2 py-1 text-2xs font-medium text-t3"
+                  className="inline-flex min-w-0 items-center gap-1.5 rounded-control border border-line bg-field px-2 py-1.5 text-2xs font-medium text-t3"
                 >
                   <Dot tone="ok" />
-                  <Text id={st.metLabelId}>{st.metLabel}</Text>
+                  <span className="truncate"><Text id={st.metLabelId}>{st.metLabel}</Text></span>
                 </span>
               ) : (
                 <button
                   key={st.id}
                   type="button"
                   onClick={() => onJump(st)}
-                  className="inline-flex items-center gap-1 rounded-control border border-acc bg-acc-soft px-2 py-1 text-2xs font-semibold text-t1 transition-colors hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+                  className="inline-flex min-w-0 items-center gap-1.5 rounded-control border border-warn/50 bg-field px-2 py-1.5 text-left text-2xs font-semibold text-t1 transition-colors hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
                 >
                   <Dot tone="warn" />
-                  <Text id={st.labelId}>{st.label}</Text>
+                  <span className="truncate"><Text id={st.labelId}>{st.label}</Text></span>
                 </button>
               ),
             )}
           </div>
         ) : null}
-      </div>
-    </Card>
+      </Card>
+    </div>
   );
 }
 
@@ -756,7 +850,7 @@ function ProfilesSection() {
                       onClick={() => onActivate(name)}
                       disabled={activate.isPending}
                     >
-                      <Text id="settings.profiles.activate">Activate</Text>
+                      <Text id="settings.profiles.activate">Switch To This Profile</Text>
                     </Button>
                     <Button
                       small
@@ -795,7 +889,7 @@ function ProfilesSection() {
           onClick={onCreate}
           disabled={!newName.trim() || create.isPending}
         >
-          <Text id="settings.profiles.create">Create</Text>
+          <Text id="settings.profiles.create">Create Profile</Text>
         </Button>
       </div>
 
@@ -893,7 +987,7 @@ function SyncSection() {
       ) : null}
       <div className="mt-3.5 flex items-center gap-3">
         <Button variant="accent" onClick={onSync} disabled={sync.isPending} data-dev-id="settings.sync-action">
-          {sync.isPending ? "Syncing..." : <Text id="settings.sync.action">Sync Now</Text>}
+          {sync.isPending ? "Syncing..." : <Text id="settings.sync.action">Pull And Push Library</Text>}
         </Button>
         {sync.data ? (
           <span className="text-xs text-t3">
@@ -1003,7 +1097,7 @@ function KiCadSection() {
               ) : settings.data?.kicad_wired ? (
                 <span className="text-ok">Wired to the active profile</span>
               ) : (
-                <span className="text-warn">Not wired so far (use Wire KiCad below)</span>
+                <span className="text-warn">Not wired so far (use Recheck And Wire KiCad below)</span>
               )
             }
           />
@@ -1014,7 +1108,7 @@ function KiCadSection() {
         <div className="mt-3.5 flex flex-col gap-3">
           <div>
             <Button onClick={onWire} disabled={wireBusy} data-dev-id="settings.kicad-wire">
-              {wireBusy ? "Wiring..." : <Text id="settings.kicad.wire">Wire KiCad</Text>}
+              {wireBusy ? "Wiring..." : <Text id="settings.kicad.wire">Recheck And Wire KiCad</Text>}
             </Button>
           </div>
           {wireJob.status === "running" && wireJob.progress?.message ? (
@@ -1080,7 +1174,7 @@ function KiCadSection() {
         </div>
         <div>
           <Button onClick={onSave} disabled={!dirty || save.isPending}>
-            {save.isPending ? "Applying..." : <Text id="settings.kicad.save-overrides">Save Overrides</Text>}
+            {save.isPending ? "Applying..." : <Text id="settings.kicad.save-overrides">Save Paths And Rewire</Text>}
           </Button>
         </div>
       </div>
@@ -1165,11 +1259,11 @@ function DistributorSection() {
           onClick={onSave}
           disabled={!keyInput.trim() || save.isPending}
         >
-          <Text id="settings.distributor.save-key">Save Key</Text>
+          <Text id="settings.distributor.save-key">Save Mouser Key</Text>
         </Button>
         {isSet ? (
           <Button variant="danger" onClick={onClear} disabled={save.isPending}>
-            <Text id="settings.distributor.clear">Clear</Text>
+            <Text id="settings.distributor.clear">Remove Mouser Key</Text>
           </Button>
         ) : null}
       </div>
@@ -1451,11 +1545,11 @@ function GitHubSection() {
           className={INPUT_CLS}
         />
         <Button onClick={onSave} disabled={!tokenInput.trim() || save.isPending}>
-          <Text id="settings.github.connect">Connect</Text>
+          <Text id="settings.github.connect">Save GitHub Access</Text>
         </Button>
         {isSet ? (
           <Button variant="danger" onClick={onClear} disabled={save.isPending}>
-            <Text id="settings.github.disconnect">Disconnect</Text>
+            <Text id="settings.github.disconnect">Remove GitHub Access</Text>
           </Button>
         ) : null}
       </div>
@@ -1494,24 +1588,52 @@ function UpdateSection() {
       ) : check.isError ? (
         <p className="py-1 text-sm text-err">Could not check for updates.</p>
       ) : (
-        <StatusRow
-          label="Status"
-          labelId="settings.update.status"
-          value={
-            check.data?.state === "offline" ? (
-              <span className="text-warn">Could not reach the update server</span>
-            ) : available ? (
-              "Update available"
-            ) : (
-              "Up to date"
-            )
-          }
-        />
+        <>
+          <StatusRow
+            label="Delivery"
+            value={check.data?.automatic_on_launch ? "Automatic when Stockroom opens" : "Manual"}
+          />
+          <StatusRow
+            label="Application Branch"
+            value={<span className="font-mono">{check.data?.channel || "Unknown"}</span>}
+          />
+          <StatusRow
+            label="Installed Revision"
+            value={
+              <span className="font-mono">
+                {check.data?.current_revision || "Unavailable"}
+              </span>
+            }
+          />
+          <StatusRow
+            label="Update Status"
+            labelId="settings.update.status"
+            value={
+              check.data?.state === "offline" ? (
+                <span className="text-warn">Offline, using the last verified checkout</span>
+              ) : check.data?.state === "no_remote" ? (
+                <span className="text-warn">Application remote is not configured</span>
+              ) : available ? (
+                <span className="text-warn">
+                  {check.data?.behind
+                    ? `${check.data.behind} commits ready to install`
+                    : "Update ready to install"}
+                </span>
+              ) : (
+                <span className="text-ok">Current</span>
+              )
+            }
+          />
+        </>
       )}
-      <div className="mt-3.5 flex items-center gap-3">
+      <p className="mt-3 text-xs leading-relaxed text-t3">
+        Share the Stockroom.exe from the Releases page. Each installation keeps its own component
+        data, while application code follows the branch shown above.
+      </p>
+      <div className="mt-3.5 flex flex-wrap items-center gap-2">
         {available ? (
           <Button variant="accent" onClick={onApply} disabled={apply.isPending} data-dev-id="settings.update-apply">
-            {apply.isPending ? "Applying..." : <Text id="settings.update.apply">Apply Update</Text>}
+            {apply.isPending ? "Installing..." : <Text id="settings.update.apply">Install And Restart</Text>}
           </Button>
         ) : null}
         <Button
@@ -1519,8 +1641,16 @@ function UpdateSection() {
           onClick={() => check.refetch()}
           disabled={check.isFetching}
         >
-          <Text id="settings.update.check-again">Check Again</Text>
+          <Text id="settings.update.check-again">Check Now</Text>
         </Button>
+        <a
+          href="https://github.com/sadadsh/stockroom/releases"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-[27px] items-center rounded-control px-2 text-xs font-medium text-t2 underline decoration-line2 underline-offset-2 hover:text-t1"
+        >
+          Download Stockroom.exe
+        </a>
       </div>
     </>
   );

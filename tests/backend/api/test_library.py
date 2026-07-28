@@ -213,7 +213,7 @@ def test_library_lfs_endpoints_report_then_adopt(client, app_ctx):
 
     after = client.get("/api/library/lfs").json()
     assert after["adopted"] is True
-    assert any("PcbLib" in p for p in after["tracked_patterns"])
+    assert any("pcblib" in p.casefold() for p in after["tracked_patterns"])
 
     root = app_ctx.repo.root
     payload = root / "part.PcbLib"

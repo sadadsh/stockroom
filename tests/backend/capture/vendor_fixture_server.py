@@ -27,6 +27,7 @@ import zipfile
 from pathlib import Path
 
 FIXTURES = Path(__file__).resolve().parents[1] / "host" / "fixtures"
+READABLE_STEP = Path(__file__).parent / "fixtures" / "readable_geometry.step"
 
 # Stands in for the vendor's own submit script (see the module docstring). Enables the disabled
 # submit link once any export is selected, and posts the form when it is clicked.
@@ -60,9 +61,15 @@ _SYMBOL_LIB = """(kicad_symbol_lib (version 20211014) (generator stockroom_test)
   (symbol "TPD6E05U06RVZR" (in_bom yes) (on_board yes)
     (property "Reference" "U" (id 0) (at 0 0 0))
     (property "Value" "TPD6E05U06RVZR" (id 1) (at 0 0 0))
+    (property "Manufacturer" "Texas Instruments" (id 2) (at 0 0 0))
     (symbol "TPD6E05U06RVZR_0_1"
       (rectangle (start -5.08 5.08) (end 5.08 -5.08)
         (stroke (width 0.254) (type default)) (fill (type none)))
+    )
+    (symbol "TPD6E05U06RVZR_1_1"
+      (pin input line (at -7.62 0 0) (length 2.54)
+        (name "IO1" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27)))))
     )
   )
 )
@@ -74,9 +81,6 @@ _FOOTPRINT = """(footprint "RVZ0014A" (version 20211014) (generator stockroom_te
   (pad "1" smd rect (at -1 0) (size 0.5 0.3) (layers "F.Cu" "F.Paste" "F.Mask"))
 )
 """
-
-# A real STEP header, so a classifier or reader that sniffs content sees a plausible model.
-_STEP = "ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((''),'2;1');\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n"
 
 # A P-CAD ASCII library shaped like the real one: ACCEL_ASCII header, one symbolDef (the schematic
 # symbol) and one patternDef (the PCB footprint), so ONE file satisfies BOTH Altium requirements.
@@ -98,7 +102,7 @@ def _kicad_altium_zip() -> bytes:
     with zipfile.ZipFile(buffer, "w") as zf:
         zf.writestr("TPD6E05U06RVZR.kicad_sym", _SYMBOL_LIB)
         zf.writestr("footprints.pretty/RVZ0014A.kicad_mod", _FOOTPRINT)
-        zf.writestr("RVZ0014A.stp", _STEP)
+        zf.writestr("RVZ0014A.stp", READABLE_STEP.read_bytes())
         # What Ultra Librarian ACTUALLY delivers for Altium: a P-CAD ASCII library nested under
         # AltiumV15/, carrying the symbol AND the footprint in one file. NOT .SchLib/.PcbLib - the
         # fixture claimed those for a while, and no vendor this app drives produces them that way,
@@ -113,7 +117,7 @@ def _kicad_only_zip() -> bytes:
     with zipfile.ZipFile(buffer, "w") as zf:
         zf.writestr("TPD6E05U06RVZR.kicad_sym", _SYMBOL_LIB)
         zf.writestr("footprints.pretty/RVZ0014A.kicad_mod", _FOOTPRINT)
-        zf.writestr("RVZ0014A.stp", _STEP)
+        zf.writestr("RVZ0014A.stp", READABLE_STEP.read_bytes())
     return buffer.getvalue()
 
 

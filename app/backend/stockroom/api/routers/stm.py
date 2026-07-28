@@ -3,10 +3,9 @@
 Every handler reads ``ctx = request.app.state.ctx`` and gates a read on ``ctx.stm_index is
 None`` with ``ApiError(409, "STM index not built")`` - mirroring api/routers/library.py's
 ``request.app.state.ctx`` pattern. This module (and everything under ``stockroom.stm``) must
-NEVER import PyQt/pywebview, nor reference any board/switch-fabric concept from
-INTERFACES.md section 6's DO-NOT-REUSE row - tests/backend/test_stm_import_boundary.py and
-CI both enforce this (and the test itself greps for those literal legacy identifiers, so
-they are deliberately not spelled out here)."""
+NEVER import PyQt/pywebview. Silicon facts remain independent of any one board:
+the target-definition endpoint only compiles the explicit policy in its request,
+so hardware intent stays visible rather than leaking in through hidden globals."""
 
 from __future__ import annotations
 
@@ -23,11 +22,13 @@ from stockroom.api.schemas import (
     PinoutDTO,
     StmStatusDTO,
     SuggestionGroupDTO,
+    TargetDefinitionDTO,
     UnionDTO,
 )
 from stockroom.stm import authority as stm_authority
 from stockroom.stm import geometry as stm_geometry
 from stockroom.stm import source as stm_source
+from stockroom.stm import target_definition as stm_target_definition
 
 # Single-flight guard for POST /build, mirroring library.py's _rescan_lock: a second POST
 # while one build is QUEUED/RUNNING must return the SAME in-flight job, never spawn a second
@@ -516,13 +517,38 @@ def stm_router(require_token) -> APIRouter:
         ]
         return UnionDTO.from_dict(result).model_dump()
 
+    @r.post("/target-definition")
+    def target_definition(request: Request, body: dict) -> dict:
+        """Compile an explicit device set and caller-owned hardware policy.
+
+        Unlike the similarity verdict, this response keeps silicon variation,
+        requested routes, safety rules, and channel allocation as separate
+        auditable layers and binds them to the current source revisions.
+        """
+        ctx = request.app.state.ctx
+        if ctx.stm_index is None:
+            raise ApiError(409, "STM index not built")
+        parts = list(body.get("parts") or [])
+        policy = dict(body.get("policy") or {})
+        try:
+            with _stm_read_lock:
+                result = stm_target_definition.compile_target_definition(
+                    ctx.stm_index.conn,
+                    refs=parts,
+                    policy=policy,
+                    source_meta=ctx.stm_index.meta(),
+                )
+        except ValueError as exc:
+            raise ApiError(400, str(exc)) from exc
+        return TargetDefinitionDTO.from_dict(result).model_dump()
+
     @r.get("/compat/suggestions")
     def compat_suggestions(
         request: Request, package: str, family: str, tolerance: int = 0
     ) -> dict:
         """`family` accepts one name OR a comma-separated multi-family scope (owner
-        amendment 2026-07-23) - groups are then free to mix families, the cross-family
-        drop-in discovery the build-card concept wants."""
+        amendment 2026-07-23) - groups are then free to mix families for cross-family
+        drop-in discovery."""
         ctx = request.app.state.ctx
         if ctx.stm_index is None:
             raise ApiError(409, "STM index not built")

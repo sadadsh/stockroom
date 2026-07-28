@@ -1,7 +1,7 @@
 /**
- * CompatibilityWorkbench - the Bench (owner redesign 2026-07-23): the socket-union workbench
- * rebuilt around the build-card question. Pick a scope (families + one package) and the Bench
- * does the rest - no Build Set button, no per-set rebuilding:
+ * CompatibilityWorkbench - the Bench: a generic STM target-definition workbench.
+ * Pick a scope (families + one package) and the Bench derives an explicit device
+ * set, then compiles it with the caller-owned policy:
  *
  * - The package chips are the UNION of the selected families' packages, each showing its family
  *   coverage (n/m when a family lacks it); building a set uses the covered families only, so an
@@ -9,28 +9,40 @@
  * - The compatible sets (the suggestion groups) compute automatically and render as a stepper:
  *   All Parts, then Baseline, then each divergent group. Stepping auto-unions that set - the
  *   goal is every MCU in scope belonging to a set you can walk through.
- * - Each set shows the verdict, the part chips (click = that part's full pinout table; x = drop
- *   it into a custom set, auto-rebuilt), the SWITCH PLAN - every position that is not identical
- *   across the set, its baseline identity, who diverges, and whether an AF swap reconciles it or
- *   the socket board needs real switching hardware (the ZIF/build-card architecture readout) -
- *   then the union map and the AF conflict check.
- * - Export produces the machine-readable bundle the Obsidian build-card pipeline consumes.
+ * - Each set compiles a content-addressed target definition. Silicon class,
+ *   requested route, safety policy, and channel allocation remain distinct.
+ * - Raw socket-union similarity and AF checks stay available as evidence, but
+ *   do not dictate hardware switching.
+ * - Export produces the generic target-definition artifact.
  *
  * Still software/informational only: a swap is shown, never applied; nothing is persisted
  * client-side (CONTEXT decisions 4 and 8 unchanged).
  */
 import { useEffect, useMemo, useState } from "react";
-import { useStmCompatUnion, useStmFamilies, useStmSuggestions } from "../../api/stmQueries";
+import {
+  useStmCompatUnion,
+  useStmFamilies,
+  useStmSuggestions,
+  useStmTargetDefinition,
+} from "../../api/stmQueries";
 import { ApiError } from "../../api/client";
-import type { CompatUnionBody, SuggestionGroupDTO, UnionDTO } from "../../api/types";
+import type {
+  CompatUnionBody,
+  SuggestionGroupDTO,
+  TargetDefinitionPolicy,
+  UnionDTO,
+} from "../../api/types";
 import type { StmScope } from "../../pages/StmViewerPage";
 import { FamilyPicker } from "./FamilyPicker";
 import { CompatUnionMap } from "./CompatUnionMap";
-import { CompatVerdictBanner } from "./CompatVerdictBanner";
-import { SwitchPlanTable } from "./SwitchPlanTable";
 import { BenchPartModal } from "./BenchPartModal";
 import { BuildIndexGate } from "./BuildIndexGate";
 import { AfCheckPanel } from "./AfCheckPanel";
+import { TargetDefinitionPanel } from "./TargetDefinitionPanel";
+import {
+  cloneCoreBringUpPolicy,
+  TargetPolicyEditor,
+} from "./TargetPolicyEditor";
 import { Button, Eyebrow } from "../primitives";
 
 // ── scope helpers (pure, tested) ─────────────────────────────────────────────
@@ -107,8 +119,7 @@ export function benchSets(groups: SuggestionGroupDTO[], scopeCount: number): Ben
   return sets;
 }
 
-// The export bundle for the Obsidian build-card pipeline: the scope, every set, and the active
-// set's full union (positions + reconcile + verdict) - the switch-plan facts a card needs.
+// The project-agnostic export bundle: the scope, every set, and the active set's full union.
 export function benchExport(
   scope: { families: string[]; package: string },
   sets: BenchSet[],
@@ -117,7 +128,7 @@ export function benchExport(
   return JSON.stringify(
     {
       format: "stm-bench/1",
-      purpose: "obsidian-build-card socket union",
+      purpose: "socket-union analysis",
       scope,
       sets: sets.map((s) => ({
         id: s.id,
@@ -152,9 +163,13 @@ export function CompatibilityWorkbench() {
   // A chip drop edits the active set into a custom one (auto-rebuilt, still explicit).
   const [customParts, setCustomParts] = useState<string[] | null>(null);
   const [openPart, setOpenPart] = useState<string | null>(null);
+  const [policy, setPolicy] = useState<TargetDefinitionPolicy>(() =>
+    cloneCoreBringUpPolicy(),
+  );
 
   const families = useStmFamilies();
   const union = useStmCompatUnion();
+  const targetDefinition = useStmTargetDefinition();
 
   const selectedFamilies = scope.families;
   const familiesKey = selectedFamilies.join(",");
@@ -219,10 +234,19 @@ export function CompatibilityWorkbench() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bodyKey]);
 
+  const definitionPartsKey = union.data?.parts.join("|") ?? "";
+  const policyKey = useMemo(() => JSON.stringify(policy), [policy]);
+  useEffect(() => {
+    if (!union.data) return;
+    targetDefinition.mutate({ parts: union.data.parts, policy });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [definitionPartsKey, policyKey]);
+
   const err = union.error;
   const indexNotBuilt =
     (err instanceof ApiError && err.status === 409) ||
-    (suggestions.error instanceof ApiError && suggestions.error.status === 409);
+    (suggestions.error instanceof ApiError && suggestions.error.status === 409) ||
+    (targetDefinition.error instanceof ApiError && targetDefinition.error.status === 409);
 
   const stepTo = (id: string) => {
     setCustomParts(null);
@@ -235,17 +259,13 @@ export function CompatibilityWorkbench() {
   };
 
   const exportActive = () => {
-    if (!union.data || !selectedPackage) return;
-    const payload = benchExport(
-      { families: coveredFamilies, package: selectedPackage },
-      sets,
-      union.data,
-    );
+    if (!targetDefinition.data || !selectedPackage) return;
+    const payload = JSON.stringify(targetDefinition.data, null, 2);
     const blob = new Blob([payload], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stm-bench_${selectedPackage}.json`;
+    a.download = `stm-target-definition_${selectedPackage}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -384,8 +404,8 @@ export function CompatibilityWorkbench() {
               <Button small onClick={() => stepBy(1)} aria-label="Next Set">
                 →
               </Button>
-              <Button small onClick={exportActive} disabled={!union.data}>
-                Export
+              <Button small onClick={exportActive} disabled={!targetDefinition.data}>
+                Export Definition
               </Button>
             </div>
 
@@ -404,7 +424,6 @@ export function CompatibilityWorkbench() {
               </div>
             ) : union.data ? (
               <>
-                <CompatVerdictBanner verdict={union.data.verdict} />
                 <SetStrip
                   union={union.data}
                   onOpenPart={setOpenPart}
@@ -414,9 +433,39 @@ export function CompatibilityWorkbench() {
                     )
                   }
                 />
-                <SwitchPlanTable union={union.data} />
-                <CompatUnionMap union={union.data} />
-                <AfCheckPanel union={union.data} />
+                <TargetPolicyEditor policy={policy} onPolicyChange={setPolicy} />
+                {targetDefinition.isPending ? (
+                  <ChamberMessage>Compiling the target definition...</ChamberMessage>
+                ) : targetDefinition.error && !indexNotBuilt ? (
+                  <div className="flex flex-col items-center gap-3 py-12 text-center">
+                    <p className="text-sm text-err">{targetDefinition.error.message}</p>
+                    <Button
+                      small
+                      onClick={() =>
+                        union.data &&
+                        targetDefinition.mutate({ parts: union.data.parts, policy })
+                      }
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                ) : targetDefinition.data ? (
+                  <TargetDefinitionPanel definition={targetDefinition.data} />
+                ) : null}
+
+                <details className="rounded-card border border-line bg-surface">
+                  <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-t2">
+                    Silicon Capability Evidence
+                  </summary>
+                  <div className="flex flex-col gap-3 border-t border-line p-3">
+                    <p className="text-xs text-t3">
+                      This view shows raw capability similarity and alternate-function evidence.
+                      It does not decide physical routing.
+                    </p>
+                    <CompatUnionMap union={union.data} />
+                    <AfCheckPanel union={union.data} />
+                  </div>
+                </details>
               </>
             ) : null}
           </div>

@@ -268,9 +268,15 @@ describe("Glb3DView scene synchronization", () => {
     });
     expect(handle.setView).toHaveBeenCalledWith("iso");
     expect(handle.setPlacementMode).toHaveBeenCalledWith("auto");
+    expect(screen.getByRole("group", { name: "Layers" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Appearance" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Motion" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Camera view" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Auto rotate" })).toHaveClass("min-h-[32px]");
+    expect(screen.getByRole("button", { name: "Isometric" })).toHaveClass("min-h-[32px]");
   });
 
-  it("keeps advanced controls available behind one settings control in the compact viewer", async () => {
+  it("makes the compact viewer a passive auto-rotating specimen", async () => {
     const handle = sceneHandle();
     mountSpy.mockReturnValue(handle);
     const placedLand = {
@@ -292,11 +298,11 @@ describe("Glb3DView scene synchronization", () => {
         compact
       />,
     );
-    expect(screen.queryByText("Realistic")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "3D view settings" }));
-    expect(screen.getByText("Shading")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Source" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Top" })).toBeInTheDocument();
+    await waitFor(() => expect(mountSpy).toHaveBeenCalled());
+    expect(screen.getByTestId("model-canvas")).toBeInTheDocument();
+    expect(handle.setSpin).toHaveBeenCalledWith(true);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
   });
 
   it("does not carry a failed render across to replacement GLB bytes", async () => {

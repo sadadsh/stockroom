@@ -151,6 +151,7 @@ _TOOLS = {
     "bake_stm_index.py": "Build the STM part index used by the stm viewer.",
     "capturerec.py": "THE recorder: a human drives a vendor page, this writes down the workflow.",
     "deploy.py": "Deploy to the Windows install AND prove the code arrived.",
+    "export_stm_target_definition.py": "Compile an STM target definition from explicit policy.",
     "gen_eda_registry_ts.py": "Generate the TS EDA registry from the Python one (single source).",
     "import_library.py": "Bulk-import parts into the library from a register/BOM.",
     "library_audit.py": "Audit the library's records on disk.",

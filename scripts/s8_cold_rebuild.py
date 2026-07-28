@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""S8 cold-rebuild metrics harness.
+"""Historical S8 cold-rebuild metrics harness.
 
 Drives the REAL running app (a live uvicorn server + the real camoufox render tier)
 to cold-rebuild the enrichment of every corpus part THROUGH the app's HTTP surface —
 the exact `POST /api/enrich/from-url` + SSE-job path the Add-A-Part look-up uses — and
 measures the rebuilt depth against the committed corpus record.
+
+This is a read-only legacy diagnostic, not a vNext intake source.  A corpus path
+must be supplied explicitly so an old checkout can never become an implicit
+component import queue.
 
 Why from-url and not type-an-MPN: the corpus is Mouser-sourced (each record carries its
 exact Mouser product URL in provenance.source_url), and the bare-MPN path is LCSC-first
@@ -23,10 +27,10 @@ per-launch token and the real camoufox fetcher, and every enrich goes over HTTP 
 JobRunner read lane + SSE, i.e. the running app.
 
 Usage:
-    .venv/bin/python scripts/s8_cold_rebuild.py --all
-    .venv/bin/python scripts/s8_cold_rebuild.py --sample 5
-    .venv/bin/python scripts/s8_cold_rebuild.py --parts bq24074rgtt 2n7002
-    .venv/bin/python scripts/s8_cold_rebuild.py --all --out scripts/out/run1
+    uv run python scripts/s8_cold_rebuild.py --corpus <path> --all
+    uv run python scripts/s8_cold_rebuild.py --corpus <path> --sample 5
+    uv run python scripts/s8_cold_rebuild.py --corpus <path> --parts bq24074rgtt 2n7002
+    uv run python scripts/s8_cold_rebuild.py --corpus <path> --all --out scripts/out/run1
 """
 from __future__ import annotations
 
@@ -43,8 +47,6 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 BACKEND = REPO / "app" / "backend"
 sys.path.insert(0, str(BACKEND))
-
-DEFAULT_CORPUS = Path("/mnt/c/Users/Sadad Haidari/stockroom-winverify/libraries/Main/parts")
 
 # ---------------------------------------------------------------------------
 # comparison normalization (imported from the backend so keys/values are
@@ -346,7 +348,12 @@ def load_corpus(corpus_dir: Path) -> dict[str, dict]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
+    ap.add_argument(
+        "--corpus",
+        type=Path,
+        required=True,
+        help="explicit read-only historical corpus; never a vNext intake source",
+    )
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--sample", type=int, default=0, help="first N corpus parts")
     ap.add_argument("--parts", nargs="*", default=[], help="specific part ids")

@@ -4,6 +4,7 @@ from stockroom.enrich.schema import (
     EnrichmentResult,
     PriceBreak,
     Sourced,
+    mpn_identity_key,
     normalize_lifecycle,
     normalize_mpn,
 )
@@ -31,6 +32,11 @@ def test_normalize_mpn_is_filesystem_safe():
     # no path-separator or wildcard survives
     for ch in "/\\:*?\"<>|":
         assert ch not in normalize_mpn(f"A{ch}B")
+
+
+def test_mpn_identity_key_is_case_tolerant_but_preserves_punctuation():
+    assert mpn_identity_key(" abc/123+X ") == mpn_identity_key("ABC/123+x")
+    assert mpn_identity_key("ABC/123+X") != mpn_identity_key("ABC-123+X")
 
 
 def test_sourced_carries_source_and_confidence():

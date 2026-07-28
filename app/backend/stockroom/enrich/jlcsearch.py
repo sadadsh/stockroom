@@ -21,7 +21,7 @@ from urllib.parse import quote
 
 from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.fetch import HttpFetcher
-from stockroom.enrich.schema import PriceBreak
+from stockroom.enrich.schema import PriceBreak, mpn_identity_key
 
 _BASE_URL = "https://jlcsearch.tscircuit.com/components/list.json"
 
@@ -98,8 +98,24 @@ class JlcSearchClient:
         if not components or not isinstance(components, list):
             return None
 
-        in_stock = [c for c in components if isinstance(c, dict) and int(c.get("stock") or 0) > 0]
-        pool = in_stock or [c for c in components if isinstance(c, dict)]
+        # The endpoint is a fuzzy search, not an identity lookup. Rank only rows whose
+        # manufacturer part number is the requested MPN; otherwise a popular near match
+        # (for example US1M for S1M) can replace the user's exact input and carry all of
+        # that other part's manufacturer, package, pricing, and product page into review.
+        target = mpn_identity_key(mpn)
+        exact = [
+            component
+            for component in components
+            if (
+                isinstance(component, dict)
+                and mpn_identity_key(component.get("mfr")) == target
+            )
+        ]
+        if not exact:
+            return None
+
+        in_stock = [component for component in exact if int(component.get("stock") or 0) > 0]
+        pool = in_stock or exact
         if not pool:
             return None
 

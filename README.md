@@ -76,6 +76,25 @@ native window. Building and shipping the Windows exe is covered in
 `packaging/README.md`. For fast UI work, `npm run dev` serves the SPA with hot
 reload.
 
+## Installing and updating
+
+Give each Windows user the `Stockroom.exe` attached to the latest
+[GitHub Release](https://github.com/sadadsh/stockroom/releases). They install it
+once by keeping the executable anywhere convenient and launching it. Portable
+Git, uv, and the WebView2 bootstrapper are bundled; KiCad remains optional.
+
+A version tag (`v*`) runs `.github/workflows/release.yml`, builds the executable,
+optionally Authenticode-signs it when the signing secrets exist, and publishes
+both the executable and its SHA-256 file. Existing installations reconcile their
+managed application checkout whenever Stockroom opens. While running, they check
+every two minutes and expose an explicit `Install And Restart` action when code is
+waiting.
+
+This is the current portable-launcher delivery model, not the final signed,
+atomic updater described in `docs/Stockroom VNext Architecture.md`. The launcher
+itself is not replaced in place, and application code currently converges through
+Git rather than a signed release-set manifest.
+
 ## Verifying a change
 
 Two gates, both green before anything ships.

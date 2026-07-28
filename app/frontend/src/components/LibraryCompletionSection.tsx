@@ -136,7 +136,7 @@ function CoverageBody({
 
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
         <Button variant="accent" onClick={onRun} disabled={running || needsFiles === 0}>
-          {running ? "Filling Gaps" : "Complete My Library"}
+          {running ? "Filling Gaps" : "Fill Supported CAD Gaps"}
         </Button>
         <p className="text-sm text-t2">
           {needsFiles > 0 ? (

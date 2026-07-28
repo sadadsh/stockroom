@@ -43,6 +43,34 @@ def test_a_source_that_raises_is_skipped_and_the_walk_continues():
     assert r.mpn.value == "M1" and r.mpn.source == "mouser"  # dead source never blocked
 
 
+def test_a_near_match_is_rejected_wholesale_before_an_exact_fallback():
+    near = _FakeSource(
+        "lcsc",
+        {"mpn": "US1M", "manufacturer": "R+O", "description": "the wrong diode"},
+    )
+    exact = _FakeSource(
+        "mouser",
+        {"mpn": "S1M", "manufacturer": "ON Semiconductor", "description": "rectifier"},
+    )
+
+    result = SourceRegistry([near, exact]).enrich("s1m", "Diodes")
+
+    assert result.mpn.value == "S1M"
+    assert result.manufacturer.value == "ON Semiconductor"
+    assert result.description.value == "rectifier"
+    assert exact.was_called_with is not None
+
+
+def test_exact_mpn_comparison_preserves_identity_punctuation():
+    near = _FakeSource("lcsc", {"mpn": "ABC-123+X", "manufacturer": "Wrong"})
+    exact = _FakeSource("mouser", {"mpn": "abc/123+x", "manufacturer": "Right"})
+
+    result = SourceRegistry([near, exact]).enrich("ABC/123+X", "ICs")
+
+    assert result.mpn.value == "abc/123+x"
+    assert result.manufacturer.value == "Right"
+
+
 def test_walk_stops_early_once_nothing_remains():
     s1 = _FakeSource("lcsc", {"mpn": "M1", "manufacturer": "M", "description": "d",
                               "datasheet_url": "u", "stock": 1, "package": "QFN"})

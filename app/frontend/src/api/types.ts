@@ -662,6 +662,10 @@ export interface UpdateCheck {
   update_available: boolean;
   state?: string;
   behind?: number;
+  current_revision?: string;
+  channel?: string;
+  automatic_on_launch?: boolean;
+  check_interval_seconds?: number;
   // set when the check could not reach the remote (state "offline"), so the UI
   // never shows a silent Up To Date it did not verify
   detail?: string;
@@ -1132,6 +1136,333 @@ export interface CompatUnionBody {
   family?: string;
   families?: string[];
   package?: string;
+}
+
+export type TargetSiliconClass =
+  | "fixed_critical"
+  | "stable_io"
+  | "variant_io"
+  | "safety_collision"
+  | "partial";
+
+export type TargetBoardAction =
+  | "hardwire"
+  | "breakout"
+  | "direct"
+  | "switched"
+  | "selectable"
+  | "isolate"
+  | "unsupported";
+
+export interface TargetDefinitionPolicy {
+  id: string;
+  revision: number;
+  coverage_mode?: string;
+  requirements: {
+    id: string;
+    label: string;
+    net: string;
+    required: boolean;
+    implementation_required?: boolean;
+    signal_patterns?: string[];
+    access_tags?: string[];
+    preferred_positions?: string[];
+    applies_to?: {
+      refs?: string[];
+      families?: string[];
+      lines?: string[];
+    };
+    category?: string;
+    service_group?: string;
+    protocol?: string;
+    direction?: string;
+    access_plane?: string;
+    purposes?: string[];
+    claim_scope?: "pin-capability" | "documented-service" | "validated-procedure";
+    onehot_group?: string;
+    evidence: string[];
+  }[];
+  service_groups?: {
+    id: string;
+    label: string;
+    category: string;
+    protocol?: string;
+    required: boolean;
+    claim_scope?: "pin-capability" | "documented-service" | "validated-procedure";
+    purposes?: string[];
+    requirement_ids: string[];
+    required_requirement_ids?: string[];
+    applies_to?: {
+      refs?: string[];
+      families?: string[];
+      lines?: string[];
+    };
+    entry_conditions?: string[];
+    protection_constraints?: string[];
+    side_effects?: string[];
+    procedure_refs?: string[];
+    destructive?: boolean;
+    evidence: string[];
+  }[];
+  safety_rules: {
+    position: string;
+    action: TargetBoardAction;
+    safe_default: "open" | "off" | "high-z";
+    uses_channel?: boolean;
+    onehot_group?: string | null;
+    net?: string;
+    hazard?: string;
+    evidence: string[];
+    branches?: {
+      id: string;
+      identity_patterns: string[];
+      action: TargetBoardAction;
+      net?: string;
+      uses_channel?: boolean;
+      safe_default?: "open" | "off" | "high-z";
+      onehot_group?: string | null;
+      evidence?: string[];
+    }[];
+  }[];
+  channel_fabric: {
+    part_mpn: string;
+    channels_per_device: number;
+    max_devices: number;
+    default_state: "open";
+    reference_prefix?: string;
+  };
+  target_mpns?: Record<string, string[]>;
+  declared_blockers?: string[];
+}
+
+export interface TargetDefinitionBody {
+  parts: string[];
+  policy: TargetDefinitionPolicy;
+}
+
+export interface TargetDefinitionPosition {
+  position: string;
+  position_kind: "numeric" | "alnum";
+  lqfp_side: "left" | "bottom" | "right" | "top" | null;
+  bga_row: string | null;
+  bga_col: number | null;
+  silicon_class: TargetSiliconClass;
+  board_action: TargetBoardAction;
+  identities: string[];
+  access_tags: string[];
+  access_tags_union: string[];
+  present_on: number;
+  total_targets: number;
+  route_ids: string[];
+  hazard: string;
+  per_target: {
+    ref: string;
+    family: string;
+    canonical_pin_name: string;
+    electrical_class: string;
+    critical_identity: string | null;
+    roles: string[];
+    functions: string[];
+    alternate_functions: AfOptionDTO[];
+    access_tags: string[];
+  }[];
+}
+
+export interface TargetDefinitionDTO {
+  format: "stm-target-definition/1";
+  compiler_rev: number;
+  artifact_digest: string;
+  profile: {
+    id: string;
+    revision: number;
+    coverage_mode: string;
+    policy_digest: string;
+  };
+  scope: {
+    package: string;
+    families: string[];
+    target_count: number;
+    targets: {
+      ref: string;
+      family: string;
+      line: string;
+      verified_mpns: string[];
+    }[];
+  };
+  provenance: {
+    silicon_source: string;
+    source_sha256: string;
+    source_built_at: string;
+    classifier_rev: number;
+    af_schema_rev: number;
+    geometry_rev: number;
+    policy_digest: string;
+  };
+  readiness: {
+    status: "ready" | "blocked";
+    blockers: string[];
+    warnings: string[];
+  };
+  summary: {
+    silicon_classes: Record<string, number>;
+    board_actions: Record<string, number>;
+    required_routes: number;
+    switched_routes: number;
+    safety_rules: number;
+    service_groups: number;
+    foundation_groups: number;
+  };
+  requirements: {
+    id: string;
+    label: string;
+    net: string;
+    required: boolean;
+    implementation_required: boolean;
+    category: string;
+    service_group: string;
+    protocol: string;
+    direction: string;
+    access_plane: string;
+    purposes: string[];
+    claim_scope: "pin-capability" | "documented-service" | "validated-procedure";
+    route_kind: "direct" | "switched" | "partial" | "unavailable" | "blocked";
+    implementation_kind: "direct" | "switched" | "none";
+    coverage_status: "complete" | "partial" | "unavailable";
+    applicable_targets: string[];
+    not_applicable_targets: string[];
+    missing_targets: string[];
+    blocked_targets: string[];
+    routes: {
+      ref: string;
+      position: string;
+      canonical_pin_name: string;
+      signal: string;
+      af_index: number | null;
+      usable: boolean;
+      safety_branch: string | null;
+    }[];
+    candidates_by_target: Record<
+      string,
+      {
+        ref: string;
+        position: string;
+        canonical_pin_name: string;
+        signal: string;
+        af_index: number | null;
+      }[]
+    >;
+    candidate_counts: Record<string, number>;
+    onehot_group: string | null;
+    evidence: string[];
+  }[];
+  service_groups: {
+    id: string;
+    label: string;
+    category: string;
+    protocol: string;
+    required: boolean;
+    claim_scope: "pin-capability" | "documented-service" | "validated-procedure";
+    purposes: string[];
+    requirement_ids: string[];
+    required_requirement_ids: string[];
+    status: "complete" | "partial" | "unavailable";
+    applicable_target_count: number;
+    complete_target_count: number;
+    not_applicable_targets: string[];
+    per_target: {
+      ref: string;
+      family: string;
+      line: string;
+      status: "complete" | "incomplete";
+      missing_requirements: string[];
+      positions: Record<string, string>;
+    }[];
+    entry_conditions: string[];
+    protection_constraints: string[];
+    side_effects: string[];
+    procedure_refs: string[];
+    destructive: boolean;
+    evidence: string[];
+  }[];
+  functional_foundation: {
+    claim_scope: "pin-obligation";
+    network_values_authority: "external-target-documentation-required";
+    status: "complete" | "partial";
+    unresolved_positions: string[];
+    groups: {
+      id: string;
+      label: string;
+      obligation: string;
+      applicability: "when-present" | "design-policy";
+      claim_scope: "pin-obligation";
+      network_evidence_required: boolean;
+      status: "complete" | "partial" | "unavailable";
+      present_target_count: number;
+      resolved_target_count: number;
+      positions: string[];
+      unresolved_positions: string[];
+      per_target: {
+        ref: string;
+        family: string;
+        line: string;
+        present: boolean;
+        resolved: boolean;
+        pins: {
+          position: string;
+          canonical_pin_name: string;
+          electrical_class: string;
+          identity: string;
+          board_action: TargetBoardAction;
+          resolved: boolean;
+        }[];
+      }[];
+    }[];
+  };
+  safety_rules: {
+    position: string;
+    action: string;
+    safe_default: string;
+    onehot_group: string | null;
+    evidence: string[];
+    branches: {
+      id: string;
+      identity_patterns: string[];
+      matched_identities: string[];
+      matched_targets: string[];
+      action: string;
+      net: string;
+      uses_channel: boolean;
+      safe_default: string;
+      evidence: string[];
+    }[];
+  }[];
+  channel_fabric: {
+    part_mpn: string;
+    channels_per_device: number;
+    max_devices: number;
+    default_state: string;
+    reference_prefix: string;
+    required_channels: number;
+    capacity: number;
+    used_devices: number;
+    allocations: {
+      kind: "route" | "safety";
+      position: string;
+      net: string;
+      route_id: string | null;
+      branch_id?: string;
+      onehot_group: string | null;
+      safe_default: string;
+      targets?: string[];
+      identities?: string[];
+      reference: string;
+      device_index: number;
+      channel: number;
+      register_bit: number;
+      register_label: string;
+    }[];
+  };
+  positions: TargetDefinitionPosition[];
 }
 
 // GET /api/stm/pin/af?part=&position= -> one pin's complete AF0-15 set (SWAP-01). Reuses Phase 4's

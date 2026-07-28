@@ -55,6 +55,14 @@ def _target_files() -> list[Path]:
     return files
 
 
+def _user_surface_files() -> list[Path]:
+    repo = Path(stockroom.stm.__file__).resolve().parents[4]
+    frontend = repo / "app" / "frontend" / "src"
+    files = sorted((frontend / "components" / "stm").glob("*.ts*"))
+    files.append(frontend / "pages" / "StmViewerPage.tsx")
+    return _target_files() + [path for path in files if path.exists()]
+
+
 def test_no_pyqt_or_pywebview_import_in_stm_files():
     for path in _target_files():
         text = path.read_text(encoding="utf-8")
@@ -80,6 +88,18 @@ def test_no_banned_switch_fabric_identifier_in_stm_files():
                     f"{identifier!r} in code - this concept must never be reachable from "
                     "stm/ (INTERFACES.md section 6)"
                 )
+
+
+def test_stm_surface_stays_project_agnostic():
+    """A downstream board may consume the generic artifact, but its product,
+    documentation, EDA, and component names must not leak back into Stockroom."""
+    project_terms = ("NETDECK", "Obsidian", "Altium", "ADG714", "build-card")
+    for path in _user_surface_files():
+        text = path.read_text(encoding="utf-8")
+        for term in project_terms:
+            assert term.lower() not in text.lower(), (
+                f"{path}: project-specific term {term!r} leaked into the generic STM surface"
+            )
 
 
 def test_stockroom_stm_imports_clean_of_qt_and_webview():

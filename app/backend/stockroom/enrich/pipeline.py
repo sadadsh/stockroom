@@ -28,7 +28,12 @@ from stockroom.enrich.fetch import HttpFetcher, HttpRenderedDomFetcher, Rendered
 from stockroom.enrich.progress import Stage, emit, monotonic, stage_callback
 from stockroom.enrich.ratelimit import SlidingWindowLimiter
 from stockroom.enrich.registry import DEFAULT_WANT, SourceRegistry, record_vendor_offer
-from stockroom.enrich.schema import SOURCED_FIELDS, EnrichmentResult, Sourced
+from stockroom.enrich.schema import (
+    SOURCED_FIELDS,
+    EnrichmentResult,
+    Sourced,
+    mpn_identity_key,
+)
 from stockroom.enrich.sites import SITE_EXTRACTORS
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.model.part import Provenance, Purchase
@@ -541,11 +546,15 @@ class EnrichmentPipeline:
             # An instant cache hit does no network work; the job returns straight to a
             # `done`, so no fetching/rendering stage is claimed for it.
             hit = _result_from_cache(cached, category)
-            # Classify the cache hit too. An install carries entries written BEFORE the MPN path
-            # classified at all, whose stored category is "Other" beside a perfectly good Product
-            # Category, and a cached answer must not serve that stale verdict for the whole TTL.
-            fill_category(hit)
-            return hit
+            if hit.mpn is None or mpn_identity_key(hit.mpn.value) == mpn_identity_key(mpn):
+                # Classify the cache hit too. An install carries entries written BEFORE the MPN
+                # path classified at all, whose stored category is "Other" beside a perfectly
+                # good Product Category, and a cached answer must not serve that stale verdict
+                # for the whole TTL.
+                fill_category(hit)
+                return hit
+            # A cache entry can outlive a provider bug fix. Treat a foreign cached MPN as a miss;
+            # the fresh exact-only walk below replaces it through the normal atomic cache write.
         # One monotonic wrapper for the whole registry walk, so a later source's low local
         # pct (the datasheet leg after the scrape leg) never rewinds the bar.
         sink = monotonic(progress)

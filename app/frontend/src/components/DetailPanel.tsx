@@ -444,9 +444,10 @@ const PANE_RAIL_PX = 44;
  * `className`-contains test stayed GREEN through the whole thing. `grid-cols-[var(--sr-panes)]` is
  * a static, scannable class; only the VALUE moves.
  *
- * "The open ones maximized" (owner, 2026-07-26) is what decides who takes the freed space: whatever
- * is still open absorbs it. When BOTH are collapsed the specimen rail stops being a fixed 288px and
- * grows, because a fixed column beside two 44px rails would leave the sheet mostly empty.
+ * When all three panes are open they receive equal tracks; matching 20px cell padding then produces
+ * equal content widths instead of three almost-but-not-quite widths. "The open ones maximized"
+ * (owner, 2026-07-26) decides who takes space released by a collapsed work pane. When both are
+ * collapsed the specimen rail grows beside the two 44px rails.
  */
 export function panesTemplate(specsOpen: boolean, sourcingOpen: boolean): string {
   const rail = `${PANE_RAIL_PX}px`;
@@ -908,9 +909,10 @@ export function DetailPanel({
           // column, so a long specs list grew the whole sheet instead of scrolling inside its
           // own pane. Pinning the row to the container height lets each column's own
           // overflow-y-auto engage.
-          // RESPONSIVE ON THE CONTAINER, never the viewport. The three-column form needs
-          // 288 + 256(the middle track's own minimum) + 320 = 864px, and what it actually gets is
-          // the PANE's width, not the window's.
+          // RESPONSIVE ON THE CONTAINER, never the viewport. The three-column form divides the
+          // available sheet into equal tracks; at narrower widths the 320px specimen minimum and
+          // 256px work-pane minimum determine when it must stack. What it actually gets is the
+          // PANE's width, not the window's.
           //
           // This was a VIEWPORT media query (`lg:`/`xl:`) and it was wrong by construction.
           // MEASURED in the real WebView2 window at the host's own default 1400x900 (2026-07-25):
@@ -1030,11 +1032,10 @@ export function DetailPanel({
                 ) : undefined
               }
               onOpen={hasModel ? () => setPreview("model") : undefined}
-              interactiveStage
             />
             {/* Content-sized, NOT `h-[200px]`. That literal sat here holding two `h-[142px]` tiles,
                 so it guaranteed 58px of empty row under the cards on every part, forever - and with
-                the column's own `gap-4` on top of it that is the 74px void the owner reported as
+                the column's former `gap-4` on top of it that is the 74px void the owner reported as
                 "odd spacing underneath the model symbol and footprint before the cad complete
                 button" (measured 75px on their window, 89px ink-to-ink here including the CAD row's
                 own padding). Two hardcoded heights that disagreed by 58px, in the same element. */}
@@ -1829,17 +1830,15 @@ function ReadinessRow({
 
 
 // One Part Canvas tile. `hero` is the big physical (3D) stage; `tile` is a compact
-// embodiment (symbol / footprint). Present -> the whole tile is a button that expands
-// the preview; missing-with-handler -> a button that opens the Attach modal; missing
-// read-only -> the honest Not Linked state. The recessed `stage` chamber makes a render
-// read as a lit object, not a flat image.
+// embodiment (symbol / footprint). A present asset exposes the SAME stage-centred Expand
+// affordance on hover or keyboard focus; the footer is identity/status only. Missing with a
+// handler opens Attach; missing read-only stays the honest Not Linked state.
 function AssetTile({
   name,
   present,
   art,
   thumb,
   onOpen,
-  interactiveStage,
   onAttach,
   className,
   devId,
@@ -1851,11 +1850,8 @@ function AssetTile({
   // The live render shown when present (falls back to `art` internally on failure);
   // omit it and `art` is shown directly.
   thumb?: ReactNode;
-  // When present and set, the whole tile is a button that expands the preview.
+  // When present and set, the stage offers a hover/focus Expand action.
   onOpen?: () => void;
-  // The stage handles its OWN pointer events (the 3D viewer orbits and zooms in place), so the
-  // tile must not swallow them.
-  interactiveStage?: boolean;
   // When the asset is MISSING and set, the whole tile is a button that opens the
   // Attach modal. Ignored when the asset is present.
   onAttach?: () => void;
@@ -1871,7 +1867,7 @@ function AssetTile({
     <div
       data-dev-id={stageDevId}
       className={
-        "relative flex min-h-0 flex-1 items-center justify-center overflow-hidden " +
+        "group relative flex min-h-0 flex-1 items-center justify-center overflow-hidden " +
         (present ? "bg-stage" : "flex-col gap-2 bg-stage text-t3")
       }
     >
@@ -1892,6 +1888,20 @@ function AssetTile({
           </div>
         )}
       </div>
+      {present && onOpen ? (
+        <button
+          type="button"
+          data-dev-id={devId ? `${devId}-open` : undefined}
+          onClick={onOpen}
+          aria-label={`Open ${name} Preview`}
+          className="absolute inset-0 z-10 flex items-center justify-center bg-canvas/0 opacity-0 transition-[background-color,opacity] duration-150 group-hover:bg-canvas/70 group-hover:opacity-100 focus-visible:bg-canvas/70 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+        >
+          <span className="inline-flex items-center gap-2 rounded-control border border-line2 bg-popover px-3 py-2 text-xs font-semibold text-t1 shadow-pop">
+            <EyeIcon className="h-4 w-4 text-t2" />
+            Expand
+          </span>
+        </button>
+      ) : null}
     </div>
   );
   const footer = (
@@ -1903,29 +1913,7 @@ function AssetTile({
           on the left that should give way (truncate) if anything has to. */}
       <span className="ml-auto inline-flex flex-none items-center gap-1.5 whitespace-nowrap text-2xs text-t3">
         {present ? (
-          // no green "present" dot (owner's call - the render itself already reads as present).
-          // An openable tile shows an EYE rather than spelling out "View" (punch 11): the tile is
-          // already a button whose aria-label says "Open <name> Preview", so the word was carrying
-          // no information a glyph could not, in a strip that has no room to spare.
-          onOpen ? (
-            interactiveStage ? (
-              <button
-                type="button"
-                // Addressable: since the stage stopped being a button, this eye is the ONLY way
-                // into the preview modal, and the shot harness could not reach it.
-                data-dev-id={devId ? `${devId}-open` : undefined}
-                onClick={onOpen}
-                aria-label={`Open ${name} Preview`}
-                className="-m-1 flex items-center rounded-control p-1 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
-              >
-                <EyeIcon className="h-3.5 w-3.5" />
-              </button>
-            ) : (
-              <EyeIcon className="h-3.5 w-3.5" />
-            )
-          ) : (
-            <>Linked</>
-          )
+          <>Linked</>
         ) : onAttach ? (
           <>
             <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden="true" />
@@ -1946,32 +1934,15 @@ function AssetTile({
   const buttonCls =
     base +
     " cursor-pointer text-left transition-colors hover:border-line2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc";
-  // A tile whose STAGE is itself interactive cannot also be one big button: every drag to orbit and
-  // every wheel to zoom would land on the button and open the modal instead (owner, 2026-07-26:
-  // "clicking the tile must NOT expand - only the eye symbol opens the modal", which is exactly what
-  // made the 3D tile impossible to use in place). So the wrapper stays a plain div and the EYE in
-  // the footer becomes the only opener. The symbol and footprint tiles are unaffected: their stages
-  // are static images, where whole-tile click is the better target.
-  if (onOpen && present && interactiveStage) {
+  // Present previews are plain shells with one consistent action INSIDE the stage. That keeps the
+  // footer quiet, avoids nesting a button around the renderer, and gives 3D, Symbol, and Footprint
+  // the same interaction instead of three subtly different click contracts.
+  if (onOpen && present) {
     return (
       <div data-dev-id={devId} className={base}>
         {stage}
         {footer}
       </div>
-    );
-  }
-  if (onOpen && present) {
-    return (
-      <button
-        data-dev-id={devId}
-        type="button"
-        onClick={onOpen}
-        aria-label={`Open ${name} Preview`}
-        className={buttonCls}
-      >
-        {stage}
-        {footer}
-      </button>
     );
   }
   if (onAttach && !present) {
@@ -2453,7 +2424,11 @@ function SpecRowList({
   onTogglePin?: (category: string, specKey: string) => void;
 }) {
   return (
-    <dl className="flex flex-col">
+    // The row breakpoints must resolve against THIS list's column, not the full detail pane.
+    // Without this container boundary an equal 280px pane inherited the detail root's @4xl
+    // 13rem label track, leaving too little value width and wrapping `3A991`, `Active`, and
+    // `Japan` into vertical fragments.
+    <dl className="@container flex flex-col">
       {rows.map((row) =>
         row.members ? (
           <SpecFamilyRow key={row.key} row={row} />

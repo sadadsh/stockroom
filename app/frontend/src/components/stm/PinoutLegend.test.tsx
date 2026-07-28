@@ -53,7 +53,7 @@ describe("PinoutLegend", () => {
     // clicking a category row is the highlight lens
     fireEvent.click(gpioRow);
     expect(onToggle).toHaveBeenCalledWith("gpio");
-    // the build-card key-pin facts with counts
+    // the key bring-up pin facts with counts
     const keyPins = screen.getByTestId("legend-key-pins");
     expect(screen.getByText("Bring-Up Pins")).toBeInTheDocument();
     expect(within(keyPins).getByText("Boot straps")).toBeInTheDocument();

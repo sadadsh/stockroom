@@ -12,6 +12,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { ViewportGizmo } from "three-viewport-gizmo";
+import { MONOCHROME_VIEW_GIZMO } from "./viewGizmoStyle";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
@@ -626,34 +627,25 @@ export function mountModelScene(
       viewGizmo = new ViewportGizmo(activeCamera, renderer, {
         container,
         type: "cube",
-        size: 92,
+        size: MONOCHROME_VIEW_GIZMO.size,
+        resolution: MONOCHROME_VIEW_GIZMO.resolution,
+        radius: MONOCHROME_VIEW_GIZMO.radius,
+        smoothness: MONOCHROME_VIEW_GIZMO.smoothness,
         placement: "top-right",
         className: "stockroom-view-gizmo",
-        offset: { top: 10, right: 10 },
+        offset: { top: 14, right: 14 },
         animated: !prefersReducedMotion(),
         speed: 1.35,
-        font: { family: "Work Sans, system-ui, sans-serif", weight: 650 },
-        background: {
-          color: 0x20242b,
-          opacity: 0.94,
-          hover: { color: 0x2d3540, opacity: 1 },
-        },
-        corners: {
-          color: 0x697586,
-          opacity: 0.9,
-          hover: { color: 0x58a6ff, opacity: 1, scale: 1.08 },
-        },
-        edges: {
-          color: 0x4c5665,
-          opacity: 0.88,
-          hover: { color: 0x58a6ff, opacity: 1, scale: 1.06 },
-        },
-        x: { label: "R", color: 0xb84d52, labelColor: 0xffffff },
-        nx: { label: "L", color: 0x873b40, labelColor: 0xffffff },
-        y: { label: "T", color: 0x4f8d65, labelColor: 0xffffff },
-        ny: { label: "B", color: 0x37684a, labelColor: 0xffffff },
-        z: { label: "F", color: 0x477db3, labelColor: 0xffffff },
-        nz: { label: "Bk", color: 0x345d87, labelColor: 0xffffff },
+        font: { family: "Work Sans, system-ui, sans-serif", weight: 700 },
+        background: MONOCHROME_VIEW_GIZMO.background,
+        corners: MONOCHROME_VIEW_GIZMO.corners,
+        edges: MONOCHROME_VIEW_GIZMO.edges,
+        x: MONOCHROME_VIEW_GIZMO.faces.x,
+        nx: MONOCHROME_VIEW_GIZMO.faces.nx,
+        y: MONOCHROME_VIEW_GIZMO.faces.y,
+        ny: MONOCHROME_VIEW_GIZMO.faces.ny,
+        z: MONOCHROME_VIEW_GIZMO.faces.z,
+        nz: MONOCHROME_VIEW_GIZMO.faces.nz,
       });
       gizmoCamera = activeCamera;
       viewGizmo.attachControls(controls);

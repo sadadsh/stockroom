@@ -154,11 +154,13 @@ def test_capturing_one_component_attaches_files_to_that_record(
     job = client.post(
         "/api/library/capture/run", json={"part_ids": [target["id"]]}
     ).json()["job_id"]
-    _drain(client, job)
+    events = _drain(client, job)
 
     after = client.get(f"/api/library/parts/{target['id']}").json()
     kicad = after.get("assets", {}).get("kicad", {})
-    assert kicad.get("symbol"), f"no symbol attached to {target['id']}: {kicad}"
+    assert kicad.get("symbol"), (
+        f"no symbol attached to {target['id']}: {kicad}; job events were {events}"
+    )
     assert kicad.get("footprint"), f"no footprint attached to {target['id']}: {kicad}"
 
 
@@ -170,13 +172,15 @@ def test_a_captured_asset_records_where_it_came_from(client, fake_vendor, headle
     job = client.post(
         "/api/library/capture/run", json={"part_ids": [target["id"]]}
     ).json()["job_id"]
-    _drain(client, job)
+    events = _drain(client, job)
 
     assets = client.get(f"/api/library/parts/{target['id']}").json().get("assets") or {}
     kicad = assets.get("kicad") or {}
     # Say WHY when nothing attached, instead of a bare KeyError that hides whether the capture
     # failed, timed out, or attached under a different tool.
-    assert kicad.get("symbol"), f"capture attached no KiCad symbol; assets were {assets}"
+    assert kicad.get("symbol"), (
+        f"capture attached no KiCad symbol; assets were {assets}; job events were {events}"
+    )
     symbol = kicad["symbol"]
     origin = symbol.get("origin") or {}
     assert origin.get("vendor") == "ultralibrarian", symbol

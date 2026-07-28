@@ -10,7 +10,12 @@ import {
   packagesForScope,
 } from "./CompatibilityWorkbench";
 import { api, ApiError } from "../../api/client";
-import type { FamiliesResponse, SuggestionsResponse, UnionDTO } from "../../api/types";
+import type {
+  FamiliesResponse,
+  SuggestionsResponse,
+  TargetDefinitionDTO,
+  UnionDTO,
+} from "../../api/types";
 
 const FAMILIES: FamiliesResponse = {
   families: [
@@ -94,6 +99,229 @@ function unionResult(): UnionDTO {
   };
 }
 
+function targetDefinitionResult(): TargetDefinitionDTO {
+  return {
+    format: "stm-target-definition/1",
+    compiler_rev: 4,
+    artifact_digest: "a".repeat(64),
+    profile: {
+      id: "stm32-core-bring-up",
+      revision: 1,
+      coverage_mode: "explicit-device-set",
+      policy_digest: "b".repeat(64),
+    },
+    scope: {
+      package: "LQFP144",
+      families: ["STM32F4", "STM32F7"],
+      target_count: 3,
+      targets: [
+        {
+          ref: "STM32F407ZGT6",
+          family: "STM32F4",
+          line: "STM32F407",
+          verified_mpns: [],
+        },
+        {
+          ref: "STM32F429ZET6",
+          family: "STM32F4",
+          line: "STM32F429",
+          verified_mpns: [],
+        },
+        {
+          ref: "STM32F746ZGT6",
+          family: "STM32F7",
+          line: "STM32F746",
+          verified_mpns: [],
+        },
+      ],
+    },
+    provenance: {
+      silicon_source: "STM32CubeMX XML",
+      source_sha256: "c".repeat(64),
+      source_built_at: "2026-07-23T00:00:00Z",
+      classifier_rev: 2,
+      af_schema_rev: 1,
+      geometry_rev: 3,
+      policy_digest: "b".repeat(64),
+    },
+    readiness: { status: "ready", blockers: [], warnings: [] },
+    summary: {
+      silicon_classes: { stable_io: 1 },
+      board_actions: { direct: 1 },
+      required_routes: 1,
+      switched_routes: 0,
+      safety_rules: 0,
+      service_groups: 0,
+      foundation_groups: 0,
+    },
+    requirements: [
+      {
+        id: "uart_tx",
+        label: "USART1 TX",
+        net: "USART1_TX",
+        required: true,
+        implementation_required: true,
+        category: "serial",
+        service_group: "serial-uart",
+        protocol: "UART",
+        direction: "output",
+        access_plane: "function",
+        purposes: ["communication"],
+        claim_scope: "pin-capability",
+        route_kind: "direct",
+        implementation_kind: "direct",
+        coverage_status: "complete",
+        applicable_targets: [
+          "STM32F407ZGT6",
+          "STM32F429ZET6",
+          "STM32F746ZGT6",
+        ],
+        not_applicable_targets: [],
+        missing_targets: [],
+        blocked_targets: [],
+        routes: [
+          {
+            ref: "STM32F407ZGT6",
+            position: "23",
+            canonical_pin_name: "PA9",
+            signal: "USART1_TX",
+            af_index: 7,
+            usable: true,
+            safety_branch: null,
+          },
+          {
+            ref: "STM32F429ZET6",
+            position: "23",
+            canonical_pin_name: "PA9",
+            signal: "USART1_TX",
+            af_index: 7,
+            usable: true,
+            safety_branch: null,
+          },
+          {
+            ref: "STM32F746ZGT6",
+            position: "23",
+            canonical_pin_name: "PA9",
+            signal: "USART1_TX",
+            af_index: 7,
+            usable: true,
+            safety_branch: null,
+          },
+        ],
+        candidates_by_target: {
+          STM32F407ZGT6: [
+            {
+              ref: "STM32F407ZGT6",
+              position: "23",
+              canonical_pin_name: "PA9",
+              signal: "USART1_TX",
+              af_index: 7,
+            },
+          ],
+          STM32F429ZET6: [
+            {
+              ref: "STM32F429ZET6",
+              position: "23",
+              canonical_pin_name: "PA9",
+              signal: "USART1_TX",
+              af_index: 7,
+            },
+          ],
+          STM32F746ZGT6: [
+            {
+              ref: "STM32F746ZGT6",
+              position: "23",
+              canonical_pin_name: "PA9",
+              signal: "USART1_TX",
+              af_index: 7,
+            },
+          ],
+        },
+        candidate_counts: {
+          STM32F407ZGT6: 1,
+          STM32F429ZET6: 1,
+          STM32F746ZGT6: 1,
+        },
+        onehot_group: null,
+        evidence: ["fixture"],
+      },
+    ],
+    service_groups: [],
+    functional_foundation: {
+      claim_scope: "pin-obligation",
+      network_values_authority: "external-target-documentation-required",
+      status: "complete",
+      unresolved_positions: [],
+      groups: [],
+    },
+    safety_rules: [],
+    channel_fabric: {
+      part_mpn: "",
+      channels_per_device: 0,
+      max_devices: 0,
+      default_state: "open",
+      reference_prefix: "U_ROUTE",
+      required_channels: 0,
+      capacity: 0,
+      used_devices: 0,
+      allocations: [],
+    },
+    positions: [
+      {
+        position: "23",
+        position_kind: "numeric",
+        lqfp_side: "left",
+        bga_row: null,
+        bga_col: null,
+        silicon_class: "stable_io",
+        board_action: "direct",
+        identities: ["PA9"],
+        access_tags: ["usart"],
+        access_tags_union: ["usart"],
+        present_on: 3,
+        total_targets: 3,
+        route_ids: ["uart_tx"],
+        hazard: "",
+        per_target: [
+          {
+            ref: "STM32F407ZGT6",
+            family: "STM32F4",
+            canonical_pin_name: "PA9",
+            electrical_class: "io",
+            critical_identity: null,
+            roles: [],
+            functions: ["USART1_TX", "ETH_TXD3"],
+            alternate_functions: [],
+            access_tags: ["usart"],
+          },
+          {
+            ref: "STM32F429ZET6",
+            family: "STM32F4",
+            canonical_pin_name: "PA9",
+            electrical_class: "io",
+            critical_identity: null,
+            roles: [],
+            functions: ["USART1_TX"],
+            alternate_functions: [],
+            access_tags: ["usart"],
+          },
+          {
+            ref: "STM32F746ZGT6",
+            family: "STM32F7",
+            canonical_pin_name: "PA9",
+            electrical_class: "io",
+            critical_identity: null,
+            roles: [],
+            functions: ["USART1_TX"],
+            alternate_functions: [],
+            access_tags: ["usart"],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function wrapperWith(qc: QueryClient) {
   return ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: qc }, children);
@@ -139,7 +367,7 @@ describe("benchSets", () => {
 });
 
 describe("benchExport", () => {
-  it("bundles the scope, every set, and the active union for the build-card pipeline", () => {
+  it("bundles the scope, every set, and the active union as a generic analysis", () => {
     const sets = benchSets(SUGGESTIONS.groups, 3);
     const parsed = JSON.parse(
       benchExport({ families: ["STM32F4", "STM32F7"], package: "LQFP144" }, sets, unionResult()),
@@ -159,7 +387,10 @@ describe("CompatibilityWorkbench (the Bench)", () => {
     vi.spyOn(api, "getStmFamilies").mockResolvedValue(FAMILIES);
     const suggSpy = vi.spyOn(api, "getStmCompatSuggestions").mockResolvedValue(SUGGESTIONS);
     const unionSpy = vi.spyOn(api, "postStmCompatUnion").mockResolvedValue(unionResult());
-    return { suggSpy, unionSpy };
+    const definitionSpy = vi
+      .spyOn(api, "postStmTargetDefinition")
+      .mockResolvedValue(targetDefinitionResult());
+    return { suggSpy, unionSpy, definitionSpy };
   }
 
   async function pickScope() {
@@ -220,16 +451,15 @@ describe("CompatibilityWorkbench (the Bench)", () => {
     await waitFor(() => expect(unionSpy).toHaveBeenCalledWith({ parts: ["STM32F407ZGT6"] }));
   });
 
-  it("renders the switch plan with the blocked position and its baseline identity", async () => {
+  it("keeps capability differences as evidence and shows the compiled physical action", async () => {
     mockScope();
     render(<CompatibilityWorkbench />, { wrapper: wrapperWith(freshClient()) });
     await pickScope();
 
-    const plan = await screen.findByTestId("switch-plan");
-    expect(within(plan).getByText("23")).toBeInTheDocument();
-    expect(within(plan).getByText("PA9")).toBeInTheDocument(); // the baseline identity
-    expect(within(plan).getByText("Needs switching")).toBeInTheDocument();
-    expect(within(plan).getByText(/1 shared/)).toBeInTheDocument();
+    const rail = await screen.findByTestId("target-continuity-rail");
+    expect(within(rail).getByRole("button", { name: "Position 23: Direct" })).toBeInTheDocument();
+    expect(screen.getByText("Build Ready")).toBeInTheDocument();
+    expect(screen.queryByTestId("switch-plan")).toBeNull();
   });
 
   it("dropping a chip switches to a custom set and auto-rebuilds with the remaining refs", async () => {
@@ -290,7 +520,7 @@ describe("CompatibilityWorkbench (the Bench)", () => {
     expect(within(modal).getByText("VDD")).toBeInTheDocument();
   });
 
-  it("exports the active set as the build-card JSON bundle", async () => {
+  it("exports the compiled generic target definition", async () => {
     mockScope();
     const createUrl = vi.fn(() => "blob:x");
     const revokeUrl = vi.fn();
@@ -299,9 +529,9 @@ describe("CompatibilityWorkbench (the Bench)", () => {
 
     render(<CompatibilityWorkbench />, { wrapper: wrapperWith(freshClient()) });
     await pickScope();
-    await screen.findByTestId("bench-stepper");
+    await screen.findByTestId("target-continuity-rail");
 
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    fireEvent.click(screen.getByRole("button", { name: "Export Definition" }));
     expect(createUrl).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();

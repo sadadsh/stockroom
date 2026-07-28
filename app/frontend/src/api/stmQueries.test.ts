@@ -9,13 +9,21 @@ import {
   useStmPinout,
   useBuildStmIndex,
   useStmCompatUnion,
+  useStmTargetDefinition,
   useStmPinAf,
   useStmSignalCandidates,
   useStmSuggestions,
   useStmAfCheck,
 } from "./stmQueries";
 import { api, ApiError } from "./client";
-import type { McusResponse, PinoutDTO, StmStatusDTO, UnionDTO } from "./types";
+import type {
+  McusResponse,
+  PinoutDTO,
+  StmStatusDTO,
+  TargetDefinitionDTO,
+  TargetDefinitionPolicy,
+  UnionDTO,
+} from "./types";
 
 const UNION: UnionDTO = {
   parts: ["STM32F407VETx"],
@@ -26,6 +34,73 @@ const UNION: UnionDTO = {
   grain: "per-part",
   positions: [],
   verdict: { interchangeable: true, swaps_required: 0, blocking: [] },
+};
+
+const TARGET_POLICY: TargetDefinitionPolicy = {
+  id: "test",
+  revision: 1,
+  requirements: [],
+  safety_rules: [],
+  channel_fabric: {
+    part_mpn: "TEST-SWITCH",
+    channels_per_device: 8,
+    max_devices: 1,
+    default_state: "open",
+  },
+};
+
+const TARGET_DEFINITION: TargetDefinitionDTO = {
+  format: "stm-target-definition/1",
+  compiler_rev: 4,
+  artifact_digest: "a".repeat(64),
+  profile: {
+    id: "test",
+    revision: 1,
+    coverage_mode: "explicit-device-set",
+    policy_digest: "b".repeat(64),
+  },
+  scope: { package: "LQFP100", families: ["STM32F4"], target_count: 1, targets: [] },
+  provenance: {
+    silicon_source: "STM32CubeMX XML",
+    source_sha256: "abc",
+    source_built_at: "2026-07-23T00:00:00Z",
+    classifier_rev: 2,
+    af_schema_rev: 1,
+    geometry_rev: 3,
+    policy_digest: "b".repeat(64),
+  },
+  readiness: { status: "ready", blockers: [], warnings: [] },
+  summary: {
+    silicon_classes: {},
+    board_actions: {},
+    required_routes: 0,
+    switched_routes: 0,
+    safety_rules: 0,
+    service_groups: 0,
+    foundation_groups: 0,
+  },
+  requirements: [],
+  service_groups: [],
+  functional_foundation: {
+    claim_scope: "pin-obligation",
+    network_values_authority: "external-target-documentation-required",
+    status: "complete",
+    unresolved_positions: [],
+    groups: [],
+  },
+  safety_rules: [],
+  channel_fabric: {
+    part_mpn: "TEST-SWITCH",
+    channels_per_device: 8,
+    max_devices: 1,
+    default_state: "open",
+    reference_prefix: "U_ROUTE",
+    required_channels: 0,
+    capacity: 8,
+    used_devices: 0,
+    allocations: [],
+  },
+  positions: [],
 };
 
 const STATUS: StmStatusDTO = {
@@ -165,6 +240,20 @@ describe("STM query hooks", () => {
     result.current.mutate({ family: "STM32F4", package: "LQFP100" });
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect((result.current.error as ApiError).status).toBe(409);
+  });
+
+  it("useStmTargetDefinition posts the explicit policy and resolves the artifact", async () => {
+    const spy = vi
+      .spyOn(api, "postStmTargetDefinition")
+      .mockResolvedValue(TARGET_DEFINITION);
+    const { result } = renderHook(() => useStmTargetDefinition(), {
+      wrapper: wrapperWith(freshClient()),
+    });
+    const body = { parts: ["STM32F407VETx"], policy: TARGET_POLICY };
+    result.current.mutate(body);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(spy).toHaveBeenCalledWith(body);
+    expect(result.current.data?.artifact_digest).toHaveLength(64);
   });
 
   it("useStmPinAf is disabled until a part AND position are set, then loads the AF set", async () => {

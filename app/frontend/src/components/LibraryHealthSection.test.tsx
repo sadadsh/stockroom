@@ -58,7 +58,7 @@ describe("LibraryHealthSection", () => {
   it("shows an honest healthy state with no repair button when nothing is wrong", async () => {
     renderSection();
     expect(await screen.findByTestId("doctor-healthy")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Repair Components" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Apply Safe Library Repairs" })).toBeNull();
   });
 
   it("lists fixable defects, uncommitted changes, and manual findings", async () => {
@@ -72,7 +72,7 @@ describe("LibraryHealthSection", () => {
     const manual = screen.getByTestId("doctor-manual-cap1");
     expect(manual).toHaveTextContent("Missing 3D Model");
     expect(manual).toHaveTextContent("re-import the 3D model for this part");
-    expect(screen.getByRole("button", { name: "Repair Components" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply Safe Library Repairs" })).toBeInTheDocument();
   });
 
   it("runs the repair, reports what it did, and refreshes to the healed state", async () => {
@@ -80,7 +80,7 @@ describe("LibraryHealthSection", () => {
     renderSection();
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Repair Components" }));
+    await user.click(await screen.findByRole("button", { name: "Apply Safe Library Repairs" }));
 
     await waitFor(() => expect(mockApi.repairLibrary).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(/Repaired:/)).toBeInTheDocument();

@@ -55,9 +55,30 @@ class AppUpdater:
         self._uv = uv_runner or (lambda: None)
         self._restart = restart or (lambda: None)
 
+    def _check_identity(self) -> dict:
+        """Stable, non-secret delivery facts the Settings UI can explain.
+
+        A bare `update_available=false` cannot distinguish a current install from a detached,
+        unreachable, or unmanaged one. Keep the payload deliberately small: exact local revision,
+        release channel, and the launcher policy. No filesystem path or remote credential is exposed.
+        """
+        head = self.repo.head()
+        return {
+            "current_revision": head[:12] if head else "",
+            "channel": self.repo.current_branch() or "detached",
+            "automatic_on_launch": True,
+            "check_interval_seconds": 120,
+        }
+
     def check(self) -> dict:
+        identity = self._check_identity()
         if not self.repo.has_remote():
-            return {"update_available": False, "state": UpdateState.NO_REMOTE}
+            return {
+                **identity,
+                "update_available": False,
+                "state": UpdateState.NO_REMOTE,
+                "detail": "no application remote is configured",
+            }
         # A real check must FETCH first: ahead_behind reads the local view of the
         # remote refs, so without a fetch the running app can never learn that a
         # new release exists and the Apply button never appears (the stuck-update
@@ -65,13 +86,19 @@ class AppUpdater:
         ok, reason = self.repo.fetch()
         if not ok:
             return {
+                **identity,
                 "update_available": False,
                 "state": UpdateState.OFFLINE,
                 "detail": reason,
             }
         ab = self.repo.ahead_behind()
         behind = ab[1] if ab else 0
-        return {"update_available": behind > 0, "behind": behind}
+        return {
+            **identity,
+            "update_available": behind > 0,
+            "state": "update_available" if behind > 0 else UpdateState.UP_TO_DATE,
+            "behind": behind,
+        }
 
     def _apply(self) -> UpdateResult:
         # files changed: sync deps then request a graceful restart + reload

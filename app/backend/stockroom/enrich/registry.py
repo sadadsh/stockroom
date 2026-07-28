@@ -10,10 +10,11 @@ completeness, the load-bearing rule)."""
 from __future__ import annotations
 
 import inspect
+from collections.abc import Iterable
 from typing import Protocol, runtime_checkable
 
 from stockroom.enrich.errors import EnrichError
-from stockroom.enrich.schema import EnrichmentResult
+from stockroom.enrich.schema import EnrichmentResult, mpn_identity_key
 
 # The want token that means "ask EVERY distributor, not just enough of them". It is not a
 # field: it is satisfied only once every source declaring a `vendor` has been consulted, which
@@ -92,7 +93,7 @@ def _accepts_kw(fn, name: str) -> bool:
 
 
 class SourceRegistry:
-    def __init__(self, sources: list[Source]):
+    def __init__(self, sources: Iterable[Source]):
         self.sources = list(sources)
 
     def enrich(self, mpn: str, category: str, want: set[str] | None = None,
@@ -123,6 +124,14 @@ class SourceRegistry:
                 unconsulted.discard(id(source))  # asked, and it failed: that still counts
                 continue  # a dead source never blocks
             unconsulted.discard(id(source))
+            if (
+                partial.mpn is not None
+                and mpn_identity_key(partial.mpn.value) != mpn_identity_key(mpn)
+            ):
+                # Search APIs are allowed to return fuzzy candidates, but an MPN lookup is not.
+                # Reject the whole foreign row before its manufacturer, specs, prices, or URL
+                # can contaminate the requested part, then continue to the next source.
+                continue
             if vendor:
                 record_vendor_offer(result, vendor, partial)
             result.merge_missing(partial)

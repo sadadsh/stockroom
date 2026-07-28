@@ -26,6 +26,7 @@ both paths), so the viewer's millimetre normalisation is unaffected by the route
 from __future__ import annotations
 
 import json
+import math
 import re
 import struct
 import tempfile
@@ -196,6 +197,20 @@ def _srgb8(base_color: list[float]) -> tuple[int, int, int]:
 _CHUNK_JSON = 0x4E4F534A
 
 
+def _read_gltf_json(data: bytes) -> dict | None:
+    """Read the JSON document from a binary glTF without touching its geometry chunks."""
+    offset = 12
+    while offset + 8 <= len(data):
+        length, kind = struct.unpack_from("<II", data, offset)
+        if kind == _CHUNK_JSON:
+            try:
+                return json.loads(data[offset + 8 : offset + 8 + length])
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return None
+        offset += 8 + length
+    return None
+
+
 def _with_gltf_json(data: bytes, gltf: dict) -> bytes:
     """Re-emit GLB `data` carrying `gltf` as its JSON chunk.
 
@@ -261,6 +276,94 @@ def _state_surface_finish(data: bytes) -> bytes:
     return data
 
 
+def _normalise_step_basis(data: bytes) -> bytes:
+    """Declare a STEP model in glTF's Y-up coordinate basis without touching its mesh.
+
+    OpenCASCADE writes STEP's native Z-up coordinates straight into POSITION accessors,
+    while glTF defines +Y as up. The file is structurally valid, but every conforming
+    viewer therefore stands a board-mounted part on its side. Wrap the authored scene
+    roots in a -90° X rotation: source ``(x, y, z)`` becomes render ``(x, z, -y)``.
+
+    A parent node is deliberate. Rewriting vertex buffers would risk normals, morphs,
+    precision, and future mesh attributes; modifying an existing root would compound
+    vendor transforms. The wrapper preserves both exactly and makes the conversion
+    explicit in asset metadata for any downstream consumer.
+    """
+    offset = 12
+    while offset + 8 <= len(data):
+        length, kind = struct.unpack_from("<II", data, offset)
+        if kind == _CHUNK_JSON:
+            gltf = json.loads(data[offset + 8 : offset + 8 + length])
+            scenes = gltf.get("scenes", [])
+            if not scenes:
+                return data
+
+            nodes = gltf.setdefault("nodes", [])
+            half_sqrt = math.sqrt(0.5)
+            for index, scene in enumerate(scenes):
+                authored_roots = list(scene.get("nodes", []))
+                if not authored_roots:
+                    continue
+                wrapper_index = len(nodes)
+                nodes.append(
+                    {
+                        "name": f"Stockroom STEP Basis — Scene {index + 1}",
+                        "rotation": [-half_sqrt, 0.0, 0.0, half_sqrt],
+                        "children": authored_roots,
+                    }
+                )
+                scene["nodes"] = [wrapper_index]
+
+            asset = gltf.setdefault("asset", {})
+            extras = asset.setdefault("extras", {})
+            stockroom = extras.setdefault("stockroom", {})
+            stockroom.update(
+                {
+                    "sourceFormat": "STEP",
+                    "sourceUpAxis": "Z",
+                    "sourceUnits": "model-declared",
+                    "renderUpAxis": "Y",
+                    "renderUnits": "m",
+                    "basisTransform": "rotateX(-90deg)",
+                    "frameConfidence": "declared",
+                }
+            )
+            return _with_gltf_json(data, gltf)
+        offset += 8 + length
+    return data
+
+
+def _state_mesh_frame(data: bytes, src: Path) -> bytes:
+    """Describe what is and is not known about a non-STEP mesh's coordinate frame.
+
+    glTF/GLB have a standard Y-up, metre coordinate system. OBJ, STL, PLY, and most other
+    interchange meshes do not declare either an up axis or a unit reliably. Trimesh can turn those
+    bytes into a valid GLB, but that act does not magically make the source convention known. The
+    renderer may still offer a raw preview and run plausibility checks; it must not present a guessed
+    rotation or scale as accepted placement.
+    """
+    suffix = src.suffix.lower()
+    standard_gltf = suffix in {".glb", ".gltf"}
+    gltf = _read_gltf_json(data)
+    if gltf is None:
+        return data
+    asset = gltf.setdefault("asset", {})
+    extras = asset.setdefault("extras", {})
+    stockroom = extras.setdefault("stockroom", {})
+    stockroom.update(
+        {
+            "sourceFormat": suffix.lstrip(".").upper() or "UNKNOWN",
+            "sourceUpAxis": "Y" if standard_gltf else "unknown",
+            "sourceUnits": "m" if standard_gltf else "unknown",
+            "renderUpAxis": "Y",
+            "renderUnits": "m",
+            "basisTransform": "identity",
+            "frameConfidence": "standard" if standard_gltf else "unresolved",
+        }
+    )
+    return _with_gltf_json(data, gltf)
+
+
 def _step_to_glb(src: Path) -> bytes:
     """Convert a STEP with cascadio, keeping every byte of its geometry.
 
@@ -268,8 +371,9 @@ def _step_to_glb(src: Path) -> bytes:
     colour and a NORMAL attribute per primitive, and re-encoding the result through any
     scene model risks losing exactly those (which is what trimesh did). cascadio only
     writes to a path, so it goes to a temp file that is read back and discarded. The one
-    edit made on the way out is the surface finish above, which adds two numbers per
-    material to the JSON chunk and touches no buffer."""
+    edits made on the way out are JSON-only: the surface finish above adds two numbers
+    per material, and a parent node converts STEP's Z-up basis to glTF's mandated Y-up
+    basis. Neither operation touches a geometry buffer."""
     try:
         import cascadio
     except Exception as exc:  # ImportError, or a broken partial install
@@ -292,7 +396,7 @@ def _step_to_glb(src: Path) -> bytes:
         raise ModelConversionError("the 3D exporter did not produce a valid GLB")
     if _glb_mesh_count(data) == 0:
         raise ModelConversionError("the 3D model has no geometry to show")
-    return _state_surface_finish(data)
+    return _state_surface_finish(_normalise_step_basis(data))
 
 
 def model_to_glb(src: Path) -> bytes:
@@ -343,4 +447,4 @@ def model_to_glb(src: Path) -> bytes:
 
     if not isinstance(data, (bytes, bytearray)) or not bytes(data).startswith(GLB_MAGIC):
         raise ModelConversionError("the 3D exporter did not produce a valid GLB")
-    return bytes(data)
+    return _state_mesh_frame(bytes(data), src)

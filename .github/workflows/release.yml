@@ -76,31 +76,43 @@ jobs:
           Remove-Item $pfx -Force
           Write-Host "Signed dist\Stockroom.exe"
 
+      - name: Write the release checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash dist\Stockroom.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Stockroom.exe" | Set-Content -Encoding ascii dist\Stockroom.exe.sha256
+
       - name: Upload as a build artifact
         uses: actions/upload-artifact@v4
         with:
           name: Stockroom-exe
-          path: dist/Stockroom.exe
+          path: |
+            dist/Stockroom.exe
+            dist/Stockroom.exe.sha256
 
       - name: Publish the GitHub Release (on a version tag)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Stockroom.exe
+          files: |
+            dist/Stockroom.exe
+            dist/Stockroom.exe.sha256
           name: Stockroom ${{ github.ref_name }}
           prerelease: true
           body: |
             Portable frozen-once launcher for Stockroom, the KiCad component-library and PCB-project manager.
 
-            Download `Stockroom.exe` below and run it. On first launch it clones the app repo to
-            `%LOCALAPPDATA%\Stockroom\app`, provisions the environment with uv, opens the WebView2
-            window, and opens straight on the bundled library. Updates flow by git pull: the launcher
-            reconciles the latest code on every launch and the in-app Update control does the same, so
-            once you install this build, future commits self-update automatically (no re-download).
+            Download `Stockroom.exe` and keep it anywhere convenient. The launcher bundles portable
+            Git, uv, and the WebView2 bootstrapper. On first launch it creates a managed checkout at
+            `%LOCALAPPDATA%\Stockroom\app`, provisions the environment, and opens the bundled library.
+            Later launches reconcile that checkout with its configured application branch. A running
+            session checks every two minutes and offers `Install And Restart` when new code is ready.
 
-            Requirements on the target machine: git and uv (https://astral.sh/uv) on PATH, the WebView2
-            runtime (bundled with current Windows), internet on first run, and 64-bit Windows. KiCad 10
-            for the ERC/DRC, fab-export, and preview features.
+            Requirements on the target machine: internet on first run and 64-bit Windows. KiCad 10 is
+            optional and enables ERC/DRC, fab export, and native preview features.
+
+            `Stockroom.exe.sha256` contains the release asset's SHA-256 checksum. Authenticode signing
+            is applied when the repository's Windows signing certificate secrets are configured.
 
             Marked pre-release: the full fresh-device flow (clone, uv sync, every backend feature, ERC/DRC
             and fab export via the real Windows kicad-cli) is verified on real Windows; the remaining

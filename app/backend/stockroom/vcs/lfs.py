@@ -111,6 +111,37 @@ def repo_enabled(repo: GitRepo) -> bool:
     return repo._run("config", "--get", _CLEAN_KEY, check=False).returncode == 0
 
 
+def _parse_tracked_patterns(output: str) -> tuple[str, ...]:
+    """Parse only the tracked section of ``git lfs track`` output.
+
+    Git LFS may normalize pattern casing for the host filesystem, so retain the CLI-reported
+    pattern verbatim. The command also prints a separate excluded-patterns section; neither its
+    heading nor its rows describe content routed through LFS.
+    """
+    out: list[str] = []
+    in_tracked_section = False
+    for line in output.splitlines():
+        line = line.strip()
+        heading = line.casefold()
+        if heading.startswith("listing tracked patterns"):
+            in_tracked_section = True
+            continue
+        if heading.startswith("listing excluded patterns"):
+            in_tracked_section = False
+            continue
+        if not line or not in_tracked_section:
+            continue
+        # Pattern rows are `<pattern> (<attributes source>)`. Split from the right so a literal
+        # opening parenthesis in a pattern is not truncated.
+        pattern, separator, source = line.rpartition(" (")
+        if not separator or not source.endswith(")"):
+            continue
+        pattern = pattern.strip()
+        if pattern:
+            out.append(pattern)
+    return tuple(out)
+
+
 def tracked_patterns(repo: GitRepo) -> tuple[str, ...]:
     """The patterns git-lfs believes it is handling, read from git-lfs itself rather than parsed
     out of `.gitattributes`, so an attributes file that does not mean what it looks like cannot
@@ -118,16 +149,7 @@ def tracked_patterns(repo: GitRepo) -> tuple[str, ...]:
     proc = _lfs(repo, "track")
     if proc.returncode != 0:
         return ()
-    out: list[str] = []
-    for line in proc.stdout.splitlines():
-        line = line.strip()
-        # `git lfs track` prints a heading then `    <pattern> (.gitattributes)` per rule
-        if not line or line.lower().startswith("listing tracked"):
-            continue
-        pattern = line.split("(")[0].strip()
-        if pattern:
-            out.append(pattern)
-    return tuple(out)
+    return _parse_tracked_patterns(proc.stdout)
 
 
 def _pointer_count(repo: GitRepo) -> int:

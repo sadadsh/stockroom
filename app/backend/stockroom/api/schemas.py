@@ -667,6 +667,45 @@ class UnionDTO(BaseModel):
         )
 
 
+class TargetDefinitionDTO(BaseModel):
+    """A content-addressed hardware target definition compiled from silicon facts
+    plus an explicit caller-owned policy."""
+
+    format: str
+    compiler_rev: int
+    artifact_digest: str
+    profile: dict
+    scope: dict
+    provenance: dict
+    readiness: dict
+    summary: dict
+    requirements: list[dict] = []
+    service_groups: list[dict] = []
+    functional_foundation: dict
+    safety_rules: list[dict] = []
+    channel_fabric: dict
+    positions: list[dict] = []
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "TargetDefinitionDTO":
+        return cls(
+            format=d.get("format", "") or "",
+            compiler_rev=int(d.get("compiler_rev", 0) or 0),
+            artifact_digest=d.get("artifact_digest", "") or "",
+            profile=dict(d.get("profile", {}) or {}),
+            scope=dict(d.get("scope", {}) or {}),
+            provenance=dict(d.get("provenance", {}) or {}),
+            readiness=dict(d.get("readiness", {}) or {}),
+            summary=dict(d.get("summary", {}) or {}),
+            requirements=list(d.get("requirements", []) or []),
+            service_groups=list(d.get("service_groups", []) or []),
+            functional_foundation=dict(d.get("functional_foundation", {}) or {}),
+            safety_rules=list(d.get("safety_rules", []) or []),
+            channel_fabric=dict(d.get("channel_fabric", {}) or {}),
+            positions=list(d.get("positions", []) or []),
+        )
+
+
 class SuggestionGroupDTO(BaseModel):
     """One compatibility-suggestion group (COMPAT-04)."""
 
