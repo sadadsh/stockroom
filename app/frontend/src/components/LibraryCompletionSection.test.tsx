@@ -224,6 +224,46 @@ describe("running", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a provider's non-error reason before the remaining gaps", async () => {
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
+    vi.spyOn(api, "runCompletion").mockResolvedValue({ job_id: "j1" });
+    vi.spyOn(api, "openJobStream").mockResolvedValue(
+      streamOf([
+        {
+          event: "result",
+          data: {
+            result: {
+              items: [
+                {
+                  part_id: "p1",
+                  mpn: "M",
+                  display_name: "Part One",
+                  category: "ICs",
+                  status: "unchanged",
+                  needed: ["kicad_symbol"],
+                  satisfied: [],
+                  remaining: ["kicad_symbol"],
+                  sources: [],
+                  notes: ["snapmagic: no exact CAD model was found"],
+                  error: "",
+                },
+              ],
+              counts: { unchanged: 1 },
+              stopped: false,
+              stop_reason: "",
+            },
+          },
+        },
+      ]),
+    );
+    renderSection();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
+
+    const detail = await screen.findByText(/snapmagic: no exact CAD model was found/i);
+    expect(detail).toHaveTextContent(/snapmagic:.*Still needs symbol/i);
+  });
+
   it("surfaces a failure to start rather than sitting on a spinner", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
     vi.spyOn(api, "runCompletion").mockRejectedValue(new Error("backend is down"));

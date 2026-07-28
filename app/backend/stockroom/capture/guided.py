@@ -368,6 +368,11 @@ class GuidedCaptureSource:
     ) -> None:
         self._make_pipeline = make_pipeline
         self._vendor_key = vendor
+        adapter = get_adapter(vendor)
+        # Public, human-facing identity for completion reports. `key` must remain "guided"
+        # because it names the source implementation, while two instances in one fallback chain
+        # need distinct provider names so their honest decline reasons remain distinguishable.
+        self.report_label = adapter.capability.label if adapter is not None else vendor
         self._download_root = Path(download_root)
         self._download_root.mkdir(parents=True, exist_ok=True)
         self._profile_dir = profile_dir

@@ -481,7 +481,7 @@ export interface StagingCandidate {
 export interface IngestEnrichResult {
   candidate: StagingCandidate;
   filled: string[];
-  notes: string[];
+  notes?: string[];
   missing: string[];
 }
 
@@ -1610,6 +1610,9 @@ export interface CompletionItem {
   satisfied: string[];
   remaining: string[];
   sources: string[];
+  // Provider-named reasons a source declined this exact part. These are explanations, not
+  // failures; `error` remains reserved for an operation that broke.
+  notes: string[];
   error: string;
 }
 

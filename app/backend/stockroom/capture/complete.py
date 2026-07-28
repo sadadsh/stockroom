@@ -105,6 +105,10 @@ class CompletionItem:
     satisfied: list[str] = field(default_factory=list)
     remaining: list[str] = field(default_factory=list)
     sources: list[str] = field(default_factory=list)  # which sources actually delivered
+    # Honest non-error explanations from sources that declined this exact part. Kept separate
+    # from `error`: "no exact model exists here" is useful evidence, but it is not a provider
+    # failure and must not be presented as one.
+    notes: list[str] = field(default_factory=list)
     error: str = ""
     # Internal batch-control signal. A provider-wide gate may coexist with a useful partial
     # fallback, so status can remain `improved` while the circuit breaker still stops repeated
@@ -123,6 +127,7 @@ class CompletionItem:
             "satisfied": list(self.satisfied),
             "remaining": list(self.remaining),
             "sources": list(self.sources),
+            "notes": list(self.notes),
             "error": self.error,
         }
 
@@ -213,6 +218,12 @@ def complete_part(part_id: str, *, load_record, sources) -> CompletionItem:
             continue
         if outcome.error:
             errors.append(f"{source.key}: {outcome.error}")
+        if outcome.skipped:
+            # A source's stable engine key is not always its provider identity. Guided browser
+            # sources deliberately share `key="guided"` while each instance drives a different
+            # provider, so prefer their public report label when naming a decline.
+            source_label = getattr(source, "report_label", "") or source.key
+            item.notes.append(f"{source_label}: {outcome.skipped}")
         if outcome.blocked:
             blocked = True
         # Re-read the record's OWN state rather than trusting the claim. A source that
