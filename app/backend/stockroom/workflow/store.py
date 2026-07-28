@@ -6,8 +6,8 @@ Design choices kept intentionally small and reversible:
 * Every public mutation is one ``BEGIN IMMEDIATE`` transaction.
 * Optional idempotency keys bind to a canonical request digest, so concurrent
   client retries collapse to the first batch or fail on request mismatch.
-* A fresh SQLite connection is used per operation, making one store safe to use
-  from multiple worker threads without sharing connection state.
+* A fresh SQLite connection is used per operation, and a process-local writer
+  lock avoids making worker threads contend inside SQLite for its single writer.
 * Pausing stops new claims but lets an already leased worker finish.  Cancelling
   is immediate and invalidates every non-completed lease.  Long provider and CAD
   stages renew an owned, unexpired lease with explicit heartbeats.
@@ -33,6 +33,7 @@ import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
+from threading import RLock
 
 from .identifiers import (
     authoritative_text,
@@ -882,6 +883,18 @@ _DECISION_SELECT = """
     FROM decisions AS d
 """
 
+_PERSISTED_DEPENDENCY_SELECT = """
+    SELECT
+        child.name AS child_name,
+        parent.name AS parent_name,
+        child.item_id AS child_item_id,
+        parent.item_id AS parent_item_id
+    FROM stage_dependencies AS dependency
+    JOIN stages AS child ON child.id = dependency.stage_id
+    JOIN stages AS parent ON parent.id = dependency.depends_on_stage_id
+    WHERE child.item_id = ?
+"""
+
 
 class WorkflowStore:
     """Durable batch, item, stage, event, decision, and receipt storage."""
@@ -891,6 +904,7 @@ class WorkflowStore:
             raise ValueError("WorkflowStore requires a durable filesystem database")
         self.database = Path(database)
         self.database.parent.mkdir(parents=True, exist_ok=True)
+        self._writer_lock = RLock()
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -925,6 +939,20 @@ class WorkflowStore:
             raise
         finally:
             connection.close()
+
+    @contextmanager
+    def _serialized_writing(self) -> Iterator[sqlite3.Connection]:
+        """Enter one process-local SQLite writer without busy-lock contention.
+
+        SQLite remains the cross-process authority.  This narrow lock only
+        prevents threads sharing a store from racing for SQLite's single writer
+        slot; subclasses may still select a different qualified connection
+        lifecycle through ``_writing``.
+        """
+
+        with self._writer_lock:
+            with self._writing() as connection:
+                yield connection
 
     @staticmethod
     def _schema_columns(
@@ -1054,18 +1082,8 @@ class WorkflowStore:
                 )
 
             dependency_rows = connection.execute(
-                """
-                SELECT
-                    child.name AS child_name,
-                    parent.name AS parent_name,
-                    child.item_id AS child_item_id,
-                    parent.item_id AS parent_item_id
-                FROM stage_dependencies AS dependency
-                JOIN stages AS child ON child.id = dependency.stage_id
-                JOIN stages AS parent ON parent.id = dependency.depends_on_stage_id
-                WHERE child.item_id = ? OR parent.item_id = ?
-                """,
-                (item_id, item_id),
+                _PERSISTED_DEPENDENCY_SELECT,
+                (item_id,),
             ).fetchall()
             if any(
                 row["child_item_id"] != item_id or row["parent_item_id"] != item_id
@@ -1149,7 +1167,8 @@ class WorkflowStore:
                     (version, time.time()),
                 )
                 self._verify_schema(connection, version)
-            self._verify_persisted_stage_graph(connection)
+            if current < SCHEMA_VERSION:
+                self._verify_persisted_stage_graph(connection)
             connection.commit()
         except BaseException:
             connection.rollback()
@@ -1612,7 +1631,7 @@ class WorkflowStore:
         batch_id = new_opaque_id()
         plan = default_stage_plan()
 
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             if idempotency_key is not None:
                 existing = connection.execute(
                     "SELECT * FROM batches WHERE idempotency_key = ?",
@@ -1805,7 +1824,7 @@ class WorkflowStore:
         )
         timestamp = self._timestamp(now)
 
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             self._recover_expired_in_transaction(connection, timestamp)
             stage = self._require_stage_row(connection, stage_id)
             if StageName(stage["name"]) is not StageName.IDENTITY_DEDUPE:
@@ -2077,7 +2096,7 @@ class WorkflowStore:
         )
         timestamp = self._timestamp(now)
 
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             self._recover_expired_in_transaction(connection, timestamp)
             stage = self._require_stage_row(connection, stage_id)
             if StageName(stage["name"]) is not StageName.PUBLISH:
@@ -2449,7 +2468,7 @@ class WorkflowStore:
         claimed: list[PublicationLease] = []
         states = tuple(state.value for state in RECONCILABLE_PUBLICATION_STATES)
 
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             rows = connection.execute(
                 f"""
                 SELECT * FROM publication_operations
@@ -2532,7 +2551,7 @@ class WorkflowStore:
             timestamp + lease_duration,
             "lease expiration",
         )
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             row = self._require_publication_row(connection, publication_id)
             self._require_publication_lease(
                 row,
@@ -2594,7 +2613,7 @@ class WorkflowStore:
             lease_generation,
         )
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             row = self._require_publication_row(connection, publication_id)
             self._require_publication_lease(
                 row,
@@ -2683,7 +2702,7 @@ class WorkflowStore:
             lease_generation,
         )
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             row = self._require_publication_row(connection, publication_id)
             self._require_publication_lease(
                 row,
@@ -2776,7 +2795,7 @@ class WorkflowStore:
             lease_generation,
         )
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             row = self._require_publication_row(connection, publication_id)
             self._require_publication_lease(
                 row,
@@ -2859,7 +2878,7 @@ class WorkflowStore:
             lease_generation,
         )
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             row = self._require_publication_row(connection, publication_id)
             self._require_publication_lease(
                 row,
@@ -2934,7 +2953,7 @@ class WorkflowStore:
             lease_generation,
         )
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             operation = self._require_publication_row(
                 connection,
                 publication_id,
@@ -3555,7 +3574,7 @@ class WorkflowStore:
 
     def recover_expired_leases(self, *, now: float | None = None) -> int:
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             return self._recover_expired_in_transaction(connection, timestamp)
 
     def claim_ready(
@@ -3582,7 +3601,7 @@ class WorkflowStore:
             "lease expiration",
         )
         claimed_ids: list[str] = []
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             self._recover_expired_in_transaction(connection, timestamp)
             self._promote_due_retries(connection, timestamp)
             candidates = connection.execute(
@@ -3742,7 +3761,7 @@ class WorkflowStore:
             "lease expiration",
         )
 
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             row = self._require_stage_row(connection, stage_id)
             self._require_running_lease(
                 row,
@@ -3880,7 +3899,7 @@ class WorkflowStore:
             lease_generation,
         )
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             self._recover_expired_in_transaction(connection, timestamp)
             row = self._require_stage_row(connection, stage_id)
             status = StageStatus(row["status"])
@@ -3975,7 +3994,7 @@ class WorkflowStore:
         if retry_timestamp < timestamp:
             raise ValueError("retry_at must not be in the past")
 
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             self._recover_expired_in_transaction(connection, timestamp)
             row = self._require_stage_row(connection, stage_id)
             self._require_running_lease(
@@ -4043,7 +4062,7 @@ class WorkflowStore:
             lease_generation,
         )
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             self._recover_expired_in_transaction(connection, timestamp)
             row = self._require_stage_row(connection, stage_id)
             self._require_running_lease(
@@ -4110,7 +4129,7 @@ class WorkflowStore:
         )
         timestamp = self._timestamp(now)
         decision_id = new_opaque_id()
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             self._recover_expired_in_transaction(connection, timestamp)
             row = self._require_stage_row(connection, stage_id)
             self._require_running_lease(
@@ -4191,7 +4210,7 @@ class WorkflowStore:
 
         resolution_json = canonical_json(resolution)
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             decision = self._require_decision_row(connection, decision_id)
             status = DecisionStatus(decision["status"])
             if status is DecisionStatus.RESOLVED:
@@ -4296,7 +4315,7 @@ class WorkflowStore:
         now: float | None = None,
     ) -> BatchRecord:
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             row = self._require_batch_row(connection, batch_id)
             status = BatchStatus(row["status"])
             if status is BatchStatus.PAUSED:
@@ -4335,7 +4354,7 @@ class WorkflowStore:
         now: float | None = None,
     ) -> BatchRecord:
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             row = self._require_batch_row(connection, batch_id)
             status = BatchStatus(row["status"])
             if status in {
@@ -4379,7 +4398,7 @@ class WorkflowStore:
 
         reason_json = canonical_json({"reason": "user_requested"} if reason is None else reason)
         timestamp = self._timestamp(now)
-        with self._writing() as connection:
+        with self._serialized_writing() as connection:
             row = self._require_batch_row(connection, batch_id)
             status = BatchStatus(row["status"])
             if status is BatchStatus.CANCELLED:

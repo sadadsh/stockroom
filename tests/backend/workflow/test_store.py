@@ -1,8 +1,10 @@
 import json
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
-from threading import Barrier
+from threading import Barrier, Lock
+from time import sleep
 
 import pytest
 
@@ -224,6 +226,44 @@ def test_submission_idempotency_is_concurrent_and_request_exact(tmp_path):
         )
     assert store.count_batches() == 1
     assert len(store.list_items(batch.id)) == 2
+
+
+def test_one_store_serializes_local_writers_before_sqlite_busy_wait(tmp_path):
+    class ObservedWorkflowStore(WorkflowStore):
+        def __init__(self, database: Path):
+            self.observation_lock = Lock()
+            self.active_writers = 0
+            self.max_active_writers = 0
+            super().__init__(database)
+
+        @contextmanager
+        def _writing(self):
+            with self.observation_lock:
+                self.active_writers += 1
+                self.max_active_writers = max(
+                    self.max_active_writers,
+                    self.active_writers,
+                )
+            try:
+                sleep(0.01)
+                with super()._writing() as connection:
+                    yield connection
+            finally:
+                with self.observation_lock:
+                    self.active_writers -= 1
+
+    store = ObservedWorkflowStore(tmp_path / "serialized-writers.sqlite3")
+    start = Barrier(8)
+
+    def recover(_: int) -> int:
+        start.wait()
+        return store.recover_expired_leases(now=10)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        recovered = list(pool.map(recover, range(8)))
+
+    assert recovered == [0] * 8
+    assert store.max_active_writers == 1
 
 
 def test_exact_identity_fields_and_punctuation_collisions_survive_round_trip(tmp_path):
@@ -1122,6 +1162,27 @@ def test_every_open_refuses_noncanonical_persisted_graph(tmp_path, corruption):
         match="graph|stage dependencies|cross-item stage dependency",
     ):
         WorkflowStore(database)
+
+
+def test_persisted_dependency_verification_is_bounded_by_item(tmp_path):
+    database = tmp_path / "bounded-graph-verification.sqlite3"
+    store = WorkflowStore(database)
+    batch = store.submit_batch(
+        [IntakeIdentity("ACME", f"P-{index}") for index in range(100)],
+        now=1,
+    )
+    item_id = store.list_items(batch.id)[50].id
+
+    with sqlite3.connect(database) as connection:
+        plan = connection.execute(
+            "EXPLAIN QUERY PLAN " + workflow_store_module._PERSISTED_DEPENDENCY_SELECT,
+            (item_id,),
+        ).fetchall()
+
+    details = [str(row[3]) for row in plan]
+    assert any("SEARCH child" in detail and "item_id=?" in detail for detail in details)
+    assert any("SEARCH dependency" in detail and "stage_id=?" in detail for detail in details)
+    assert not any("SCAN dependency" in detail for detail in details)
 
 
 def test_schema_ledger_gaps_and_missing_required_objects_are_rejected(tmp_path):
