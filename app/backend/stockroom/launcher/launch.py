@@ -406,7 +406,11 @@ def _spawn_host(workdir: Path) -> int:  # pragma: no cover - real shell-out
 def main() -> int:  # pragma: no cover - the frozen exe entry point
     # Refuse to race a second launch over the same working copy (a concurrent clone/sync corrupts
     # it); if another Stockroom already holds the lock, exit quietly rather than start a fight.
-    if acquire_single_instance(app_workdir().parent) is None:
+    # Keep the handle in a local for the full supervisor lifetime. Comparing the returned handle
+    # inline immediately dropped the last reference under CPython, closed the file, and released
+    # the OS lock before the host had even started.
+    instance_lock = acquire_single_instance(app_workdir().parent)
+    if instance_lock is None:
         return 0
     # Show a first-run progress splash during the slow provision (clone + WebView2 + uv sync); it
     # degrades to a plain run if a splash cannot be shown, so it never blocks the launch.
