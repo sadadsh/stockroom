@@ -117,6 +117,7 @@ _ADAPTER_FAILURES = frozenset(
         FailureClassification.AUTH_INVALID,
         FailureClassification.UNSUPPORTED_FORMAT,
         FailureClassification.NOT_FOUND_EXACT,
+        FailureClassification.NEAR_MATCH_REJECTED,
     }
 )
 

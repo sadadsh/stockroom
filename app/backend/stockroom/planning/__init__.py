@@ -1,5 +1,10 @@
 """Durable orchestration adapters over the Stockroom workflow kernel."""
 
+from .distributor_provider import (
+    DistributorMetadataProviderAdapter,
+    build_configured_distributor_metadata_registrations,
+    build_configured_distributor_metadata_runtime,
+)
 from .provider_policy import (
     ALTIUM_CAD_OPERATION,
     DATASHEET_OPERATION,
@@ -36,6 +41,7 @@ from .provider_policy import (
 )
 from .provider_runtime import (
     ProviderAttemptReceipt,
+    ProviderEvidenceVerifier,
     ProviderExecutionReceipt,
     ProviderExecutionRuntime,
     ProviderRuntimeError,
@@ -71,6 +77,7 @@ __all__ = [
     "AdapterOutcomeStatus",
     "AuthenticationState",
     "CapabilityKind",
+    "DistributorMetadataProviderAdapter",
     "EdaTarget",
     "ExactPartIdentity",
     "ExactIdentityResolver",
@@ -89,6 +96,7 @@ __all__ = [
     "ProviderExecutionReport",
     "ProviderExecutionReceipt",
     "ProviderExecutionRuntime",
+    "ProviderEvidenceVerifier",
     "ProviderExclusion",
     "ProviderHealth",
     "ProviderOperation",
@@ -112,4 +120,6 @@ __all__ = [
     "TrustDecision",
     "UnexecutableProviderPlan",
     "build_provider_stage_handlers",
+    "build_configured_distributor_metadata_registrations",
+    "build_configured_distributor_metadata_runtime",
 ]
