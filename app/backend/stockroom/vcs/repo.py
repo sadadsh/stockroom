@@ -126,10 +126,16 @@ class GitRepo:
                 _WRITE_LOCKS[key] = lock
             return lock
 
-    def _run(self, *args: str, check: bool = True) -> subprocess.CompletedProcess:
+    def _run(
+        self,
+        *args: str,
+        check: bool = True,
+        input_text: str | None = None,
+    ) -> subprocess.CompletedProcess:
         proc = subprocess.run(
             [self.git, "-C", str(self.root), *args],
             capture_output=True,
+            input=input_text,
             text=True,
             encoding="utf-8",
             errors="replace",

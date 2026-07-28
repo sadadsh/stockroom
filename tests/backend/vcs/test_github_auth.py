@@ -1,9 +1,7 @@
-"""GitHub PAT auth for a repo's git operations: inject the token as a per-repo, github-scoped
-http extraheader (never in the remote URL, never committed), so push/pull authenticate."""
+"""GitHub authentication uses the configured credential helper, never Git config."""
 
 from __future__ import annotations
 
-import base64
 import shutil
 
 import pytest
@@ -14,35 +12,110 @@ from stockroom.vcs.repo import GitRepo
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
 
 
-def test_auth_header_is_basic_base64_of_the_token():
-    h = github_auth.auth_header("ghp_ABC123")
-    assert h.lower().startswith("authorization: basic ")
-    decoded = base64.b64decode(h.split()[-1]).decode()
-    assert decoded == "x-access-token:ghp_ABC123"  # the token is the basic-auth password
-
-
-def test_extraheader_key_scopes_to_github_only():
-    # the credential is bound to https://github.com/ so it is never sent to another host
-    assert github_auth.EXTRAHEADER_KEY == "http.https://github.com/.extraheader"
-
-
-def test_configure_sets_then_clears_the_github_credential(tmp_path):
+def _repo_with_origin(tmp_path, url: str) -> GitRepo:
     repo = GitRepo(tmp_path)
     repo.init()
+    repo._run("remote", "add", "origin", url)
+    return repo
+
+
+def test_configure_scrubs_legacy_header_and_approves_path_scoped_credential(
+    tmp_path,
+    monkeypatch,
+):
+    repo = _repo_with_origin(tmp_path, "https://github.com/owner/repo.git")
+    repo.set_config(github_auth.EXTRAHEADER_KEY, "AUTHORIZATION: basic LEGACY")
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        github_auth,
+        "_run_credential",
+        lambda _repo, action, payload: calls.append((action, payload)),
+    )
+
     github_auth.configure(repo, "ghp_TOKEN")
-    got = repo._run("config", "--get", github_auth.EXTRAHEADER_KEY).stdout.strip()
-    assert base64.b64decode(got.split()[-1]).decode() == "x-access-token:ghp_TOKEN"
-    # a blank token removes the header (idempotent: absent is fine)
+
+    assert (
+        repo._run(
+            "config",
+            "--get",
+            github_auth.EXTRAHEADER_KEY,
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert repo._run("config", "--get", github_auth.USE_HTTP_PATH_KEY).stdout.strip() == "true"
+    assert calls == [
+        (
+            "approve",
+            "protocol=https\n"
+            "host=github.com\n"
+            "path=owner/repo.git\n"
+            "username=x-access-token\n"
+            "password=ghp_TOKEN\n\n",
+        )
+    ]
+    assert "ghp_TOKEN" not in (tmp_path / ".git" / "config").read_text(encoding="utf-8")
+
+
+def test_clearing_rejects_only_the_exact_repository_path(tmp_path, monkeypatch):
+    repo = _repo_with_origin(tmp_path, "https://github.com/owner/repo.git")
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        github_auth,
+        "_run_credential",
+        lambda _repo, action, payload: calls.append((action, payload)),
+    )
+
     github_auth.configure(repo, "")
-    assert repo._run("config", "--get", github_auth.EXTRAHEADER_KEY, check=False).returncode != 0
-    github_auth.configure(repo, "")  # a second clear does not raise
+
+    assert calls == [
+        (
+            "reject",
+            "protocol=https\nhost=github.com\npath=owner/repo.git\nusername=x-access-token\n\n",
+        )
+    ]
 
 
-def test_configure_is_not_in_the_remote_url(tmp_path):
-    # the token lives in an extraheader, NOT baked into origin, so `git remote -v` never leaks it
-    repo = GitRepo(tmp_path)
-    repo.init()
-    repo._run("remote", "add", "origin", "https://github.com/owner/repo.git")
+@pytest.mark.parametrize(
+    "url",
+    [
+        "git@github.com:owner/repo.git",
+        "https://example.com/owner/repo.git",
+    ],
+)
+def test_non_https_github_remote_only_scrubs_legacy_header(
+    tmp_path,
+    monkeypatch,
+    url,
+):
+    repo = _repo_with_origin(tmp_path, url)
+    repo.set_config(github_auth.EXTRAHEADER_KEY, "AUTHORIZATION: basic LEGACY")
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        github_auth,
+        "_run_credential",
+        lambda _repo, action, payload: calls.append((action, payload)),
+    )
+
+    github_auth.configure(repo, "ghp_TOKEN")
+
+    assert calls == []
+    assert (
+        repo._run(
+            "config",
+            "--get",
+            github_auth.EXTRAHEADER_KEY,
+            check=False,
+        ).returncode
+        != 0
+    )
+
+
+def test_configure_never_puts_the_token_in_the_remote_url(tmp_path, monkeypatch):
+    repo = _repo_with_origin(tmp_path, "https://github.com/owner/repo.git")
+    monkeypatch.setattr(github_auth, "_run_credential", lambda *_args: None)
+
     github_auth.configure(repo, "ghp_SECRET")
+
     remotes = repo._run("remote", "-v").stdout
     assert "ghp_SECRET" not in remotes

@@ -1,7 +1,7 @@
 """The machine-settings surface (spec section 11): read the redacted per-machine
 config and write the one field that is wired end-to-end today, the Mouser API key.
 The key is a secret, so it is never echoed back raw; the write applies live (the
-next enrich picks it up) and persists to the per-machine config.json."""
+next enrich picks it up) and persists in the machine credential store."""
 
 from __future__ import annotations
 
@@ -36,10 +36,13 @@ def test_patch_sets_the_key_live_on_the_context(client, app_ctx):
     assert r.json()["mouser_api_key_set"] is True
 
 
-def test_patch_persists_the_key_to_disk(client):
+def test_patch_persists_the_key_outside_plaintext_config(client):
     client.patch("/api/settings", json={"mouser_api_key": "PERSISTED42"})
     saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
-    assert saved["mouser_api_key"] == "PERSISTED42"
+    assert "mouser_api_key" not in saved
+    from stockroom.store.machine_config import MachineConfig
+
+    assert MachineConfig.load().mouser_api_key == "PERSISTED42"
 
 
 def test_patch_empty_string_clears_the_key(client):
@@ -89,9 +92,12 @@ def test_load_dev_creds_applies_the_config_dir_file(client, app_ctx):
     assert body["digikey_client_id"] == "DKID1234"
     assert body["digikey_client_secret_set"] is True
     assert body["mouser_api_key_set"] is True
-    # persisted to config.json
+    # identifiers persist in config.json; secrets persist only in the credential store
     saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
-    assert saved["digikey_client_secret"] == "DKSECRET9"
+    assert saved["digikey_client_id"] == "DKID1234"
+    assert "digikey_client_secret" not in saved
+    assert "mouser_api_key" not in saved
+    assert not (config_dir() / "dev-creds.json").exists()
 
 
 def test_load_dev_creds_missing_file_is_a_noop(client):
@@ -106,13 +112,15 @@ def test_load_dev_creds_is_token_guarded(anon_client):
 
 def test_settings_is_token_guarded(anon_client):
     assert anon_client.get("/api/settings").status_code in (401, 403)
-    assert anon_client.patch(
-        "/api/settings", json={"mouser_api_key": "x"}
-    ).status_code in (401, 403)
+    assert anon_client.patch("/api/settings", json={"mouser_api_key": "x"}).status_code in (
+        401,
+        403,
+    )
     # a new credential field is guarded by the same per-launch token dependency
-    assert anon_client.patch(
-        "/api/settings", json={"digikey_client_secret": "x"}
-    ).status_code in (401, 403)
+    assert anon_client.patch("/api/settings", json={"digikey_client_secret": "x"}).status_code in (
+        401,
+        403,
+    )
 
 
 # -- GitHub personal access token (auto-push auth) -----------------------------
@@ -128,16 +136,18 @@ def test_patch_github_token_sets_it_live_and_never_leaks_it(client, app_ctx):
     assert body["github_token_set"] is True and body["github_token_hint"] == "1234"
     assert "ghp_SECRET" not in json.dumps(body)  # only presence + last-4, never the raw token
     assert app_ctx.config.github_token == "ghp_SECRET1234"
-    # applied LIVE to the library repo so push/pull authenticate immediately (a github extraheader)
+    # No reversible credential is ever written into the repository's Git config.
     got = app_ctx.repo._run("config", "--get", "http.https://github.com/.extraheader", check=False)
-    assert got.returncode == 0 and "basic" in got.stdout.lower()
-    assert "ghp_SECRET" not in got.stdout  # base64-encoded, not the raw token
+    assert got.returncode != 0
 
 
-def test_patch_persists_the_github_token(client):
+def test_patch_persists_the_github_token_outside_plaintext_config(client):
     client.patch("/api/settings", json={"github_token": "ghp_PERSIST42"})
     saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
-    assert saved["github_token"] == "ghp_PERSIST42"
+    assert "github_token" not in saved
+    from stockroom.store.machine_config import MachineConfig
+
+    assert MachineConfig.load().github_token == "ghp_PERSIST42"
 
 
 def test_patch_empty_github_token_clears_the_credential(client, app_ctx):
@@ -222,10 +232,15 @@ def test_patch_strips_windows_copy_as_path_quotes(client, app_ctx, tmp_path):
 
 
 def test_patch_sets_vendor_logins(client, app_ctx):
-    client.patch("/api/settings", json={
-        "ul_username": "me@x.com", "ul_password": "secret",
-        "snapeda_username": "s", "snapeda_password": "q",
-    })
+    client.patch(
+        "/api/settings",
+        json={
+            "ul_username": "me@x.com",
+            "ul_password": "secret",
+            "snapeda_username": "s",
+            "snapeda_password": "q",
+        },
+    )
     assert app_ctx.config.ul_username == "me@x.com"
     assert app_ctx.config.ul_password == "secret"
     assert app_ctx.config.snapeda_username == "s"
@@ -244,6 +259,7 @@ def test_get_settings_masks_vendor_passwords(client, app_ctx):
 
 def test_vendor_login_raw_password_never_leaks(client, app_ctx):
     import json as _json
+
     app_ctx.config.snapeda_password = "topsecretpw"
     body = client.get("/api/settings").json()
     assert "topsecretpw" not in _json.dumps(body)
@@ -262,15 +278,19 @@ def test_get_settings_tolerates_a_null_secret_field(client, app_ctx):
 
 
 def test_patch_sets_samacsys_login_live_and_persists(client, app_ctx):
-    r = client.patch("/api/settings", json={
-        "samacsys_username": "sam@x.com", "samacsys_password": "samsecret",
-    })
+    r = client.patch(
+        "/api/settings",
+        json={
+            "samacsys_username": "sam@x.com",
+            "samacsys_password": "samsecret",
+        },
+    )
     assert r.status_code == 200
     assert app_ctx.config.samacsys_username == "sam@x.com"
     assert app_ctx.config.samacsys_password == "samsecret"
     saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
     assert saved["samacsys_username"] == "sam@x.com"
-    assert saved["samacsys_password"] == "samsecret"
+    assert "samacsys_password" not in saved
 
 
 def test_get_settings_masks_samacsys_password(client, app_ctx):
@@ -296,15 +316,19 @@ def test_get_settings_tolerates_a_null_samacsys_password(client, app_ctx):
 
 
 def test_patch_sets_digikey_api_creds_live_and_persists(client, app_ctx):
-    r = client.patch("/api/settings", json={
-        "digikey_client_id": "CLIENTID", "digikey_client_secret": "APISECRET1234",
-    })
+    r = client.patch(
+        "/api/settings",
+        json={
+            "digikey_client_id": "CLIENTID",
+            "digikey_client_secret": "APISECRET1234",
+        },
+    )
     assert r.status_code == 200
     assert app_ctx.config.digikey_client_id == "CLIENTID"
     assert app_ctx.config.digikey_client_secret == "APISECRET1234"
     saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
     assert saved["digikey_client_id"] == "CLIENTID"
-    assert saved["digikey_client_secret"] == "APISECRET1234"
+    assert "digikey_client_secret" not in saved
 
 
 def test_get_settings_echoes_client_id_and_masks_the_secret(client, app_ctx):
@@ -322,15 +346,19 @@ def test_get_settings_echoes_client_id_and_masks_the_secret(client, app_ctx):
 
 
 def test_patch_sets_digikey_account_login_live_and_persists(client, app_ctx):
-    r = client.patch("/api/settings", json={
-        "digikey_username": "dk@x.com", "digikey_password": "accountpw1234",
-    })
+    r = client.patch(
+        "/api/settings",
+        json={
+            "digikey_username": "dk@x.com",
+            "digikey_password": "accountpw1234",
+        },
+    )
     assert r.status_code == 200
     assert app_ctx.config.digikey_username == "dk@x.com"
     assert app_ctx.config.digikey_password == "accountpw1234"
     saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
     assert saved["digikey_username"] == "dk@x.com"
-    assert saved["digikey_password"] == "accountpw1234"
+    assert "digikey_password" not in saved
 
 
 def test_get_settings_echoes_digikey_username_and_masks_the_password(client, app_ctx):

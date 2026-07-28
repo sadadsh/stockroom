@@ -3,7 +3,8 @@ config and writes the fields wired end-to-end: the Mouser API key, the GitHub
 token, and the KiCad overrides. The keys are secrets, so GET returns only
 presence plus a last-4 hint, never the raw value; the KiCad overrides are plain
 paths and are shown raw. Every PATCH applies live on the running context (no
-restart) and persists to the config.json."""
+restart); secrets persist in Windows Credential Manager while ordinary settings
+remain in ``config.json``."""
 
 from __future__ import annotations
 
@@ -40,9 +41,12 @@ _DEV_CRED_FIELDS = (
 
 
 def _load_dev_creds(ctx) -> list[str]:
-    """Apply any credentials present in the per-machine dev-creds.json (in the OS config dir, never
-    the repo) to the running config and persist. A missing or unreadable file is a no-op. Returns
-    the field NAMES that were loaded (never the values), so the UI can confirm what landed."""
+    """Import a legacy dev-creds.json into the credential store, then remove it.
+
+    The source remains untouched unless the credential write and readback
+    succeed. A missing or unreadable file is a no-op. Only field names are
+    returned, never values.
+    """
     import json
 
     from stockroom.store.machine_config import config_dir
@@ -64,6 +68,7 @@ def _load_dev_creds(ctx) -> list[str]:
             loaded.append(field)
     if loaded:
         ctx.config.save()
+        path.unlink()
     return loaded
 
 
@@ -140,8 +145,11 @@ def settings_router(require_token) -> APIRouter:
         loaded = _load_dev_creds(ctx)
         # the exact path searched, so an empty result can say WHERE to put the file
         # (the owner hit a bare "not found" on a fresh laptop, 2026-07-24)
-        return {"loaded": loaded, "config_path": (config_dir() / "dev-creds.json").as_posix(),
-                **_settings_dto(ctx)}
+        return {
+            "loaded": loaded,
+            "config_path": (config_dir() / "dev-creds.json").as_posix(),
+            **_settings_dto(ctx),
+        }
 
     @r.patch("")
     def update_settings(request: Request, body: dict) -> dict:
@@ -195,9 +203,13 @@ def settings_router(require_token) -> APIRouter:
             # strip whitespace AND the quotes Windows "Copy as path" wraps around
             # a path, which would otherwise break wiring and CLI discovery
             if "kicad_cli_override" in body:
-                ctx.config.kicad_cli_override = str(body["kicad_cli_override"] or "").strip().strip('"')
+                ctx.config.kicad_cli_override = (
+                    str(body["kicad_cli_override"] or "").strip().strip('"')
+                )
             if "kicad_config_override" in body:
-                ctx.config.kicad_config_override = str(body["kicad_config_override"] or "").strip().strip('"')
+                ctx.config.kicad_config_override = (
+                    str(body["kicad_config_override"] or "").strip().strip('"')
+                )
             ctx.config.save()
             # Rebuild the cli/ops/config-dir LIVE and rewire KiCad at the active
             # library, so the change takes effect without a restart.
