@@ -134,6 +134,48 @@ def test_attach_accepts_a_lone_schlib_then_the_pcblib_completes_the_pair(library
     assert (altium_dir / "split.SchLib").exists() and (altium_dir / "split.PcbLib").exists()
 
 
+def test_attach_records_where_the_altium_libraries_came_from(library_ops):
+    """PROVENANCE, for the tool that did not have it.
+
+    `attach_symbol` and `IngestPipeline.attach_assets` have recorded an origin since the owner's
+    *"its not trusted where we've gotten them"*. This path had none, so a guided capture filed a
+    real Altium library beside an attributed KiCad one and left it `origin: None` - the story
+    holding for one tool and quietly not for the other.
+    """
+    from stockroom.model.asset import AssetOrigin
+
+    ops = library_ops
+    _seed(ops, "prov", "S1M")
+
+    record = ops.attach_altium_assets(
+        "prov", FIX / "sample.IntLib",
+        origin=AssetOrigin(vendor="snapmagic", url="https://www.snapeda.com/parts/S1M/"),
+        now_iso="2026-07-27T00:00:00Z",
+    )
+
+    for kind in ("symbol", "footprint"):
+        asset = record.assets_for("altium").get(kind)
+        assert asset.origin is not None, f"the altium {kind} landed unattributed"
+        assert asset.origin.vendor == "snapmagic"
+        assert asset.origin.url == "https://www.snapeda.com/parts/S1M/"
+        # stamped HERE, never taken from a caller-chosen field on the origin itself
+        assert asset.origin.captured_at == "2026-07-27T00:00:00Z"
+    # and it PERSISTS - an origin that only exists on the returned object is not provenance
+    reloaded = ops.load_record("prov")
+    assert reloaded.assets_for("altium").get("symbol").origin.vendor == "snapmagic"
+
+
+def test_attach_without_an_origin_stays_honestly_unattributed(library_ops):
+    """No origin must mean `None`, never a vendor whose name is the empty string."""
+    ops = library_ops
+    _seed(ops, "bare", "S1M")
+
+    record = ops.attach_altium_assets("bare", FIX / "sample.IntLib")
+
+    assert record.assets_for("altium").get("symbol").origin is None
+    assert record.assets_for("altium").get("footprint").origin is None
+
+
 def test_attach_takes_the_loose_pair_when_a_bundle_carries_intlib_and_pair(library_ops):
     # Some vendor bundles ship the IntLib AND the loose pair together; the loose pair
     # wins and the IntLib fills nothing (never a refused capture over redundancy).
