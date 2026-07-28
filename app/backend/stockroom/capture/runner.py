@@ -20,6 +20,7 @@ That is exactly why the run is stoppable and why resuming is free.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from stockroom.capture.complete import complete_library, iter_incomplete, sourceable_needs
@@ -285,21 +286,46 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _capture_downloads(ctx, provider_key: str) -> Path:
-    """Where captured files land before they are attached. Beside the library, never inside it:
-    an un-attached download is not library data and must never be committed. Providers are isolated
-    so simultaneous workers cannot race on identical vendor filenames."""
+def capture_state_root() -> Path:
+    """Return Stockroom's per-machine acquisition state root.
+
+    Browser profiles contain authenticated cookies and downloads contain
+    untrusted, not-yet-attached bytes. Neither belongs beside the Git-backed
+    library. An explicit override keeps tests and portable installs isolated;
+    Windows uses LocalAppData because this state is machine-local and can be
+    large.
+    """
+
+    override = os.environ.get("STOCKROOM_CAPTURE_DIR")
+    if override:
+        return Path(override)
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        return Path(local_app_data) / "Stockroom" / "Capture"
+    if os.name == "nt":
+        return Path.home() / "AppData" / "Local" / "Stockroom" / "Capture"
+    xdg_state = os.environ.get("XDG_STATE_HOME")
+    base = Path(xdg_state) if xdg_state else Path.home() / ".local" / "state"
+    return base / "stockroom" / "capture"
+
+
+def _capture_downloads(_ctx, provider_key: str) -> Path:
+    """Where captured files land before attachment, outside every Git checkout.
+
+    ``ctx`` remains in the signature so all capture-path helpers share one call
+    shape; the location is intentionally independent of the selected library.
+    """
     from stockroom.capture.browser import provider_profile_dir
 
     root = provider_profile_dir(
-        Path(ctx.profile.library.root).parent / ".stockroom-capture" / "downloads",
+        capture_state_root() / "Downloads",
         provider_key,
     )
     root.mkdir(parents=True, exist_ok=True)
     return root
 
 
-def _capture_profile(ctx, provider_key: str) -> Path:
+def _capture_profile(_ctx, provider_key: str) -> Path:
     """The persistent browser profile holding vendor sign-ins.
 
     PER-MACHINE, and it is the permitted kind: it holds session cookies only, so it cannot change
@@ -309,16 +335,16 @@ def _capture_profile(ctx, provider_key: str) -> Path:
     from stockroom.capture.browser import provider_profile_dir
 
     root = provider_profile_dir(
-        Path(ctx.profile.library.root).parent / ".stockroom-capture" / "profile",
+        capture_state_root() / "Profiles",
         provider_key,
     )
     root.mkdir(parents=True, exist_ok=True)
     return root
 
 
-def _capture_evidence_root(ctx) -> Path:
+def _capture_evidence_root(_ctx) -> Path:
     """Machine-local immutable provider evidence, outside the Git library."""
-    root = Path(ctx.profile.library.root).parent / ".stockroom-capture" / "evidence"
+    root = capture_state_root() / "Evidence"
     root.mkdir(parents=True, exist_ok=True)
     return root
 

@@ -23,7 +23,13 @@ from stockroom.capture.browser import (
 )
 from stockroom.capture.download_broker import DownloadBroker, DownloadTask
 from stockroom.capture.guided import _wait_for_capture
-from stockroom.capture.runner import _capture_downloads, _capture_profile, run_guided_capture
+from stockroom.capture.runner import (
+    _capture_downloads,
+    _capture_evidence_root,
+    _capture_profile,
+    capture_state_root,
+    run_guided_capture,
+)
 
 
 class _Context:
@@ -154,7 +160,9 @@ def test_two_provider_contexts_share_one_real_playwright_runtime(tmp_path):
         runtime.close()
 
 
-def test_provider_profiles_and_downloads_are_isolated(tmp_path):
+def test_provider_profiles_and_downloads_are_isolated(monkeypatch, tmp_path):
+    machine_root = tmp_path / "Machine Capture"
+    monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(machine_root))
     ctx = SimpleNamespace(
         profile=SimpleNamespace(library=SimpleNamespace(root=tmp_path / "Library"))
     )
@@ -163,6 +171,7 @@ def test_provider_profiles_and_downloads_are_isolated(tmp_path):
     snap_profile = _capture_profile(ctx, "snapmagic")
     ultra_downloads = _capture_downloads(ctx, "ultralibrarian")
     snap_downloads = _capture_downloads(ctx, "snapmagic")
+    evidence = _capture_evidence_root(ctx)
 
     assert ultra_profile != snap_profile
     assert ultra_downloads != snap_downloads
@@ -170,6 +179,11 @@ def test_provider_profiles_and_downloads_are_isolated(tmp_path):
     assert snap_profile.name == "snapmagic"
     assert ultra_downloads.name == "ultralibrarian"
     assert snap_downloads.name == "snapmagic"
+    assert capture_state_root() == machine_root
+    assert ultra_profile.parent == machine_root / "Profiles"
+    assert ultra_downloads.parent == machine_root / "Downloads"
+    assert evidence == machine_root / "Evidence"
+    assert not ultra_profile.is_relative_to(tmp_path / "Library")
 
 
 def test_a_provider_profile_has_one_worker_owner(tmp_path):
