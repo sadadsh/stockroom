@@ -108,11 +108,11 @@ def _field(properties: dict[str, str], aliases: tuple[str, ...]) -> str:
     found = {normalized[alias] for alias in aliases if alias in normalized}
     if not found:
         return ""
-    if len(found) != 1:
+    if len({_mpn_key(value) for value in found}) != 1:
         raise CrossEdaVerificationError(
             f"conflicting identity fields are present: {sorted(found)!r}"
         )
-    return found.pop()
+    return sorted(found, key=lambda value: (_mpn_key(value), value))[0]
 
 
 def _verify_identity(
@@ -204,9 +204,7 @@ def read_kicad_footprint(path: Path, step_model: Path) -> _FootprintReadback:
     )
     _validate_pads(pads, "KiCad")
     model_path = footprint.model_path
-    if not model_path:
-        raise CrossEdaVerificationError("KiCad footprint does not link a 3D model")
-    if Path(model_path).name.casefold() != step_model.name.casefold():
+    if model_path and Path(model_path).name.casefold() != step_model.name.casefold():
         raise CrossEdaVerificationError(
             f"KiCad footprint links {Path(model_path).name!r}, not {step_model.name!r}"
         )
@@ -601,6 +599,7 @@ def verify_kicad_component(
     step = _verify_step(step_model)
     return {
         "footprint_entry": footprint.entry,
+        "model_link": "provider-supplied" if footprint.model_path else "installed-during-attach",
         "model_path": footprint.model_path,
         "pad_count": len(footprint.pads),
         "pin_count": len(symbol.pins),

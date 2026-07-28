@@ -9,7 +9,9 @@ from stockroom.capture.cross_eda import (
     CrossEdaVerificationError,
     read_altium_footprint,
     read_altium_symbol,
+    read_kicad_symbol,
     verify_cross_eda_component,
+    verify_kicad_component,
 )
 from stockroom.kicad.stock import find_kicad_share_dir
 from stockroom.planning import ExactPartIdentity
@@ -162,3 +164,46 @@ def test_cross_eda_rejects_ambiguous_pin_name_mapping(
                 ALTIUM_FIXTURES / "sample.PcbLib",
             ),
         )
+
+
+def test_identity_fields_accept_capitalization_only_duplicates(tmp_path: Path) -> None:
+    symbol, _footprint = _write_kicad_pair(tmp_path)
+    text = symbol.read_text(encoding="utf-8")
+    symbol.write_text(
+        text.replace(
+            '(property "Manufacturer Part Number" "S1M" (at 0 0 0))',
+            '(property "Manufacturer Name" "On Semiconductor" (at 0 0 0))\n'
+            '    (property "Manufacturer Part Number" "S1M" (at 0 0 0))',
+        ),
+        encoding="utf-8",
+    )
+
+    observed = read_kicad_symbol(symbol, "S1M")
+
+    assert observed.manufacturer in {"ON Semiconductor", "On Semiconductor"}
+
+
+def test_provider_footprint_may_ship_model_as_a_separate_companion(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    symbol, footprint = _write_kicad_pair(tmp_path)
+    footprint.write_text(
+        footprint.read_text(encoding="utf-8").split("  (model ", 1)[0] + ")\n",
+        encoding="utf-8",
+    )
+    step = tmp_path / "D_SMA.step"
+    step.write_bytes(b"ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n")
+    monkeypatch.setattr(
+        "stockroom.capture.cross_eda.model_to_glb",
+        lambda _path: b"glTF-test-geometry",
+    )
+
+    report = verify_kicad_component(
+        identity=ExactPartIdentity("ON Semiconductor", "S1M"),
+        kicad_symbol=symbol,
+        kicad_footprint=footprint,
+        step_model=step,
+    )
+
+    assert report["model_link"] == "installed-during-attach"
