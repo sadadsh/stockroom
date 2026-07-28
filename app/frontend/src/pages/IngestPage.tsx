@@ -94,6 +94,16 @@ function PathArrow() {
   );
 }
 
+function mpnIdentityKey(value: string): string {
+  return value.normalize("NFC").trim().toLocaleLowerCase("en-US");
+}
+
+function hasExactPulledIdentity(result: EnrichmentResult, input: string): boolean {
+  const mpn = sv(result.mpn);
+  if (!mpn) return false;
+  return isUrl(input) || mpnIdentityKey(mpn) === mpnIdentityKey(input);
+}
+
 export function IngestPage() {
   const [input, setInput] = useState("");
   const [result, setResult] = useState<EnrichmentResult | null>(null);
@@ -157,9 +167,9 @@ export function IngestPage() {
     if (enrich.status === "done" && enrich.result) {
       const r = enrich.result;
       setResult(r);
-      const gotAnything =
-        r.mpn || r.manufacturer || r.datasheet_url || Object.keys(r.specs).length > 0 || r.add_plan;
-      if (!gotAnything) {
+      const exactIdentity = hasExactPulledIdentity(r, lookedUpInput);
+      if (!exactIdentity) {
+        setStaged(null);
         toast(toastNothing, "neutral");
       } else if (!r.add_plan) {
         // The perfect workflow (owner): a pulled NON-passive stages itself immediately -
@@ -301,11 +311,7 @@ export function IngestPage() {
   const busy = job.status === "running";
   const plan = result?.add_plan ?? null;
   const pulledSomething =
-    result !== null &&
-    (!!sv(result.mpn) ||
-      !!sv(result.manufacturer) ||
-      !!sv(result.description) ||
-      Object.keys(result.specs).some((k) => k !== "product_url"));
+    result !== null && hasExactPulledIdentity(result, lookedUpInput);
   // A real non-passive part (data pulled, needs its assets) vs a fetch that came back
   // empty (blocked/not a product page) - the latter must NOT assert "needs files".
   const nonPassive = result !== null && plan === null && pulledSomething;
@@ -444,9 +450,23 @@ export function IngestPage() {
                   Nothing was pulled, and no DigiKey API key is set. DigiKey blocks the page fetch, so the key is what resolves a DigiKey link reliably. Add one in Settings under Sourcing, then look this up again, or drop a vendor ZIP.
                 </Text>
               ) : (
-                <Text id="ingest.blocked-msg">
-                  Nothing was pulled. The page might have blocked the fetch, or the link is not a product page. Use a different link, or drop a vendor ZIP.
-                </Text>
+                <>
+                  {isUrl(lookedUpInput) ? (
+                    <Text id="ingest.blocked-msg">
+                      Nothing was pulled. The page might have blocked the fetch, or the link is not a product page. Use a different link, or drop a vendor ZIP.
+                    </Text>
+                  ) : (
+                    <>
+                      <Text id="ingest.blocked-exact">
+                        No exact manufacturer and part-number match was proven for
+                      </Text>{" "}
+                      <span className="font-mono text-t1">{lookedUpInput}</span>
+                      <Text id="ingest.blocked-exact-suffix">
+                        . Stockroom rejected near matches and will not add a blank replacement.
+                      </Text>
+                    </>
+                  )}
+                </>
               )}
             </span>
             <div className="flex flex-wrap items-center gap-3">
