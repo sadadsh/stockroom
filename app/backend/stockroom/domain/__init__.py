@@ -1,0 +1,41 @@
+"""Canonical vNext library domain."""
+
+from .canonical import (
+    ArtifactSet,
+    AuthoritativeEvidence,
+    BodyRectangleNm,
+    CanonicalPassiveBundle,
+    ComponentIdentity,
+    Manufacturer,
+    PassiveTerminal,
+    PointNm,
+    SelectedClaim,
+    SharedTemplate,
+    TerminalBinding,
+    ToolNeutralDefinition,
+    ToolTemplateBinding,
+    Verification,
+    build_two_pin_passive_bundle,
+    canonical_json_bytes,
+    canonical_model_digest,
+)
+
+__all__ = [
+    "ArtifactSet",
+    "AuthoritativeEvidence",
+    "BodyRectangleNm",
+    "CanonicalPassiveBundle",
+    "ComponentIdentity",
+    "Manufacturer",
+    "PassiveTerminal",
+    "PointNm",
+    "SelectedClaim",
+    "SharedTemplate",
+    "TerminalBinding",
+    "ToolNeutralDefinition",
+    "ToolTemplateBinding",
+    "Verification",
+    "build_two_pin_passive_bundle",
+    "canonical_json_bytes",
+    "canonical_model_digest",
+]

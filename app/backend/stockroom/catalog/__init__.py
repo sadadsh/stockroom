@@ -1,0 +1,41 @@
+"""Derived Catalog.sqlite and EDA database-link staging."""
+
+from .projection import (
+    ALTIUM_DBLIB_FILENAME,
+    CATALOG_APPLICATION_ID,
+    CATALOG_DIGEST_FILENAME,
+    CATALOG_FILENAME,
+    CATALOG_SCHEMA_VERSION,
+    KICAD_DBL_FILENAME,
+    PART_COLUMNS,
+    CatalogArtifactRole,
+    CatalogArtifacts,
+    CatalogOutput,
+    CatalogProjection,
+    CatalogProjectionError,
+    ProjectedArtifact,
+    lookup_catalog_component,
+    render_kicad_dbl,
+    stage_catalog_projection,
+    validate_catalog_projection,
+)
+
+__all__ = [
+    "ALTIUM_DBLIB_FILENAME",
+    "CATALOG_APPLICATION_ID",
+    "CATALOG_DIGEST_FILENAME",
+    "CATALOG_FILENAME",
+    "CATALOG_SCHEMA_VERSION",
+    "KICAD_DBL_FILENAME",
+    "PART_COLUMNS",
+    "CatalogArtifactRole",
+    "CatalogArtifacts",
+    "CatalogOutput",
+    "CatalogProjection",
+    "CatalogProjectionError",
+    "ProjectedArtifact",
+    "lookup_catalog_component",
+    "render_kicad_dbl",
+    "stage_catalog_projection",
+    "validate_catalog_projection",
+]
