@@ -13,6 +13,7 @@ import math
 import os
 import re
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, TypeAlias
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -23,7 +24,9 @@ JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _MEDIA_TYPE = re.compile(r"[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*\Z")
 _PROVIDER_KEY = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\Z")
+_ARTIFACT_ROLE = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")
 _MAX_OBJECT_BYTES = 64 * 1024 * 1024
+_CAD_REQUIRED_ROLES = frozenset({"symbol", "footprint", "model", "validation_report"})
 _SENSITIVE_KEYS = frozenset(
     {
         "authorization",
@@ -63,6 +66,28 @@ class ExactIdentity(Protocol):
 class EvidenceOperation(Protocol):
     @property
     def label(self) -> str: ...
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceArtifact:
+    """One immutable file that contributes to a provider operation."""
+
+    role: str
+    data: bytes
+    media_type: str
+    suggested_name: str = ""
+
+    def __post_init__(self) -> None:
+        if type(self.role) is not str or _ARTIFACT_ROLE.fullmatch(self.role) is None:
+            raise EvidenceError("artifact role is not canonical")
+        if type(self.data) is not bytes or not self.data:
+            raise EvidenceError("artifact data must be non-empty immutable bytes")
+        if type(self.media_type) is not str or _MEDIA_TYPE.fullmatch(self.media_type) is None:
+            raise EvidenceError("artifact media type is not canonical")
+        if self.suggested_name:
+            _required_text(self.suggested_name, "artifact suggested name", limit=255)
+            if Path(self.suggested_name).name != self.suggested_name:
+                raise EvidenceError("artifact suggested name must not contain a path")
 
 
 def _canonical_json(value: JsonValue) -> bytes:
@@ -267,6 +292,78 @@ class EvidenceStore:
         }
         return self.install_bytes(_canonical_json(manifest))
 
+    def record_provider_artifact_success(
+        self,
+        *,
+        identity: ExactIdentity,
+        operation: EvidenceOperation,
+        provider_key: str,
+        adapter_version: str,
+        artifacts: tuple[EvidenceArtifact, ...],
+    ) -> str:
+        """Record the actual files required to satisfy one CAD operation.
+
+        CAD success is intentionally stronger than "a vendor download landed":
+        the manifest must contain a symbol, footprint, model, and validation
+        report. Optional role-labelled objects may retain the original provider
+        bundle without weakening that minimum.
+        """
+        _required_text(
+            getattr(identity, "authoritative_manufacturer_key", None),
+            "authoritative manufacturer key",
+        )
+        _required_text(getattr(identity, "mpn_canonical", None), "canonical MPN")
+        operation_label = _required_text(
+            getattr(operation, "label", None),
+            "operation label",
+        )
+        if not operation_label.startswith("cad:"):
+            raise EvidenceError("artifact evidence currently supports CAD operations only")
+        if type(provider_key) is not str or _PROVIDER_KEY.fullmatch(provider_key) is None:
+            raise EvidenceError("provider key is not canonical")
+        _required_text(adapter_version, "adapter version", limit=128)
+        if type(artifacts) is not tuple or not artifacts:
+            raise EvidenceError("artifact evidence must be a non-empty tuple")
+        if any(type(artifact) is not EvidenceArtifact for artifact in artifacts):
+            raise EvidenceError("artifact evidence contains an invalid object")
+
+        roles = [artifact.role for artifact in artifacts]
+        if len(set(roles)) != len(roles):
+            raise EvidenceError("artifact evidence roles must be unique")
+        missing = sorted(_CAD_REQUIRED_ROLES.difference(roles))
+        if missing:
+            raise EvidenceError(
+                "CAD artifact evidence is incomplete: missing " + ", ".join(missing)
+            )
+
+        objects: list[JsonValue] = []
+        for artifact in sorted(artifacts, key=lambda item: item.role):
+            digest = self.install_bytes(artifact.data)
+            reference: dict[str, JsonValue] = {
+                "bytes": len(artifact.data),
+                "digest": digest,
+                "disposition": "local_cas",
+                "media_type": artifact.media_type,
+                "role": artifact.role,
+            }
+            if artifact.suggested_name:
+                reference["suggested_name"] = artifact.suggested_name
+            objects.append(reference)
+
+        manifest: JsonValue = {
+            "adapter_version": adapter_version,
+            "identity": {
+                "authoritative_manufacturer_key": identity.authoritative_manufacturer_key,
+                "mpn_canonical": identity.mpn_canonical,
+            },
+            "objects": objects,
+            "operation": operation_label,
+            "provider": provider_key,
+            "required_roles": sorted(_CAD_REQUIRED_ROLES),
+            "schema": "stockroom.provider-artifact-evidence/1",
+        }
+        return self.install_bytes(_canonical_json(manifest))
+
     def verify_provider_success(
         self,
         digest: str,
@@ -286,14 +383,22 @@ class EvidenceStore:
             "authoritative_manufacturer_key": identity.authoritative_manufacturer_key,
             "mpn_canonical": identity.mpn_canonical,
         }
+        schema = manifest.get("schema")
         if (
-            manifest.get("schema") != "stockroom.provider-evidence/1"
+            schema
+            not in {
+                "stockroom.provider-evidence/1",
+                "stockroom.provider-artifact-evidence/1",
+            }
             or manifest.get("identity") != expected_identity
             or manifest.get("operation") != operation.label
             or manifest.get("provider") != provider_key
             or manifest.get("adapter_version") != adapter_version
         ):
             raise EvidenceManifestMismatch("evidence manifest does not match the provider attempt")
+        if schema == "stockroom.provider-artifact-evidence/1":
+            self._verify_artifact_manifest(manifest, operation)
+            return manifest
         payload = manifest.get("payload")
         if type(payload) is not dict:
             raise EvidenceCorruption("evidence manifest payload reference is invalid")
@@ -307,3 +412,42 @@ class EvidenceStore:
         ):
             raise EvidenceCorruption("evidence manifest payload does not match stored bytes")
         return manifest
+
+    def _verify_artifact_manifest(
+        self,
+        manifest: dict[str, JsonValue],
+        operation: EvidenceOperation,
+    ) -> None:
+        if not operation.label.startswith("cad:"):
+            raise EvidenceManifestMismatch(
+                "artifact evidence cannot satisfy a non-CAD provider operation"
+            )
+        if manifest.get("required_roles") != sorted(_CAD_REQUIRED_ROLES):
+            raise EvidenceCorruption("CAD artifact evidence required roles are invalid")
+        objects = manifest.get("objects")
+        if type(objects) is not list or not objects:
+            raise EvidenceCorruption("CAD artifact evidence objects are invalid")
+        roles: set[str] = set()
+        for reference in objects:
+            if type(reference) is not dict:
+                raise EvidenceCorruption("CAD artifact evidence object is invalid")
+            role = reference.get("role")
+            digest = reference.get("digest")
+            byte_count = reference.get("bytes")
+            media_type = reference.get("media_type")
+            if (
+                type(role) is not str
+                or _ARTIFACT_ROLE.fullmatch(role) is None
+                or role in roles
+                or type(digest) is not str
+                or type(byte_count) is not int
+                or byte_count <= 0
+                or type(media_type) is not str
+                or _MEDIA_TYPE.fullmatch(media_type) is None
+                or reference.get("disposition") != "local_cas"
+                or self._verify_path(self.object_path(digest), digest) != byte_count
+            ):
+                raise EvidenceCorruption("CAD artifact evidence object does not match stored bytes")
+            roles.add(role)
+        if not _CAD_REQUIRED_ROLES.issubset(roles):
+            raise EvidenceCorruption("CAD artifact evidence is missing a required object")
