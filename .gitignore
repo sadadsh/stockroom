@@ -114,3 +114,14 @@ docs/progress/index.html
 # can never be blocked by a file this machine created (GitRepo._clear_untracked_blockers). Inside
 # the repo so the person whose file it was can find it; ignored so it travels nowhere.
 /.stockroom-kept/
+
+# git-lfs writes these into scripts/hooks because core.hooksPath points there. They are
+# GENERATED PER CLONE by `git lfs install`, not authored, and their content is whatever the
+# installed git-lfs version emits - so committing them would hand every peer one machine's
+# version of a file their own git-lfs rewrites. `scripts/install-hooks.sh` generates them, which
+# is the same "regenerated files stop being shared" rule this repo's Library Sync section applies
+# to the library itself. `scripts/hooks/post-commit` IS authored and stays tracked.
+/scripts/hooks/pre-push
+/scripts/hooks/post-checkout
+/scripts/hooks/post-merge
+/scripts/hooks/pre-commit
