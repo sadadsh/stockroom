@@ -43,6 +43,20 @@ afterEach(() => {
 });
 
 describe("PreviewModal - copy adoption", () => {
+  it("gives the inspection stage nearly the full application window", () => {
+    vi.spyOn(api, "previewSvg").mockReturnValue(new Promise<Blob>(() => {}));
+    const { container } = renderPreview();
+    const dialog = container.querySelector('[data-dev-id="preview.root"]');
+
+    expect(dialog).toHaveClass(
+      "h-[calc(100vh-24px)]",
+      "w-[calc(100vw-24px)]",
+      "max-w-[1600px]",
+      "max-h-[1100px]",
+    );
+    expect(container.querySelector('[data-dev-id="preview.stage"]')).toHaveClass("flex-1");
+  });
+
   it("renders its tab, close and loading strings as default text with no copy wrappers outside dev mode", () => {
     vi.spyOn(api, "previewSvg").mockReturnValue(new Promise<Blob>(() => {}));
     const { container } = renderPreview();

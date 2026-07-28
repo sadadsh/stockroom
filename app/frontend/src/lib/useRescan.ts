@@ -144,7 +144,7 @@ export function useRescan() {
   );
 
   // Starts a fresh rescan (or attaches to one already running). Fire-and-forget on the
-  // stream itself (mirrors the ProjectsPage/IngestPage job-trigger convention): the returned
+  // stream itself (mirrors the IngestPage job-trigger convention): the returned
   // promise resolves as soon as the POST does, so the caller can toast about already_running
   // without waiting for the whole run to finish.
   const start = useCallback(

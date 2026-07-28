@@ -146,7 +146,7 @@ export function DevInspector() {
                 {hover.vars.map((v) => (
                   <span
                     key={v}
-                    className="rounded-[3px] bg-raise2 px-1 py-0.5 font-mono text-[9px] text-t2"
+                    className="rounded-[3px] bg-raise2 px-1 py-0.5 font-mono text-2xs text-t2"
                   >
                     {v}
                   </span>
@@ -163,7 +163,7 @@ export function DevInspector() {
             <span
               key={`${b.id}-${i}`}
               data-testid="dev-id-badge"
-              className="absolute rounded-[3px] bg-acc px-1 py-0.5 font-mono text-[9px] font-semibold text-acc-on shadow-card"
+              className="absolute rounded-[3px] bg-acc px-1 py-0.5 font-mono text-2xs font-semibold text-acc-on shadow-card"
               style={{ left: b.rect.left, top: b.rect.top }}
             >
               {b.id}

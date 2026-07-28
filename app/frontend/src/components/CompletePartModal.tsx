@@ -335,6 +335,10 @@ export function CompletePartModal({
 
   const cadSource = useCadSourceQuery(detail.id, true);
   const cadSources = useMemo<CadSource[]>(() => cadSource.data?.sources ?? [], [cadSource.data]);
+  const captureSources = useMemo(
+    () => cadSources.filter((source) => source.capture_available),
+    [cadSources],
+  );
   // The chosen vendor persists across parts and across launches: over a 90-part sitting, one
   // decision beats ninety. Falls back to the head of the backend's trust order whenever the
   // stored key is absent from what this part actually offers.
@@ -342,8 +346,8 @@ export function CompletePartModal({
     () => readVendorPref() ?? "",
   );
   const vendorKey =
-    cadSources.find((v) => v.key === vendorPref)?.key ?? cadSources[0]?.key ?? "";
-  const chosen = cadSources.find((v) => v.key === vendorKey) ?? null;
+    captureSources.find((v) => v.key === vendorPref)?.key ?? captureSources[0]?.key ?? "";
+  const chosen = captureSources.find((v) => v.key === vendorKey) ?? null;
   const pickVendor = useCallback((key: string) => {
     setVendorPref(key);
     writeVendorPref(key);
@@ -528,7 +532,7 @@ export function CompletePartModal({
 
                 {!isDone ? (
                   <VendorPicker
-                    sources={cadSources}
+                    sources={captureSources}
                     value={vendorKey}
                     onChange={pickVendor}
                     disabled={cadBusy}

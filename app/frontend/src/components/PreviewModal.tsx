@@ -14,10 +14,10 @@ import { SvgViewport } from "./SvgViewport";
 
 export type PreviewKind = "model" | "symbol" | "footprint";
 
-const TABS: { kind: PreviewKind; label: string }[] = [
-  { kind: "model", label: "3D Model" },
-  { kind: "symbol", label: "Symbol" },
-  { kind: "footprint", label: "Footprint" },
+const TABS: { kind: PreviewKind; label: string; devId: string }[] = [
+  { kind: "symbol", label: "Symbol", devId: "preview.tab-symbol" },
+  { kind: "footprint", label: "Footprint", devId: "preview.tab-footprint" },
+  { kind: "model", label: "3D Model", devId: "preview.tab-model" },
 ];
 
 interface Props {
@@ -51,7 +51,7 @@ export function PreviewModal({
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-3"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -62,16 +62,19 @@ export function PreviewModal({
         data-dev-id="preview.root"
         role="dialog"
         aria-modal="true"
-        aria-label={`Previews for ${partName}`}
+        aria-label={`Inspect ${partName}`}
         tabIndex={-1}
-        className="flex h-[80vh] max-h-[680px] w-full max-w-[860px] flex-col overflow-hidden rounded-card border border-line2 bg-popover shadow-pop outline-none"
+        className="flex h-[calc(100vh-24px)] max-h-[1100px] w-[calc(100vw-24px)] max-w-[1600px] flex-col overflow-hidden rounded-card border border-line2 bg-popover shadow-pop outline-none"
       >
         <div
           data-dev-id="preview.header"
           className="flex h-[38px] flex-none items-center gap-3 border-b border-line bg-band px-4"
         >
-          <span className="min-w-0 flex-none truncate text-sm font-semibold text-t1">
+          <span className="min-w-0 flex-none truncate text-xs font-semibold text-t1">
             {partName}
+          </span>
+          <span className="flex-none text-2xs font-medium uppercase tracking-[0.08em] text-t3">
+            Inspect
           </span>
           <div data-dev-id="preview.tabs" className="flex gap-1" role="tablist" aria-label={tablistLabel}>
             {TABS.map((t) => {
@@ -81,6 +84,7 @@ export function PreviewModal({
                 <button
                   key={t.kind}
                   type="button"
+                  data-dev-id={t.devId}
                   role="tab"
                   aria-selected={active}
                   disabled={!enabled}
@@ -142,7 +146,14 @@ function SvgPreview({
   if (query.isError || !query.data) {
     return <Centered>Could not render this {kind}.</Centered>;
   }
-  return <SvgViewport blob={query.data} alt={`${kind} preview`} />;
+  const safePartName = partId.replace(/[^a-z0-9._-]+/gi, "-");
+  return (
+    <SvgViewport
+      blob={query.data}
+      alt={`${kind} preview`}
+      downloadName={`${safePartName}-${kind}.svg`}
+    />
+  );
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

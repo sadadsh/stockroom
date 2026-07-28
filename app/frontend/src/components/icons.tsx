@@ -68,10 +68,6 @@ export function DuplicateIcon({ className }: { className?: string }) {
   return <Icon id="action.duplicate" className={className} />;
 }
 
-export function ProjectsIcon({ className }: { className?: string }) {
-  return <Icon id="nav.projects.alt" className={className} />;
-}
-
 export function DoctorIcon({ className }: { className?: string }) {
   return <Icon id="action.doctor" className={className} />;
 }

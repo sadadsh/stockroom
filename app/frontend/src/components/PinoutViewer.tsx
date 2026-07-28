@@ -35,6 +35,10 @@ interface SortState {
   dir: "asc" | "desc";
 }
 
+function provenanceLabel(source?: string, confidence?: string): string {
+  return source ? (confidence ? `${source} · ${confidence}` : source) : "";
+}
+
 // Pin identifiers are usually numeric ("1".."64") but can be alphanumeric ("A1").
 // Numeric-aware collation is the SINGLE mechanism: it orders "1","2","10" correctly
 // (not lexicographic "1","10","2") AND handles "A1".."A10", so the numeric-sort test
@@ -86,8 +90,7 @@ export function PinoutViewer({
   const indicator = (key: SortKey) =>
     sort && sort.key === key ? (sort.dir === "asc" ? " ↑" : " ↓") : "";
 
-  const provenance =
-    source ? (confidence ? `${source} · ${confidence}` : source) : "";
+  const provenance = provenanceLabel(source, confidence);
 
   return (
     <Card className="overflow-hidden">
@@ -148,5 +151,113 @@ export function PinoutViewer({
         </tbody>
       </table>
     </Card>
+  );
+}
+
+/**
+ * The narrow, persistent pinout card used in the specimen/CAD rail.
+ *
+ * A pinout is a property of the accepted component representation, not a separate workflow
+ * destination. This compact form keeps the complete persisted datasheet extraction beside CAD,
+ * uses its own bounded scroller for large packages, and retains filtering without forcing the
+ * whole page (or the specimen rail) to become a long table.
+ */
+export function CompactPinoutCard({
+  pins,
+  source,
+  confidence,
+}: {
+  pins: PinoutPin[];
+  source?: string;
+  confidence?: string;
+}) {
+  const [filter, setFilter] = useState("");
+  const query = filter.trim().toLowerCase();
+  const shown = useMemo(
+    () =>
+      query
+        ? pins.filter(
+            (pin) =>
+              pin.pin.toLowerCase().includes(query) ||
+              pin.name.toLowerCase().includes(query),
+          )
+        : pins,
+    [pins, query],
+  );
+  const provenance = provenanceLabel(source, confidence);
+
+  return (
+    <section
+      data-dev-id="detail.pinout"
+      aria-labelledby="detail-pinout-heading"
+      className="flex min-h-[112px] max-h-[300px] flex-1 flex-col overflow-hidden rounded-card border border-line bg-s1"
+    >
+      <div className="flex-none border-b border-line px-2.5 py-2">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h3
+            id="detail-pinout-heading"
+            className="min-w-0 truncate text-xs font-semibold text-t1"
+          >
+            Datasheet Pinout
+          </h3>
+          <span className="tnum flex-none text-2xs text-t3">
+            {pins.length} {pins.length === 1 ? "Pin" : "Pins"}
+          </span>
+          {provenance ? (
+            <Badge
+              tone={confidence === "high" ? "ok" : "neutral"}
+              size="sm"
+              className="ml-auto max-w-[92px] truncate"
+            >
+              {provenance}
+            </Badge>
+          ) : null}
+        </div>
+        <input
+          type="search"
+          aria-label="Filter Datasheet Pins"
+          placeholder="Filter pin or signal"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+          className="mt-1.5 h-6 w-full rounded-control border border-line2 bg-field px-2 text-2xs text-t1 outline-none placeholder:text-t3 focus:border-acc"
+        />
+      </div>
+
+      <div className="grid flex-none grid-cols-2 border-b border-line bg-band text-2xs font-medium text-t3">
+        {[0, 1].map((column) => (
+          <div
+            key={column}
+            className="grid grid-cols-[1.75rem_minmax(0,1fr)] px-2 py-1 odd:border-r odd:border-line"
+          >
+            <span>Pin</span>
+            <span>Signal</span>
+          </div>
+        ))}
+      </div>
+      <div
+        data-dev-id="detail.pinout-list"
+        className="grid min-h-0 flex-1 auto-rows-min grid-cols-2 content-start overflow-y-auto"
+      >
+        {shown.length > 0 ? (
+          shown.map((pin, index) => (
+            <div
+              key={`${pin.pin}-${pin.name}-${index}`}
+              className="grid min-h-6 grid-cols-[1.75rem_minmax(0,1fr)] items-center border-b border-line px-2 py-1 odd:border-r"
+            >
+              <span className="tnum truncate font-mono text-2xs text-t2" title={pin.pin}>
+                {pin.pin || "—"}
+              </span>
+              <span className="truncate text-xs text-t1" title={pin.name}>
+                {pin.name || "—"}
+              </span>
+            </div>
+          ))
+        ) : (
+          <p className="col-span-2 px-2.5 py-3 text-center text-2xs text-t3">
+            No pins match this filter.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }

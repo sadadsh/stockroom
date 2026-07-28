@@ -918,7 +918,7 @@ function Catalogue({
                       (dev.selectedDevId === e.id ? "bg-raise2" : "")
                     }
                   >
-                    <span className="flex-none font-mono text-[10px] text-t2">{e.id}</span>
+                    <span className="flex-none font-mono text-xs text-t2">{e.id}</span>
                     <span className="ml-auto truncate text-2xs text-t3">{e.label}</span>
                   </button>
                 ))}
@@ -969,7 +969,7 @@ function SelectionPane({
             {dev.highlightedVars.map((v) => (
               <span
                 key={v}
-                className="rounded-[3px] bg-raise2 px-1 py-0.5 font-mono text-[9px] text-t2"
+                className="rounded-[3px] bg-raise2 px-1 py-0.5 font-mono text-2xs text-t2"
               >
                 {v}
               </span>

@@ -100,6 +100,12 @@ const FALLBACK_ORDER = 100000;
 // category); omit it and the entry applies everywhere. Adding a key needs no code
 // change - a registry row only refines where it lands.
 export interface SpecRegistryEntry {
+  /**
+   * Stable semantic identity. Omit when the normalized display label is already the right id.
+   * This is what preferences and cross-source reconciliation bind to; the distributor's raw key
+   * remains on the row for editing, provenance and round-tripping.
+   */
+  id?: string;
   match: string;
   group: SpecGroupName;
   // The display label; defaults to the spec's own (raw) key when omitted.
@@ -158,6 +164,8 @@ export const SPEC_PATTERNS: SpecPattern[] = [
   { token: "interface", group: "Device", order: 22 },
   { token: "protocol", group: "Device", order: 23 },
   { token: "function", group: "Device", order: 13 },
+  { token: "features", group: "Device", order: 24 },
+  { token: "feature", group: "Device", order: 24 },
 
   // --- 2. Physical form, before electrical: "Supplier Device Package" and "Package / Case" are
   // dimensions of the body whatever else their name carries.
@@ -285,26 +293,31 @@ export const SPEC_REGISTRY: SpecRegistryEntry[] = [
   { match: "color", group: "Physical", label: "Color", order: 70 },
   { match: "colour", group: "Physical", label: "Color", order: 70 },
 
+  // --- Device ---------------------------------------------------------------
+  { match: "composition", group: "Device", label: "Composition", order: 20 },
+  { match: "operating mode", group: "Device", label: "Operating Mode", order: 21 },
+
   // --- Ratings & Compliance -------------------------------------------------
   { match: "operating temperature", group: "Ratings & Compliance", label: "Operating Temperature", order: 10 },
   { match: "temperature range", group: "Ratings & Compliance", label: "Temperature Range", order: 10 },
   { match: "operating temperature range", group: "Ratings & Compliance", label: "Operating Temperature", order: 10 },
   { match: "rohs", group: "Ratings & Compliance", label: "RoHS", order: 20 },
   { match: "reach", group: "Ratings & Compliance", label: "REACH", order: 21 },
-  { match: "lifecycle", group: "Ratings & Compliance", label: "Lifecycle", order: 30 },
-  { match: "lead time", group: "Ratings & Compliance", label: "Lead Time", order: 31 },
   { match: "moisture sensitivity level", group: "Ratings & Compliance", label: "Moisture Sensitivity Level", order: 40 },
   { match: "msl", group: "Ratings & Compliance", label: "Moisture Sensitivity Level", order: 40 },
   { match: "qualification", group: "Ratings & Compliance", label: "Qualification", order: 50 },
   { match: "maximum operating temperature", group: "Ratings & Compliance", label: "Maximum Operating Temperature", order: 11 },
   { match: "minimum operating temperature", group: "Ratings & Compliance", label: "Minimum Operating Temperature", order: 12 },
-  { match: "part status", group: "Ratings & Compliance", label: "Part Status", order: 31 },
   { match: "flammability rating", group: "Ratings & Compliance", label: "Flammability Rating", order: 45 },
   { match: "ul rating", group: "Ratings & Compliance", label: "UL Rating", order: 46 },
   { match: "aec q200", group: "Ratings & Compliance", label: "AEC-Q200", order: 51 },
 
   // --- Trade & Compliance (procurement, not physics; see TRADE_GROUP) ----------
   { match: "eccn", group: TRADE_GROUP, label: "ECCN", order: 10 },
+  { match: "lifecycle", group: TRADE_GROUP, label: "Lifecycle", order: 12 },
+  { match: "lifecycle status", group: TRADE_GROUP, label: "Lifecycle", order: 12 },
+  { match: "part status", group: TRADE_GROUP, label: "Part Status", order: 13 },
+  { match: "lead time", group: TRADE_GROUP, label: "Lead Time", order: 14 },
   { match: "country of origin", group: TRADE_GROUP, label: "Country of Origin", order: 20 },
   { match: "assembly country of origin", group: TRADE_GROUP, label: "Assembly Country", order: 21 },
   { match: "country of diffusion", group: TRADE_GROUP, label: "Country of Diffusion", order: 22 },
@@ -318,7 +331,9 @@ export const SPEC_REGISTRY: SpecRegistryEntry[] = [
   { match: "standard package", group: TRADE_GROUP, label: "Standard Package", order: 43 },
   { match: "packaging", group: TRADE_GROUP, label: "Packaging", order: 44 },
   { match: "factory pack quantity", group: TRADE_GROUP, label: "Factory Pack Quantity", order: 45 },
+  { id: "factory pack quantity", match: "factory pack qty", group: TRADE_GROUP, label: "Factory Pack Quantity", order: 45 },
   { match: "standard pack quantity", group: TRADE_GROUP, label: "Standard Pack Quantity", order: 46 },
+  { id: "standard pack quantity", match: "standard pack qty", group: TRADE_GROUP, label: "Standard Pack Quantity", order: 46 },
   { match: "unit weight kg", group: TRADE_GROUP, label: "Unit Weight", unit: "kg", order: 50 },
 ];
 
@@ -352,6 +367,13 @@ export const SPEC_FAMILIES: readonly SpecFamily[] = [
     // just below ECCN: both are export classification, and ECCN is the single-value one.
     order: 11,
   },
+  {
+    family: "HTS Code",
+    // DigiKey's additional Brazil and Korea customs classifications.
+    match: /^(br|kr)hts$/,
+    group: TRADE_GROUP,
+    order: 11,
+  },
 ];
 
 // The member's own label, recovered from the raw key so it reads as the source wrote it
@@ -382,6 +404,7 @@ export function resolveFamily(
 
 // A resolved spec: raw key + where the registry (or the fallback) places it.
 interface ResolvedSpec {
+  id: string;
   key: string;
   label: string;
   group: SpecGroupName;
@@ -392,6 +415,11 @@ interface ResolvedSpec {
 // One presented spec row: the raw key, the display label, the coerced value, and the
 // unit split off it (for tabular alignment) when there was one.
 export interface SpecRow {
+  /**
+   * Stable presentation-schema identity. Older fixtures may omit it, so every consumer must use
+   * `specRowId()` rather than reading it directly.
+   */
+  id?: string;
   key: string;
   label: string;
   value: string;
@@ -450,24 +478,54 @@ export function normalizeSpecKey(key: string): string {
 const _REGISTRY_INDEX: Map<string, SpecRegistryEntry> = (() => {
   const index = new Map<string, SpecRegistryEntry>();
   for (const entry of SPEC_REGISTRY) {
-    const scope = entry.category ?? "*";
+    const scope = entry.category ? normalizeSpecKey(entry.category) : "*";
     index.set(`${scope}::${entry.match}`, entry);
   }
   return index;
 })();
 
+/**
+ * Stable semantic identity for a specification.
+ *
+ * Raw distributor keys are evidence, not identifiers: `DCR`, `DC Resistance`, and
+ * `Voltage - Breakdown` versus `Breakdown Voltage` are spelling variants. Exact registry rows
+ * canonicalize through their human label; unregistered rows use the conservative label cleanup.
+ * Qualifiers remain part of the id, so Breakdown Voltage and Breakdown Voltage (Min) never merge.
+ */
+export function canonicalSpecId(
+  rawKey: string,
+  displayLabel?: string,
+  category = "",
+): string {
+  const norm = normalizeSpecKey(rawKey);
+  const scope = normalizeSpecKey(category);
+  const entry =
+    (scope ? _REGISTRY_INDEX.get(`${scope}::${norm}`) : undefined) ??
+    _REGISTRY_INDEX.get(`*::${norm}`);
+  const label = displayLabel?.trim() || entry?.label || cleanSpecLabel(rawKey);
+  return normalizeSpecKey(entry?.id ?? label);
+}
+
+/** Resolve the identity of a presented row, including legacy/test rows created before ids existed. */
+export function specRowId(row: Pick<SpecRow, "id" | "key" | "label">): string {
+  return row.id || canonicalSpecId(row.key, row.label);
+}
+
 // Resolve where a raw key lands: a category-scoped entry wins, then a global entry, then
 // the fallback (Other, at the fallback order) so an unknown key is placed, never dropped.
 export function resolveSpec(rawKey: string, category: string): ResolvedSpec {
   const norm = normalizeSpecKey(rawKey);
-  const scoped = category
-    ? _REGISTRY_INDEX.get(`${category}::${norm}`)
+  const categoryId = normalizeSpecKey(category);
+  const scoped = categoryId
+    ? _REGISTRY_INDEX.get(`${categoryId}::${norm}`)
     : undefined;
   const entry = scoped ?? _REGISTRY_INDEX.get(`*::${norm}`);
   if (entry) {
+    const label = entry.label ?? rawKey;
     return {
+      id: canonicalSpecId(rawKey, label, category),
       key: rawKey,
-      label: entry.label ?? rawKey,
+      label,
       group: entry.group,
       unit: entry.unit,
       order: entry.order,
@@ -484,11 +542,25 @@ export function resolveSpec(rawKey: string, category: string): ResolvedSpec {
     for (const p of SPEC_PATTERNS) {
       const hit = p.leading ? first === p.token : present.has(p.token);
       if (hit) {
-        return { key: rawKey, label: cleanSpecLabel(rawKey), group: p.group, order: p.order };
+        const label = cleanSpecLabel(rawKey);
+        return {
+          id: canonicalSpecId(rawKey, label, category),
+          key: rawKey,
+          label,
+          group: p.group,
+          order: p.order,
+        };
       }
     }
   }
-  return { key: rawKey, label: cleanSpecLabel(rawKey), group: FALLBACK_GROUP, order: FALLBACK_ORDER };
+  const label = cleanSpecLabel(rawKey);
+  return {
+    id: canonicalSpecId(rawKey, label, category),
+    key: rawKey,
+    label,
+    group: FALLBACK_GROUP,
+    order: FALLBACK_ORDER,
+  };
 }
 
 // Leading "number [unit]" matcher: a number (optional sign, thousands, decimal,
@@ -596,6 +668,7 @@ export function groupSpecs(
         family: inFamily.family, rows: [], seq: seq++,
       };
       bucket.rows.push({
+        id: canonicalSpecId(key, inFamily.member, category),
         key,
         label: inFamily.member,
         value: prettifyValue(coerceValue(value)),
@@ -618,6 +691,7 @@ export function groupSpecs(
     }
     dispValue = applySign(key, dispValue);
     const row: SpecRow = {
+      id: resolved.id,
       key: resolved.key,
       label: resolved.label,
       value: dispValue,
@@ -636,6 +710,7 @@ export function groupSpecs(
     const list = buckets.get(family.group) ?? [];
     list.push({
       row: {
+        id: canonicalSpecId(family.family),
         key: family.family,
         label: family.family,
         raw: "",  // a family row is a count of its members, not a value any source offered
@@ -840,7 +915,7 @@ export function mergeSameConcept(
         rows.push(row);
         continue;
       }
-      const concept = specConcept(row.key);
+      const concept = specConcept(specRowId(row));
       const winner = winnerFor.get(concept);
       if (!winner) {
         winnerFor.set(concept, row);
@@ -849,7 +924,11 @@ export function mergeSameConcept(
       }
       // `raw` and not `value`: the presented string is prettified ("1%" renders "±1%"), and
       // comparing presented values is what made an alternates row offer the value already in force.
-      const already = [...(alternates[winner.key] ?? []), ...(extra[winner.key] ?? [])];
+      const already = [
+        { value: winner.raw ?? winner.value },
+        ...(alternates[winner.key] ?? []),
+        ...(extra[winner.key] ?? []),
+      ];
       if (already.some((a) => a.value === (row.raw ?? row.value))) continue;
       (extra[winner.key] ??= []).push({
         value: row.raw ?? row.value,

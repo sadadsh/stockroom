@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { Icon } from "./Icon";
 
 // Render-diff guard for the non-modal <Icon> adoption (D-06) under the D-03 constraint (adoption may
-// change NO icon's appearance). DetailPanel's glyphs, the ProjectsPage card thumbnail, and the Finder
-// filter toggle are now drawn by <Icon id>; each must still emit the exact svg its hand-written source
+// change NO icon's appearance). DetailPanel's glyphs and the Finder filter toggle are now drawn by
+// <Icon id>; each must still emit the exact svg its hand-written source
 // did. We canonicalise the rendered DOM (attrs sorted + names lowered) and compare it to the original
 // markup, captured verbatim as it stood before this plan, parsed the same way. A match proves adoption
 // changed no icon's output.
@@ -73,15 +73,6 @@ const CASES: Array<{ name: string; el: React.ReactElement; svg: string }> = [
     svg:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-t3">' +
       '<path d="m6 9 6 6 6-6"/></svg>',
-  },
-  {
-    // ProjectsPage: the project-card thumbnail (lucide circuit-board, echoing the Projects nav glyph).
-    name: "glyph.project",
-    el: <Icon id="glyph.project" className="h-[18px] w-[18px]" />,
-    svg:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]">' +
-      '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M11 9h4a2 2 0 0 0 2-2V3"/><circle cx="9" cy="9" r="2"/>' +
-      '<path d="M7 21v-4a2 2 0 0 1 2-2h4"/><circle cx="15" cy="15" r="2"/></svg>',
   },
   {
     // Finder: the filter toggle (lucide list-filter). Its size 15 comes from the registry entry,

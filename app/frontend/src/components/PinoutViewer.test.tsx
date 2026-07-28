@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PinoutPin } from "../api/types";
-import { PinoutViewer } from "./PinoutViewer";
+import { CompactPinoutCard, PinoutViewer } from "./PinoutViewer";
 
 const PINS: PinoutPin[] = [
   { pin: "2", name: "GND" },
@@ -76,5 +76,23 @@ describe("PinoutViewer", () => {
     expect(names()).toEqual(["GND", "VCC", "VIN"]);
     await userEvent.click(screen.getByRole("button", { name: /sort by name/i }));
     expect(names()).toEqual(["VIN", "VCC", "GND"]);
+  });
+});
+
+describe("CompactPinoutCard", () => {
+  it("bounds a large datasheet pinout and scrolls only its row list", () => {
+    const pins = Array.from({ length: 64 }, (_, index) => ({
+      pin: String(index + 1),
+      name: `SIGNAL_${index + 1}`,
+    }));
+    const { container } = render(
+      <CompactPinoutCard pins={pins} source="datasheet" confidence="high" />,
+    );
+
+    const card = container.querySelector('[data-dev-id="detail.pinout"]');
+    const list = container.querySelector('[data-dev-id="detail.pinout-list"]');
+    expect(card).toHaveClass("max-h-[300px]", "overflow-hidden");
+    expect(list).toHaveClass("grid-cols-2", "overflow-y-auto");
+    expect(screen.getByText("64 Pins")).toBeInTheDocument();
   });
 });

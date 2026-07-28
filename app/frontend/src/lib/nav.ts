@@ -1,6 +1,6 @@
 /**
  * The single source of truth for the app's destinations: the three top-level
- * surfaces (Components, Projects, Settings) shown in the rail. Add Parts is a
+ * surfaces shown in the rail. Add Parts is a
  * full-screen wizard off the Parts toolbar, not a route. The rail derives from
  * this list, so they can never disagree. `available` gates what the user can
  * actually reach: a surface only appears once its page is really built and wired.
@@ -21,7 +21,6 @@ export interface NavEntry {
 
 export const NAV: NavEntry[] = [
   { route: "components", title: "Components", group: "primary", available: true },
-  { route: "projects", title: "Projects", group: "primary", available: true },
   { route: "stm", title: "STM Viewer", group: "primary", available: true },
   { route: "settings", title: "Settings", group: "foot", available: true },
 ];

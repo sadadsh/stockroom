@@ -72,8 +72,8 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
         <Eyebrow>Welcome</Eyebrow>
         <h1 className="mt-1 text-xl font-semibold text-t1">Set Up Your Components</h1>
         <p className="mt-2 text-sm text-t2">
-          Your components live in a git repository of one JSON record per part, plus the KiCad
-          projects you register. Tell Stockroom where they live to get started.
+          Your components live in a git repository with one JSON record per part and their
+          shared library assets. Tell Stockroom where that repository lives to get started.
         </p>
 
         <div className="mt-5 grid grid-cols-3 gap-2">

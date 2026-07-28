@@ -51,8 +51,8 @@ function Harness() {
           <button type="button" data-dev-id="rail.nav-components" className="text-t1">
             Nav Components
           </button>
-          <button type="button" data-dev-id="rail.nav-projects" className="text-t1">
-            Nav Projects
+          <button type="button" data-dev-id="rail.nav-stm" className="text-t1">
+            Nav STM
           </button>
           <button type="button" data-dev-id="rail.nav-settings" className="text-t1">
             Nav Settings
@@ -185,7 +185,7 @@ describe("DevPanel inspect-first shell", () => {
     // The raw-SVG editor is present (nav.components is a primary line icon, so raw editing is allowed).
     expect(screen.getByLabelText("Edit icon SVG body")).toBeInTheDocument();
     // The picker offers other primary glyphs (same category), and marks the current glyph active.
-    expect(screen.getByRole("button", { name: "Swap to nav.projects" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Swap to nav.stm" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Swap to nav.components" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -198,9 +198,9 @@ describe("DevPanel inspect-first shell", () => {
     inspectClick(screen.getByRole("button", { name: "Components tab" }));
     fireEvent.click(screen.getByRole("tab", { name: "Icon" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Swap to nav.projects" }));
+    fireEvent.click(screen.getByRole("button", { name: "Swap to nav.stm" }));
     // The resolved target moves to the picked glyph.
-    expect(screen.getByRole("button", { name: "Swap to nav.projects" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Swap to nav.stm" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -418,7 +418,7 @@ describe("DevPanel inspect-first shell", () => {
     const first = selectNavAndOpenBox("rail.nav-components", "Nav Components");
     const last = document.querySelector('[data-dev-id="rail.nav-settings"]') as HTMLElement;
 
-    // From visual index 0, one Move Down lands at 1 (swaps with projects), not at the back.
+    // From visual index 0, one Move Down lands at 1 (swaps with STM), not at the back.
     fireEvent.click(screen.getByRole("button", { name: "Move Down" }));
     expect(first.style.order).toBe("1");
     // A second Move Down lands at 2 (swaps with settings), and settings falls back to 1.
@@ -500,11 +500,11 @@ describe("DevPanel inspect-first shell", () => {
     render(<Harness />);
     toggleDevMode();
     const node = selectNavAndOpenBox("rail.nav-components", "Nav Components");
-    const projects = document.querySelector('[data-dev-id="rail.nav-projects"]') as HTMLElement;
+    const stm = document.querySelector('[data-dev-id="rail.nav-stm"]') as HTMLElement;
 
     fireEvent.click(screen.getByRole("button", { name: "Move Down" }));
     expect(node.style.order).toBe("1");
-    expect(projects.style.order).toBe("0");
+    expect(stm.style.order).toBe("0");
 
     // Commit the reorder so the saved baseline carries the order values.
     const devSave = vi.mocked(api.devSave);
@@ -520,7 +520,7 @@ describe("DevPanel inspect-first shell", () => {
     // Reset Order strips `order` from every sibling, restoring the original DOM order.
     fireEvent.click(screen.getByRole("button", { name: "Reset Order" }));
     expect(node.style.order).toBe("");
-    expect(projects.style.order).toBe("");
+    expect(stm.style.order).toBe("");
     expect(screen.queryByRole("button", { name: "Reset Order" })).not.toBeInTheDocument();
 
     // Saving again carries an empty `elements` block - the reorder reverted with no leftover overrides.

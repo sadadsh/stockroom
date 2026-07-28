@@ -4,7 +4,7 @@
  * string so the glyph is reproduced pixel-for-pixel by <Icon id="...">. Built from
  * `.planning/phases/02-icon-editor/icons.json` (the 57-icon inventory) and the real SVG bodies
  * lifted verbatim from their source components (components/icons.tsx, Rail.tsx, PartsList.tsx,
- * DetailPanel.tsx, SearchOverlay.tsx, CompletePartModal.tsx, ProjectsPage.tsx, Finder.tsx,
+ * DetailPanel.tsx, SearchOverlay.tsx, CompletePartModal.tsx, Finder.tsx,
  * DevPanel.tsx).
  *
  * Categories:
@@ -81,13 +81,6 @@ export const ICON_REGISTRY: IconEntry[] = [
     viewBox: "0 0 24 24",
     strokeWidth: 1.9,
     body: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
-  },
-  {
-    id: "nav.projects.alt",
-    category: "primary",
-    viewBox: "0 0 24 24",
-    strokeWidth: 1.9,
-    body: '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>',
   },
   {
     id: "action.doctor",
@@ -172,18 +165,6 @@ export const ICON_REGISTRY: IconEntry[] = [
       '<path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/>' +
       '<rect x="4" y="4" width="16" height="16" rx="2"/>' +
       '<rect x="8" y="8" width="8" height="8" rx="1"/>',
-  },
-  {
-    id: "nav.projects",
-    category: "primary",
-    viewBox: "0 0 24 24",
-    strokeWidth: 2,
-    body:
-      '<rect width="18" height="18" x="3" y="3" rx="2"/>' +
-      '<path d="M11 9h4a2 2 0 0 0 2-2V3"/>' +
-      '<circle cx="9" cy="9" r="2"/>' +
-      '<path d="M7 21v-4a2 2 0 0 1 2-2h4"/>' +
-      '<circle cx="15" cy="15" r="2"/>',
   },
   {
     // The STM Viewer rail glyph. Its siblings all carried an icon and it did not, which read as an
@@ -568,19 +549,6 @@ export const ICON_REGISTRY: IconEntry[] = [
     body:
       '<rect x="9" y="3" width="14" height="12" rx="1.5"/>' +
       '<path d="M6 6h3M6 9h3M6 12h3M23 6h3M23 9h3M23 12h3"/>',
-  },
-
-  // ---- bespoke: ProjectsPage card thumbnail -----------------------------------------------------
-  {
-    id: "glyph.project",
-    category: "bespoke",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.8,
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    body: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M11 9h4a2 2 0 0 0 2-2V3"/><circle cx="9" cy="9" r="2"/><path d="M7 21v-4a2 2 0 0 1 2-2h4"/><circle cx="15" cy="15" r="2"/>',
   },
 
   // ---- bespoke: CompletePartModal glyphs --------------------------------------------------------

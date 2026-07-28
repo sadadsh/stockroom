@@ -161,7 +161,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "10px" },
+    default: { dark: "9.5px" },
     range: { min: 8, max: 26, step: 0.5 },
   },
   {
@@ -170,7 +170,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "11px" },
+    default: { dark: "10.5px" },
     range: { min: 8, max: 26, step: 0.5 },
   },
   {
@@ -179,7 +179,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "11.5px" },
+    default: { dark: "11px" },
     range: { min: 8, max: 26, step: 0.5 },
   },
   {
@@ -188,7 +188,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "12px" },
+    default: { dark: "11.5px" },
     range: { min: 8, max: 26, step: 0.5 },
   },
   {
@@ -197,7 +197,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "13.5px" },
+    default: { dark: "13px" },
     range: { min: 10, max: 30, step: 0.5 },
   },
   {
@@ -206,7 +206,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "15px" },
+    default: { dark: "14.5px" },
     range: { min: 10, max: 32, step: 0.5 },
   },
   {
@@ -215,7 +215,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "18px" },
+    default: { dark: "17px" },
     range: { min: 14, max: 40, step: 0.5 },
   },
   // --- Elevation (shadows; theme-specific raw CSS box-shadow strings) ----------------------------

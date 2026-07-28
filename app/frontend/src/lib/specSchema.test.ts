@@ -12,8 +12,24 @@ import {
   SPEC_HIDDEN_KEYS,
   resolveSpec,
   cleanSpecLabel,
+  canonicalSpecId,
   type SpecGroupName,
 } from "./specSchema";
+
+describe("canonicalSpecId", () => {
+  it("gives distributor spellings of one specification the same stable identity", () => {
+    expect(canonicalSpecId("Voltage - Breakdown")).toBe("breakdown voltage");
+    expect(canonicalSpecId("Breakdown Voltage")).toBe("breakdown voltage");
+    expect(canonicalSpecId("DCR")).toBe("dc resistance");
+  });
+
+  it("keeps measurement qualifiers in the identity", () => {
+    expect(canonicalSpecId("Voltage - Breakdown (Min)")).toBe("breakdown voltage min");
+    expect(canonicalSpecId("Voltage - Breakdown (Min)")).not.toBe(
+      canonicalSpecId("Breakdown Voltage"),
+    );
+  });
+});
 
 describe("normalizeSpecKey", () => {
   it("folds casing and punctuation to a canonical form", () => {
@@ -74,6 +90,15 @@ describe("splitValueUnit", () => {
 });
 
 describe("groupSpecs", () => {
+  it("puts the canonical identity on every presented row", () => {
+    const rows = groupSpecs("Diodes", {
+      "Voltage - Breakdown": "6 V",
+      DCR: "20 mOhm",
+    }).flatMap((group) => group.rows);
+    expect(rows.find((row) => row.key === "Voltage - Breakdown")?.id).toBe("breakdown voltage");
+    expect(rows.find((row) => row.key === "DCR")?.id).toBe("dc resistance");
+  });
+
   it("drops hidden keys and empty-in-disguise values", () => {
     const groups = groupSpecs("Resistors", {
       Symbol: "R",
@@ -115,6 +140,34 @@ describe("groupSpecs", () => {
     expect(groupOf("Flammability Rating")).toBe("Ratings & Compliance");
     expect(groupOf("Maximum Operating Temperature")).toBe("Ratings & Compliance");
     expect(groupOf("Brand")).toBe("Other");
+  });
+
+  it("keeps supply-chain state out of the physical specification groups", () => {
+    expect(resolveSpec("Lifecycle", "ICs").group).toBe("Trade & Compliance");
+    expect(resolveSpec("Lead Time", "ICs").group).toBe("Trade & Compliance");
+    expect(resolveSpec("Part Status", "ICs").group).toBe("Trade & Compliance");
+    expect(resolveSpec("Weight", "Connectors").group).toBe("Physical");
+  });
+
+  it("classifies the actual historical corpus spellings without leaking logistics into specs", () => {
+    const groups = groupSpecs("Resistors", {
+      "Power (Watts)": "0.1 W",
+      Composition: "Thick Film",
+      "Standard Pack Qty": "5000",
+      "Unit Weight (kg)": "0.0001",
+      KRHTS: "8533.21",
+      BRHTS: "8533.21.20",
+    });
+    const groupOf = (key: string) =>
+      groups.find((group) =>
+        group.rows.some((row) => row.key === key || row.members?.some((member) => member.key === key)),
+      )?.title;
+    expect(groupOf("Power (Watts)")).toBe("Electrical");
+    expect(groupOf("Composition")).toBe("Device");
+    expect(groupOf("Standard Pack Qty")).toBe("Trade & Compliance");
+    expect(groupOf("Unit Weight (kg)")).toBe("Trade & Compliance");
+    expect(groupOf("KRHTS")).toBe("Trade & Compliance");
+    expect(groupOf("BRHTS")).toBe("Trade & Compliance");
   });
 
   it("orders groups Electrical -> Physical -> Ratings & Compliance -> Other", () => {

@@ -6,7 +6,13 @@
  * The heavy three.js code is import()ed lazily so it only loads when a 3D view is open.
  */
 import { useEffect, useRef, useState } from "react";
-import type { ModelSceneHandle, RenderMode, ViewMode } from "../lib/threeScene";
+import type {
+  ModelSceneHandle,
+  PlacementMode,
+  RenderMode,
+  ViewMode,
+} from "../lib/threeScene";
+import type { PlacementAssessment } from "../lib/placementAssessment";
 // VALUE import, and deliberately from boardPlane rather than threeScene: threeScene
 // top-level-imports three and is loaded lazily so three lands in its own chunk, so importing a
 // value from it here would pull the whole library into the main bundle. boardPlane is three-free.
@@ -14,6 +20,13 @@ import { DEFAULT_LAYERS } from "../lib/boardPlane";
 import type { LandPattern } from "../api/client";
 import { ApiError } from "../api/client";
 import { Icon } from "./Icon";
+
+function startsWithMotion(): boolean {
+  return !(
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
+  );
+}
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -67,22 +80,51 @@ export function Glb3DView({
   compact?: boolean;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const [renderError, setRenderError] = useState(false);
+  // Bind a parse/WebGL failure to the bytes that caused it. A plain boolean survived a part
+  // change, removed the canvas from the DOM, and then prevented the replacement scene from ever
+  // mounting because the effect had already observed the new data while no mount node existed.
+  const [failedData, setFailedData] = useState<ArrayBuffer | null>(null);
   const sceneRef = useRef<ModelSceneHandle | null>(null);
-  // read inside the mount effect without making the scene remount when the toggle flips
-  const showLandRef = useRef(DEFAULT_LAYERS.pads);
   // Which canonical view is in force. Tracked in React (not read back off the camera) so the
   // control can show the CURRENT answer rather than just issuing commands into the scene.
-  const [view, setView] = useState<ViewMode | null>(null);
+  const [view, setView] = useState<ViewMode | null>("iso");
   const [showLand, setShowLand] = useState(DEFAULT_LAYERS.pads);
   const [renderMode, setRenderMode] = useState<RenderMode>("realistic");
   // The idle spin. Owner 2026-07-26 asked for "an option to stop rotation" - and the same switch closes
   // a logged accessibility defect, since the perpetual rotation ignored prefers-reduced-motion while
   // the 300ms view tween honoured it. `setSpin` returns the state actually in force, which is false
   // under reduced motion whatever is asked, so the chip can never claim to be spinning when it is not.
-  const [spinning, setSpinning] = useState(true);
+  const [spinning, setSpinning] = useState(startsWithMotion);
   const [showModel, setShowModel] = useState(DEFAULT_LAYERS.model);
   const [showBoard, setShowBoard] = useState(DEFAULT_LAYERS.board);
+  const [placementMode, setPlacementMode] = useState<PlacementMode>("auto");
+  const [placementAssessment, setPlacementAssessment] =
+    useState<PlacementAssessment | null>(null);
+  const [selectedPlacementSource, setSelectedPlacementSource] = useState<"kicad" | "model">(
+    "model",
+  );
+  const [compactControlsOpen, setCompactControlsOpen] = useState(false);
+  // The scene is imported asynchronously. Keep one current snapshot so the handle receives the
+  // state visible in React at the moment it becomes available, rather than the values captured by
+  // an older render that began the import.
+  const viewerStateRef = useRef({
+    view,
+    showLand,
+    renderMode,
+    spinning,
+    showModel,
+    showBoard,
+    placementMode,
+  });
+  viewerStateRef.current = {
+    view,
+    showLand,
+    renderMode,
+    spinning,
+    showModel,
+    showBoard,
+    placementMode,
+  };
 
   useEffect(() => {
     const container = mountRef.current;
@@ -93,19 +135,41 @@ export function Glb3DView({
       try {
         const { mountModelScene } = await import("../lib/threeScene");
         if (disposed || !mountRef.current) return;
-        handle = mountModelScene(mountRef.current, data, () => {
-          // GLTFLoader rejected the GLB asynchronously: show an honest message rather
-          // than a blank canvas.
-          if (!disposed) setRenderError(true);
+        handle = mountModelScene(mountRef.current, data, {
+          onError: () => {
+            // GLTFLoader rejected the GLB asynchronously: show an honest message rather
+            // than a blank canvas.
+            if (!disposed) setFailedData(data);
+          },
+          onViewChange: (nextView) => {
+            if (!disposed) setView(nextView);
+          },
+          onPlacementAssessment: (assessment, source) => {
+            if (!disposed) {
+              setPlacementAssessment(assessment);
+              setSelectedPlacementSource(source);
+            }
+          },
         });
         sceneRef.current = handle;
+        const state = viewerStateRef.current;
+        handle.setPlacementMode(state.placementMode);
         // Build whenever the data exists, not only when the Pads toggle happens to be on: the
         // board and the pads are two independently switchable layers of ONE land pattern, and
         // gating construction on one of them made the other unreachable.
         if (land) handle.setLandPattern(land);
+        handle.setRenderMode(state.renderMode);
+        handle.setLayers({
+          model: state.showModel,
+          pads: state.showLand,
+          board: state.showBoard,
+        });
+        const spinInForce = handle.setSpin(state.spinning);
+        if (spinInForce !== state.spinning && !disposed) setSpinning(spinInForce);
+        if (state.view) handle.setView(state.view);
       } catch {
         // no WebGL context (or three failed to load): degrade honestly.
-        if (!disposed) setRenderError(true);
+        if (!disposed) setFailedData(data);
       }
     })();
     return () => {
@@ -114,6 +178,13 @@ export function Glb3DView({
       handle?.dispose();
     };
   }, [data]);
+
+  // Land data is a separate query from the GLB. It frequently resolves after the renderer has
+  // mounted, so it needs its own synchronization path; tying it to the data-only mount effect left
+  // the board and pads absent forever for exactly that ordinary arrival order.
+  useEffect(() => {
+    sceneRef.current?.setLandPattern(land ?? null);
+  }, [land]);
 
   if (isLoading) {
     return <Centered>Loading 3D model...</Centered>;
@@ -126,7 +197,7 @@ export function Glb3DView({
       err?.status === 502 && err.message ? err.message : "Could not load the 3D model.";
     return <Centered>{message}</Centered>;
   }
-  if (renderError) {
+  if (data && failedData === data) {
     return <Centered>This device could not render the 3D preview.</Centered>;
   }
   return (
@@ -141,8 +212,8 @@ export function Glb3DView({
     //
     // A bar costs ~28px of stage height and can never collide. It also means the model can be
     // framed edge to edge without a chip covering a lead.
-    <div className="flex h-full w-full flex-col">
-      <div ref={mountRef} className="min-h-0 w-full flex-1" data-testid="model-canvas" />
+    <div className="relative flex h-full w-full flex-col">
+      <div ref={mountRef} className="relative min-h-0 w-full flex-1" data-testid="model-canvas" />
       <div
         onClick={(e) => e.stopPropagation()}
         // pointer-events-auto is LOAD-BEARING: the detail panel wraps this whole view in a
@@ -187,7 +258,6 @@ export function Glb3DView({
                 onToggle={() => {
                   const next = !showLand;
                   setShowLand(next);
-                  showLandRef.current = next;
                   // visibility only - the geometry is already built. Rebuilding it here also
                   // destroyed and recreated the board every time the pads were toggled.
                   sceneRef.current?.setLayers({ pads: next });
@@ -209,7 +279,7 @@ export function Glb3DView({
             </>
           ) : null}
         </div>
-        {showShading ? (
+        {showShading && !compact ? (
         <div
           data-dev-id="detail.model-shading"
           // NO border-l. On a bar that wraps, a left border on a flex child becomes a stray vertical
@@ -234,6 +304,17 @@ export function Glb3DView({
           ))}
         </div>
         ) : null}
+        {showViews && !compact && land?.model_placement ? (
+          <PlacementControls
+            active={placementMode}
+            assessment={placementAssessment}
+            selectedSource={selectedPlacementSource}
+            onPick={(mode) => {
+              setPlacementMode(mode);
+              sceneRef.current?.setPlacementMode(mode);
+            }}
+          />
+        ) : null}
       </div>
       {showViews ? (
         <div className="flex items-center gap-2">
@@ -251,17 +332,172 @@ export function Glb3DView({
               setSpinning(inForce);
             }}
           />
-          <ViewControls
-            compact={compact}
-            active={view}
-            onPick={(mode) => {
-              setView(mode);
-              sceneRef.current?.setView(mode);
-            }}
-          />
+          {compact ? (
+            <button
+              type="button"
+              data-dev-id="detail.model-settings"
+              aria-label="3D view settings"
+              aria-expanded={compactControlsOpen}
+              title="View, shading, and placement settings"
+              onClick={() => setCompactControlsOpen((open) => !open)}
+              className={
+                "flex h-[22px] w-[22px] items-center justify-center rounded-[2px] transition-colors " +
+                (compactControlsOpen
+                  ? "bg-raise2 text-t1"
+                  : "text-t3 hover:bg-[var(--c-hover)] hover:text-t1")
+              }
+            >
+              <Icon id="action.settings" className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <ViewControls
+              active={view}
+              onPick={(mode) => {
+                setView(mode);
+                sceneRef.current?.setView(mode);
+              }}
+            />
+          )}
         </div>
       ) : null}
       </div>
+      {compact && compactControlsOpen ? (
+        <div
+          data-dev-id="detail.model-settings-popover"
+          onClick={(event) => event.stopPropagation()}
+          className="pointer-events-auto absolute bottom-9 right-1 z-20 w-[238px] rounded-card border border-line2 bg-popover p-2 shadow-pop"
+        >
+          <ControlSection label="View">
+            <ViewControls
+              active={view}
+              onPick={(mode) => {
+                setView(mode);
+                sceneRef.current?.setView(mode);
+              }}
+            />
+          </ControlSection>
+          {showShading ? (
+            <ControlSection label="Shading">
+              <div className="flex items-center gap-px">
+                {SHADING.map((item) => (
+                  <LayerToggle
+                    key={item.mode}
+                    devId={item.devId}
+                    label={item.label}
+                    on={renderMode === item.mode}
+                    hint={item.hint}
+                    onToggle={() => {
+                      setRenderMode(item.mode);
+                      sceneRef.current?.setRenderMode(item.mode);
+                    }}
+                  />
+                ))}
+              </div>
+            </ControlSection>
+          ) : null}
+          {land?.model_placement ? (
+            <ControlSection label="Placement">
+              <PlacementControls
+                active={placementMode}
+                assessment={placementAssessment}
+                selectedSource={selectedPlacementSource}
+                showLabel={false}
+                onPick={(mode) => {
+                  setPlacementMode(mode);
+                  sceneRef.current?.setPlacementMode(mode);
+                }}
+              />
+            </ControlSection>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ControlSection({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 border-b border-line py-1.5 last:border-b-0">
+      <span className="flex-none text-2xs font-medium text-t3">{label}</span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
+const PLACEMENT_MODES: { mode: PlacementMode; label: string; hint: string }[] = [
+  {
+    mode: "auto",
+    label: "Auto",
+    hint: "Use KiCad placement when it passes conservative sanity checks; otherwise show the model frame",
+  },
+  {
+    mode: "kicad",
+    label: "Source",
+    hint: "Show the KiCad model placement exactly, even when it is flagged",
+  },
+  {
+    mode: "model",
+    label: "Model",
+    hint: "Ignore footprint placement and inspect the model's own frame",
+  },
+];
+
+function PlacementControls({
+  active,
+  assessment,
+  selectedSource,
+  onPick,
+  showLabel = true,
+}: {
+  active: PlacementMode;
+  assessment: PlacementAssessment | null;
+  selectedSource: "kicad" | "model";
+  onPick: (mode: PlacementMode) => void;
+  showLabel?: boolean;
+}) {
+  const suspect = assessment?.status === "suspect";
+  const issueText = assessment?.issues.join(". ");
+  return (
+    <div className={"flex items-center gap-1 " + (showLabel ? "border-l border-line pl-1.5" : "")}>
+      {showLabel ? <span className="text-2xs font-medium text-t3">Placement</span> : null}
+      <div className="flex items-center gap-px">
+        {PLACEMENT_MODES.map((item) => (
+          <button
+            key={item.mode}
+            type="button"
+            aria-pressed={active === item.mode}
+            title={item.hint}
+            onClick={() => onPick(item.mode)}
+            className={
+              "rounded-[2px] px-1.5 py-0.5 text-2xs font-medium transition-colors " +
+              (active === item.mode
+                ? "bg-raise2 text-t1"
+                : "text-t3 hover:bg-[var(--c-hover)] hover:text-t1")
+            }
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <span
+        title={
+          suspect
+            ? `${issueText}. Auto is showing the ${selectedSource} frame.`
+            : `Auto is showing the ${selectedSource} frame.`
+        }
+        className={
+          "rounded-[2px] px-1 py-0.5 text-2xs font-semibold " +
+          (suspect ? "bg-warn/15 text-warn" : "bg-ok/15 text-ok")
+        }
+      >
+        {suspect ? "Check" : selectedSource === "kicad" ? "Source" : "Model"}
+      </span>
     </div>
   );
 }

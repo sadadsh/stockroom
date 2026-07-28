@@ -21,7 +21,12 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../api/client";
-import type { CadSourceResponse, Requirement, StagingCandidate } from "../api/types";
+import type {
+  CadSourceResponse,
+  CompletionResult,
+  Requirement,
+  StagingCandidate,
+} from "../api/types";
 import { streamEvents } from "./sse";
 
 export type { Requirement };
@@ -393,25 +398,52 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         }));
         const body = await api.openJobStream(job_id);
         let failure: string | null = null;
+        let result: CompletionResult | null = null;
         for await (const ev of streamEvents(body)) {
           if (ev.event === "progress") {
             const message = (ev.data as { message?: string }).message;
             if (message) setState((s) => (s.status === "done" ? s : { ...s, message }));
           } else if (ev.event === "error") {
             failure = (ev.data as { detail?: string }).detail ?? "The capture failed.";
+          } else if (ev.event === "result") {
+            result = (ev.data as { result?: CompletionResult }).result ?? null;
           } else if (ev.event === "done") {
             break;
           }
         }
         if (failure) throw new Error(failure);
         if (partIdRef.current !== partId) return;
-        // The RECORD is the truth, never the job's own summary: re-read the part so the checklist
-        // reports what ACTUALLY attached.
+        if (!result) {
+          throw new Error("The capture ended without a verified completion report.");
+        }
+        const item = result.items.find((candidate) => candidate.part_id === partId);
+        if (!item) {
+          throw new Error("The capture report did not contain the requested part.");
+        }
+        const complete =
+          (item.status === "completed" || item.status === "already-complete") &&
+          item.remaining.length === 0;
+        if (complete) {
+          markReceived(needs);
+        } else {
+          markReceived(
+            item.satisfied.filter((value): value is Requirement =>
+              needs.includes(value as Requirement),
+            ),
+          );
+        }
+        // Re-read server state after the result has proved what happened. The report decides
+        // success; a terminal SSE `done` frame only says the worker stopped emitting events.
         invalidate();
         setState((s) => ({
           ...s,
-          status: "done",
-          message: "Capture finished. The part shows whatever actually attached.",
+          status: complete ? "done" : "error",
+          message: complete
+            ? "All network files were verified and attached."
+            : item.error ||
+              `Capture finished incomplete. Still missing: ${item.remaining
+                .map((requirement) => REQ_LABELS[requirement as Requirement] ?? requirement)
+                .join(", ") || "required CAD files"}.`,
         }));
       } catch (err) {
         if (partIdRef.current !== partId) return;
@@ -422,7 +454,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         }));
       }
     },
-    [clearWatchdog, clearHandler, invalidate],
+    [clearWatchdog, clearHandler, invalidate, markReceived],
   );
 
   const submitPaths = useCallback(

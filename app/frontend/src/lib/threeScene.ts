@@ -11,7 +11,7 @@
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { ViewHelper } from "three/examples/jsm/helpers/ViewHelper.js";
+import { ViewportGizmo } from "three-viewport-gizmo";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
@@ -36,6 +36,11 @@ import {
   screenUpFor,
   visibleBounds,
 } from "./cameraFit";
+import {
+  assessPlacement,
+  type PlacementAssessment,
+} from "./placementAssessment";
+import { kicadModelPlacementMatrix } from "./placementTransform";
 
 /**
  * Ambient-occlusion settings for a part whose bounding-sphere radius is `modelRadius` SCENE units
@@ -82,6 +87,16 @@ export type ViewMode = "iso" | "top" | "front";
  * - `xray`      - translucent, for seeing where the body sits relative to its pads.
  */
 export type RenderMode = "realistic" | "studio" | "xray";
+export type PlacementMode = "auto" | "kicad" | "model";
+
+export interface ModelSceneOptions {
+  onError?: () => void;
+  onViewChange?: (mode: ViewMode | null) => void;
+  onPlacementAssessment?: (
+    assessment: PlacementAssessment,
+    selectedSource: Exclude<PlacementMode, "auto">,
+  ) => void;
+}
 
 /** Which layers are drawn. All three can be off; the viewer simply shows an empty stage. */
 export interface LayerVisibility {
@@ -151,6 +166,9 @@ export interface ModelSceneHandle {
   /** Turn the idle spin on or off; returns the state actually in force (always false under
    *  prefers-reduced-motion, whatever was asked for). */
   setSpin: (wanted: boolean) => boolean;
+  /** Choose how model placement is resolved. Auto rejects only grossly implausible source data;
+   * KiCad and Model expose each source frame directly for inspection. */
+  setPlacementMode: (mode: PlacementMode) => void;
 }
 
 /** The OS-level reduced-motion preference. Read at the moment it matters rather than cached, so a
@@ -160,6 +178,40 @@ function prefersReducedMotion(): boolean {
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
   );
+}
+
+/** Dispose a scene subtree exactly once per GPU resource, including materials no longer attached
+ * to a mesh because a render mode swapped them out. Material.dispose() deliberately does not
+ * release its textures, so texture-valued properties are included as well. */
+function disposeObjectResources(
+  object: THREE.Object3D,
+  extras: (THREE.Material | THREE.Material[])[] = [],
+) {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+  const collectMaterial = (material: THREE.Material | THREE.Material[] | undefined) => {
+    if (!material) return;
+    if (Array.isArray(material)) {
+      material.forEach(collectMaterial);
+      return;
+    }
+    materials.add(material);
+  };
+  object.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (mesh.geometry) geometries.add(mesh.geometry);
+    collectMaterial(mesh.material as THREE.Material | THREE.Material[] | undefined);
+  });
+  extras.forEach(collectMaterial);
+  materials.forEach((material) => {
+    Object.values(material).forEach((value) => {
+      if (value instanceof THREE.Texture) textures.add(value);
+    });
+  });
+  geometries.forEach((geometry) => geometry.dispose());
+  textures.forEach((texture) => texture.dispose());
+  materials.forEach((material) => material.dispose());
 }
 
 /** A pad as real extruded geometry: rounded corners for a roundrect/oval, square for a rect, and
@@ -215,8 +267,9 @@ function roundedPadGeometry(
 export function mountModelScene(
   container: HTMLElement,
   glb: ArrayBuffer,
-  onError?: () => void,
+  options: ModelSceneOptions = {},
 ): ModelSceneHandle {
+  const { onError, onViewChange, onPlacementAssessment } = options;
   const width = container.clientWidth || 640;
   const height = container.clientHeight || 460;
 
@@ -309,13 +362,13 @@ export function mountModelScene(
   let spinChosen = false;
   // The view in force, so the spin switch knows whether spinning is even legal (only free iso spins).
   let viewMode: ViewMode = "iso";
-  // The axis gizmo. Constructed lazily in `mountGizmo` once the DOM parent exists. It is REBOUND on
+  // The view cube. Constructed lazily once the DOM parent exists. It is REBOUND on
   // every camera swap for the same reason GTAOPass had to be: a helper that captures its camera at
   // construction keeps pointing at the camera it was born with, and the orthographic top view would
   // then spin a gizmo describing a camera nobody is looking through. That bug has been paid for
   // twice in this file already.
-  let viewHelper: ViewHelper | null = null;
-  /** The camera the live gizmo was CONSTRUCTED with, since ViewHelper does not expose it. */
+  let viewGizmo: ViewportGizmo | null = null;
+  /** The camera the live gizmo was constructed with. */
   let gizmoCamera: THREE.Camera | null = null;
 
   let controls = makeControls(camera);
@@ -351,6 +404,7 @@ export function mountModelScene(
     controls.autoRotate = spinning;
     boundUp.copy(cam.up);
     controls.update();
+    viewGizmo?.attachControls(controls);
   }
 
   // Captured once the model is framed, so a view change re-uses the SAME fit distance and the
@@ -371,8 +425,15 @@ export function mountModelScene(
   // fallback on every single part. The fix would have looked correct in the diff and done nothing.
   let lastLand: LandPatternInput | null = null;
   let modelRoot: THREE.Object3D | null = null;
+  let nativeModelTransform: {
+    position: THREE.Vector3;
+    quaternion: THREE.Quaternion;
+    scale: THREE.Vector3;
+  } | null = null;
   let placement: LandPatternInput["model_placement"] = null;
+  let placementMode: PlacementMode = "auto";
   let modelCenter: THREE.Vector3 | null = null;
+  let groundPlane: THREE.Mesh | null = null;
 
   // POST-PROCESSING, the half of "looks ray traced" that lighting alone cannot give you. GTAO is
   // ground-truth ambient occlusion: it darkens where surfaces approach each other - under the
@@ -397,7 +458,8 @@ export function mountModelScene(
   // is exactly what kept the real one hidden for two sessions.
   gtao.enabled = true;
   composer.addPass(gtao);
-  composer.addPass(new OutputPass());
+  const outputPass = new OutputPass();
+  composer.addPass(outputPass);
 
   let renderMode: RenderMode = "realistic";
   const modelMeshes: THREE.Mesh[] = [];
@@ -415,6 +477,7 @@ export function mountModelScene(
   // ever CONSTRUCTED inside setLandPattern, and setLandPattern was only called by the Pads toggle -
   // so at load the PCB chip read "on" while no board existed at all, and turning PCB on did nothing.
   const layers: LayerVisibility = { ...DEFAULT_LAYERS };
+  let disposed = false;
 
   const loader = new GLTFLoader();
   const root = new THREE.Group();
@@ -424,8 +487,22 @@ export function mountModelScene(
     glb,
     "",
     (gltf) => {
+      // Parsing can finish after React has unmounted the canvas. Never attach a late model to a
+      // disposed renderer; release the parser-created resources immediately instead.
+      if (disposed) {
+        disposeObjectResources(gltf.scene);
+        return;
+      }
       root.add(gltf.scene);
       modelRoot = gltf.scene;
+      // Keep the loader-authored transform so a land pattern arriving later can switch from the
+      // viewer's no-footprint orientation fallback to authoritative KiCad placement without
+      // compounding rotations or scales.
+      nativeModelTransform = {
+        position: gltf.scene.position.clone(),
+        quaternion: gltf.scene.quaternion.clone(),
+        scale: gltf.scene.scale.clone(),
+      };
       // Render every part in ONE neutral surface (the app's 3D renders are monochrome - no
       // per-material colour), so a model reads by its lit form, not by the GLB's arbitrary
       // colour. Disposed with the scene below (all meshes share this one material).
@@ -484,65 +561,8 @@ export function mountModelScene(
       // materials are swapped by setRenderMode; hold the studio pair so it can swap BACK
       studioMaterial = neutral;
       applyRenderMode(renderMode);
-      applyPlacement();
-      // THE SCENE WORKS IN MILLIMETRES. glTF mandates METRES, so a 3.5mm package arrives as 0.0035
-      // units - and every effect with a world-space radius is tuned for human-scale numbers. GTAO's
-      // default radius alone is ~70x that whole model, so it computed the part as fully occluded
-      // and rendered it BLACK. Scaling to mm here (rather than tuning each effect to a
-      // thousandth) makes the scene the same unit KiCad already speaks, so pad coordinates drop in
-      // unconverted and any future effect behaves at its documented defaults.
-      gltf.scene.scale.multiplyScalar(1000);
-      // Sit the part upright on its largest face (see orientUpright), so a flat part lies flat
-      // and the body points up, and the auto-spin turns it about that vertical axis.
-      orientUpright(gltf.scene);
-      gltf.scene.updateMatrixWorld(true);
-      // frame the model: center it on the origin and back the camera off to fit. Use the
-      // bounding-SPHERE radius (half the box diagonal) so the model never clips at any
-      // auto-rotate angle, then place the camera along a fixed 3/4 view direction at just
-      // the fit distance (a small pad, not the old non-normalized offset that pushed the
-      // camera ~1.6x too far and left the model a tiny object in a big empty chamber).
-      const box = new THREE.Box3().setFromObject(gltf.scene);
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      gltf.scene.position.sub(center);
-      const radius = Math.max(size.length() * 0.5, 0.001);
-
-      // A soft CONTACT SHADOW under the part: a shadow-only plane at the model's base catches the
-      // key light, grounding the object and adding depth (a floating monochrome shape reads as flat;
-      // a grounded one reads as solid). Sized + placed relative to the model so it works at any scale.
-      const bottomY = -size.y / 2;
-      modelBaseY = bottomY;
-      modelSize = size.clone();
-      modelCenter = center.clone();
-      const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(radius * 8, radius * 8),
-        new THREE.ShadowMaterial({ opacity: 0.28 }),
-      );
-      ground.rotation.x = -Math.PI / 2;
-      ground.position.y = bottomY - radius * 0.02;
-      ground.receiveShadow = true;
-      groundPlane = ground;
-      scene.add(ground);
-      // Size the ambient occlusion to THIS part, now that its real extent is known. Same reasoning
-      // as the shadow frustum immediately below: a radius that is right for one package is wrong
-      // for every other size, and here that failure is silent - the AO simply returns "nothing is
-      // occluded" and looks like a pass that is switched off.
-      gtao.updateGtaoMaterial(aoSettings(radius));
-      // aim the key + scale its shadow frustum to the model so the shadow is crisp, not clipped
-      key.position.set(radius * 1.6, radius * 2.6, radius * 1.5);
-      kd.left = kd.bottom = -radius * 2.2;
-      kd.right = kd.top = radius * 2.2;
-      kd.near = radius * 0.05;
-      kd.far = radius * 8;
-      kd.updateProjectionMatrix();
-      fill.position.set(-radius * 1.4, -radius * 0.3, -radius);
-
-      // Point the camera down the canonical 3/4 direction, then let the SHARED fit decide how
-      // far along it to sit. One fit path, not two: a second copy of this arithmetic beside
-      // refitCamera would be free to disagree with it, and the disagreement would show up only
-      // as a model that changes size when a layer is toggled.
-      camera.position.set(...VIEW_DIRECTIONS.iso);
-      refitCamera();
+      refreshModelFrame();
+      if (viewMode !== "iso") setView(viewMode);
       // The component's height is only knowable HERE, and the board's thickness is derived from it.
       // Any land pattern handed in before this point was built against the unknown-height fallback
       // and against a `modelBaseY` of 0, so rebuild it now that both are real. Fires at most once
@@ -554,12 +574,13 @@ export function mountModelScene(
       // cache file). This fires asynchronously, after mountModelScene has returned, so
       // it is the only channel that can tell the component to show an honest message
       // instead of leaving a lit, empty canvas.
-      onError?.();
+      if (!disposed) onError?.();
     },
   );
 
   let raf = 0;
   const tick = () => {
+    if (disposed) return;
     controls.update();
     // Realistic mode goes through the composer (GTAO); the cheaper modes render direct, so the
     // AO cost is paid only when it is the thing being asked for.
@@ -567,12 +588,7 @@ export function mountModelScene(
     // a perspective image through an orthographic view's controls, which looks like the view
     // control simply not working.
     renderPass.camera = activeCamera;
-    // Same trap as GTAOPass below, with a twist: ViewHelper CLOSES OVER its camera in the
-    // constructor and exposes no field to rebind (checked in the installed source, not assumed), so
-    // it cannot be pointed at a new one - it has to be REBUILT. Cheap, because this only fires when
-    // the view actually swaps projection, and the alternative is a gizmo describing a camera nobody
-    // is looking through.
-    if (viewHelper && gizmoCamera !== activeCamera) rebuildGizmo();
+    if (viewGizmo && gizmoCamera !== activeCamera) rebuildGizmo();
     // GTAO renders its OWN depth/normal G-buffer, from its OWN camera reference - which the pass
     // captures at construction and never updates. Left alone, the orthographic top view drew its
     // beauty pass through one camera while the occlusion multiplied over it was computed through
@@ -587,30 +603,15 @@ export function mountModelScene(
     }
     if (renderMode === "realistic") composer.render();
     else renderer.render(scene, activeCamera);
-    // THE AXIS GIZMO, drawn last and over the top (owner, 2026-07-26: "one of those 3d view things
-    // where u can look at different views"). three's own ViewHelper, not a hand-rolled cube: it is
-    // maintained, it already labels and hit-tests its axes, and reproducing that is exactly the
-    // wheel-reinvention the rules warn about.
-    //
-    // It needs its own clearDepth or the composer's output buffer occludes it, and it is rendered
-    // OUTSIDE the composer so the AO pass never processes it as scene geometry.
-    if (viewHelper) {
-      renderer.autoClear = false;
-      renderer.clearDepth();
-      viewHelper.render(renderer);
-      renderer.autoClear = true;
-    }
+    // Drawn outside the composer so AO never treats the control as scene geometry. The gizmo owns
+    // its viewport/scissor restoration and hit testing, including face, edge, corner and drag input.
+    viewGizmo?.render();
     raf = requestAnimationFrame(tick);
   };
   // Mounted after the loop is armed so the first frame already carries it. The parent is the
   // renderer's own container, and the helper draws into a corner viewport of the same canvas -
   // no second canvas, no second context.
-  /** three's ViewHelper draws into a FIXED 128px corner viewport (`const dim = 128`, read from the
-   *  installed source - it is not configurable and we do not fork vendor code). In the ~280px
-   *  detail tile that is 45% of the width, which is an axis gizmo wearing the stage rather than
-   *  sitting in its corner. So it appears only where 128px reads as a corner: measured against the
-   *  live canvas, so the modal gets it, the tile does not, and a resize re-decides on its own
-   *  rather than needing a context flag threaded down. */
+  /** Keep the cube on inspection-sized stages, not the small detail tile. */
   const GIZMO_MIN_STAGE_PX = 420;
   function gizmoFits() {
     return renderer.domElement.clientWidth >= GIZMO_MIN_STAGE_PX;
@@ -618,19 +619,63 @@ export function mountModelScene(
 
   function rebuildGizmo() {
     try {
-      viewHelper?.dispose?.();
-      viewHelper = null;
+      viewGizmo?.dispose();
+      viewGizmo = null;
       gizmoCamera = null;
       if (!gizmoFits()) return;
-      viewHelper = new ViewHelper(activeCamera, renderer.domElement);
+      viewGizmo = new ViewportGizmo(activeCamera, renderer, {
+        container,
+        type: "cube",
+        size: 92,
+        placement: "top-right",
+        className: "stockroom-view-gizmo",
+        offset: { top: 10, right: 10 },
+        animated: !prefersReducedMotion(),
+        speed: 1.35,
+        font: { family: "Work Sans, system-ui, sans-serif", weight: 650 },
+        background: {
+          color: 0x20242b,
+          opacity: 0.94,
+          hover: { color: 0x2d3540, opacity: 1 },
+        },
+        corners: {
+          color: 0x697586,
+          opacity: 0.9,
+          hover: { color: 0x58a6ff, opacity: 1, scale: 1.08 },
+        },
+        edges: {
+          color: 0x4c5665,
+          opacity: 0.88,
+          hover: { color: 0x58a6ff, opacity: 1, scale: 1.06 },
+        },
+        x: { label: "R", color: 0xb84d52, labelColor: 0xffffff },
+        nx: { label: "L", color: 0x873b40, labelColor: 0xffffff },
+        y: { label: "T", color: 0x4f8d65, labelColor: 0xffffff },
+        ny: { label: "B", color: 0x37684a, labelColor: 0xffffff },
+        z: { label: "F", color: 0x477db3, labelColor: 0xffffff },
+        nz: { label: "Bk", color: 0x345d87, labelColor: 0xffffff },
+      });
       gizmoCamera = activeCamera;
-      // Its "look at" point must be the point the controls actually orbit, or clicking an axis
-      // frames a different subject than dragging does.
-      viewHelper.center.copy(controls.target);
+      viewGizmo.attachControls(controls);
+      viewGizmo.target.copy(controls.target);
+      const gizmoElement = container.querySelector<HTMLElement>(".stockroom-view-gizmo");
+      gizmoElement?.setAttribute("data-dev-id", "detail.model-gizmo");
+      gizmoElement?.setAttribute("role", "application");
+      gizmoElement?.setAttribute(
+        "aria-label",
+        "3D view cube. Click a face, edge, or corner, or drag to change orientation.",
+      );
+      // A face/edge/corner choice is a valid fixed camera direction, but it is not necessarily one
+      // of the three named toolbar views. Clear the named pressed state instead of lying about it.
+      viewGizmo.addEventListener("start", () => {
+        viewMode = "iso";
+        controls.autoRotate = false;
+        onViewChange?.(null);
+      });
     } catch {
       // A helper that fails to construct must never take the viewer down with it: the 3D view is
       // the feature, the gizmo is an affordance on top of it.
-      viewHelper = null;
+      viewGizmo = null;
       gizmoCamera = null;
     }
   }
@@ -639,13 +684,14 @@ export function mountModelScene(
 
   const onResize = () => {
     // crossing the threshold in either direction adds or removes the gizmo
-    if (gizmoFits() !== Boolean(viewHelper)) rebuildGizmo();
+    if (gizmoFits() !== Boolean(viewGizmo)) rebuildGizmo();
     const w = container.clientWidth || width;
     const h = container.clientHeight || height;
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
     composer.setSize(w, h);
+    viewGizmo?.update(false);
     // the orthographic frustum is re-derived from the new aspect by refitCamera below
     // REFIT, do not just restretch. The required distance is a function of the ASPECT
     // (`fitDistanceForBox(half, dir, fov, aspect)`), because a perspective fov is VERTICAL and a
@@ -820,7 +866,7 @@ export function mountModelScene(
     const orbit = modelCenter ?? centre;
     fitTarget.copy(orbit);
     controls.target.copy(orbit);
-    viewHelper?.center.copy(orbit);
+    viewGizmo?.target.copy(orbit);
     if (!forDirection) {
       activeCamera.position.copy(orbit).add(direction.clone().multiplyScalar(fitDistance));
     }
@@ -857,8 +903,11 @@ export function mountModelScene(
    *  for UI motion, and skipped entirely under prefers-reduced-motion, where the position simply
    *  snaps - reduced motion means less movement, not a missing feature. */
   function setView(mode: ViewMode) {
-    if (!fitDistance) return;
     viewMode = mode;
+    onViewChange?.(mode);
+    // GLTF parsing is asynchronous. Remember a request made before bounds exist; the loaded
+    // callback replays it after the first fit instead of silently dropping the command.
+    if (!fitDistance) return;
     // 3D IS the spinning view - it is the free orbit, and stopping the spin when the user asks for
     // it made the control look broken. The FIXED views (top/front) are the ones that must hold
     // still, because a "top" view that rotates away from top is not a top view.
@@ -914,23 +963,20 @@ export function mountModelScene(
     cancelAnimationFrame(raf);
     resizeObserver?.disconnect();
     controls.dispose();
-    // The gizmo owns geometry, materials and its own sprite textures. This viewer is mounted and
-    // unmounted every time a part is opened, so leaking them once per part is leaking them forever.
-    viewHelper?.dispose?.();
-    viewHelper = null;
+    viewGizmo?.dispose();
+    viewGizmo = null;
     gizmoCamera = null;
-    scene.traverse((obj) => {
-      const mesh = obj as THREE.Mesh;
-      if (mesh.geometry) mesh.geometry.dispose();
-      const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
-      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-      else mat?.dispose();
-    });
-    for (const mat of originalMaterials.values()) {
-      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-      else mat.dispose();
-    }
+    const extraMaterials = [
+      ...originalMaterials.values(),
+      studioMaterial,
+      realisticMaterial,
+      xrayMaterial,
+    ].filter((material): material is THREE.Material | THREE.Material[] => Boolean(material));
+    disposeObjectResources(scene, extraMaterials);
     originalMaterials.clear();
+    gtao.dispose();
+    outputPass.dispose();
+    composer.dispose();
     envRT.texture.dispose();
     pmrem.dispose();
     renderer.dispose();
@@ -950,8 +996,6 @@ export function mountModelScene(
   let landGroup: THREE.Group | null = null;
   let boardMesh: THREE.Mesh | null = null;
 
-  let groundPlane: THREE.Mesh | null = null;
-
   /**
    * APPLY THE FOOTPRINT'S MODEL PLACEMENT. `(model ...)` carries offset/scale/rotate saying where
    * the body sits relative to the footprint origin. Ignoring it draws a vendor part in the wrong
@@ -959,28 +1003,117 @@ export function mountModelScene(
    * reader was built for, and until now nothing consumed it.
    *
    * Applied to the wrapper `root`, not the model itself, because the model's own transform is
-   * already carrying the metres->millimetres normalisation and the upright orientation. KiCad's
-   * rotation is in DEGREES and its Y axis points down the screen, so Y and Z trade places and the
-   * angles are negated coming into a Y-up scene.
+   * already carrying the metres->millimetres normalization and the STEP Z-up -> glTF Y-up basis.
+   * KiCad's 3D model frame is right-handed and Z-up; the footprint's separate 2D pad frame is the
+   * one whose Y runs down-screen.
    */
-  function applyPlacement() {
+  function applyPlacement(source: LandPatternInput["model_placement"]) {
     if (!modelRoot) return;
-    if (!placement) {
+    if (!source) {
       root.position.set(0, 0, 0);
       root.rotation.set(0, 0, 0);
       root.scale.set(1, 1, 1);
       return;
     }
-    const [ox, oy, oz] = placement.offset;
-    const [sx, sy, sz] = placement.scale;
-    const [rx, ry, rz] = placement.rotate;
-    root.rotation.set((-rx * Math.PI) / 180, (-rz * Math.PI) / 180, (ry * Math.PI) / 180);
-    root.scale.set(sx || 1, sy || 1, sz || 1);
-    // offset is millimetres in KiCad's frame; the scene is millimetres, Y-up
-    root.position.set(ox, oz, -oy);
+    // Convert the WHOLE placement matrix. Field-by-field Euler swaps fail when more than one
+    // rotation axis is non-zero because they change multiplication order, and scale needs the
+    // same Y/Z basis conversion as position.
+    kicadModelPlacementMatrix(source).decompose(
+      root.position,
+      root.quaternion,
+      root.scale,
+    );
+  }
+
+  /**
+   * Rebuild the model transform and all bounds-derived scene state from one authoritative frame.
+   *
+   * With footprint placement, the model origin must remain the footprint origin: translating the
+   * mesh to its box center destroys offset/rotation semantics. Without placement, the upright
+   * heuristic remains a useful preview fallback. This function is safe to replay when land data
+   * arrives after GLTF parsing because it always starts from the loader-authored transform.
+   */
+  function refreshModelFrame() {
+    if (!modelRoot || !nativeModelTransform) return;
+    const configure = (source: "kicad" | "model") => {
+      modelRoot!.position.copy(nativeModelTransform!.position);
+      modelRoot!.quaternion.copy(nativeModelTransform!.quaternion);
+      modelRoot!.scale.copy(nativeModelTransform!.scale).multiplyScalar(1000);
+      applyPlacement(source === "kicad" ? placement : null);
+      if (source === "model") orientUpright(modelRoot!);
+      root.updateMatrixWorld(true);
+    };
+
+    // Assess the KiCad candidate independently of the mode the user asked to see. This makes
+    // provenance inspectable: selecting Model does not erase the fact that source placement is
+    // suspect, and selecting KiCad does not suppress the warning.
+    let assessment: PlacementAssessment = {
+      status: "unavailable",
+      issues: [],
+      metrics: {
+        centerOffsetRatio: null,
+        sizeRatio: null,
+        verticalOffsetRatio: null,
+      },
+    };
+    if (placement) {
+      configure("kicad");
+      const candidate = new THREE.Box3().setFromObject(root);
+      assessment = assessPlacement(
+        candidate.isEmpty()
+          ? null
+          : { min: candidate.min.toArray(), max: candidate.max.toArray() },
+        lastLand?.pads ?? [],
+      );
+    }
+    const selectedSource: "kicad" | "model" =
+      placementMode === "model" || !placement
+        ? "model"
+        : placementMode === "kicad"
+          ? "kicad"
+          : assessment.status === "suspect"
+            ? "model"
+            : "kicad";
+    configure(selectedSource);
+    onPlacementAssessment?.(assessment, selectedSource);
+
+    const box = new THREE.Box3().setFromObject(root);
+    if (box.isEmpty()) return;
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const radius = Math.max(size.length() * 0.5, 0.001);
+    modelBaseY = box.min.y;
+    modelSize = size;
+    modelCenter = center;
+
+    if (groundPlane) {
+      scene.remove(groundPlane);
+      disposeObjectResources(groundPlane);
+    }
+    groundPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(radius * 8, radius * 8),
+      new THREE.ShadowMaterial({ opacity: 0.28 }),
+    );
+    groundPlane.rotation.x = -Math.PI / 2;
+    groundPlane.position.set(center.x, modelBaseY - radius * 0.02, center.z);
+    groundPlane.receiveShadow = true;
+    scene.add(groundPlane);
+
+    gtao.updateGtaoMaterial(aoSettings(radius));
+    key.position.set(center.x + radius * 1.6, center.y + radius * 2.6, center.z + radius * 1.5);
+    kd.left = kd.bottom = -radius * 2.2;
+    kd.right = kd.top = radius * 2.2;
+    kd.near = radius * 0.05;
+    kd.far = radius * 8;
+    kd.updateProjectionMatrix();
+    fill.position.set(center.x - radius * 1.4, center.y - radius * 0.3, center.z - radius);
+
+    if (!fitDistance) camera.position.set(...VIEW_DIRECTIONS.iso);
+    refitCamera();
   }
 
   function setLandPattern(land: LandPatternInput | null) {
+    if (disposed) return;
     // remembered so the model-loaded callback can rebuild it against the real component height
     lastLand = land;
     if (groundPlane) groundPlane.visible = true;
@@ -1003,7 +1136,9 @@ export function mountModelScene(
       landGroup = null;
     }
     placement = land ? land.model_placement : null;
-    applyPlacement();
+    // Placement is allowed to arrive after the model. Rebuild from the native transform so the
+    // fallback upright rotation is removed rather than silently compounded with KiCad's rotation.
+    refreshModelFrame();
     if (!land || !land.pads.length) {
       // the board and pads have just been REMOVED; the frame that held them is now far too wide
       refitCamera();
@@ -1241,8 +1376,10 @@ export function mountModelScene(
 
   return {
     dispose: () => {
+      if (disposed) return;
       cancelAnimationFrame(viewTween);
       setLandPattern(null);
+      disposed = true;
       disposeScene();
     },
     setView,
@@ -1256,6 +1393,12 @@ export function mountModelScene(
       return on;
     },
     setLandPattern,
+    setPlacementMode: (mode: PlacementMode) => {
+      if (disposed || placementMode === mode) return;
+      placementMode = mode;
+      if (lastLand) setLandPattern(lastLand);
+      else refreshModelFrame();
+    },
     setRenderMode: applyRenderMode,
     setLayers,
     modelInfo: () =>

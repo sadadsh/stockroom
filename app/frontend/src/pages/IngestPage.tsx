@@ -78,7 +78,7 @@ const FILE_LESS_CANDIDATE: StagingCandidate = {
 function PathStep({ n, children }: { n: number; children: ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-      <span className="tnum grid h-4 w-4 flex-none place-items-center rounded-full border border-line2 font-mono text-[9px] leading-none text-t2">
+      <span className="tnum grid h-4 w-4 flex-none place-items-center rounded-full border border-line2 font-mono text-2xs leading-none text-t2">
         {n}
       </span>
       {children}

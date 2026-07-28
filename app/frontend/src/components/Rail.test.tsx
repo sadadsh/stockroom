@@ -49,10 +49,10 @@ describe("Rail", () => {
     applyMutate.mockReset();
   });
 
-  it("shows exactly the top-level destinations: Library, Projects, Settings", () => {
+  it("shows exactly the top-level destinations", () => {
     render(<Rail />);
     expect(screen.getByRole("button", { name: /Components/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Projects/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /STM Viewer/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Settings/ })).toBeInTheDocument();
     // the folded Library tabs are not rail destinations anymore
     expect(screen.queryByRole("button", { name: /Ingest|Add Parts/ })).toBeNull();
@@ -98,7 +98,7 @@ describe("Rail", () => {
       "rail.root",
       "rail.about",
       "rail.nav-components",
-      "rail.nav-projects",
+      "rail.nav-stm",
       "rail.nav-settings",
     ];
     for (const id of expected) {
@@ -253,12 +253,30 @@ describe("the rail's three reported defects", () => {
     expect(rail.className).not.toContain("shadow-pop");
   });
 
+  it("does not keep the overlay open after pointer navigation", () => {
+    // MEASURED in the real WebView2 host at 1384px: clicking Components, STM Viewer, or Settings
+    // left that button focused. `focus-within:w-[190px]` therefore kept the collapsed rail's
+    // 190px overlay open over a 52px layout slot and hid the first 138px of the destination until
+    // the user clicked somewhere else. Keyboard focus must still reveal the labels, but only when
+    // the browser reports focus-visible (keyboard modality), not for every focused descendant.
+    setWidth(1000);
+    window.__STOCKROOM_UI__ = {};
+    render(<DevModeProvider><Rail /></DevModeProvider>);
+    const rail = document.querySelector('[data-dev-id="rail.root"]')!;
+    expect(rail.className).not.toContain("focus-within:w-[190px]");
+    expect(rail.className).toContain("has-[:focus-visible]:w-[190px]");
+    const components = document.querySelector('[data-dev-id="rail.nav-components"]')!;
+    const label = components.querySelector("span:not([aria-hidden])")!;
+    expect(label.className).not.toContain("group-focus-within/rail");
+    expect(label.className).toContain("group-has-[:focus-visible]/rail");
+  });
+
   it("keeps the glyph column still while the peek opens", () => {
     // Owner: "hovering it shifts the icons to the right spot but not hovering on it misaligns
     // everything". MEASURED before: glyph centre 20.5 collapsed, 30.5 hovered - a 10px jump, and
     // neither was the rail's centre. AFTER: 25.5 in both states (jsdom has no layout, so what is
     // asserted here is the STRUCTURE that produces it).
-    //   * the row is left-aligned in both states, so the peek cannot re-justify it;
+    //   * every row owns a fixed icon grid track, so the peek cannot re-justify it;
     //   * the panel's padding does not change on hover, so the row's x cannot move;
     //   * the glyph sits in a fixed-width box, so the zero-width label's flex GAP - which is what
     //     dragged it 5px off centre - lands to its right instead of being centred with it.
@@ -269,9 +287,39 @@ describe("the rail's three reported defects", () => {
     expect(rail.className).not.toContain("hover:px-3");
     expect(rail.className).not.toContain("focus-within:px-3");
     const row = document.querySelector('[data-dev-id="rail.nav-components"]')!;
-    expect(row.className).toContain("justify-start");
-    expect(row.className).not.toContain("justify-center");
+    expect(row.className).toContain("grid-cols-[35px_minmax(0,1fr)]");
     expect(row.querySelector("span[aria-hidden]")!.className).toContain("w-[35px]");
+  });
+
+  it("uses the same glyph centerline when pinned and for every collapsed utility", () => {
+    // REAL WEBVIEW2 MEASUREMENT before:
+    //   collapsed nav/about 25.5px, update 16px, theme 20.5px
+    //   pinned nav/about 30.5px, update 31px
+    // The panel itself never moved. Those differences came from four separate padding/wrapper
+    // arrangements. One grid and one glyph box derive a 25.5px centerline for every control in
+    // both states.
+    setWidth(1000);
+    window.__STOCKROOM_UI__ = {};
+    const compact = render(<DevModeProvider><Rail /></DevModeProvider>);
+    for (const id of ["rail.nav-components", "rail.about", "rail.update", "rail.theme-toggle"]) {
+      const control = compact.container.querySelector(`[data-dev-id="${id}"]`)!;
+      expect(control.querySelector("span[aria-hidden]")!.className).toContain("w-[35px]");
+    }
+    compact.unmount();
+
+    setWidth(1600);
+    window.__STOCKROOM_UI__ = { rail_collapsed: false };
+    const pinned = render(<DevModeProvider><Rail /></DevModeProvider>);
+    for (const id of [
+      "rail.nav-components",
+      "rail.about",
+      "rail.update",
+      "rail.theme-toggle",
+    ]) {
+      const control = pinned.container.querySelector(`[data-dev-id="${id}"]`)!;
+      expect(control.className).toContain("grid-cols-[35px_minmax(0,1fr)]");
+      expect(control.querySelector("span[aria-hidden]")!.className).toContain("w-[35px]");
+    }
   });
 
   it("fills its column when pinned open, instead of stopping under the last icon", () => {

@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 
 const MIN_SCALE = 0.3;
 const MAX_SCALE = 8;
+const BUTTON_ZOOM_FACTOR = 1.25;
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
@@ -67,6 +68,12 @@ export function usePanZoom() {
   };
 
   const reset = () => setView(CENTERED);
+  // Button/keyboard zoom is centered in the viewport. Wheel zoom keeps its cursor-anchored path
+  // above; both share the same bounds so the readout and interaction never disagree.
+  const zoomBy = (factor: number) =>
+    setView((v) => ({ ...v, scale: clamp(v.scale * factor, MIN_SCALE, MAX_SCALE) }));
+  const zoomIn = () => zoomBy(BUTTON_ZOOM_FACTOR);
+  const zoomOut = () => zoomBy(1 / BUTTON_ZOOM_FACTOR);
 
-  return { view, frameRef, handlers, reset };
+  return { view, frameRef, handlers, reset, zoomIn, zoomOut };
 }

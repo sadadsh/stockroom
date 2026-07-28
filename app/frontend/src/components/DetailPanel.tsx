@@ -5,7 +5,7 @@
  * serial + manufacturer, all editable in place), the 3D object as the hero with its symbol
  * and footprint as supporting embodiments, and a single readiness read (KiCad / Altium, what
  * each still needs) with the one Complete Part action. The RIGHT workbench is a tabbed panel
- * (Specs / Sourcing / Pinout / Enrich / History) so the reference depth lives in one panel
+ * (Overview / Representations / Sources / Activity) so the reference depth lives in one panel
  * height and never pushes the page into a long scroll. A slim footer carries the filing
  * (category) control and the quiet Delete.
  *
@@ -21,6 +21,7 @@ import {
   type ReactNode,
 } from "react";
 import type {
+  Asset,
   PartDetail,
   PurchaseRef,
   SourcedAlternate,
@@ -57,7 +58,7 @@ import { useInlineEdit } from "../lib/useInlineEdit";
 import { Text } from "../lib/copy";
 import { Icon } from "./Icon";
 import { EnrichPanel } from "./EnrichPanel";
-import { PinoutViewer, parsePinout } from "./PinoutViewer";
+import { CompactPinoutCard, parsePinout } from "./PinoutViewer";
 import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PreviewImage } from "./PreviewImage";
@@ -68,7 +69,9 @@ import {
   isCuratedOnly,
   isPinned,
   keySpecRows,
+  normalizePinnedSpecs,
   togglePinned,
+  withoutPromoted,
 } from "../lib/keySpecs";
 import { readPref, writePref } from "../lib/uiPrefs";
 import { PhotoTrigger, partPhotos } from "./ProductPhoto";
@@ -140,7 +143,135 @@ function vendorLabel(vendor: string, url: string): string {
   return v.charAt(0).toUpperCase() + v.slice(1);
 }
 
-type WorkbenchTab = "specs" | "sourcing" | "pinout" | "enrich" | "history" | "handoff";
+function assetLocation(asset: Asset | null | undefined): string {
+  const ref = assetRef(asset);
+  if (!ref) return "";
+  if (ref.file) return ref.file.split(/[\\/]/).pop() ?? ref.file;
+  return [ref.lib, ref.name].filter(Boolean).join(":");
+}
+
+function sourceLabel(asset: Asset | null | undefined): string {
+  const vendor = asset?.origin?.vendor?.trim();
+  if (!vendor) return "Unattributed";
+  return vendor
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+/**
+ * One representation inventory across every registered EDA tool.
+ *
+ * The old Handoff view jumped straight to the fields emitted during placement, which made it
+ * impossible to answer the more basic question: "which symbol, footprint and mechanical body are
+ * actually accepted for each tool, and what supports them?" This matrix keeps the underlying
+ * tool-neutral Asset/Origin/Check contract visible without forcing Altium through KiCad-shaped
+ * cards or reducing provenance to a decorative source badge.
+ */
+function RepresentationMatrix({ detail }: { detail: PartDetail }) {
+  const kinds = Array.from(new Set(EDA_TOOLS.flatMap((tool) => tool.assetKinds)));
+
+  return (
+    <section
+      data-dev-id="detail.representations"
+      aria-labelledby="detail-representations-heading"
+      className="flex-none overflow-hidden rounded-panel border border-line bg-s1"
+    >
+      <div className="flex items-baseline gap-2 border-b border-line px-3 py-2">
+        <h2 id="detail-representations-heading" className="text-2xs font-semibold text-t1">
+          Representations
+        </h2>
+        <p className="truncate text-2xs text-t3">
+          Exact asset, source, and verification by design tool
+        </p>
+      </div>
+      <div className="overflow-auto">
+        <div className="grid min-w-[760px] grid-cols-[136px_repeat(3,minmax(0,1fr))] border-b border-line bg-band text-2xs font-semibold text-t3">
+          <div className="px-3 py-1.5">Design Tool</div>
+          {kinds.map((kind) => (
+            <div key={kind} className="border-l border-line px-3 py-1.5">
+              {assetTitleLabel(kind)}
+            </div>
+          ))}
+        </div>
+        {EDA_TOOLS.map((tool) => {
+          const bundle = assetsFor(detail, tool.key);
+          const readiness = assetReadiness(detail, tool.key);
+          const requiredKinds = new Set(
+            neededKinds(detail, tool.key, partClass(detail.part_class)),
+          );
+
+          return (
+            <div
+              key={tool.key}
+              className="grid min-w-[760px] grid-cols-[136px_repeat(3,minmax(0,1fr))] border-b border-line last:border-b-0"
+            >
+              <div className="flex min-h-14 flex-col justify-center px-3 py-2">
+                <div className="truncate text-2xs font-semibold text-t1">{tool.label}</div>
+                <div className={`text-2xs ${readiness.ready ? "text-ok" : "text-warn"}`}>
+                  {readiness.ready ? "Ready" : `${readiness.missing.length} needed`}
+                </div>
+              </div>
+              {kinds.map((kind) => {
+                const asset = bundle[kind as keyof typeof bundle];
+                const present = assetPresent(asset);
+                const unsupported = tool.unsupportedAssets[kind];
+                const embedded = tool.embeddedAssets[kind];
+                const required = requiredKinds.has(kind);
+                const location = assetLocation(asset);
+                const checkCount = asset?.checks?.length ?? 0;
+                const state = present
+                  ? embedded
+                    ? "Embedded"
+                    : "Present"
+                  : !required
+                    ? "Tool Default"
+                    : embedded
+                      ? "Needs Embed"
+                      : unsupported
+                        ? "Not Applicable"
+                        : "Missing";
+                const stateTone = present
+                  ? "text-ok"
+                  : !required || (unsupported && !embedded)
+                    ? "text-t3"
+                    : "text-warn";
+                const secondary = present
+                  ? `${sourceLabel(asset)} · ${checkCount ? `${checkCount} checks` : "Unchecked"}`
+                  : !required
+                    ? "No dedicated asset required"
+                    : embedded
+                      ? "Stored inside the footprint"
+                      : unsupported
+                        ? "This tool cannot reference it"
+                        : "No accepted artifact";
+
+                return (
+                  <div
+                    key={kind}
+                    className="flex min-h-14 min-w-0 flex-col justify-center border-l border-line px-3 py-2"
+                    title={!present && embedded ? embedded.reason : unsupported}
+                  >
+                    <div className={`text-2xs font-semibold ${stateTone}`}>{state}</div>
+                    <div className="truncate text-2xs text-t1" title={location || undefined}>
+                      {location || "—"}
+                    </div>
+                    <div className="truncate text-2xs text-t2" title={secondary}>
+                      {secondary}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+type WorkbenchTab = "specs" | "sourcing" | "enrich" | "history" | "handoff";
 
 const PINNED_SPECS_KEY = "stockroom.pinned-specs";
 
@@ -148,20 +279,22 @@ const PINNED_SPECS_KEY = "stockroom.pinned-specs";
  *  scalar prefs this one is JSON, so a malformed mirror must degrade to "nothing pinned" rather than
  *  throwing during the first render of the sheet. */
 function readPinnedSpecs(): PinnedSpecs {
-  return readPref<PinnedSpecs>(
-    "pinned_specs",
-    PINNED_SPECS_KEY,
-    (raw) => {
-      try {
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-          ? (parsed as PinnedSpecs)
-          : undefined;
-      } catch {
-        return undefined;
-      }
-    },
-    {},
+  return normalizePinnedSpecs(
+    readPref<PinnedSpecs>(
+      "pinned_specs",
+      PINNED_SPECS_KEY,
+      (raw) => {
+        try {
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            ? (parsed as PinnedSpecs)
+            : undefined;
+        } catch {
+          return undefined;
+        }
+      },
+      {},
+    ),
   );
 }
 
@@ -229,13 +362,14 @@ function KeySpecificationsBlock({
     // catalogue's count gate for no reader-visible gain.)
     <section
       data-dev-id="detail.key-specs"
-      aria-label="Top Specifications"
+      aria-label="Key Specifications"
       className="@container mb-3 flex flex-none flex-col rounded-card border border-line bg-surface"
     >
       <header className="flex items-center gap-3 border-b border-line px-3 py-1.5">
         <span className={EYEBROW_DENSE}>
-          <Text id="detail.top-specifications">Top Specifications</Text>
+          <Text id="detail.top-specifications">Key Specifications</Text>
         </span>
+        <span className="truncate text-2xs text-t3">Recommended and pinned</span>
         {/* A PIN, marking what this block IS: the rows pinned up out of the list below. Owner,
             2026-07-26, replacing the "What This Part Is" caption that used to sit here - the caption
             explained the block in words, the pin says the same thing in the same glyph the row
@@ -244,7 +378,7 @@ function KeySpecificationsBlock({
             action this header does not have. */}
         <span
           className="ml-auto flex-none text-t3"
-          title="Pinned to Top Specifications"
+          title="Pinned and recommended specifications"
           aria-hidden="true"
         >
           <svg viewBox="0 0 16 16" className="h-[12px] w-[12px]" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
@@ -274,8 +408,8 @@ function KeySpecificationsBlock({
             <span className="absolute right-1.5 top-1.5">
               {isCuratedOnly(effective, pinned, category, row.key) ? null : (
                 <PinStar
-                  pinned={isPinned(pinned, category, row.key)}
-                  onToggle={() => onTogglePin(category, row.key)}
+                  pinned={isPinned(pinned, category, row.id ?? row.key)}
+                  onToggle={() => onTogglePin(category, row.id ?? row.key)}
                   label={row.label}
                 />
               )}
@@ -316,10 +450,12 @@ const PANE_RAIL_PX = 44;
  */
 export function panesTemplate(specsOpen: boolean, sourcingOpen: boolean): string {
   const rail = `${PANE_RAIL_PX}px`;
-  if (specsOpen && sourcingOpen) return "288px minmax(16rem,1fr) 320px";
-  if (specsOpen) return `288px minmax(16rem,1fr) ${rail}`;
-  if (sourcingOpen) return `288px ${rail} minmax(16rem,1fr)`;
-  return `minmax(288px,1fr) ${rail} ${rail}`;
+  if (specsOpen && sourcingOpen) {
+    return "minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)";
+  }
+  if (specsOpen) return `320px minmax(16rem,1fr) ${rail}`;
+  if (sourcingOpen) return `320px ${rail} minmax(16rem,1fr)`;
+  return `minmax(320px,1fr) ${rail} ${rail}`;
 }
 
 /**
@@ -409,11 +545,11 @@ function PinStar({
       disabled={locked}
       aria-pressed={on}
       aria-label={
-        locked ? `${label} is already in Top Specifications` : on ? `Unpin ${label}` : `Pin ${label}`
+        locked ? `${label} is already in Key Specifications` : on ? `Unpin ${label}` : `Pin ${label}`
       }
       title={
         locked
-          ? "Already In Top Specifications"
+          ? "Already In Key Specifications"
           : on
             ? "Unpin From Key Specifications"
             : "Pin To Key Specifications"
@@ -689,6 +825,12 @@ export function DetailPanel({
       rows: group.rows.filter((row) => !isReferenceOnlySpecKey(row.key)),
     }))
     .filter((group) => group.rows.length > 0);
+  const promotedSpecKeys = effectiveKeySpecKeys(
+    specGroups,
+    detail.derived.category,
+    pinnedSpecs,
+  );
+  const remainingSpecGroups = withoutPromoted(specGroups, promotedSpecKeys);
   // The procurement facts (origin, the page's own tariff rate, export classification, order
   // quantities) go to SOURCING, not here. They are real vendor data the owner asked to stop
   // losing, but they are not physical parameters - and this is the one place the reference-only
@@ -699,20 +841,19 @@ export function DetailPanel({
   const pinout = parsePinout(detail.derived.specs);
   const pinoutProvenance = detail.enrichment?.pinout;
 
-  // The workbench tabs: Specs and Sourcing always; Pinout only when the record carries one;
-  // Enrich only in editable mode with an MPN to look up by; History always. The active tab
-  // falls back to Specs when the current id is not in the set (a part switch).
+  // Pinout belongs beside the component's CAD representations in the specimen rail, where it
+  // remains visible without adding another top-level destination. Sources is present only in
+  // editable mode with an MPN to look up by; Activity is always available. The active tab falls
+  // back to Overview when the current id is not in the set (a part switch).
   const hasEnrich = !!onEditField && !!detail.mpn;
   const tabs: TabItem<WorkbenchTab>[] = [
-    { id: "specs", label: "Details" },
+    { id: "specs", label: "Overview" },
     // Its own tab (owner's choice from previews, 2026-07-26), rather than a band at the head of the
     // Specifications column. That slot now carries Key Specifications, which is what a person opens
     // a part to read; the handoff is what a person needs once they are about to PLACE it.
-    { id: "handoff", label: "Handoff" },
-    ...(pinout.length > 0 ? [{ id: "pinout" as const, label: "Pinout" }] : []),
-    ...(hasEnrich ? [{ id: "enrich" as const, label: "Enrich" }] : []),
-    // Labelled Timeline (the component IS PartTimeline) - "History" broke the no-y copy rule.
-    { id: "history", label: "Timeline" },
+    { id: "handoff", label: "Representations" },
+    ...(hasEnrich ? [{ id: "enrich" as const, label: "Sources" }] : []),
+    { id: "history", label: "Activity" },
   ];
   const activeTab = tabs.some((t) => t.id === tab) ? tab : "specs";
 
@@ -802,7 +943,7 @@ export function DetailPanel({
             "mt-3 grid min-h-0 flex-1 gap-y-5 " +
             "content-start overflow-y-auto " +
             "grid-cols-1 " +
-            "@xl:grid-cols-[288px_minmax(16rem,1fr)] " +
+            "@xl:grid-cols-[320px_minmax(16rem,1fr)] " +
             "@4xl:grid-cols-[var(--sr-panes)] @4xl:grid-rows-[minmax(0,1fr)] " +
             "@4xl:content-normal @4xl:overflow-hidden"
           }
@@ -814,7 +955,7 @@ export function DetailPanel({
               trapped in a half-height first row - measured, that clipped the symbol and footprint
               tiles to 17 visible pixels and left ~288x330px of dead space beneath them. At three
               columns there is only one row, so the span is released. */}
-          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-5 @xl:row-span-2 @4xl:row-span-1">
+          <div className="flex min-h-0 flex-col gap-3 overflow-y-auto px-5 @xl:row-span-2 @4xl:row-span-1">
           {/* the physical object as the hero, its symbol + footprint as supporting embodiments.
               flex-1 (no min-h-0): the canvas absorbs the pane's slack so the hero grows to fill
               the column beside a tall specs pane, and still scrolls when content genuinely
@@ -949,7 +1090,9 @@ export function DetailPanel({
             </div>
           ) : null}
 
-          {/* the CAD status + Filing as ONE tight cluster of matching property rows */}
+          {/* CAD readiness is followed by the datasheet pinout. That makes the specimen rail a
+              complete representation summary and turns its former dead space into bounded,
+              searchable technical data rather than another top-level workbench destination. */}
           <div className="flex flex-col gap-1.5">
             <ReadinessBlock
               kicad={kicad}
@@ -987,6 +1130,14 @@ export function DetailPanel({
               onRemove={(kind, label) => setPendingDetach({ kind, label })}
             />
           </div>
+          {pinout.length > 0 ? (
+            <CompactPinoutCard
+              key={detail.id}
+              pins={pinout}
+              source={pinoutProvenance?.source}
+              confidence={pinoutProvenance?.confidence}
+            />
+          ) : null}
           </div>
 
           {/* COLUMN 2 - the specifications, the technical heart, in one clean single column,
@@ -1025,7 +1176,7 @@ export function DetailPanel({
               onUse={onEditField ? (value) => onEditField("description", value) : undefined}
             />
             <KeySpecificationsBlock
-              groups={allSpecGroups}
+              groups={specGroups}
               category={detail.derived.category}
               pinned={pinnedSpecs}
               onTogglePin={togglePin}
@@ -1042,16 +1193,15 @@ export function DetailPanel({
               }
             >
               <SpecificationsSection
-                // COPY, not promote - the owner reversed this on 2026-07-26 ("It should copy the
-                // specifications i go back on what i said earlier"). So the full list stays complete
-                // and Top Specifications repeats the handful that matter. This is why that block now
-                // has to look DISTINCT from this one: two identically-styled lists showing the same
-                // row is what makes a repeat read as a bug rather than as a summary.
-                groups={specGroups}
+                // A promoted row has one canonical home. The full sheet keeps the remaining depth;
+                // it does not repeat the same fact immediately below the Key Specifications block.
+                groups={remainingSpecGroups}
+                hasPromotedSpecs={promotedSpecKeys.size > 0}
                 alternates={specAlternates}
                 onUseSpecValue={onUseSpecValue}
                 category={detail.derived.category}
                 pinned={pinnedSpecs}
+                effectivePinned={promotedSpecKeys}
                 onTogglePin={togglePin}
               />
             </DetailSection>
@@ -1078,7 +1228,7 @@ export function DetailPanel({
               onExpand={() => setSourcingOpen(true)}
             />
           ) : (
-          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto @xl:col-start-2 @4xl:col-start-auto @4xl:border-l @4xl:border-line @4xl:pl-5">
+          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-5 @xl:col-start-2 @4xl:col-start-auto @4xl:border-l @4xl:border-line">
             <DetailSection
               title={<Text id="detail.sourcing-head">Sourcing</Text>}
               action={
@@ -1122,22 +1272,6 @@ export function DetailPanel({
           )}
         </WorkbenchPanel>
 
-        {pinout.length > 0 ? (
-          <WorkbenchPanel
-            id="pinout"
-            devId="detail.pinout"
-            active={activeTab}
-            className="mt-3 min-h-0 flex-1 overflow-y-auto"
-          >
-            <PinoutViewer
-              key={detail.id}
-              pins={pinout}
-              source={pinoutProvenance?.source}
-              confidence={pinoutProvenance?.confidence}
-            />
-          </WorkbenchPanel>
-        ) : null}
-
         {hasEnrich ? (
           <WorkbenchPanel
             id="enrich"
@@ -1168,26 +1302,29 @@ export function DetailPanel({
           id="handoff"
           devId="detail.handoff-tab"
           active={activeTab}
-          className="mt-3 min-h-0 flex-1 overflow-y-auto"
+          className="mt-3 min-h-0 flex-1 overflow-hidden"
         >
-          <div className="max-w-[760px] px-1">
-            <HandoffBand
-              detail={detail}
-              onEditField={onEditField}
-              onMoveCategory={onMoveCategory}
-              categories={categories}
-              busy={busy}
-              slots={{
-                // the disagreement follows the value it is about
-                description: (
-                  <AlternatesDisclosure
-                    entries={detail.alternates?.description ?? []}
-                    current={detail.derived.description}
-                    onUse={onEditField ? (value) => onEditField("description", value) : undefined}
-                  />
-                ),
-              }}
-            />
+          <div className="mx-auto flex h-full min-h-0 w-full max-w-[980px] flex-col gap-3 px-1">
+            <RepresentationMatrix detail={detail} />
+            <div className="min-h-0 flex-1 overflow-auto rounded-panel">
+              <HandoffBand
+                detail={detail}
+                onEditField={onEditField}
+                onMoveCategory={onMoveCategory}
+                categories={categories}
+                busy={busy}
+                slots={{
+                  // the disagreement follows the value it is about
+                  description: (
+                    <AlternatesDisclosure
+                      entries={detail.alternates?.description ?? []}
+                      current={detail.derived.description}
+                      onUse={onEditField ? (value) => onEditField("description", value) : undefined}
+                    />
+                  ),
+                }}
+              />
+            </div>
           </div>
         </WorkbenchPanel>
 
@@ -1337,7 +1474,11 @@ function WorkbenchPanel({
       aria-labelledby={tabButtonId("workbench", id)}
       hidden={active !== id}
       className={className}
-      style={style}
+      // Tailwind display utilities such as `grid` can override the browser's `[hidden]` rule.
+      // The result was visible in the real host: selecting Representations left the entire
+      // three-column Overview mounted above it. Inline display is the authoritative visibility
+      // boundary; the `hidden` attribute remains for the accessibility tree.
+      style={active !== id ? { ...style, display: "none" } : style}
     >
       {children}
     </div>
@@ -2133,32 +2274,36 @@ function SpecFamilyRow({ row }: { row: SpecRow }) {
 
 function SpecificationsSection({
   groups,
+  hasPromotedSpecs,
   alternates,
   onUseSpecValue,
   category,
   pinned,
+  effectivePinned,
   onTogglePin,
 }: {
   groups: SpecGroup[];
+  hasPromotedSpecs: boolean;
   alternates: Record<string, SourcedAlternate[]>;
   onUseSpecValue?: (key: string, value: string, source: string) => void;
   // Pinning is threaded down to the ROW because that is where the star lives: the owner's chosen
   // model is "a star on any Specifications row promotes it into Key Specifications".
   category: string;
   pinned: PinnedSpecs;
+  effectivePinned: ReadonlySet<string>;
   onTogglePin: (category: string, specKey: string) => void;
 }) {
   // Only the groups the user has EXPLICITLY toggled live here; everything else falls back to the
   // index-based default below. Storing the default in state instead would make it a snapshot that
   // goes stale the moment a different part arrives with different groups.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  // What Top Specifications is ALREADY showing. Declared above the empty-group return, because a
-  // hook below an early return is the trap this file has paid for before; `effectiveKeySpecKeys`
-  // is pure so it costs nothing here.
-  const effective = effectiveKeySpecKeys(groups, category, pinned);
   if (groups.length === 0) {
     return (
-      <div data-dev-id="detail.specs" className="text-sm text-t3">No parametric specs on record for this part.</div>
+      <div data-dev-id="detail.specs" className="text-sm text-t3">
+        {hasPromotedSpecs
+          ? "All available specifications are shown above."
+          : "No parametric specs on record for this part."}
+      </div>
     );
   }
   // One clean column inside its own pane (the middle of the three-pane sheet). Groups stack in a
@@ -2198,7 +2343,7 @@ function SpecificationsSection({
             onUseSpecValue={onUseSpecValue}
             category={category}
             pinned={pinned}
-            effectivePinned={effective}
+            effectivePinned={effectivePinned}
             onTogglePin={onTogglePin}
           />
         </SpecSection>
@@ -2345,11 +2490,11 @@ function SpecRowList({
                   be pinned from; only the control inside it is conditional */}
               {onTogglePin && category ? (
                 <PinStar
-                  pinned={isPinned(pinned ?? {}, category, row.key)}
+                  pinned={isPinned(pinned ?? {}, category, row.id ?? row.key)}
                   locked={isCuratedOnly(
                     effectivePinned ?? new Set<string>(), pinned ?? {}, category, row.key,
                   )}
-                  onToggle={() => onTogglePin(category, row.key)}
+                  onToggle={() => onTogglePin(category, row.id ?? row.key)}
                   label={typeof row.label === "string" ? row.label : row.key}
                 />
               ) : (
