@@ -120,46 +120,62 @@ def run_windowed(
     from stockroom.api.serve import build_context, pick_free_port
     from stockroom.host.webview_fetch import WebViewRenderedDomFetcher
 
-    if ctx is None:
+    owns_context = ctx is None
+    if owns_context:
         ctx = build_context(libraries_root, kicad_dir=kicad_dir)
-    # Close the M4 seam at runtime: enrich now renders bot-protected pages through the
-    # live WebView2 engine (resolved lazily from the running window on Windows).
-    if ctx.rendered_dom_fetcher is None:
-        ctx.rendered_dom_fetcher = WebViewRenderedDomFetcher()
-    # Give the self-updater a real restart hook instead of the no-op default: the updater
-    # (updater.py) calls this AFTER a successful git pull + uv sync, so flag the restart
-    # intent, then close the window. run_windowed then returns True and main() exits
-    # EXIT_RESTART, which the frozen launcher recognizes and relaunches on (M9d).
-    restart_requested = {"value": False}
-
-    def _request_restart() -> None:
-        restart_requested["value"] = True
-        _close_active_window()
-
-    ctx.request_restart = _request_restart
-
-    # Reconcile this device with the remote on EVERY launch, not only after a local write.
-    # `auto_push` covers the write path; without this a machine that adds nothing never pulls, and
-    # two checkouts on one machine drifted ten commits apart with neither of them reporting a
-    # problem. In a daemon thread because it talks to the network: the window must never wait on it,
-    # and `sync_on_launch` is already best-effort and cannot raise.
-    threading.Thread(target=ctx.sync_on_launch, name="stockroom-launch-sync", daemon=True).start()
-    # ...and KEEP reconciling while the window is open. Owner: "it shouldnt need to relaunch".
-    # A launch-only pull still leaves a window open for an hour showing an hour-old library.
-    ctx.start_background_sync()
-
-    app = create_app(ctx)
-    port = pick_free_port()
-    base_url = f"http://127.0.0.1:{port}"
-    _install_injected_index(app, base_url, ctx.token)  # authenticate the SPA from its first byte
-    server, thread = _serve_in_thread(app, port)
-    opener = open_window or _open_window
+    assert ctx is not None
+    background_sync_stop: threading.Event | None = None
+    launch_sync_thread: threading.Thread | None = None
     try:
-        opener(base_url, ctx.token)  # blocks until the window closes
+        # Close the M4 seam at runtime: enrich now renders bot-protected pages through the
+        # live WebView2 engine (resolved lazily from the running window on Windows).
+        if ctx.rendered_dom_fetcher is None:
+            ctx.rendered_dom_fetcher = WebViewRenderedDomFetcher()
+        # Give the self-updater a real restart hook instead of the no-op default: the updater
+        # (updater.py) calls this AFTER a successful git pull + uv sync, so flag the restart
+        # intent, then close the window. run_windowed then returns True and main() exits
+        # EXIT_RESTART, which the frozen launcher recognizes and relaunches on (M9d).
+        restart_requested = {"value": False}
+
+        def _request_restart() -> None:
+            restart_requested["value"] = True
+            _close_active_window()
+
+        ctx.request_restart = _request_restart
+
+        # Reconcile this device with the remote on EVERY launch, not only after a local write.
+        # `auto_push` covers the write path; without this a machine that adds nothing never pulls,
+        # and two checkouts on one machine drifted ten commits apart with neither reporting a
+        # problem. Keep the thread so an owned context is not closed under its one-shot sync.
+        launch_sync_thread = threading.Thread(
+            target=ctx.sync_on_launch, name="stockroom-launch-sync", daemon=True
+        )
+        launch_sync_thread.start()
+        # ...and KEEP reconciling while the window is open. The host owns this loop even when a
+        # caller injected the context, so always stop the loop when this window closes.
+        background_sync_stop = ctx.start_background_sync()
+
+        app = create_app(ctx)
+        port = pick_free_port()
+        base_url = f"http://127.0.0.1:{port}"
+        _install_injected_index(app, base_url, ctx.token)  # auth from the first byte
+        server, thread = _serve_in_thread(app, port)
+        opener = open_window or _open_window
+        try:
+            opener(base_url, ctx.token)  # blocks until the window closes
+        finally:
+            server.should_exit = True
+            thread.join(timeout=5.0)
+        return restart_requested["value"]
     finally:
-        server.should_exit = True
-        thread.join(timeout=5.0)
-    return restart_requested["value"]
+        if background_sync_stop is not None:
+            background_sync_stop.set()
+        if owns_context:
+            # Usually finished long before the user closes the window. Bound the wait so an
+            # unreachable remote cannot turn window shutdown into an indefinite hang.
+            if launch_sync_thread is not None:
+                launch_sync_thread.join(timeout=5.0)
+            ctx.close()
 
 
 def _spawn_self() -> int:

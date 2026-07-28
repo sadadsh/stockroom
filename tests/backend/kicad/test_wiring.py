@@ -133,18 +133,19 @@ def test_auto_wire_wires_when_config_dir_exists(tmp_path, fixtures_dir):
     assert read_env_var(kdir / "kicad_common.json", "SR_LIB") == str(profile.root.resolve())
 
 
-def test_auto_wire_captures_failure_but_still_repoints_sr_lib(tmp_path, fixtures_dir):
-    # no cli and no category libs: creating them fails, and auto_wire must capture
-    # that instead of raising - but SR_LIB is already correct, so a switch on a
-    # cli-less machine still repoints KiCad at the right library. The table rows
-    # are deliberately NOT written (they would be 13 broken libraries in KiCad).
+def test_auto_wire_does_not_materialize_missing_library_data(tmp_path, fixtures_dir):
+    # Boot/profile wiring owns the machine config, not the library data. Merely
+    # opening an intentionally empty library must not recreate 13 category files.
     profile = _profile(tmp_path)
+    before_paths = sorted(path.relative_to(profile.root) for path in profile.root.rglob("*"))
     kdir = _kicad_dir(tmp_path, fixtures_dir)
     report = auto_wire(kdir, profile, cli=None, running_detector=lambda: False)
-    assert report.error != ""
+    assert report.error == ""
     assert report.skipped == ""
     assert read_env_var(kdir / "kicad_common.json", "SR_LIB") == str(profile.root.resolve())
     assert "SR-ICs" not in LibTable.load(kdir / "sym-lib-table").entries()
+    after_paths = sorted(path.relative_to(profile.root) for path in profile.root.rglob("*"))
+    assert after_paths == before_paths
 
 
 def test_apply_flags_restart_when_only_sr_lib_changed(tmp_path, fixtures_dir):
@@ -168,7 +169,7 @@ def test_apply_without_cli_skips_rows_for_missing_libs(tmp_path, fixtures_dir):
     profile = _profile(tmp_path)
     kdir = _kicad_dir(tmp_path, fixtures_dir)
     report = auto_wire(kdir, profile, cli=None, running_detector=lambda: False)
-    assert report.error != ""  # the category-lib step still failed honestly
+    assert report.error == ""  # boot wiring does not try to create library data
     assert read_env_var(kdir / "kicad_common.json", "SR_LIB") == str(profile.root.resolve())
     assert "SR-ICs" not in LibTable.load(kdir / "sym-lib-table").entries()
 
