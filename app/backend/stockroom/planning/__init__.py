@@ -41,6 +41,13 @@ from .provider_runtime import (
     ProviderRuntimeError,
     ProviderSelectionReceipt,
 )
+from .provider_workflow import (
+    PROVIDER_WORKFLOW_STAGES,
+    ExactIdentityResolver,
+    ProviderRetryBounds,
+    ProviderWorkflowError,
+    build_provider_stage_handlers,
+)
 from .qualified_fixture import (
     FixturePlanningError,
     FixtureRunResult,
@@ -66,6 +73,7 @@ __all__ = [
     "CapabilityKind",
     "EdaTarget",
     "ExactPartIdentity",
+    "ExactIdentityResolver",
     "ExecutableProviderAdapter",
     "FailureClassification",
     "FixturePlanningError",
@@ -88,16 +96,20 @@ __all__ = [
     "ProviderPlanner",
     "ProviderPolicyError",
     "ProviderPolicyInput",
+    "ProviderRetryBounds",
     "ProviderRegistration",
     "ProviderRequest",
     "ProviderResolution",
     "ProviderRoute",
     "ProviderRuntimeError",
     "ProviderSelectionReceipt",
+    "ProviderWorkflowError",
+    "PROVIDER_WORKFLOW_STAGES",
     "SYNTHETIC_SCALE_SCOPE",
     "ScaleSimulationError",
     "ScaleSimulationHarness",
     "ScaleSimulationReport",
     "TrustDecision",
     "UnexecutableProviderPlan",
+    "build_provider_stage_handlers",
 ]
