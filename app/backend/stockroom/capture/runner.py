@@ -133,6 +133,7 @@ def run_completion(ctx, *, progress=None, should_stop=None, part_ids=None, limit
     worklist is DERIVED from the library, which is what makes a stopped run resumable by
     simply running it again.
     """
+
     def run_write(fn):
         # Each git commit goes onto the serialized write lane while the slow network work
         # stays on the read lane -- the same split bulk_import uses, so commits can never
@@ -180,7 +181,7 @@ def run_guided_capture(
     should_stop=None,
     limit=None,
     headless: bool = False,
-    engine: str = "camoufox",
+    engine: str = "windows",
 ) -> dict:
     """Capture from a trusted vendor through a real browser: ONE component, or the whole library.
 
@@ -204,22 +205,23 @@ def run_guided_capture(
     and ALL of them are closed here, so a stopped, failed or completed run leaves no window behind.
     """
     from stockroom.capture.guided import GuidedCaptureSource
+    from stockroom.evidence import EvidenceStore
     from stockroom.ingest.pipeline import IngestPipeline
 
     def make_pipeline():
         return IngestPipeline(ctx.profile, ctx.repo, ctx.cli)
 
+    evidence_store = EvidenceStore(_capture_evidence_root(ctx))
     sources = [
         GuidedCaptureSource(
             make_pipeline,
             vendor=key,
-            download_root=_capture_downloads(ctx),
-            profile_dir=_capture_profile(ctx),
+            download_root=_capture_downloads(ctx, key),
+            profile_dir=_capture_profile(ctx, key),
             headless=headless,
-            # THE engine for real vendors, named HERE at the production call site rather than as a
-            # constructor default. Stated where it ships means a test that forgets to choose gets
-            # the fast engine instead of silently launching a full Firefox and hanging the suite -
-            # which is exactly what a camoufox constructor default did on 2026-07-27.
+            # Installed Chrome first, then Edge: current Windows browsers, persistent provider
+            # sessions, and first-class Playwright downloads. Camoufox remains an explicit mode
+            # for a measured provider-specific need, never the production default.
             engine=engine,
             # The Altium seam, which already existed and was already atomic but which guided capture
             # never called - so a vendor shipping real .SchLib/.PcbLib had them downloaded and
@@ -230,6 +232,7 @@ def run_guided_capture(
             credentials=_saved_credentials,
             run_write=ctx.jobs.run_write,
             now_iso=_utc_now_iso,
+            evidence_store=evidence_store,
         )
         for key in _vendor_chain(vendor)
     ]
@@ -274,22 +277,40 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _capture_downloads(ctx) -> Path:
+def _capture_downloads(ctx, provider_key: str) -> Path:
     """Where captured files land before they are attached. Beside the library, never inside it:
-    an un-attached download is not library data and must never be committed."""
-    root = Path(ctx.profile.library.root).parent / ".stockroom-capture" / "downloads"
+    an un-attached download is not library data and must never be committed. Providers are isolated
+    so simultaneous workers cannot race on identical vendor filenames."""
+    from stockroom.capture.browser import provider_profile_dir
+
+    root = provider_profile_dir(
+        Path(ctx.profile.library.root).parent / ".stockroom-capture" / "downloads",
+        provider_key,
+    )
     root.mkdir(parents=True, exist_ok=True)
     return root
 
 
-def _capture_profile(ctx) -> Path:
+def _capture_profile(ctx, provider_key: str) -> Path:
     """The persistent browser profile holding vendor sign-ins.
 
     PER-MACHINE, and it is the permitted kind: it holds session cookies only, so it cannot change
     what the library renders the way a per-machine enrich cache can. It is what makes a 90-part
-    sitting cost ONE sign-in.
+    sitting cost ONE sign-in. Every provider has an isolated profile and an explicit session lock.
     """
-    root = Path(ctx.profile.library.root).parent / ".stockroom-capture" / "profile"
+    from stockroom.capture.browser import provider_profile_dir
+
+    root = provider_profile_dir(
+        Path(ctx.profile.library.root).parent / ".stockroom-capture" / "profile",
+        provider_key,
+    )
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _capture_evidence_root(ctx) -> Path:
+    """Machine-local immutable provider evidence, outside the Git library."""
+    root = Path(ctx.profile.library.root).parent / ".stockroom-capture" / "evidence"
     root.mkdir(parents=True, exist_ok=True)
     return root
 

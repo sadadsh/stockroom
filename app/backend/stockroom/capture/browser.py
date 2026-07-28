@@ -1,4 +1,4 @@
-"""The capture BROWSER: one cross-platform way to open a vendor page and catch its download.
+"""The capture BROWSER: one deterministic way to open a vendor page and save its download.
 
 Owner, 2026-07-27: *"literally make the best environment for us ... something that works on both
 windows and linux so its not hard for u to test it"*.
@@ -19,10 +19,9 @@ costs, all of them measured rather than supposed:
    in WebView2, so the one API that would have made downloads observable there does not work.
 
 Playwright, which this repo ALREADY bundles for the scrape engine (`pyproject.toml`), has a
-public, documented download API (`expect_download` / `save_as`), runs identically on Windows and
-Linux, and gives real waiting primitives instead of sleeps. So the capture browser is Playwright,
-and the vendor logic moves OUT of injected JS in `host/` into ordinary Python that a test can drive
-anywhere.
+public, documented download API (`expect_download` / `save_as`) and gives real waiting primitives
+instead of sleeps. So the capture browser is Playwright, and the vendor logic moves OUT of injected
+JS in `host/` into ordinary Python that a test can drive anywhere.
 
 WHAT STAYS AS IT WAS
 The APP SHELL is still pywebview/WebView2 on Windows: that decision (spec 2026-07-12 section 3) is
@@ -30,17 +29,19 @@ about hosting our own frontend, where Python-as-host and native drag/drop paths 
 nothing here disturbs it. This module is only about the SECOND window - the vendor page.
 
 A NOTE ON THE PERSISTENT PROFILE, which is not a free choice
-Vendor logins must survive between parts, which means a persistent user-data dir. But Playwright
-has open reports of `download.save_as()` raising "Download canceled" under
-`launch_persistent_context` (microsoft/playwright#34989), while plain `launch()` is unaffected. So
-persistence is OPT-IN here, the two paths are separate, and `test_a_download_survives_a_persistent
-_profile` exists to catch that regression on the version we actually ship rather than trusting the
-issue tracker.
+Vendor logins must survive between parts, which means a persistent user-data dir. Playwright and
+Chromium permit only one owner of a user-data dir at a time. Production therefore gives every
+provider its own profile and holds an explicit inter-process profile lock for the whole browser
+session. Two workers can drive different providers, but two workers can never corrupt the same
+provider's cookies or browser state.
 """
 
 from __future__ import annotations
 
+import os
+import re
 import shutil
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -63,25 +64,147 @@ class CapturedFile:
     url: str
 
 
+@dataclass(frozen=True)
+class _BrowserCandidate:
+    label: str
+    browser_type: str
+    channel: str | None = None
+
+
+_PROVIDER_KEY = re.compile(r"[a-z0-9]+(?:[-_][a-z0-9]+)*", re.ASCII)
+_WINDOWS_INVALID_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_WINDOWS_RESERVED_NAMES = {
+    "aux",
+    "clock$",
+    "con",
+    "nul",
+    "prn",
+    *(f"com{number}" for number in range(1, 10)),
+    *(f"lpt{number}" for number in range(1, 10)),
+}
+_PROCESS_LOCK_GUARD = threading.Lock()
+_PROCESS_LOCKS: set[str] = set()
+
+
+def _normalise_provider_key(provider_key: str) -> str:
+    key = (provider_key or "").strip().casefold()
+    if _PROVIDER_KEY.fullmatch(key) is None:
+        raise CaptureBrowserError(f"invalid capture provider key {provider_key!r}")
+    return key
+
+
+def provider_profile_dir(profile_root: Path, provider_key: str) -> Path:
+    """Return the provider's isolated persistent profile below ``profile_root``."""
+
+    return Path(profile_root) / _normalise_provider_key(provider_key)
+
+
+class ProviderProfileLock:
+    """Fail-fast process and OS lock protecting one provider's browser profile.
+
+    Chromium already refuses many duplicate profile launches, but relying on its incidental error
+    makes contention browser-version dependent and can leave partially updated profile state.
+    This guard establishes ownership before Playwright touches the directory.
+    """
+
+    def __init__(self, profile_dir: Path, provider_key: str):
+        self.profile_dir = Path(profile_dir)
+        self.provider_key = _normalise_provider_key(provider_key)
+        self.path = (
+            self.profile_dir.parent / ".locks" / f"{self.provider_key}.stockroom-browser.lock"
+        )
+        self._handle = None
+        self._process_key = os.path.normcase(str(self.path.resolve(strict=False)))
+        self._held = False
+
+    def acquire(self) -> None:
+        with _PROCESS_LOCK_GUARD:
+            if self._process_key in _PROCESS_LOCKS:
+                self._raise_busy()
+            _PROCESS_LOCKS.add(self._process_key)
+
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            handle = self.path.open("a+b")
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() == 0:
+                handle.write(b"\0")
+                handle.flush()
+            handle.seek(0)
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:  # pragma: no cover - Windows is authoritative; keeps unit tests portable
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except (OSError, BlockingIOError):
+                handle.close()
+                self._raise_busy()
+            self._handle = handle
+            self._held = True
+        except BaseException:
+            with _PROCESS_LOCK_GUARD:
+                _PROCESS_LOCKS.discard(self._process_key)
+            raise
+
+    def _raise_busy(self) -> None:
+        raise CaptureBrowserError(
+            f"{self.provider_key} capture is already using its browser profile; "
+            "wait for that capture worker to finish"
+        )
+
+    def release(self) -> None:
+        if not self._held:
+            return
+        handle = self._handle
+        try:
+            if handle is not None:
+                try:
+                    handle.seek(0)
+                    if os.name == "nt":
+                        import msvcrt
+
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                    else:  # pragma: no cover - Windows authoritative; tests stay portable
+                        import fcntl
+
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                finally:
+                    handle.close()
+        finally:
+            self._handle = None
+            self._held = False
+            with _PROCESS_LOCK_GUARD:
+                _PROCESS_LOCKS.discard(self._process_key)
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.release()
+
+
 class PlaywrightCaptureBrowser:
     """A real, visible browser the person can work in, whose downloads we observe.
 
     Not headless by default: this is a GUIDED capture, so the human signs in, clears a Cloudflare
     check, and watches what happens. Headless exists for the tests.
 
-    ENGINE IS A PARAMETER, NEVER A SECOND CLASS. `chromium` is fast; `camoufox` is a Firefox fork
-    with self-consistent fingerprints and is the only engine measured to clear SnapEDA's Cloudflare
-    Turnstile. A vendor that resists is therefore a MODE on this class, never a
+    ENGINE IS A PARAMETER, NEVER A SECOND CLASS. Production uses ``windows``: the installed Google
+    Chrome first, then installed Microsoft Edge if Chrome cannot launch. ``camoufox`` remains an
+    explicit opt-in fallback for a provider that demonstrably requires it, never the default. A
+    vendor that resists is therefore a MODE on this class, never a
     `CamoufoxCaptureBrowser` beside it - that is the one-tool-per-job rule, and
     tests/backend/capture/test_one_tool_per_job.py enforces it by listing the modules allowed to
     launch a browser at all.
 
-    WHY THE CONSTRUCTOR DEFAULT IS chromium AND NOT camoufox. Production asks for camoufox
-    explicitly (see `capture/runner.py`). The default stays chromium because the OTHER callers are
-    tests driving a LOCALHOST fixture with no bot protection, where stealth buys nothing and costs
-    roughly 15x the wall clock. Measured 2026-07-27: flipping this default routed every fixture test
-    through a full Firefox and hung the suite. The default is a test-speed decision; the SHIPPED
-    engine is named at the production call site, where it is visible.
+    WHY THE CONSTRUCTOR DEFAULT IS chromium. Tests drive a LOCALHOST fixture with the bundled
+    browser, where probing installed browser channels adds machine dependence. The shipped engine
+    is named at the production call site, where it is visible and tested.
     """
 
     def __init__(
@@ -91,13 +214,23 @@ class PlaywrightCaptureBrowser:
         profile_dir: Path | None = None,
         headless: bool = False,
         engine: str = "chromium",
+        provider_key: str | None = None,
     ) -> None:
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.profile_dir = Path(profile_dir) if profile_dir else None
         self.headless = headless
         self.engine = engine
+        self.provider_key = (
+            _normalise_provider_key(provider_key)
+            if provider_key is not None
+            else _normalise_provider_key(self.profile_dir.name)
+            if self.profile_dir is not None
+            else None
+        )
+        self.launched_browser: str | None = None
         self._captured: list[CapturedFile] = []
+        self._download_lock = threading.Lock()
 
     @property
     def captured(self) -> list[CapturedFile]:
@@ -112,53 +245,104 @@ class PlaywrightCaptureBrowser:
         a context's downloads when the context closes, so a file only "arrived" once it is copied
         out of the temp area.
         """
-        if self.engine == "camoufox":
-            with self._camoufox_session() as page:
-                yield page
-            return
-
+        lock = (
+            ProviderProfileLock(self.profile_dir, self.provider_key)
+            if self.profile_dir is not None and self.provider_key is not None
+            else None
+        )
+        if lock is not None:
+            lock.acquire()
         try:
-            from playwright.sync_api import sync_playwright
-        except ImportError as exc:  # pragma: no cover - dependency is declared
-            raise CaptureBrowserError(
-                "playwright is not installed; it is a declared dependency, run `uv sync`"
-            ) from exc
+            if self.engine == "camoufox":
+                self.launched_browser = "Camoufox"
+                with self._camoufox_session() as page:
+                    yield page
+                return
 
-        with sync_playwright() as pw:
-            engine = getattr(pw, self.engine, None)
+            try:
+                from playwright.sync_api import sync_playwright
+            except ImportError as exc:  # pragma: no cover - dependency is declared
+                raise CaptureBrowserError(
+                    "playwright is not installed; it is a declared dependency, run `uv sync`"
+                ) from exc
+
+            with sync_playwright() as pw:
+                context = None
+                browser = None
+                try:
+                    context, browser = self._launch_playwright(pw)
+
+                    context.on("page", self._wire_downloads)
+                    page = context.pages[0] if context.pages else context.new_page()
+                    self._wire_downloads(page)
+                    yield page
+                finally:
+                    for closable in (context, browser):
+                        if closable is not None:
+                            try:
+                                closable.close()
+                            except Exception:  # noqa: BLE001 - teardown is best effort
+                                pass
+        finally:
+            if lock is not None:
+                lock.release()
+
+    def _launch_playwright(self, pw):
+        """Launch the requested browser policy and return ``(context, browser)``.
+
+        ``windows`` is a deterministic policy, not an alias for bundled Chromium: prefer the
+        newest browser already managed on this machine (Chrome), then Edge. A failed candidate is
+        fully discarded before the next one is attempted.
+        """
+
+        candidates = _browser_candidates(self.engine)
+        failures: list[str] = []
+        for candidate in candidates:
+            engine = getattr(pw, candidate.browser_type, None)
             if engine is None:
-                raise CaptureBrowserError(f"unknown browser engine {self.engine!r}")
+                failures.append(f"{candidate.label}: browser type unavailable")
+                continue
+            options = {
+                "headless": self.headless,
+                "accept_downloads": True,
+            }
+            if candidate.channel is not None:
+                options["channel"] = candidate.channel
             context = None
             browser = None
             try:
-                try:
-                    if self.profile_dir is not None:
-                        self.profile_dir.mkdir(parents=True, exist_ok=True)
-                        context = engine.launch_persistent_context(
-                            str(self.profile_dir),
-                            headless=self.headless,
-                            accept_downloads=True,
-                        )
-                    else:
-                        browser = engine.launch(headless=self.headless)
-                        context = browser.new_context(accept_downloads=True)
-                except Exception as exc:  # noqa: BLE001 - turn a launch failure into a real message
-                    raise CaptureBrowserError(
-                        f"could not launch {self.engine}: {exc}. If the browser is missing, "
-                        "run `uv run python -m playwright install chromium`."
-                    ) from exc
-
-                context.on("page", self._wire_downloads)
-                page = context.pages[0] if context.pages else context.new_page()
-                self._wire_downloads(page)
-                yield page
-            finally:
+                if self.profile_dir is not None:
+                    self.profile_dir.mkdir(parents=True, exist_ok=True)
+                    context = engine.launch_persistent_context(
+                        str(self.profile_dir),
+                        **options,
+                    )
+                else:
+                    launch_options = dict(options)
+                    launch_options.pop("accept_downloads")
+                    browser = engine.launch(**launch_options)
+                    context = browser.new_context(accept_downloads=True)
+                self.launched_browser = candidate.label
+                return context, browser
+            except Exception as exc:  # noqa: BLE001 - each candidate is an independent fallback
                 for closable in (context, browser):
                     if closable is not None:
                         try:
                             closable.close()
-                        except Exception:  # noqa: BLE001 - teardown is best effort
+                        except Exception:  # noqa: BLE001 - failed-launch teardown is best effort
                             pass
+                detail = (
+                    str(exc).strip().splitlines()[0] if str(exc).strip() else type(exc).__name__
+                )
+                failures.append(f"{candidate.label}: {detail}")
+
+        hint = (
+            "Install Google Chrome or Microsoft Edge."
+            if self.engine == "windows"
+            else "Run `uv run python -m playwright install chromium` if the bundled browser "
+            "is missing."
+        )
+        raise CaptureBrowserError(f"could not launch {self.engine}: {'; '.join(failures)}. {hint}")
 
     @contextmanager
     def _camoufox_session(self):
@@ -214,7 +398,7 @@ class PlaywrightCaptureBrowser:
             if hasattr(opened, "new_page") and not hasattr(opened, "new_context"):
                 context = opened
             else:
-                context = opened.new_context(accept_downloads=True)
+                context = getattr(opened, "new_context")(accept_downloads=True)
             try:
                 context.on("page", self._wire_downloads)
                 page = context.pages[0] if context.pages else context.new_page()
@@ -237,19 +421,52 @@ class PlaywrightCaptureBrowser:
         the file landed" failure the owner called out.
         """
         name = download.suggested_filename or "cad-download"
-        dest = _unique(self.download_dir, name)
-        try:
-            download.save_as(str(dest))
-        except Exception as exc:  # noqa: BLE001 - a cancelled/failed download must not kill capture
-            failure = getattr(download, "failure", None)
-            reason = failure() if callable(failure) else exc
-            raise CaptureBrowserError(
-                f"the vendor download did not complete ({reason}); nothing was saved for "
-                f"{name!r}"
-            ) from exc
-        self._captured.append(
-            CapturedFile(path=dest, suggested_name=name, url=download.url or "")
+        with self._download_lock:
+            dest = _unique(self.download_dir, _safe_filename(name))
+            try:
+                download.save_as(str(dest))
+                if not dest.is_file() or dest.stat().st_size <= 0:
+                    raise OSError("saved file is missing or empty")
+            except Exception as exc:  # noqa: BLE001 - failed download is an honest capture error
+                dest.unlink(missing_ok=True)
+                failure = getattr(download, "failure", None)
+                reason = failure() if callable(failure) else exc
+                raise CaptureBrowserError(
+                    f"the vendor download did not complete ({reason}); nothing was saved for "
+                    f"{name!r}"
+                ) from exc
+            self._captured.append(
+                CapturedFile(path=dest, suggested_name=name, url=download.url or "")
+            )
+
+
+def _browser_candidates(engine: str) -> tuple[_BrowserCandidate, ...]:
+    if engine == "windows":
+        return (
+            _BrowserCandidate("Google Chrome", "chromium", "chrome"),
+            _BrowserCandidate("Microsoft Edge", "chromium", "msedge"),
         )
+    if engine in {"chrome", "edge", "msedge"}:
+        channel = "chrome" if engine == "chrome" else "msedge"
+        label = "Google Chrome" if channel == "chrome" else "Microsoft Edge"
+        return (_BrowserCandidate(label, "chromium", channel),)
+    if engine in {"chromium", "firefox", "webkit"}:
+        return (_BrowserCandidate(f"Playwright {engine.title()}", engine),)
+    raise CaptureBrowserError(f"unknown browser engine {engine!r}")
+
+
+def _safe_filename(name: str) -> str:
+    """Make a vendor filename portable to Windows without changing its evidence label."""
+
+    leaf = Path(name).name
+    safe = _WINDOWS_INVALID_FILENAME.sub("_", leaf).strip(" .")
+    if not safe:
+        return "cad-download"
+    stem = Path(safe).stem[:160].rstrip(" .") or "cad-download"
+    suffix = Path(safe).suffix[:20]
+    if stem.casefold() in _WINDOWS_RESERVED_NAMES:
+        stem = f"_{stem}"
+    return f"{stem}{suffix}"
 
 
 def _unique(directory: Path, name: str) -> Path:

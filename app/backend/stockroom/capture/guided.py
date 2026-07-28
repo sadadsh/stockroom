@@ -35,9 +35,14 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from stockroom.capture.browser import PlaywrightCaptureBrowser
 from stockroom.capture.complete import SourceOutcome
+from stockroom.capture.evidence import (
+    BROWSER_CAPTURE_ADAPTER_VERSION,
+    record_browser_cad_evidence,
+)
 from stockroom.capture.identity import select_exact_candidate
 from stockroom.capture.requirements import Requirement, asset_present, capture_needs
 from stockroom.capture.vendors import formats_for, get_adapter
@@ -224,8 +229,12 @@ def _altium_libraries(landed) -> list[Path]:
 @dataclass
 class _Session:
     browser: PlaywrightCaptureBrowser
-    ctx_manager: object
+    ctx_manager: "_SessionManager"
     page: object
+
+
+class _SessionManager(Protocol):
+    def __exit__(self, typ, value, traceback) -> object: ...
 
 
 class GuidedCaptureSource:
@@ -271,11 +280,13 @@ class GuidedCaptureSource:
         download_root: Path,
         profile_dir: Path | None = None,
         headless: bool = False,
-        engine: str = "chromium",
+        engine: str = "windows",
         attach_altium=None,
         credentials=None,
         run_write=None,
         now_iso=None,
+        evidence_store=None,
+        cross_eda_verifier=None,
     ) -> None:
         self._make_pipeline = make_pipeline
         self._vendor_key = vendor
@@ -292,6 +303,8 @@ class GuidedCaptureSource:
         self._sign_in_error = ""
         self._run_write = run_write or (lambda fn: fn())
         self._now_iso = now_iso
+        self._evidence_store = evidence_store
+        self._cross_eda_verifier = cross_eda_verifier
         self._session: _Session | None = None
 
     # -- lifecycle -------------------------------------------------------------------------
@@ -309,6 +322,7 @@ class GuidedCaptureSource:
             download_dir=self._download_root,
             profile_dir=self._profile_dir,
             headless=self._headless,
+            provider_key=self._vendor_key,
         )
         manager = browser.session()
         page = manager.__enter__()
@@ -419,14 +433,14 @@ class GuidedCaptureSource:
         underlying seams each guarantee; neither can leave a partial write behind.
         """
         adapter = get_adapter(self._vendor_key)
-        origin = AssetOrigin(
-            vendor=self._vendor_key,
-            url=url,
-            captured_at=self._now_iso() if self._now_iso else "",
-        )
+        if adapter is None:
+            return SourceOutcome(error=f"no capture adapter for vendor {self._vendor_key!r}")
         offered: list[Requirement] = []
         failures: list[str] = []
         identity_error = ""
+        evidence_digest = ""
+        cross_eda_verified = False
+        altium_sources = _altium_libraries(landed)
         pipeline = self._make_pipeline()
         try:
             try:
@@ -451,6 +465,40 @@ class GuidedCaptureSource:
                     kicad_offered.append(Requirement.KICAD_FOOTPRINT)
                 if candidate.model_path is not None:
                     kicad_offered.append(Requirement.KICAD_MODEL)
+                if self._evidence_store is not None:
+                    try:
+                        evidence_digest, cross_eda_verified = record_browser_cad_evidence(
+                            store=self._evidence_store,
+                            record=record,
+                            candidate=candidate,
+                            provider_key=self._vendor_key,
+                            detail_url=detail_url,
+                            altium_sources=tuple(altium_sources),
+                            cross_eda_verifier=self._cross_eda_verifier,
+                        )
+                    except Exception as exc:  # noqa: BLE001 - fail closed before any library write
+                        return SourceOutcome(error=f"CAD evidence verification failed: {exc}")
+            elif self._evidence_store is not None and not identity_error:
+                return SourceOutcome(
+                    error=(
+                        "CAD evidence verification failed: the provider download has no exact "
+                        "KiCad symbol, footprint, and STEP set"
+                    )
+                )
+            origin = AssetOrigin(
+                vendor=self._vendor_key,
+                url=url,
+                captured_at=self._now_iso() if self._now_iso else "",
+                extra=(
+                    {}
+                    if not evidence_digest
+                    else {
+                        "evidence_adapter_version": BROWSER_CAPTURE_ADAPTER_VERSION,
+                        "evidence_manifest_digest": evidence_digest,
+                        "evidence_operation": "cad:kicad",
+                    }
+                ),
+            )
             if kicad_offered:
                 try:
                     self._run_write(
@@ -468,21 +516,43 @@ class GuidedCaptureSource:
         if identity_error:
             return SourceOutcome(error=identity_error)
 
-        offered.extend(self._attach_altium_assets(record, landed, failures, origin))
+        if altium_sources and self._evidence_store is not None and not cross_eda_verified:
+            failures.append(
+                "native Altium files were retained in immutable evidence but not attached: "
+                "cross-EDA terminal, pad, and package equivalence is not verified"
+            )
+        else:
+            offered.extend(
+                self._attach_altium_assets(
+                    record,
+                    landed,
+                    failures,
+                    origin,
+                    sources=altium_sources,
+                )
+            )
 
         if offered:
-            return SourceOutcome(satisfied=tuple(offered))
+            return SourceOutcome(
+                satisfied=tuple(offered),
+                error="; ".join(failures),
+            )
         if failures:
             return SourceOutcome(error="; ".join(failures))
         return SourceOutcome(
             error=(
-                f"{adapter.capability.label} delivered a file with nothing this part can use "
-                "in it"
+                f"{adapter.capability.label} delivered a file with nothing this part can use in it"
             )
         )
 
     def _attach_altium_assets(
-        self, record, landed, failures: list[str], origin=None
+        self,
+        record,
+        landed,
+        failures: list[str],
+        origin=None,
+        *,
+        sources: list[Path] | None = None,
     ) -> list[Requirement]:
         """Attach any Altium libraries in the download, and report what the RECORD then holds.
 
@@ -496,16 +566,15 @@ class GuidedCaptureSource:
         """
         if self._attach_altium is None:
             return []
-        sources = _altium_libraries(landed)
+        attach_altium = self._attach_altium
+        sources = _altium_libraries(landed) if sources is None else sources
         if not sources:
             return []
         try:
             # The SAME origin the KiCad half files. Without it a guided capture recorded where its
             # symbol came from and left the Altium library beside it unattributed, which is the
             # provenance story holding for one tool and quietly not the other.
-            updated = self._run_write(
-                lambda: self._attach_altium(record.id, *sources, origin=origin)
-            )
+            updated = self._run_write(lambda: attach_altium(record.id, *sources, origin=origin))
         except Exception as exc:  # noqa: BLE001 - atomic: a failure leaves the part untouched
             failures.append(f"could not attach the Altium libraries: {exc}")
             return []

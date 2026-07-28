@@ -344,6 +344,7 @@ class EvidenceStore:
                 "digest": digest,
                 "disposition": "local_cas",
                 "media_type": artifact.media_type,
+                "provider": provider_key,
                 "role": artifact.role,
             }
             if artifact.suggested_name:
@@ -444,6 +445,7 @@ class EvidenceStore:
                 or byte_count <= 0
                 or type(media_type) is not str
                 or _MEDIA_TYPE.fullmatch(media_type) is None
+                or reference.get("provider") != manifest.get("provider")
                 or reference.get("disposition") != "local_cas"
                 or self._verify_path(self.object_path(digest), digest) != byte_count
             ):
@@ -451,3 +453,25 @@ class EvidenceStore:
             roles.add(role)
         if not _CAD_REQUIRED_ROLES.issubset(roles):
             raise EvidenceCorruption("CAD artifact evidence is missing a required object")
+        report_reference = next(
+            reference
+            for reference in objects
+            if isinstance(reference, dict) and reference.get("role") == "validation_report"
+        )
+        try:
+            report_bytes = self.object_bytes(str(report_reference["digest"]))
+            report = json.loads(report_bytes)
+        except (KeyError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise EvidenceCorruption("CAD validation report is not canonical JSON") from exc
+        if (
+            type(report) is not dict
+            or _canonical_json(report) != report_bytes
+            or report.get("schema") != "stockroom.cad-validation/1"
+            or report.get("valid") is not True
+            or report.get("identity") != manifest.get("identity")
+            or report.get("operation") != manifest.get("operation")
+            or report.get("provider") != manifest.get("provider")
+        ):
+            raise EvidenceCorruption(
+                "CAD validation report does not prove the manifest identity and operation"
+            )

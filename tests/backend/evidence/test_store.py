@@ -162,7 +162,7 @@ def _cad_artifacts() -> tuple[EvidenceArtifact, ...]:
         ),
         EvidenceArtifact(
             "footprint",
-            b"(footprint \"D_SMA\")",
+            b'(footprint "D_SMA")',
             "application/vnd.kicad.footprint",
             "S1M.kicad_mod",
         ),
@@ -174,7 +174,11 @@ def _cad_artifacts() -> tuple[EvidenceArtifact, ...]:
         ),
         EvidenceArtifact(
             "validation_report",
-            b'{"identity":"ON Semiconductor/S1M","valid":true}',
+            (
+                b'{"identity":{"authoritative_manufacturer_key":"ON Semiconductor",'
+                b'"mpn_canonical":"S1M"},"operation":"cad:kicad",'
+                b'"provider":"snapmagic","schema":"stockroom.cad-validation/1","valid":true}'
+            ),
             "application/json",
             "Validation Report.json",
         ),
@@ -208,6 +212,7 @@ def test_cad_success_requires_and_verifies_actual_symbol_footprint_and_model(
         "symbol",
         "validation_report",
     ]
+    assert {item["provider"] for item in manifest["objects"]} == {"snapmagic"}
     assert all(store.object_bytes(item["digest"]) for item in manifest["objects"])
 
 
