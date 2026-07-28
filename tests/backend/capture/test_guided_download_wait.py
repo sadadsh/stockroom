@@ -702,6 +702,10 @@ def test_signed_in_is_false_when_the_header_still_offers_a_login():
     )
 
 
+def test_signed_in_is_false_before_any_ultra_page_has_loaded():
+    assert _ul().signed_in(_StatePage("about:blank")) is False
+
+
 def test_signed_in_needs_all_three_signals_not_any_one():
     """Mutation guard. Each single signal alone is satisfied by a state that is NOT signed in, which
     is exactly why the original one-signal version could not tell a hit from a miss."""
@@ -878,12 +882,12 @@ def test_the_kicad_chooser_waits_for_its_member_instead_of_sleeping():
             return self
 
         def count(self):
-            if self._sel == '[data-format="kicad_modv6"]':
+            if self._sel == '[data-format="kicad_modv6"]:visible':
                 return 1 if self._page.member_ready else 0
             return 1
 
         def wait_for(self, **kwargs):
-            if self._sel == '[data-format="kicad_modv6"]':
+            if self._sel == '[data-format="kicad_modv6"]:visible':
                 self._page.member_ready = True
 
         def click(self, **kwargs):
@@ -921,7 +925,9 @@ def test_the_kicad_chooser_waits_for_its_member_instead_of_sleeping():
     assert report.submitted is True, f"the chooser member was never found: {report.message}"
     assert report.selected == ["kicad"]
     assert report.missed == []
-    assert '[data-format="kicad_modv6"]' in page.clicked, "the pinned version was never clicked"
+    assert (
+        '[data-format="kicad_modv6"]:visible' in page.clicked
+    ), "the pinned version was never clicked"
 
 
 def test_altium_only_gap_drives_one_full_snapmagic_evidence_bundle(monkeypatch, tmp_path):
