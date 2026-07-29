@@ -32,6 +32,11 @@ from stockroom.verify.record_diff import extract_symbol_node, field_diff
 # the same cap governs history and the diff rev-validation so the two agree on what
 # is reachable.
 _HISTORY_MAX = 100
+_AUTOMATIC_CAPTURE_INSTRUCTION = (
+    "Stockroom tries permitted automatic sources first. If this provider window opens, select the "
+    "exact result and formats and click its download controls; Stockroom captures, validates, "
+    "attaches, and continues automatically."
+)
 
 
 # Single-flight guard for POST /rescan: two concurrent rescans would double the API quota
@@ -151,7 +156,7 @@ def build_refresh_adapters(ctx) -> list:
     adapters: list = []
     api_fallback = MouserAdapter(api_key=ctx.config.mouser_api_key) if ctx.config.mouser_api_key else None
     if api_fallback is not None:
-        api_fallback.vendor = "Mouser"
+        setattr(api_fallback, "vendor", "Mouser")
     mouser = MouserScrapeAdapter(
         getattr(ctx, "rendered_dom_fetcher", None),
         url_for=_mouser_link_resolver(ctx),
@@ -164,7 +169,7 @@ def build_refresh_adapters(ctx) -> list:
         from stockroom.enrich.digikey_api import DigiKeyAdapter
 
         a = DigiKeyAdapter(ctx.config.digikey_client_id, ctx.config.digikey_client_secret)
-        a.vendor = "DigiKey"
+        setattr(a, "vendor", "DigiKey")
         adapters.append(a)
     return adapters
 
@@ -404,7 +409,9 @@ def library_router(require_token) -> APIRouter:
         sources = resolve_cad_sources(record.mpn, digikey)
         from stockroom.capture.vendors import all_adapters
 
-        implemented_capture = {adapter.capability.key for adapter in all_adapters()}
+        implemented_capture = {
+            adapter.capability.key: adapter.capability for adapter in all_adapters()
+        }
         first = sources[0] if sources else None
         return {
             "mpn": record.mpn,
@@ -416,7 +423,12 @@ def library_router(require_token) -> APIRouter:
                     "url": s.url,
                     "tools": list(s.tools),
                     "aggregator": s.aggregator,
-                    "instruction": s.instruction,
+                    "instruction": (
+                        f"{_AUTOMATIC_CAPTURE_INSTRUCTION} "
+                        f"{implemented_capture[s.key].instruction}"
+                        if s.key in implemented_capture
+                        else s.instruction
+                    ),
                     "capture_available": s.key in implemented_capture,
                 }
                 for s in sources
@@ -664,34 +676,56 @@ def library_router(require_token) -> APIRouter:
 
     @r.post("/capture/run")
     def capture_run(request: Request, body: dict | None = None) -> dict:
-        """Guided capture from a trusted vendor: ONE component, or the whole library.
+        """Automatically acquire missing CAD, or explicitly open the assisted fallback.
 
-        Owner, 2026-07-27: *"i also need guided capture per component"* and *"always make the
-        easiest workflow"*. So there is ONE route and one engine:
-
-            {"part_ids": ["<id>"]}   -> that component
-            {}                       -> every part still missing files
-
-        Both run the same `complete_library` path the offline sources use, so per-component and
-        whole-library cannot behave differently, and whichever is verified verifies the other.
-
-        A real browser window opens. The person signs in to the vendor ONCE - the profile is
-        persistent - and the run continues by itself from there. Cancellable, and every part is
-        its own atomic commit, so stopping is safe at any moment and resuming is just running it
-        again.
+        Automatic mode is the default and supports one component or the derived incomplete
+        worklist. It tries keyless/direct and policy-permitted machine sources without opening a
+        commercial page. Assisted mode is deliberately one component + one preferred provider:
+        the selected provider opens first, and the same job may advance to another user-driven
+        provider when the first cannot close every remaining gap.
         """
         from stockroom.capture.runner import run_guided_capture
+        from stockroom.capture.vendors import get_adapter
 
         ctx = request.app.state.ctx
         payload = body or {}
-        part_ids = payload.get("part_ids") or None
-        limit = payload.get("limit")
+        mode = payload.get("mode", "automatic")
+        if mode not in {"automatic", "assisted"}:
+            raise ValueError("capture mode must be 'automatic' or 'assisted'")
+        raw_part_ids = payload.get("part_ids")
+        if raw_part_ids is None:
+            part_ids = None
+        elif not isinstance(raw_part_ids, list) or any(
+            not isinstance(part_id, str) or not part_id.strip() or part_id != part_id.strip()
+            for part_id in raw_part_ids
+        ):
+            raise ValueError("part_ids must be a list of non-empty part identifiers")
+        else:
+            part_ids = raw_part_ids or None
+
         requested_vendor = payload.get("vendor")
         vendor = (
-            str(requested_vendor).strip().lower()
-            if requested_vendor is not None and str(requested_vendor).strip()
+            requested_vendor.strip().lower()
+            if isinstance(requested_vendor, str) and requested_vendor.strip()
             else None
         )
+        if requested_vendor is not None and vendor is None:
+            raise ValueError("vendor must be a non-empty provider key")
+        if vendor is not None and get_adapter(vendor) is None:
+            raise ValueError(f"no network capture adapter for provider {vendor!r}")
+        limit = payload.get("limit")
+
+        if mode == "assisted":
+            if part_ids is None or len(part_ids) != 1:
+                raise ValueError("assisted capture requires exactly one selected part")
+            if vendor is None:
+                raise ValueError("assisted capture requires one selected provider")
+            if limit is not None:
+                raise ValueError(
+                    "assisted capture does not accept a batch limit; select exactly one part"
+                )
+        if part_ids is not None and len(part_ids) == 1 and ctx.index.get(part_ids[0]) is None:
+            raise FileNotFoundError(f"no such part: {part_ids[0]}")
 
         def work(progress, should_stop):
             return run_guided_capture(
@@ -701,17 +735,17 @@ def library_router(require_token) -> APIRouter:
                 progress=progress,
                 should_stop=should_stop,
                 limit=(int(limit) if limit else None),
+                user_driven=mode == "assisted",
             )
 
         return {"job_id": ctx.jobs.submit_cancellable(work)}
 
     @r.get("/capture/vendors")
     def capture_vendors() -> dict:
-        """The vendors guided capture can actually drive, with what each can supply.
+        """Providers Stockroom can drive and safely capture downloads from.
 
         Driven off the adapter registry rather than a hand-kept list, so a surface can never offer
-        a vendor that has no implementation behind it - which is exactly how the old flow sent
-        people to a 404 for months.
+        a provider that has no capture/evidence implementation behind it.
         """
         from stockroom.capture.vendors import all_adapters
 
@@ -723,7 +757,9 @@ def library_router(require_token) -> APIRouter:
                     "tools": list(a.capability.tools),
                     "needs_login": a.capability.needs_login,
                     "aggregator": a.capability.aggregator,
-                    "instruction": a.capability.instruction,
+                    "instruction": (
+                        f"{_AUTOMATIC_CAPTURE_INSTRUCTION} {a.capability.instruction}"
+                    ),
                     "one_download_for_all_formats": not a.capability.formats_exclusive,
                 }
                 for a in all_adapters()
