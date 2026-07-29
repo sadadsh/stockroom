@@ -48,7 +48,7 @@ _KICAD_REQS = frozenset(
 )
 _ALTIUM_REQS = frozenset({Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT})
 BrowserAccessPolicy = Literal["user_driven", "machine_allowed"]
-BrowserEngine = Literal["chromium", "camoufox"]
+BrowserEngine = Literal["chromium", "camoufox", "cloak"]
 
 
 def formats_for(needs) -> list[str]:
@@ -1265,7 +1265,7 @@ class DigiKeyUltraLibrarianAdapter:
             "altium": "Altium Designer",
         },
         browser_access="machine_allowed",
-        browser_engine="camoufox",
+        browser_engine="cloak",
     )
 
     def __init__(self) -> None:
@@ -1381,6 +1381,36 @@ class DigiKeyUltraLibrarianAdapter:
         )
         return "" if issue else self._exact_product_url
 
+    @staticmethod
+    def _wait_for_provider_surface(page) -> None:
+        """Wait for DigiKey's client-rendered provider catalogue, not a hidden template.
+
+        The model page attaches every provider placeholder in its first HTML document and then
+        hydrates the available rows asynchronously. Treating an attached-but-hidden row as an
+        immediate catalogue miss races that hydration in stealth Chromium. Once any known
+        provider row is visible, the surface is authoritative and every other hidden row can
+        still decline immediately.
+        """
+
+        selectors = tuple(
+            dict.fromkeys(
+                (
+                    *_DIGIKEY_SNAPMAGIC_ROUTE.row_ids,
+                    *_DIGIKEY_TRACEPARTS_ROUTE.row_ids,
+                    *_DIGIKEY_ULTRALIBRARIAN_ROUTE.row_ids,
+                )
+            )
+        )
+        try:
+            page.locator(
+                ", ".join(f"#{value}:visible" for value in selectors)
+            ).first.wait_for(
+                state="visible",
+                timeout=35_000,
+            )
+        except Exception:  # noqa: BLE001 - caller still reports the exact unavailable route
+            pass
+
     def open_panel(
         self,
         page,
@@ -1442,6 +1472,11 @@ class DigiKeyUltraLibrarianAdapter:
                 "DigiKey's opaque model page is missing its exact product-page identity; "
                 "refusing to download."
             )
+
+        self._wait_for_provider_surface(page)
+        challenge = _challenge_issue(page, self.capability.label)
+        if challenge:
+            return challenge
 
         row = None
         row_id = ""
@@ -1864,7 +1899,7 @@ class DigiKeySnapMagicRouteAdapter(_DigiKeyProviderRouteAdapter):
             "altium": "Altium Designer",
         },
         browser_access="machine_allowed",
-        browser_engine="camoufox",
+        browser_engine="cloak",
     )
 
 
@@ -1887,7 +1922,7 @@ class DigiKeyTracePartsRouteAdapter(_DigiKeyProviderRouteAdapter):
         machine_format_labels={"model": "STEP AP214"},
         user_format_labels={"model": "STEP AP214"},
         browser_access="machine_allowed",
-        browser_engine="camoufox",
+        browser_engine="cloak",
     )
 
 

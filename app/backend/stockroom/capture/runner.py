@@ -296,20 +296,19 @@ def run_guided_capture(
         return IngestPipeline(ctx.profile, ctx.repo, ctx.cli)
 
     evidence_store = EvidenceStore(_capture_evidence_root(ctx))
-    provider_engines = {
-        key: (
+    provider_engines = {}
+    for key in provider_keys:
+        adapter = get_adapter(key)
+        provider_engines[key] = (
             engine
-            or (
-                get_adapter(key).capability.browser_engine
-                if get_adapter(key) is not None
-                else "chromium"
-            )
+            or (adapter.capability.browser_engine if adapter is not None else "chromium")
         )
-        for key in provider_keys
-    }
     playwright_runtime = (
         SharedPlaywrightRuntime()
-        if any(selected != "camoufox" for selected in provider_engines.values())
+        if any(
+            selected not in {"camoufox", "cloak"}
+            for selected in provider_engines.values()
+        )
         else None
     )
 

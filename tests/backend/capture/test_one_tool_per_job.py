@@ -39,8 +39,8 @@ REPO = Path(__file__).resolve().parents[3]
 # reason it is not simply a mode on that module. A new entry here is a decision, not an accident.
 _LAUNCHERS = {
     "app/backend/stockroom/capture/browser.py": (
-        "THE owner of 'launch a browser'. Engine is a parameter (chromium / camoufox), so a "
-        "stealth need is a mode on this, never a second class beside it."
+        "THE owner of 'launch a browser'. Engine is a parameter (chromium / camoufox / cloak), "
+        "so a stealth need is a mode on this, never a second class beside it."
     ),
     "app/backend/stockroom/scrape/fetch/camoufox_browser.py": (
         "The scrape render tier. Pre-dates the capture engine, is ASYNC and implements the "
@@ -150,6 +150,9 @@ _TOOLS = {
     "altium_probe.py": "Inspect Altium binary libraries from outside Altium.",
     "bake_stm_index.py": "Build the STM part index used by the stm viewer.",
     "capturerec.py": "THE recorder: a human drives a vendor page, this writes down the workflow.",
+    "cad_capture_canary.py": (
+        "Prove one live CAD route through Stockroom's broker, evidence store, and API."
+    ),
     "deploy.py": "Deploy to the Windows install AND prove the code arrived.",
     "export_stm_target_definition.py": "Compile an STM target definition from explicit policy.",
     "gen_eda_registry_ts.py": "Generate the TS EDA registry from the Python one (single source).",
