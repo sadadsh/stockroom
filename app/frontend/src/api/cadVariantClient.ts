@@ -35,9 +35,30 @@ export interface CadVariantInventory {
   variants: readonly CadVariant[];
 }
 
+export interface SupplementaryCadArtifact {
+  id: string;
+  fileName: string;
+  sizeBytes: number;
+  mediaType: string;
+  evidenceDigest: string;
+  canActivate: false;
+  downloadUrl: string;
+}
+
+export interface SupplementaryCadEvidence {
+  id: string;
+  provider: string;
+  surface: string;
+  adapterVersion: string;
+  evidenceDigest: string;
+  canActivate: false;
+  artifacts: readonly SupplementaryCadArtifact[];
+}
+
 export interface CadVariantDocument {
   partId: string;
   inventories: readonly CadVariantInventory[];
+  supplementary: readonly SupplementaryCadEvidence[];
 }
 
 export interface CadVariantActivation {

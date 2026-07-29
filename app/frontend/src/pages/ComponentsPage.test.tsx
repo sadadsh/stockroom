@@ -78,10 +78,12 @@ beforeEach(() => {
   mockCadVariantApi.inventory.mockResolvedValue({
     partId: "lm358",
     inventories: [],
+    supplementary: [],
   });
   mockCadVariantApi.activate.mockResolvedValue({
     partId: "lm358",
     inventories: [],
+    supplementary: [],
   });
 });
 

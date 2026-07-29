@@ -47,6 +47,7 @@ export function CadVariantSection({
   return (
     <CadVariantSelector
       inventories={inventory.data?.inventories ?? []}
+      supplementary={inventory.data?.supplementary ?? []}
       activating={
         activation.isPending
           ? {

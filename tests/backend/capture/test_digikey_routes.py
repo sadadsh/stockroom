@@ -11,7 +11,7 @@ _MODELS_HTML = """
 <!doctype html>
 <html>
   <body>
-    <section id="snapmagic-media-active">
+    <section id="snap-media-active">
       <button onclick="document.getElementById('snapeda-export-options').hidden=false">
         Select Download Format
       </button>
@@ -41,6 +41,31 @@ _MODELS_HTML = """
       <label for="ul-step" data-original="STEP">STEP</label>
       <button id="btn-download-Ultra">Download</button>
     </div>
+    <section id="traceparts-media-active">
+      <button onclick="document.getElementById('traceparts-export-options').hidden=false">
+        Select Download Format
+      </button>
+    </section>
+    <div id="traceparts-export-options" hidden>
+      <input id="trace-step" type="radio" name="traceparts-format-selection">
+      <label for="trace-step" data-original="STEP AP214">STEP AP214</label>
+      <button id="btn-clear-selection-traceParts">Clear</button>
+      <button id="btn-download-traceParts">Download</button>
+    </div>
+    <section id="mfr-media-active" hidden></section>
+    <section id="cadenas-media-active" hidden></section>
+    <div id="mfr-export-options"></div>
+  </body>
+</html>
+"""
+
+_EXTERNAL_SNAP_HTML = """
+<!doctype html>
+<html>
+  <body>
+    <section id="snap-media-active">
+      <a href="https://www.snapmagic.com/parts/example/view-part/">View on SnapMagic</a>
+    </section>
   </body>
 </html>
 """
@@ -50,7 +75,7 @@ _MODELS_HTML = """
     chromium_unavailable_reason() is not None,
     reason=str(chromium_unavailable_reason()),
 )
-def test_digikey_snapmagic_and_ultralibrarian_routes_select_their_own_controls(tmp_path):
+def test_digikey_embedded_routes_select_only_their_own_measured_controls(tmp_path):
     surface = DigiKeyUltraLibrarianAdapter()
     surface._exact_product_url = (
         "https://www.digikey.com/en/products/detail/texas-instruments/"
@@ -66,30 +91,75 @@ def test_digikey_snapmagic_and_ultralibrarian_routes_select_their_own_controls(t
         )
         for adapter in routes:
             page.goto("https://www.digikey.com/en/models/4307639")
+            requested_format = (
+                "model"
+                if adapter.evidence_provider_key == "digikey-traceparts"
+                else "altium"
+            )
             report = adapter.drive(
                 page,
-                ["altium"],
+                [requested_format],
                 expected_manufacturer="Texas Instruments",
                 expected_mpn="TPD6E05U06RVZR",
             )
 
-            modal_id = (
-                "snapeda-export-options"
-                if adapter.evidence_provider_key == "digikey-snapmagic"
-                else "ultralib-export-options"
-            )
+            modal_id = {
+                "digikey-snapmagic": "snapeda-export-options",
+                "digikey-traceparts": "traceparts-export-options",
+                "digikey-ultralibrarian": "ultralib-export-options",
+            }[adapter.evidence_provider_key]
             checked = page.locator(f"#{modal_id} input:checked")
-            assert report.selected == ["altium"]
+            assert report.selected == [requested_format]
             assert report.submitted is True
-            assert checked.count() == 2
+            expected_names = {
+                "digikey-snapmagic": {
+                    "snapeda-format-selection",
+                    "snapeda-format-selection-3d",
+                },
+                "digikey-traceparts": {"traceparts-format-selection"},
+                "digikey-ultralibrarian": {
+                    "ultra-format-selection",
+                    "ultra-format-selection-3d",
+                },
+            }[adapter.evidence_provider_key]
+            assert checked.count() == len(expected_names)
             assert {
                 checked.nth(index).get_attribute("name")
                 for index in range(checked.count())
-            } == {
-                "snapeda-format-selection"
-                if modal_id == "snapeda-export-options"
-                else "ultra-format-selection",
-                "snapeda-format-selection-3d"
-                if modal_id == "snapeda-export-options"
-                else "ultra-format-selection-3d",
-            }
+            } == expected_names
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_current_external_snapmagic_row_is_not_reported_as_a_download(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    surface._exact_product_url = (
+        "https://www.digikey.com/en/products/detail/te-connectivity-amp-connectors/"
+        "5212034-1/2038204"
+    )
+    snap = surface.capture_routes()[0]
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+
+    with browser.session() as page:
+        page.route(
+            "https://www.digikey.com/en/models/2038204",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="text/html",
+                body=_EXTERNAL_SNAP_HTML,
+            ),
+        )
+        page.goto("https://www.digikey.com/en/models/2038204")
+        report = snap.drive(
+            page,
+            ["kicad"],
+            expected_manufacturer="TE Connectivity AMP Connectors",
+            expected_mpn="5212034-1",
+        )
+
+    assert report.submitted is False
+    assert report.route_unavailable is True
+    assert report.selected == []
+    assert "external provider link" in report.message

@@ -1611,6 +1611,9 @@ export interface CompletionItem {
   status: string;
   needed: string[];
   satisfied: string[];
+  // Exact provider files preserved as non-projectable evidence. These do not satisfy a CAD
+  // requirement until a complete, compatible symbol/footprint/model bundle is activated.
+  retained?: number;
   remaining: string[];
   sources: string[];
   // Provider-named reasons a source declined this exact part. These are explanations, not
@@ -1639,6 +1642,7 @@ export interface CompletionProgress {
   display_name: string;
   status: string;
   satisfied: string[];
+  retained?: number;
   remaining: string[];
   message: string;
 }

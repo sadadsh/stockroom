@@ -13,6 +13,7 @@ import type {
   CadVariantArtifactKind,
   CadVariantInventory,
   CadVariantTool,
+  SupplementaryCadEvidence,
 } from "../api/cadVariantClient";
 import { Text } from "../lib/copy";
 import { Badge, Button, Card, Dot, EYEBROW_DENSE } from "./primitives";
@@ -24,10 +25,12 @@ export type {
   CadVariantArtifactKind,
   CadVariantInventory,
   CadVariantTool,
+  SupplementaryCadEvidence,
 } from "../api/cadVariantClient";
 
 interface Props {
   inventories: readonly CadVariantInventory[];
+  supplementary: readonly SupplementaryCadEvidence[];
   onActivate: (activation: CadVariantActivation) => void;
   activating?: Pick<CadVariantActivation, "tool" | "variantId"> | null;
   activationError?: string | null;
@@ -74,6 +77,7 @@ function shortDigest(value: string): string {
 
 export function CadVariantSelector({
   inventories,
+  supplementary,
   onActivate,
   activating = null,
   activationError = null,
@@ -82,6 +86,10 @@ export function CadVariantSelector({
   const inventoryByTool = new Map(inventories.map((inventory) => [inventory.tool, inventory]));
   const retainedCount = TOOL_ORDER.reduce(
     (count, tool) => count + (inventoryByTool.get(tool)?.variants.length ?? 0),
+    0,
+  );
+  const supplementaryCount = supplementary.reduce(
+    (count, evidence) => count + evidence.artifacts.length,
     0,
   );
 
@@ -100,6 +108,11 @@ export function CadVariantSelector({
             <Badge tone="neutral" size="sm">
               {retainedCount} Retained
             </Badge>
+            {supplementaryCount ? (
+              <Badge tone="neutral" size="sm">
+                {supplementaryCount} Originals
+              </Badge>
+            ) : null}
           </div>
           <p className="mt-1 text-2xs text-t2">
             <Text id="detail.cad-variants.help">
@@ -132,7 +145,84 @@ export function CadVariantSelector({
           );
         })}
       </div>
+      {supplementary.length ? (
+        <SupplementaryInventory evidence={supplementary} />
+      ) : null}
     </Card>
+  );
+}
+
+function readableBytes(size: number): string {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function SupplementaryInventory({
+  evidence,
+}: {
+  evidence: readonly SupplementaryCadEvidence[];
+}) {
+  return (
+    <section
+      aria-label="Supplementary Retained Artifacts"
+      className="border-t border-line bg-surface px-3 py-2.5"
+    >
+      <div className="mb-2 flex min-w-0 items-baseline gap-2">
+        <h3 className="text-xs font-semibold text-t1">
+          <Text id="detail.cad-variants.supplementary">Retained Originals</Text>
+        </h3>
+        <span className="text-2xs text-t3">
+          Exact provider files kept for inspection and future processing
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
+        {evidence.map((manifest) => (
+          <article
+            key={manifest.id}
+            aria-label={`${manifest.provider} retained originals`}
+            className="min-w-0 rounded-card border border-line bg-raise px-3 py-2"
+          >
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <h4 className="min-w-0 truncate text-xs font-semibold text-t1">
+                {manifest.provider}
+              </h4>
+              <Badge tone="neutral" size="sm">
+                Supplementary
+              </Badge>
+              <Badge tone="neutral" size="sm">
+                Not Activatable
+              </Badge>
+            </div>
+            <p className="mt-1 text-2xs text-t2">
+              Original files from {manifest.surface}. They do not satisfy Symbol, Footprint, or 3D
+              Model coverage until a validated CAD pipeline projects them.
+            </p>
+            <ul className="mt-2 divide-y divide-line border-t border-line">
+              {manifest.artifacts.map((artifact) => (
+                <li
+                  key={`${artifact.id}:${artifact.fileName}`}
+                  className="flex min-w-0 items-center gap-2 py-1.5 text-2xs"
+                >
+                  <span className="min-w-0 flex-1 truncate font-medium text-t1">
+                    {artifact.fileName}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-t3">
+                    {readableBytes(artifact.sizeBytes)}
+                  </span>
+                  <span
+                    className="shrink-0 font-mono text-t3"
+                    title={artifact.evidenceDigest}
+                  >
+                    {shortDigest(artifact.evidenceDigest)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 

@@ -420,6 +420,60 @@ def test_guided_attach_persists_digest_and_refuses_unverified_altium(
     active_variants[0].validate_for_tool("kicad")
 
 
+def test_each_route_reloads_the_record_before_selecting_and_attaching(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    candidate = _candidate(tmp_path)
+    downloaded = tmp_path / "route.zip"
+    downloaded.write_bytes(b"captured")
+    current = _Record()
+    attached: list[str] = []
+
+    class _Pipeline:
+        ops = SimpleNamespace(load_record=lambda part_id: current)
+
+        def inspect(self, inputs):
+            assert inputs == [downloaded]
+            return [candidate]
+
+        def attach_assets(self, part_id, selected, **_kwargs):
+            assert selected is candidate
+            attached.append(part_id)
+
+        def cleanup(self):
+            return None
+
+    monkeypatch.setattr(
+        "stockroom.capture.guided.get_adapter",
+        lambda _key: type(
+            "_Adapter",
+            (),
+            {"capability": type("_Capability", (), {"label": "SnapMagic"})()},
+        )(),
+    )
+    source = GuidedCaptureSource(
+        lambda: _Pipeline(),
+        vendor="snapmagic",
+        download_root=tmp_path / "Downloads",
+    )
+
+    outcome = source._attach(
+        _Record(mpn="STALE-BEFORE-EARLIER-ROUTE"),
+        [SimpleNamespace(path=downloaded)],
+        _DETAIL_URL,
+        detail_url=_DETAIL_URL,
+    )
+
+    assert outcome.error == ""
+    assert attached == ["s1m"]
+    assert set(outcome.satisfied) == {
+        Requirement.KICAD_SYMBOL,
+        Requirement.KICAD_FOOTPRINT,
+        Requirement.KICAD_MODEL,
+    }
+
+
 def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_variant(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

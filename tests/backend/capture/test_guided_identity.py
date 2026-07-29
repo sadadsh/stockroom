@@ -54,6 +54,7 @@ def test_digikey_product_and_samacsys_detail_urls_decode_exact_identity():
     )
     digikey = page_identity("digikey-ultralibrarian", detail_url)
     digikey_snapmagic = page_identity("digikey-snapmagic", detail_url)
+    digikey_traceparts = page_identity("digikey-traceparts", detail_url)
     samacsys = page_identity(
         "samacsys",
         (
@@ -68,6 +69,7 @@ def test_digikey_product_and_samacsys_detail_urls_decode_exact_identity():
         "texas-instruments",
     )
     assert digikey_snapmagic == digikey
+    assert digikey_traceparts == digikey
     assert samacsys is not None
     assert (samacsys.mpn, samacsys.manufacturer) == (
         "TPD6E05U06RVZR",

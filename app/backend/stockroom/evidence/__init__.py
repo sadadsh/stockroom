@@ -6,6 +6,9 @@ from .store import (
     EvidenceError,
     EvidenceManifestMismatch,
     EvidenceStore,
+    SupplementaryReceipt,
+    VerifiedSupplementaryArtifact,
+    VerifiedSupplementaryEvidence,
 )
 
 __all__ = [
@@ -14,4 +17,7 @@ __all__ = [
     "EvidenceError",
     "EvidenceManifestMismatch",
     "EvidenceStore",
+    "SupplementaryReceipt",
+    "VerifiedSupplementaryArtifact",
+    "VerifiedSupplementaryEvidence",
 ]

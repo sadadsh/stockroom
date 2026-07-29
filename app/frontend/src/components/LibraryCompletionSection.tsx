@@ -338,7 +338,9 @@ function LiveRun() {
               <span className="w-40 shrink-0 truncate font-mono text-t2">
                 {entry.mpn || entry.part_id}
               </span>
-              <span className="truncate text-t3">{describe(entry.status, entry.satisfied)}</span>
+              <span className="truncate text-t3">
+                {describe(entry.status, entry.satisfied, entry.retained ?? 0)}
+              </span>
             </li>
           ))}
         </ul>
@@ -364,13 +366,21 @@ const KIND_WORD: Record<string, string> = {
   altium_footprint: "Altium footprint",
 };
 
-function describe(status: string, satisfied: string[]): string {
+function describe(status: string, satisfied: string[], retained = 0): string {
   const got = satisfied.map((s) => KIND_WORD[s] ?? s);
+  const retainedText = retained
+    ? `retained ${retained} supplementary ${retained === 1 ? "file" : "files"}`
+    : "";
+  if (retainedText && !got.length) return `${retainedText}; library still incomplete`;
   switch (status) {
     case "completed":
-      return got.length ? `filed ${got.join(", ")}` : "already had everything";
+      return got.length
+        ? `filed ${got.join(", ")}${retainedText ? `; ${retainedText}` : ""}`
+        : "already had everything";
     case "improved":
-      return `filed ${got.join(", ")}, some still missing`;
+      return `filed ${got.join(", ")}, some still missing${
+        retainedText ? `; ${retainedText}` : ""
+      }`;
     case "already-complete":
       return "already had everything";
     case "deferred":
@@ -389,12 +399,14 @@ function RunReport() {
   const filled = (counts.completed ?? 0) + (counts.improved ?? 0);
   const deferred = counts.deferred ?? 0;
   const stuck = (counts.unchanged ?? 0) + (counts.error ?? 0);
+  const retained = result.items.reduce((total, item) => total + (item.retained ?? 0), 0);
   // Only the parts a person can act on, plus provider-declined rows that now carry an exact
   // explanation. Anonymous "no source" rows stay collapsed so they cannot bury useful evidence.
   const actionable: CompletionItem[] = result.items.filter(
     (i) =>
       i.status === "improved" ||
       i.status === "error" ||
+      (i.retained ?? 0) > 0 ||
       (i.remaining.length > 0 && (i.notes?.length ?? 0) > 0),
   );
 
@@ -404,6 +416,7 @@ function RunReport() {
         <Badge tone={filled ? "ok" : "neutral"}>
           {filled} Filed
         </Badge>
+        {retained > 0 ? <Badge tone="neutral">{retained} Supplementary Retained</Badge> : null}
         {deferred > 0 ? <Badge tone="warn">{deferred} To Retry</Badge> : null}
         {stuck > 0 ? <Badge tone="neutral">{stuck} No Source</Badge> : null}
       </div>

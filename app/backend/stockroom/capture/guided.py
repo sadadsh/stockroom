@@ -431,6 +431,7 @@ def _combine_route_outcomes(
     errors: list[str] = []
     skipped: list[str] = []
     blocked = False
+    retained = 0
     for label, outcome in outcomes:
         for requirement in outcome.satisfied:
             if requirement not in satisfied:
@@ -439,9 +440,11 @@ def _combine_route_outcomes(
             errors.append(f"{label}: {outcome.error}")
         if outcome.skipped:
             skipped.append(f"{label}: {outcome.skipped}")
+        retained += outcome.retained
         blocked = blocked or outcome.blocked
     return SourceOutcome(
         satisfied=tuple(satisfied),
+        retained=retained,
         error="; ".join(errors),
         skipped="; ".join(skipped),
         blocked=blocked,
@@ -983,6 +986,15 @@ class GuidedCaptureSource:
         if not landed:
             return SourceOutcome(error="the vendor download did not produce a file")
 
+        if getattr(adapter, "supplementary_only", False):
+            return self._retain_supplementary(
+                record,
+                landed,
+                detail_url=detail_url,
+                surface_key=self._vendor_key,
+                evidence_provider_key=evidence_provider_key,
+            )
+
         return self._attach(
             record,
             landed,
@@ -990,6 +1002,110 @@ class GuidedCaptureSource:
             detail_url=detail_url,
             evidence_provider_key=evidence_provider_key,
         )
+
+    def _retain_supplementary(
+        self,
+        record,
+        landed,
+        *,
+        detail_url: str,
+        surface_key: str,
+        evidence_provider_key: str,
+    ) -> SourceOutcome:
+        """Preserve exact route downloads without projecting an incomplete CAD bundle."""
+
+        if self._evidence_store is None:
+            return SourceOutcome(
+                error=(
+                    f"{evidence_provider_key} delivered supplementary files, but immutable "
+                    "evidence storage is unavailable"
+                )
+            )
+        attributed = {
+            value
+            for item in landed
+            if (value := getattr(item, "evidence_provider_key", ""))
+        }
+        if attributed != {evidence_provider_key}:
+            return SourceOutcome(
+                error=(
+                    "supplementary capture route attribution mismatch: "
+                    f"expected {evidence_provider_key!r}, received {sorted(attributed)!r}"
+                )
+            )
+        observed = page_identity(evidence_provider_key, detail_url)
+        if observed is None:
+            return SourceOutcome(
+                error=(
+                    "the provider page does not demonstrate the requested part identity; "
+                    "refusing to retain an unbound supplementary download"
+                )
+            )
+        identity_error = exact_observation_error(record, observed)
+        if identity_error:
+            return SourceOutcome(error=identity_error)
+        model_issue = self._supplementary_model_issue(landed)
+        if model_issue:
+            return SourceOutcome(error=model_issue)
+        try:
+            self._evidence_store.record_supplementary_artifacts(
+                identity=exact_identity(record),
+                surface_key=surface_key,
+                provider_key=evidence_provider_key,
+                adapter_version=BROWSER_CAPTURE_ADAPTER_VERSION,
+                receipts=tuple(landed),
+            )
+        except Exception as exc:  # noqa: BLE001 - never round failed retention up to delivery
+            return SourceOutcome(error=f"supplementary evidence retention failed: {exc}")
+        count = len(landed)
+        noun = "file" if count == 1 else "files"
+        return SourceOutcome(
+            retained=count,
+            skipped=(
+                f"retained {count} exact supplementary {noun}; no incomplete CAD bundle was "
+                "activated"
+            ),
+        )
+
+    def _supplementary_model_issue(self, landed) -> str:
+        """Prove at least one delivered artifact contains a structurally valid STEP model."""
+
+        pipeline = self._make_pipeline()
+        try:
+            candidates = []
+            failures: list[str] = []
+            for item in landed:
+                try:
+                    candidates.extend(pipeline.inspect(inputs=[item.path]))
+                except Exception as exc:  # noqa: BLE001 - collect a useful route-level reason
+                    failures.append(str(exc))
+            model_paths = [
+                Path(candidate.model_path)
+                for candidate in candidates
+                if getattr(candidate, "model_path", None) is not None
+            ]
+            for model_path in model_paths:
+                try:
+                    with model_path.open("rb") as handle:
+                        prefix = handle.read(256).lstrip()
+                        handle.seek(0, 2)
+                        size = handle.tell()
+                        handle.seek(max(0, size - 256))
+                        suffix = handle.read()
+                    if (
+                        prefix.startswith(b"ISO-10303-21;")
+                        and b"END-ISO-10303-21;" in suffix
+                    ):
+                        return ""
+                except OSError as exc:
+                    failures.append(str(exc))
+            detail = f": {failures[0]}" if failures else ""
+            return (
+                "supplementary provider download contains no structurally valid STEP model"
+                f"{detail}"
+            )
+        finally:
+            pipeline.cleanup()
 
     def _machine_access_issue(self, adapter) -> str:
         """Fail closed when a machine-eligible adapter lacks live authorization."""
@@ -1361,6 +1477,9 @@ class GuidedCaptureSource:
                 failures.append(f"could not convert the provider's Altium package: {exc}")
         pipeline = self._make_pipeline()
         try:
+            load_current = getattr(getattr(pipeline, "ops", None), "load_record", None)
+            if callable(load_current):
+                record = load_current(record.id)
             candidates = []
             inspect_errors: list[Exception] = []
             # Exclusive-format providers deliver KiCad and Altium as sibling files. Inspecting

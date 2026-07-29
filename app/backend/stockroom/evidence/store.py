@@ -24,8 +24,10 @@ JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _MEDIA_TYPE = re.compile(r"[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*\Z")
 _PROVIDER_KEY = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\Z")
+_TASK_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _ARTIFACT_ROLE = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")
-_MAX_OBJECT_BYTES = 64 * 1024 * 1024
+_MAX_OBJECT_BYTES = 512 * 1024 * 1024
+_CHUNK_BYTES = 1024 * 1024
 _CAD_REQUIRED_ROLES = frozenset({"symbol", "footprint", "model", "validation_report"})
 DEFAULT_CAD_PROVIDER_PREFERENCE = ("ultralibrarian", "snapmagic")
 _SENSITIVE_KEYS = frozenset(
@@ -69,6 +71,49 @@ class EvidenceOperation(Protocol):
     def label(self) -> str: ...
 
 
+class SupplementaryReceipt(Protocol):
+    """The task-bound receipt fields required to retain an original download."""
+
+    @property
+    def task_id(self) -> str: ...
+
+    @property
+    def manufacturer_key(self) -> str: ...
+
+    @property
+    def mpn_canonical(self) -> str: ...
+
+    @property
+    def path(self) -> Path: ...
+
+    @property
+    def suggested_name(self) -> str: ...
+
+    @property
+    def source_url(self) -> str: ...
+
+    @property
+    def final_url(self) -> str: ...
+
+    @property
+    def sha256(self) -> str: ...
+
+    @property
+    def size_bytes(self) -> int: ...
+
+    @property
+    def transport(self) -> str: ...
+
+    @property
+    def attempt(self) -> int: ...
+
+    @property
+    def surface_key(self) -> str: ...
+
+    @property
+    def evidence_provider_key(self) -> str: ...
+
+
 @dataclass(frozen=True, slots=True)
 class EvidenceArtifact:
     """One immutable file that contributes to a provider operation."""
@@ -107,6 +152,32 @@ class VerifiedRoleArtifact:
     source_manifests: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class VerifiedSupplementaryArtifact:
+    """One original, non-projectable file retained from a task-bound receipt."""
+
+    artifact_digest: str
+    path: Path
+    size_bytes: int
+    suggested_name: str
+    source_url: str
+    final_url: str
+    task_id: str
+    transport: str
+    attempt: int
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedSupplementaryEvidence:
+    """A reverified supplementary manifest and its immutable original files."""
+
+    manifest_digest: str
+    surface_key: str
+    provider_key: str
+    adapter_version: str
+    artifacts: tuple[VerifiedSupplementaryArtifact, ...]
+
+
 def _canonical_json(value: JsonValue) -> bytes:
     return json.dumps(
         value,
@@ -142,6 +213,23 @@ def _sanitize_url(value: str) -> str:
             parsed.fragment,
         )
     )
+
+
+def _sanitize_receipt_url(value: object, name: str) -> str:
+    if type(value) is not str:
+        raise EvidenceError(f"{name} is not canonical")
+    if not value:
+        return ""
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError as exc:
+        raise EvidenceError(f"{name} is not canonical") from exc
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise EvidenceError(f"{name} is not canonical")
+    hostname = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+    netloc = f"{hostname}:{port}" if port is not None else hostname
+    return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
 
 
 def _sanitize_json(value: object, *, depth: int = 0) -> JsonValue:
@@ -228,10 +316,17 @@ class EvidenceStore:
     def _verify_path(self, path: Path, digest: str) -> int:
         if not path.is_file() or path.is_symlink():
             raise EvidenceCorruption("evidence object is missing or linked")
-        data = path.read_bytes()
-        if len(data) > self._max_object_bytes or _digest(data) != digest:
+        observed = hashlib.sha256()
+        size = 0
+        with path.open("rb") as stream:
+            while chunk := stream.read(_CHUNK_BYTES):
+                size += len(chunk)
+                if size > self._max_object_bytes:
+                    raise EvidenceCorruption("evidence object exceeds the supported bound")
+                observed.update(chunk)
+        if size == 0 or f"sha256:{observed.hexdigest()}" != digest:
             raise EvidenceCorruption("evidence object bytes do not match their digest")
-        return len(data)
+        return size
 
     def install_bytes(self, data: bytes) -> str:
         if type(data) is not bytes:
@@ -268,6 +363,82 @@ class EvidenceStore:
         finally:
             temporary.unlink(missing_ok=True)
         return digest
+
+    def install_path(
+        self,
+        path: Path,
+        *,
+        expected_digest: str | None = None,
+        expected_size: int | None = None,
+    ) -> str:
+        """Stream one staged file into the CAS and optionally bind its receipt."""
+        source = Path(path)
+        if not source.is_file() or source.is_symlink():
+            raise EvidenceError("evidence source path must be a real file")
+        if expected_digest is not None and (
+            type(expected_digest) is not str or _DIGEST.fullmatch(expected_digest) is None
+        ):
+            raise EvidenceError("expected evidence digest is not canonical")
+        if expected_size is not None and (
+            type(expected_size) is not int
+            or not 1 <= expected_size <= self._max_object_bytes
+        ):
+            raise EvidenceError("expected evidence size is outside the supported bound")
+
+        incoming = self._root / "Objects" / ".Incoming"
+        incoming.mkdir(parents=True, exist_ok=True)
+        if incoming.is_symlink() or not incoming.resolve(strict=True).is_relative_to(self._root):
+            raise EvidenceCorruption("evidence incoming directory escaped its store root")
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=".Evidence-",
+            suffix=".tmp",
+            dir=incoming,
+        )
+        temporary = Path(temporary_name)
+        observed = hashlib.sha256()
+        size = 0
+        try:
+            with source.open("rb") as input_stream, os.fdopen(descriptor, "wb") as output:
+                while chunk := input_stream.read(_CHUNK_BYTES):
+                    size += len(chunk)
+                    if size > self._max_object_bytes:
+                        raise EvidenceError(
+                            "evidence object size is outside the supported bound"
+                        )
+                    observed.update(chunk)
+                    output.write(chunk)
+                output.flush()
+                os.fsync(output.fileno())
+            if size == 0:
+                raise EvidenceError("evidence object size is outside the supported bound")
+            digest = f"sha256:{observed.hexdigest()}"
+            if expected_digest is not None and digest != expected_digest:
+                raise EvidenceManifestMismatch(
+                    "staged evidence bytes do not match the receipt digest"
+                )
+            if expected_size is not None and size != expected_size:
+                raise EvidenceManifestMismatch(
+                    "staged evidence bytes do not match the receipt size"
+                )
+
+            destination = self.object_path(digest)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                os.link(temporary, destination)
+            except FileExistsError:
+                pass
+            except OSError as exc:
+                raise EvidenceError(
+                    "evidence filesystem does not support atomic installation"
+                ) from exc
+            self._verify_path(destination, digest)
+            return digest
+        finally:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+            temporary.unlink(missing_ok=True)
 
     def object_bytes(self, digest: str) -> bytes:
         path = self.object_path(digest)
@@ -351,6 +522,379 @@ class EvidenceStore:
                 raise EvidenceCorruption("evidence role index entry is corrupt")
         finally:
             temporary.unlink(missing_ok=True)
+
+    def _supplementary_index_directory(self, identity: ExactIdentity) -> Path:
+        identity_key = hashlib.sha256(_canonical_json(_identity_document(identity))).hexdigest()
+        directory = (
+            self._root
+            / "Indexes"
+            / "Supplementary Exact Identity"
+            / "sha256"
+            / identity_key[:2]
+            / identity_key[2:]
+        )
+        directory.mkdir(parents=True, exist_ok=True)
+        if directory.is_symlink() or not directory.resolve(strict=True).is_relative_to(self._root):
+            raise EvidenceCorruption("supplementary evidence index escaped its store root")
+        return directory
+
+    def _index_supplementary_manifest(
+        self,
+        *,
+        identity: ExactIdentity,
+        manifest_digest: str,
+        surface_key: str,
+        provider_key: str,
+        adapter_version: str,
+    ) -> None:
+        if _DIGEST.fullmatch(manifest_digest) is None:
+            raise EvidenceError("evidence manifest digest is not canonical")
+        pointer: JsonValue = {
+            "adapter_version": adapter_version,
+            "identity": _identity_document(identity),
+            "manifest_digest": manifest_digest,
+            "provider": provider_key,
+            "schema": "stockroom.supplementary-artifact-index/1",
+            "surface": surface_key,
+        }
+        data = _canonical_json(pointer)
+        directory = self._supplementary_index_directory(identity)
+        destination = directory / f"{manifest_digest.removeprefix('sha256:')}.json"
+        if destination.exists():
+            if destination.is_symlink() or destination.read_bytes() != data:
+                raise EvidenceCorruption("supplementary evidence index entry is corrupt")
+            return
+
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=".Evidence-Index-",
+            suffix=".tmp",
+            dir=directory,
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            try:
+                os.link(temporary, destination)
+            except FileExistsError:
+                pass
+            except OSError as exc:
+                raise EvidenceError(
+                    "evidence filesystem does not support atomic supplementary indexing"
+                ) from exc
+            if destination.is_symlink() or destination.read_bytes() != data:
+                raise EvidenceCorruption("supplementary evidence index entry is corrupt")
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def record_supplementary_artifacts(
+        self,
+        *,
+        identity: ExactIdentity,
+        surface_key: str,
+        provider_key: str,
+        adapter_version: str,
+        receipts: tuple[SupplementaryReceipt, ...],
+    ) -> str:
+        """Retain original provider files without making them CAD-projectable."""
+        identity_document = _identity_document(identity)
+        if type(surface_key) is not str or _PROVIDER_KEY.fullmatch(surface_key) is None:
+            raise EvidenceError("supplementary surface key is not canonical")
+        if type(provider_key) is not str or _PROVIDER_KEY.fullmatch(provider_key) is None:
+            raise EvidenceError("supplementary provider key is not canonical")
+        _required_text(adapter_version, "adapter version", limit=128)
+        if type(receipts) is not tuple or not receipts:
+            raise EvidenceError("supplementary evidence must contain at least one receipt")
+
+        objects: list[JsonValue] = []
+        for receipt in receipts:
+            task_id = getattr(receipt, "task_id", None)
+            manufacturer_key = getattr(receipt, "manufacturer_key", None)
+            mpn_canonical = getattr(receipt, "mpn_canonical", None)
+            suggested_name = getattr(receipt, "suggested_name", None)
+            receipt_digest = getattr(receipt, "sha256", None)
+            size_bytes = getattr(receipt, "size_bytes", None)
+            transport = getattr(receipt, "transport", None)
+            attempt = getattr(receipt, "attempt", None)
+            receipt_surface = getattr(receipt, "surface_key", None)
+            receipt_provider = getattr(receipt, "evidence_provider_key", None)
+            if type(task_id) is not str or _TASK_ID.fullmatch(task_id) is None:
+                raise EvidenceError("supplementary receipt task ID is not canonical")
+            if (
+                manufacturer_key != identity_document["authoritative_manufacturer_key"]
+                or mpn_canonical != identity_document["mpn_canonical"]
+            ):
+                raise EvidenceManifestMismatch(
+                    "supplementary receipt does not match the exact identity"
+                )
+            if receipt_surface != surface_key or receipt_provider != provider_key:
+                raise EvidenceManifestMismatch(
+                    "supplementary receipt does not match the surface and provider"
+                )
+            if (
+                type(suggested_name) is not str
+                or not suggested_name
+                or Path(suggested_name).name != suggested_name
+            ):
+                raise EvidenceError("supplementary receipt filename is not canonical")
+            _required_text(suggested_name, "supplementary receipt filename", limit=255)
+            if type(receipt_digest) is not str or _DIGEST.fullmatch(receipt_digest) is None:
+                raise EvidenceError("supplementary receipt digest is not canonical")
+            if (
+                type(size_bytes) is not int
+                or not 1 <= size_bytes <= self._max_object_bytes
+            ):
+                raise EvidenceError("supplementary receipt size is outside the supported bound")
+            _required_text(transport, "supplementary receipt transport", limit=32)
+            if type(attempt) is not int or not 1 <= attempt <= 5:
+                raise EvidenceError("supplementary receipt attempt is not canonical")
+
+            digest = self.install_path(
+                Path(getattr(receipt, "path", "")),
+                expected_digest=receipt_digest,
+                expected_size=size_bytes,
+            )
+            receipt_document: dict[str, JsonValue] = {
+                "attempt": attempt,
+                "evidence_provider_key": receipt_provider,
+                "final_url": _sanitize_receipt_url(
+                    getattr(receipt, "final_url", None),
+                    "supplementary receipt final URL",
+                ),
+                "manufacturer_key": manufacturer_key,
+                "mpn_canonical": mpn_canonical,
+                "sha256": receipt_digest,
+                "size_bytes": size_bytes,
+                "source_url": _sanitize_receipt_url(
+                    getattr(receipt, "source_url", None),
+                    "supplementary receipt source URL",
+                ),
+                "surface_key": receipt_surface,
+                "task_id": task_id,
+                "transport": transport,
+            }
+            objects.append(
+                {
+                    "bytes": size_bytes,
+                    "digest": digest,
+                    "disposition": "local_cas",
+                    "media_type": "application/octet-stream",
+                    "receipt": receipt_document,
+                    "suggested_name": suggested_name,
+                }
+            )
+
+        objects.sort(
+            key=lambda item: (
+                str(item.get("suggested_name", "")) if isinstance(item, dict) else "",
+                str(item.get("digest", "")) if isinstance(item, dict) else "",
+                _canonical_json(item),
+            )
+        )
+        if len({_canonical_json(item) for item in objects}) != len(objects):
+            raise EvidenceError("supplementary receipts must be unique")
+        manifest: JsonValue = {
+            "adapter_version": adapter_version,
+            "identity": identity_document,
+            "objects": objects,
+            "projectable": False,
+            "provider": provider_key,
+            "sanitization": {
+                "credential_query_values_removed": True,
+                "url_fragments_removed": True,
+            },
+            "schema": "stockroom.supplementary-artifact-evidence/1",
+            "surface": surface_key,
+        }
+        digest = self.install_bytes(_canonical_json(manifest))
+        self.verify_supplementary_artifacts(
+            digest,
+            identity=identity,
+            surface_key=surface_key,
+            provider_key=provider_key,
+            adapter_version=adapter_version,
+        )
+        self._index_supplementary_manifest(
+            identity=identity,
+            manifest_digest=digest,
+            surface_key=surface_key,
+            provider_key=provider_key,
+            adapter_version=adapter_version,
+        )
+        return digest
+
+    def verify_supplementary_artifacts(
+        self,
+        digest: str,
+        *,
+        identity: ExactIdentity,
+        surface_key: str,
+        provider_key: str,
+        adapter_version: str,
+    ) -> VerifiedSupplementaryEvidence:
+        """Reverify one exact, explicitly non-projectable supplementary manifest."""
+        identity_document = _identity_document(identity)
+        manifest = self._canonical_manifest(digest)
+        if (
+            manifest.get("schema") != "stockroom.supplementary-artifact-evidence/1"
+            or manifest.get("projectable") is not False
+            or manifest.get("identity") != identity_document
+            or manifest.get("surface") != surface_key
+            or manifest.get("provider") != provider_key
+            or manifest.get("adapter_version") != adapter_version
+        ):
+            raise EvidenceManifestMismatch(
+                "supplementary evidence does not match the exact capture route"
+            )
+        objects = manifest.get("objects")
+        if type(objects) is not list or not objects:
+            raise EvidenceCorruption("supplementary evidence objects are invalid")
+
+        verified: list[VerifiedSupplementaryArtifact] = []
+        canonical_references: set[bytes] = set()
+        for reference in objects:
+            if type(reference) is not dict:
+                raise EvidenceCorruption("supplementary evidence object is invalid")
+            object_digest = reference.get("digest")
+            size_bytes = reference.get("bytes")
+            suggested_name = reference.get("suggested_name")
+            receipt = reference.get("receipt")
+            if (
+                type(object_digest) is not str
+                or _DIGEST.fullmatch(object_digest) is None
+                or type(size_bytes) is not int
+                or not 1 <= size_bytes <= self._max_object_bytes
+                or type(suggested_name) is not str
+                or not suggested_name
+                or Path(suggested_name).name != suggested_name
+                or reference.get("disposition") != "local_cas"
+                or reference.get("media_type") != "application/octet-stream"
+                or type(receipt) is not dict
+            ):
+                raise EvidenceCorruption("supplementary evidence object envelope is invalid")
+            task_id = receipt.get("task_id")
+            transport = receipt.get("transport")
+            attempt = receipt.get("attempt")
+            source_url = receipt.get("source_url")
+            final_url = receipt.get("final_url")
+            if (
+                type(task_id) is not str
+                or _TASK_ID.fullmatch(task_id) is None
+                or receipt.get("manufacturer_key")
+                != identity_document["authoritative_manufacturer_key"]
+                or receipt.get("mpn_canonical") != identity_document["mpn_canonical"]
+                or receipt.get("surface_key") != surface_key
+                or receipt.get("evidence_provider_key") != provider_key
+                or receipt.get("sha256") != object_digest
+                or receipt.get("size_bytes") != size_bytes
+                or type(transport) is not str
+                or not transport
+                or type(attempt) is not int
+                or not 1 <= attempt <= 5
+                or type(source_url) is not str
+                or _sanitize_receipt_url(source_url, "supplementary receipt source URL")
+                != source_url
+                or type(final_url) is not str
+                or _sanitize_receipt_url(final_url, "supplementary receipt final URL")
+                != final_url
+            ):
+                raise EvidenceCorruption(
+                    "supplementary evidence receipt does not match its manifest"
+                )
+            if self._verify_path(self.object_path(object_digest), object_digest) != size_bytes:
+                raise EvidenceCorruption(
+                    "supplementary evidence object does not match stored bytes"
+                )
+            canonical_reference = _canonical_json(reference)
+            if canonical_reference in canonical_references:
+                raise EvidenceCorruption("supplementary evidence contains duplicate receipts")
+            canonical_references.add(canonical_reference)
+            verified.append(
+                VerifiedSupplementaryArtifact(
+                    artifact_digest=object_digest,
+                    path=self.object_path(object_digest),
+                    size_bytes=size_bytes,
+                    suggested_name=suggested_name,
+                    source_url=source_url,
+                    final_url=final_url,
+                    task_id=task_id,
+                    transport=transport,
+                    attempt=attempt,
+                )
+            )
+        return VerifiedSupplementaryEvidence(
+            manifest_digest=digest,
+            surface_key=surface_key,
+            provider_key=provider_key,
+            adapter_version=adapter_version,
+            artifacts=tuple(verified),
+        )
+
+    def list_supplementary_artifacts(
+        self,
+        *,
+        identity: ExactIdentity,
+    ) -> tuple[VerifiedSupplementaryEvidence, ...]:
+        """List all exact-identity supplementary manifests without CAD projection."""
+        directory = self._supplementary_index_directory(identity)
+        listed: list[VerifiedSupplementaryEvidence] = []
+        for path in sorted(directory.glob("*.json"), key=lambda item: item.name):
+            if not path.is_file() or path.is_symlink():
+                raise EvidenceCorruption(
+                    "supplementary evidence index entry is missing or linked"
+                )
+            data = path.read_bytes()
+            try:
+                pointer = json.loads(data)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise EvidenceCorruption(
+                    "supplementary evidence index entry is not canonical JSON"
+                ) from exc
+            surface_key = pointer.get("surface") if isinstance(pointer, dict) else None
+            provider_key = pointer.get("provider") if isinstance(pointer, dict) else None
+            adapter_version = (
+                pointer.get("adapter_version") if isinstance(pointer, dict) else None
+            )
+            manifest_digest = (
+                pointer.get("manifest_digest") if isinstance(pointer, dict) else None
+            )
+            if (
+                type(pointer) is not dict
+                or _canonical_json(pointer) != data
+                or pointer.get("schema") != "stockroom.supplementary-artifact-index/1"
+                or pointer.get("identity") != _identity_document(identity)
+                or type(surface_key) is not str
+                or _PROVIDER_KEY.fullmatch(surface_key) is None
+                or type(provider_key) is not str
+                or _PROVIDER_KEY.fullmatch(provider_key) is None
+                or type(adapter_version) is not str
+                or not adapter_version
+                or type(manifest_digest) is not str
+                or _DIGEST.fullmatch(manifest_digest) is None
+            ):
+                raise EvidenceCorruption("supplementary evidence index entry is invalid")
+            listed.append(
+                self.verify_supplementary_artifacts(
+                    manifest_digest,
+                    identity=identity,
+                    surface_key=surface_key,
+                    provider_key=provider_key,
+                    adapter_version=adapter_version,
+                )
+            )
+        return tuple(
+            sorted(
+                listed,
+                key=lambda item: (
+                    item.provider_key,
+                    item.surface_key,
+                    item.adapter_version,
+                    item.manifest_digest,
+                ),
+            )
+        )
 
     def record_provider_success(
         self,

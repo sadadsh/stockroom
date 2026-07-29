@@ -287,6 +287,52 @@ describe("running", () => {
     expect(detail).toHaveTextContent(/snapmagic:.*Still needs symbol/i);
   });
 
+  it("reports supplementary files without presenting them as filed CAD", async () => {
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
+    vi.spyOn(api, "runCompletion").mockResolvedValue({ job_id: "j1" });
+    vi.spyOn(api, "openJobStream").mockResolvedValue(
+      streamOf([
+        {
+          event: "result",
+          data: {
+            result: {
+              items: [
+                {
+                  part_id: "p1",
+                  mpn: "5212034-1",
+                  display_name: "Connector",
+                  category: "Connectors",
+                  status: "unchanged",
+                  needed: ["kicad_model"],
+                  satisfied: [],
+                  retained: 1,
+                  remaining: ["kicad_model"],
+                  sources: [],
+                  notes: [
+                    "DigiKey · TraceParts: retained 1 exact supplementary file; no incomplete CAD bundle was activated",
+                  ],
+                  error: "",
+                },
+              ],
+              counts: { unchanged: 1 },
+              stopped: false,
+              stop_reason: "",
+            },
+          },
+        },
+      ]),
+    );
+    renderSection();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
+
+    expect(await screen.findByText("1 Supplementary Retained")).toBeInTheDocument();
+    expect(screen.getByText("0 Filed")).toBeInTheDocument();
+    expect(screen.getByText(/DigiKey · TraceParts: retained 1 exact supplementary file/)).toHaveTextContent(
+      /Still needs 3D model/i,
+    );
+  });
+
   it("surfaces a failure to start rather than sitting on a spinner", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
     vi.spyOn(api, "runCompletion").mockRejectedValue(new Error("backend is down"));
