@@ -1076,7 +1076,14 @@ class GuidedCaptureSource:
             try:
                 candidates = pipeline.inspect(inputs=[item.path for item in landed])
             except Exception as exc:  # noqa: BLE001
-                return SourceOutcome(error=f"could not read the download: {exc}")
+                # The ingest inspector is intentionally KiCad-shaped and raises when a download
+                # contains only native Altium libraries. That is not an unreadable package:
+                # `_altium_libraries` already decoded a usable SchLib/PcbLib/IntLib above, and the
+                # Altium-only evidence path below binds it to the reverified active KiCad bundle.
+                if altium_sources:
+                    candidates = []
+                else:
+                    return SourceOutcome(error=f"could not read the download: {exc}")
 
             kicad_offered: list[Requirement] = []
             selection = select_exact_candidate(

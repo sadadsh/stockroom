@@ -446,7 +446,7 @@ def test_altium_only_download_composes_with_reverified_active_kicad_without_repl
 
         def inspect(self, inputs):
             assert inputs == [bundle]
-            return []
+            raise ValueError("unable to identify package: no symbol, footprint, or model found")
 
         def cleanup(self):
             return None
