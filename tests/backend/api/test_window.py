@@ -1065,7 +1065,8 @@ def test_inject_cad_scripts_re_derives_from_the_current_url(monkeypatch):
 
     win = NavWindow("https://www.snapeda.com/parts/x")
     W._inject_cad_scripts(win, "https://www.digikey.com/x", ["kicad_symbol"])
-    assert len(win.scripts) == 2  # overlay + driver (manual login, no autofill)
+    assert len(win.scripts) == 1  # unauthorized commercial route stays guidance-only
+    assert "__STOCKROOM_OVERLAY__" in win.scripts[0]
     assert "snu" not in "".join(win.scripts)  # creds never injected
 
 
@@ -1080,7 +1081,8 @@ def test_inject_cad_scripts_falls_back_when_current_url_unavailable(monkeypatch)
 
     win = BadWindow()
     W._inject_cad_scripts(win, "https://www.digikey.com/x", ["kicad_symbol"])
-    assert len(win.scripts) == 2  # overlay + driver (manual login, no autofill)
+    assert len(win.scripts) == 1  # unauthorized commercial route stays guidance-only
+    assert "__STOCKROOM_OVERLAY__" in win.scripts[0]
     assert "dku" not in "".join(win.scripts)
 
 

@@ -70,7 +70,10 @@ class _FakePage:
     """
 
     def __init__(self):
-        self.url = "https://app.ultralibrarian.com/details/fake"
+        self.url = (
+            "https://app.ultralibrarian.com/details/fixture/"
+            "Texas%20Instruments/TPD6E05U06RVZR?open=exports"
+        )
 
     def goto(self, *args, **kwargs):
         return None
@@ -95,7 +98,7 @@ class _FakePage:
 def _install_adapter(monkeypatch, browser, *, on_drive):
     """Register a fake vendor whose drive() calls `on_drive(browser)`."""
     capability = VendorCapability(
-        key="faketron",
+        key="ultralibrarian",
         label="Faketron",
         tools=("kicad",),
         formats_exclusive=False,
@@ -103,6 +106,7 @@ def _install_adapter(monkeypatch, browser, *, on_drive):
         needs_login=False,
         instruction="",
         version_pins={"kicad": "KiCADv6"},
+        browser_access="machine_allowed",
     )
 
     class _Adapter:
@@ -110,9 +114,16 @@ def _install_adapter(monkeypatch, browser, *, on_drive):
             self.capability = capability
 
         def resolve_url(self, mpn: str) -> str:
-            return "https://example.invalid/part"
+            return f"https://app.ultralibrarian.com/search?queryText={mpn}"
 
-        def drive(self, page, formats):
+        def drive(
+            self,
+            page,
+            formats,
+            *,
+            expected_manufacturer="",
+            expected_mpn="",
+        ):
             on_drive(browser)
             return DriveReport(selected=list(formats), submitted=True, message="Requested KiCad.")
 
@@ -127,6 +138,7 @@ def _source(monkeypatch, tmp_path, browser, *, on_drive, pipeline=None):
         vendor="faketron",
         download_root=tmp_path / "dl",
         headless=True,
+        machine_access_check=lambda: True,
     )
     # Inject the session rather than launching a browser: this test is about the WAIT, and a real
     # engine launch would make it slow and vendor-dependent for no added coverage.
@@ -234,6 +246,7 @@ def test_guided_supply_attaches_only_the_exact_task_broker_receipts(monkeypatch,
         vendor="faketron",
         download_root=tmp_path / "Downloads",
         headless=True,
+        machine_access_check=lambda: True,
     )
     source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
 
@@ -331,7 +344,9 @@ def test_user_driven_guided_supply_skips_provider_automation_and_validates_captu
     finally:
         source.close()
 
-    assert captured_call["url"] == "https://example.invalid/part"
+    assert captured_call["url"] == (
+        "https://app.ultralibrarian.com/search?queryText=TPD6E05U06RVZR"
+    )
     assert captured_call["broker"].task.task_id == _Record.id
     assert captured_call["broker"].task.mpn_canonical == _Record.mpn
     hud = captured_call["options"].pop("hud")
@@ -709,7 +724,7 @@ class _LoginAdapter:
 
     def __init__(self, already_signed_in=False, refuse=""):
         self.capability = VendorCapability(
-            key="faketron",
+            key="ultralibrarian",
             label="Faketron",
             tools=("kicad",),
             formats_exclusive=False,
@@ -717,6 +732,7 @@ class _LoginAdapter:
             needs_login=True,
             instruction="",
             version_pins={"kicad": "KiCADv6"},
+            browser_access="machine_allowed",
         )
         self.calls: list[tuple] = []
         self._already = already_signed_in
@@ -730,9 +746,16 @@ class _LoginAdapter:
         return self._refuse
 
     def resolve_url(self, mpn):
-        return "https://example.invalid/part"
+        return f"https://app.ultralibrarian.com/search?queryText={mpn}"
 
-    def drive(self, page, formats):
+    def drive(
+        self,
+        page,
+        formats,
+        *,
+        expected_manufacturer="",
+        expected_mpn="",
+    ):
         return DriveReport(
             missed=list(formats),
             submitted=False,
@@ -748,6 +771,7 @@ def _source_with_adapter(monkeypatch, tmp_path, browser, adapter, credentials):
         download_root=tmp_path / "dl",
         headless=True,
         credentials=credentials,
+        machine_access_check=lambda: True,
     )
     src._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
     return src
@@ -1004,7 +1028,7 @@ def test_a_submitted_format_that_never_arrives_is_an_error_not_a_skip(monkeypatc
 
     class _NeverDelivers:
         capability = VendorCapability(
-            key="vanishtron",
+            key="ultralibrarian",
             label="Vanishtron",
             tools=("altium",),
             formats_exclusive=True,
@@ -1012,12 +1036,20 @@ def test_a_submitted_format_that_never_arrives_is_an_error_not_a_skip(monkeypatc
             needs_login=False,
             instruction="",
             version_pins={"altium": "a"},
+            browser_access="machine_allowed",
         )
 
         def resolve_url(self, mpn):
-            return "https://example.invalid/part"
+            return f"https://app.ultralibrarian.com/search?queryText={mpn}"
 
-        def drive(self, page, formats):
+        def drive(
+            self,
+            page,
+            formats,
+            *,
+            expected_manufacturer="",
+            expected_mpn="",
+        ):
             # clicked, and nothing ever lands
             return DriveReport(selected=list(formats), submitted=True, message="ok")
 
@@ -1032,6 +1064,7 @@ def test_a_submitted_format_that_never_arrives_is_an_error_not_a_skip(monkeypatc
         vendor="vanishtron",
         download_root=tmp_path / "dl",
         headless=True,
+        machine_access_check=lambda: True,
     )
     src._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
 
@@ -1113,7 +1146,7 @@ def test_the_kicad_chooser_waits_for_its_member_instead_of_sleeping():
     )
 
 
-def test_altium_only_gap_drives_one_full_snapmagic_evidence_bundle(monkeypatch, tmp_path):
+def test_altium_only_gap_drives_one_full_ultralibrarian_evidence_bundle(monkeypatch, tmp_path):
     """A partial repair needs same-provider companion bytes for cross-EDA proof."""
     browser = _FakeBrowser()
     requested: list[str] = []
@@ -1133,9 +1166,10 @@ def test_altium_only_gap_drives_one_full_snapmagic_evidence_bundle(monkeypatch, 
     )
     source = guided.GuidedCaptureSource(
         lambda: None,
-        vendor="snapmagic",
+        vendor="ultralibrarian",
         download_root=tmp_path / "downloads",
         headless=True,
+        machine_access_check=lambda: True,
     )
     source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
 
@@ -1152,7 +1186,7 @@ def test_provider_wide_capture_gate_trips_batch_breaker_instead_of_burning_every
 
     class _BlockedAdapter:
         capability = VendorCapability(
-            key="blocked-provider",
+            key="ultralibrarian",
             label="Blocked Provider",
             tools=("kicad",),
             formats_exclusive=False,
@@ -1160,10 +1194,14 @@ def test_provider_wide_capture_gate_trips_batch_breaker_instead_of_burning_every
             needs_login=True,
             instruction="",
             version_pins={"kicad": "v6"},
+            browser_access="machine_allowed",
         )
 
         def resolve_url(self, _mpn):
-            return "https://example.invalid/search"
+            return (
+                "https://app.ultralibrarian.com/search"
+                "?queryText=TPD6E05U06RVZR"
+            )
 
     adapter = _BlockedAdapter()
     monkeypatch.setattr(guided, "get_adapter", lambda _key: adapter)
@@ -1185,6 +1223,7 @@ def test_provider_wide_capture_gate_trips_batch_breaker_instead_of_burning_every
         vendor="blocked-provider",
         download_root=tmp_path / "downloads",
         headless=True,
+        machine_access_check=lambda: True,
     )
     source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
 
