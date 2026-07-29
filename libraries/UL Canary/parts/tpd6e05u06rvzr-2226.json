@@ -1,0 +1,47 @@
+{
+  "assets": {},
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/tpd6e05u06"
+  },
+  "derived": {
+    "category": "Diodes",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "Six-channel low-capacitance ESD protection diode array",
+    "display_name": "TPD6E05U06 ESD Protection Array",
+    "specs": {},
+    "value": ""
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "tpd6e05u06rvzr-2226",
+  "manufacturer": "Texas Instruments",
+  "mpn": "TPD6E05U06RVZR",
+  "part_class": "component",
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "texas-instruments",
+    "source_url": "https://www.ti.com/lit/gpn/tpd6e05u06"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [],
+      "stock": null,
+      "url": "https://www.ti.com/product/TPD6E05U06",
+      "vendor": "Texas Instruments"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 4,
+  "sources": {},
+  "tags": [
+    "canary",
+    "esd-protection"
+  ]
+}
