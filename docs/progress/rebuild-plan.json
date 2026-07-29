@@ -42,7 +42,7 @@
         "name": "Deploy And Durable State",
         "status": "completed",
         "owner": "development tool · Windows deployment and Obsidian state",
-        "evidence": "Canonical main, origin/main, and the managed Windows install are converged at b3e831cd. Deployment verified the AP214 route, supplementary evidence schema, and exact committed frontend bundle while preserving unrelated working changes and installed fixtures. Stockroom was not running, so no process restart was needed.",
+        "evidence": "Implementation and frontend-bundle commit b3e831cd is contained in canonical main, origin/main, and the converged managed Windows install. Deployment verified the AP214 route, supplementary evidence schema, and exact committed frontend bundle while preserving unrelated working changes and installed fixtures. Stockroom was not running, so no process restart was needed.",
         "blocker": "Source, remote, and installed checkout convergence is complete for the multi-author DigiKey implementation. Automatic hot adoption without a deploy/restart ritual is still a separate unfinished product outcome.",
         "next_action": "Complete the Stockroom-broker TraceParts canary, then continue unrelated-MPN and package-class qualification without desktop takeover."
       }
