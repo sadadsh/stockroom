@@ -217,18 +217,39 @@ def cross_eda_report_is_proved(report: object) -> bool:
     if canonical.get("schema") != "stockroom.cross-eda-verification/1":
         return False
     terminal_map = canonical.get("terminal_map")
+    no_connect_pad_map = canonical.get("no_connect_pad_map")
     geometry = canonical.get("geometry")
     kicad = canonical.get("kicad")
     altium = canonical.get("altium")
     if (
         not isinstance(terminal_map, list)
         or not terminal_map
+        or not isinstance(no_connect_pad_map, list)
         or not isinstance(geometry, dict)
         or geometry.get("method") != "mapped-pad-distance-and-size-signatures"
         or not isinstance(kicad, dict)
         or not isinstance(altium, dict)
     ):
         return False
+    physical_map = terminal_map + no_connect_pad_map
+    kicad_numbers: set[str] = set()
+    altium_numbers: set[str] = set()
+    for mapping in physical_map:
+        if not isinstance(mapping, dict) or set(mapping) != {"kicad", "altium"}:
+            return False
+        kicad_number = mapping["kicad"]
+        altium_number = mapping["altium"]
+        if (
+            not isinstance(kicad_number, str)
+            or not kicad_number.strip()
+            or not isinstance(altium_number, str)
+            or not altium_number.strip()
+            or kicad_number in kicad_numbers
+            or altium_number in altium_numbers
+        ):
+            return False
+        kicad_numbers.add(kicad_number)
+        altium_numbers.add(altium_number)
     counts = (
         kicad.get("pin_count"),
         kicad.get("pad_count"),
@@ -239,8 +260,11 @@ def cross_eda_report_is_proved(report: object) -> bool:
         return False
     kicad_pins, kicad_pads, altium_pins, altium_pads = counts
     return (
-        kicad_pins == altium_pins == len(terminal_map)
-        and kicad_pads == altium_pads
+        len(terminal_map) <= kicad_pins
+        and len(terminal_map) <= altium_pins
+        and kicad_pins - len(terminal_map) <= len(no_connect_pad_map)
+        and altium_pins - len(terminal_map) <= len(no_connect_pad_map)
+        and len(physical_map) <= kicad_pads == altium_pads
     )
 
 

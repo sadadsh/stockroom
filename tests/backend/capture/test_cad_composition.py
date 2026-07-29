@@ -311,3 +311,52 @@ def test_provider_family_is_affinity_only(provider: str, family: str) -> None:
 )
 def test_cross_eda_report_rejects_incomplete_or_non_json_proof(report: object) -> None:
     assert cross_eda_report_is_proved(report) is False
+
+
+def test_cross_eda_report_accepts_explicit_and_omitted_no_connect_pins() -> None:
+    terminal_map = [
+        {"kicad": str(number), "altium": str(number)}
+        for number in (5, 8, 9, 10, 11, 12, 13, 14)
+    ]
+    no_connect_pad_map = [
+        {"kicad": str(number), "altium": str(number)}
+        for number in (1, 2, 3, 4, 6, 7)
+    ]
+    report = {
+        "schema": "stockroom.cross-eda-verification/1",
+        "valid": True,
+        "terminal_map": terminal_map,
+        "no_connect_pad_map": no_connect_pad_map,
+        "geometry": {"method": "mapped-pad-distance-and-size-signatures"},
+        "kicad": {"pin_count": 14, "pad_count": 14},
+        "altium": {"pin_count": 8, "pad_count": 14},
+    }
+
+    assert cross_eda_report_is_proved(report) is True
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda report: report.pop("no_connect_pad_map"),
+        lambda report: report["no_connect_pad_map"].append(
+            {"kicad": "1", "altium": "15"}
+        ),
+        lambda report: report["terminal_map"].append(
+            {"kicad": "15", "altium": "15"}
+        ),
+    ],
+)
+def test_cross_eda_report_rejects_incoherent_terminal_maps(mutation) -> None:
+    report = {
+        "schema": "stockroom.cross-eda-verification/1",
+        "valid": True,
+        "terminal_map": [{"kicad": "1", "altium": "1"}],
+        "no_connect_pad_map": [],
+        "geometry": {"method": "mapped-pad-distance-and-size-signatures"},
+        "kicad": {"pin_count": 1, "pad_count": 1},
+        "altium": {"pin_count": 1, "pad_count": 1},
+    }
+    mutation(report)
+
+    assert cross_eda_report_is_proved(report) is False
