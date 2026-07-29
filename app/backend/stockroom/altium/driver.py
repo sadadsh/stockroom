@@ -29,7 +29,9 @@ re-parse the line correctly. A native Windows caller does not have this problem.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -102,7 +104,6 @@ _EXIT_GRACE_POLLS = 3
 # Window titles that mean Altium is WAITING FOR A HUMAN rather than working.
 DIALOG_HINTS = (
     "select item to run",
-    "choose",
     "error",
     "license",
     "sign in",
@@ -304,17 +305,51 @@ class AltiumDriver:
 
         marker = Path(marker)
         marker.unlink(missing_ok=True)
-        target = (
-            f'ProjectName="{self.host.to_windows_path(str(project))}"'
-            if project
-            else f'FileName="{self.host.to_windows_path(str(script))}"'
-        )
-        invocation = f'-RScriptingSystem:RunScript({target}|ProcName="{proc}")'
+        proc_name = proc
+        if script is not None:
+            # AD26 currently opens a generic Error dialog for FileName= standalone-script
+            # invocations even when the identical source runs through a PrjScr. Stage an isolated
+            # one-document project so every public driver path uses the working invocation form.
+            # The unique directory also prevents one worker from changing another worker's script.
+            project_root = Path(
+                tempfile.mkdtemp(
+                    prefix="stockroom-altium-script-",
+                    dir=str(self.host.windows_temp()),
+                )
+            )
+            staged_script = project_root / "StockroomScript.pas"
+            shutil.copy2(Path(script), staged_script)
+            staged_project = project_root / "StockroomScript.PrjScr"
+            staged_project.write_text(
+                "[Design]\r\n"
+                "Version=1.0\r\n"
+                "HierarchyMode=0\r\n"
+                "[Document1]\r\n"
+                "DocumentPath=StockroomScript.pas\r\n",
+                encoding="utf-8",
+                newline="",
+            )
+            project = staged_project
+            proc_name = f"{staged_script.name}>{proc.rsplit('>', 1)[-1]}"
+
+        assert project is not None
+        target = f'ProjectName="{self.host.to_windows_path(str(project))}"'
+        invocation = f'-RScriptingSystem:RunScript({target}|ProcName="{proc_name}")'
 
         # Route through a generated .bat, never a direct spawn. See the module docstring: WSL's
         # argv translation corrupts every quoted value. `^|` is cmd's escape for the parameter
         # separator, since a bare `|` would be read as a pipe.
-        bat = self.host.windows_temp() / "stockroom-altium-run.bat"
+        # A fixed launcher name is a cross-run race. Two independent Stockroom workers can
+        # legitimately need Altium at nearly the same time; if both rewrite one .bat, the first
+        # cmd.exe can execute the second worker's script. Keep the launcher unique and immutable
+        # for the lifetime of this run.
+        descriptor, bat_name = tempfile.mkstemp(
+            prefix="stockroom-altium-run-",
+            suffix=".bat",
+            dir=str(self.host.windows_temp()),
+        )
+        os.close(descriptor)
+        bat = Path(bat_name)
         bat.write_text(
             "@echo off\r\n"
             f'"{self.host.to_windows_path(str(self.x2))}" {invocation.replace("|", "^|")}\r\n',

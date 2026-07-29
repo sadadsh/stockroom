@@ -191,13 +191,69 @@ def test_the_invocation_is_routed_through_a_bat_with_an_escaped_separator(tmp_pa
     drv, host, marker = _driver(tmp_path, x2, marker_after=1)
     drv.run_script(proc="P.pas>P", marker=marker, project=tmp_path / "P.PrjScr", timeout=99)
     assert host.spawned[0][0] == "cmd.exe"
-    bat = (tmp_path / "stockroom-altium-run.bat").read_text(encoding="utf-8")
+    launchers = list(tmp_path.glob("stockroom-altium-run-*.bat"))
+    assert len(launchers) == 1
+    bat = launchers[0].read_text(encoding="utf-8")
     assert "-RScriptingSystem:RunScript(" in bat
     assert "^|ProcName=" in bat, "a bare | would be read by cmd as a pipe"
     assert 'ProcName="P.pas>P"' in bat
     # Read the BYTES: `read_text` decodes universal newlines, so it would report CRLF as LF and
     # this assertion would be testing nothing. cmd.exe needs the real CRLF.
-    assert (tmp_path / "stockroom-altium-run.bat").read_bytes().endswith(b"\r\n")
+    assert launchers[0].read_bytes().endswith(b"\r\n")
+
+
+def test_each_run_gets_an_immutable_launcher_instead_of_overwriting_another_run(
+    tmp_path: Path, x2: Path
+):
+    first_driver, _first_host, first_marker = _driver(tmp_path, x2, marker_after=1)
+    second_driver, _second_host, second_marker = _driver(tmp_path, x2, marker_after=1)
+
+    first_driver.run_script(
+        proc="First.pas>First",
+        marker=first_marker,
+        project=tmp_path / "First.PrjScr",
+        timeout=99,
+    )
+    second_driver.run_script(
+        proc="Second.pas>Second",
+        marker=second_marker,
+        project=tmp_path / "Second.PrjScr",
+        timeout=99,
+    )
+
+    launchers = list(tmp_path.glob("stockroom-altium-run-*.bat"))
+    assert len(launchers) == 2
+    launcher_texts = {launcher.read_text(encoding="utf-8") for launcher in launchers}
+    assert any('ProcName="First.pas>First"' in text for text in launcher_texts)
+    assert any('ProcName="Second.pas>Second"' in text for text in launcher_texts)
+
+
+def test_a_standalone_script_is_isolated_in_a_project_instead_of_using_broken_filename_mode(
+    tmp_path: Path, x2: Path
+):
+    source = tmp_path / "Owner Probe.pas"
+    source.write_text("Procedure OwnerProbe; Begin End;", encoding="utf-8")
+    drv, _host, marker = _driver(tmp_path, x2, marker_after=1)
+
+    out = drv.run_script(
+        proc="OwnerProbe",
+        marker=marker,
+        script=source,
+        timeout=99,
+    )
+
+    assert out.status == "ok"
+    projects = list(tmp_path.glob("stockroom-altium-script-*/StockroomScript.PrjScr"))
+    assert len(projects) == 1
+    assert "DocumentPath=StockroomScript.pas" in projects[0].read_text(encoding="utf-8")
+    staged_script = projects[0].with_name("StockroomScript.pas")
+    assert staged_script.read_text(encoding="utf-8") == source.read_text(encoding="utf-8")
+    launchers = list(tmp_path.glob("stockroom-altium-run-*.bat"))
+    assert len(launchers) == 1
+    launcher = launchers[0].read_text(encoding="utf-8")
+    assert "ProjectName=" in launcher
+    assert "FileName=" not in launcher
+    assert 'ProcName="StockroomScript.pas>OwnerProbe"' in launcher
 
 
 def test_run_script_requires_a_target(tmp_path: Path, x2: Path):
@@ -259,6 +315,35 @@ def test_altiums_own_main_window_during_a_run_is_not_a_stuck_dialog(tmp_path: Pa
         timeout=999,
         allow_busy=True,
     )
+    assert out.status == "ok", out.detail
+
+
+def test_outjob_controls_with_choose_labels_are_not_a_stuck_dialog(tmp_path: Path, x2: Path):
+    """OutJob's normal window contains two persistent controls beginning with "Choose".
+
+    Matching that generic verb as a modal made a completed native validation fail during
+    the marker visibility race. The actual script chooser is already identified by its
+    precise "Select Item To Run" title.
+    """
+    drv, host, marker = _driver(
+        tmp_path,
+        x2,
+        windows=(
+            "StockroomValidation.OutJob - Altium Designer Professional | "
+            "Choose a different variant for each output | "
+            "Choose a single variant for the whole outputjob file\n"
+        ),
+        marker_after=2,
+    )
+
+    out = drv.run_script(
+        proc="P.pas>P",
+        marker=marker,
+        project=tmp_path / "P.PrjScr",
+        timeout=999,
+        allow_busy=True,
+    )
+
     assert out.status == "ok", out.detail
 
 
