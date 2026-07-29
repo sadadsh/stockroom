@@ -6,7 +6,7 @@
   "note": "Owner outcomes are the product source of truth. The historical engineering checklist is retained below as unweighted implementation history and must never be presented as product readiness.",
   "product_scope": "Windows-only component-library management for both KiCad and Altium. A capability ships only when both EDA workflows are supported. KiCad-only project management is deferred and removed from the current frontend; its backend and Git history are preserved.",
   "active_work": {
-    "last_updated": "2026-07-29T06:44:10Z",
+    "last_updated": "2026-07-29T07:37:42Z",
     "objective": "Finish exact-MPN-to-assets acquisition with the smallest possible user workload: use verified direct sources and reviewed provider automation, retain every usable file, convert supported provider packages into native outputs, and require exact identity plus semantic and cross-EDA verification before attachment.",
     "refresh_policy": "Manually refreshed at meaningful checkpoints; this is not real-time telemetry.",
     "workstreams": [
@@ -15,36 +15,36 @@
         "name": "Automatic MPN-To-Assets Acquisition",
         "status": "active",
         "owner": "development tool · acquisition planning and provider adapters",
-        "evidence": "The isolated UL Canary profile now proves two coherent provider paths for Texas Instruments TPD6E05U06RVZR. The retained SnapMagic pair remains available. A real saved 79,884-byte DigiKey Ultra Librarian script ZIP then ran through installed AD26 in 12.8 seconds and activated all five required KiCad/Altium assets in exactly one Git transaction. Active KiCad provider ultralibrarian manifest sha256:f84d8d3530caba1a0a011b0a51dda42630fb7dbba5e3d376b4121229db1d8b47 is the exact source of active Altium provider digikey-ultralibrarian manifest sha256:5886053375092ddbdeb3b74b7dcdbbbb0b02b61fde0f0dbc1929617690bc174a. Reopen, immutable evidence resolution, native SchLib/PcbLib entry readback, and installed cross-EDA verification all passed for 8 connected terminals, 6 no-connect package pads, and 14 physical pads.",
-        "blocker": "One successful provider canary does not prove arbitrary-MPN completion. The production Stockroom profile still contains only incomplete IC51-0484-806, and provider availability, verified-cache reuse, deterministic generation, and fallback performance remain unqualified at scale.",
-        "next_action": "Run one live DigiKey multi-author canary that retains both SnapMagic and Ultra Librarian through the same signed-in surface, then exercise several unrelated MPN and package classes through browser acquisition, conversion, fallback, attachment, reopen, and evidence verification."
+        "evidence": "The isolated UL Canary profile proves coherent KiCad plus native Altium acquisition for Texas Instruments TPD6E05U06RVZR. DigiKey's live 5212034-1 model page was then remeasured without desktop takeover: SnapMagic is external-only for that MPN, TraceParts exposes 67 mechanical formats, and a pinned STEP AP214 guest export reached DigiKey's visible Download complete state. Stockroom now enumerates SnapMagic, TraceParts, and Ultra Librarian under one DigiKey session; retains exact TraceParts originals in a 512 MiB streaming CAS as projectable=false supplementary evidence; reports retained separately from satisfied; and exposes retained originals in Representations with no activation control. The full capture directory passes 327 tests.",
+        "blocker": "The live TraceParts provider completed its AP214 export, but that browser session was not the Stockroom DownloadBroker, so a real provider-to-broker-to-CAS canary is still required. One UL part and one TraceParts MPN do not prove arbitrary-MPN availability, verified-cache reuse, deterministic generation, or fallback performance at scale.",
+        "next_action": "Run 5212034-1 through Stockroom's actual DigiKey broker and prove the AP214 receipt, immutable supplementary manifest, API inventory, and downloaded original bytes end to end; then qualify unrelated MPNs and package classes across the UL, TraceParts, and fallback routes."
       },
       {
         "id": "cad-evidence-composition",
         "name": "CAD Evidence Composition And Variants",
         "status": "completed",
         "owner": "development tool · immutable evidence and cross-EDA validation",
-        "evidence": "Committed role manifests and active CAD pointers preserve exact identity, provider, content digest, validation, and compatible source-manifest links. The live DigiKey/UL canary searched retained KiCad variants, rejected the incompatible active SnapMagic geometry, promoted the compatible UL bundle without deleting alternatives, bound the derived Altium manifest to that exact source, and projected both tools through one transaction and one commit. Mutation tests prove rollback after a post-KiCad Altium failure and preserve dirty exact targets.",
-        "blocker": "The component UI does not yet expose retained variants or a deliberate coherent pair switch. Per-tool activation remains unsuitable for switching an already-complete incompatible pair.",
-        "next_action": "Expose retained variants and add a user-facing coherent pair selector that invokes the same one-transaction compatibility boundary."
+        "evidence": "Committed role manifests and active CAD pointers preserve exact identity, provider, content digest, validation, and compatible source-manifest links. Complete KiCad and Altium variants remain selectable, while the new supplementary inventory exposes original TraceParts/provider files separately with canActivate=false and an authenticated exact-manifest download boundary. Mutation tests prove rollback after a post-KiCad Altium failure and preserve dirty exact targets.",
+        "blocker": "A deliberate coherent pair switch is still missing. Per-tool activation remains unsuitable for switching an already-complete incompatible pair, and supplementary originals intentionally cannot activate.",
+        "next_action": "Add one user-facing coherent pair selector and atomic pair-switch endpoint that invoke the existing one-transaction compatibility boundary."
       },
       {
         "id": "digikey-ultralibrarian-conversion",
         "name": "DigiKey Ultra Librarian Conversion",
         "status": "completed",
         "owner": "development tool · DigiKey browser adapter and guarded Altium bridge",
-        "evidence": "A real isolated Camoufox run reused saved DigiKey credentials, selected the exact product/model page, and downloaded TPD6E05U06RVZR.zip. The 79,884-byte Altium choice is script based and contains STEP, one ASCII component payload, and the reviewed Ultra Librarian importer. The saved archive ran through installed AD26 in the normal guarded converter, produced one exact TPD6E05U06RVZR SchLib entry and one RVZ0014A PcbLib entry, selected a geometrically compatible retained UL KiCad set, preserved original and derived immutable evidence, and attached all five assets in one 12.8-second transaction. Independent installed readback proved 8 connected terminals, 6 no-connect mappings, and 14 matching pads. No X2 process or task-owned conversion/materialization directory remained. The duplicate WebView2 provider driver is retired. DigiKey now captures SnapMagic and Ultra Librarian as separate author routes under one session, binds every receipt to surface plus author, rejects mixed-route landed lists, ranks distributor-prefixed variants by CAD-author family, and retries a visible transient DigiKey export error with at most three fresh exact-route attempts. The real-DOM route regression and complete capture directory pass 321 tests.",
+        "evidence": "A real isolated Camoufox run reused saved DigiKey credentials, selected the exact product/model page, and downloaded TPD6E05U06RVZR.zip. The 79,884-byte Altium choice ran through installed AD26, produced one exact SchLib entry and one RVZ0014A PcbLib entry, and attached all five assets in one 12.8-second transaction with installed readback. The duplicate WebView2 provider driver is retired. DigiKey now captures SnapMagic and Ultra Librarian as separate complete-author routes, identifies current external-only SnapMagic rows honestly, adds a measured TraceParts model-only route pinned to STEP AP214, retains its receipt-bound originals without changing library coverage, and retries visible transient export errors with at most three fresh exact-route attempts. Backend capture plus supplementary inventory gates pass 337 tests; Ruff, Ty, frontend typecheck, focused frontend tests, and the production build pass.",
         "blocker": "One part and package class do not prove arbitrary-MPN availability, account behavior, or throughput. The current acquisition timing starts from an already-downloaded archive, so browser navigation/download time is not included.",
-        "next_action": "Run a live DigiKey canary with both embedded author rows, then qualify unrelated MPNs and package classes through the full browser-to-archive path and measure provider gates, bounded retry recovery, and total wall time separately."
+        "next_action": "Run the live TraceParts download through Stockroom's broker/CAS, then qualify unrelated MPNs and package classes through the full browser-to-archive path and measure provider gates, bounded retry recovery, and total wall time separately."
       },
       {
         "id": "deploy-and-durable-state",
         "name": "Deploy And Durable State",
         "status": "completed",
         "owner": "development tool · Windows deployment and Obsidian state",
-        "evidence": "Implementation commit 50880e4b is on canonical main, origin/main, and the installed checkout. Deployment verified the DigiKey SnapMagic route marker while preserving the installed checkout's unrelated modified fixtures and untracked evidence. Stockroom was not restarted or launched. The permanent Current State records the route-attributed broker, bounded transient-error recovery, 321-test capture gate, and exact remaining live-canary boundary; the QMD project collection was refreshed and retrieval-checked.",
+        "evidence": "Canonical main, origin/main, and the managed Windows install are converged at b3e831cd. Deployment verified the AP214 route, supplementary evidence schema, and exact committed frontend bundle while preserving unrelated working changes and installed fixtures. Stockroom was not running, so no process restart was needed.",
         "blocker": "Source, remote, and installed checkout convergence is complete for the multi-author DigiKey implementation. Automatic hot adoption without a deploy/restart ritual is still a separate unfinished product outcome.",
-        "next_action": "Run the live DigiKey multi-author canary without taking over the owner's active desktop, then continue unrelated-MPN and package-class qualification."
+        "next_action": "Complete the Stockroom-broker TraceParts canary, then continue unrelated-MPN and package-class qualification without desktop takeover."
       }
     ]
   },
@@ -612,7 +612,7 @@
                 {
                   "t": "Every exact validated variant is preserved and active selection is explicit",
                   "done": false,
-                  "evidence": "PARTIAL. The working-tree role index is append-only and retains role, source, digest, validation, and compatibility source-manifest links for every exact validated variant. Ultra Librarian ranks before SnapMagic by default, but ranking does not mutate active references. The explicit reversible active-set selector and UI are still pending.",
+                  "evidence": "PARTIAL. The shipped role index is append-only and the component UI exposes complete KiCad/Altium variants. Supplementary exact-provider originals now have a separate projectable=false inventory, authenticated downloads, and no activation controls. Ultra Librarian ranks before SnapMagic without deleting either. The remaining gap is one explicit atomic coherent-pair switch; independent per-tool activation can deadlock an A-to-B pair change.",
                   "status": "doing"
                 },
                 {
