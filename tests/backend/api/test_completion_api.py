@@ -32,8 +32,9 @@ def test_coverage_answers_whether_the_library_is_complete(client):
     # The fixture library holds one part with a symbol+footprint and one without.
     assert body["total"] == 2
     assert set(body) >= {
-        "total", "complete", "needs_files", "unsourced", "by_requirement",
-        "sources", "can_provide",
+        "total", "complete", "needs_files", "needs_assistance", "unsourced",
+        "by_requirement", "sources", "can_provide", "assisted_sources",
+        "assisted_can_provide",
     }
 
 
@@ -54,6 +55,8 @@ def test_coverage_separates_a_gap_with_a_source_from_a_gap_with_none(client):
     assert body["needs_files"] + body["unsourced"] + body["complete"] <= body["total"]
     assert "altium_symbol" in body["by_requirement"]
     assert "altium_symbol" not in body["can_provide"]
+    assert "altium_symbol" in body["assisted_can_provide"]
+    assert body["needs_assistance"] > 0
 
 
 def test_coverage_needs_a_token(anon_client):

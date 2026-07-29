@@ -99,6 +99,48 @@ def test_each_vendor_states_which_tools_it_can_export_for(client, app_ctx):
         assert isinstance(source["aggregator"], bool)
 
 
+def test_implemented_capture_providers_explain_the_user_driven_finish_contract(client, app_ctx):
+    part_id = _land_bare_part(app_ctx)
+    sources = client.get(f"/api/library/parts/{part_id}/cad-source").json()["sources"]
+    implemented = [source for source in sources if source["capture_available"]]
+
+    assert implemented
+    for source in implemented:
+        instruction = source["instruction"].lower()
+        assert "automatic sources first" in instruction
+        assert "select the exact result" in instruction
+        assert "click its download controls" in instruction
+        assert "validates" in instruction
+        assert "attaches" in instruction
+
+    vendors = client.get("/api/library/capture/vendors").json()["vendors"]
+    assert vendors
+    implemented_by_key = {source["key"]: source for source in implemented}
+    for vendor in vendors:
+        assert vendor["instruction"] == implemented_by_key[vendor["key"]]["instruction"]
+    ultra = next(vendor for vendor in vendors if vendor["key"] == "ultralibrarian")
+    assert "altium designer (native)" in ultra["instruction"].lower()
+
+
+def test_user_driven_capture_route_requires_one_part_and_one_provider(client, app_ctx):
+    part_id = _land_bare_part(app_ctx)
+    cases = (
+        ({"mode": "assisted"}, "exactly one selected part"),
+        ({"mode": "assisted", "part_ids": [part_id, "another-part"], "vendor": "snapmagic"},
+         "exactly one selected part"),
+        ({"mode": "assisted", "part_ids": [part_id]}, "one selected provider"),
+        ({"mode": "assisted", "part_ids": [part_id], "vendor": "snapmagic", "limit": 1},
+         "does not accept a batch limit"),
+        ({"mode": "assisted", "part_ids": [part_id], "vendor": "not-a-provider"},
+         "no network capture adapter"),
+    )
+
+    for payload, detail in cases:
+        response = client.post("/api/library/capture/run", json=payload)
+        assert response.status_code == 400, (payload, response.text)
+        assert detail in response.json()["detail"]
+
+
 def test_digikey_is_marked_an_AGGREGATOR_and_the_model_libraries_are_not(client, app_ctx):
     """DigiKey HOSTS models the other three authored; it is not a fourth library. Carried as data
     so a surface can order and label it honestly instead of implying one."""
