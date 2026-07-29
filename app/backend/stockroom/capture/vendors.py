@@ -1409,7 +1409,16 @@ def _challenge_issue(page, label: str) -> str:
     try:
         frames = page.locator("iframe")
         for index in range(min(frames.count(), 20)):
-            samples.append(frames.nth(index).get_attribute("src") or "")
+            frame = frames.nth(index)
+            # Providers commonly preload invisible CAPTCHA/Turnstile frames for login,
+            # feedback, or analytics. Their mere presence is not a human gate: treating
+            # one as active pauses an otherwise usable result page forever. A visible
+            # challenge frame remains a handoff, and any locator without a visibility
+            # API keeps the conservative legacy behavior used by lightweight adapters.
+            is_visible = getattr(frame, "is_visible", None)
+            if callable(is_visible) and not is_visible():
+                continue
+            samples.append(frame.get_attribute("src") or "")
     except Exception:  # noqa: BLE001 - frames are an optional signal
         pass
     evidence = "\n".join(samples).casefold()

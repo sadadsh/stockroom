@@ -279,6 +279,9 @@ class _Frame:
     def get_attribute(self, name: str):
         return "https://challenges.cloudflare.com/turnstile" if name == "src" else None
 
+    def is_visible(self):
+        return True
+
 
 class _Frames:
     @property
@@ -335,6 +338,24 @@ def test_standard_captcha_signals_are_detected_for_handoff(evidence):
     page = _ChallengePage()
     page.title = lambda: evidence
     assert "confirm you are human" in _challenge_issue(page, "Ultra Librarian")
+
+
+def test_hidden_challenge_integration_does_not_pause_a_normal_result_page():
+    class HiddenFrame(_Frame):
+        def is_visible(self):
+            return False
+
+    class HiddenFrames(_Frames):
+        def nth(self, index: int):
+            assert index == 0
+            return HiddenFrame()
+
+    page = _ChallengePage()
+    page.title = lambda: "Search | Ultra Librarian"
+    page.inner_text = lambda _selector: "Texas Instruments TPD6E05U06RVZR Models Available"
+    page.locator = lambda selector: HiddenFrames() if selector == "iframe" else _NoNodes()
+
+    assert _challenge_issue(page, "Ultra Librarian") == ""
 
 
 @pytest.mark.parametrize(
