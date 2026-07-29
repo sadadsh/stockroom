@@ -1,0 +1,18 @@
+{
+  "audit_digest": null,
+  "bindings": {},
+  "board_paths": [
+    "WiFi.PcbDoc",
+    "WiFi_panel.PcbDoc"
+  ],
+  "eda": "altium",
+  "git_root": null,
+  "id": "wifi_minipcie",
+  "name": "WiFi_miniPCIe",
+  "pro_path": "WiFi_miniPCIe.PrjPcb",
+  "registered_at": "2026-07-29T20:04:03Z",
+  "root": "C:/Users/Public/Documents/Altium/AD26/Examples/Mini PC/Mini PC - WiFi",
+  "sheet_paths": [
+    "Connector_WiFi.SchDoc"
+  ]
+}
