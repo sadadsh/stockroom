@@ -6,7 +6,7 @@
   "note": "Owner outcomes are the product source of truth. The historical engineering checklist is retained below as unweighted implementation history and must never be presented as product readiness.",
   "product_scope": "Windows-only component-library management for both KiCad and Altium. A capability ships only when both EDA workflows are supported. KiCad-only project management is deferred and removed from the current frontend; its backend and Git history are preserved.",
   "active_work": {
-    "last_updated": "2026-07-29T05:57:14Z",
+    "last_updated": "2026-07-29T06:44:10Z",
     "objective": "Finish exact-MPN-to-assets acquisition with the smallest possible user workload: use verified direct sources and reviewed provider automation, retain every usable file, convert supported provider packages into native outputs, and require exact identity plus semantic and cross-EDA verification before attachment.",
     "refresh_policy": "Manually refreshed at meaningful checkpoints; this is not real-time telemetry.",
     "workstreams": [
@@ -22,7 +22,7 @@
       {
         "id": "cad-evidence-composition",
         "name": "CAD Evidence Composition And Variants",
-        "status": "verified",
+        "status": "completed",
         "owner": "Codex · immutable evidence and cross-EDA validation",
         "evidence": "Committed role manifests and active CAD pointers preserve exact identity, provider, content digest, validation, and compatible source-manifest links. The live DigiKey/UL canary searched retained KiCad variants, rejected the incompatible active SnapMagic geometry, promoted the compatible UL bundle without deleting alternatives, bound the derived Altium manifest to that exact source, and projected both tools through one transaction and one commit. Mutation tests prove rollback after a post-KiCad Altium failure and preserve dirty exact targets.",
         "blocker": "The component UI does not yet expose retained variants or a deliberate coherent pair switch. Per-tool activation remains unsuitable for switching an already-complete incompatible pair.",
@@ -31,7 +31,7 @@
       {
         "id": "digikey-ultralibrarian-conversion",
         "name": "DigiKey Ultra Librarian Conversion",
-        "status": "verified",
+        "status": "completed",
         "owner": "Codex · DigiKey browser adapter and guarded Altium bridge",
         "evidence": "A real isolated Camoufox run reused saved DigiKey credentials, selected the exact product/model page, and downloaded TPD6E05U06RVZR.zip. The 79,884-byte Altium choice is script based and contains STEP, one ASCII component payload, and the reviewed Ultra Librarian importer. The saved archive ran through installed AD26 in the normal guarded converter, produced one exact TPD6E05U06RVZR SchLib entry and one RVZ0014A PcbLib entry, selected a geometrically compatible retained UL KiCad set, preserved original and derived immutable evidence, and attached all five assets in one 12.8-second transaction. Independent installed readback proved 8 connected terminals, 6 no-connect mappings, and 14 matching pads. No X2 process or task-owned conversion/materialization directory remained. The duplicate WebView2 provider driver is retired. DigiKey now captures SnapMagic and Ultra Librarian as separate author routes under one session, binds every receipt to surface plus author, rejects mixed-route landed lists, ranks distributor-prefixed variants by CAD-author family, and retries a visible transient DigiKey export error with at most three fresh exact-route attempts. The real-DOM route regression and complete capture directory pass 321 tests.",
         "blocker": "One part and package class do not prove arbitrary-MPN availability, account behavior, or throughput. The current acquisition timing starts from an already-downloaded archive, so browser navigation/download time is not included.",
@@ -40,11 +40,11 @@
       {
         "id": "deploy-and-durable-state",
         "name": "Deploy And Durable State",
-        "status": "verified",
+        "status": "completed",
         "owner": "Codex · Windows deployment and Obsidian state",
-        "evidence": "Implementation commit 29fd20a5 is on canonical main and origin/main. The installed checkout was fast-forwarded to that revision with an explicit ul_import.py content marker while preserving all five modified KiCad fixtures plus drive-shots/ and paste_list.js. Stockroom was not restarted or launched, and no visible browser, mouse, keyboard, or desktop control was used. The permanent Current State records the exact proven boundary and the QMD project collection was refreshed.",
-        "blocker": "The live AD26 and coherent-attach proof is complete. Final source/installed convergence for the accepted revision remains the deployment step for this checkpoint; automatic hot adoption is still a separate unfinished product outcome.",
-        "next_action": "Deploy the accepted coherent-attach revision without restarting the visible app, verify the installed commit/content marker, then continue unrelated-MPN/provider scale qualification."
+        "evidence": "Implementation commit 50880e4b is on canonical main, origin/main, and the installed checkout. Deployment verified the DigiKey SnapMagic route marker while preserving the installed checkout's unrelated modified fixtures and untracked evidence. Stockroom was not restarted or launched. The permanent Current State records the route-attributed broker, bounded transient-error recovery, 321-test capture gate, and exact remaining live-canary boundary; the QMD project collection was refreshed and retrieval-checked.",
+        "blocker": "Source, remote, and installed checkout convergence is complete for the multi-author DigiKey implementation. Automatic hot adoption without a deploy/restart ritual is still a separate unfinished product outcome.",
+        "next_action": "Run the live DigiKey multi-author canary without taking over the owner's active desktop, then continue unrelated-MPN and package-class qualification."
       }
     ]
   },
@@ -248,9 +248,7 @@
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either.",
     "No person's Stockroom install should be independently maintained or remain on a different version: every supported online install must converge automatically and show changes without the person closing and reopening it, regardless of which release tier changed."
   ],
-  "updated": "2026-07-28 23:40 UTC",
-  "now": "Finishing policy-compliant MPN-to-assets acquisition and the IC51 KiCad projection. Verified cache, permitted direct/open sources, deterministic generation, and approved adapters are automatic; commercial pages remain managed user-driven fallback. Deployment, installed-app proof, and the permanent Obsidian state update remain pending.",
-  "now_updated": "2026-07-28 23:40 UTC",
+  "updated": "2026-07-29 06:44 UTC",
   "projects": [
     {
       "id": "stockroom",
