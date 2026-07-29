@@ -1,0 +1,17 @@
+{
+  "audit_digest": null,
+  "bindings": {},
+  "board_paths": [
+    "minimal.kicad_pcb"
+  ],
+  "eda": "kicad",
+  "git_root": "D:/Workspace/Worktrees/Stockroom-Projects-Library-Grammar",
+  "id": "minimal",
+  "name": "minimal",
+  "pro_path": "minimal.kicad_pro",
+  "registered_at": "2026-07-29T20:05:10Z",
+  "root": "D:/Workspace/Worktrees/Stockroom-Projects-Library-Grammar/tests/backend/fixtures/kicad",
+  "sheet_paths": [
+    "minimal.kicad_sch"
+  ]
+}
