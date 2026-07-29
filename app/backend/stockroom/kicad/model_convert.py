@@ -25,6 +25,7 @@ both paths), so the viewer's millimetre normalisation is unaffected by the route
 
 from __future__ import annotations
 
+import importlib
 import json
 import math
 import re
@@ -190,7 +191,10 @@ def surface_finish(srgb: tuple[int, int, int], mesh_name: str = "") -> SurfaceFi
 def _srgb8(base_color: list[float]) -> tuple[int, int, int]:
     """glTF states baseColorFactor in LINEAR light; the palette above is written in the sRGB bytes
     a person reads off a colour picker, so the comparison happens in sRGB."""
-    return tuple(round((max(c, 0.0) ** (1 / 2.2)) * 255) for c in base_color[:3])  # type: ignore[return-value]
+    converted = [round((max(c, 0.0) ** (1 / 2.2)) * 255) for c in base_color[:3]]
+    if len(converted) != 3:
+        raise ValueError("base color must contain at least three channels")
+    return (converted[0], converted[1], converted[2])
 
 
 # The GLB JSON chunk's type, as the little-endian u32 the container stores it as.
@@ -375,7 +379,7 @@ def _step_to_glb(src: Path) -> bytes:
     per material, and a parent node converts STEP's Z-up basis to glTF's mandated Y-up
     basis. Neither operation touches a geometry buffer."""
     try:
-        import cascadio
+        cascadio = importlib.import_module("cascadio")
     except Exception as exc:  # ImportError, or a broken partial install
         raise ModelToolingMissing(
             "3D preview needs the 'cascadio' package to read STEP files; install it to "
@@ -439,7 +443,7 @@ def model_to_glb(src: Path) -> bytes:
         raise ModelConversionError("the 3D model has no geometry to show")
 
     try:
-        data = scene.export(file_type="glb")
+        data = scene.export(file_obj=None, file_type="glb")
     except Exception as exc:
         raise ModelConversionError(
             f"could not encode the 3D model as GLB: {exc}"

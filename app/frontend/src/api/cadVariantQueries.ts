@@ -4,8 +4,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   cadVariantApi,
-  type CadVariantActivation,
   type CadVariantDocument,
+  type CadVariantPairActivation,
 } from "./cadVariantClient";
 
 export const cadVariantQueryKey = (partId: string) =>
@@ -19,15 +19,12 @@ export function useCadVariantInventory(partId: string, enabled: boolean) {
   });
 }
 
-export function useActivateCadVariant(partId: string) {
+export function useActivateCadPair(partId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (activation: CadVariantActivation) =>
-      cadVariantApi.activate(partId, activation),
+    mutationFn: (activation: CadVariantPairActivation) =>
+      cadVariantApi.activatePair(partId, activation),
     onSuccess: async (document: CadVariantDocument) => {
-      // The response advances the controlled selector immediately. Refetch both truths anyway:
-      // inventory proves the active pointer and part detail proves the newly materialized assets
-      // that RepresentationMatrix renders.
       queryClient.setQueryData(cadVariantQueryKey(partId), document);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: cadVariantQueryKey(partId) }),
@@ -36,8 +33,6 @@ export function useActivateCadVariant(partId: string) {
       ]);
     },
     onError: async () => {
-      // A 409 means another writer advanced the pointer. Every failure refetches the inventory so
-      // the controlled selector cannot keep offering a stale expectedActiveVariantId.
       await queryClient.invalidateQueries({
         queryKey: cadVariantQueryKey(partId),
       });

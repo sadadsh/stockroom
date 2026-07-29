@@ -40,7 +40,6 @@ function mockSource(url: string | null = "https://app.ultralibrarian.com/x") {
 afterEach(() => {
   vi.restoreAllMocks();
   delete (window as { pywebview?: unknown }).pywebview;
-  delete window.__STOCKROOM_CAD_DOWNLOAD__;
 });
 
 describe("CaptureProvider store", () => {

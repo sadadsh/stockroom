@@ -222,7 +222,7 @@
     --c-acc: #1b1b1e;
     --c-acc-on: #f5f5f5;
     --c-acc-strong: #1b1b1e;
-    --c-acc-soft: rgba(0, 0, 0, 0.06);
+    --c-acc-soft: rgba(0, 0, 0, 0.11);
     --c-hero-glow: rgba(0, 0, 0, 0.05);
     /* Light elevation: a bright top edge (the crisp highlight a lit panel has)
        over soft, low-opacity shadows. */

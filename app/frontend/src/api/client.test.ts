@@ -32,6 +32,18 @@ function okBlob(bytes: Uint8Array, type: string): Response {
   } as unknown as Response;
 }
 
+function okDownload(content: string, filename: string): Response {
+  const blob = new Blob([content], { type: "text/csv" });
+  return {
+    ok: true,
+    status: 200,
+    blob: async () => blob,
+    headers: new Headers({
+      "content-disposition": `attachment; filename="${filename}"`,
+    }),
+  } as unknown as Response;
+}
+
 describe("api client", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -65,6 +77,16 @@ describe("api client", () => {
     expect(url).toContain("complete_only=true");
   });
 
+  it("routes delete recovery through the exact part-scoped undo endpoint", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ id: "part/with space" }));
+
+    await api.restoreDeletedPart("part/with space");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/library/parts/part%2Fwith%20space/undo-delete");
+    expect((init as RequestInit).method).toBe("POST");
+  });
+
   it("searchParts serializes each spec constraint as a repeated query param", async () => {
     fetchMock.mockResolvedValueOnce(okJson({ parts: [], count: 0 }));
 
@@ -76,10 +98,7 @@ describe("api client", () => {
     const url = new URL(String(fetchMock.mock.calls[0][0]));
     expect(url.pathname).toContain("/api/library/search");
     expect(url.searchParams.get("category")).toBe("Resistors");
-    expect(url.searchParams.getAll("spec")).toEqual([
-      "Resistance:1000~10000",
-      "Tolerance:1%",
-    ]);
+    expect(url.searchParams.getAll("spec")).toEqual(["Resistance:1000~10000", "Tolerance:1%"]);
   });
 
   it("parametricFacets scopes by category and query", async () => {
@@ -130,19 +149,149 @@ describe("api client", () => {
     });
   });
 
-  it("posts inspect paths and lcsc ids and returns the job id", async () => {
-    fetchMock.mockResolvedValueOnce(okJson({ job_id: "job123" }));
+  it("binds a change request to the exact displayed project review", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        event: { id: "event-1", kind: "changes_requested" },
+        candidate: {},
+      }),
+    );
 
-    const res = await api.ingestInspect(["/tmp/part.zip"], ["C123"]);
-
-    expect(res).toEqual({ job_id: "job123" });
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toContain("/api/ingest/inspect");
-    expect((init as RequestInit).method).toBe("POST");
-    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
-      paths: ["/tmp/part.zip"],
-      lcsc_ids: ["C123"],
+    await api.requestProjectChanges("amp", {
+      branch: "work/mina/power",
+      commit: "b".repeat(40),
+      base_branch: "main",
+      base_commit: "a".repeat(40),
+      reviewer: "Sadad",
+      message: "Verify the power-stage clearance.",
     });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/projects/amp/reviews/request-changes");
+    expect(init).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({
+        branch: "work/mina/power",
+        commit: "b".repeat(40),
+        base_branch: "main",
+        base_commit: "a".repeat(40),
+        reviewer: "Sadad",
+        message: "Verify the power-stage clearance.",
+      }),
+    });
+  });
+
+  it("builds evidence for the exact displayed project review", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        schema_version: 1,
+        commit: "b".repeat(40),
+        digest: "d".repeat(64),
+      }),
+    );
+
+    await api.projectReviewEvidence("amp", {
+      branch: "work/mina/power",
+      commit: "b".repeat(40),
+      base_branch: "main",
+      base_commit: "a".repeat(40),
+    });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/projects/amp/reviews/evidence");
+    expect(init).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({
+        branch: "work/mina/power",
+        commit: "b".repeat(40),
+        base_branch: "main",
+        base_commit: "a".repeat(40),
+      }),
+    });
+  });
+
+  it("runs native checks for the exact displayed project review", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        schema_version: 1,
+        status: "passed",
+        commit: "b".repeat(40),
+        digest: "d".repeat(64),
+      }),
+    );
+
+    await api.validateProjectReview("amp", {
+      branch: "work/mina/power",
+      commit: "b".repeat(40),
+      base_branch: "main",
+      base_commit: "a".repeat(40),
+    });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/projects/amp/reviews/validate");
+    expect(init).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({
+        branch: "work/mina/power",
+        commit: "b".repeat(40),
+        base_branch: "main",
+        base_commit: "a".repeat(40),
+      }),
+    });
+  });
+
+  it("reads the live project BOM at the selected board quantity", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ lines: [], evidence: {} }));
+
+    await api.liveProjectBom("amp power", 7);
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toContain("/api/projects/amp%20power/bom/live");
+    expect(url.searchParams.get("boards")).toBe("7");
+  });
+
+  it("downloads the live project BOM with the server filename", async () => {
+    fetchMock.mockResolvedValueOnce(okDownload("Qty,MPN\n7,LM358DR\n", "amp-bom.csv"));
+
+    const result = await api.liveProjectBomExport("amp power", 7);
+
+    const [rawUrl, init] = fetchMock.mock.calls[0];
+    const url = new URL(String(rawUrl));
+    expect(url.pathname).toContain("/api/projects/amp%20power/bom/live/export");
+    expect(url.searchParams.get("boards")).toBe("7");
+    expect(url.searchParams.get("kind")).toBe("csv");
+    expect((init as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer test-token",
+      Accept: "text/csv",
+    });
+    expect(result.filename).toBe("amp-bom.csv");
+    expect(result.blob.type).toBe("text/csv");
+    expect(result.blob.size).toBeGreaterThan(0);
+  });
+
+  it("assigns one exact placement group through the shared project route", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ project: "Amp", refs: ["R1", "R2"], part_id: "r10k", bound: 2 }),
+    );
+
+    await api.assignProjectGroup("amp power", ["R1", "R2"], "r10k");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toContain("/api/projects/amp%20power/assign");
+    expect(init).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ refs: ["R1", "R2"], part_id: "r10k" }),
+    });
+  });
+
+  it("resumes one exact persisted project work session", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ repository: null, session: null, recovery: null }));
+
+    await api.resumeWorkSession("amp power", "session/a");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/projects/amp%20power/work-sessions/session%2Fa/resume");
+    expect(init).toMatchObject({ method: "POST" });
   });
 
   it("surfaces the 422 complete-to-add gate missing list on commit as ApiError.missing", async () => {
@@ -206,48 +355,6 @@ describe("api client", () => {
     expect((init as RequestInit).method).toBe("POST");
   });
 
-  it("POSTs a symbol reference with lib, name and the default kicad tool", async () => {
-    fetchMock.mockResolvedValueOnce(
-      okJson({
-        id: "r1",
-        assets: {
-          kicad: {
-            symbol: { ref: { lib: "Device", name: "R", file: "" } },
-            footprint: null,
-            model: null,
-          },
-        },
-      }),
-    );
-    const res = await api.attachSymbol("r1", "Device", "R");
-    // Reads through the `ref` wrapper on purpose: a slot is `{ref, origin?, checks?}`, and
-    // asserting `symbol?.name` would pass against a mock while yielding undefined off the wire.
-    expect(res.assets.kicad.symbol?.ref.name).toBe("R");
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(new URL(String(url)).pathname).toBe("/api/library/parts/r1/symbol");
-    expect((init as RequestInit).method).toBe("POST");
-    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
-      lib: "Device",
-      name: "R",
-      tool: "kicad",
-    });
-  });
-
-  it("POSTs a footprint reference and carries an explicit tool", async () => {
-    fetchMock.mockResolvedValueOnce(
-      okJson({ id: "r1", footprint: { lib: "L", name: "F", tool: "altium" } }),
-    );
-    await api.attachFootprint("r1", "L", "F", "altium");
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(new URL(String(url)).pathname).toBe("/api/library/parts/r1/footprint");
-    expect((init as RequestInit).method).toBe("POST");
-    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
-      lib: "L",
-      name: "F",
-      tool: "altium",
-    });
-  });
-
   it("reads the redacted settings", async () => {
     fetchMock.mockResolvedValueOnce(
       okJson({ mouser_api_key_set: true, mouser_api_key_hint: "1234" }),
@@ -276,9 +383,7 @@ describe("api client", () => {
     await api.listProfiles();
     expect(String(fetchMock.mock.calls[0][0])).toContain("/api/profiles");
 
-    fetchMock.mockResolvedValueOnce(
-      okJson({ profiles: ["Main", "Archive"], active: "Main" }),
-    );
+    fetchMock.mockResolvedValueOnce(okJson({ profiles: ["Main", "Archive"], active: "Main" }));
     await api.createProfile("Archive", true);
     const init = fetchMock.mock.calls[1][1] as RequestInit;
     expect(init.method).toBe("POST");
@@ -370,9 +475,7 @@ describe("api client", () => {
     );
     const buf = await api.modelGlb("tps62130");
     expect(buf).toBeInstanceOf(ArrayBuffer);
-    expect(new Uint8Array(buf).slice(0, 4)).toEqual(
-      new Uint8Array([0x67, 0x6c, 0x54, 0x46]),
-    );
+    expect(new Uint8Array(buf).slice(0, 4)).toEqual(new Uint8Array([0x67, 0x6c, 0x54, 0x46]));
     expect(String(fetchMock.mock.calls[0][0])).toContain("/api/previews/model/tps62130.glb");
   });
 
@@ -397,7 +500,12 @@ describe("api client", () => {
     fetchMock.mockResolvedValueOnce(
       okJson({
         commits: [
-          { sha: "a".repeat(40), subject: "Edit tps: mpn", author: "Sadad", iso_date: "2026-07-13T12:00:00-04:00" },
+          {
+            sha: "a".repeat(40),
+            subject: "Edit tps: mpn",
+            author: "Sadad",
+            iso_date: "2026-07-13T12:00:00-04:00",
+          },
         ],
         count: 1,
       }),
@@ -412,7 +520,12 @@ describe("api client", () => {
 
   it("requests the diff with both revs, dropping an empty 'a' (the earliest side)", async () => {
     fetchMock.mockResolvedValueOnce(
-      okJson({ a: "", b: "def", fields: [], assets: { symbol: false, footprint: false, model: false, datasheet: false } }),
+      okJson({
+        a: "",
+        b: "def",
+        fields: [],
+        assets: { symbol: false, footprint: false, model: false, datasheet: false },
+      }),
     );
     await api.partDiff("tps62130", "", "def456");
     const url = new URL(String(fetchMock.mock.calls[0][0]));
@@ -424,7 +537,12 @@ describe("api client", () => {
 
   it("sends both revs when a real 'a' is given", async () => {
     fetchMock.mockResolvedValueOnce(
-      okJson({ a: "abc", b: "def", fields: [], assets: { symbol: true, footprint: false, model: false, datasheet: false } }),
+      okJson({
+        a: "abc",
+        b: "def",
+        fields: [],
+        assets: { symbol: true, footprint: false, model: false, datasheet: false },
+      }),
     );
     await api.partDiff("tps62130", "abc123", "def456");
     const url = new URL(String(fetchMock.mock.calls[0][0]));
@@ -521,5 +639,63 @@ describe("api client", () => {
         }
       })(),
     ).rejects.toBe("STM index not built");
+  });
+
+  it("preserves the durable completion reference returned by submission", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ workflow_batch_id: "batch-1", event_cursor: 17 }));
+
+    const result = await api.runCompletion({ limit: 1_000 });
+
+    expect(result).toEqual({
+      workflow_batch_id: "batch-1",
+      event_cursor: 17,
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/api/library/completion/run");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse(String((init as RequestInit).body))).toEqual({
+      limit: 1_000,
+    });
+  });
+
+  it("serializes bounded durable event cursors and batch pages", async () => {
+    fetchMock
+      .mockResolvedValueOnce(okJson({ schema_version: 1, events: [] }))
+      .mockResolvedValueOnce(okJson({ schema_version: 1, items: [] }));
+
+    await api.workflowEvents("batch-1", 42, 200);
+    await api.workflowBatch("batch-1", 99, 100);
+
+    const eventUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(eventUrl.pathname).toBe("/api/workflows/batches/batch-1/events");
+    expect(eventUrl.searchParams.get("after_sequence")).toBe("42");
+    expect(eventUrl.searchParams.get("limit")).toBe("200");
+    const batchUrl = new URL(String(fetchMock.mock.calls[1][0]));
+    expect(batchUrl.pathname).toBe("/api/workflows/batches/batch-1");
+    expect(batchUrl.searchParams.get("after_ordinal")).toBe("99");
+    expect(batchUrl.searchParams.get("limit")).toBe("100");
+  });
+
+  it("routes every durable control to its exact batch-scoped endpoint", async () => {
+    for (let index = 0; index < 4; index += 1) {
+      fetchMock.mockResolvedValueOnce(okJson({ schema_version: 1 }));
+    }
+
+    await api.workflowPause("batch-1");
+    await api.workflowResume("batch-1");
+    await api.workflowRetry("batch-1");
+    await api.workflowCancel("batch-1");
+
+    expect(
+      fetchMock.mock.calls.map(([url, init]) => ({
+        method: (init as RequestInit).method,
+        path: new URL(String(url)).pathname,
+      })),
+    ).toEqual([
+      { method: "POST", path: "/api/workflows/batches/batch-1/pause" },
+      { method: "POST", path: "/api/workflows/batches/batch-1/resume" },
+      { method: "POST", path: "/api/workflows/batches/batch-1/retry" },
+      { method: "POST", path: "/api/workflows/batches/batch-1/cancel" },
+    ]);
   });
 });

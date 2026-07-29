@@ -444,6 +444,39 @@ def test_delete_part_removes_everything(tmp_path, fixtures_dir):
     assert repo.is_clean()
 
 
+def test_delete_part_can_be_restored_as_one_non_destructive_git_revert(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    added = ops.add_part(staged)
+    before_delete = repo.head()
+
+    delete_commit = ops.delete_part(added.id)
+    restored = ops.restore_deleted_part(added.id)
+
+    lib = profile.library
+    assert delete_commit != before_delete
+    assert repo.head() not in {before_delete, delete_commit}
+    assert restored.id == added.id
+    assert (lib.parts_dir / f"{added.id}.json").exists()
+    assert "TPS62130RGTR" in SymbolLib.load(lib.symbol_lib_path("ICs")).symbol_names
+    assert (lib.footprint_lib_path("ICs") / "TPS62130RGTR.kicad_mod").exists()
+    assert (lib.models_dir / "TPS62130RGTR.step").exists()
+    assert (lib.datasheets_dir / f"{added.id}.pdf").exists()
+    assert repo.is_clean()
+
+
+def test_undo_refuses_to_revert_a_non_delete_commit(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    added = ops.add_part(staged)
+    path = profile.library.parts_dir / f"{added.id}.json"
+    path.unlink()
+    repo.commit("A manual removal with a different contract", [path])
+
+    with pytest.raises(ValueError, match="not an undoable deletion"):
+        ops.restore_deleted_part(added.id)
+
+
 def test_detect_drift_clean_after_add(tmp_path, fixtures_dir):
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)

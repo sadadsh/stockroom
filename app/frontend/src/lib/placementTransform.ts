@@ -26,7 +26,11 @@ export function kicadModelPlacementMatrix(
 ): THREE.Matrix4 {
   const [ox, oy, oz] = placement.offset;
   const [rx, ry, rz] = placement.rotate.map((degrees) => (degrees * Math.PI) / 180);
-  const [sx, sy, sz] = placement.scale.map((value) => value || 1);
+  // Preserve the source values exactly. KiCad's omitted scale is normalized to
+  // [1, 1, 1] by the footprint reader; a literal zero is therefore evidence, not
+  // another spelling of "missing". Replacing it with 1 made a source-hidden axis
+  // visible in Stockroom and broke parity with KiCad's own glm::scale call.
+  const [sx, sy, sz] = placement.scale;
 
   const kicad = new THREE.Matrix4()
     .makeTranslation(ox, oy, oz)

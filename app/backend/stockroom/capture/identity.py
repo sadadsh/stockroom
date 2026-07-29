@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlparse
 
+from stockroom.text import is_abbreviation_of
+
 if TYPE_CHECKING:
     from stockroom.ingest.staging import StagingCandidate
 
@@ -40,6 +42,18 @@ _PROVIDER_HOSTS = {
         }
     ),
     "digikey-traceparts": frozenset(
+        {
+            "digikey.com",
+            "www.digikey.com",
+        }
+    ),
+    "digikey-manufacturer": frozenset(
+        {
+            "digikey.com",
+            "www.digikey.com",
+        }
+    ),
+    "digikey-cadenas": frozenset(
         {
             "digikey.com",
             "www.digikey.com",
@@ -98,7 +112,7 @@ def exact_observation_error(record: object, observed: PageIdentity) -> str:
                 "the provider exposed no exact candidate with manufacturer "
                 f"{requested_manufacturer!r}"
             )
-        if _manufacturer_key(observed.manufacturer) != _manufacturer_key(requested_manufacturer):
+        if not _same_manufacturer(observed.manufacturer, requested_manufacturer):
             return (
                 "the provider exact-MPN candidate identifies manufacturer "
                 f"{observed.manufacturer!r}, not {requested_manufacturer!r}"
@@ -130,6 +144,21 @@ def _manufacturer_key(value: str) -> str:
     """Normalize presentation separators, not manufacturer words or aliases."""
     normalized = unicodedata.normalize("NFKC", value or "").casefold()
     return "".join(character for character in normalized if character.isalnum())
+
+
+def _same_manufacturer(left: str, right: str) -> bool:
+    """Accept only an exact spelling or a provable abbreviation relationship.
+
+    Distributor catalogues routinely identify Texas Instruments as ``TI``. Stockroom already has
+    one deliberately narrow, adversarially tested abbreviation proof for canonical-field
+    reconciliation; reusing that proof here avoids both a second alias table and the false-negative
+    fallback observed on LCSC C962978. Unrelated short names such as ``TI`` and ``Toshiba`` still
+    fail closed.
+    """
+
+    if _manufacturer_key(left) == _manufacturer_key(right):
+        return True
+    return is_abbreviation_of(left, right) or is_abbreviation_of(right, left)
 
 
 def provider_url_allowed(
@@ -168,7 +197,9 @@ def page_identity(
     """Read identity from the canonical detail URL shapes used by current adapters."""
     if not provider_url_allowed(vendor_key, url, allow_relative=allow_relative):
         return None
-    segments = [_decode_segment(segment) for segment in urlparse(url or "").path.split("/") if segment]
+    segments = [
+        _decode_segment(segment) for segment in urlparse(url or "").path.split("/") if segment
+    ]
     try:
         if vendor_key == "ultralibrarian":
             index = segments.index("details")
@@ -191,6 +222,8 @@ def page_identity(
             "digikey-snapmagic",
             "digikey-traceparts",
             "digikey-ultralibrarian",
+            "digikey-manufacturer",
+            "digikey-cadenas",
         }:
             index = segments.index("detail")
             # /en/products/detail/<manufacturer>/<mpn>/<opaque-product-id>
@@ -241,8 +274,9 @@ def select_exact_candidate(
                     f"{detail.mpn!r}, not requested MPN {requested_mpn!r}"
                 )
             )
-        if requested_manufacturer and (
-            _manufacturer_key(detail.manufacturer) != _manufacturer_key(requested_manufacturer)
+        if requested_manufacturer and not _same_manufacturer(
+            detail.manufacturer,
+            requested_manufacturer,
         ):
             return CandidateSelection(
                 error=(
@@ -255,13 +289,17 @@ def select_exact_candidate(
         # A native Altium-only archive has no ingest candidate to interrogate. For the implemented
         # browser providers, the canonical detail page must therefore carry the exact identity;
         # otherwise `_attach_altium_assets` would fall back to an arbitrary first library entry.
-        if vendor_key in {
-            "digikey-snapmagic",
-            "digikey-ultralibrarian",
-            "samacsys",
-            "snapmagic",
-            "ultralibrarian",
-        } and detail is None:
+        if (
+            vendor_key
+            in {
+                "digikey-snapmagic",
+                "digikey-ultralibrarian",
+                "samacsys",
+                "snapmagic",
+                "ultralibrarian",
+            }
+            and detail is None
+        ):
             return CandidateSelection(
                 error=(
                     "the vendor page does not demonstrate the requested part identity; "
@@ -283,7 +321,7 @@ def select_exact_candidate(
         if (
             requested_manufacturer_key
             and candidate_manufacturer
-            and _manufacturer_key(candidate_manufacturer) != requested_manufacturer_key
+            and not _same_manufacturer(candidate_manufacturer, requested_manufacturer)
         ):
             manufacturer_conflicts.append(candidate_manufacturer)
             continue

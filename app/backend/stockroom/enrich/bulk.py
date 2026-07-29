@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import csv
 import io
-import re
 from dataclasses import dataclass, field
 
+from stockroom.enrich.datasheet import extract_datasheet_specs
+from stockroom.enrich.errors import EnrichError
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.mutation.library_ops import staged_missing_fields
+from stockroom.text import fullest_name
 
 # CSV header names that mark the MPN column, lowercased, checked in order.
 _MPN_HEADERS = ("mpn", "manufacturer part number", "part number", "part#", "partnumber")
@@ -133,12 +135,12 @@ class ImportItem:
     query: str
     mpn: str = ""
     part_id: str = ""
-    status: str = ""          # added | would-add | exists | duplicate | incomplete | error
+    status: str = ""  # added | would-add | exists | duplicate | incomplete | error
     display_name: str = ""
     category: str = ""
     missing: list[str] = field(default_factory=list)
     error: str = ""
-    resolved_by: str = ""     # which distributor recognised the stock number, if any
+    resolved_by: str = ""  # which distributor recognised the stock number, if any
     # What CAD the part landed with. "kicad-stock" means a real, placeable symbol +
     # footprint + 3D model (KiCad's own, referenced by lib_id); "none" means the record
     # landed on identity alone and still needs a capture. The owner's question is "did I
@@ -227,47 +229,6 @@ def _passive_record(candidate: StagingCandidate):
     return record
 
 
-_LCSC_IN_URL = re.compile(r"/product-detail/(C\d+)", re.IGNORECASE)
-_LCSC_ID = re.compile(r"^C\d+$", re.IGNORECASE)
-
-
-def lcsc_id_for(candidate: StagingCandidate) -> str:
-    """The LCSC part number enrichment already found for this part, or "".
-
-    Measured on the owner's library: 69 of the first 96 cached enrichments carry one, because the
-    scrape leg resolves an LCSC product page and stores it as the candidate's purchase link. That
-    id is the key `ingest/lcsc.fetch_lcsc` needs to produce a real symbol, footprint and 3D model,
-    so reading it here is what connects two capabilities the repo already had.
-    """
-    for purchase in candidate.purchase:
-        m = _LCSC_IN_URL.search(purchase.url or "")
-        if m:
-            return m.group(1).upper()
-        if _LCSC_ID.match((purchase.part_number or "").strip()):
-            return purchase.part_number.strip().upper()
-    for value in candidate.specs.values():
-        text = str(value).strip()
-        if _LCSC_ID.match(text):
-            return text.upper()
-    return ""
-
-
-def _take_assets(candidate: StagingCandidate, cad: StagingCandidate) -> None:
-    """Move a converted part's ASSET files onto the enriched candidate, keeping the enriched
-    IDENTITY. The converter names things after the LCSC id ("C7666"); enrichment knows the real
-    manufacturer part, description and sourcing, and those are strictly better. Only the files
-    are taken."""
-    candidate.symbol_lib_path = cad.symbol_lib_path
-    candidate.symbol_name = cad.symbol_name
-    candidate.footprint_variants = list(cad.footprint_variants)
-    candidate.chosen_footprint_index = cad.chosen_footprint_index
-    candidate.model_path = cad.model_path
-    # add_part REFUSES a staged symbol with no entry name (it would merge a symbol named ""),
-    # so the entry name is guaranteed here rather than left to chance.
-    if candidate.symbol_lib_path is not None and not candidate.entry_name:
-        candidate.entry_name = candidate.mpn or cad.entry_name or cad.symbol_name
-
-
 def _lookup(index):
     """The index to query RIGHT NOW. `index` may be the object itself (tests, short calls) or a
     zero-argument callable that returns the current one - which is what a long run must pass,
@@ -275,8 +236,53 @@ def _lookup(index):
     return index() if callable(index) else index
 
 
-def bulk_import(queries, pipeline, ops, *, index, category: str = "Other",
-                dry_run: bool = False, on_progress=None, cad_source=None) -> ImportReport:
+def _promote_datasheet_manufacturer(candidate: StagingCandidate) -> None:
+    """Prefer a provably fuller manufacturer spelling from the exact datasheet.
+
+    Distributor catalogues commonly return short names such as ``TI``.  The
+    downloaded PDF is already part of the import and can carry the full maker
+    name, but the ordinary enrichment walk stops asking for manufacturer after
+    the short catalogue value fills that field.  Only inspect short, single-word
+    values, require the exact requested MPN to occur in the PDF, and use the
+    existing conservative abbreviation proof.  An unrelated name never wins.
+    """
+
+    current = candidate.manufacturer.strip()
+    identifier = candidate.mpn.strip()
+    path = candidate.datasheet_path
+    compact = "".join(character for character in current if character.isalnum())
+    if not current or not identifier or path is None or " " in current or len(compact) > 5:
+        return
+    try:
+        result = extract_datasheet_specs(
+            path,
+            known_mpn=identifier,
+            page_limit=None,
+        )
+    except (EnrichError, OSError):
+        return
+    if result.mpn is None or str(result.mpn.value) != identifier:
+        return
+    observed = "" if result.manufacturer is None else str(result.manufacturer.value).strip()
+    promoted = fullest_name((current, observed))
+    if not promoted or promoted == current:
+        return
+    alternates = candidate.alternates.setdefault("manufacturer", [])
+    if not any(str(entry.get("value", "")).strip() == current for entry in alternates):
+        alternates.append({"value": current, "source": "", "confidence": ""})
+    candidate.manufacturer = promoted
+
+
+def bulk_import(
+    queries,
+    pipeline,
+    ops,
+    *,
+    index,
+    category: str = "Other",
+    dry_run: bool = False,
+    on_progress=None,
+) -> ImportReport:
     """Import a list of part numbers into the library, one atomic add each.
 
     Each query is RESOLVED to a manufacturer part number first (a distributor stock number is
@@ -327,6 +333,7 @@ def bulk_import(queries, pipeline, ops, *, index, category: str = "Other",
                 continue
             candidate = _candidate_for(item.mpn, category)
             pipeline.enrich_candidate(candidate)
+            _promote_datasheet_manufacturer(candidate)
             item.category = candidate.category
             item.display_name = candidate.display_name
             # A passive resolves KiCad's own stock symbol/footprint/3D from its MPN alone, so it
@@ -353,21 +360,10 @@ def bulk_import(queries, pipeline, ops, *, index, category: str = "Other",
                 added_mpns.add(item.mpn)
                 continue
 
-            # Not a passive: try the LCSC lane for REAL files (symbol + footprint + 3D, converted
-            # from the vendor's own data with no login). A failure here never loses the part - it
-            # falls through to the identity-only add and is reported as still needing a capture,
-            # because a part in the library beats a part dropped on the floor.
+            # Non-passive CAD is admitted only by the coherent provider-evidence workflow.
+            # LCSC may still supply exact product identity and specification metadata, but it
+            # has no CAD conversion or production symbol/footprint/model authority.
             item.assets = "none"
-            lcsc_id = lcsc_id_for(candidate) if cad_source is not None else ""
-            if lcsc_id:
-                try:
-                    cad = cad_source(lcsc_id)
-                except Exception:  # noqa: BLE001 - a convert failure is a degraded add, not a loss
-                    cad = None
-                if cad is not None and cad.symbol_lib_path is not None:
-                    _take_assets(candidate, cad)
-                    item.assets = "lcsc"
-
             missing = _missing_for(candidate)
             if missing:
                 item.status = "incomplete"

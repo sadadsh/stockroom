@@ -690,6 +690,11 @@ def _click_dev_ids(page, dev_ids: list[str]) -> list[str]:
         # a settle wait, not a detector: the click has already landed, and this only lets the
         # resulting transition finish before the next click or the capture.
         page.wait_for_timeout(700)
+        # A rail destination click leaves the pointer on the expanded overlay. Without parking it,
+        # that overlay intercepts the next requested control even when the control is visibly in
+        # the page behind it (for example: navigate to STM Viewer, then open Bench). Multi-step
+        # captures must therefore close the transient rail state between clicks.
+        _park_pointer_off_rail(page)
     return missing
 
 

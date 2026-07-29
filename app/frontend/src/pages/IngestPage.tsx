@@ -1,23 +1,19 @@
 /**
  * Add A Part: the one place to add a part to the library. Paste a product link (Mouser,
- * LCSC, DigiKey...) or a part number and Stockroom pulls every field and decides what the
- * part needs. A passive (R/C/L) is complete with no files: it uses KiCad's stock symbol,
- * footprint and 3D model, which are shown before it is added. A non-passive takes its KiCad
- * files from a vendor ZIP here (the complete-to-add gate), and the moment it lands the
- * Complete Part window opens so the guided capture finishes the ALTIUM set - the add flow
- * hands off into the both-EDA workflow instead of dead-ending on a toast. The pulled
- * identity/specs merge onto the ZIP so nothing is re-typed; a ZIP with no link still works.
+ * LCSC, DigiKey...) or a part number and Stockroom retains every available sourced field and
+ * decides what the part needs. A passive (R/C/L) needs no provider download because qualified
+ * built-in representations project into both tools. A non-passive lands as an identity/spec
+ * record, then Complete Part runs
+ * the network capture that must verify one same-source KiCad + Altium + STEP set. Local ZIP
+ * ingest is deliberately absent so a single-tool or mixed-author set cannot enter here.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ApiError, api } from "../api/client";
 import type { EnrichmentResult, StagingCandidate } from "../api/types";
-import { useJob, type JobProgress } from "../lib/useJob";
 import { useEnrichLookup, useSettings } from "../api/queries";
 import { useCapture } from "../lib/capture";
 import { useAddPart } from "../lib/addPart";
 import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
-import { onQueuedPaths } from "../lib/ingestQueue";
 import {
   mergeResultIntoCandidate,
   pulledSpecConflicts,
@@ -34,7 +30,6 @@ import { EnrichStages } from "../components/EnrichStages";
 import { PassiveAddSection } from "../components/PassiveAddSection";
 import { PhotoTrigger, productPhotoUrl } from "../components/ProductPhoto";
 import { PulledDepth } from "../components/PulledDepth";
-import { UploadIcon } from "../components/icons";
 
 // Each staged candidate carries a stable id assigned on load, so committing or
 // removing one never shifts another's React key (which would remount its sibling
@@ -43,8 +38,8 @@ interface Staged {
   id: number;
   candidate: StagingCandidate;
   datasheetUrl: string;
-  // every spec disagreement around this candidate (API-vs-API + ZIP-vs-pull), kept for
-  // display on the review card (merge-only-identical, owner 2026-07-24)
+  // Every source disagreement around this candidate, kept for display on the
+  // review card (merge-only-identical, owner 2026-07-24).
   conflicts: SpecConflict[];
 }
 
@@ -107,13 +102,12 @@ function hasExactPulledIdentity(result: EnrichmentResult, input: string): boolea
 export function IngestPage() {
   const [input, setInput] = useState("");
   const [result, setResult] = useState<EnrichmentResult | null>(null);
-  // The exact input that produced `result`, so the passive section and the ZIP merge
-  // use the right link even after the input box is edited.
+  // The exact input that produced `result`, so the staged identity and passive
+  // section use the right source even after the input box is edited.
   const [lookedUpInput, setLookedUpInput] = useState("");
-  // null = nothing inspected yet; [] = inspected, found nothing.
+  // A non-passive exact match stages one metadata-only candidate for review.
   const [staged, setStaged] = useState<Staged[] | null>(null);
   const nextId = useRef(0);
-  const job = useJob<StagingCandidate[]>();
   // The lookup is a background job now (the render tier can take seconds): it streams the live
   // fetching/rendering/extracting/validating stages, and the sourced result lands on `enrich.result`.
   const enrich = useEnrichLookup();
@@ -137,11 +131,6 @@ export function IngestPage() {
     "Nothing came back. The page might have blocked the fetch, or the link is not a product page.",
   );
   const toastLookupFailed = useText("ingest.toast-lookup-failed", "Look up failed.");
-  const toastInspectFailed = useText("ingest.toast-inspect-failed", "Inspect failed");
-  const toastNoHost = useText(
-    "ingest.toast-no-host",
-    "Open Stockroom as the app to browse for a ZIP (a web browser cannot read file paths).",
-  );
   const toastAdded = useText("ingest.toast-added", "Added");
 
   const lookUp = useCallback(() => {
@@ -150,19 +139,17 @@ export function IngestPage() {
     setResult(null);
     setStaged(null);
     setLookedUpInput(v);
-    // Drop any in-flight ZIP inspect so its result never merges onto this new lookup.
-    job.reset();
     // Fire-and-forget: the hook drives status/progress/result; the settle effect below folds
     // the sourced fields in once the stream ends (a submit/stream failure lands as enrich.error).
     if (isUrl(v)) enrich.runUrl(v);
     else enrich.runPart(v);
-  }, [input, looking, job, enrich]);
+  }, [input, looking, enrich]);
 
   // Fold the finished lookup into the page: the sourced result feeds the passive section and
-  // the ZIP merge; a total miss or an error is surfaced honestly (never a fabricated value).
+  // metadata-only staging; a total miss or an error is surfaced honestly.
   // useLayoutEffect (not useEffect): `looking` flips false the moment the job commits done, but
-  // the local `result` is written here; running BEFORE paint keeps the empty "Browse for ZIP"
-  // state from flashing for one frame between the two on every successful lookup.
+  // the local `result` is written here; running BEFORE paint keeps the empty state
+  // from flashing for one frame between the two on every successful lookup.
   useLayoutEffect(() => {
     if (enrich.status === "done" && enrich.result) {
       const r = enrich.result;
@@ -174,8 +161,7 @@ export function IngestPage() {
       } else if (!r.add_plan) {
         // The perfect workflow (owner): a pulled NON-passive stages itself immediately -
         // one click lands it file-less, then the Complete Part window opens and the
-        // guided capture downloads both the KiCad and Altium sets. A vendor ZIP stays
-        // the fallback (inspecting one replaces this staged candidate wholesale).
+        // guided network capture verifies both EDA projections and their shared STEP.
         const url = isUrl(lookedUpInput) ? lookedUpInput : "";
         const candidate = {
           ...mergeResultIntoCandidate(FILE_LESS_CANDIDATE, r, url),
@@ -197,82 +183,9 @@ export function IngestPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enrich.status, enrich.result]);
 
-  const inspect = useCallback(
-    async (paths: string[], lcscIds: string[]) => {
-      setStaged(null);
-      job.reset();
-      try {
-        const { job_id } = await api.ingestInspect(paths, lcscIds);
-        await job.run(job_id);
-      } catch (err) {
-        toast(err instanceof ApiError ? err.message : toastInspectFailed, "err");
-      }
-    },
-    [job, toast],
-  );
-
-  // Native file picker for vendor ZIPs (the reliable path): the host exposes
-  // window.pywebview.api.pick_ingest_files, which returns real filesystem paths straight into
-  // the normal inspect flow. Drag-drop needs pywebview's own DOM registration to deliver paths
-  // and silently yields none otherwise, so Browse is the dependable way to add a ZIP.
-  const browseForZip = useCallback(async () => {
-    const hostApi = (
-      window as unknown as {
-        pywebview?: { api?: { pick_ingest_files?: () => Promise<string[]> } };
-      }
-    ).pywebview?.api;
-    if (!hostApi?.pick_ingest_files) {
-      toast(toastNoHost, "neutral");
-      return;
-    }
-    try {
-      const paths = await hostApi.pick_ingest_files();
-      if (paths && paths.length > 0) inspect(paths, []);
-    } catch {
-      // the picker was cancelled or is unavailable; nothing to do
-    }
-  }, [inspect, toast]);
-
-  // Load the job's result once it settles. When a link was looked up (a non-passive), the
-  // pulled identity/specs merge onto each candidate so only the ZIP's assets are new; the
-  // pulled datasheet link is carried so the candidate can fetch+store it in one click.
-  useEffect(() => {
-    if (job.status !== "done" || !job.result) return;
-    // Wait for a still-streaming lookup. A native drag can drop a ZIP mid-lookup, and its
-    // inspect settles FIRST; staging its candidates now (with no result yet) would strand them
-    // un-merged, because this effect keys off the ZIP job and would not re-run when the lookup
-    // lands. Deferring while the lookup runs - enrich.status is a dep - folds the pulled data in
-    // exactly once, when it arrives. enrich.result is read (not the local mirror) so the merge
-    // never depends on the sibling layout effect having written `result` first.
-    if (enrich.status === "running") return;
-    const r = enrich.status === "done" ? enrich.result : null;
-    const url = r && isUrl(lookedUpInput) ? lookedUpInput : "";
-    setStaged(
-      job.result.map((candidate) => ({
-        id: nextId.current++,
-        candidate: r ? mergeResultIntoCandidate(candidate, r, url) : candidate,
-        datasheetUrl: r ? sv(r.datasheet_url) : "",
-        // conflicts compare the PRE-merge candidate (the ZIP's own answers) to the pull
-        conflicts: r ? pulledSpecConflicts(candidate, r) : [],
-      })),
-    );
-    // enrich.result/lookedUpInput are read at settle time; re-running on their change would
-    // re-key already-loaded cards and discard edits.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job.status, job.result, enrich.status]);
-
-  // A drop anywhere in the window queues native paths here; inspect them.
-  useEffect(() => {
-    return onQueuedPaths((paths) => {
-      if (paths.length > 0) inspect(paths, []);
-    });
-  }, [inspect]);
-
-  // When the LAST staged candidate is committed away, tear down the whole part context (like a
-  // passive add) so the just-added part's live lookup cannot contaminate a later ZIP and no
-  // completed job lingers to resurrect. Keyed off staged transitioning NON-EMPTY -> empty; an
-  // inspect that finds nothing (null -> empty) must NOT reset (it shows "No parts found"), hence
-  // the prev-length guard. Reading the transition here (not inside removeStaged) lets removeStaged
+  // When the staged candidate is committed away, tear down the whole part context
+  // so the just-added part's live lookup cannot contaminate the next lookup.
+  // Reading the transition here (not inside removeStaged) lets removeStaged
   // use a functional update, so committing several candidates concurrently can never miss the
   // emptiness check via a stale render-closure.
   const prevStagedLen = useRef<number | null>(null);
@@ -298,20 +211,13 @@ export function IngestPage() {
     setResult(null);
     setLookedUpInput("");
     setStaged(null);
-    // Tear down BOTH lifecycles, not just the local mirror. The staging effect merges from
-    // enrich.result and keys off job.status, so a stale "done" lookup would contaminate the next
-    // ZIP, and a still-"done" ZIP job would let flipping enrich.status done->idle re-fire the
-    // effect and resurrect the just-cleared candidate un-merged. Reset a COMPLETED job, but leave
-    // a genuinely in-flight one alone so a native-drag ZIP still inspecting through this teardown
-    // is not silently discarded (it finishes and stages standalone).
+    // Tear down the source job as well as the local mirror so a stale successful
+    // lookup cannot contaminate the next part.
     enrich.reset();
-    if (job.status !== "running") job.reset();
   }
 
-  const busy = job.status === "running";
   const plan = result?.add_plan ?? null;
-  const pulledSomething =
-    result !== null && hasExactPulledIdentity(result, lookedUpInput);
+  const pulledSomething = result !== null && hasExactPulledIdentity(result, lookedUpInput);
   // A real non-passive part (data pulled, needs its assets) vs a fetch that came back
   // empty (blocked/not a product page) - the latter must NOT assert "needs files".
   const nonPassive = result !== null && plan === null && pulledSomething;
@@ -325,14 +231,17 @@ export function IngestPage() {
     if (!blockedFetch || !isUrl(lookedUpInput) || !settingsQ.data) return null;
     const u = lookedUpInput.toLowerCase();
     if (u.includes("mouser.") && !settingsQ.data.mouser_api_key_set) return "mouser";
-    if ((u.includes("digikey.") || u.includes("digi-key")) && !settingsQ.data.digikey_client_secret_set)
+    if (
+      (u.includes("digikey.") || u.includes("digi-key")) &&
+      !settingsQ.data.digikey_client_secret_set
+    )
       return "digikey";
     return null;
   })();
 
   return (
     <div data-dev-id="ingest.root" className="flex flex-col gap-5">
-      {/* The hero: paste a link, or drop a ZIP. This is the whole point of the window. */}
+      {/* One network-first entry: exact identity before any CAD acquisition. */}
       <div data-dev-id="ingest.hero">
         <Eyebrow className="mb-2">
           <Text id="ingest.source-eyebrow">Source</Text>
@@ -366,7 +275,8 @@ export function IngestPage() {
         </div>
         <p className="mt-2 text-xs text-t3">
           <Text id="ingest.hero-hint">
-            A product link (Mouser, LCSC, DigiKey...) or a part number pulls every detail. A passive lands complete with no files.
+            An MPN or distributor link retains available metadata, datasheet, provenance, and source
+            disagreements. Qualified passives need no provider download.
           </Text>
         </p>
         {looking ? (
@@ -375,46 +285,21 @@ export function IngestPage() {
           </div>
         ) : !result ? (
           <>
-            {/* the alternate route: a vendor ZIP, as a region tile (the Complete Part
-                window's file-tile idiom, so the two part-windows read as one family) */}
-            <div
-              data-dev-id="ingest.zip-tile"
-              className="mt-3.5 flex items-center gap-3 rounded-control border border-line2 bg-raise p-3.5 shadow-file"
-            >
-              <span className="grid h-7 w-7 flex-none place-items-center rounded-control bg-raise2 text-t1">
-                <UploadIcon className="h-3.5 w-3.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-t1">
-                  <Text id="ingest.zip-title">Vendor ZIP</Text>
-                </div>
-                <div className="mt-0.5 text-xs text-t3">
-                  <Text id="ingest.browse-hint">
-                    A SnapEDA or Ultra Librarian ZIP carries the KiCad files. Drop it anywhere in the window, or browse.
-                  </Text>
-                </div>
-              </div>
-              <Button data-dev-id="ingest.browse" onClick={browseForZip} disabled={busy} className="flex-none">
-                <Text id="ingest.browse-label">Browse for ZIP</Text>
-              </Button>
-            </div>
-            {/* the path a non-passive takes, as structure instead of prose: pull the
-                details, land with the KiCad files, then the guided capture finishes the
-                Altium set. The sequence IS the app's two-EDA design philosophy. */}
+            {/* The only non-passive path: identity first, then one coherent network set. */}
             <div
               data-dev-id="ingest.path"
-              className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line pt-3"
+              className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-control border border-line bg-raise px-3 py-2.5"
             >
               <PathStep n={1}>
-                <Text id="ingest.path-pull">Pull Details</Text>
+                <Text id="ingest.path-pull">Resolve Identity + Data</Text>
               </PathStep>
               <PathArrow />
               <PathStep n={2}>
-                <Text id="ingest.path-add">Add The Part</Text>
+                <Text id="ingest.path-add">Add Once</Text>
               </PathStep>
               <PathArrow />
               <PathStep n={3}>
-                <Text id="ingest.path-capture">Capture KiCad + Altium Files</Text>
+                <Text id="ingest.path-capture">Collect One KiCad + Altium + STEP Package</Text>
               </PathStep>
             </div>
           </>
@@ -443,17 +328,23 @@ export function IngestPage() {
             <span className="text-sm text-warn">
               {blockedKeyVendor === "mouser" ? (
                 <Text id="ingest.blocked-mouser-key">
-                  Nothing was pulled, and no Mouser API key is set. Mouser blocks the page fetch, so the key is what resolves a Mouser link reliably. Add one in Settings under Sourcing, then look this up again, or drop a vendor ZIP.
+                  Nothing was pulled, and no Mouser API key is set. Mouser blocks the page fetch, so
+                  the key is what resolves a Mouser link reliably. Add one in Settings under
+                  Sourcing, then look this up again.
                 </Text>
               ) : blockedKeyVendor === "digikey" ? (
                 <Text id="ingest.blocked-digikey-key">
-                  Nothing was pulled, and no DigiKey API key is set. DigiKey blocks the page fetch, so the key is what resolves a DigiKey link reliably. Add one in Settings under Sourcing, then look this up again, or drop a vendor ZIP.
+                  Nothing was pulled, and no DigiKey API key is set. DigiKey blocks the page fetch,
+                  so the key is what resolves a DigiKey link reliably. Add one in Settings under
+                  Sourcing, then look this up again.
                 </Text>
               ) : (
                 <>
                   {isUrl(lookedUpInput) ? (
                     <Text id="ingest.blocked-msg">
-                      Nothing was pulled. The page might have blocked the fetch, or the link is not a product page. Use a different link, or drop a vendor ZIP.
+                      Nothing was pulled. The page might have blocked the fetch, or the link is not
+                      a product page. Use the exact manufacturer part number or a different product
+                      link.
                     </Text>
                   ) : (
                     <>
@@ -469,11 +360,6 @@ export function IngestPage() {
                 </>
               )}
             </span>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
-                <Text id="ingest.browse-label">Browse for ZIP</Text>
-              </Button>
-            </div>
           </div>
         </Card>
       ) : null}
@@ -491,8 +377,7 @@ export function IngestPage() {
               initialDatasheetUrl={datasheetUrl}
               onCommitted={(created) => {
                 removeStaged(id);
-                // Continue into Complete Part only when this emptied the staging list
-                // (a bulk ZIP add stays here so the remaining cards keep their place).
+                // Continue into Complete Part only when this emptied the staging list.
                 const remaining = (staged ?? []).filter((x) => x.id !== id).length;
                 if (remaining === 0) {
                   capture.requestOpenFor(created.id);
@@ -503,10 +388,6 @@ export function IngestPage() {
             />
           ))}
         </div>
-      ) : staged && staged.length === 0 ? (
-        <div className="py-4 text-center text-sm text-t3">
-          <Text id="ingest.no-parts">No parts found in what was dropped.</Text>
-        </div>
       ) : null}
 
       {nonPassive ? (
@@ -514,32 +395,26 @@ export function IngestPage() {
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 text-sm text-t2">
               <Badge tone="neutral">
-                <Text id="ingest.needs-files">Files Via Capture</Text>
+                <Text id="ingest.needs-files">Automatic Source Ladder</Text>
               </Badge>
               <span>
-                <Text id="ingest.needs-msg">Add it below and the guided capture downloads the KiCad and Altium files.</Text>
-              </span>
-            </div>
-            <PulledSummary result={result} />
-            <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
-                <Text id="ingest.browse-label">Browse for ZIP</Text>
-              </Button>
-              <span className="text-xs text-t3">
-                <Text id="ingest.drop-hint">
-                  The fallback when the capture cannot: a vendor ZIP (SnapEDA, Ultra Librarian) supplies the KiCad files up front. The pulled details are kept either way.
+                <Text id="ingest.needs-msg">
+                  Add it once; Stockroom reuses verified evidence, searches eligible providers in
+                  trust order, retains fallbacks, and activates one same-download KiCad + Altium +
+                  STEP package.
                 </Text>
               </span>
             </div>
+            <PulledSummary result={result} />
+            <p className="text-xs text-t3">
+              <Text id="ingest.network-only">
+                The same STEP is linked in KiCad and embedded in the Altium footprint. Identity-only
+                sources may contribute data but never active CAD; a visible provider window pauses
+                only for an account or security gate, or an explicit download choice.
+              </Text>
+            </p>
           </div>
         </Card>
-      ) : null}
-
-      {busy ? <Progress progress={job.progress} /> : null}
-      {job.status === "error" ? (
-        <div className="text-sm text-err">
-          <Text id="ingest.inspect-failed">Inspect failed.</Text> {job.error}
-        </div>
       ) : null}
 
       {/* The many-at-once lane, below the one-at-a-time lane it complements: the single-part
@@ -563,7 +438,8 @@ function PulledSummary({ result }: { result: EnrichmentResult }) {
     return (
       <span className="text-sm text-warn">
         <Text id="ingest.nothing-pulled">
-          Nothing was pulled. The page might have blocked the fetch, or the link is not a product page.
+          Nothing was pulled. The page might have blocked the fetch, or the link is not a product
+          page.
         </Text>
       </span>
     );
@@ -669,26 +545,6 @@ function PulledSpecTable({ result }: { result: EnrichmentResult }) {
             </div>
           ))}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function Progress({ progress }: { progress: JobProgress | null }) {
-  const pct = Math.max(0, Math.min(100, progress?.pct ?? 0));
-  return (
-    <div className="mt-4">
-      <div
-        data-dev-id="ingest.progress"
-        className="h-1.5 w-full overflow-hidden bg-raise2"
-      >
-        <div
-          className="h-full bg-acc transition-[width]"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <div className="mt-2 text-xs text-t3">
-        {progress?.message ? progress.message : <Text id="ingest.working">Working...</Text>}
       </div>
     </div>
   );

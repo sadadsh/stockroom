@@ -12,7 +12,10 @@ from stockroom.enrich.errors import EnrichError
 from stockroom.ingest.errors import IngestError
 from stockroom.kicad.errors import KiCadCliError
 from stockroom.mutation.library_ops import IncompleteError
+from stockroom.projects.collaboration import CollaborationError
+from stockroom.service import WorkflowCoordinatorError
 from stockroom.vcs.repo import GitError
+from stockroom.workflow import WorkflowConflict
 
 
 class ApiError(Exception):
@@ -29,6 +32,23 @@ def status_for(exc: Exception) -> int:
         return exc.status
     if isinstance(exc, IncompleteError):
         return 422
+    if isinstance(exc, WorkflowConflict):
+        return 409
+    if isinstance(exc, WorkflowCoordinatorError):
+        return 503
+    if isinstance(exc, CollaborationError):
+        if exc.code in {
+            "locking_unavailable",
+            "fetch_failed",
+            "push_failed",
+            "lock_status_failed",
+            "unlock_failed",
+            "review_event_fetch_failed",
+            "review_event_push_failed",
+            "review_event_write_failed",
+        }:
+            return 503
+        return 409
     if isinstance(exc, GitError):
         return 503
     if isinstance(exc, (IngestError, EnrichError, KiCadCliError)):
@@ -42,6 +62,9 @@ def status_for(exc: Exception) -> int:
 
 def error_body(exc: Exception) -> dict:
     body = {"error": type(exc).__name__, "detail": str(exc)}
+    code = getattr(exc, "code", None)
+    if code is not None:
+        body["code"] = code
     missing = getattr(exc, "missing", None)
     if missing is not None:
         body["missing"] = list(missing)

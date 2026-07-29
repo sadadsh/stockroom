@@ -470,12 +470,8 @@ export const CORE_BRING_UP_POLICY: TargetDefinitionPolicy = {
     },
   ],
   safety_rules: [],
-  channel_fabric: {
-    part_mpn: "",
-    channels_per_device: 0,
-    max_devices: 0,
-    default_state: "open",
-    reference_prefix: "U_ROUTE",
+  routing_constraints: {
+    safe_default: "open",
   },
   declared_blockers: [],
 };
@@ -536,9 +532,11 @@ export function TargetPolicyEditor({
         <p className="mb-3 text-xs text-t3">
           The compiler always inventories the functional power, ground, regulator, reset, boot,
           clock, and reserved-pin foundation. This policy adds access services, required routes,
-          target applicability, safety handling, and optional channel capacity. Pin capability
-          stays distinct from externally evidenced recovery or data-access support, and the whole
-          policy is included in the artifact digest.
+          target applicability, safety handling, and implementation-neutral routing requirements.
+          Stockroom specifies connection behavior and safe states, while the consuming design
+          chooses the switching, selection, or isolation technology. Pin capability stays
+          distinct from externally evidenced recovery or data-access support, and the whole policy
+          is included in the artifact digest.
         </p>
         <textarea
           value={draft}

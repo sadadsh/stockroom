@@ -71,9 +71,7 @@ def _preflight_script_archive(path: Path) -> None:
         return
     with zipfile.ZipFile(path) as archive:
         files = [item for item in archive.infolist() if not item.is_dir()]
-        if not any(
-            PurePosixPath(item.filename).name.casefold() == _IMPORT_NAME for item in files
-        ):
+        if not any(PurePosixPath(item.filename).name.casefold() == _IMPORT_NAME for item in files):
             return
         if len(files) != 6:
             raise UltraLibrarianImportError(
@@ -100,17 +98,12 @@ def _preflight_script_archive(path: Path) -> None:
                 )
             folded.add(key)
             unix_mode = item.external_attr >> 16
-            if (
-                item.create_system == 3
-                and stat.S_IFMT(unix_mode) not in {0, stat.S_IFREG}
-            ):
+            if item.create_system == 3 and stat.S_IFMT(unix_mode) not in {0, stat.S_IFREG}:
                 raise UltraLibrarianImportError(
                     f"the Ultra Librarian archive has a non-regular member: {name!r}"
                 )
             if item.flag_bits & 0x1:
-                raise UltraLibrarianImportError(
-                    "the Ultra Librarian script archive is encrypted"
-                )
+                raise UltraLibrarianImportError("the Ultra Librarian script archive is encrypted")
             if item.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}:
                 raise UltraLibrarianImportError(
                     "the Ultra Librarian script archive uses unsupported compression"
@@ -154,16 +147,18 @@ def _preflight_script_archive(path: Path) -> None:
                 "the Ultra Librarian Altium directory has unexpected members"
             )
         for member_name in ("ul_form.pas", "ul_form.dfm"):
-            if _sha256_bytes(archive.read(names[member_name])) != _APPROVED_STATIC_MEMBER_SHA256[
-                member_name
-            ]:
+            if (
+                _sha256_bytes(archive.read(names[member_name]))
+                != _APPROVED_STATIC_MEMBER_SHA256[member_name]
+            ):
                 raise UltraLibrarianImportError(
                     f"the Ultra Librarian static member is not reviewed: {member_name}"
                 )
         project_name = next(name for name in names if name.endswith(".prjscr"))
-        if _sha256_bytes(
-            archive.read(names[project_name])
-        ) != _APPROVED_STATIC_MEMBER_SHA256[".prjscr"]:
+        if (
+            _sha256_bytes(archive.read(names[project_name]))
+            != _APPROVED_STATIC_MEMBER_SHA256[".prjscr"]
+        ):
             raise UltraLibrarianImportError(
                 "the Ultra Librarian scripting project revision is not reviewed"
             )
@@ -229,9 +224,7 @@ def _payload_contract(
             "the Ultra Librarian ASCII component payload is not Windows-1252 text"
         ) from exc
     if not text.startswith("# Created by Ultra Librarian "):
-        raise UltraLibrarianImportError(
-            "the ASCII component payload has no Ultra Librarian header"
-        )
+        raise UltraLibrarianImportError("the ASCII component payload has no Ultra Librarian header")
     component = _unique_payload_value(
         text,
         r'^Component \(Name "([^"\r\n]+)"\)',
@@ -375,15 +368,17 @@ def _recognize_package(
             f"SHA-256 {importer_digest}"
         )
     for static_path, key in ((form_pas, "ul_form.pas"), (form_dfm, "ul_form.dfm")):
-        if hashlib.sha256(static_path.read_bytes()).hexdigest() != _APPROVED_STATIC_MEMBER_SHA256[
-            key
-        ]:
+        if (
+            hashlib.sha256(static_path.read_bytes()).hexdigest()
+            != _APPROVED_STATIC_MEMBER_SHA256[key]
+        ):
             raise UltraLibrarianImportError(
                 f"the Ultra Librarian static member is not reviewed: {static_path.name}"
             )
-    if hashlib.sha256(project.read_bytes()).hexdigest() != _APPROVED_STATIC_MEMBER_SHA256[
-        ".prjscr"
-    ]:
+    if (
+        hashlib.sha256(project.read_bytes()).hexdigest()
+        != _APPROVED_STATIC_MEMBER_SHA256[".prjscr"]
+    ):
         raise UltraLibrarianImportError(
             "the Ultra Librarian scripting project revision is not reviewed"
         )
@@ -446,14 +441,10 @@ def _patch_reviewed_dialogs(importer_text: str, *, expected_calls: int) -> str:
     )
     patched = patched.replace("ShowMessage(", "StockroomCaptureMessage(")
 
-    global_var = (
-        "    BrokenSCHFontManager : Integer; // for Alitum 19's broken SCH FontManager"
-    )
+    global_var = "    BrokenSCHFontManager : Integer; // for Alitum 19's broken SCH FontManager"
     first_function = "Function CheckLeft(BaseStr: String, Srch: String): Boolean;"
     if patched.count(global_var) != 1 or patched.count(first_function) != 1:
-        raise UltraLibrarianImportError(
-            "the reviewed Ultra Librarian declaration anchors changed"
-        )
+        raise UltraLibrarianImportError("the reviewed Ultra Librarian declaration anchors changed")
     patched = patched.replace(
         global_var,
         global_var + "\n    StockroomProviderMessage : String;",
@@ -605,7 +596,7 @@ def convert_ul_altium_package(
     if expected_mpn != expected_mpn.strip():
         raise ValueError("expected_mpn must not contain surrounding whitespace")
 
-    input_paths = tuple(Path(path) for path in inputs)
+    input_paths = [Path(path) for path in inputs]
     for path in input_paths:
         _preflight_script_archive(path)
 
@@ -632,8 +623,7 @@ def convert_ul_altium_package(
             path
             for item in unpacked
             for path in item.root.rglob("*")
-            if path.is_file()
-            and path.suffix.casefold() in {".schlib", ".pcblib", ".libpkg"}
+            if path.is_file() and path.suffix.casefold() in {".schlib", ".pcblib", ".libpkg"}
         ]
         if native_outputs:
             raise UltraLibrarianImportError(

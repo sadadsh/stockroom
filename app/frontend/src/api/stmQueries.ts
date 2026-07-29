@@ -98,6 +98,12 @@ export function useStmTargetDefinition() {
   });
 }
 
+export function useStmSocketSolution() {
+  return useMutation({
+    mutationFn: (body: TargetDefinitionBody) => api.postStmSocketSolution(body),
+  });
+}
+
 // One pin's complete AF0-15 set (SWAP-01). Disabled until a part AND a position are set, so the
 // panel shows its prompt with no wasted call while nothing is selected. retry:false so a 409 reaches
 // the reused not-built state at once.

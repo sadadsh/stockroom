@@ -1,10 +1,8 @@
 /**
  * Test doubles for the guided-capture route.
  *
- * Capture used to run through `window.pywebview.api.open_cad_download`, so the tests mocked a
- * Windows-only host object. It now runs through `POST /api/library/capture/run` plus the job's SSE
- * stream - one path on Windows and Linux - so the doubles moved here, ONCE, rather than being
- * copied into each of the three test files that need them.
+ * Capture runs through `POST /api/library/capture/run` plus the job's SSE stream. These shared
+ * doubles keep that one route consistent across the tests that exercise it.
  */
 import { vi } from "vitest";
 import { api } from "../api/client";

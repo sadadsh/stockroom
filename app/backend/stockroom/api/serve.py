@@ -35,17 +35,41 @@ def _uv_sync() -> None:  # pragma: no cover - shells out to the bundled uv
     subprocess.run(["uv", "sync", "--frozen"], check=True, cwd=str(_APP_REPO_ROOT))
 
 
-def build_context(libraries_root: Path | None = None, kicad_dir: Path | None = None) -> AppContext:
-    config = MachineConfig.load()
-    if libraries_root is None:
-        # Guarantee a usable library exists so the server ALWAYS boots (M9a/M9b): the
-        # persisted choice or the in-repo dev library if either is usable, else a freshly
-        # created default. This turns a frozen first run (which ships no library) into a
-        # bootable app that serves the onboarding UI, where the user opens / clones / creates
-        # the real library and the engine repoints live, instead of a startup crash.
-        from stockroom.store.onboarding import bootstrap_library
+def build_context(
+    libraries_root: Path | None = None,
+    kicad_dir: Path | None = None,
+    *,
+    cold: bool = False,
+) -> AppContext:
+    """Build the application object graph.
 
-        libraries_root = bootstrap_library(config)
+    ``cold=True`` is the managed-release candidate boundary: it may inspect an
+    already initialized library, but it must not create one, migrate credentials,
+    alter Git/KiCad configuration, materialize derived artifacts, or restore
+    machine indexes. The coordinator lifecycle performs those actions after
+    promotion.
+    """
+
+    config = MachineConfig.load(migrate_credentials=not cold)
+    if libraries_root is None:
+        if cold:
+            from stockroom.store.library_location import (
+                library_is_initialized,
+                resolve_libraries_root,
+            )
+
+            libraries_root = resolve_libraries_root(config)
+            if libraries_root is None or not library_is_initialized(libraries_root):
+                raise RuntimeError(
+                    "managed cold context requires an initialized library"
+                )
+        else:
+            # Guarantee a usable library exists so the standalone server ALWAYS boots
+            # (M9a/M9b). Managed hosts perform this bootstrap under a service fence and
+            # then invoke this builder cold.
+            from stockroom.store.onboarding import bootstrap_library
+
+            libraries_root = bootstrap_library(config)
     else:
         # A provided library may not carry this machine's active-profile name (a config from
         # another machine, or a retired/renamed profile - e.g. the old "Main" after it is
@@ -60,7 +84,13 @@ def build_context(libraries_root: Path | None = None, kicad_dir: Path | None = N
                 config.active_profile = names[0]
         except GitError:
             pass
-    ctx = _build_context(libraries_root, kicad_dir=kicad_dir, config=config, token=mint_token())
+    ctx = _build_context(
+        libraries_root,
+        kicad_dir=kicad_dir,
+        config=config,
+        token=mint_token(),
+        perform_boot_reconciliation=not cold,
+    )
     # Attach the app-repo GitRepo + a real uv_sync runner for the self-updater. The
     # app repo (this file's repo) is distinct from the library repo the context
     # already wired. request_restart stays the safe no-op default here: serve.py
@@ -94,7 +124,8 @@ def build_context(libraries_root: Path | None = None, kicad_dir: Path | None = N
     # library is visible in KiCad without the manual Doctor click. rewire_kicad
     # never raises: it skips when KiCad is absent and captures failures into
     # ctx.last_wiring, which Settings surfaces honestly.
-    ctx.rewire_kicad()
+    if not cold:
+        ctx.rewire_kicad()
     return ctx
 
 

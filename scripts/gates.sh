@@ -13,7 +13,7 @@
 #                                 # Seconds, not minutes. A LOOP tool, never a gate.
 #   scripts/gates.sh frontend     # frontend tests + typecheck + build
 #   scripts/gates.sh quick        # typecheck + a serial-safe backend subset, for a tight loop
-#   scripts/gates.sh types        # ty (advisory: NOT a gate yet, see the punch list)
+#   scripts/gates.sh types        # backend type gate
 #   scripts/gates.sh bg           # start the backend suite detached, print the log path
 #   scripts/gates.sh bg all      # detach ANY scope (default: backend), not just the suite
 #   scripts/gates.sh await       # block until the detached run finishes, print its summary line
@@ -268,8 +268,9 @@ case "${1:-all}" in
             run "backend (projects+store+model)" env QT_QPA_PLATFORM=offscreen \
                 .venv/bin/python -m pytest tests/backend/projects tests/backend/store \
                 tests/backend/model -q -p no:randomly ;;
-  types)    run "ty (advisory)" .venv/bin/ty check app/backend/stockroom ;;
+  types)    run "ty" .venv/bin/ty check app/backend/stockroom ;;
   all)      run "ruff" lint
+            run "ty" .venv/bin/ty check app/backend/stockroom
             run "typecheck" fe typecheck
             run "frontend tests" fe test:run
             run "backend suite" backend

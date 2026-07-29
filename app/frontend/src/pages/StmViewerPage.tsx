@@ -107,6 +107,7 @@ export function StmViewerPage() {
           active={tab}
           onSelect={setTab}
           idBase="stm-view"
+          devIdBase="stm"
           aria-label="STM Viewer sections"
         />
       </div>
@@ -194,7 +195,7 @@ function PinoutRegion({
     });
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div data-dev-id="stm.pinout" className="flex min-h-0 flex-1 flex-col">
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
         <Eyebrow>Pinout</Eyebrow>
         {pinout ? (
@@ -329,7 +330,7 @@ function PageShell({
   families?: number;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div data-dev-id="stm.root" className="flex min-h-0 flex-1 flex-col">
       <header className="flex items-baseline gap-3 px-[30px] pb-4 pt-[22px]">
         <h1 className="text-title font-semibold text-t1">STM Viewer</h1>
         {status != null ? (

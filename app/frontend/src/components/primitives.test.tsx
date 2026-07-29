@@ -56,6 +56,31 @@ describe("TabStrip devIdBase passthrough", () => {
       expect(tab).not.toHaveAttribute("data-dev-id");
     }
   });
+
+  it("supports the compact title-strip density without changing the default", () => {
+    const { rerender } = render(
+      <TabStrip
+        tabs={TABS}
+        active="specs"
+        onSelect={() => {}}
+        idBase="compact-workbench"
+        density="compact"
+        aria-label="Compact tabs"
+      />,
+    );
+    expect(screen.getByRole("tab", { name: "Specs" })).toHaveClass("text-xs", "py-0.5");
+
+    rerender(
+      <TabStrip
+        tabs={TABS}
+        active="specs"
+        onSelect={() => {}}
+        idBase="default-workbench"
+        aria-label="Default tabs"
+      />,
+    );
+    expect(screen.getByRole("tab", { name: "Specs" })).toHaveClass("text-sm", "py-1");
+  });
 });
 
 describe("PanelTitle's count", () => {

@@ -383,7 +383,8 @@ class Board:
                 kids[1].set_value(_fmt_num(val), quote=False)
                 return
         # Malformed node (unexpected arity): replace the whole node span.
-        self._doc.replace_span(*node.span, self._render_flat(key, val))
+        start, end = node.span
+        self._doc.replace_span(start, end, self._render_flat(key, val))
 
     def _render_flat(self, key: str, val) -> str:
         if key in SETUP_BOOL_KEYS:

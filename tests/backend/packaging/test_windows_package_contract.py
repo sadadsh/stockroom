@@ -1,0 +1,299 @@
+from __future__ import annotations
+
+import hashlib
+import zipfile
+from pathlib import Path
+from xml.etree import ElementTree
+
+import pytest
+from PIL import Image
+
+from packaging.package_contract import (
+    APPINSTALLER_NAMESPACE,
+    PACKAGE_NAMESPACE,
+    PackageConfiguration,
+    PackageContractError,
+    inventory_tree,
+    normalize_msix_timestamps,
+    render_contract,
+    validate_rendered_contract,
+)
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+TEMPLATE_DIRECTORY = REPOSITORY_ROOT / "packaging"
+SOURCE_ICON = REPOSITORY_ROOT / "app/backend/stockroom/host/assets/stockroom.ico"
+BUILD_SCRIPT = REPOSITORY_ROOT / "packaging/Build-Windows-Package.ps1"
+
+
+def fixture_configuration() -> PackageConfiguration:
+    return PackageConfiguration.for_mode(
+        mode="Fixture",
+        publisher="CN=Stockroom Development",
+        version="0.1.2.3",
+        feed_base_uri="https://updates.example.invalid/stockroom/development/x64",
+        signing_certificate_provided=False,
+    )
+
+
+def render_fixture(root: Path) -> tuple[Path, Path, Path]:
+    package_root = root / "Package"
+    appinstaller = root / "Stockroom.Development.appinstaller"
+    version_info = root / "StockroomVersionInfo.txt"
+    render_contract(
+        fixture_configuration(),
+        template_directory=TEMPLATE_DIRECTORY,
+        package_root=package_root,
+        appinstaller_path=appinstaller,
+        version_info_path=version_info,
+        source_icon=SOURCE_ICON,
+    )
+    return package_root, appinstaller, version_info
+
+
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_fixture_and_production_are_cryptographically_distinct_identities() -> None:
+    fixture = fixture_configuration()
+    production = PackageConfiguration.for_mode(
+        mode="Production",
+        publisher="CN=Stockroom LLC, O=Stockroom LLC, C=US",
+        version="1.2.3.4",
+        feed_base_uri="https://updates.stockroom.com/windows/x64",
+        signing_certificate_provided=True,
+    )
+
+    assert fixture.package_name == "Stockroom.Desktop.Development"
+    assert fixture.application_id == "StockroomDevelopment"
+    assert production.package_name == "Stockroom.Desktop"
+    assert production.application_id == "Stockroom"
+    assert fixture.package_name != production.package_name
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"version": "1.2.3"}, "four-part"),
+        ({"version": "1.2.3.65536"}, "at most 65535"),
+        ({"version": "0.0.0.0"}, "not deployable"),
+        ({"feed_base_uri": "http://updates.example.invalid/x"}, "absolute HTTPS"),
+        (
+            {"feed_base_uri": "https://updates.example.com/stockroom"},
+            "reserved .invalid",
+        ),
+        (
+            {"publisher": "CN=Stockroom"},
+            "visibly development-only",
+        ),
+        (
+            {"signing_certificate_provided": True},
+            "must remain unsigned",
+        ),
+    ],
+)
+def test_fixture_configuration_fails_closed(overrides: dict[str, object], message: str) -> None:
+    values: dict[str, object] = {
+        "mode": "Fixture",
+        "publisher": "CN=Stockroom Development",
+        "version": "1.2.3.4",
+        "feed_base_uri": "https://updates.example.invalid/stockroom",
+        "signing_certificate_provided": False,
+    }
+    values.update(overrides)
+    with pytest.raises(PackageContractError, match=message):
+        PackageConfiguration.for_mode(**values)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        (
+            {"feed_base_uri": "https://updates.example.invalid/stockroom"},
+            "real HTTPS",
+        ),
+        (
+            {"feed_base_uri": "https://updates.stockroom.example/windows"},
+            "real HTTPS",
+        ),
+        (
+            {"feed_base_uri": "https://updates.example.com/stockroom"},
+            "real HTTPS",
+        ),
+        (
+            {"publisher": "CN=Stockroom Test"},
+            "development/test",
+        ),
+        (
+            {"signing_certificate_provided": False},
+            "real signing certificate",
+        ),
+    ],
+)
+def test_production_configuration_fails_closed_without_real_inputs(
+    overrides: dict[str, object], message: str
+) -> None:
+    values: dict[str, object] = {
+        "mode": "Production",
+        "publisher": "CN=Stockroom LLC, O=Stockroom LLC, C=US",
+        "version": "1.2.3.4",
+        "feed_base_uri": "https://updates.stockroom.com/windows/x64",
+        "signing_certificate_provided": True,
+    }
+    values.update(overrides)
+    with pytest.raises(PackageContractError, match=message):
+        PackageConfiguration.for_mode(**values)  # type: ignore[arg-type]
+
+
+def test_manifest_is_one_x64_full_trust_desktop_application(tmp_path: Path) -> None:
+    package_root, _, _ = render_fixture(tmp_path)
+    root = ElementTree.parse(package_root / "AppxManifest.xml").getroot()
+    identity = root.find(f"{{{PACKAGE_NAMESPACE}}}Identity")
+    application = root.find(
+        f"{{{PACKAGE_NAMESPACE}}}Applications/{{{PACKAGE_NAMESPACE}}}Application"
+    )
+
+    assert identity is not None
+    assert identity.attrib == {
+        "Name": "Stockroom.Desktop.Development",
+        "Publisher": "CN=Stockroom Development",
+        "Version": "0.1.2.3",
+        "ProcessorArchitecture": "x64",
+    }
+    assert application is not None
+    assert application.attrib == {
+        "Id": "StockroomDevelopment",
+        "Executable": "Stockroom.exe",
+        "EntryPoint": "Windows.FullTrustApplication",
+    }
+
+
+def test_appinstaller_is_silent_on_launch_and_background_updates(
+    tmp_path: Path,
+) -> None:
+    _, appinstaller, _ = render_fixture(tmp_path)
+    root = ElementTree.parse(appinstaller).getroot()
+    settings = root.find(f"{{{APPINSTALLER_NAMESPACE}}}UpdateSettings")
+    assert settings is not None
+    children = list(settings)
+
+    assert [child.tag.rsplit("}", 1)[-1] for child in children] == [
+        "OnLaunch",
+        "AutomaticBackgroundTask",
+    ]
+    assert children[0].attrib == {
+        "HoursBetweenUpdateChecks": "0",
+        "ShowPrompt": "false",
+        "UpdateBlocksActivation": "false",
+    }
+    assert root.find(f".//{{{APPINSTALLER_NAMESPACE}}}ForceUpdateFromAnyVersion") is None
+
+
+def test_appinstaller_identity_must_match_the_msix_contract(tmp_path: Path) -> None:
+    package_root, appinstaller, _ = render_fixture(tmp_path)
+    appinstaller.write_text(
+        appinstaller.read_text(encoding="utf-8").replace(
+            'Name="Stockroom.Desktop.Development"',
+            'Name="Stockroom.Desktop"',
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+
+    with pytest.raises(PackageContractError, match="does not match MSIX"):
+        validate_rendered_contract(
+            fixture_configuration(),
+            manifest_path=package_root / "AppxManifest.xml",
+            appinstaller_path=appinstaller,
+            package_root=package_root,
+        )
+
+
+def test_rendered_assets_and_contract_are_byte_reproducible(tmp_path: Path) -> None:
+    first_root, first_appinstaller, first_version = render_fixture(tmp_path / "First")
+    second_root, second_appinstaller, second_version = render_fixture(tmp_path / "Second")
+
+    assert inventory_tree(first_root) == inventory_tree(second_root)
+    assert digest(first_appinstaller) == digest(second_appinstaller)
+    assert digest(first_version) == digest(second_version)
+    for name, expected_size in (
+        ("Square44x44Logo.png", (44, 44)),
+        ("StoreLogo.png", (50, 50)),
+        ("Square150x150Logo.png", (150, 150)),
+    ):
+        with Image.open(first_root / "Assets" / name) as image:
+            assert image.mode == "RGBA"
+            assert image.size == expected_size
+
+
+def test_inventory_is_case_insensitive_path_sorted_and_content_only(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "z").mkdir()
+    (tmp_path / "A.txt").write_bytes(b"a")
+    (tmp_path / "z" / "B.txt").write_bytes(b"b")
+
+    assert inventory_tree(tmp_path) == (
+        {
+            "path": "A.txt",
+            "sha256": hashlib.sha256(b"a").hexdigest(),
+            "size": 1,
+        },
+        {
+            "path": "z/B.txt",
+            "sha256": hashlib.sha256(b"b").hexdigest(),
+            "size": 1,
+        },
+    )
+
+
+def test_msix_timestamp_normalization_preserves_members_and_reproduces_bytes(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "First.msix"
+    second = tmp_path / "Second.msix"
+    for path, timestamp in (
+        (first, (2026, 7, 29, 6, 30, 2)),
+        (second, (2026, 7, 29, 6, 45, 58)),
+    ):
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for name, data in (
+                ("AppxManifest.xml", b"<Package />"),
+                ("Stockroom.exe", b"MZ" + b"\0" * 1_024),
+            ):
+                info = zipfile.ZipInfo(name, date_time=timestamp)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                archive.writestr(info, data)
+
+    assert digest(first) != digest(second)
+    normalize_msix_timestamps(first, 1_704_067_200)
+    normalize_msix_timestamps(second, 1_704_067_200)
+
+    assert digest(first) == digest(second)
+    with zipfile.ZipFile(first) as archive:
+        assert archive.read("AppxManifest.xml") == b"<Package />"
+        assert archive.read("Stockroom.exe") == b"MZ" + b"\0" * 1_024
+        assert {info.date_time for info in archive.infolist()} == {(2024, 1, 1, 0, 0, 0)}
+
+
+def test_windows_build_keeps_sdk_validation_and_round_trip_enabled() -> None:
+    script = BUILD_SCRIPT.read_text(encoding="utf-8")
+
+    assert '"/nv"' not in script
+    assert '"pack",' in script
+    assert '"unpack",' in script
+    assert '"normalize-msix",' in script
+    assert "MakeAppx round-trip changed AppxManifest.xml." in script
+    assert "MakeAppx round-trip changed Stockroom.exe." in script
+
+
+def test_windows_build_fails_closed_around_production_signing() -> None:
+    script = BUILD_SCRIPT.read_text(encoding="utf-8")
+
+    assert "Production mode requires -SigningCertificatePath" in script
+    assert "EphemeralKeySet" in script
+    assert "Publisher must exactly equal the signing certificate subject." in script
+    assert "The signing PFX does not contain the Code Signing EKU." in script
+    assert '"verify", "/pa", "/all", (Join-Path $FirstStage "Stockroom.exe")' in script
+    assert '"verify", "/pa", "/all", $FinalPackage' in script
+    assert "Fixture mode refuses a signing certificate." in script

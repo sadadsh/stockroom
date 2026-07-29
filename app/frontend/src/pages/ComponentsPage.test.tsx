@@ -28,6 +28,7 @@ vi.mock("../api/client", async (importActual) => {
       editField: vi.fn(),
       moveCategory: vi.fn(),
       deletePart: vi.fn(),
+      restoreDeletedPart: vi.fn(),
       enrichPart: vi.fn(),
       openJobStream: vi.fn(),
       setSpecs: vi.fn(),
@@ -42,7 +43,7 @@ vi.mock("../api/cadVariantClient", async (importActual) => {
     ...actual,
     cadVariantApi: {
       inventory: vi.fn(),
-      activate: vi.fn(),
+      activatePair: vi.fn(),
     },
   };
 });
@@ -78,11 +79,13 @@ beforeEach(() => {
   mockCadVariantApi.inventory.mockResolvedValue({
     partId: "lm358",
     inventories: [],
+    pairs: [],
     supplementary: [],
   });
-  mockCadVariantApi.activate.mockResolvedValue({
+  mockCadVariantApi.activatePair.mockResolvedValue({
     partId: "lm358",
     inventories: [],
+    pairs: [],
     supplementary: [],
   });
 });
@@ -95,6 +98,7 @@ const SUMMARY: PartSummary = {
   manufacturer: "Texas Instruments",
   is_complete: true,
   missing: [],
+  eda_readiness: {},
 };
 
 const DETAIL: PartDetail = makePartDetail({
@@ -151,10 +155,53 @@ describe("ComponentsPage", () => {
     expect((await screen.findAllByText("Dual Operational Amplifier")).length).toBeGreaterThan(0);
   });
 
+  it("keeps the highlighted row and detail panel on the same selected part", async () => {
+    const secondSummary: PartSummary = {
+      id: "tl072",
+      display_name: "TL072",
+      category: "ICs",
+      mpn: "TL072ID",
+      manufacturer: "Texas Instruments",
+      is_complete: true,
+      missing: [],
+      eda_readiness: {},
+    };
+    const secondDetail = makePartDetail({
+      id: "tl072",
+      mpn: "TL072ID",
+      manufacturer: "Texas Instruments",
+      derived: {
+        display_name: "TL072",
+        description: "Low-noise dual JFET operational amplifier",
+      },
+    });
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY, secondSummary], count: 2 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 2 },
+      by_manufacturer: { "Texas Instruments": 2 },
+      complete: 2,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockImplementation(async (id) => (id === "tl072" ? secondDetail : DETAIL));
+
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+    await screen.findAllByText("Dual Operational Amplifier");
+
+    const secondRow = await screen.findByRole("button", { name: /TL072/ });
+    await user.click(secondRow);
+
+    expect(secondRow).toHaveAttribute("aria-current", "true");
+    expect(
+      (await screen.findAllByText("Low-noise dual JFET operational amplifier")).length,
+    ).toBeGreaterThan(0);
+    expect(mockApi.partDetail).toHaveBeenLastCalledWith("tl072");
+  });
+
   it("badges MPN duplicates and the Duplicates filter narrows to just them (D2)", async () => {
-    const dupA: PartSummary = { id: "a", display_name: "Cap A", category: "Passives", mpn: "C1", manufacturer: "X", is_complete: true, missing: [] };
-    const dupB: PartSummary = { id: "b", display_name: "Cap B", category: "Passives", mpn: "C1", manufacturer: "Y", is_complete: true, missing: [] };
-    const solo: PartSummary = { id: "s", display_name: "Solo Part", category: "Passives", mpn: "S1", manufacturer: "Z", is_complete: true, missing: [] };
+    const dupA: PartSummary = { id: "a", display_name: "Cap A", category: "Passives", mpn: "C1", manufacturer: "X", is_complete: true, missing: [], eda_readiness: {} };
+    const dupB: PartSummary = { id: "b", display_name: "Cap B", category: "Passives", mpn: "C1", manufacturer: "Y", is_complete: true, missing: [], eda_readiness: {} };
+    const solo: PartSummary = { id: "s", display_name: "Solo Part", category: "Passives", mpn: "S1", manufacturer: "Z", is_complete: true, missing: [], eda_readiness: {} };
     mockApi.listParts.mockResolvedValue({ parts: [dupA, dupB, solo], count: 3 });
     mockApi.facets.mockResolvedValue({ by_category: { Passives: 3 }, by_manufacturer: {}, complete: 3, incomplete: 0 });
     mockApi.partDetail.mockResolvedValue(DETAIL);
@@ -265,6 +312,32 @@ describe("ComponentsPage", () => {
 
     expect(mockApi.deletePart).toHaveBeenCalledWith("lm358");
     expect(await screen.findByText("Part deleted")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Undo Delete" })).toBeInTheDocument();
+  });
+
+  it("restores the exact deleted part from the toast action", async () => {
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.deletePart.mockResolvedValue(undefined);
+    mockApi.restoreDeletedPart.mockResolvedValue(DETAIL);
+
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Delete Part?" }));
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }),
+    );
+    await user.click(await screen.findByRole("button", { name: "Undo Delete" }));
+
+    await waitFor(() => expect(mockApi.restoreDeletedPart).toHaveBeenCalledWith("lm358"));
+    expect(await screen.findByText("Part restored")).toBeInTheDocument();
   });
 
   it("does not re-fetch the just-deleted part off the retained list mid-refetch", async () => {

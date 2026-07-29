@@ -10,6 +10,7 @@ backend requires git on PATH (present in dev and CI).
 from __future__ import annotations
 
 import functools
+import os
 import shutil
 import subprocess
 import threading
@@ -19,6 +20,7 @@ from pathlib import Path
 # CREATE_NO_WINDOW on Windows so a git subprocess never flashes a console window (the frozen
 # exe is windowed); a harmless 0 on POSIX. Mirrors kicad/checks.py's _NO_WINDOW.
 _NO_WINDOW = 0x08000000 if hasattr(subprocess, "STARTUPINFO") else 0
+_GIT_TIMEOUT_SECONDS = 120.0
 
 # ONE write lock per repository, shared by every GitRepo object pointing at it.
 #
@@ -28,8 +30,9 @@ _NO_WINDOW = 0x08000000 if hasattr(subprocess, "STARTUPINFO") else 0
 # handlers in a threadpool, so Prepare, Sync Hygiene, Library Pin and Restore can all be in flight
 # at once against one project, and every library mutation shares the library repo the same way.
 #
-# Keyed by RESOLVED root, so two GitRepo instances for the same repo share a lock while two
-# different repos still write in parallel (the library must not block a project).
+# Keyed by Git's resolved common directory, so handles constructed at the repository root,
+# a subdirectory such as ``libraries/``, or a linked worktree share the correct lock while
+# different repositories still write in parallel.
 #
 # RLock, not Lock: `Transaction` holds this for its whole stage/validate/commit window and then
 # calls `repo.commit`, which takes it again on the same thread. A plain Lock would deadlock the app
@@ -112,13 +115,54 @@ class GitRepo:
             raise GitError(f"git not found: {git_binary or 'git'}")
         self.git = resolved
         self.root = Path(root)
+        self._common_lock_key: str | None = None
 
     def _write_lock(self) -> threading.RLock:
         """The write lock for THIS repository. See `_WRITE_LOCKS` above."""
-        # `str()` of the resolved path, not the Path object: Path hashes by its parts, which is
-        # fine, but a string key is what the dict is documented to hold and survives a Path
-        # subclass. Resolution normalizes symlinks and, on Windows, case.
-        key = str(Path(self.root).resolve())
+        if self._common_lock_key is not None:
+            key = self._common_lock_key
+            with _WRITE_LOCKS_GUARD:
+                lock = _WRITE_LOCKS.get(key)
+                if lock is None:
+                    lock = threading.RLock()
+                    _WRITE_LOCKS[key] = lock
+                return lock
+        # GitRepo is legitimately constructed at both the app root and its in-repo
+        # ``libraries`` directory. Keying by constructor path gave those two handles
+        # independent locks over the same index. Ask Git for the common-dir without
+        # going through _run (which itself is used while holding this lock). A path
+        # that is not a repository yet, as during init(), safely falls back to root.
+        command = [
+            self.git,
+            "-C",
+            str(self.root),
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-common-dir",
+        ]
+        try:
+            common = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=_NO_WINDOW,
+                timeout=10.0,
+            )
+        except subprocess.TimeoutExpired:
+            common = subprocess.CompletedProcess(command, 124, stdout="", stderr="")
+        resolved = (
+            Path(common.stdout.strip()).resolve()
+            if common.returncode == 0 and common.stdout.strip()
+            else Path(self.root).resolve()
+        )
+        key = str(resolved).casefold()
+        # Cache only Git's authoritative answer. During `init()` the repository does not
+        # exist yet and the fallback root is intentionally temporary; the next write must
+        # retry so it can converge with handles constructed inside this repository.
+        if common.returncode == 0 and common.stdout.strip():
+            self._common_lock_key = key
         with _WRITE_LOCKS_GUARD:
             lock = _WRITE_LOCKS.get(key)
             if lock is None:
@@ -132,15 +176,30 @@ class GitRepo:
         check: bool = True,
         input_text: str | None = None,
     ) -> subprocess.CompletedProcess:
-        proc = subprocess.run(
-            [self.git, "-C", str(self.root), *args],
-            capture_output=True,
-            input=input_text,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=_NO_WINDOW,
-        )
+        command = [self.git, "-C", str(self.root), *args]
+        environment = os.environ.copy()
+        environment["GIT_TERMINAL_PROMPT"] = "0"
+        try:
+            proc = subprocess.run(
+                command,
+                capture_output=True,
+                input=input_text,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=_NO_WINDOW,
+                env=environment,
+                timeout=_GIT_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            if check:
+                raise GitError("git operation timed out") from exc
+            return subprocess.CompletedProcess(
+                command,
+                124,
+                stdout="",
+                stderr="git operation timed out",
+            )
         if check and proc.returncode != 0:
             raise GitError(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
         return proc
@@ -216,6 +275,13 @@ class GitRepo:
         proc = self._run("remote", "get-url", name, check=False)
         return proc.stdout.strip() if proc.returncode == 0 else ""
 
+    def top_level(self) -> Path | None:
+        """Resolved working-copy root, even when this instance was given a subdirectory."""
+        proc = self._run("rev-parse", "--show-toplevel", check=False)
+        if proc.returncode != 0 or not proc.stdout.strip():
+            return None
+        return Path(proc.stdout.strip()).resolve()
+
     def status_porcelain(self) -> list[str]:
         out = self._run("status", "--porcelain").stdout
         return [line for line in out.splitlines() if line.strip()]
@@ -240,6 +306,16 @@ class GitRepo:
             args.append("--")
             args += [str(p) for p in paths]
         return not [line for line in self._run(*args).stdout.splitlines() if line.strip()]
+
+    def has_tracked_changes(self) -> bool:
+        """Whether tracked work is modified, staged, or deleted but uncommitted.
+
+        Automatic reconciliation may ignore unrelated untracked scratch, just as
+        Git rebase does, but it must never rewrite history over an in-progress
+        tracked edit.
+        """
+        out = self._run("status", "--porcelain", "--untracked-files=no", check=False)
+        return bool([line for line in out.stdout.splitlines() if line.strip()])
 
     @_serialized
     def commit(self, message: str, paths: list[Path], force: bool = False) -> str:
@@ -453,6 +529,21 @@ class GitRepo:
         proc = self._run("rev-parse", "--verify", "@{upstream}^{commit}", check=False)
         return proc.stdout.strip() if proc.returncode == 0 else ""
 
+    def changed_paths(self, base: str, target: str) -> tuple[str, ...]:
+        """Repo-relative paths changed between two verified commit addresses."""
+        if not self.has_commit(base) or not self.has_commit(target):
+            raise GitError("cannot compare unknown application revisions")
+        proc = self._run(
+            "-c",
+            "core.quotepath=false",
+            "diff",
+            "--name-only",
+            "-z",
+            base,
+            target,
+        )
+        return tuple(sorted((path for path in proc.stdout.split("\0") if path), key=str.casefold))
+
     @_serialized
     def pull_ff(self) -> PullResult:
         before = self.head()
@@ -529,6 +620,12 @@ class GitRepo:
         one repo with the app code), a local part commit + a remote app-code commit touch DISJOINT
         paths, so a rebase replays the part commit on top of the update cleanly, reconciling what a
         fast-forward could not. A real conflict aborts the half-applied rebase and reports honestly."""
+        if self.has_tracked_changes():
+            return PullResult(
+                ok=False,
+                updated=False,
+                reason="uncommitted local changes; not rebasing over work in progress",
+            )
         before = self.head()
         # Fetch FIRST so the blocker check can see what is actually incoming. Without a fetch the
         # upstream ref is whatever was last seen, so a brand-new file would not be found and the

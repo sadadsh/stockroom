@@ -573,6 +573,15 @@ describe("specConcept", () => {
   it("ignores punctuation and case", () => {
     expect(specConcept("factory-pack QUANTITY")).toBe(specConcept("Factory Pack Quantity"));
   });
+
+  it("treats rating and rated as distributor grammar, not a second concept", () => {
+    expect(specConcept("Power Rating")).toBe(specConcept("Power"));
+    expect(specConcept("Voltage Rated")).toBe(specConcept("Voltage Rating"));
+  });
+
+  it("does not erase rating from an unrelated named concept", () => {
+    expect(specConcept("Safety Rating")).not.toBe(specConcept("Safety"));
+  });
 });
 
 describe("mergeSameConcept", () => {
@@ -608,6 +617,49 @@ describe("mergeSameConcept", () => {
   it("routes the displaced value into alternates, with the winner leading", () => {
     const { alternates } = mergeSameConcept(groups, {});
     expect(alternates["Breakdown Voltage"].map((a) => a.value)).toEqual(["6 V", "8.5V"]);
+  });
+
+  it("folds real rating variants and recognizes equivalent engineering-unit values", () => {
+    const ratingVariants = [
+      {
+        title: "ELECTRICAL",
+        rows: [
+          { key: "Power", label: "Power", value: "0.063 W", raw: "0.063 W" },
+          {
+            key: "Power Rating",
+            label: "Power Rating",
+            value: "62.5 mW (1/16 W)",
+            raw: "62.5 mW (1/16 W)",
+          },
+          { key: "Voltage Rated", label: "Voltage Rated", value: "50 V", raw: "50 V" },
+          { key: "Voltage Rating", label: "Voltage Rating", value: "50 V", raw: "50 V" },
+        ],
+      },
+    ] as unknown as Parameters<typeof mergeSameConcept>[0];
+
+    const { groups: out, alternates } = mergeSameConcept(ratingVariants, {});
+    expect(out[0].rows.map((row) => row.key)).toEqual(["Power", "Voltage Rated"]);
+    expect(alternates.Power).toBeUndefined();
+    expect(alternates["Voltage Rated"]).toBeUndefined();
+  });
+
+  it("folds exact SI conversions but keeps a materially different source answer", () => {
+    const values = [
+      {
+        title: "ELECTRICAL",
+        rows: [
+          { key: "Voltage", label: "Voltage", value: "0.5 V", raw: "0.5 V" },
+          { key: "Voltage Rating", label: "Voltage Rating", value: "500 mV", raw: "500 mV" },
+          { key: "Power", label: "Power", value: "0.063 W", raw: "0.063 W" },
+          { key: "Power Rating", label: "Power Rating", value: "80 mW", raw: "80 mW" },
+        ],
+      },
+    ] as unknown as Parameters<typeof mergeSameConcept>[0];
+
+    const { groups: out, alternates } = mergeSameConcept(values, {});
+    expect(out[0].rows.map((row) => row.key)).toEqual(["Voltage", "Power"]);
+    expect(alternates.Voltage).toBeUndefined();
+    expect(alternates.Power.map((alternate) => alternate.value)).toEqual(["0.063 W", "80 mW"]);
   });
 
   it("compares RAW values, so a prettified twin is not offered as an alternative", () => {

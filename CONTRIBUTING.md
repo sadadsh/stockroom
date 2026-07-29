@@ -16,6 +16,9 @@ uv sync                                   # creates .venv with the pinned deps
 
 # frontend
 cd app/frontend && npm ci
+
+# Windows workflow validator
+winget install --id rhysd.actionlint --exact
 ```
 
 ## The gates
@@ -24,6 +27,8 @@ A change is done when these pass. Run them before you commit; do not claim "done
 
 ```bash
 # backend
+actionlint .github/workflows/ci.yml .github/workflows/release.yml
+uv run ty check app/backend/stockroom
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/backend -q
 
 # frontend (from app/frontend)

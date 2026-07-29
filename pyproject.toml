@@ -14,6 +14,10 @@ dependencies = [
     # it to <1.61, and the async API we use is stable across 1.60/1.61.
     "playwright>=1.55,<1.61",
     "pypdf>=4.0",
+    # Altium's native documentation pipeline emits PDF. PDFium rasterizes those
+    # exact native pages into safe, browser-neutral PNG review artifacts so the
+    # Projects reviewer has the same visual workflow as KiCad's SVG exporter.
+    "pypdfium2>=4.30",
     "fastapi>=0.111",
     "uvicorn>=0.30",
     "sse-starlette>=2.1",
@@ -42,6 +46,7 @@ dependencies = [
     # combined with zlib it replicates KiCad's DecodeIntLibStream. We never write Altium binary.
     "olefile>=0.47",
     "cloakbrowser==0.5.2",
+    "tuf==7.0.0",
 ]
 
 [dependency-groups]
@@ -69,6 +74,7 @@ dev = [
     # lazily so its absence used to reduce every native-window check to "probe disabled" while
     # leaving the browser-substitute screenshots green.
     "websocket-client>=1.8",
+    "pyinstaller>=6.21.0",
 ]
 
 [tool.hatch.build.targets.wheel]

@@ -287,3 +287,48 @@ def test_composed_altium_attach_atomically_adopts_only_the_exact_installed_kicad
     assert (altium_dir / "composed.SchLib").read_bytes() == sch_before
     assert (altium_dir / "composed.PcbLib").read_bytes() == pcb_before
     assert record_path.read_bytes() == record_before
+
+
+def test_automatic_embed_failure_rolls_back_the_native_altium_attach(
+    library_ops,
+    monkeypatch,
+):
+    ops = library_ops
+    kicad_pointer, altium_pointer, _model_path, record_path = (
+        _seed_installed_kicad_with_pointers(ops, "auto-embed")
+    )
+    record_before = record_path.read_bytes()
+    head_before = ops.repo.head()
+
+    def fail_after_altium_touched_the_library(
+        part_id,
+        *,
+        _transaction,
+        _record,
+        _require_native_readback,
+        **_kwargs,
+    ):
+        assert part_id == "auto-embed"
+        assert _transaction is not None
+        assert _record.assets_for("altium").footprint.name == "DIOM5227X270N"
+        assert _require_native_readback is True
+        pcblib = ops.lib.parts_dir.parent / "altium" / "auto-embed.PcbLib"
+        pcblib.write_bytes(b"simulated corrupt Altium output")
+        raise ValueError("native readback rejected the embedded body")
+
+    monkeypatch.setattr(ops, "embed_altium_model", fail_after_altium_touched_the_library)
+
+    with pytest.raises(ValueError, match="native readback rejected"):
+        ops.attach_altium_assets(
+            "auto-embed",
+            FIX / "sample.SchLib",
+            FIX / "sample.PcbLib",
+            active_variant=altium_pointer,
+            compatible_kicad_variant=kicad_pointer,
+            auto_embed_model=True,
+        )
+
+    assert ops.repo.head() == head_before
+    assert record_path.read_bytes() == record_before
+    assert not (ops.lib.parts_dir.parent / "altium").exists()
+    assert ops.repo.status_porcelain() == []

@@ -16,42 +16,6 @@ function wrapperWith(qc: QueryClient) {
     );
 }
 
-
-const KICAD_NEEDS: Requirement[] = ["kicad_symbol", "kicad_footprint"];
-const ALL_NEEDS: Requirement[] = ["kicad_symbol", "kicad_footprint", "altium_symbol"];
-
-const CANDIDATE = {
-  entry_name: "BQ24074",
-  symbol_lib_path: "s.kicad_sym",
-  footprint_variants: [{ name: "F", path: "f.kicad_mod" }],
-  model_path: "m.step",
-} as unknown as import("../api/types").StagingCandidate;
-
-function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
-  const encoder = new TextEncoder();
-  return new ReadableStream<Uint8Array>({
-    start(c) {
-      for (const chunk of chunks) c.enqueue(encoder.encode(chunk));
-      c.close();
-    },
-  });
-}
-
-function inspectResultStream(candidates: unknown[]): ReadableStream<Uint8Array> {
-  return streamOf([
-    `event: result\ndata: {"result":${JSON.stringify(candidates)}}\n\n`,
-    "event: done\ndata: {}\n\n",
-  ]);
-}
-
-/** The MANUAL browse path: inspect the picked file, then commit it. Untouched by the capture
- *  rewrite - "Browse For Files" is still how a person hands the app a file they already have. */
-function mockKicadAttach() {
-  vi.spyOn(api, "assetsInspect").mockResolvedValue({ job_id: "j1" });
-  vi.spyOn(api, "openJobStream").mockResolvedValue(inspectResultStream([CANDIDATE]));
-  vi.spyOn(api, "assetsCommit").mockResolvedValue({} as never);
-}
-
 const UL_URL = "https://app.ultralibrarian.com/search?queryText=BQ24074";
 
 
@@ -94,7 +58,6 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
   delete (window as { pywebview?: unknown }).pywebview;
-  delete window.__STOCKROOM_CAD_DOWNLOAD__;
 });
 
 describe("useGuidedCapture", () => {
@@ -171,6 +134,70 @@ describe("useGuidedCapture", () => {
     );
   });
 
+  it("forwards exhaustive collection without narrowing it to the preferred provider", async () => {
+    mockCadSourceUrl();
+    const capture = mockCapture([
+      {
+        event: "result",
+        data: {
+          result: {
+            items: [
+              {
+                part_id: "part1",
+                mpn: "BQ24074",
+                display_name: "BQ24074",
+                category: "ICs",
+                status: "already-complete",
+                needed: [],
+                satisfied: [],
+                remaining: [],
+                retained: 2,
+                sources: ["guided"],
+                notes: [],
+                error: "",
+                collection_complete: true,
+                provider_outcomes: [
+                  {
+                    route_id: "digikey:digikey-ultralibrarian",
+                    provider_key: "digikey",
+                    author_key: "digikey-ultralibrarian",
+                    label: "DigiKey / Ultra Librarian",
+                    status: "succeeded-retained",
+                    attempted: true,
+                    retained: 2,
+                    activated: false,
+                    reason: "Retained two exact files.",
+                  },
+                ],
+              },
+            ],
+            counts: { "already-complete": 1 },
+            retained: 2,
+            collection_complete: true,
+            stopped: false,
+            stop_reason: "",
+          },
+        },
+      },
+      { event: "done", data: {} },
+    ]);
+    const { result } = render([]);
+
+    await act(async () => {
+      await result.current.start("digikey", "collect-all");
+    });
+
+    expect(capture.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partIds: ["part1"],
+        vendor: "digikey",
+        mode: "collect-all",
+      }),
+    );
+    expect(result.current.collectionComplete).toBe(true);
+    expect(result.current.providerOutcomes).toHaveLength(1);
+  });
+
   it("surfaces a failed run as an error rather than a quiet done", async () => {
     mockCadSourceUrl();
     mockCapture([
@@ -208,49 +235,4 @@ describe("useGuidedCapture", () => {
     expect(result.current.status).toBe("idle");
   });
 
-  // -- the MANUAL path, still live and still covered ----------------------------------------
-  //
-  // These came back after the capture rewrite briefly deleted them along with the host-bridge
-  // tests. "Browse For Files" is not part of guided capture and was never changed, so dropping
-  // its tests was a real loss of coverage rather than the relocation it looked like.
-
-  it("submitPaths serves the manual-pick fallback through the KiCad pipeline", async () => {
-    mockKicadAttach();
-    const { result } = render(KICAD_NEEDS);
-
-    await act(async () => {
-      await result.current.submitPaths(["C:\\manual\\pick.zip"]);
-    });
-
-    expect(api.assetsInspect).toHaveBeenCalledWith("part1", ["C:\\manual\\pick.zip"]);
-    expect(result.current.status).toBe("done");
-  });
-
-  it("a manual KiCad browse never reports done while Altium is still missing", async () => {
-    mockKicadAttach();
-    const { result } = render(ALL_NEEDS);
-
-    await act(async () => {
-      await result.current.submitPaths(["k.zip"]);
-    });
-
-    expect(result.current.status).toBe("receiving");
-    expect(result.current.received.kicad_symbol).toBe(true);
-    expect(result.current.received.altium_symbol).toBeUndefined();
-  });
-
-  it("surfaces an empty inspect result as an honest error instead of attaching nothing", async () => {
-    vi.spyOn(api, "assetsInspect").mockResolvedValue({ job_id: "j3" });
-    vi.spyOn(api, "openJobStream").mockResolvedValue(inspectResultStream([]));
-    const commitSpy = vi.spyOn(api, "assetsCommit");
-    const { result } = render(KICAD_NEEDS);
-
-    await act(async () => {
-      await result.current.submitPaths(["empty.zip"]);
-    });
-
-    expect(result.current.status).toBe("error");
-    expect(result.current.message).toContain("No usable");
-    expect(commitSpy).not.toHaveBeenCalled();
-  });
 });

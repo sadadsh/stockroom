@@ -17,17 +17,12 @@ import inspect
 import json
 import tempfile
 from collections.abc import Iterable
-from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Protocol
 
 from stockroom.altium.extract import extract_intlib
-from stockroom.cad_variants import ResolvedCadVariant, resolve_cad_variant
-from stockroom.capture.cad_composition import (
-    cross_eda_report_is_proved,
-    select_compatible_retained_kicad,
-)
+from stockroom.capture.cad_composition import cross_eda_report_is_proved
 from stockroom.capture.cross_eda import (
     CrossEdaVerificationError,
     read_kicad_symbol,
@@ -50,7 +45,6 @@ from stockroom.planning import (
 
 BROWSER_CAPTURE_ADAPTER_VERSION = "browser-guided-cad-v1"
 INSTALLED_KICAD_READBACK_ADAPTER_VERSION = "installed-kicad-readback-v1"
-COMPATIBLE_KICAD_ADAPTER_VERSION = "compatible-retained-kicad-v1"
 
 
 class CrossEdaVerifier(Protocol):
@@ -66,19 +60,6 @@ class CrossEdaVerifier(Protocol):
         altium_sources: tuple[Path, ...],
         altium_identity_attestation: ExactPartIdentity | None = None,
     ) -> object: ...
-
-
-@dataclass(frozen=True, slots=True)
-class ComposedBrowserAltiumEvidence:
-    """One strict compatible pair resolved from immutable evidence.
-
-    No temporary paths escape the evidence layer. The caller materializes these verified bytes
-    only for the synchronous library transaction and owns that temporary lifetime explicitly.
-    """
-
-    altium_variant: ResolvedCadVariant
-    kicad_variant: ResolvedCadVariant
-    uses_installed_kicad: bool
 
 
 def exact_identity(record: object) -> ExactPartIdentity:
@@ -111,6 +92,7 @@ def _altium_artifacts(paths: Iterable[Path]) -> tuple[EvidenceArtifact, ...]:
         ".pcblib": ("altium_footprint", "application/vnd.altium.pcblib"),
         ".intlib": ("altium_integrated_library", "application/vnd.altium.intlib"),
     }
+
     def append(path: Path, base_role: str, media_type: str) -> None:
         counts[base_role] = counts.get(base_role, 0) + 1
         index = counts[base_role]
@@ -155,18 +137,10 @@ def _verify_cross_eda_with_provider_identity(
 ) -> object:
     """Call a verifier with exact provider-page identity when it supports that contract."""
 
-    kwargs = {
-        "identity": identity,
-        "kicad_symbol": kicad_symbol,
-        "kicad_footprint": kicad_footprint,
-        "step_model": step_model,
-        "altium_sources": altium_sources,
-    }
     parameters = inspect.signature(verifier).parameters.values()
-    supports_attestation = (
-        "altium_identity_attestation" in {parameter.name for parameter in parameters}
-        or any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters)
-    )
+    supports_attestation = "altium_identity_attestation" in {
+        parameter.name for parameter in parameters
+    } or any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters)
     if supports_attestation:
         detail = page_identity(provider_key, detail_url)
         if detail is not None:
@@ -175,11 +149,25 @@ def _verify_cross_eda_with_provider_identity(
                 mpn=identity.mpn_canonical,
             )
             if not exact_observation_error(expected_record, detail):
-                kwargs["altium_identity_attestation"] = ExactPartIdentity(
+                attestation = ExactPartIdentity(
                     detail.manufacturer,
                     detail.mpn,
                 )
-    return verifier(**kwargs)
+                return verifier(
+                    identity=identity,
+                    kicad_symbol=kicad_symbol,
+                    kicad_footprint=kicad_footprint,
+                    step_model=step_model,
+                    altium_sources=altium_sources,
+                    altium_identity_attestation=attestation,
+                )
+    return verifier(
+        identity=identity,
+        kicad_symbol=kicad_symbol,
+        kicad_footprint=kicad_footprint,
+        step_model=step_model,
+        altium_sources=altium_sources,
+    )
 
 
 def _bind_kicad_symbol_identity(
@@ -353,9 +341,14 @@ def _installed_kicad_paths(record: object, profile: object) -> tuple[Path, Path,
     if not callable(assets_for) or library is None or not isinstance(category, str) or not category:
         raise ValueError("existing KiCad assets cannot be resolved from the active library")
     kicad = assets_for("kicad")
-    symbol_asset = getattr(kicad, "symbol", None)
-    footprint_asset = getattr(kicad, "footprint", None)
-    model_asset = getattr(kicad, "model", None)
+    try:
+        symbol_asset = kicad.symbol
+        footprint_asset = kicad.footprint
+        model_asset = kicad.model
+    except AttributeError as exc:
+        raise ValueError(
+            "existing KiCad assets do not use the canonical EDA bundle"
+        ) from exc
     symbol_name = getattr(symbol_asset, "name", "")
     footprint_name = getattr(footprint_asset, "name", "")
     model_file = getattr(model_asset, "file", "")
@@ -446,16 +439,13 @@ def _active_kicad_pad_allowance(
         raise ValueError("active KiCad validation report is unreadable") from exc
     if not isinstance(validation, dict) or validation.get("valid") is not True:
         raise ValueError("active KiCad validation report is not a proved result")
+    cross_eda = validation.get("cross_eda")
+    cross_eda_report = cross_eda.get("report") if isinstance(cross_eda, dict) else None
+    cross_eda_kicad = cross_eda_report.get("kicad") if isinstance(cross_eda_report, dict) else None
     candidate_sections = [
         validation.get("kicad_readback"),
         validation.get("verification"),
-        (
-            validation.get("cross_eda", {})
-            .get("report", {})
-            .get("kicad")
-            if isinstance(validation.get("cross_eda"), dict)
-            else None
-        ),
+        cross_eda_kicad,
     ]
     for section in candidate_sections:
         if not isinstance(section, dict):
@@ -521,159 +511,6 @@ def record_installed_kicad_role_evidence(
         validation_report=validation,
     )
     return digest, (symbol, footprint, model)
-
-
-def _record_compatible_kicad_role_evidence(
-    *,
-    store: EvidenceStore,
-    identity: ExactPartIdentity,
-    selected: ResolvedCadVariant,
-    cross_eda_report: object,
-) -> ResolvedCadVariant:
-    """Promote old/full retained evidence into the role-manifest dependency contract."""
-
-    artifacts = tuple(
-        EvidenceArtifact(
-            role=artifact.evidence_role,
-            data=selected.data[artifact.asset_kind],
-            media_type=artifact.media_type,
-            suggested_name=artifact.suggested_name,
-        )
-        for artifact in selected.descriptor.artifacts
-    )
-    roles = tuple(artifact.role for artifact in artifacts)
-    validation = _canonical_role_report(
-        identity=identity,
-        operation=KICAD_CAD_OPERATION.label,
-        provider_key=selected.descriptor.provider,
-        roles=roles,
-        source_manifests=(),
-        verification={
-            "cross_eda": cross_eda_report,
-            "retained_manifest": selected.descriptor.manifest_digest,
-        },
-        observations={
-            "promoted_from_retained_manifest": selected.descriptor.manifest_digest,
-        },
-    )
-    digest = store.record_role_artifact_success(
-        identity=identity,
-        operation=KICAD_CAD_OPERATION,
-        provider_key=selected.descriptor.provider,
-        adapter_version=COMPATIBLE_KICAD_ADAPTER_VERSION,
-        artifacts=artifacts,
-        validation_report=validation,
-    )
-    return resolve_cad_variant(
-        store,
-        identity=identity,
-        tool="kicad",
-        manifest_digest=digest,
-    )
-
-
-def record_composed_browser_altium_evidence(
-    *,
-    store: EvidenceStore,
-    record: object,
-    profile: object,
-    provider_key: str,
-    detail_url: str,
-    altium_sources: tuple[Path, ...],
-    cross_eda_verifier: CrossEdaVerifier,
-) -> ComposedBrowserAltiumEvidence:
-    """Prove native Altium against one compatible retained KiCad bundle.
-
-    The currently installed projection is recorded and tried first. If its strict terminal, pad,
-    or package geometry differs, complete retained bundles are tried in deterministic
-    provider-family trust order. No projection is changed until one exact pair has passed.
-    """
-    identity = exact_identity(record)
-    selection = select_exact_candidate(
-        record,
-        [],
-        vendor_key=provider_key,
-        detail_url=detail_url,
-    )
-    if selection.error:
-        raise ValueError(selection.error)
-    native_altium = tuple(Path(path) for path in altium_sources)
-    altium_artifacts = _altium_artifacts(native_altium)
-    if not altium_artifacts:
-        raise ValueError("browser Altium evidence contains no native library")
-
-    installed_kicad_manifest, _ = record_installed_kicad_role_evidence(
-        store=store,
-        record=record,
-        profile=profile,
-    )
-    selected_kicad = select_compatible_retained_kicad(
-        store,
-        identity=identity,
-        altium_provider_key=provider_key,
-        altium_sources=native_altium,
-        preferred_manifest_digest=installed_kicad_manifest,
-        verifier=lambda **kwargs: _verify_cross_eda_with_provider_identity(
-            cross_eda_verifier,
-            identity=identity,
-            provider_key=provider_key,
-            detail_url=detail_url,
-            kicad_symbol=kwargs["kicad_symbol"],
-            kicad_footprint=kwargs["kicad_footprint"],
-            step_model=kwargs["step_model"],
-            altium_sources=kwargs["altium_sources"],
-        ),
-    )
-    cross_eda_report = selected_kicad.verification
-    uses_installed_kicad = (
-        selected_kicad.resolved.descriptor.manifest_digest == installed_kicad_manifest
-    )
-    resolved_kicad = selected_kicad.resolved
-    if not uses_installed_kicad:
-        resolved_kicad = _record_compatible_kicad_role_evidence(
-            store=store,
-            identity=identity,
-            selected=resolved_kicad,
-            cross_eda_report=cross_eda_report,
-        )
-    kicad_manifest = resolved_kicad.descriptor.manifest_digest
-
-    roles = tuple(artifact.role for artifact in altium_artifacts)
-    validation = _canonical_role_report(
-        identity=identity,
-        operation=ALTIUM_CAD_OPERATION.label,
-        provider_key=provider_key,
-        roles=roles,
-        source_manifests=(kicad_manifest,),
-        verification=cross_eda_report,
-        observations={
-            "provider_detail_page": (
-                None
-                if (detail := page_identity(provider_key, detail_url)) is None
-                else {"manufacturer": detail.manufacturer, "mpn": detail.mpn}
-            )
-        },
-    )
-    digest = store.record_role_artifact_success(
-        identity=identity,
-        operation=ALTIUM_CAD_OPERATION,
-        provider_key=provider_key,
-        adapter_version=BROWSER_CAPTURE_ADAPTER_VERSION,
-        artifacts=altium_artifacts,
-        validation_report=validation,
-        source_manifests=(kicad_manifest,),
-    )
-    resolved_altium = resolve_cad_variant(
-        store,
-        identity=identity,
-        tool="altium",
-        manifest_digest=digest,
-    )
-    return ComposedBrowserAltiumEvidence(
-        altium_variant=resolved_altium,
-        kicad_variant=resolved_kicad,
-        uses_installed_kicad=uses_installed_kicad,
-    )
 
 
 def record_browser_cad_evidence(
@@ -742,17 +579,23 @@ def record_browser_cad_evidence(
             step_model=model_path,
             altium_sources=native_altium,
         )
-        if not cross_eda_report_is_proved(cross_eda_report):
+        if not isinstance(cross_eda_report, dict) or not cross_eda_report_is_proved(
+            cross_eda_report
+        ):
             raise ValueError(
                 "cross-EDA verifier did not prove terminal, pad, and package equivalence"
             )
         kicad_section = cross_eda_report.get("kicad")
         if isinstance(kicad_section, dict):
             reported_unrepresented = kicad_section.get("unrepresented_pad_numbers", ())
-            if isinstance(reported_unrepresented, list) and all(
-                isinstance(number, str) and number for number in reported_unrepresented
-            ):
-                allowed_unrepresented_pads = frozenset(reported_unrepresented)
+            if isinstance(reported_unrepresented, list):
+                valid_unrepresented = [
+                    number
+                    for number in reported_unrepresented
+                    if isinstance(number, str) and number
+                ]
+                if len(valid_unrepresented) == len(reported_unrepresented):
+                    allowed_unrepresented_pads = frozenset(valid_unrepresented)
 
     kicad_report = verify_kicad_component(
         identity=identity,
@@ -821,12 +664,9 @@ def record_browser_cad_evidence(
 
 __all__ = [
     "BROWSER_CAPTURE_ADAPTER_VERSION",
-    "COMPATIBLE_KICAD_ADAPTER_VERSION",
-    "ComposedBrowserAltiumEvidence",
     "CrossEdaVerifier",
     "INSTALLED_KICAD_READBACK_ADAPTER_VERSION",
     "exact_identity",
     "record_browser_cad_evidence",
-    "record_composed_browser_altium_evidence",
     "record_installed_kicad_role_evidence",
 ]

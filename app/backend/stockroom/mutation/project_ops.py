@@ -11,6 +11,7 @@ No em dashes anywhere (standing owner rule).
 
 from __future__ import annotations
 
+import builtins
 import os
 from pathlib import Path
 
@@ -35,6 +36,7 @@ from stockroom.projects import fields as fields_mod
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
 from stockroom.projects.health import audit_altium_project, audit_project
+from stockroom.projects.parity import project_capabilities as shared_project_capabilities
 from stockroom.sexp.document import SexpDocument
 from stockroom.store.project_store import ProjectStore
 from stockroom.text import counted, have, is_are
@@ -49,25 +51,16 @@ def _resolve_parts(library_parts):
     return list(parts or ())
 
 
-# What each EDA's registration can do in the Projects surface. The base set works for
-# any project (the audit reads the schematics, the BOM builds offline, git history is
-# git). The KiCad-only set needs KiCad files or kicad-cli: ERC/DRC, fab exports, the
-# .kicad_pro editors (setup/net classes), Prepare (annotate/fill writes), and the
-# board/schematic viewer. Altium binaries are read-only here, so those honestly stay off.
-KICAD_ONLY_CAPABILITIES = ("checks", "fab", "setup", "netclasses", "prepare", "viewer")
-
-
 def project_capabilities(rec: ProjectRecord) -> list[str]:
-    caps = ["audit", "bom", "revisions", "restore", "file"]
-    # Bulk assign is registry-generic: it needs a placement READER, not a design writer, because a
-    # tool Stockroom cannot write records its bindings on the project record instead. Gating it on
-    # `prepare` (a KiCad-only writer, as its name says) hid the whole surface from every Altium
-    # project that could in fact be assigned.
-    if placements.supported(rec.eda or "kicad"):
-        caps.append("assign")
-    if rec.eda == "kicad":
-        caps += list(KICAD_ONLY_CAPABILITIES)
-    return caps
+    """Return the format-neutral Projects tools.
+
+    The record is retained in this compatibility seam because older callers
+    pass it, but public capabilities no longer expose legacy KiCad-only
+    endpoints. Native implementation details belong behind project adapters.
+    """
+
+    del rec
+    return shared_project_capabilities()
 
 
 class ProjectOps:
@@ -78,7 +71,7 @@ class ProjectOps:
     def register(self, root, eda: str | None = None) -> ProjectRecord:
         return self.store.register(root, eda=eda)
 
-    def list(self) -> list[ProjectRecord]:
+    def list(self) -> builtins.list[ProjectRecord]:
         return self.store.list()
 
     def get(self, project_id: str) -> ProjectRecord | None:
@@ -133,6 +126,7 @@ class ProjectOps:
             name=rec.name, boards=boards, tax_rate=tax_rate,
             library_parts=_resolve_parts(library_parts),
             price_lookup=price_lookup, progress=progress,
+            tool=rec.eda or "kicad",
             # The durable bindings for a tool whose design files Stockroom cannot write. A
             # writable tool's bindings live in the design itself, so this is empty for it and the
             # BOM reads them straight off each placement.
@@ -173,6 +167,8 @@ class ProjectOps:
         else:
             chosen = rec.board_paths[0]
         cli = getattr(self.cli, "binary", self.cli)
+        if not isinstance(cli, str) or not cli:
+            raise ValueError("kicad-cli is unavailable")
         return fab_export_mod.build_fab_bundle(
             Path(rec.root) / chosen, cli,
             drill_format=drill_format, drill_map=drill_map,
@@ -539,7 +535,9 @@ class ProjectOps:
         return {"project": rec.name, "committed": sha, "design_rules": dict(rules)}
 
     @staticmethod
-    def _validate_netclass_patterns(patterns, valid_netclasses, *, check_membership) -> list:
+    def _validate_netclass_patterns(
+        patterns, valid_netclasses, *, check_membership
+    ) -> builtins.list:
         """Validate + normalize the submitted netclass-pattern rows to exactly
         {netclass, pattern} (the two keys KiCad 10 writes, verified against the real NETDECK
         .kicad_pro). Each row needs a non-empty pattern and a non-empty netclass; when
@@ -602,7 +600,7 @@ class ProjectOps:
 
     # -- M7h KiField bulk-field editor ----------------------------------------
 
-    def _placed_components(self, rec: ProjectRecord) -> list[dict]:
+    def _placed_components(self, rec: ProjectRecord) -> builtins.list[dict]:
         """Every placed component across every existing sheet, each tagged with its relative
         sheet path, for the field grid. Read-only."""
         root = Path(rec.root).resolve()
@@ -799,8 +797,10 @@ class ProjectOps:
             pro_data = project_settings.parse(pro_path.read_text(encoding="utf-8"))
             erc = pro_data.get("erc") or {}
             ds = ((pro_data.get("board") or {}).get("design_settings")) or {}
-            cur_erc = erc.get("rule_severities") if isinstance(erc.get("rule_severities"), dict) else {}
-            cur_drc = ds.get("rule_severities") if isinstance(ds.get("rule_severities"), dict) else {}
+            raw_erc_severities = erc.get("rule_severities")
+            raw_drc_severities = ds.get("rule_severities")
+            cur_erc: dict = raw_erc_severities if isinstance(raw_erc_severities, dict) else {}
+            cur_drc: dict = raw_drc_severities if isinstance(raw_drc_severities, dict) else {}
             if has_erc_sev:
                 settings_ops.validate_severity_map(
                     erc_severities, allowed=set(cur_erc) | set(settings_ops.ERC_RULE_IDS))
@@ -854,9 +854,9 @@ class ProjectOps:
         with Transaction(repo) as txn:
             # Track BOTH edited files BEFORE any write: a save that raises mid-write (disk full,
             # a lock, revoked permission) must still roll BOTH back to their committed bytes.
-            if has_board_edit:
+            if board_path is not None:
                 txn.track(board_path)
-            if has_pro_edit:
+            if pro_path is not None:
                 txn.track(pro_path)
             if has_board_edit:
                 board = Board.load(board_path)
@@ -872,7 +872,9 @@ class ProjectOps:
 
     # --- M7f-B Editor: object conform (font/thickness normalize) --------------
 
-    def _kicad_files(self, rec: ProjectRecord) -> tuple[list[Path], list[Path]]:
+    def _kicad_files(
+        self, rec: ProjectRecord
+    ) -> tuple[builtins.list[Path], builtins.list[Path]]:
         """(boards, sheets) as absolute paths that exist on disk. A record path that moved after
         registration is skipped (it cannot be conformed) rather than crashing the whole conform."""
         root = Path(rec.root)
@@ -896,7 +898,9 @@ class ProjectOps:
             "suggested": conform_ops.SUGGESTED,
         }
 
-    def _stage_conform(self, rec: ProjectRecord, pcb_targets, sch_targets) -> list[dict]:
+    def _stage_conform(
+        self, rec: ProjectRecord, pcb_targets, sch_targets
+    ) -> builtins.list[dict]:
         """Compute, per project file, the conform change counts WITHOUT writing (dry run): load
         each board + sheet into a byte-preserving SexpDocument, apply the conform in memory, and
         record {path (posix, display-safe), counts, changed, _abs, _doc}. Only a file with at least
@@ -1151,13 +1155,13 @@ class ProjectOps:
 
     # --- M7f-D Editor: Library Fill + Prepare/Complete-All + reversible Restore ---
 
-    def _sheet_abs(self, rec: ProjectRecord) -> list[Path]:
+    def _sheet_abs(self, rec: ProjectRecord) -> builtins.list[Path]:
         """The project's schematic sheets that exist on disk, as absolute paths in sorted (registered)
         order. A sheet that moved after registration is skipped (it cannot be prepared)."""
         root = Path(rec.root)
         return [root / s for s in rec.sheet_paths if (root / s).exists()]
 
-    def _stage_prepare(self, rec: ProjectRecord, index: list[dict]):
+    def _stage_prepare(self, rec: ProjectRecord, index: builtins.list[dict]):
         """Compute a Prepare across every sheet WITHOUT writing: seed the project-wide used-reference
         set, then per sheet (in registered order so annotation is deterministic and project-unique)
         annotate every unannotated reference and auto-fill every BLANK identity field of a confidently
@@ -1348,7 +1352,7 @@ class ProjectOps:
             raise ValueError(
                 f"{rec.name} is registered for {tool!r}, which Stockroom cannot assign parts in"
             )
-        index = fill.library_match_records(_resolve_parts(library_parts))
+        index = fill.library_match_records(_resolve_parts(library_parts), tool=tool)
         part = next((p for p in index if p["id"] == part_id), None)
         if part is None:
             raise ValueError(f"no such library part: {part_id}")
@@ -1356,7 +1360,7 @@ class ProjectOps:
             return self._assign_in_design(rec, wanted, part, part_id)
         return self._assign_on_record(rec, wanted, part_id)
 
-    def _assign_in_design(self, rec: ProjectRecord, wanted: list[str], part: dict,
+    def _assign_in_design(self, rec: ProjectRecord, wanted: builtins.list[str], part: dict,
                           part_id: str) -> dict:
         """Assign by writing the design: identity fields, the repointed symbol link, and the hidden
         binding field, in one atomic commit on the project's own git."""
@@ -1413,7 +1417,9 @@ class ProjectOps:
             sha = txn.commit(message)
         return {**result, "committed": sha}
 
-    def _assign_on_record(self, rec: ProjectRecord, wanted: list[str], part_id: str) -> dict:
+    def _assign_on_record(
+        self, rec: ProjectRecord, wanted: builtins.list[str], part_id: str
+    ) -> dict:
         """Assign by recording the binding on the Stockroom project record, for a tool whose design
         files Stockroom reads but never writes. The design is left byte-identical on purpose."""
         tool = rec.eda or "kicad"
@@ -1449,7 +1455,7 @@ class ProjectOps:
             raise ValueError(
                 f"{rec.name} is registered for {tool!r}, which Stockroom cannot read placements for"
             )
-        index = fill.library_match_records(_resolve_parts(library_parts))
+        index = fill.library_match_records(_resolve_parts(library_parts), tool=tool)
         by_id = {p["id"]: p for p in index}
         comps = placements.read_placements(rec)
         unmatched: list[dict] = []

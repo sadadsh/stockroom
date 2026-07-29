@@ -196,18 +196,23 @@ export function assetReadiness(part: PartDetail, tool: EdaTool): AssetReadiness 
 
 export interface SummaryReadiness {
   ready: boolean;
+  coverageComplete: boolean;
+  trust: "pass" | "fail" | "unknown";
   missing: string[];
 }
 
-// The readiness of a list-row summary. A PartSummary carries no per-tool asset detail, so
-// only the default tool can be judged from it (its is_complete/missing flags). For any other
-// tool the summary cannot confirm that tool's assets exist, so it is treated conservatively
-// as not-ready until a summary grows per-tool fields to say otherwise.
+// The readiness of a list-row summary comes entirely from the backend's registry-keyed contract.
+// `is_complete` / `missing` are passport-data fields, not CAD facts, and a default-tool branch
+// would quietly turn metadata presence into both CAD coverage and trust. A missing/stale tool row
+// fails closed without fabricating which asset is absent.
 export function summaryReadiness(part: PartSummary, tool: EdaTool): SummaryReadiness {
-  if (tool === DEFAULT_EDA_TOOL) {
-    return { ready: part.is_complete, missing: part.missing };
-  }
-  return { ready: false, missing: [assetTitleLabel("symbol"), assetTitleLabel("footprint")] };
+  const state = part.eda_readiness?.[tool];
+  return {
+    ready: state?.ready ?? false,
+    coverageComplete: state?.coverage_complete ?? false,
+    trust: state?.trust ?? "unknown",
+    missing: (state?.missing ?? []).map(assetTitleLabel),
+  };
 }
 
 export interface LibraryReadiness {

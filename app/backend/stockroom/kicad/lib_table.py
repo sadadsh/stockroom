@@ -27,7 +27,10 @@ class LibTable:
     @classmethod
     def load(cls, path) -> "LibTable":
         doc = SexpDocument.load(path)
-        return cls(doc, doc.root.name)
+        kind = doc.root.name
+        if kind is None:
+            raise KiCadFileError("library table root must be a named list")
+        return cls(doc, kind)
 
     @classmethod
     def new(cls, kind: str) -> "LibTable":

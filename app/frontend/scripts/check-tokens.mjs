@@ -39,10 +39,11 @@ const referenced = new Set(
 const declared = new Set([...css.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map((m) => m[1]));
 
 const lightStart = css.indexOf('[data-theme="light"]');
+const lightCss = lightStart === -1 ? "" : css.slice(lightStart);
 const lightDeclared = new Set(
   lightStart === -1
     ? []
-    : [...css.slice(lightStart).matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map((m) => m[1]),
+    : [...lightCss.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map((m) => m[1]),
 );
 
 const problems = [];
@@ -72,6 +73,25 @@ const missingLight = [...referenced]
 if (missingLight.length) {
   problems.push(
     `declared for dark but missing a [data-theme="light"] override:\n    ${missingLight.join("\n    ")}`,
+  );
+}
+
+// Selected rows must read as selected in light mode, not as a hover that happened to stick.
+// This belongs in the CSS-aware build gate rather than Vitest: test.css=false intentionally turns
+// stylesheet imports into empty strings (see the module comment above).
+function blackAlpha(token) {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`${escaped}:\\s*rgba\\(0,\\s*0,\\s*0,\\s*([\\d.]+)\\)`).exec(lightCss);
+  return match ? Number(match[1]) : null;
+}
+
+const selectedAlpha = blackAlpha("--c-acc-soft");
+const hoverAlpha = blackAlpha("--c-hover");
+if (selectedAlpha === null || hoverAlpha === null) {
+  problems.push("light interaction tokens --c-acc-soft / --c-hover must use black rgba values");
+} else if (selectedAlpha < 0.1 || selectedAlpha <= hoverAlpha * 2) {
+  problems.push(
+    `light selection is not visibly stronger than hover (--c-acc-soft ${selectedAlpha}, --c-hover ${hoverAlpha})`,
   );
 }
 

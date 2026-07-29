@@ -83,6 +83,7 @@ def test_projects_s1m_into_content_addressed_staging_with_real_readback(tmp_path
     assert result.limitations == (
         "Altium artifacts were acquired from a checked-in fixture, not generated.",
         "Altium semantics were read from OLE fixture streams, not the live official adapter.",
+        "The Altium fixture has no embedded 3D body; cross-EDA 3D linking was not exercised.",
         "Database-library browse, placement, and compilation were not exercised.",
     )
 
@@ -149,6 +150,13 @@ def test_projects_s1m_into_content_addressed_staging_with_real_readback(tmp_path
 
     altium_symbol = staging / Path(artifacts[("altium", "symbol")].relative_path)
     altium_footprint = staging / Path(artifacts[("altium", "footprint")].relative_path)
+    kicad_footprint = staging / Path(artifacts[("kicad", "footprint")].relative_path)
+    projected_footprint = passive_projection.Footprint.load(kicad_footprint)
+    assert projected_footprint.model_path == (
+        "${KICAD10_3DMODEL_DIR}/Diode_SMD.3dshapes/D_SMA.step"
+    )
+    assert projected_footprint.model_placement is not None
+    assert projected_footprint.model_placement.rotate == (0.0, 0.0, 0.0)
     assert read_symbol_names(altium_symbol) == ["S1M"]
     assert read_footprint_names(altium_footprint) == ["DIOM5227X270N"]
     assert sorted(

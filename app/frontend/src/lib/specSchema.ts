@@ -876,10 +876,12 @@ export function cleanSpecLabel(raw: string): string {
  * than showing one, because a reader cannot tell it is a disagreement rather than two parameters.
  *
  * A SET, not a sequence: the wordings differ by ORDER ("voltage breakdown" vs "breakdown
- * voltage"), which is exactly what a plain normalised-string compare misses. Qualifiers still
- * separate concepts, because they add a word - `Voltage - Breakdown (Min)` keeps `min` and stays
- * its own row, and `Voltage - Clamping (Max) @ Ipp` keeps `max`/`ipp` and never folds into
- * `Clamping Voltage`. Verified against the owner's real record, which contains all five.
+ * voltage"), which is exactly what a plain normalised-string compare misses. `rating` / `rated`
+ * are distributor grammar rather than a second electrical concept: `Power` and `Power Rating`,
+ * or `Voltage Rated` and `Voltage Rating`, must occupy one row. Other qualifiers still separate
+ * concepts, because they add a word - `Voltage - Breakdown (Min)` keeps `min` and stays its own
+ * row, and `Voltage - Clamping (Max) @ Ipp` keeps `max`/`ipp` and never folds into
+ * `Clamping Voltage`. Verified against the owner's real records.
  */
 export function specConcept(key: string): string {
   const words = key
@@ -888,7 +890,100 @@ export function specConcept(key: string): string {
     .trim()
     .split(" ")
     .filter(Boolean);
-  return [...new Set(words)].sort().join(" ");
+  const quantityWords = new Set([
+    "capacitance",
+    "current",
+    "frequency",
+    "inductance",
+    "power",
+    "resistance",
+    "temperature",
+    "voltage",
+  ]);
+  const isRatedQuantity = words.some((word) => quantityWords.has(word));
+  const semanticWords =
+    words.length > 1 && isRatedQuantity
+      ? words.filter((word) => word !== "rating" && word !== "rated")
+      : words;
+  return [...new Set(semanticWords)].sort().join(" ");
+}
+
+const SI_PREFIX_SCALE: Readonly<Record<string, number>> = {
+  p: 1e-12,
+  n: 1e-9,
+  u: 1e-6,
+  "µ": 1e-6,
+  "μ": 1e-6,
+  m: 1e-3,
+  k: 1e3,
+  K: 1e3,
+  M: 1e6,
+  G: 1e9,
+  T: 1e12,
+};
+
+function comparableBaseUnit(token: string): string | null {
+  if (token === "Ω") return "Ω";
+  if (/^hz$/i.test(token)) return "Hz";
+  if (/^wh$/i.test(token)) return "Wh";
+  if (/^ah$/i.test(token)) return "Ah";
+  if (/^[fhvawsj]$/i.test(token)) return token.toUpperCase();
+  return null;
+}
+
+/**
+ * Parse the leading engineering quantity from a source value into its base-unit magnitude.
+ *
+ * Parenthetical source detail is deliberately allowed after the first quantity:
+ * `62.5 mW (1/16 W)` is still a power value. Unsupported/prose units return null, so this can
+ * suppress a duplicate only when both the dimension and the magnitude are understood.
+ */
+function comparableQuantity(raw: string): { magnitude: number; unit: string } | null {
+  const text = prettifyValue(raw).replace(/^−/, "-").trim();
+  const match =
+    /^([+-]?(?:\d[\d,]*(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?)\s*([^\s(]+)/.exec(text);
+  if (!match) return null;
+  const value = Number(match[1].replace(/,/g, ""));
+  if (!Number.isFinite(value)) return null;
+  const token = match[2];
+
+  const direct = comparableBaseUnit(token);
+  if (direct) return { magnitude: value, unit: direct };
+
+  const prefix = token[0];
+  const base = comparableBaseUnit(token.slice(1));
+  const scale = SI_PREFIX_SCALE[prefix];
+  if (!base || scale === undefined) return null;
+  return { magnitude: value * scale, unit: base };
+}
+
+/**
+ * Whether two source strings are the same presentable answer.
+ *
+ * Distributor values often differ only in engineering notation (`0.5 V` / `500 mV`) or in the
+ * rounding used beside an exact fraction (`0.063 W` / `62.5 mW (1/16 W)`). A one-percent relative
+ * window covers that measured rounding case while still retaining a materially different source
+ * answer as an alternate. Unknown units never compare numerically.
+ */
+export function equivalentSpecValue(left: unknown, right: unknown): boolean {
+  if (
+    (typeof left !== "string" && typeof left !== "number") ||
+    (typeof right !== "string" && typeof right !== "number")
+  ) {
+    return left === right;
+  }
+  const leftText = String(left);
+  const rightText = String(right);
+  const normalizedLeft = leftText.trim().replace(/\s+/g, " ").toLowerCase();
+  const normalizedRight = rightText.trim().replace(/\s+/g, " ").toLowerCase();
+  if (normalizedLeft === normalizedRight) return true;
+
+  const a = comparableQuantity(leftText);
+  const b = comparableQuantity(rightText);
+  if (!a || !b || a.unit !== b.unit) return false;
+  const scale = Math.max(Math.abs(a.magnitude), Math.abs(b.magnitude));
+  if (scale === 0) return true;
+  return Math.abs(a.magnitude - b.magnitude) <= scale * 0.01;
 }
 
 /**
@@ -929,7 +1024,7 @@ export function mergeSameConcept(
         ...(alternates[winner.key] ?? []),
         ...(extra[winner.key] ?? []),
       ];
-      if (already.some((a) => a.value === (row.raw ?? row.value))) continue;
+      if (already.some((a) => equivalentSpecValue(a.value, row.raw ?? row.value))) continue;
       (extra[winner.key] ??= []).push({
         value: row.raw ?? row.value,
         source: row.key,

@@ -1,11 +1,11 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { TargetDefinitionDTO } from "../../api/types";
 import { TargetDefinitionPanel } from "./TargetDefinitionPanel";
 
 const DEFINITION: TargetDefinitionDTO = {
-  format: "stm-target-definition/1",
-  compiler_rev: 4,
+  format: "stm-target-definition/2",
+  compiler_rev: 8,
   artifact_digest: "a".repeat(64),
   profile: {
     id: "fixture-policy",
@@ -35,7 +35,7 @@ const DEFINITION: TargetDefinitionDTO = {
   },
   summary: {
     silicon_classes: { stable_io: 1, safety_collision: 1 },
-    board_actions: { direct: 1, isolate: 1 },
+    board_actions: { direct: 1, selectable: 1 },
     required_routes: 1,
     switched_routes: 0,
     safety_rules: 0,
@@ -198,16 +198,95 @@ const DEFINITION: TargetDefinitionDTO = {
     ],
   },
   safety_rules: [],
-  channel_fabric: {
-    part_mpn: "",
-    channels_per_device: 0,
-    max_devices: 0,
-    default_state: "open",
-    reference_prefix: "U_ROUTE",
-    required_channels: 0,
-    capacity: 0,
-    used_devices: 0,
-    allocations: [],
+  routing_requirements: {
+    strategy: "implementation-neutral-independent-paths",
+    safe_default: "open",
+    required_independent_paths: 0,
+    maximum_independent_paths: null,
+    limit_status: "unbounded",
+    paths: [],
+  },
+  universalization: {
+    strategy: "one-package-universal-support",
+    implementation_owner: "consuming-design",
+    implementation_technology: "unspecified",
+    required_independent_paths: 2,
+    safe_default: "open",
+    state_contract: {
+      unknown_target: "all-independent-paths-open",
+      controller_startup: "all-independent-paths-open",
+      controller_reset: "all-independent-paths-open",
+      power_loss: "all-independent-paths-open",
+      target_change: "open-before-reconfigure",
+      identity_mismatch: "refuse-activation",
+      configured: "only-target-permitted-paths-may-conduct",
+    },
+    summary: {
+      direct_or_fixed: 1,
+      selectable: 1,
+      excluded_from_common_interface: 0,
+    },
+    strategies: [
+      {
+        position: "1",
+        silicon_class: "stable_io",
+        primitive: "universal-breakout",
+        explanation:
+          "The same GPIO identity can feed one common assignable board net.",
+        selection: "none",
+        safe_default: null,
+        identities: ["PA0"],
+        branches: [],
+        constraints: [],
+        validation: {
+          status: "not-required",
+          required_checks: [],
+          failure_action: "none",
+        },
+        evidence_status: "compiler-derived",
+        implementation_owner: "consuming-design",
+      },
+      {
+        position: "2",
+        silicon_class: "safety_collision",
+        primitive: "exclusive-identity-branches",
+        explanation:
+          "Conflicting fixed identities require mutually exclusive target-specific branches.",
+        selection: "one-of",
+        safe_default: "open",
+        identities: ["ground", "vcap"],
+        branches: [
+          {
+            id: "identity-1",
+            identity_patterns: ["ground"],
+            matched_identities: ["ground"],
+            matched_targets: ["STM32TESTA"],
+            action: "selectable",
+            net: "",
+            safe_default: "open",
+            evidence_status: "suggested",
+          },
+          {
+            id: "identity-2",
+            identity_patterns: ["vcap"],
+            matched_identities: ["vcap"],
+            matched_targets: ["STM32TESTB"],
+            action: "selectable",
+            net: "",
+            safe_default: "open",
+            evidence_status: "suggested",
+          },
+        ],
+        constraints: ["Only the valid branch may conduct."],
+        validation: {
+          status: "required",
+          required_checks: [],
+          failure_action: "keep-independent-paths-open",
+        },
+        evidence_status: "suggested",
+        implementation_owner: "consuming-design",
+      },
+    ],
   },
   positions: [
     {
@@ -218,6 +297,7 @@ const DEFINITION: TargetDefinitionDTO = {
       bga_col: null,
       silicon_class: "stable_io",
       board_action: "direct",
+      universal_primitive: "universal-breakout",
       identities: ["PA0"],
       access_tags: ["usart"],
       access_tags_union: ["usart"],
@@ -257,7 +337,8 @@ const DEFINITION: TargetDefinitionDTO = {
       bga_row: null,
       bga_col: null,
       silicon_class: "safety_collision",
-      board_action: "isolate",
+      board_action: "selectable",
+      universal_primitive: "exclusive-identity-branches",
       identities: ["ground", "vcap"],
       access_tags: [],
       access_tags_union: [],
@@ -294,28 +375,117 @@ const DEFINITION: TargetDefinitionDTO = {
 };
 
 describe("TargetDefinitionPanel", () => {
-  it("puts build readiness and the physical continuity rail ahead of similarity", () => {
+  it("leads with explained package compatibility and exact denominators", () => {
     render(<TargetDefinitionPanel definition={DEFINITION} />);
-    expect(screen.getByText("Blocked")).toBeInTheDocument();
-    expect(screen.getByTestId("target-continuity-rail")).toBeInTheDocument();
-    expect(screen.getByText(DEFINITION.readiness.blockers[0])).toBeInTheDocument();
-    expect(screen.getAllByText("Service TX").length).toBeGreaterThan(0);
-    expect(screen.getByTestId("target-service-matrix")).toBeInTheDocument();
-    expect(screen.getByTestId("target-board-access-coverage")).toBeInTheDocument();
-    expect(screen.getAllByText("Service UART").length).toBeGreaterThan(0);
+    expect(screen.getByText("Definition Blocked")).toBeInTheDocument();
+    expect(screen.getByTestId("target-package-map-svg")).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Pinout Lens" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Compatibility" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByText("1/2 Shared")).toBeInTheDocument();
+    const legend = screen.getByTestId("target-smart-legend");
     expect(
-      screen.getByText(/ROM-loader, debug-unlock, or data extraction claim/),
+      within(legend).getByRole("img", { name: "Package Position Distribution" }),
     ).toBeInTheDocument();
+    expect(
+      within(legend).getByRole("button", { name: "Show Same Across All MCUs" }),
+    ).toHaveTextContent("Same1 · 50%");
+    expect(
+      within(legend).getByRole("button", { name: "Show Electrical Conflict" }),
+    ).toHaveTextContent("Conflict1 · 50%");
+    expect(legend).toHaveTextContent(
+      "Shows whether one physical connection can work across every selected MCU",
+    );
+    expect(screen.getByTestId("target-position-inspector")).toBeInTheDocument();
+    expect(
+      screen.getByRole("radiogroup", { name: "Position Inspector View" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Position 2 has a critical identity collision without a safety rule",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Proof Required")).toBeInTheDocument();
+    expect(screen.getByText(/Keep Independent Paths Open/)).toBeInTheDocument();
+    expect(screen.queryByTestId("target-continuity-rail")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("target-service-matrix")).not.toBeInTheDocument();
   });
 
-  it("opens the exact per-target evidence behind a rail position", () => {
+  it("filters conflicts and explains a selected position without raw taxonomy", () => {
     render(<TargetDefinitionPanel definition={DEFINITION} />);
-    expect(screen.getAllByText("functional foundation")).toHaveLength(2);
-    expect(screen.queryByText("general I/O")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Position 1: Direct" }));
-    expect(screen.getByText("Position 1")).toBeInTheDocument();
-    expect(screen.getAllByText("PA0")).toHaveLength(2);
-    expect(screen.getByText("stable io")).toBeInTheDocument();
-    expect(screen.getAllByText("usart")).toHaveLength(2);
+    const conflictFilter = screen.getByRole("button", {
+      name: "Show Electrical Conflict",
+    });
+    fireEvent.click(conflictFilter);
+    expect(conflictFilter).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("target-smart-legend")).toHaveTextContent(
+      "compact passive conditioning where safe",
+    );
+    expect(
+      screen.getByRole("button", { name: "Position 1: Same Across All MCUs" }),
+    ).toHaveAttribute("opacity", "0.18");
+    expect(
+      screen.getByRole("button", { name: "Position 2: Electrical Conflict" }),
+    ).toHaveAttribute("opacity", "1");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Position 1: Same Across All MCUs" }),
+    );
+    const inspector = screen.getByTestId("target-position-inspector");
+    expect(inspector).toHaveTextContent("PA0");
+    expect(inspector).toHaveTextContent("2 Of 2 MCUs · 100%");
+    expect(inspector).toHaveTextContent("Same Across All MCUs");
+    expect(inspector).not.toHaveTextContent("stable_io");
+    expect(inspector).not.toHaveTextContent("usart");
+    expect(inspector).toHaveTextContent("UART");
+    expect(inspector).toHaveTextContent("Service TX");
+
+    fireEvent.click(
+      within(inspector).getByRole("radio", { name: "MCUs" }),
+    );
+    expect(inspector).toHaveTextContent(
+      "Grouped by canonical pin name and electrical identity",
+    );
+    expect(inspector).toHaveTextContent("PA0");
+
+    fireEvent.click(
+      within(inspector).getByRole("radio", { name: "Evidence" }),
+    );
+    expect(inspector).toHaveTextContent("Access Routes");
+    expect(inspector).toHaveTextContent("Board Evidence");
+    expect(inspector).toHaveTextContent("Safe State Contract");
+    expect(inspector).toHaveTextContent("Unknown Target");
+    expect(inspector).toHaveTextContent("All Independent Paths Open");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Service Access" }));
+    expect(screen.getByRole("radio", { name: "Service Access" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Position 1: UART" })).toHaveAttribute(
+      "data-lens",
+      "access",
+    );
+    const routeFilter = screen.getByRole("button", {
+      name: "Show Required Service Route",
+    });
+    fireEvent.click(routeFilter);
+    expect(routeFilter).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: "Position 1: UART" }),
+    ).toHaveAttribute("opacity", "1");
+    expect(
+      screen.getByRole("button", { name: "Position 2: No Declared Access" }),
+    ).toHaveAttribute("opacity", "0.18");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Routing Plan" }));
+    expect(
+      screen.getByRole("button", { name: "Show Direct Or Fixed" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Show Fully Exclusive" }),
+    ).toBeInTheDocument();
   });
 });

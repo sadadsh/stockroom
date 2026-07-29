@@ -1,18 +1,18 @@
 """Capture requirements: the per-EDA-tool assets a part still needs.
 
-Pure (no pywebview). Shared by the API (which reports a part's needs) and the host capture
-session. ``Requirement`` values are the wire contract the TypeScript ``Requirement`` union
+Pure (no pywebview). Shared by the API planner and provider-evidence workflow.
+``Requirement`` values are the wire contract the TypeScript ``Requirement`` union
 mirrors, and the same `<tool>_<kind>` vocabulary ``LibraryOps.detach_asset`` speaks.
 
 The members are spelled out rather than generated at import time. This is a WIRE CONTRACT --
-the TypeScript union, the capture HUD's labels and the host bridge all speak these exact
-strings -- and a contract belongs in source where it can be read, grepped and jumped to, not
+the TypeScript union and provider HUD both speak these exact strings -- and a contract
+belongs in source where it can be read, grepped and jumped to, not
 conjured from a loop. What keeps it honest instead is
 `test_the_enum_covers_exactly_the_registry`: registering a third EDA tool turns that test red
 with the members to add, so the enum can never silently fall behind the registry.
 
 An asset kind a tool cannot take by reference has NO member: an Altium 3D model lives inside
-the footprint's `.PcbLib` binary, so asking a capture session to fetch one names a gap that
+the footprint's `.PcbLib` binary, so asking the acquisition workflow to fetch one names a gap that
 can never be closed.
 """
 

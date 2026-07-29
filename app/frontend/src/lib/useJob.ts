@@ -1,6 +1,6 @@
 /**
  * Run a backend job and expose its live state. A job is started elsewhere (e.g.
- * ingestInspect returns a job_id); `run(jobId)` opens the SSE stream through the
+ * a network acquisition request returns a job_id); `run(jobId)` opens the SSE stream through the
  * fetch-based client (native EventSource cannot send the bearer token) and folds
  * progress / result / error events into React state. The stream always ends with a
  * `done` event, so the loop terminates cleanly on success or failure.

@@ -9,6 +9,7 @@ and each is written against a failure that is cheap to ship and expensive to fin
 * one bad part must never abort the batch;
 * an incomplete part must be REPORTED, never force-added past the complete-to-add gate.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -88,8 +89,9 @@ def _index(existing: dict):
 def test_a_stock_number_is_resolved_before_anything_is_enriched(tmp_path):
     ds = tmp_path / "d.pdf"
     ds.write_bytes(b"%PDF-")
-    pipe = _Pipeline(resolve={"595-TPS62130RGTR": "TPS62130RGTR"},
-                     fill={"TPS62130RGTR": _complete(ds)})
+    pipe = _Pipeline(
+        resolve={"595-TPS62130RGTR": "TPS62130RGTR"}, fill={"TPS62130RGTR": _complete(ds)}
+    )
     ops = _Ops()
     report = bulk_import(["595-TPS62130RGTR"], pipe, ops, index=_index({}))
     assert pipe.enriched == ["TPS62130RGTR"], "the SKU itself must never reach enrichment"
@@ -100,11 +102,39 @@ def test_a_stock_number_is_resolved_before_anything_is_enriched(tmp_path):
     assert ops.added[0].mpn == "TPS62130RGTR"
 
 
+def test_import_promotes_a_proven_manufacturer_abbreviation_from_the_datasheet():
+    datasheet = Path(__file__).parent / "fixtures" / "sample_datasheet.pdf"
+    pipe = _Pipeline(fill={"TPS62130RGTR": _complete(datasheet)})
+    ops = _Ops()
+
+    report = bulk_import(["TPS62130RGTR"], pipe, ops, index=_index({}))
+
+    assert report.items[0].status == "added"
+    staged = ops.added[0]
+    assert staged.manufacturer == "Texas Instruments"
+    assert staged.alternates["manufacturer"] == [{"value": "TI", "source": "", "confidence": ""}]
+
+
+def test_import_does_not_replace_an_unrelated_short_manufacturer_from_the_datasheet():
+    datasheet = Path(__file__).parent / "fixtures" / "sample_datasheet.pdf"
+    filled = _complete(datasheet)
+    filled["manufacturer"] = "ON"
+    pipe = _Pipeline(fill={"TPS62130RGTR": filled})
+    ops = _Ops()
+
+    report = bulk_import(["TPS62130RGTR"], pipe, ops, index=_index({}))
+
+    assert report.items[0].status == "added"
+    assert ops.added[0].manufacturer == "ON"
+    assert "manufacturer" not in ops.added[0].alternates
+
+
 def test_a_part_already_in_the_library_is_skipped_not_duplicated(tmp_path):
     pipe = _Pipeline(resolve={"595-TPS62130RGTR": "TPS62130RGTR"})
     ops = _Ops()
-    report = bulk_import(["595-TPS62130RGTR"], pipe, ops,
-                         index=_index({"TPS62130RGTR": "tps62130rgtr"}))
+    report = bulk_import(
+        ["595-TPS62130RGTR"], pipe, ops, index=_index({"TPS62130RGTR": "tps62130rgtr"})
+    )
     assert report.items[0].status == "exists"
     assert report.items[0].part_id == "tps62130rgtr"
     assert ops.added == []
@@ -170,8 +200,9 @@ def test_a_part_added_earlier_in_the_same_run_is_not_added_twice(tmp_path):
     is only rebuilt after the run."""
     ds = tmp_path / "d.pdf"
     ds.write_bytes(b"%PDF-")
-    pipe = _Pipeline(resolve={"595-X": "SAMEPART", "296-Y-ND": "SAMEPART"},
-                     fill={"SAMEPART": _complete(ds)})
+    pipe = _Pipeline(
+        resolve={"595-X": "SAMEPART", "296-Y-ND": "SAMEPART"}, fill={"SAMEPART": _complete(ds)}
+    )
     ops = _Ops()
     report = bulk_import(["595-X", "296-Y-ND"], pipe, ops, index=_index({}))
     assert len(ops.added) == 1
@@ -185,8 +216,13 @@ def test_progress_names_the_part_it_is_on(tmp_path):
     ds.write_bytes(b"%PDF-")
     pipe = _Pipeline(fill={"A": _complete(ds), "B": _complete(ds)})
     seen = []
-    bulk_import(["A", "B"], pipe, _Ops(), index=_index({}),
-                on_progress=lambda done, total, q: seen.append((done, total, q)))
+    bulk_import(
+        ["A", "B"],
+        pipe,
+        _Ops(),
+        index=_index({}),
+        on_progress=lambda done, total, q: seen.append((done, total, q)),
+    )
     assert seen == [(0, 2, "A"), (1, 2, "B")]
 
 
@@ -194,8 +230,7 @@ def test_the_report_counts_every_outcome(tmp_path):
     ds = tmp_path / "d.pdf"
     ds.write_bytes(b"%PDF-")
     pipe = _Pipeline(fill={"A": _complete(ds), "C": {"manufacturer": "?"}}, raises=["D"])
-    report = bulk_import(["A", "B", "C", "D"], pipe, _Ops(),
-                         index=_index({"B": "b-part"}))
+    report = bulk_import(["A", "B", "C", "D"], pipe, _Ops(), index=_index({"B": "b-part"}))
     assert report.counts() == {"added": 1, "exists": 1, "incomplete": 1, "error": 1}
     assert len(report.items) == 4
 
@@ -314,31 +349,6 @@ def test_a_passive_whose_package_cannot_be_resolved_is_not_forced():
     assert report.items[0].assets in ("none", "")
 
 
-# --------------------------------------------------------------------------- #
-# The LCSC lane: real symbol + footprint + 3D for a NON-passive, with no login.
-# `ingest/lcsc.py` already converts an LCSC part number through easyeda2kicad; enrichment
-# already resolves that id (69 of the owner's first 96 cached parts carry one). This is the
-# wiring between them, and it is what gets files onto the ICs, connectors and diodes.
-# --------------------------------------------------------------------------- #
-
-
-def _lcsc_candidate(tmp_path):
-    """What ingest's LCSC fetch produces: a candidate carrying real asset FILES."""
-    from stockroom.ingest.staging import StagingCandidate
-
-    sym = tmp_path / "lcsc.kicad_sym"
-    sym.write_text("(kicad_symbol_lib)", encoding="utf-8")
-    fp = tmp_path / "lcsc.kicad_mod"
-    fp.write_text("(footprint)", encoding="utf-8")
-    model = tmp_path / "lcsc.step"
-    model.write_bytes(b"ISO-10303-21;")
-    return StagingCandidate(
-        vendor="lcsc", symbol_lib_path=sym, symbol_name="C7666",
-        footprint_variants=[fp], model_path=model,
-        display_name="C7666", entry_name="C7666", category="Other",
-    )
-
-
 def _lcsc_pipeline(tmp_path):
     from stockroom.model.part import Provenance, Purchase
 
@@ -346,8 +356,7 @@ def _lcsc_pipeline(tmp_path):
         def resolve_to_mpn(self, query):
             from stockroom.enrich.pipeline import ResolvedQuery
 
-            return ResolvedQuery(mpn="SN74LVC1G08DBVR", query=query,
-                                 vendor="mouser", resolved=True)
+            return ResolvedQuery(mpn="SN74LVC1G08DBVR", query=query, vendor="mouser", resolved=True)
 
         def enrich_candidate(self, candidate, overwrite=None):
             candidate.manufacturer = "TI"
@@ -364,67 +373,25 @@ def _lcsc_pipeline(tmp_path):
     return _P()
 
 
-def test_a_non_passive_gets_real_files_from_its_lcsc_id(tmp_path):
+def test_lcsc_product_identity_never_promotes_easyeda_geometry(tmp_path):
     (tmp_path / "d.pdf").write_bytes(b"%PDF-")
-    seen = []
-
-    def cad_source(lcsc_id):
-        seen.append(lcsc_id)
-        return _lcsc_candidate(tmp_path)
-
     ops = _PassiveOps()
-    report = bulk_import(["595-SN74LVC1G08DBVR"], _lcsc_pipeline(tmp_path), ops,
-                         index=_index({}), cad_source=cad_source)
+    report = bulk_import(
+        ["595-SN74LVC1G08DBVR"],
+        _lcsc_pipeline(tmp_path),
+        ops,
+        index=_index({}),
+    )
 
-    assert seen == ["C7666"], "the LCSC id must be read out of the enriched purchase link"
     item = report.items[0]
     assert item.status == "added"
-    assert item.assets == "lcsc"
+    assert item.assets == "none"
     staged = ops.plain[0]
-    assert staged.symbol_source is not None
-    assert staged.footprint_source is not None
-    assert staged.model_source is not None, "the 3D model is the part the owner asked about"
-    # the ENRICHED identity wins over the converter's placeholder
+    assert staged.symbol_source is None
+    assert staged.footprint_source is None
+    assert staged.model_source is None
     assert staged.mpn == "SN74LVC1G08DBVR"
     assert staged.manufacturer == "TI"
-    assert staged.entry_name, "a staged symbol needs an entry name or add_part refuses it"
-
-
-def test_a_failing_cad_fetch_never_loses_the_part(tmp_path):
-    """easyeda2kicad can fail (no LCSC entry, a bad convert, no network). The part must still
-    land on its identity and be REPORTED as needing a capture, never dropped."""
-    (tmp_path / "d.pdf").write_bytes(b"%PDF-")
-
-    def cad_source(lcsc_id):
-        raise RuntimeError("easyeda2kicad failed: no such component")
-
-    ops = _PassiveOps()
-    report = bulk_import(["595-SN74LVC1G08DBVR"], _lcsc_pipeline(tmp_path), ops,
-                         index=_index({}), cad_source=cad_source)
-    assert report.items[0].status == "added"
-    assert report.items[0].assets == "none"
-    assert len(ops.plain) == 1
-
-
-def test_no_cad_source_configured_is_not_an_error(tmp_path):
-    """The lane is optional: with no fetcher the import still works, parts just land file-less."""
-    (tmp_path / "d.pdf").write_bytes(b"%PDF-")
-    ops = _PassiveOps()
-    report = bulk_import(["595-SN74LVC1G08DBVR"], _lcsc_pipeline(tmp_path), ops, index=_index({}))
-    assert report.items[0].status == "added"
-    assert report.items[0].assets == "none"
-
-
-def test_a_passive_never_takes_the_lcsc_lane(tmp_path):
-    """KiCad's own stock footprint is authoritative for a jellybean; a converted one is not.
-    The passive lane must win, and must not spend a conversion."""
-    calls = []
-    report = bulk_import(["81-GRM155R71C104KA88D"],
-                         _PassivePipeline({"81-GRM155R71C104KA88D": "GRM155R71C104KA88D"}),
-                         _PassiveOps(), index=_index({}),
-                         cad_source=lambda i: calls.append(i))
-    assert calls == []
-    assert report.items[0].assets == "kicad-stock"
 
 
 def test_the_index_is_re_read_per_part_not_captured_for_the_whole_run(tmp_path):
@@ -454,8 +421,12 @@ def test_the_index_is_re_read_per_part_not_captured_for_the_whole_run(tmp_path):
 
     live = {"index": _Rebuilding()}
     pipe = _Pipeline(fill={"A": _complete(ds), "B": _complete(ds)})
-    report = bulk_import(["A", "B"], pipe, _Ops(),
-                         index=lambda: live.__setitem__("index", _Rebuilding()) or live["index"])
+    report = bulk_import(
+        ["A", "B"],
+        pipe,
+        _Ops(),
+        index=lambda: live.__setitem__("index", _Rebuilding()) or live["index"],
+    )
     assert [i.status for i in report.items] == ["added", "added"]
 
 

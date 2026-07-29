@@ -28,7 +28,14 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // explicitly addressable Symbol / Footprint / 3D inspection tabs.
 // 245 after the standalone Pinout tab moved into the persistent specimen/CAD rail and its
 // bounded pin-list scroller became directly inspectable.
-const EXPECTED_ENTRIES = 245;
+// 262 with the STM Viewer workbench, compiled target map, legend, and inspector controls.
+// 264 with both Add to Components paths addressable under the same dev-mode contract.
+// 262 after the owner removed the KiCad-only Projects surface and automatic convergence
+// removed the obsolete Install And Restart control.
+// 258 after network-only ingest removed ZIP browsing, inspect progress, and the global
+// file-drop overlay; none of those retired local-file controls remains addressable.
+// 259 with the source-collection outcome ledger exposed to the dev-mode inspector.
+const EXPECTED_ENTRIES = 259;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
@@ -55,7 +62,7 @@ describe("devIds catalogue", () => {
     expect(seen.size).toBe(EXPECTED_ENTRIES);
   });
 
-  it("enumerates the 14 areas in first-appearance order, and every entry is a member", () => {
+  it("enumerates the 15 areas in first-appearance order, and every entry is a member", () => {
     expect(DEV_ID_AREAS).toEqual([
       "rail",
       "about",
@@ -64,6 +71,7 @@ describe("devIds catalogue", () => {
       "search",
       "addpart",
       "ingest",
+      "stm",
       "settings",
       "altiumdb",
       "complete",
@@ -72,7 +80,7 @@ describe("devIds catalogue", () => {
       "confirm",
       "shell",
     ]);
-    expect(DEV_ID_AREAS).toHaveLength(14);
+    expect(DEV_ID_AREAS).toHaveLength(15);
 
     // Every catalogued area is declared in DEV_ID_AREAS...
     const declared = new Set(DEV_ID_AREAS);

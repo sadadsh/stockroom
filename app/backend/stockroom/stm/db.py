@@ -868,6 +868,8 @@ class StmIndex:
                         geo["lqfp_side"],
                     ),
                 ).lastrowid
+                if pin_id is None:
+                    raise RuntimeError("SQLite did not return an id for the inserted MCU pin")
                 pin_ids_by_raw_name.setdefault(pin.name, []).append(pin_id)
                 for s in pin.signals:
                     conn.execute(

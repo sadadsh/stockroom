@@ -767,6 +767,38 @@ be rewritten in one branch.
   and the final expanded/compact headless captures pass. No visible Windows UI
   control was used.
 
+### 2026-07-28 — open-part consistency pass
+
+- Scoped the pass to the Library open-part workspace; Projects was deliberately
+  left unchanged.
+- Audited Overview, Representations, Sources, and Activity headlessly in dark
+  and light themes at 1,384 × 861. The underlying three-track IA was retained:
+  the defects were competing density and component rules, not the track model.
+- Added an optional compact density to the shared tab strip and used it only in
+  the 34 px open-part title band. The title, edit state, and tabs now share one
+  compact type scale without changing tabs elsewhere in the application.
+- Normalized the Overview workspace to a 20 px outer inset, 16 px pane insets,
+  a 10/16 px vertical rhythm, 24 px section headers, 28 px representation
+  footers, and 32 px action rows. Photo and CAD readiness now use the same row
+  geometry; Refresh and pane-collapse controls have explicit, matched targets.
+- Promoted Key Specifications from a tiny small-caps band to the same Title Case
+  heading level as Specifications and Sourcing. Supporting labels remain the
+  dense small-caps tier, so section hierarchy and data hierarchy are no longer
+  conflated.
+- Reduced oversized description, source-result, history, vendor, and price text
+  one step while keeping values and provenance legible. The compact datasheet
+  pinout now shares the same 12 px horizontal card inset as adjacent controls.
+- Constrained Sources and Activity to the same 980 px working width as
+  Representations, renamed the ambiguous `Enrich` heading to `Source Lookup`,
+  and tightened their cards and rows to the open-part density.
+- Rebuilt `frontend-dist` so the packaged executable uses the source changes.
+  Final headless measurements show no page-level horizontal scrolling; the three
+  Overview content tracks measure 292, 291, and 291 px. Source and Activity
+  panels measure 971 px inside the bounded detail workspace.
+- Verification: frontend typecheck, production build, 120 focused component
+  tests, and final dark/light Overview plus dark Sources/Activity captures pass.
+  No visible Windows UI control was used.
+
 ### 2026-07-28 — remaining product work
 
 - Symbol and Footprint now have credible navigation/export controls and share
@@ -792,6 +824,15 @@ be rewritten in one branch.
 
 ### Verification caveats
 
+- The open-part consistency aggregate gate completed all 4,284 backend cases
+  and all 1,171 frontend tests. Frontend tests were green. Three unrelated
+  backend failures were present in the shared dirty worktree: removed flat
+  asset access in `capture/evidence.py`, parenthesized plural messages in
+  `capture/guided.py`, and one workflow-coordinator concurrency assertion. The
+  concurrency test passed alone immediately afterward. Frontend typecheck then
+  failed in the concurrently edited STM target-visual model because new
+  `group`, `basis`, and `foundation` fields were not yet supplied. None of the
+  failing files belongs to the Library open-part slice.
 - The specification-schema full gate completed with Ruff green, all 1,133
   frontend tests green, and 4,034 backend passes with 25 skips. Four unrelated
   backend failures remain in the dirty worktree: two capture-attachment

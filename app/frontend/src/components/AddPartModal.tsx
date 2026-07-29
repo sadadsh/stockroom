@@ -1,8 +1,8 @@
 /**
  * The Add A Part window. A single in-window modal (the ConfirmDialog / CommandPalette
  * scrim idiom, so it feels like the rest of the app) that hosts the whole Add A Part
- * flow. Opened from three places through useAddPart(): the Components toolbar button,
- * the Ctrl+K palette, and a vendor ZIP dropped anywhere. It springs in over a blurred
+ * flow. Opened from the Components toolbar or Ctrl+K palette through useAddPart().
+ * It springs in over a blurred
  * scrim; Escape or a scrim click closes it and returns focus where it was.
  */
 import { useEffect, useRef } from "react";
@@ -32,9 +32,7 @@ export function AddPartModal() {
     window.addEventListener("keydown", onKey);
     // Land the caret in the hero input so a pasted link is one keystroke away.
     const focusTimer = window.setTimeout(() => {
-      document
-        .querySelector<HTMLInputElement>('[data-dev-id="ingest.input"]')
-        ?.focus();
+      document.querySelector<HTMLInputElement>('[data-dev-id="ingest.input"]')?.focus();
     }, 60);
     return () => {
       window.removeEventListener("keydown", onKey);
@@ -75,7 +73,8 @@ export function AddPartModal() {
             </div>
             <div className="mt-0.5 text-xs text-t3">
               <Text id="modal.addPart.subtitle">
-                Paste a link or part number, add a passive, or drop a vendor ZIP.
+                Resolve exact identity and source evidence, then let Stockroom complete one shared
+                CAD package.
               </Text>
             </div>
           </div>

@@ -41,6 +41,7 @@ from .ports import (
     WindowsLocalNtfsStorage,
     is_windows_sid,
 )
+from .windows_mutex import current_user_mutex_name
 
 SCHEMA_VERSION = 1
 BUSY_TIMEOUT_MS = 5_000
@@ -48,13 +49,17 @@ APPLICATION_ID = 0x5354434C
 CONTROL_DATABASE_NAME = "Control.sqlite"
 MAX_EVENT_PAYLOAD_BYTES = 65_536
 MAX_JSON_DEPTH = 32
-MUTEX_NAME_PREFIX = "Local\\Stockroom.Coordinator."
+DEFAULT_AUTHORITY_SCOPE = "Coordinator"
 
 JsonScalar: TypeAlias = None | bool | int | float | str
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 
 _OPAQUE_ID_PATTERN = re.compile(r"[0-9a-f]{32}", re.ASCII)
 _EVENT_TYPE_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", re.ASCII)
+_AUTHORITY_SCOPE_PATTERN = re.compile(
+    r"[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*",
+    re.ASCII,
+)
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}", re.ASCII)
 _PROHIBITED_KEY_NAMES = frozenset(
     {
@@ -181,6 +186,7 @@ _MIGRATION_1_OBJECTS = {
         CREATE TABLE runtime_identity (
             singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
             windows_sid TEXT NOT NULL,
+            authority_scope TEXT NOT NULL,
             bound_at REAL NOT NULL
         ) STRICT
     """,
@@ -241,7 +247,12 @@ _MIGRATION_1_OBJECTS = {
 
 _EXPECTED_TABLE_COLUMNS = {
     "schema_migrations": {"version", "name", "sha256", "applied_at"},
-    "runtime_identity": {"singleton", "windows_sid", "bound_at"},
+    "runtime_identity": {
+        "singleton",
+        "windows_sid",
+        "authority_scope",
+        "bound_at",
+    },
     "coordinator_state": {
         "singleton",
         "generation",
@@ -313,6 +324,16 @@ def _opaque_id() -> str:
 def _require_opaque_id(value: object) -> str:
     if type(value) is not str or _OPAQUE_ID_PATTERN.fullmatch(value) is None:
         raise CoordinatorConflict("coordinator generation fence is invalid")
+    return value
+
+
+def _authority_scope(value: object) -> str:
+    if (
+        type(value) is not str
+        or len(value) > 96
+        or _AUTHORITY_SCOPE_PATTERN.fullmatch(value) is None
+    ):
+        raise ValueError("authority_scope is invalid")
     return value
 
 
@@ -424,6 +445,7 @@ class ServiceControl:
         identity: CurrentIdentityPort,
         mutex_factory: NamedMutexFactoryPort | None = None,
         storage_policy: StoragePolicyPort | None = None,
+        authority_scope: str = DEFAULT_AUTHORITY_SCOPE,
     ):
         raw_database = Path(database)
         if not raw_database.is_absolute() or raw_database.name != CONTROL_DATABASE_NAME:
@@ -447,6 +469,7 @@ class ServiceControl:
             raise ValueError("mode must be a ServiceMode")
 
         self.mode = mode
+        self.authority_scope = _authority_scope(authority_scope)
         self._identity = identity
         self._initial_sid = self._current_sid()
         self._mutex: NamedMutexHandlePort | None = None
@@ -460,8 +483,9 @@ class ServiceControl:
 
         if mutex_factory is None:
             raise MutexProtocolError("coordinator mode requires a current-user named-mutex adapter")
-        mutex_name = (
-            MUTEX_NAME_PREFIX + hashlib.sha256(self._initial_sid.encode("ascii")).hexdigest()
+        mutex_name = current_user_mutex_name(
+            self._initial_sid,
+            purpose=self.authority_scope,
         )
         try:
             self._mutex = mutex_factory.open_current_user(
@@ -572,10 +596,12 @@ class ServiceControl:
                 )
                 connection.execute(
                     """
-                    INSERT INTO runtime_identity(singleton, windows_sid, bound_at)
-                    VALUES (1, ?, ?)
+                    INSERT INTO runtime_identity(
+                        singleton, windows_sid, authority_scope, bound_at
+                    )
+                    VALUES (1, ?, ?, ?)
                     """,
-                    (self._initial_sid, applied_at),
+                    (self._initial_sid, self.authority_scope, applied_at),
                 )
                 connection.execute(
                     """
@@ -712,7 +738,7 @@ class ServiceControl:
         current_sid = self._current_sid()
         rows = connection.execute(
             """
-            SELECT singleton, windows_sid, bound_at
+            SELECT singleton, windows_sid, authority_scope, bound_at
             FROM runtime_identity
             """
         ).fetchall()
@@ -724,15 +750,20 @@ class ServiceControl:
         except ValueError as exc:
             raise ControlDataCorruption("Control.sqlite identity binding is invalid") from exc
         stored_sid = row["windows_sid"]
+        stored_scope = row["authority_scope"]
         if (
             type(row["singleton"]) is not int
             or row["singleton"] != 1
             or not is_windows_sid(stored_sid)
+            or type(stored_scope) is not str
+            or _AUTHORITY_SCOPE_PATTERN.fullmatch(stored_scope) is None
             or not math.isfinite(bound_at)
         ):
             raise ControlDataCorruption("Control.sqlite identity binding is invalid")
         if not secrets.compare_digest(stored_sid, current_sid):
             raise IdentityMismatch("Control.sqlite belongs to a different Windows identity")
+        if not secrets.compare_digest(stored_scope, self.authority_scope):
+            raise IdentityMismatch("Control.sqlite belongs to a different authority scope")
 
     @staticmethod
     def _read_state(
@@ -1051,6 +1082,27 @@ class ServiceControl:
         except BaseException as exc:
             raise MutexProtocolError("coordinator named-mutex release failed") from exc
         self._held_fence = None
+
+    def close(self) -> None:
+        """Close an unowned native mutex handle without inventing a release.
+
+        A released Win32 mutex object remains alive while any process retains an
+        open handle. Explicit closure preserves the distinction between
+        ``WAIT_ABANDONED`` and cold recreation and prevents completed authority
+        generations from leaking kernel resources for the process lifetime.
+        """
+
+        if self._held_fence is not None:
+            raise CoordinatorConflict(
+                "coordinator control cannot close while holding a generation"
+            )
+        mutex = self._mutex
+        if mutex is None:
+            return
+        closer = getattr(mutex, "close", None)
+        if callable(closer):
+            closer()
+        self._mutex = None
 
     def record_event(
         self,

@@ -324,8 +324,8 @@ function DescriptionLede({
   const body = (text ?? "").trim();
   if (!body) return null;
   return (
-    <section data-dev-id="detail.description-lede" className="mb-3 flex flex-col gap-1">
-      <p className="text-sm leading-snug text-t1">{body}</p>
+    <section data-dev-id="detail.description-lede" className="mb-2.5 flex flex-col gap-1">
+      <p className="text-xs leading-snug text-t1">{body}</p>
       {/* the disagreement follows the value it is about, the same rule the Handoff tab uses */}
       <AlternatesDisclosure entries={alternates} current={body} onUse={onUse} />
     </section>
@@ -366,8 +366,8 @@ function KeySpecificationsBlock({
       aria-label="Key Specifications"
       className="@container mb-3 flex flex-none flex-col rounded-card border border-line bg-surface"
     >
-      <header className="flex items-center gap-3 border-b border-line px-3 py-1.5">
-        <span className={EYEBROW_DENSE}>
+      <header className="flex h-6 items-center gap-2.5 border-b border-line px-3">
+        <span className="text-xs font-semibold text-t1">
           <Text id="detail.top-specifications">Key Specifications</Text>
         </span>
         <span className="truncate text-2xs text-t3">Recommended and pinned</span>
@@ -508,7 +508,7 @@ function CollapsePaneButton({ devId, label, onCollapse }: { devId: string; label
       onClick={onCollapse}
       aria-expanded="true"
       title={`Collapse ${label}`}
-      className="inline-flex items-center rounded-control p-1 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+      className="inline-flex h-6 w-6 items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
     >
       <Icon id="detail.chevron-right" className="size-3.5" />
     </button>
@@ -595,13 +595,8 @@ interface Props {
   // Applying an enriched pinout persists through the specs seam (not editField);
   // omit it and the enrich panel offers no pinout Apply.
   onApplyPinout?: (sourced: SourcedField) => void;
-  // Attaching a symbol / footprint reference AFTER the part exists (assets no longer
-  // gate entry). Each takes a lib + name; omit them for a read-only panel and the
-  // missing-asset tiles offer no Attach affordance.
-  onAttachSymbol?: (lib: string, name: string) => void;
-  onAttachFootprint?: (lib: string, name: string) => void;
   // TRUE only while the delete itself is in flight. Distinct from `busy`, which is the panel's
-  // aggregate write flag: spinning the delete control because a symbol is attaching would claim an
+  // aggregate write flag: spinning the delete control because metadata is saving would claim an
   // action the user never started.
   deleting?: boolean;
   // Putting a DIFFERENT source's answer in force for a spec. It routes through the specs seam
@@ -621,8 +616,6 @@ export function DetailPanel({
   categories,
   onDelete,
   onApplyPinout,
-  onAttachSymbol,
-  onAttachFootprint,
   onUseSpecValue,
   deleting = false,
   busy = false,
@@ -794,9 +787,9 @@ export function DetailPanel({
     .filter((m) => m === "Symbol" || m === "Footprint")
     .map((m) => `Altium ${m}`);
   const needsList = [...missing, ...missingAssets, ...altiumNeeds];
-  // The panel is completable when it can edit a field OR attach an asset (a read-only panel gets
-  // no Complete Part affordance, only the honest "Not linked" state on the tiles).
-  const canComplete = !!(onEditField || onAttachSymbol || onAttachFootprint);
+  // A writable metadata seam makes Complete Part available. CAD never has a reference-entry
+  // callback here: symbols, footprints, and models arrive through the network collection flow.
+  const canComplete = !!onEditField;
 
   const derived = deriveTitle(detail);
   const name = detail.derived.display_name.trim();
@@ -866,7 +859,7 @@ export function DetailPanel({
           so the three panes read as one workspace. Then the padded body. */}
       <div
         data-dev-id="detail.title-strip"
-        // h-[34px], the SAME as PanelTitle, the rail header and the Projects strip. It was 38 while
+        // h-[34px], the SAME as PanelTitle and the rail header. It was 38 while
         // the comment above claimed it matched them, and on the owner's real Windows window that 4px
         // put this header's ink centre at 17.8 against 16.2 for "Components" and the rail toggle -
         // three docked panel headers on one band, one of them sitting low. Measured, not guessed.
@@ -891,6 +884,7 @@ export function DetailPanel({
             onSelect={setTab}
             idBase="workbench"
             devIdBase="detail"
+            density="compact"
             aria-label="Part views"
           />
         </div>
@@ -898,7 +892,7 @@ export function DetailPanel({
       {/* @container: the query root every `@`-prefixed breakpoint inside this sheet resolves
           against. It must sit here, on the pane, so the sheet reacts to the room it actually has
           (the rail collapsing 190px -> 52px changes it by 138px at an unchanged window size). */}
-      <div className="@container flex min-h-0 flex-1 flex-col px-6 pb-3 pt-3">
+      <div className="@container flex min-h-0 flex-1 flex-col px-5 pb-3 pt-3">
 
         {/* The default view is a three-pane sheet, bordered like docked panels: the PART (its
             embodiments + CAD readiness), the SPECIFICATIONS (one clean column), and the COMMERCIAL
@@ -943,7 +937,7 @@ export function DetailPanel({
           // to their content (`content-start`) and the SHEET is the single scroller; at three
           // columns the row is pinned to the pane height again so each column scrolls in place.
           className={
-            "mt-3 grid min-h-0 flex-1 gap-y-5 " +
+            "mt-2.5 grid min-h-0 flex-1 gap-y-4 " +
             "content-start overflow-y-auto " +
             "grid-cols-1 " +
             "@xl:grid-cols-[320px_minmax(16rem,1fr)] " +
@@ -958,7 +952,7 @@ export function DetailPanel({
               trapped in a half-height first row - measured, that clipped the symbol and footprint
               tiles to 17 visible pixels and left ~288x330px of dead space beneath them. At three
               columns there is only one row, so the span is released. */}
-          <div className="flex min-h-0 flex-col gap-3 overflow-y-auto px-5 @xl:row-span-2 @4xl:row-span-1">
+          <div className="flex min-h-0 flex-col gap-2.5 overflow-y-auto px-4 @xl:row-span-2 @4xl:row-span-1">
           {/* the physical object as the hero, its symbol + footprint as supporting embodiments.
               flex-1 (no min-h-0): the canvas absorbs the pane's slack so the hero grows to fill
               the column beside a tall specs pane, and still scrolls when content genuinely
@@ -1156,7 +1150,7 @@ export function DetailPanel({
               onExpand={() => setSpecsOpen(true)}
             />
           ) : (
-          <div className="flex min-h-0 flex-col overflow-y-auto border-l border-line px-5">
+          <div className="flex min-h-0 flex-col overflow-y-auto border-l border-line px-4">
             {/* KEY SPECIFICATIONS lead this column now, where the EDA handoff band used to sit. The
                 owner's ask: "the important specifications should be where the eda handoff is,
                 formatted like the specifications, but the most important details people care about
@@ -1230,7 +1224,7 @@ export function DetailPanel({
               onExpand={() => setSourcingOpen(true)}
             />
           ) : (
-          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-5 @xl:col-start-2 @4xl:col-start-auto @4xl:border-l @4xl:border-line">
+          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-4 @xl:col-start-2 @4xl:col-start-auto @4xl:border-l @4xl:border-line">
             <DetailSection
               title={<Text id="detail.sourcing-head">Sourcing</Text>}
               action={
@@ -1241,7 +1235,7 @@ export function DetailPanel({
                     data-dev-id="detail.sourcing-refresh"
                     onClick={() => refreshJob.run()}
                     disabled={refreshStatus === "running"}
-                    className="inline-flex items-center gap-1 rounded-control px-1 py-0.5 text-2xs font-semibold text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc disabled:pointer-events-none disabled:opacity-60"
+                    className="inline-flex h-6 items-center gap-1 rounded-control border border-line bg-field px-2 text-2xs font-semibold text-t2 transition-colors hover:border-line2 hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc disabled:pointer-events-none disabled:opacity-60"
                   >
                     <RefreshIcon
                       className={refreshStatus === "running" ? "animate-spin" : undefined}
@@ -1373,17 +1367,14 @@ export function DetailPanel({
       </footer>
       </div>
 
-      {/* The one Complete-Part window: every missing file (symbol / footprint / 3D model) and
-          data field (datasheet, MPN, ...) is added here, replacing the per-tile attach buttons
-          and the standalone DigiKey card. Mounted only while open so its inputs start fresh. */}
+      {/* The one Complete-Part window: network collection fills CAD while editable rows fill
+          metadata (datasheet, MPN, ...). Mounted only while open so its inputs start fresh. */}
       {completeOpen ? (
         <CompletePartModal
           detail={detail}
           hasModel={hasModel}
           busy={busy}
           onClose={() => setCompleteOpen(false)}
-          onAttachSymbol={onAttachSymbol}
-          onAttachFootprint={onAttachFootprint}
           onEditField={onEditField}
         />
       ) : null}
@@ -1535,14 +1526,14 @@ function TitleBlock({
             cancel();
           }
         }}
-        className="w-[280px] max-w-full rounded-control border border-line2 bg-field px-2 py-0.5 text-base font-semibold tracking-[-0.01em] text-t1 outline-none focus:border-acc"
+        className="w-[280px] max-w-full rounded-control border border-line2 bg-field px-2 py-0.5 text-sm font-semibold tracking-[-0.01em] text-t1 outline-none focus:border-acc"
       />
     );
   }
 
   return (
     <div className="group flex min-w-0 items-center gap-1.5">
-      <h1 data-dev-id="detail.title" className="min-w-0 truncate text-base font-semibold tracking-[-0.01em] text-t1">
+      <h1 data-dev-id="detail.title" className="min-w-0 truncate text-sm font-semibold tracking-[-0.01em] text-t1">
         {headline}
       </h1>
       {onRename ? (
@@ -1576,8 +1567,8 @@ function DetailSection({
     <section className={className} {...rest}>
       {/* Pane-level heading: Title Case, t1 - a clear step ABOVE the uppercase micro-eyebrows
           the spec groups use, so "Specifications" and "Electrical" never read as the same level. */}
-      <div className="mb-2 flex h-5 items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-t1">{title}</span>
+      <div className="mb-1.5 flex h-6 items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-t1">{title}</span>
         {action}
       </div>
       {children}
@@ -1660,7 +1651,7 @@ function ReadinessBlock({
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex h-[34px] w-full items-center gap-2.5 rounded-control border border-line bg-field px-3 text-left transition-colors hover:bg-raise2"
+        className="flex h-8 w-full items-center gap-2.5 rounded-control border border-line bg-field px-3 text-left transition-colors hover:border-line2 hover:bg-raise2"
       >
         {allReady ? (
           <Icon id="detail.ready-check" className="h-3.5 w-3.5 flex-none" />
@@ -1843,15 +1834,14 @@ function ReadinessRow({
 
 // One Part Canvas tile. `hero` is the big physical (3D) stage; `tile` is a compact
 // embodiment (symbol / footprint). A present asset exposes the SAME stage-centred Expand
-// affordance on hover or keyboard focus; the footer is identity/status only. Missing with a
-// handler opens Attach; missing read-only stays the honest Not Linked state.
+// affordance on hover or keyboard focus; the footer is identity/status only. Missing assets stay
+// the honest Not Linked state and are completed through the network workflow, never this tile.
 function AssetTile({
   name,
   present,
   art,
   thumb,
   onOpen,
-  onAttach,
   className,
   devId,
   stageDevId,
@@ -1864,9 +1854,6 @@ function AssetTile({
   thumb?: ReactNode;
   // When present and set, the stage offers a hover/focus Expand action.
   onOpen?: () => void;
-  // When the asset is MISSING and set, the whole tile is a button that opens the
-  // Attach modal. Ignored when the asset is present.
-  onAttach?: () => void;
   // Height / extra classes for the tile shell (the caller sizes it in its layout).
   className?: string;
   // The stable dev-mode id for the tile shell; each of the three call sites passes a
@@ -1917,7 +1904,7 @@ function AssetTile({
     </div>
   );
   const footer = (
-    <div className="flex items-center gap-2 px-3 py-2">
+    <div className="flex h-7 items-center gap-2 px-3">
       <span className="min-w-0 truncate text-2xs font-semibold text-t1">{name}</span>
       {/* The STATUS never wraps: "Not Linked" broke as "Not / Linked" across two lines in the
           130px Symbol and Footprint tiles, which made a two-word state read as two states and
@@ -1926,11 +1913,6 @@ function AssetTile({
       <span className="ml-auto inline-flex flex-none items-center gap-1.5 whitespace-nowrap text-2xs text-t3">
         {present ? (
           <>Linked</>
-        ) : onAttach ? (
-          <>
-            <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden="true" />
-            Attach
-          </>
         ) : (
           <>
             <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden="true" />
@@ -1943,9 +1925,6 @@ function AssetTile({
   const base =
     "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border border-line bg-raise " +
     (className ?? "");
-  const buttonCls =
-    base +
-    " cursor-pointer text-left transition-colors hover:border-line2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc";
   // Present previews are plain shells with one consistent action INSIDE the stage. That keeps the
   // footer quiet, avoids nesting a button around the renderer, and gives 3D, Symbol, and Footprint
   // the same interaction instead of three subtly different click contracts.
@@ -1955,20 +1934,6 @@ function AssetTile({
         {stage}
         {footer}
       </div>
-    );
-  }
-  if (onAttach && !present) {
-    return (
-      <button
-        data-dev-id={devId}
-        type="button"
-        onClick={onAttach}
-        aria-label={`Attach ${name}`}
-        className={buttonCls}
-      >
-        {stage}
-        {footer}
-      </button>
     );
   }
   return (
@@ -2627,7 +2592,7 @@ function Sourcing({
   const orderable = orderPurchases(purchase.filter((p) => p.url));
   if (orderable.length === 0) {
     return (
-      <div data-dev-id="detail.sourcing" className="text-sm text-t2">
+      <div data-dev-id="detail.sourcing" className="text-xs text-t2">
         {hasMpn
           ? "No purchase link on record yet."
           : "Not orderable yet, this component has no part number."}
@@ -2678,7 +2643,7 @@ function Sourcing({
                 with no headers" a fault, so the fix is the structural one rather than a fourth nudge.
                 Line 1 is WHO (and whether it is recommended), line 2 is the commercial answer. */}
             <div className="flex min-w-0 items-center gap-2">
-              <span className="min-w-0 truncate text-sm font-semibold text-t1">{name}</span>
+              <span className="min-w-0 truncate text-xs font-semibold text-t1">{name}</span>
               {isBest ? (
                 <span
                   className="flex-none rounded-control px-1.5 py-0.5 text-2xs font-bold"
@@ -2711,7 +2676,7 @@ function Sourcing({
               <span className="ml-auto flex items-baseline gap-2.5">
                 {unit ? (
                   <span className="flex flex-col items-end">
-                    <span className="tnum font-mono text-base font-semibold leading-none text-t1">
+                    <span className="tnum font-mono text-sm font-semibold leading-none text-t1">
                       {formatPrice(unit.price, p.currency)}
                     </span>
                     {needQty > 1 && orderTotal != null ? (

@@ -146,7 +146,10 @@ class BrowserFetcher:
             pass
 
     async def _new_context(self):
-        ctx = await self._browser.new_context(**stealth_context_options(self._ua))
+        browser = self._browser
+        if browser is None:
+            raise RuntimeError("browser not started")
+        ctx = await browser.new_context(**stealth_context_options(self._ua))
         await ctx.add_init_script(STEALTH_INIT_SCRIPT)
         return ctx
 

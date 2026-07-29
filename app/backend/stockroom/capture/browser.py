@@ -1,32 +1,14 @@
-"""The capture BROWSER: one deterministic way to open a vendor page and save its download.
+"""The provider browser: one deterministic way to open a page and save its download.
 
-Owner, 2026-07-27: *"literally make the best environment for us ... something that works on both
-windows and linux so its not hard for u to test it"*.
+The retired implementation drove provider pages through the pywebview app host, private
+WebView2 download hooks, injected vendor JavaScript, and a global Downloads-folder watcher.
+That path was Windows-only, difficult to verify end to end, and could not bind a downloaded
+file reliably to the task that requested it.
 
-WHY THIS EXISTS (the problem it removes)
-Guided capture used to live entirely inside the pywebview WebView2 window, and that had three
-costs, all of them measured rather than supposed:
-
-1. **It is Windows-only, so the whole flow was untestable from Linux.** The frontend's only route
-   in is `window.pywebview.api.open_cad_download` (`lib/capture.tsx`), which does not exist off
-   Windows, so on Linux the flow silently degrades to "pick the files yourself". That is exactly
-   why an agent could verify the URL layer and the selector layer but never the layer the owner
-   actually sees.
-2. **pywebview exposes NO public download-intercept API** (verified and recorded at
-   `host/window.py:201`), so tier 1 monkeypatched pywebview's private WinForms/WebView2 internals
-   and tier 2 polled `~/Downloads`. That coupling is logged as risk R3 in the guided-capture spec.
-3. **CDP cannot rescue it**: `Browser.setDownloadBehavior` returns invalid-argument (0x80070057)
-   in WebView2, so the one API that would have made downloads observable there does not work.
-
-Playwright, which this repo ALREADY bundles for the scrape engine (`pyproject.toml`), has a
-public, documented download API (`expect_download` / `save_as`) and gives real waiting primitives
-instead of sleeps. So the capture browser is Playwright, and the vendor logic moves OUT of injected
-JS in `host/` into ordinary Python that a test can drive anywhere.
-
-WHAT STAYS AS IT WAS
-The APP SHELL is still pywebview/WebView2 on Windows: that decision (spec 2026-07-12 section 3) is
-about hosting our own frontend, where Python-as-host and native drag/drop paths genuinely win, and
-nothing here disturbs it. This module is only about the SECOND window - the vendor page.
+Playwright has a public download API (``expect_download`` / ``save_as``), real waiting
+primitives, and portable test support. Provider logic therefore lives here as ordinary
+Python behind the API-owned capture workflow. The Stockroom app shell remains
+pywebview/WebView2 on Windows; it no longer owns provider acquisition.
 
 A NOTE ON THE PERSISTENT PROFILE, which is not a free choice
 Vendor logins must survive between parts, which means a persistent user-data dir. Playwright and
@@ -74,15 +56,23 @@ class ProviderHudSpec:
     """Exact Stockroom-owned text shown over one person-controlled provider page."""
 
     provider_label: str
+    author_route: str
     manufacturer: str
     mpn: str
     required_file_labels: tuple[str, ...]
+    automated_step: str = "Listening for provider downloads."
+    human_action: str = (
+        "Start this part's download with every required format shown here."
+    )
 
     def __post_init__(self) -> None:
         for value, label in (
             (self.provider_label, "provider_label"),
+            (self.author_route, "author_route"),
             (self.manufacturer, "manufacturer"),
             (self.mpn, "mpn"),
+            (self.automated_step, "automated_step"),
+            (self.human_action, "human_action"),
         ):
             if type(value) is not str or not value or value != value.strip():
                 raise ValueError(f"{label} must be exact non-empty text")
@@ -186,34 +176,56 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
         inset: 12px 12px auto auto;
         z-index: 2147483647;
         display: block;
-        width: min(360px, calc(100vw - 24px));
+        width: min(368px, calc(100vw - 24px));
         margin: 0;
         padding: 0;
         border: 0;
-        color-scheme: dark;
-        font: 13px/1.4 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-          "Segoe UI", sans-serif;
+        color-scheme: light dark;
+        --sr-canvas: #e9eaee;
+        --sr-surface: #ffffff;
+        --sr-raise: #f4f4f5;
+        --sr-field: rgb(17 18 20 / 5%);
+        --sr-band: #e2e4e9;
+        --sr-line: rgb(17 18 20 / 10%);
+        --sr-line-strong: rgb(17 18 20 / 18%);
+        --sr-t1: #17181b;
+        --sr-t2: rgb(23 24 27 / 68%);
+        --sr-t3: rgb(23 24 27 / 48%);
+        --sr-accent: #1b1b1e;
+        --sr-accent-on: #f5f5f5;
+        --sr-ok: #2f9e63;
+        --sr-ok-soft: #e3f3ea;
+        --sr-warn: #a9761b;
+        --sr-warn-soft: #f7edd7;
+        --sr-err: #cf4a40;
+        --sr-err-soft: #f8e4e2;
+        --sr-shadow: inset 0 1px 0 rgb(255 255 255 / 90%),
+          0 2px 8px rgb(17 18 20 / 10%), 0 24px 56px rgb(17 18 20 / 20%);
+        --sr-scrollbar: rgb(0 0 0 / 20%);
+        font: 12px/1.45 "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont,
+          sans-serif;
+        letter-spacing: -.004em;
       }
       *, *::before, *::after {
         box-sizing: border-box;
       }
       .panel {
         overflow: hidden;
-        color: #f8fafc;
-        background: #101827;
-        border: 1px solid #64748b;
-        border-radius: 12px;
-        box-shadow: 0 18px 48px rgb(0 0 0 / 42%);
+        color: var(--sr-t1);
+        background: var(--sr-surface);
+        border: 1px solid var(--sr-line-strong);
+        border-radius: 3px;
+        box-shadow: var(--sr-shadow);
       }
       .header {
         display: grid;
-        grid-template-columns: 34px minmax(0, 1fr) auto auto;
+        grid-template-columns: 28px minmax(0, 1fr) auto 28px;
         align-items: center;
-        gap: 7px;
-        min-height: 44px;
-        padding: 6px 7px;
-        background: #172236;
-        border-bottom: 1px solid #334155;
+        gap: 6px;
+        min-height: 38px;
+        padding: 4px 5px;
+        background: var(--sr-band);
+        border-bottom: 1px solid var(--sr-line);
         cursor: grab;
         user-select: none;
         touch-action: none;
@@ -223,165 +235,225 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
       }
       .move,
       .collapse {
-        width: 32px;
-        height: 32px;
+        width: 28px;
+        height: 28px;
         padding: 0;
-        color: #e2e8f0;
+        color: var(--sr-t2);
         background: transparent;
         border: 1px solid transparent;
-        border-radius: 7px;
+        border-radius: 2px;
         font: inherit;
       }
       .move {
         cursor: grab;
-        font-size: 18px;
-        letter-spacing: -4px;
+        font-family: Consolas, "Cascadia Mono", ui-monospace, monospace;
+        font-size: 14px;
+        letter-spacing: -3px;
       }
       .collapse {
         cursor: pointer;
-        font-size: 17px;
+        font-family: Consolas, "Cascadia Mono", ui-monospace, monospace;
+        font-size: 15px;
       }
       .title {
         min-width: 0;
-        font-size: 13px;
-        font-weight: 750;
-        letter-spacing: .01em;
+        font-size: 12px;
+        font-weight: 650;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .count {
-        min-width: 28px;
-        padding: 3px 7px;
-        color: #dbeafe;
-        background: #1e3a5f;
-        border: 1px solid #3b82f6;
-        border-radius: 999px;
-        font-size: 12px;
-        font-variant-numeric: tabular-nums;
-        text-align: center;
+      .mode {
+        padding: 2px 5px;
+        color: var(--sr-t2);
+        background: var(--sr-field);
+        border: 1px solid var(--sr-line);
+        border-radius: 2px;
+        font: 700 9px/1.3 Consolas, "Cascadia Mono", ui-monospace, monospace;
+        letter-spacing: .06em;
       }
       .content {
         display: grid;
-        gap: 10px;
-        max-height: min(72vh, 610px);
-        padding: 11px;
+        gap: 8px;
+        max-height: min(76vh, 620px);
+        padding: 8px;
         overflow: auto;
-        scrollbar-color: #64748b transparent;
+        scrollbar-color: var(--sr-scrollbar) transparent;
       }
       .identity {
         display: grid;
         grid-template-columns: max-content minmax(0, 1fr);
-        gap: 4px 9px;
+        gap: 3px 9px;
         margin: 0;
-        padding: 8px;
-        background: #0b1220;
-        border: 1px solid #334155;
-        border-radius: 8px;
+        padding: 7px 8px;
+        background: var(--sr-field);
+        border: 1px solid var(--sr-line);
+        border-radius: 2px;
       }
       dt {
-        color: #94a3b8;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: .045em;
-        text-transform: uppercase;
+        color: var(--sr-t3);
+        font-size: 10px;
+        font-weight: 600;
       }
       dd {
         min-width: 0;
         margin: 0;
-        color: #f8fafc;
-        font-weight: 650;
+        color: var(--sr-t1);
+        font: 600 11px/1.45 Consolas, "Cascadia Mono", ui-monospace, monospace;
         overflow-wrap: anywhere;
         user-select: text;
       }
-      h2 {
-        margin: 0 0 5px;
-        color: #cbd5e1;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: .055em;
-        text-transform: uppercase;
+      .section-label {
+        margin: 0 0 4px;
+        color: var(--sr-t3);
+        font-size: 10px;
+        font-weight: 650;
       }
       .files {
         display: flex;
         flex-wrap: wrap;
-        gap: 5px;
+        gap: 4px;
         margin: 0;
         padding: 0;
         list-style: none;
       }
       .files li {
-        padding: 4px 7px;
-        color: #e0f2fe;
-        background: #123047;
-        border: 1px solid #0ea5e9;
-        border-radius: 6px;
+        padding: 3px 6px;
+        color: var(--sr-t2);
+        background: var(--sr-field);
+        border: 1px solid var(--sr-line);
+        border-radius: 2px;
+        font: 10px/1.4 Consolas, "Cascadia Mono", ui-monospace, monospace;
         overflow-wrap: anywhere;
       }
-      .steps {
+      .state-card {
         display: grid;
-        gap: 5px;
-        margin: 0;
-        padding-left: 22px;
-        color: #dbe4f0;
-      }
-      .steps li {
-        padding-left: 2px;
-      }
-      .steps li::marker {
-        color: #7dd3fc;
-        font-weight: 800;
-      }
-      .live {
+        grid-template-columns: 12px minmax(0, 1fr);
+        gap: 7px;
         margin: 0;
         padding: 7px 8px;
-        color: #bfdbfe;
-        background: #172554;
-        border-left: 3px solid #60a5fa;
-        border-radius: 5px;
-        font-weight: 700;
+        background: var(--sr-field);
+        border: 1px solid var(--sr-line);
+        border-radius: 2px;
+      }
+      .state-mark {
+        width: 7px;
+        height: 7px;
+        margin-top: 5px;
+        background: var(--sr-ok);
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px var(--sr-ok-soft);
+      }
+      .state-copy {
+        min-width: 0;
+      }
+      .state-value {
+        margin: 0;
+        color: var(--sr-t1);
+        font-weight: 650;
+        overflow-wrap: anywhere;
+      }
+      .session {
+        display: grid;
+        grid-template-columns: 12px minmax(0, 1fr);
+        gap: 7px;
+        margin: 0;
+        padding: 7px 8px;
+        color: var(--sr-t1);
+        background: var(--sr-ok-soft);
+        border: 1px solid var(--sr-ok);
+        border-left-width: 3px;
+        border-radius: 2px;
+      }
+      .session-mark {
+        color: var(--sr-ok);
+        font: 700 12px/1.4 Consolas, "Cascadia Mono", ui-monospace, monospace;
+      }
+      .session-title {
+        margin: 0;
+        font-weight: 650;
+      }
+      .session-note {
+        margin: 3px 0 0;
+        color: var(--sr-t2);
+        font-size: 10px;
+        overflow-wrap: anywhere;
+      }
+      .gate {
+        margin: 0;
+        padding: 7px 8px;
+        color: var(--sr-t1);
+        background: var(--sr-warn-soft);
+        border: 1px solid var(--sr-warn);
+        border-left-width: 3px;
+        border-radius: 2px;
+      }
+      .gate .section-label {
+        color: var(--sr-warn);
+      }
+      .gate-files {
+        margin-top: 6px;
+      }
+      .gate-files .section-label {
+        margin-bottom: 3px;
+        color: var(--sr-t2);
+      }
+      .gate-action {
+        margin: 0;
+        font-weight: 650;
+        overflow-wrap: anywhere;
+      }
+      .boundary {
+        margin: 5px 0 0;
+        color: var(--sr-t2);
+        font-size: 10px;
+        overflow-wrap: anywhere;
       }
       .actions {
+        position: sticky;
+        bottom: -8px;
         display: grid;
-        grid-template-columns: 1fr 1.35fr 1fr;
-        gap: 6px;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        margin: 0 -8px -8px;
+        padding: 6px 8px 8px;
+        background: var(--sr-surface);
+        border-top: 1px solid var(--sr-line);
       }
       .action {
-        min-height: 36px;
-        padding: 6px 8px;
-        color: #f8fafc;
-        background: #263449;
-        border: 1px solid #64748b;
-        border-radius: 7px;
+        min-height: 30px;
+        padding: 5px 7px;
+        color: var(--sr-t1);
+        background: var(--sr-raise);
+        border: 1px solid var(--sr-line-strong);
+        border-radius: 2px;
         cursor: pointer;
-        font: 700 12px/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
+        font: 650 11px/1.2 "Segoe UI", system-ui, sans-serif;
       }
       .finish {
-        color: #052e16;
-        background: #86efac;
-        border-color: #4ade80;
+        grid-column: 1 / -1;
+        color: var(--sr-accent-on);
+        background: var(--sr-accent);
+        border-color: var(--sr-accent);
       }
       .another {
-        color: #172554;
-        background: #bfdbfe;
-        border-color: #60a5fa;
+        color: var(--sr-t1);
       }
       .cancel {
-        color: #fee2e2;
-        background: #451a1a;
-        border-color: #ef4444;
+        color: var(--sr-err);
+        background: var(--sr-err-soft);
+        border-color: var(--sr-err);
       }
       button:hover:not(:disabled) {
-        filter: brightness(1.08);
+        border-color: var(--sr-t2);
       }
       button:focus-visible {
-        outline: 3px solid #fbbf24;
+        outline: 2px solid var(--sr-accent);
         outline-offset: 2px;
       }
       button:disabled {
-        cursor: wait;
-        filter: grayscale(.5);
-        opacity: .68;
+        cursor: not-allowed;
+        opacity: .48;
       }
       .sr-only {
         position: absolute;
@@ -393,6 +465,31 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
         clip: rect(0, 0, 0, 0);
         white-space: nowrap;
         border: 0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :host {
+          --sr-canvas: #242427;
+          --sr-surface: #33333a;
+          --sr-raise: rgb(255 255 255 / 7%);
+          --sr-field: rgb(0 0 0 / 28%);
+          --sr-band: #2b2b30;
+          --sr-line: rgb(255 255 255 / 8%);
+          --sr-line-strong: rgb(255 255 255 / 15%);
+          --sr-t1: #f4f4f4;
+          --sr-t2: rgb(244 244 244 / 68%);
+          --sr-t3: rgb(244 244 244 / 44%);
+          --sr-accent: #f4f4f5;
+          --sr-accent-on: #141414;
+          --sr-ok: #5fd39a;
+          --sr-ok-soft: #253f35;
+          --sr-warn: #e0b354;
+          --sr-warn-soft: #403722;
+          --sr-err: #e8756c;
+          --sr-err-soft: #402726;
+          --sr-shadow: inset 0 1px 0 rgb(255 255 255 / 10%),
+            0 2px 8px rgb(0 0 0 / 40%), 0 28px 64px rgb(0 0 0 / 62%);
+          --sr-scrollbar: rgb(255 255 255 / 16%);
+        }
       }
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after {
@@ -406,8 +503,15 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
         .panel,
         .identity,
         .files li,
+        .state-card,
+        .session,
+        .gate,
         .action {
           border: 1px solid ButtonText;
+        }
+        .state-mark {
+          background: Highlight;
+          box-shadow: none;
         }
       }
     `;
@@ -420,16 +524,16 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
     const move = make("button", "move", "⠿");
     move.type = "button";
     move.setAttribute("aria-label", "Move Stockroom panel; use arrow keys");
-    const title = make("div", "title", `Stockroom · ${payload.providerLabel}`);
+    const title = make("div", "title", "Stockroom Capture");
     title.id = `${payload.namespace}-title`;
-    const count = make("span", "count", "0");
-    count.setAttribute("aria-label", "Downloads captured: 0");
+    const captureCount = make("span", "mode", "0 FILES");
+    captureCount.setAttribute("aria-label", "Downloads captured: 0");
     const collapse = make("button", "collapse", "−");
     collapse.type = "button";
     collapse.setAttribute("aria-expanded", "true");
     collapse.setAttribute("aria-controls", `${payload.namespace}-content`);
     collapse.setAttribute("aria-label", "Collapse Stockroom panel");
-    header.append(move, title, count, collapse);
+    header.append(move, title, captureCount, collapse);
 
     const content = make("div", "content");
     content.id = `${payload.namespace}-content`;
@@ -437,36 +541,67 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
     const identity = make("dl", "identity");
     for (const [label, value] of [
       ["Provider", payload.providerLabel],
+      ["Author Route", payload.authorRoute],
       ["Manufacturer", payload.manufacturer],
       ["MPN", payload.mpn],
     ]) {
       identity.append(make("dt", "", label), make("dd", "", value));
     }
 
-    const filesSection = make("section");
-    filesSection.append(make("h2", "", "Required files"));
+    let sessionMemory = null;
+    if (payload.sessionPersistent === true) {
+      sessionMemory = make("section", "session");
+      sessionMemory.setAttribute("aria-label", "DigiKey session memory");
+      const sessionMark = make("span", "session-mark", "✓");
+      sessionMark.setAttribute("aria-hidden", "true");
+      const sessionCopy = make("div");
+      sessionCopy.append(
+        make("p", "session-title", "Session Memory On"),
+        make(
+          "p",
+          "session-note",
+          "Provider-only browser profile keeps this session on this PC. This assisted " +
+            "window never reads or stores passwords from the page. DigiKey sign-in or " +
+            "consent returns only after session expiry or a new gate.",
+        ),
+      );
+      sessionMemory.append(sessionMark, sessionCopy);
+    }
+
+    const automation = make("section", "state-card");
+    automation.setAttribute("aria-labelledby", `${payload.namespace}-automation-label`);
+    const stateMark = make("span", "state-mark");
+    stateMark.setAttribute("aria-hidden", "true");
+    const stateCopy = make("div", "state-copy");
+    const automationLabel = make("h2", "section-label", "Automated Step");
+    automationLabel.id = `${payload.namespace}-automation-label`;
+    const automationValue = make("p", "state-value", payload.automatedStep);
+    stateCopy.append(automationLabel, automationValue);
+    automation.append(stateMark, stateCopy);
+
+    const gate = make("section", "gate");
+    gate.setAttribute("aria-labelledby", `${payload.namespace}-human-label`);
+    const humanLabel = make("h2", "section-label", "Human Action");
+    humanLabel.id = `${payload.namespace}-human-label`;
+    const humanAction = make("p", "gate-action", payload.humanAction);
+    const boundary = make(
+      "p",
+      "boundary",
+      "Provider security gates stay yours. This assisted window never reads or submits " +
+        "credentials, CAPTCHA, 2FA, or passkeys.",
+    );
+
+    const filesSection = make("div", "gate-files");
+    filesSection.append(make("h3", "section-label", "Required Files"));
     const files = make("ul", "files");
     files.setAttribute("aria-label", "Required file formats");
     for (const label of payload.requiredFileLabels) {
       files.append(make("li", "", label));
     }
     filesSection.append(files);
+    gate.append(humanLabel, humanAction, filesSection, boundary);
 
-    const instructions = make("section");
-    instructions.append(make("h2", "", "What to do"));
-    const steps = make("ol", "steps");
-    for (const text of [
-      "Sign in if asked—this session is remembered on this PC.",
-      "Choose the result matching the exact manufacturer and MPN shown above.",
-      "Select every required file format listed here.",
-      "Download each file. Stockroom captures it automatically.",
-      "Choose Finish, Try Another Provider, or Cancel.",
-    ]) {
-      steps.append(make("li", "", text));
-    }
-    instructions.append(steps);
-
-    const live = make("p", "live", "Downloads captured: 0");
+    const live = make("p", "sr-only", "No files captured yet.");
     live.setAttribute("role", "status");
     live.setAttribute("aria-live", "polite");
     live.setAttribute("aria-atomic", "true");
@@ -476,12 +611,22 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
     actionStatus.setAttribute("aria-live", "polite");
 
     const actions = make("div", "actions");
-    const finish = make("button", "action finish", "Finish");
-    const another = make("button", "action another", "Try Another Provider");
-    const cancel = make("button", "action cancel", "Cancel");
+    const finish = make("button", "action finish", "Resume Stockroom");
+    const another = make("button", "action another", "Use Another Provider");
+    const cancel = make("button", "action cancel", "Close Capture");
     for (const button of [finish, another, cancel]) button.type = "button";
+    finish.title = "Available after Stockroom captures at least one file";
     actions.append(finish, another, cancel);
-    content.append(identity, filesSection, instructions, live, actionStatus, actions);
+    const contentNodes = [identity];
+    if (sessionMemory) contentNodes.push(sessionMemory);
+    contentNodes.push(
+      automation,
+      gate,
+      live,
+      actionStatus,
+      actions,
+    );
+    content.append(...contentNodes);
     panel.append(header, content);
     shadow.append(style, panel);
     document.documentElement.append(host);
@@ -559,33 +704,58 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
     });
 
     let actionPending = false;
+    let currentDownloadCount = 0;
     const actionButtons = [finish, another, cancel];
     const requestAction = async (action, spokenLabel) => {
       if (actionPending) return;
       actionPending = true;
+      const previousStep = automationValue.textContent;
       for (const button of actionButtons) button.disabled = true;
       actionStatus.textContent = `${spokenLabel} requested.`;
+      if (action === "finish") {
+        automationValue.textContent = "Finishing capture after downloaded files settle.";
+      } else if (action === "try_another") {
+        automationValue.textContent = "Closing this route and preparing the next provider.";
+      } else {
+        automationValue.textContent = "Closing the assisted capture.";
+      }
       try {
         const accepted = await globalThis[payload.actionBinding](action, payload.actionToken);
         if (accepted) return;
       } catch {}
       actionPending = false;
-      for (const button of actionButtons) button.disabled = false;
+      automationValue.textContent = previousStep;
+      another.disabled = false;
+      cancel.disabled = false;
+      finish.disabled = currentDownloadCount < 1;
       actionStatus.textContent = "Stockroom could not accept that action. Try again.";
     };
-    finish.addEventListener("click", () => requestAction("finish", "Finish"));
+    finish.addEventListener("click", () => requestAction("finish", "Resume Stockroom"));
     another.addEventListener(
       "click",
-      () => requestAction("try_another", "Try another provider"),
+      () => requestAction("try_another", "Use another provider"),
     );
-    cancel.addEventListener("click", () => requestAction("cancel", "Cancel"));
+    cancel.addEventListener("click", () => requestAction("cancel", "Close capture"));
 
     const updateDownloadCount = (value) => {
       if (!Number.isInteger(value) || value < 0) return;
       const noun = value === 1 ? "file" : "files";
-      count.textContent = String(value);
-      count.setAttribute("aria-label", `Downloads captured: ${value}`);
-      live.textContent = `Downloads captured: ${value} ${noun}`;
+      currentDownloadCount = value;
+      captureCount.textContent = `${value} ${noun.toUpperCase()}`;
+      captureCount.setAttribute("aria-label", `Downloads captured: ${value}`);
+      live.textContent =
+        value === 0 ? "No files captured yet." : `${value} ${noun} captured in this task.`;
+      if (!actionPending) {
+        finish.disabled = value === 0;
+        finish.title =
+          value === 0
+            ? "Available after Stockroom captures at least one file"
+            : "Finish this route after its downloads settle";
+        automationValue.textContent =
+          value === 0
+            ? payload.automatedStep
+            : `${value} ${noun} captured. Listening for companion downloads.`;
+      }
     };
     updateDownloadCount(payload.downloadCount);
 
@@ -623,49 +793,296 @@ async (payload) => {
   }
   if (!state || !state.active || !document.documentElement) return;
 
+  const make = (tag, className = "", text = "") => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text) node.textContent = text;
+    return node;
+  };
+
   const host = document.createElement("aside");
   host.setAttribute("aria-label", "Stockroom security handoff");
+  host.setAttribute("popover", "manual");
   host.style.cssText = [
-    "all:initial",
     "position:fixed",
     "inset:12px 12px auto auto",
     "z-index:2147483647",
     "display:block",
-    "width:min(390px,calc(100vw - 24px))",
+    "width:min(368px,calc(100vw - 24px))",
+    "color-scheme:light dark",
   ].join(";");
   const shadow = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
   style.textContent = `
-    * { box-sizing: border-box; }
-    section {
-      color: #f8fafc; background: #172033; border: 2px solid #f59e0b; border-radius: 12px;
-      box-shadow: 0 18px 52px rgb(0 0 0 / 48%); padding: 14px;
-      font: 13px/1.45 Inter, ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+    :host {
+      all: initial;
+      --sr-surface: #ffffff;
+      --sr-field: rgb(17 18 20 / 5%);
+      --sr-band: #e2e4e9;
+      --sr-line: rgb(17 18 20 / 10%);
+      --sr-line-strong: rgb(17 18 20 / 18%);
+      --sr-t1: #17181b;
+      --sr-t2: rgb(23 24 27 / 68%);
+      --sr-t3: rgb(23 24 27 / 48%);
+      --sr-ok: #2f9e63;
+      --sr-ok-soft: #e3f3ea;
+      --sr-warn: #a9761b;
+      --sr-warn-soft: #f7edd7;
+      --sr-shadow: inset 0 1px 0 rgb(255 255 255 / 90%),
+        0 2px 8px rgb(17 18 20 / 10%), 0 24px 56px rgb(17 18 20 / 20%);
+      font: 12px/1.45 "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      letter-spacing: -.004em;
     }
-    h1 { margin: 0 0 7px; color: #fde68a; font-size: 15px; }
-    p { margin: 6px 0; overflow-wrap: anywhere; }
-    .identity { color: #dbeafe; font-weight: 700; }
-    .safe { color: #bfdbfe; border-left: 3px solid #60a5fa; padding-left: 8px; }
-    .status { color: #fef3c7; font-weight: 700; }
+    *, *::before, *::after { box-sizing: border-box; }
+    .panel {
+      overflow: hidden;
+      color: var(--sr-t1);
+      background: var(--sr-surface);
+      border: 1px solid var(--sr-warn);
+      border-radius: 3px;
+      box-shadow: var(--sr-shadow);
+    }
+    .header {
+      display: flex;
+      min-height: 38px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 5px 8px;
+      background: var(--sr-band);
+      border-bottom: 1px solid var(--sr-line);
+    }
+    h1 {
+      min-width: 0;
+      margin: 0;
+      overflow: hidden;
+      font-size: 12px;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .mode {
+      flex: none;
+      padding: 2px 5px;
+      color: var(--sr-warn);
+      background: var(--sr-warn-soft);
+      border: 1px solid var(--sr-warn);
+      border-radius: 2px;
+      font: 700 9px/1.3 Consolas, "Cascadia Mono", ui-monospace, monospace;
+      letter-spacing: .06em;
+    }
+    .content {
+      display: grid;
+      gap: 8px;
+      padding: 8px;
+    }
+    .identity {
+      display: grid;
+      grid-template-columns: max-content minmax(0, 1fr);
+      gap: 3px 9px;
+      margin: 0;
+      padding: 7px 8px;
+      background: var(--sr-field);
+      border: 1px solid var(--sr-line);
+      border-radius: 2px;
+    }
+    dt {
+      color: var(--sr-t3);
+      font-size: 10px;
+      font-weight: 600;
+    }
+    dd {
+      min-width: 0;
+      margin: 0;
+      color: var(--sr-t1);
+      font: 600 11px/1.45 Consolas, "Cascadia Mono", ui-monospace, monospace;
+      overflow-wrap: anywhere;
+      user-select: text;
+    }
+    .section-label {
+      margin: 0 0 4px;
+      color: var(--sr-t3);
+      font-size: 10px;
+      font-weight: 650;
+    }
+    .automation,
+    .gate {
+      margin: 0;
+      padding: 7px 8px;
+      border-radius: 2px;
+    }
+    .automation {
+      background: var(--sr-field);
+      border: 1px solid var(--sr-line);
+    }
+    .gate {
+      background: var(--sr-warn-soft);
+      border: 1px solid var(--sr-warn);
+      border-left-width: 3px;
+    }
+    .gate .section-label { color: var(--sr-warn); }
+    .session {
+      display: grid;
+      grid-template-columns: 12px minmax(0, 1fr);
+      gap: 7px;
+      margin: 0;
+      padding: 7px 8px;
+      background: var(--sr-ok-soft);
+      border: 1px solid var(--sr-ok);
+      border-left-width: 3px;
+      border-radius: 2px;
+    }
+    .session-mark {
+      color: var(--sr-ok);
+      font: 700 12px/1.4 Consolas, "Cascadia Mono", ui-monospace, monospace;
+    }
+    .session-title {
+      margin: 0;
+      font-weight: 650;
+    }
+    .session-note {
+      margin: 3px 0 0;
+      color: var(--sr-t2);
+      font-size: 10px;
+      overflow-wrap: anywhere;
+    }
+    .status,
+    .action {
+      margin: 0;
+      font-weight: 650;
+      overflow-wrap: anywhere;
+    }
+    .safe {
+      margin: 5px 0 0;
+      color: var(--sr-t2);
+      font-size: 10px;
+      overflow-wrap: anywhere;
+    }
+    .resume {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin: 0;
+      padding: 6px 8px;
+      color: var(--sr-t2);
+      background: var(--sr-field);
+      border: 1px solid var(--sr-line);
+      border-radius: 2px;
+    }
+    .resume::before {
+      width: 7px;
+      height: 7px;
+      flex: none;
+      background: var(--sr-warn);
+      border-radius: 50%;
+      box-shadow: 0 0 0 3px var(--sr-warn-soft);
+      content: "";
+    }
+    @media (prefers-color-scheme: dark) {
+      :host {
+        --sr-surface: #33333a;
+        --sr-field: rgb(0 0 0 / 28%);
+        --sr-band: #2b2b30;
+        --sr-line: rgb(255 255 255 / 8%);
+        --sr-line-strong: rgb(255 255 255 / 15%);
+        --sr-t1: #f4f4f4;
+        --sr-t2: rgb(244 244 244 / 68%);
+        --sr-t3: rgb(244 244 244 / 44%);
+        --sr-ok: #5fd39a;
+        --sr-ok-soft: #253f35;
+        --sr-warn: #e0b354;
+        --sr-warn-soft: #403722;
+        --sr-shadow: inset 0 1px 0 rgb(255 255 255 / 10%),
+          0 2px 8px rgb(0 0 0 / 40%), 0 28px 64px rgb(0 0 0 / 62%);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+      }
+    }
+    @media (forced-colors: active) {
+      .panel, .identity, .automation, .session, .gate, .resume {
+        border: 1px solid ButtonText;
+      }
+      .resume::before { background: Highlight; box-shadow: none; }
+    }
   `;
-  const panel = document.createElement("section");
+  const panel = make("section", "panel");
   panel.setAttribute("role", "alert");
-  const title = document.createElement("h1");
-  title.textContent = "Stockroom Paused For You";
-  const identity = document.createElement("p");
-  identity.className = "identity";
-  identity.textContent = `${state.providerLabel} · ${state.manufacturer} · ${state.mpn}`;
-  const message = document.createElement("p");
-  message.className = "status";
-  message.textContent = state.message;
-  const safe = document.createElement("p");
-  safe.className = "safe";
-  safe.textContent =
-    "Complete the visible sign-in, CAPTCHA, 2FA, or security check yourself. " +
-    "Stockroom will not click it and resumes automatically when it is gone.";
-  panel.append(title, identity, message, safe);
+  const header = make("header", "header");
+  const title = make("h1", "", "Stockroom Capture");
+  const mode = make("span", "mode", "PAUSED");
+  header.append(title, mode);
+
+  const content = make("div", "content");
+  const identity = make("dl", "identity");
+  for (const [label, value] of [
+    ["Provider", state.providerLabel],
+    ["Author Route", state.authorRoute],
+    ["Manufacturer", state.manufacturer],
+    ["MPN", state.mpn],
+  ]) {
+    identity.append(make("dt", "", label), make("dd", "", value));
+  }
+
+  let sessionMemory = null;
+  if (state.sessionPersistent === true) {
+    sessionMemory = make("section", "session");
+    sessionMemory.setAttribute("aria-label", "DigiKey session memory");
+    const sessionMark = make("span", "session-mark", "✓");
+    sessionMark.setAttribute("aria-hidden", "true");
+    const sessionCopy = make("div");
+    sessionCopy.append(
+      make("p", "session-title", "Session Memory On"),
+      make(
+        "p",
+        "session-note",
+        "Provider-only browser profile keeps this session on this PC. This assisted " +
+          "window never reads or stores passwords from the page. DigiKey sign-in or " +
+          "consent returns only after session expiry or a new gate.",
+      ),
+    );
+    sessionMemory.append(sessionMark, sessionCopy);
+  }
+
+  const automation = make("section", "automation");
+  automation.append(
+    make("h2", "section-label", "Automated Step"),
+    make("p", "status", "Paused at the provider security gate."),
+  );
+  const gate = make("section", "gate");
+  const message = make("p", "action", state.message);
+  message.setAttribute("aria-live", "polite");
+  const safe = make(
+    "p",
+    "safe",
+    "Complete the visible provider gate yourself. This assisted window never reads or " +
+      "submits credentials, CAPTCHA, 2FA, or passkeys.",
+  );
+  gate.append(make("h2", "section-label", "Human Action"), message, safe);
+  const resume = make(
+    "p",
+    "resume",
+    "Waiting to resume automatically when the provider gate clears.",
+  );
+  const contentNodes = [identity];
+  if (sessionMemory) contentNodes.push(sessionMemory);
+  contentNodes.push(automation, gate, resume);
+  content.append(...contentNodes);
+  panel.append(header, content);
   shadow.append(style, panel);
   document.documentElement.append(host);
+  let shownInTopLayer = false;
+  if (typeof host.showPopover === "function") {
+    try {
+      host.showPopover();
+      shownInTopLayer = true;
+    } catch {}
+  }
+  if (!shownInTopLayer) host.removeAttribute("popover");
 
   Object.defineProperty(globalThis, payload.namespace, {
     value: Object.freeze({
@@ -697,6 +1114,7 @@ _HANDOFF_HUD_DISMISS = r"""
 @dataclass(slots=True)
 class _ProviderHudState:
     spec: ProviderHudSpec
+    persistent_session: bool = False
     namespace: str = field(
         default_factory=lambda: f"__stockroom_capture_hud_{secrets.token_hex(12)}"
     )
@@ -740,9 +1158,13 @@ class _ProviderHudState:
                 "actionBinding": self.action_binding,
                 "actionToken": self.action_token,
                 "providerLabel": self.spec.provider_label,
+                "authorRoute": self.spec.author_route,
                 "manufacturer": self.spec.manufacturer,
                 "mpn": self.spec.mpn,
                 "requiredFileLabels": list(self.spec.required_file_labels),
+                "automatedStep": self.spec.automated_step,
+                "humanAction": self.spec.human_action,
+                "sessionPersistent": self.persistent_session,
                 "downloadCount": self._download_count,
             }
 
@@ -1033,6 +1455,12 @@ class PlaywrightCaptureBrowser:
         with self._download_lock:
             return tuple(self._download_errors)
 
+    @property
+    def persistent_digikey_session(self) -> bool:
+        """Whether this browser owns DigiKey's provider-isolated persistent profile."""
+
+        return self.provider_key == "digikey" and self.profile_dir is not None
+
     @contextmanager
     def task_page(
         self,
@@ -1088,6 +1516,7 @@ class PlaywrightCaptureBrowser:
         mpn: str,
         message: str,
         issue_detector: Callable[[], str],
+        author_route: str | None = None,
         should_cancel: Callable[[], bool] | None = None,
         timeout_s: float = 600.0,
         poll_interval_s: float = 0.25,
@@ -1108,6 +1537,14 @@ class PlaywrightCaptureBrowser:
         ):
             if type(value) is not str or not value or value != value.strip():
                 raise ValueError(f"{label} must be exact non-empty text")
+        if author_route is None:
+            author_route = provider_label
+        if (
+            type(author_route) is not str
+            or not author_route
+            or author_route != author_route.strip()
+        ):
+            raise ValueError("author_route must be exact non-empty text")
         if not callable(issue_detector):
             raise TypeError("issue_detector must be callable")
         if should_cancel is not None and not callable(should_cancel):
@@ -1128,9 +1565,11 @@ class PlaywrightCaptureBrowser:
         state: dict[str, object] = {
             "active": True,
             "providerLabel": provider_label,
+            "authorRoute": author_route,
             "manufacturer": manufacturer,
             "mpn": mpn,
             "message": current_issue,
+            "sessionPersistent": self.persistent_digikey_session,
         }
 
         def provide_state(_source, token) -> dict[str, object]:
@@ -1266,7 +1705,11 @@ class PlaywrightCaptureBrowser:
         status: UserCaptureStatus = "timed_out"
         final_url = url
         error_mark = len(self.download_errors)
-        hud_state = _ProviderHudState(hud) if hud is not None else None
+        hud_state = (
+            _ProviderHudState(hud, self.persistent_digikey_session)
+            if hud is not None
+            else None
+        )
         if hud_state is not None:
             hud_state.update_download_count(len(broker.receipts))
 

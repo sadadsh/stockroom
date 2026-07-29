@@ -129,6 +129,38 @@ def test_footprint_preview_rerenders_when_the_footprint_file_changes(app_ctx):
     assert len(cli.fp_bw) == 2
 
 
+def test_land_pattern_returns_the_exact_kicad_model_transform(app_ctx):
+    """Offset, scale, and rotation are source evidence, not viewer defaults.
+
+    Keep this at the HTTP boundary: a correct footprint parser is insufficient if
+    the endpoint drops, swaps, rounds, or fabricates one of the three vectors.
+    """
+    fp_file = app_ctx.profile.library.footprint_lib_path("ICs") / "TPS62130.kicad_mod"
+    fp_file.write_text(
+        '(footprint "TPS62130"\n'
+        '\t(layer "F.Cu")\n'
+        '\t(pad "1" smd rect (at 0 0) (size 1 2) (layers "F.Cu"))\n'
+        '\t(model "${SR_LIB}/models/x.step"\n'
+        "\t\t(offset (xyz 1.25 -2.5 0.125))\n"
+        "\t\t(scale (xyz 1.5 0.75 2.25))\n"
+        "\t\t(rotate (xyz 90 270 -45))\n"
+        "\t)\n"
+        ")\n",
+        encoding="utf-8",
+        newline="",
+    )
+
+    with _client_with_cli(app_ctx, _RecordingCli()) as c:
+        response = c.get("/api/previews/land/tps62130.json")
+
+    assert response.status_code == 200
+    assert response.json()["model_placement"] == {
+        "offset": [1.25, -2.5, 0.125],
+        "scale": [1.5, 0.75, 2.25],
+        "rotate": [90.0, 270.0, -45.0],
+    }
+
+
 def test_model_glb_reconverts_a_corrupt_cache_entry(app_ctx, monkeypatch):
     # A truncated/corrupt cache file (no glTF magic) must be treated as a miss and
     # re-converted, never served as a 200 that the three.js loader parses to a blank canvas.
@@ -142,7 +174,9 @@ def test_model_glb_reconverts_a_corrupt_cache_entry(app_ctx, monkeypatch):
     h = hashlib.sha256(src.read_bytes()).hexdigest()[:16]
     cache_dir = app_ctx.libraries_root.parent / ".stockroom-previews"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    (cache_dir / f"model_tps62130_{h}.glb").write_bytes(b"NOT-A-GLB truncated")
+    (cache_dir / f"model_tps62130_{previews_mod._MODEL_CONVERT_VERSION}_{h}.glb").write_bytes(
+        b"NOT-A-GLB truncated"
+    )
 
     calls = {"n": 0}
 

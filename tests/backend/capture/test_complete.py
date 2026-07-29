@@ -6,12 +6,16 @@ component" and "if i handed u 10000 components it should work fully endlessly" -
 lean hard on STREAMING, per-part isolation and resumability rather than on any one source.
 """
 
+import pytest
+
 from stockroom.capture.complete import (
     CompletionItem,
+    ProviderOutcome,
     SourceOutcome,
     complete_library,
     complete_part,
     iter_incomplete,
+    sanitize_provider_reason,
     sourceable_needs,
 )
 from stockroom.capture.requirements import Requirement
@@ -149,6 +153,212 @@ def test_complete_part_is_a_no_op_when_nothing_is_needed():
     item = complete_part("p1", load_record=_loader({"p1": rec}), sources=[src])
     assert item.status == "already-complete"
     assert src.calls == []
+
+
+def test_explicit_provider_capture_can_retain_a_variant_for_an_already_complete_part():
+    rec = _rec()
+    _fill_all_assets(rec)
+    src = FakeSource(
+        "guided",
+        ALL_REQUIREMENTS,
+        skipped="retained a complete alternate provider pair",
+        retained=5,
+        report_label="Ultra Librarian",
+    )
+
+    item = complete_part(
+        "p1",
+        load_record=_loader({"p1": rec}),
+        sources=[src],
+        collect_variants=True,
+    )
+
+    assert src.calls == ["p1"]
+    assert item.status == "completed"
+    assert item.retained == 5
+    assert item.sources == ["guided"]
+    assert item.needed == []
+    assert item.satisfied == []
+    assert item.remaining == []
+    assert item.notes == ["Ultra Librarian: retained a complete alternate provider pair"]
+
+
+def test_exhaustive_collection_keeps_running_after_projection_is_complete():
+    rec = _rec()
+    calls: list[str] = []
+    first = FakeSource("first", ALL_REQUIREMENTS, calls=calls)
+    second = FakeSource(
+        "second",
+        [Requirement.KICAD_MODEL],
+        skipped="retained a disjoint exact model",
+        retained=1,
+        calls=calls,
+    )
+
+    item = complete_part(
+        "p1",
+        load_record=_loader({"p1": rec}),
+        sources=[first, second],
+        exhaustive=True,
+    )
+
+    assert calls == ["p1", "p1"]
+    assert item.status == "completed"
+    assert item.remaining == []
+    assert item.retained == 1
+    assert item.sources == ["first", "second"]
+    assert [outcome.route_id for outcome in item.provider_outcomes] == [
+        "first:first",
+        "second:second",
+    ]
+    assert item.collection_complete is True
+
+
+def test_exhaustive_unavailable_route_is_settled():
+    rec = _rec()
+    _fill_all_assets(rec)
+    unavailable = FakeSource(
+        "ultralibrarian",
+        ALL_REQUIREMENTS,
+        skipped="the exact part has no deliverable",
+    )
+
+    item = complete_part(
+        "p1",
+        load_record=_loader({"p1": rec}),
+        sources=[unavailable],
+        exhaustive=True,
+    )
+
+    assert item.status == "already-complete"
+    assert item.provider_outcomes[0].status == "unavailable"
+    assert item.provider_outcomes[0].attempted is True
+    assert item.collection_complete is True
+
+
+def test_exhaustive_collection_rejects_a_missing_planned_route():
+    rec = _rec()
+    _fill_all_assets(rec)
+
+    class PartialDigiKey:
+        key = "guided"
+
+        def provides(self):
+            return frozenset(ALL_REQUIREMENTS)
+
+        def provider_route_ids(self):
+            return (
+                "digikey:digikey-ultralibrarian",
+                "digikey:digikey-snapmagic",
+            )
+
+        def supply(self, _record):
+            only_row = ProviderOutcome(
+                route_id="digikey:digikey-ultralibrarian",
+                provider_key="digikey",
+                author_key="digikey-ultralibrarian",
+                label="DigiKey / Ultra Librarian",
+                status="unavailable",
+                attempted=True,
+                reason="the exact part has no deliverable",
+            )
+            return SourceOutcome(
+                skipped=only_row.reason,
+                provider_outcomes=(only_row,),
+            )
+
+    item = complete_part(
+        "p1",
+        load_record=_loader({"p1": rec}),
+        sources=[PartialDigiKey()],
+        exhaustive=True,
+    )
+
+    assert item.status == "already-complete"
+    assert item.collection_complete is False
+    assert "missing terminal provider outcome(s)" in item.error
+    assert "digikey:digikey-snapmagic" in item.error
+
+
+def test_exhaustive_not_attempted_human_route_remains_partial():
+    rec = _rec()
+    _fill_all_assets(rec)
+
+    class HumanRequired:
+        key = "digikey-human-required"
+
+        def provides(self):
+            return frozenset(ALL_REQUIREMENTS)
+
+        def supply(self, _record):
+            routes = (
+                ProviderOutcome(
+                    route_id="digikey:digikey-snapmagic",
+                    provider_key="digikey",
+                    author_key="digikey-snapmagic",
+                    label="DigiKey / SnapMagic",
+                    status="requires-human",
+                    attempted=False,
+                    reason="sign in is required",
+                ),
+                ProviderOutcome(
+                    route_id="digikey:digikey-traceparts",
+                    provider_key="digikey",
+                    author_key="digikey-traceparts",
+                    label="DigiKey / TraceParts",
+                    status="not-attempted",
+                    attempted=False,
+                    reason="not attempted after the prior route stopped",
+                ),
+            )
+            return SourceOutcome(
+                skipped=routes[0].reason,
+                blocked=True,
+                provider_outcomes=routes,
+            )
+
+    item = complete_part(
+        "p1",
+        load_record=_loader({"p1": rec}),
+        sources=[HumanRequired()],
+        exhaustive=True,
+    )
+
+    assert item.status == "already-complete"
+    assert item.provider_outcomes[0].attempted is False
+    assert item.provider_outcomes[0].status == "requires-human"
+    assert item.provider_outcomes[1].attempted is False
+    assert item.provider_outcomes[1].status == "not-attempted"
+    assert item.collection_complete is False
+
+
+def test_unavailable_cannot_hide_a_route_that_was_never_attempted():
+    with pytest.raises(ValueError, match="genuine route evaluation"):
+        ProviderOutcome(
+            route_id="digikey:digikey-traceparts",
+            provider_key="digikey",
+            author_key="digikey-traceparts",
+            label="DigiKey / TraceParts",
+            status="unavailable",
+            attempted=False,
+            reason="not attempted",
+        )
+
+
+def test_provider_reason_removes_credentials_and_url_queries():
+    raw = (
+        "download https://user:pass@example.test/file.zip?token=abc#secret "
+        "password=hunter2 authorization=Bearer-abcdef"
+    )
+
+    sanitized = sanitize_provider_reason(raw)
+
+    assert "example.test/file.zip" in sanitized
+    assert "token=abc" not in sanitized
+    assert "user:pass" not in sanitized
+    assert "hunter2" not in sanitized
+    assert "Bearer-abcdef" not in sanitized
+    assert "password=[redacted]" in sanitized
 
 
 def test_a_source_that_errors_is_a_row_not_a_lost_part():

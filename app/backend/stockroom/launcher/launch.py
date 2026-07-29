@@ -344,14 +344,21 @@ def _reconcile_pull(workdir: Path, git: str) -> None:
     the user's parts are preserved. A plain ff-only would get permanently stuck the moment the first
     part is added. Every failure (offline, or the rare real conflict) is swallowed after aborting a
     half-applied rebase, so the launch always proceeds on the last-good checkout (honest degradation)."""
-    common = dict(capture_output=True, text=True, creationflags=_NO_WINDOW)
-    ff = subprocess.run([git, "-C", str(workdir), "pull", "--ff-only", "--quiet"], **common)
+    def run_git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [git, "-C", str(workdir), *args],
+            capture_output=True,
+            text=True,
+            creationflags=_NO_WINDOW,
+        )
+
+    ff = run_git("pull", "--ff-only", "--quiet")
     if ff.returncode == 0:
         return
-    reb = subprocess.run([git, "-C", str(workdir), "pull", "--rebase", "--quiet"], **common)
+    reb = run_git("pull", "--rebase", "--quiet")
     if reb.returncode != 0:
         # a true conflict, no upstream, or offline: abort any half-applied rebase and run last-good
-        subprocess.run([git, "-C", str(workdir), "rebase", "--abort"], **common)
+        run_git("rebase", "--abort")
 
 
 def _uv_sync(workdir: Path) -> None:  # pragma: no cover - real shell-out

@@ -67,17 +67,36 @@ _PACKAGE_RE = re.compile(
 )
 # A small known-manufacturer set; a hit in the text confirms the manufacturer.
 _MANUFACTURERS = (
-    "Texas Instruments", "STMicroelectronics", "Analog Devices", "Microchip",
-    "NXP", "Infineon", "onsemi", "ON Semiconductor", "Nexperia", "Vishay",
-    "Murata", "TDK", "Diodes Incorporated", "Renesas", "Maxim Integrated",
+    "Texas Instruments",
+    "STMicroelectronics",
+    "Analog Devices",
+    "Microchip",
+    "NXP",
+    "Infineon",
+    "onsemi",
+    "ON Semiconductor",
+    "Nexperia",
+    "Vishay",
+    "Murata",
+    "TDK",
+    "Diodes Incorporated",
+    "Renesas",
+    "Maxim Integrated",
 )
 _PIN_RE = re.compile(r"\bPIN\s+(\d+)\s+([A-Z][A-Z0-9_/+-]{0,15})", re.IGNORECASE)
 
 
-def _pdf_text(pdf_path) -> tuple[str, dict]:
-    """First-few-pages text plus the document-info metadata, or ("", {}) on any
-    failure (a malformed datasheet yields an honest partial result, never an
-    exception)."""
+def _pdf_text(
+    pdf_path,
+    *,
+    page_limit: int | None = 4,
+) -> tuple[str, dict]:
+    """Selected-page text plus document metadata, or ``("", {})`` on failure.
+
+    Four pages are enough for ordinary enrichment and keep that common path fast.
+    Exact identity checks can request the whole document because orderable MPNs
+    routinely live in a package or ordering table near the end of a datasheet.
+    """
     try:
         from pypdf import PdfReader
     except ImportError as exc:  # dependency not installed yet
@@ -85,7 +104,8 @@ def _pdf_text(pdf_path) -> tuple[str, dict]:
     try:
         reader = PdfReader(str(pdf_path))
         text_parts = []
-        for page in reader.pages[:4]:
+        pages = reader.pages if page_limit is None else reader.pages[:page_limit]
+        for page in pages:
             try:
                 text_parts.append(page.extract_text() or "")
             except Exception:  # noqa: BLE001 - one bad page must not sink the rest
@@ -101,9 +121,14 @@ def _pdf_text(pdf_path) -> tuple[str, dict]:
         return "", {}
 
 
-def extract_datasheet_specs(pdf_path, known_mpn: str = "") -> EnrichmentResult:
+def extract_datasheet_specs(
+    pdf_path,
+    known_mpn: str = "",
+    *,
+    page_limit: int | None = 4,
+) -> EnrichmentResult:
     r = EnrichmentResult()
-    text, info = _pdf_text(pdf_path)
+    text, info = _pdf_text(pdf_path, page_limit=page_limit)
     haystack = f"{text}\n{' '.join(info.values())}"
     if not haystack.strip():
         return r

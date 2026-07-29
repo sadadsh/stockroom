@@ -513,7 +513,10 @@ def render_html(plan: dict) -> str:
     # Absent rather than an empty box when nothing is set - a blank "Now:" reads as stalled.
     now = (plan.get("now") or "").strip()
     now_at = (plan.get("now_updated") or "").strip()
-    if now and not active_work:
+    # `now` is the live checkpoint; `active_work` is the broader manually refreshed board.
+    # They are complementary. Hiding the live line whenever the board exists made the `now`
+    # command report success while the served page continued showing only a stale objective.
+    if now:
         p += [
             '<section class="now">',
             '<div class="nowhead"><span class="dot"></span><h2>Working on now</h2>'

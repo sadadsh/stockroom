@@ -15,6 +15,7 @@ from stockroom.service import (
     ServiceControl,
     ServiceMode,
     WorkflowCoordinator,
+    WorkflowCoordinatorLifecycleError,
     WorkflowCoordinatorState,
 )
 from stockroom.workflow import (
@@ -178,6 +179,55 @@ def test_background_polling_is_bounded_fair_clean_and_payload_free(
     assert fence.owner_id not in public_status
     assert fence.owner_id not in public_events
     control.release(fence)
+
+
+def test_submission_is_generation_fenced_and_idempotent(tmp_path: Path) -> None:
+    control, _ = _control(tmp_path)
+    fence = control.acquire()
+    store = WorkflowStore(tmp_path / "Workflow.sqlite")
+    handlers, _ = _handlers()
+    coordinator = WorkflowCoordinator(
+        control,
+        fence,
+        store,
+        WorkflowRuntime(store, handlers),
+        worker_count=1,
+        minimum_idle_backoff_seconds=0.005,
+        maximum_idle_backoff_seconds=0.02,
+    )
+    identity = IntakeIdentity("ACME", "P-SUBMIT", {"part_id": "p-submit"})
+
+    coordinator.start()
+    _wait_until(lambda: coordinator.status().thread_alive)
+    first = coordinator.submit_batch(
+        [identity],
+        idempotency_key="coordinator-submit-1",
+    )
+    retry = coordinator.submit_batch(
+        [identity],
+        idempotency_key="coordinator-submit-1",
+    )
+
+    assert retry.id == first.id
+    assert store.count_batches() == 1
+    assert [event.kind for event in store.events(first.id)].count("batch_submitted") == 1
+
+    control.release(fence)
+    current_fence = control.acquire()
+    _wait_until(
+        lambda: (
+            coordinator.status().state is WorkflowCoordinatorState.STALE
+            and not coordinator.status().thread_alive
+        )
+    )
+    with pytest.raises(WorkflowCoordinatorLifecycleError, match="not accepting"):
+        coordinator.submit_batch(
+            [IntakeIdentity("ACME", "P-STALE")],
+            idempotency_key="coordinator-submit-stale",
+        )
+    assert store.count_batches() == 1
+    coordinator.stop()
+    control.release(current_fence)
 
 
 def test_reopen_recovers_an_expired_claim_before_background_dispatch(

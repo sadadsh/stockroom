@@ -4,14 +4,39 @@ the derived index (spec sections 5.1, 5.2)."""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from stockroom.store.index import Facets as _Facets
-from stockroom.store.index import IndexRow
+from stockroom.store.index import IndexRow, ToolReadiness
 from stockroom.store.parametric import ParametricFacets as _ParametricFacets
 from stockroom.store.project_index import ProjectIndexRow
+
+
+class EdaReadinessSummary(BaseModel):
+    """One EDA tool's coverage and evidence verdict.
+
+    `coverage_complete` is only a presence measurement.  `trust` is derived from check facts.
+    `ready` is the release-facing conjunction, except a class that requires no assets is ready by
+    definition while its asset-trust verdict remains honestly unknown.
+    """
+
+    required: list[str] = []
+    missing: list[str] = []
+    coverage_complete: bool
+    trust: Literal["pass", "fail", "unknown"]
+    ready: bool
+
+    @classmethod
+    def from_index(cls, state: ToolReadiness) -> "EdaReadinessSummary":
+        return cls(
+            required=list(state.required),
+            missing=list(state.missing),
+            coverage_complete=state.coverage_complete,
+            trust=state.trust.value,
+            ready=state.ready,
+        )
 
 
 class PartSummary(BaseModel):
@@ -22,6 +47,7 @@ class PartSummary(BaseModel):
     manufacturer: str
     is_complete: bool
     missing: list[str] = []
+    eda_readiness: dict[str, EdaReadinessSummary] = {}
 
     @classmethod
     def from_row(cls, row: IndexRow) -> "PartSummary":
@@ -33,7 +59,53 @@ class PartSummary(BaseModel):
             manufacturer=row.manufacturer,
             is_complete=row.is_complete,
             missing=list(row.missing),
+            eda_readiness={
+                tool: EdaReadinessSummary.from_index(state)
+                for tool, state in row.eda_readiness.items()
+            },
         )
+
+
+class StartAssemblyBody(BaseModel):
+    operator: str
+    boards: int = 1
+
+
+class AssemblyEventBody(BaseModel):
+    placement_id: str
+    state: str
+    scanned_mpn: str = ""
+    note: str = ""
+
+
+class StartWorkBody(BaseModel):
+    owner: str
+    branch: str
+    documents: list[str]
+
+
+class ShareWorkBody(BaseModel):
+    message: str
+
+
+class ApproveReviewBody(BaseModel):
+    branch: str
+    commit: str
+    base_branch: str
+    base_commit: str
+
+    @field_validator("commit", "base_commit")
+    @classmethod
+    def _full_commit(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if len(normalized) != 40 or any(char not in "0123456789abcdef" for char in normalized):
+            raise ValueError("an exact 40-character Git commit is required")
+        return normalized
+
+
+class RequestChangesBody(ApproveReviewBody):
+    reviewer: str
+    message: str
 
 
 def _scalar_specs(specs: dict) -> dict:
@@ -63,7 +135,7 @@ def _row_sourcing(record) -> tuple[int | None, float | None, str]:
     if best is None:
         return None, None, ""
     breaks = []
-    for b in (getattr(best, "price_breaks", None) or []):
+    for b in getattr(best, "price_breaks", None) or []:
         try:
             breaks.append((int(b["qty"]), float(b["price"])))
         except (KeyError, TypeError, ValueError):
@@ -235,6 +307,13 @@ class RegisterProjectBody(BaseModel):
     mapped to 400 by the error layer."""
 
     root: str
+    eda: str | None = None
+
+
+class DiscoverProjectsBody(BaseModel):
+    """Preview every project Stockroom can link from a selected file or directory."""
+
+    candidate: str
     eda: str | None = None
 
 
@@ -683,7 +762,8 @@ class TargetDefinitionDTO(BaseModel):
     service_groups: list[dict] = []
     functional_foundation: dict
     safety_rules: list[dict] = []
-    channel_fabric: dict
+    routing_requirements: dict
+    universalization: dict
     positions: list[dict] = []
 
     @classmethod
@@ -701,8 +781,56 @@ class TargetDefinitionDTO(BaseModel):
             service_groups=list(d.get("service_groups", []) or []),
             functional_foundation=dict(d.get("functional_foundation", {}) or {}),
             safety_rules=list(d.get("safety_rules", []) or []),
-            channel_fabric=dict(d.get("channel_fabric", {}) or {}),
+            routing_requirements=dict(d.get("routing_requirements", {}) or {}),
+            universalization=dict(d.get("universalization", {}) or {}),
             positions=list(d.get("positions", []) or []),
+        )
+
+
+class SocketSolutionDTO(BaseModel):
+    """A compact hardware solution synthesized from a target definition.
+
+    Target membership is encoded through the scope's target index plus hexadecimal
+    target masks. The response therefore grows with unique position behavior and
+    target cohorts rather than repeating every target under every support cell.
+    """
+
+    format: str
+    compiler_rev: int
+    artifact_digest: str
+    source_definition_digest: str
+    scope: dict
+    provenance: dict
+    status: dict
+    closure: dict
+    summary: dict
+    safe_state_contract: dict
+    bootstrap: dict
+    fabric: dict
+    target_cohorts: list[dict] = []
+    support_cells: list[dict] = []
+    positions: list[dict] = []
+    proofs: list[dict] = []
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "SocketSolutionDTO":
+        return cls(
+            format=d.get("format", "") or "",
+            compiler_rev=int(d.get("compiler_rev", 0) or 0),
+            artifact_digest=d.get("artifact_digest", "") or "",
+            source_definition_digest=d.get("source_definition_digest", "") or "",
+            scope=dict(d.get("scope", {}) or {}),
+            provenance=dict(d.get("provenance", {}) or {}),
+            status=dict(d.get("status", {}) or {}),
+            closure=dict(d.get("closure", {}) or {}),
+            summary=dict(d.get("summary", {}) or {}),
+            safe_state_contract=dict(d.get("safe_state_contract", {}) or {}),
+            bootstrap=dict(d.get("bootstrap", {}) or {}),
+            fabric=dict(d.get("fabric", {}) or {}),
+            target_cohorts=list(d.get("target_cohorts", []) or []),
+            support_cells=list(d.get("support_cells", []) or []),
+            positions=list(d.get("positions", []) or []),
+            proofs=list(d.get("proofs", []) or []),
         )
 
 

@@ -41,9 +41,44 @@ def _drain(client, job_id):
 
 @pytest.fixture
 def fake_vendor(monkeypatch):
-    """Point the Ultra Librarian adapter at a local stand-in serving its REAL captured markup, so
-    no test ever touches the live vendor."""
+    """Serve one complete native KiCad + Altium + STEP provider evidence set locally."""
+    base, shutdown = serve_fixture_vendor("ul-export-panel-native.html")
+    _patch_fixture_vendor(
+        monkeypatch,
+        base,
+        mpn="S1M",
+        manufacturer="ON Semiconductor",
+    )
+    try:
+        yield base
+    finally:
+        shutdown()
+
+
+@pytest.fixture
+def fake_kicad_only_vendor(monkeypatch):
+    """Serve the measured legacy page, which cannot satisfy the native dual-EDA contract."""
     base, shutdown = serve_fixture_vendor()
+    _patch_fixture_vendor(
+        monkeypatch,
+        base,
+        mpn="TPD6E05U06RVZR",
+        manufacturer="Texas Instruments",
+    )
+    try:
+        yield base
+    finally:
+        shutdown()
+
+
+def _patch_fixture_vendor(
+    monkeypatch,
+    base: str,
+    *,
+    mpn: str,
+    manufacturer: str,
+) -> None:
+    """Route one local fixture through the production Ultra Librarian adapter."""
     from stockroom.capture import guided as capture_guided
     from stockroom.capture import identity as capture_identity
     from stockroom.capture import runner as capture_runner
@@ -73,8 +108,8 @@ def fake_vendor(monkeypatch):
         "page_identity",
         lambda vendor, url, **options: (
             capture_identity.PageIdentity(
-                mpn="TPD6E05U06RVZR",
-                manufacturer="Texas Instruments",
+                mpn=mpn,
+                manufacturer=manufacturer,
             )
             if url.startswith(base)
             else real_page_identity(vendor, url, **options)
@@ -85,8 +120,8 @@ def fake_vendor(monkeypatch):
         "page_identity",
         lambda vendor, url, **options: (
             capture_identity.PageIdentity(
-                mpn="TPD6E05U06RVZR",
-                manufacturer="Texas Instruments",
+                mpn=mpn,
+                manufacturer=manufacturer,
             )
             if url.startswith(base)
             else real_page_identity(vendor, url, **options)
@@ -96,14 +131,9 @@ def fake_vendor(monkeypatch):
         capture_vendors,
         "_provider_url_allowed",
         lambda vendor, url, **options: (
-            url.startswith(base)
-            or real_provider_url_allowed(vendor, url, **options)
+            url.startswith(base) or real_provider_url_allowed(vendor, url, **options)
         ),
     )
-    try:
-        yield base
-    finally:
-        shutdown()
 
 
 @pytest.fixture
@@ -111,11 +141,21 @@ def headless(monkeypatch):
     """Run the capture browser headless in tests. The real workflow is HEADED on purpose - the
     person signs in - so this is the only place that differs, and it differs in one flag."""
     import stockroom.capture.runner as runner
+    import stockroom.ingest.pipeline as ingest_pipeline
 
     original = runner.run_guided_capture
+    original_pipeline = ingest_pipeline.IngestPipeline
     # These are browser-route tests. The direct LCSC lane has its own end-to-end tests and would
     # legitimately satisfy the part before this fixture provider is reached.
     monkeypatch.setattr(runner, "build_sources", lambda _ctx, **_kwargs: [])
+
+    def isolated_pipeline(*args, **kwargs):
+        # The route must prove the coherent provider pair, but it must not drive the owner's
+        # installed Altium process while testing. Native model embedding and its rollback boundary
+        # are covered at the pipeline layer; this API fixture keeps the real atomic attachment and
+        # explicitly disables only that machine-dependent post-readback step.
+        kwargs["auto_embed_altium_models"] = False
+        return original_pipeline(*args, **kwargs)
 
     def patched(ctx, **kwargs):
         kwargs["headless"] = True
@@ -128,13 +168,18 @@ def headless(monkeypatch):
         kwargs["engine"] = "chromium"
         return original(ctx, **kwargs)
 
+    monkeypatch.setattr(ingest_pipeline, "IngestPipeline", isolated_pipeline)
     monkeypatch.setattr(runner, "run_guided_capture", patched)
     return patched
 
 
-
-def _a_part_missing_its_kicad_files(client) -> dict:
-    """A part with NO KiCad symbol or footprint, made so through the real detach endpoint.
+def _a_part_missing_its_cad_files(
+    client,
+    *,
+    mpn: str = "S1M",
+    manufacturer: str = "ON Semiconductor",
+) -> dict:
+    """A part with no active CAD pair, made so through the real detach endpoint.
 
     The fixture library ships both of its parts complete, and `PartSummary.missing` is about
     METADATA (MPN, datasheet, purchase link), not assets - so an earlier version of this filtered
@@ -152,8 +197,8 @@ def _a_part_missing_its_kicad_files(client) -> dict:
     # capture; attaching the fixture bytes to the old blank-MPN `mystery` record would prove only
     # that guided capture can mislabel an arbitrary download.
     for field, value in (
-        ("mpn", "TPD6E05U06RVZR"),
-        ("manufacturer", "Texas Instruments"),
+        ("mpn", mpn),
+        ("manufacturer", manufacturer),
     ):
         response = client.patch(
             f"/api/library/parts/{part_id}",
@@ -162,7 +207,9 @@ def _a_part_missing_its_kicad_files(client) -> dict:
         assert response.status_code == 200, response.text
     for kind in ("kicad_symbol", "kicad_footprint"):
         resp = client.delete(f"/api/library/parts/{part_id}/assets/{kind}")
-        assert resp.status_code == 200, f"detach {kind} failed: {resp.status_code} {resp.text[:200]}"
+        assert resp.status_code == 200, (
+            f"detach {kind} failed: {resp.status_code} {resp.text[:200]}"
+        )
     detail = client.get(f"/api/library/parts/{part_id}").json()
     kicad = (detail.get("assets") or {}).get("kicad", {})
     assert not kicad.get("symbol"), f"detach did not remove the symbol: {kicad}"
@@ -184,15 +231,13 @@ def test_capture_needs_a_token(anon_client):
     assert anon_client.post("/api/library/capture/run", json={}).status_code == 401
 
 
-def test_capturing_one_component_attaches_files_to_that_record(
-    client, fake_vendor, headless
-):
+def test_capturing_one_component_attaches_files_to_that_record(client, fake_vendor, headless):
     """PER COMPONENT, asserted at the layer the owner looks at: the record.
 
     Before this, a part with no CAD stayed exactly as it was and the only evidence of a capture
     was a log line. Here the record is re-read through the real API after the job finishes.
     """
-    target = _a_part_missing_its_kicad_files(client)
+    target = _a_part_missing_its_cad_files(client)
 
     job = client.post(
         "/api/library/capture/run",
@@ -202,16 +247,20 @@ def test_capturing_one_component_attaches_files_to_that_record(
 
     after = client.get(f"/api/library/parts/{target['id']}").json()
     kicad = after.get("assets", {}).get("kicad", {})
+    altium = after.get("assets", {}).get("altium", {})
     assert kicad.get("symbol"), (
         f"no symbol attached to {target['id']}: {kicad}; job events were {events}"
     )
     assert kicad.get("footprint"), f"no footprint attached to {target['id']}: {kicad}"
+    assert altium.get("symbol"), f"no Altium symbol attached to {target['id']}: {altium}"
+    assert altium.get("footprint"), f"no Altium footprint attached to {target['id']}: {altium}"
+    assert kicad["symbol"]["origin"]["evidence_set"] == altium["symbol"]["origin"]["evidence_set"]
 
 
 def test_a_captured_asset_records_where_it_came_from(client, fake_vendor, headless):
     """The owner's complaint, verbatim: *"its not trusted where we've gotten them"*. An attached
     file that cannot say which vendor supplied it is exactly the state they objected to."""
-    target = _a_part_missing_its_kicad_files(client)
+    target = _a_part_missing_its_cad_files(client)
 
     job = client.post(
         "/api/library/capture/run",
@@ -221,6 +270,7 @@ def test_a_captured_asset_records_where_it_came_from(client, fake_vendor, headle
 
     assets = client.get(f"/api/library/parts/{target['id']}").json().get("assets") or {}
     kicad = assets.get("kicad") or {}
+    altium = assets.get("altium") or {}
     # Say WHY when nothing attached, instead of a bare KeyError that hides whether the capture
     # failed, timed out, or attached under a different tool.
     assert kicad.get("symbol"), (
@@ -231,6 +281,39 @@ def test_a_captured_asset_records_where_it_came_from(client, fake_vendor, headle
     assert origin.get("vendor") == "ultralibrarian", symbol
     assert origin.get("url"), symbol
     assert origin.get("captured_at"), "the server must stamp when the file landed"
+    assert altium.get("symbol"), f"capture attached no Altium symbol; assets were {assets}"
+    altium_origin = altium["symbol"].get("origin") or {}
+    assert altium_origin.get("vendor") == "ultralibrarian", altium["symbol"]
+    assert altium_origin.get("evidence_set")
+    assert altium_origin["evidence_set"] == origin.get("evidence_set")
+
+
+def test_kicad_only_provider_set_fails_closed_without_mutation(
+    client, fake_kicad_only_vendor, headless
+):
+    target = _a_part_missing_its_cad_files(
+        client,
+        mpn="TPD6E05U06RVZR",
+        manufacturer="Texas Instruments",
+    )
+
+    job = client.post(
+        "/api/library/capture/run",
+        json={"part_ids": [target["id"]], "vendor": "ultralibrarian"},
+    ).json()["job_id"]
+    events = _drain(client, job)
+
+    after = client.get(f"/api/library/parts/{target['id']}").json()
+    assets = after.get("assets") or {}
+    assert not (assets.get("kicad") or {}).get("symbol"), assets
+    assert not (assets.get("kicad") or {}).get("footprint"), assets
+    assert not (assets.get("altium") or {}).get("symbol"), assets
+    assert not (assets.get("altium") or {}).get("footprint"), assets
+    result_items = [
+        item for kind, payload in events if kind == "result" for item in payload["result"]["items"]
+    ]
+    assert result_items, events
+    assert "complete dual-EDA source set" in result_items[0]["error"]
 
 
 def test_the_whole_library_run_uses_the_same_automatic_path_as_one_component(
@@ -261,7 +344,7 @@ def test_assisted_fallback_requires_one_part_and_one_provider(client):
 
 def test_a_run_is_cancellable(client, fake_vendor, headless):
     """Stop remains available while the one selected capture is in flight."""
-    target = _a_part_missing_its_kicad_files(client)
+    target = _a_part_missing_its_cad_files(client)
     job = client.post(
         "/api/library/capture/run",
         json={"part_ids": [target["id"]], "vendor": "ultralibrarian"},

@@ -3,7 +3,7 @@
  */
 import { CadVariantApiError } from "../api/cadVariantClient";
 import {
-  useActivateCadVariant,
+  useActivateCadPair,
   useCadVariantInventory,
 } from "../api/cadVariantQueries";
 import { Text } from "../lib/copy";
@@ -18,7 +18,7 @@ export function CadVariantSection({
   enabled: boolean;
 }) {
   const inventory = useCadVariantInventory(partId, enabled);
-  const activation = useActivateCadVariant(partId);
+  const pairActivation = useActivateCadPair(partId);
 
   if (!enabled) return null;
   if (inventory.isPending) {
@@ -38,26 +38,28 @@ export function CadVariantSection({
     );
   }
 
-  const activationError = activation.isError
-    ? activation.error instanceof CadVariantApiError && activation.error.status === 409
-      ? "The active variant changed before this switch completed. The latest choices are loading."
-      : `Could not switch CAD variants. ${activation.error.message}`
+  const activationError = pairActivation.isError
+    ? pairActivation.error instanceof CadVariantApiError &&
+      pairActivation.error.status === 409
+      ? "The active CAD pair changed before this switch completed. The latest choices are loading."
+      : `Could not switch the CAD pair. ${pairActivation.error.message}`
     : null;
 
   return (
     <CadVariantSelector
       inventories={inventory.data?.inventories ?? []}
+      pairs={inventory.data?.pairs ?? []}
       supplementary={inventory.data?.supplementary ?? []}
-      activating={
-        activation.isPending
+      activatingPair={
+        pairActivation.isPending
           ? {
-              tool: activation.variables.tool,
-              variantId: activation.variables.variantId,
+              kicadVariantId: pairActivation.variables.kicadVariantId,
+              altiumVariantId: pairActivation.variables.altiumVariantId,
             }
           : null
       }
       activationError={activationError}
-      onActivate={(selection) => activation.mutate(selection)}
+      onActivatePair={(selection) => pairActivation.mutate(selection)}
     />
   );
 }

@@ -184,3 +184,119 @@ def test_run_windowed_closes_only_the_context_it_builds_even_if_the_window_raise
     assert server.should_exit is True
     assert ctx.stop.is_set()
     assert ctx.closed is True
+
+
+def test_production_host_uses_signed_runtime_and_never_touches_git_fallback(
+    app_ctx,
+    monkeypatch,
+):
+    from stockroom.host import release_runtime
+
+    class _NoGitFallback:
+        def __getattr__(self, name):
+            raise AssertionError(f"production touched legacy Git updater field {name}")
+
+    class _SignedRuntime:
+        def __init__(self):
+            self.started = False
+            self.closed = False
+
+        def start(self):
+            self.started = True
+
+        def close(self):
+            self.closed = True
+
+        def status(self):
+            return {
+                "update_available": False,
+                "state": "up_to_date",
+                "current_revision": "release-1",
+                "target_revision": "release-1",
+                "channel": "production",
+            }
+
+    signed = _SignedRuntime()
+    app_ctx.app_repo = _NoGitFallback()
+    monkeypatch.setenv("STOCKROOM_UPDATE_MODE", "production")
+    monkeypatch.setattr(
+        release_runtime,
+        "create_production_update_runtime",
+        lambda *args, **kwargs: signed,
+    )
+
+    observed = {}
+
+    def window(base_url: str, token: str) -> None:
+        observed.update(
+            httpx.get(
+                f"{base_url}/api/update/check",
+                headers={"X-Stockroom-Token": token},
+            ).json()
+        )
+
+    run_windowed(ctx=app_ctx, open_window=window)
+
+    assert signed.started
+    assert signed.closed
+    assert observed["channel"] == "production"
+    assert observed["current_revision"] == "release-1"
+
+
+def test_production_bootstrap_failure_keeps_packaged_identity_and_fences_writes(
+    app_ctx,
+    monkeypatch,
+):
+    from unittest.mock import Mock
+
+    from stockroom.host import release_runtime
+
+    sync_on_launch = Mock(side_effect=AssertionError("unmanaged launch sync started"))
+    background_sync = Mock(
+        side_effect=AssertionError("unmanaged background sync started")
+    )
+    app_ctx.sync_on_launch = sync_on_launch
+    app_ctx.start_background_sync = background_sync
+    monkeypatch.setenv("STOCKROOM_UPDATE_MODE", "production")
+    monkeypatch.setattr(
+        release_runtime,
+        "create_production_update_runtime",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("synthetic bootstrap failure")
+        ),
+    )
+    monkeypatch.setattr(
+        release_runtime,
+        "verified_packaged_release_identity",
+        lambda: "release-packaged",
+    )
+    observed: dict = {}
+
+    def window(base_url: str, token: str) -> None:
+        headers = {"X-Stockroom-Token": token}
+        health = httpx.get(f"{base_url}/api/health")
+        mutation = httpx.post(f"{base_url}/api/sync", headers=headers)
+        update = httpx.get(f"{base_url}/api/update/check", headers=headers)
+        observed["health_status"] = health.status_code
+        observed["health"] = health.json()
+        observed["mutation_status"] = mutation.status_code
+        observed["update"] = update.json()
+
+    run_windowed(ctx=app_ctx, open_window=window)
+
+    assert sync_on_launch.call_count == 0
+    assert background_sync.call_count == 0
+    assert observed["health_status"] == 503
+    assert observed["health"] == {
+        "status": "degraded",
+        "release_id": "release-packaged",
+        "service_generation": 0,
+        "service_mode": "shadow",
+        "coordinator_status": "unavailable",
+        "blocking_reason": "production_service_bootstrap_failed",
+    }
+    assert observed["mutation_status"] == 503
+    assert observed["update"]["current_release_id"] == "release-packaged"
+    assert observed["update"]["blocking_reason"] == (
+        "production_service_bootstrap_failed"
+    )

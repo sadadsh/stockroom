@@ -42,6 +42,36 @@ def test_save_then_load_round_trip(tmp_path):
     assert again == cfg
 
 
+def test_reload_reads_the_exact_source_and_reuses_its_credential_store(tmp_path):
+    path = tmp_path / "custom" / "machine.json"
+    store = MemoryCredentialStore("reload-source")
+    MachineConfig(
+        active_profile="Before",
+        github_token="SECRET",
+    ).save(path, credential_store=store)
+    loaded = MachineConfig.load(path, credential_store=store)
+    MachineConfig(
+        active_profile="After",
+        github_token="SECRET",
+        ui={"theme": "light"},
+    ).save(path, credential_store=store)
+
+    latest = loaded.reload(migrate_credentials=False)
+
+    assert latest is not loaded
+    assert latest.source_path == path.resolve(strict=False)
+    assert latest.active_profile == "After"
+    assert latest.github_token == "SECRET"
+    assert latest.ui == {"theme": "light"}
+
+
+def test_reload_preserves_an_explicit_detached_configuration():
+    detached = MachineConfig(active_profile="Embedded")
+
+    assert detached.source_path is None
+    assert detached.reload() is detached
+
+
 def test_saved_json_is_human_readable(tmp_path):
     path = tmp_path / "config.json"
     MachineConfig(active_profile="Bench").save(path)

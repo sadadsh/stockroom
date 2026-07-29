@@ -34,10 +34,10 @@ class SexpNode:
     def __init__(self, doc, text, token=None, children=None):
         self._doc = doc
         self._text = text
-        self._token = token  # set for leaves
-        self._children = children  # set for lists
-        self._list_span = None  # (open, close) byte span; set for list nodes
-        self._value_override = None  # reflects a pending set_value for read-after-write
+        self._token: Token | None = token  # set for leaves
+        self._children: list[SexpNode] | None = children  # set for lists
+        self._list_span: tuple[int, int] | None = None  # set for list nodes
+        self._value_override: str | None = None  # pending set_value for read-after-write
 
     @property
     def is_atom(self) -> bool:
@@ -56,6 +56,8 @@ class SexpNode:
 
     def _children_span(self) -> tuple[int, int]:
         # span of a list = from its own '(' to its ')'; stored on the list node
+        if self._list_span is None:
+            raise ValueError("a list node has no source span")
         return self._list_span
 
     @property
@@ -114,6 +116,8 @@ class SexpNode:
         """Whitespace run (including a leading newline) before child `index`,
         or empty string if the child is not newline-prefixed. Captures the full
         CRLF pair so inserting/removing on a Windows/KiCad file keeps CRLF."""
+        if self._children is None:
+            raise ValueError("_indent_before is only valid on a list node")
         child = self._children[index]
         start = child.span[0]
         text = self._text
@@ -162,7 +166,7 @@ class SexpNode:
             self._doc.insert_span(pos, f"{indent}{sexp_text}" if indent else f" {sexp_text}")
         else:
             # no original child: insert right before ')'
-            close = self._list_span[1] - 1
+            close = self._children_span()[1] - 1
             self._doc.insert_span(close, sexp_text)
         self._children.append(SexpDocument.parse(sexp_text).root)
 

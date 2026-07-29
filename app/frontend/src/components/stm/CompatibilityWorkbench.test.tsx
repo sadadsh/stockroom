@@ -12,10 +12,24 @@ import {
 import { api, ApiError } from "../../api/client";
 import type {
   FamiliesResponse,
+  SocketSolutionDTO,
   SuggestionsResponse,
   TargetDefinitionDTO,
+  TargetDefinitionPolicy,
   UnionDTO,
 } from "../../api/types";
+import {
+  makeStmTargetRequest,
+  stmAccessPlanCsv,
+  stmPinPlanCsv,
+  stmTargetExportFilename,
+} from "../../lib/stmTargetExport";
+import {
+  stmSocketControlStatesCsv,
+  stmSocketExportFilename,
+  stmSocketPositionsCsv,
+  stmSocketRequestJson,
+} from "../../lib/stmSocketSolutionExport";
 
 const FAMILIES: FamiliesResponse = {
   families: [
@@ -101,8 +115,8 @@ function unionResult(): UnionDTO {
 
 function targetDefinitionResult(): TargetDefinitionDTO {
   return {
-    format: "stm-target-definition/1",
-    compiler_rev: 4,
+    format: "stm-target-definition/2",
+    compiler_rev: 8,
     artifact_digest: "a".repeat(64),
     profile: {
       id: "stm32-core-bring-up",
@@ -255,16 +269,54 @@ function targetDefinitionResult(): TargetDefinitionDTO {
       groups: [],
     },
     safety_rules: [],
-    channel_fabric: {
-      part_mpn: "",
-      channels_per_device: 0,
-      max_devices: 0,
-      default_state: "open",
-      reference_prefix: "U_ROUTE",
-      required_channels: 0,
-      capacity: 0,
-      used_devices: 0,
-      allocations: [],
+    routing_requirements: {
+      strategy: "implementation-neutral-independent-paths",
+      safe_default: "open",
+      required_independent_paths: 0,
+      maximum_independent_paths: null,
+      limit_status: "unbounded",
+      paths: [],
+    },
+    universalization: {
+      strategy: "one-package-universal-support",
+      implementation_owner: "consuming-design",
+      implementation_technology: "unspecified",
+      required_independent_paths: 0,
+      safe_default: "open",
+      state_contract: {
+        unknown_target: "all-independent-paths-open",
+        controller_startup: "all-independent-paths-open",
+        controller_reset: "all-independent-paths-open",
+        power_loss: "all-independent-paths-open",
+        target_change: "open-before-reconfigure",
+        identity_mismatch: "refuse-activation",
+        configured: "only-target-permitted-paths-may-conduct",
+      },
+      summary: {
+        direct_or_fixed: 1,
+        selectable: 0,
+        excluded_from_common_interface: 0,
+      },
+      strategies: [
+        {
+          position: "23",
+          silicon_class: "stable_io",
+          primitive: "universal-breakout",
+          explanation: "One shared GPIO position can feed a common board net.",
+          selection: "none",
+          safe_default: null,
+          identities: ["PA9"],
+          branches: [],
+          constraints: [],
+          validation: {
+            status: "not-required",
+            required_checks: [],
+            failure_action: "none",
+          },
+          evidence_status: "compiler-derived",
+          implementation_owner: "consuming-design",
+        },
+      ],
     },
     positions: [
       {
@@ -319,6 +371,306 @@ function targetDefinitionResult(): TargetDefinitionDTO {
         ],
       },
     ],
+  };
+}
+
+function socketSolutionResult(): SocketSolutionDTO {
+  const envelope = {
+    authority: "family-envelope",
+    families: ["STM32F4", "STM32F7"],
+    operating_v: [1.7, 3.6] as [number, number],
+    per_pin_current_ma: 20,
+    injection_current_ma: 5,
+    five_v_tolerant: false,
+    citations: ["STM32 family electrical limits"],
+  };
+  const hazard = {
+    level: "high" as const,
+    rank: 2,
+    category: "exclusive-roles",
+    label: "Mutually Exclusive Electrical Roles",
+    reason: "Only the branch declared for the installed target may conduct.",
+  };
+  const cellContract = {
+    architecture: "fail-closed-universal-position-cell" as const,
+    selection_authority: "declared-target-profile" as const,
+    default_state: "all-branches-open" as const,
+    planes: [
+      {
+        id: "signal",
+        requirements: ["bidirectional high-impedance signal path"],
+      },
+      {
+        id: "dedicated-network",
+        requirements: ["electrically isolated target-specific support network"],
+      },
+    ],
+    mandatory_features: [
+      "hardware-enforced one-hot branch selection",
+      "target profile is declared and locked before any target rail is enabled",
+    ],
+    power_sequence: [
+      "hold every target-facing source and return branch open",
+      "load and verify the exact target cohort",
+    ],
+    failure_response: "force-all-branches-open" as const,
+    hazard,
+  };
+  return {
+    format: "stm-socket-solution/1",
+    compiler_rev: 1,
+    artifact_digest: "d".repeat(64),
+    source_definition_digest: "a".repeat(64),
+    scope: {
+      package: "LQFP144",
+      families: ["STM32F4", "STM32F7"],
+      target_count: 3,
+      targets: targetDefinitionResult().scope.targets,
+      target_index: [
+        { index: 0, ref: "STM32F407ZGT6", family: "STM32F4", line: "STM32F407" },
+        { index: 1, ref: "STM32F429ZET6", family: "STM32F4", line: "STM32F429" },
+        { index: 2, ref: "STM32F746ZGT6", family: "STM32F7", line: "STM32F746" },
+      ],
+    },
+    provenance: { silicon_source: "STM32CubeMX XML" },
+    status: {
+      solution: "conditional",
+      evidence: "complete",
+      bootstrap: "requires-declared-target",
+      blockers: [],
+      warnings: ["Target identity must be declared before configurable branches close."],
+    },
+    closure: {
+      verdict: "architecture-complete",
+      release: "ready",
+      zero_omission: true,
+      supported_target_count: 3,
+      unsupported_target_count: 0,
+      target_coverage_percentage: 100,
+      gates: [
+        {
+          id: "target-coverage",
+          label: "Target Coverage",
+          status: "pass",
+          value: "3/3",
+          detail: "Every target has one complete configuration.",
+        },
+        {
+          id: "configuration-integrity",
+          label: "Configuration Integrity",
+          status: "pass",
+          value: "0 Errors",
+          detail: "Every target belongs to one cohort.",
+        },
+        {
+          id: "safe-before-power",
+          label: "Safe Before Power",
+          status: "pass",
+          value: "Declared Target Required",
+          detail: "The target profile is applied before target power.",
+        },
+        {
+          id: "required-access",
+          label: "Required Access",
+          status: "pass",
+          value: "5/5 Complete",
+          detail: "All required access routes are covered.",
+        },
+        {
+          id: "electrical-verification",
+          label: "Electrical Verification",
+          status: "pass",
+          value: "Closed",
+          detail: "All checks are closed.",
+        },
+      ],
+      required_requirement_coverage: [],
+      configuration_errors: [],
+    },
+    summary: {
+      target_count: 3,
+      target_cohort_count: 2,
+      position_count: 1,
+      support_cell_count: 1,
+      direct_positions: 0,
+      configurable_positions: 1,
+      critical_positions: 0,
+      universal_lanes: 1,
+      observation_nodes: 1,
+      controlled_branches: 2,
+      critical_hazard_positions: 0,
+      high_hazard_positions: 1,
+      proof_open_positions: 0,
+      supported_targets: 3,
+      direct_percentage: 0,
+      configurable_percentage: 100,
+      shared_route_savings_percentage: 33.3,
+    },
+    safe_state_contract: {
+      unknown_target: "all-controlled-branches-open",
+      target_change: "open-before-reconfigure",
+    },
+    bootstrap: {
+      status: "requires-declared-target",
+      debug_positions: [],
+      rule: "Declare and verify target identity before enabling a branch.",
+    },
+    fabric: {
+      strategy: "shared-universal-lanes-with-selected-role-islands",
+      universal_lanes: 1,
+      observation_nodes: 1,
+      controlled_branches: 2,
+      control_bits_required: 1,
+      cohort_configurations: 2,
+      capacity_limit: null,
+      configuration_authority: "declared-target-before-power",
+      mandatory_interlocks: [
+        "all branches default open",
+        "hardware one-hot selection per position",
+      ],
+    },
+    target_cohorts: [
+      {
+        id: "cohort-1",
+        target_mask: "03",
+        target_count: 2,
+        percentage: 66.7,
+        families: ["STM32F4"],
+        target_examples: ["STM32F407ZGT6", "STM32F429ZET6"],
+        configuration: { "23": "pos-23-usart1-tx" },
+      },
+      {
+        id: "cohort-2",
+        target_mask: "04",
+        target_count: 1,
+        percentage: 33.3,
+        families: ["STM32F7"],
+        target_examples: ["STM32F746ZGT6"],
+        configuration: { "23": "pos-23-eth-txd3" },
+      },
+    ],
+    support_cells: [
+      {
+        id: "cell-selected-roles-1",
+        signature: "selected-roles:universal-io,eth-txd3",
+        type: "selected-roles",
+        label: "Selected Socket Roles",
+        positions: ["23"],
+        position_count: 1,
+        mode_count: 2,
+        controlled: true,
+        safe_default: "open",
+        hazard_contract: hazard,
+        cell_contract: cellContract,
+        branch_pattern: [
+          {
+            mode_id: "universal-io",
+            label: "Universal I/O",
+            endpoint: "universal-io",
+            controlled: true,
+            plane: "signal",
+          },
+          {
+            mode_id: "eth-txd3",
+            label: "ETH TXD3",
+            endpoint: "critical:eth-txd3",
+            controlled: true,
+            plane: "dedicated-network",
+          },
+        ],
+        implementation_capabilities: {
+          default_open: true,
+          hardware_reset: true,
+          readback: true,
+          break_before_make: true,
+          bidirectional: true,
+        },
+      },
+    ],
+    positions: [
+      {
+        position: "23",
+        position_kind: "numeric",
+        lqfp_side: "left",
+        bga_row: null,
+        bga_col: null,
+        cell_type: "selected-roles",
+        cell_label: "Selected Socket Roles",
+        solution_reason: "The two roles require mutually exclusive branches.",
+        network_requirements: [],
+        validation_checks: [],
+        hazard_contract: hazard,
+        cell_contract: cellContract,
+        controlled: true,
+        safe_default: "open",
+        observation_node: true,
+        universal_lane: true,
+        modes: [
+          {
+            id: "universal-io",
+            label: "Universal I/O",
+            kind: "signal",
+            conductive: true,
+            endpoint: "universal-io",
+            target_mask: "03",
+            target_count: 2,
+            percentage: 66.7,
+            target_examples: ["STM32F407ZGT6", "STM32F429ZET6"],
+            functions: ["USART1_TX"],
+            access_tags: ["usart"],
+            electrical_envelope: envelope,
+          },
+          {
+            id: "eth-txd3",
+            label: "ETH TXD3",
+            kind: "critical",
+            conductive: true,
+            endpoint: "critical:eth-txd3",
+            target_mask: "04",
+            target_count: 1,
+            percentage: 33.3,
+            target_examples: ["STM32F746ZGT6"],
+            functions: ["ETH_TXD3"],
+            access_tags: ["ethernet"],
+            electrical_envelope: envelope,
+          },
+        ],
+        branches: [
+          {
+            id: "pos-23-usart1-tx",
+            mode_id: "universal-io",
+            label: "Universal I/O",
+            endpoint: "universal-io",
+            target_mask: "03",
+            controlled: true,
+            default_state: "open",
+            direction: "bidirectional",
+            break_before_make: true,
+            plane: "signal",
+            electrical_envelope: envelope,
+          },
+          {
+            id: "pos-23-eth-txd3",
+            mode_id: "eth-txd3",
+            label: "ETH TXD3",
+            endpoint: "critical:eth-txd3",
+            target_mask: "04",
+            controlled: true,
+            default_state: "open",
+            direction: "bidirectional",
+            break_before_make: true,
+            plane: "dedicated-network",
+            electrical_envelope: envelope,
+          },
+        ],
+        mode_count: 2,
+        agreement_count: 2,
+        agreement_percentage: 66.7,
+        support_cell_id: "cell-selected-roles-1",
+        hazard: "",
+      },
+    ],
+    proofs: [],
   };
 }
 
@@ -382,6 +734,91 @@ describe("benchExport", () => {
   });
 });
 
+describe("STM target handoff exports", () => {
+  const policy: TargetDefinitionPolicy = {
+    id: "stm32-core-bring-up",
+    revision: 1,
+    requirements: [],
+    safety_rules: [],
+    routing_constraints: {
+      safe_default: "open",
+    },
+  };
+
+  it("pins the compiled device refs in a reproducible compiler request", () => {
+    const request = makeStmTargetRequest(targetDefinitionResult(), policy);
+    expect(request.format).toBe("stm-target-request/2");
+    expect(request.selection).toEqual({
+      parts: ["STM32F407ZGT6", "STM32F429ZET6", "STM32F746ZGT6"],
+    });
+    expect(request.policy).toBe(policy);
+  });
+
+  it("exports one digest-bound physical closure row per package position", () => {
+    const definition = targetDefinitionResult();
+    const plan = stmPinPlanCsv(definition);
+    expect(plan.startsWith("\uFEFF")).toBe(true);
+    expect(plan).toContain('"artifact_digest"');
+    expect(plan).toContain('"universal_primitive"');
+    expect(plan).toContain('"active_routing_paths"');
+    expect(plan).toContain('"passive_conditioned_paths"');
+    expect(plan).toContain('"fallback_topology"');
+    expect(plan).toContain('"strategy_constraints"');
+    expect(plan).toContain('"validation_checks"');
+    expect(plan).toContain('"global_safe_state_contract"');
+    expect(plan).toContain('"routing_path_requirements"');
+    expect(plan).toContain('"implementation_endpoint"');
+    expect(plan).toContain(`"${definition.artifact_digest}"`);
+    expect(plan).toContain(
+      '"LQFP144","23","left","stable_io","direct","universal-breakout","compiler-derived","none"',
+    );
+    expect(plan).toContain('"uart_tx:USART1_TX:direct:complete"');
+    expect(plan.trimEnd().split("\r\n")).toHaveLength(2);
+  });
+
+  it("exports target-specific access routes and their implementation closure fields", () => {
+    const plan = stmAccessPlanCsv(targetDefinitionResult());
+    expect(plan).toContain('"claim_scope"');
+    expect(plan).toContain('"protection_constraints"');
+    expect(plan).toContain('"implementation_evidence"');
+    expect(plan).toContain(
+      '"STM32F407ZGT6","STM32F4","STM32F407","","true","23","PA9","USART1_TX","7","true"',
+    );
+    expect(plan.trimEnd().split("\r\n")).toHaveLength(4);
+  });
+
+  it("uses the package and definition digest in every handoff filename", () => {
+    const definition = targetDefinitionResult();
+    expect(stmTargetExportFilename(definition, "request")).toBe(
+      "stm-lqfp144-aaaaaaaaaaaa.request.json",
+    );
+    expect(stmTargetExportFilename(definition, "pin-plan")).toBe(
+      "stm-lqfp144-aaaaaaaaaaaa.pin-plan.csv",
+    );
+  });
+
+  it("exports a compact socket contract with blank downstream implementation fields", () => {
+    const solution = socketSolutionResult();
+    const positions = stmSocketPositionsCsv(solution);
+    const states = stmSocketControlStatesCsv(solution);
+    const request = JSON.parse(stmSocketRequestJson(solution, policy));
+    expect(positions).toContain('"implementation_designator"');
+    expect(positions).toContain('"implementation_evidence"');
+    expect(positions.trimEnd().split("\r\n")).toHaveLength(2);
+    expect(states.trimEnd().split("\r\n")).toHaveLength(3);
+    expect(states).toContain('"cohort-2","04","1","33.3"');
+    expect(request.format).toBe("stm-socket-request/1");
+    expect(request.selection.parts).toEqual([
+      "STM32F407ZGT6",
+      "STM32F429ZET6",
+      "STM32F746ZGT6",
+    ]);
+    expect(stmSocketExportFilename(solution, "positions")).toBe(
+      "stm-lqfp144-dddddddddddd.positions.csv",
+    );
+  });
+});
+
 describe("CompatibilityWorkbench (the Bench)", () => {
   function mockScope() {
     vi.spyOn(api, "getStmFamilies").mockResolvedValue(FAMILIES);
@@ -390,7 +827,10 @@ describe("CompatibilityWorkbench (the Bench)", () => {
     const definitionSpy = vi
       .spyOn(api, "postStmTargetDefinition")
       .mockResolvedValue(targetDefinitionResult());
-    return { suggSpy, unionSpy, definitionSpy };
+    const solutionSpy = vi
+      .spyOn(api, "postStmSocketSolution")
+      .mockResolvedValue(socketSolutionResult());
+    return { suggSpy, unionSpy, definitionSpy, solutionSpy };
   }
 
   async function pickScope() {
@@ -434,11 +874,12 @@ describe("CompatibilityWorkbench (the Bench)", () => {
       }),
     );
     expect(screen.queryByRole("button", { name: "Build Set" })).toBeNull();
-    // the stepper lists every set
+    // The compact selector keeps every computed set available without a chip rail.
     const stepper = await screen.findByTestId("bench-stepper");
-    expect(within(stepper).getByText("All Parts")).toBeInTheDocument();
-    expect(within(stepper).getByText("Baseline")).toBeInTheDocument();
-    expect(within(stepper).getByText("Divergent A")).toBeInTheDocument();
+    const selector = within(stepper).getByRole("combobox", { name: "Target Set" });
+    expect(within(selector).getByRole("option", { name: /All Parts/ })).toBeInTheDocument();
+    expect(within(selector).getByRole("option", { name: /Baseline/ })).toBeInTheDocument();
+    expect(within(selector).getByRole("option", { name: /Divergent A/ })).toBeInTheDocument();
   });
 
   it("stepping to a divergent set auto-unions its refs (no rebuild)", async () => {
@@ -447,7 +888,9 @@ describe("CompatibilityWorkbench (the Bench)", () => {
     await pickScope();
     await screen.findByTestId("bench-stepper");
 
-    fireEvent.click(screen.getByText("Divergent A"));
+    fireEvent.change(screen.getByRole("combobox", { name: "Target Set" }), {
+      target: { value: "sig-div-a" },
+    });
     await waitFor(() => expect(unionSpy).toHaveBeenCalledWith({ parts: ["STM32F407ZGT6"] }));
   });
 
@@ -456,9 +899,14 @@ describe("CompatibilityWorkbench (the Bench)", () => {
     render(<CompatibilityWorkbench />, { wrapper: wrapperWith(freshClient()) });
     await pickScope();
 
-    const rail = await screen.findByTestId("target-continuity-rail");
-    expect(within(rail).getByRole("button", { name: "Position 23: Direct" })).toBeInTheDocument();
-    expect(screen.getByText("Build Ready")).toBeInTheDocument();
+    const map = await screen.findByTestId("target-package-map");
+    expect(
+      within(map).getByRole("button", {
+        name: "Position 23: Selected Socket Roles · 2 Modes · 66.7% Agreement",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Build This")).toBeInTheDocument();
+    expect(screen.getByText("Software Selected")).toBeInTheDocument();
     expect(screen.queryByTestId("switch-plan")).toBeNull();
   });
 
@@ -473,7 +921,7 @@ describe("CompatibilityWorkbench (the Bench)", () => {
     await waitFor(() =>
       expect(unionSpy).toHaveBeenCalledWith({ parts: ["STM32F429ZET6", "STM32F746ZGT6"] }),
     );
-    expect(await screen.findByText("Custom")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Target Set" })).toHaveValue("custom");
   });
 
   it("a chip click opens that part's full pinout table modal", async () => {
@@ -520,7 +968,7 @@ describe("CompatibilityWorkbench (the Bench)", () => {
     expect(within(modal).getByText("VDD")).toBeInTheDocument();
   });
 
-  it("exports the compiled generic target definition", async () => {
+  it("exports the selected digest-bound handoff from the compact export menu", async () => {
     mockScope();
     const createUrl = vi.fn(() => "blob:x");
     const revokeUrl = vi.fn();
@@ -529,12 +977,34 @@ describe("CompatibilityWorkbench (the Bench)", () => {
 
     render(<CompatibilityWorkbench />, { wrapper: wrapperWith(freshClient()) });
     await pickScope();
-    await screen.findByTestId("target-continuity-rail");
+    await screen.findByTestId("target-package-map-svg");
 
-    fireEvent.click(screen.getByRole("button", { name: "Export Definition" }));
+    fireEvent.click(screen.getByText("Export"));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Physical Positions/ }));
     expect(createUrl).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
+  });
+
+  it("finds an exact target, selects its compact cohort, and applies its map state", async () => {
+    mockScope();
+    render(<CompatibilityWorkbench />, { wrapper: wrapperWith(freshClient()) });
+    await pickScope();
+    const map = await screen.findByTestId("target-package-map");
+
+    fireEvent.change(screen.getByLabelText("Find Target Profile"), {
+      target: { value: "STM32F746ZGT6" },
+    });
+    expect(screen.queryByText("Profile 1")).toBeNull();
+    const cohortLabel = screen.getByText("Profile 2");
+    fireEvent.click(cohortLabel.closest("button")!);
+
+    expect(screen.getByRole("button", { name: "Clear Active Configuration" })).toBeInTheDocument();
+    expect(
+      within(map).getByRole("button", {
+        name: /Position 23:.*ETH TXD3 For Profile 2/,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("renders the reused Build the Index state when the scope 409s", async () => {

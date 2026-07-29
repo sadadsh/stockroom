@@ -12,6 +12,35 @@ def test_list_all_parts(client):
     assert names == {"TPS62130", "MYSTERY"}
 
 
+def test_list_summary_keeps_passport_cad_coverage_and_trust_separate(client):
+    parts = {
+        part["id"]: part
+        for part in client.get("/api/library/parts").json()["parts"]
+    }
+    tps = parts["tps62130"]
+
+    # The fixture passport is complete and every KiCad representation is present, but its bare
+    # references carry no recorded checks. Presence is observable; trust is not fabricated.
+    assert tps["is_complete"] is True
+    assert tps["missing"] == []
+    assert tps["eda_readiness"]["kicad"] == {
+        "required": ["symbol", "footprint", "model"],
+        "missing": [],
+        "coverage_complete": True,
+        "trust": "unknown",
+        "ready": False,
+    }
+    # The non-default tool comes from the same registry-keyed contract rather than a frontend
+    # branch that assumes two hardcoded requirements.
+    assert tps["eda_readiness"]["altium"] == {
+        "required": ["symbol", "footprint", "model"],
+        "missing": ["symbol", "footprint", "model"],
+        "coverage_complete": False,
+        "trust": "unknown",
+        "ready": False,
+    }
+
+
 def test_search_filters_by_query(client):
     r = client.get("/api/library/parts", params={"q": "tps"})
     assert r.status_code == 200
@@ -73,6 +102,19 @@ def test_delete_part_removes_it(client):
     assert client.get("/api/library/parts").json()["count"] == 1
 
 
+def test_delete_part_has_an_exact_recoverable_undo(client):
+    assert client.delete("/api/library/parts/mystery").status_code == 204
+
+    restored = client.post("/api/library/parts/mystery/undo-delete")
+
+    assert restored.status_code == 200
+    assert restored.json()["id"] == "mystery"
+    assert client.get("/api/library/parts/mystery").status_code == 200
+    assert client.get("/api/library/parts").json()["count"] == 2
+    # Once restored, the same action cannot revert an unrelated historical commit.
+    assert client.post("/api/library/parts/mystery/undo-delete").status_code == 400
+
+
 def test_edit_unknown_part_is_404(client):
     r = client.patch("/api/library/parts/nope", json={"field": "mpn", "value": "X"})
     assert r.status_code == 404
@@ -129,23 +171,28 @@ def test_set_specs_rejects_a_malformed_specs_body(client):
 # -- BOM match: paste a BOM, see what the library already has --------------------
 
 
-def test_attach_footprint_endpoint_files_it_under_kicad_and_nowhere_else(client):
-    r = client.post("/api/library/parts/mystery/footprint",
-                    json={"lib": "Package_SO", "name": "SOIC-8"})
-    assert r.status_code == 200
-    eda = r.json()["assets"]
-    assert eda["kicad"]["footprint"]["ref"] == {"lib": "Package_SO", "name": "SOIC-8", "file": ""}
-    # A reference can no longer carry a `tool` tag that disagrees with the slot it sits in,
-    # so "which tool got this" is answered by the slot: nothing was filed for Altium.
-    assert "altium" not in eda
-    # persisted through the index rebuild
-    detail = client.get("/api/library/parts/mystery").json()
-    assert detail["assets"]["kicad"]["footprint"]["ref"]["name"] == "SOIC-8"
-
-
-def test_attach_symbol_endpoint_requires_a_name(client):
-    r = client.post("/api/library/parts/mystery/symbol", json={"lib": "Device"})
+def test_reference_only_footprint_attachment_is_not_a_public_activation_lane(client):
+    before = client.get("/api/library/parts/mystery").json()
+    r = client.post(
+        "/api/library/parts/mystery/footprint",
+        json={"lib": "Package_SO", "name": "SOIC-8"},
+    )
     assert r.status_code == 422
+    assert "single-tool footprint attachment is disabled" in r.json()["detail"]
+    assert "KiCad, Altium, and STEP" in r.json()["detail"]
+    assert client.get("/api/library/parts/mystery").json() == before
+
+
+def test_reference_only_symbol_attachment_is_not_a_public_activation_lane(client):
+    before = client.get("/api/library/parts/mystery").json()
+    r = client.post(
+        "/api/library/parts/mystery/symbol",
+        json={"lib": "Device", "name": "R"},
+    )
+    assert r.status_code == 422
+    assert "single-tool symbol attachment is disabled" in r.json()["detail"]
+    assert "activate atomically" in r.json()["detail"]
+    assert client.get("/api/library/parts/mystery").json() == before
 
 
 def test_detach_asset_removes_one_element_and_400s_when_absent(client):

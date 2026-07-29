@@ -37,7 +37,6 @@ def fake_webview(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 def test_main_window_declares_a_minimum_size(fake_webview, monkeypatch, tmp_path):
     from stockroom.host import window as W
 
-    monkeypatch.setattr(W, "_install_capture_logfile", lambda: None, raising=False)
     monkeypatch.setattr(
         "stockroom.store.machine_config.config_dir", lambda: tmp_path, raising=False
     )
@@ -47,7 +46,9 @@ def test_main_window_declares_a_minimum_size(fake_webview, monkeypatch, tmp_path
     assert fake_webview.create_window.called, "the main window was never created"
     kwargs = fake_webview.create_window.call_args.kwargs
     min_size = kwargs.get("min_size")
-    assert min_size is not None, "the main window passes no min_size, so it can be dragged to a width that garbles the sheet"
+    assert min_size is not None, (
+        "the main window passes no min_size, so it can be dragged to a width that garbles the sheet"
+    )
     width, height = min_size
     # 884px viewport was measured CLEAN and 744px measured BROKEN, so the floor must sit above the
     # broken width. Asserting a range rather than an exact pair keeps this a behaviour test.

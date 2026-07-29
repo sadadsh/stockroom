@@ -4,11 +4,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
 import {
   useActivateProfile,
+  useAssignProjectGroup,
   useDeletePart,
   useEditField,
   useDoSync,
   useRefreshSourcing,
+  useRestoreDeletedPart,
+  useResumeWorkSession,
   useSetSpecs,
+  useValidateProjectReview,
 } from "./queries";
 import { api } from "./client";
 import type { PartDetail } from "./types";
@@ -91,6 +95,92 @@ describe("profile + sync invalidation", () => {
   });
 });
 
+describe("project review validation", () => {
+  it("refreshes only the selected project's exact-commit evidence after a native run", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    vi.spyOn(api, "validateProjectReview").mockResolvedValue({
+      schema_version: 1,
+      adapter: "altium",
+      status: "passed",
+      runtime: { name: "Altium Designer", version: "AD26" },
+      checks: [],
+      summary: { checked: 0, errors: 0, warnings: 0 },
+      detail: "Native checks passed.",
+    });
+    const candidate = {
+      branch: "work/mina/power",
+      commit: "b".repeat(40),
+      base_branch: "main",
+      base_commit: "a".repeat(40),
+    };
+
+    const { result } = renderHook(() => useValidateProjectReview("amp"), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.mutate(candidate);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(api.validateProjectReview).toHaveBeenCalledWith("amp", candidate);
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ["project-review-evidence", "amp"],
+    });
+  });
+});
+
+describe("project work recovery", () => {
+  it("replaces collaboration state with the safely resumed session", async () => {
+    const qc = new QueryClient();
+    const state = {
+      repository: null,
+      session: null,
+      recovery: null,
+    };
+    vi.spyOn(api, "resumeWorkSession").mockResolvedValue(state);
+
+    const { result } = renderHook(() => useResumeWorkSession("amp"), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.mutate("session-a");
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(api.resumeWorkSession).toHaveBeenCalledWith("amp", "session-a");
+    expect(qc.getQueryData(["project-collaboration", "amp"])).toEqual(state);
+  });
+});
+
+describe("project BOM assignment", () => {
+  it("refreshes both unresolved groups and the live BOM after one decision", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    vi.spyOn(api, "assignProjectGroup").mockResolvedValue({
+      project: "Amp",
+      refs: ["R1", "R2"],
+      part_id: "r10k",
+      bound: 2,
+      committed: null,
+    });
+
+    const { result } = renderHook(() => useAssignProjectGroup("amp"), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.mutate({ refs: ["R1", "R2"], partId: "r10k" });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(api.assignProjectGroup).toHaveBeenCalledWith(
+      "amp",
+      ["R1", "R2"],
+      "r10k",
+    );
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ["project-assignments", "amp"],
+    });
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ["project-bom-live", "amp"],
+    });
+  });
+});
+
 describe("sourcing refresh (the per-part procurement refresh job)", () => {
   // The refresh is a write-lane job: the record commits server-side and the SSE stream's
   // terminal result carries the updated record. Lock that finishing the job invalidates
@@ -166,6 +256,22 @@ describe("duplicates invalidation (M6e)", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(invalidatedKeys(spy)).toContain("duplicates");
+  });
+
+  it("restoring a deletion refreshes every derived library surface", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    vi.spyOn(api, "restoreDeletedPart").mockResolvedValue(PART_DETAIL);
+
+    const { result } = renderHook(() => useRestoreDeletedPart(), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.mutate("lm358");
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(invalidatedKeys(spy)).toEqual(
+      expect.arrayContaining(["parts", "facets", "duplicates", "part", "part-history"]),
+    );
   });
 
   // Editing an MPN can change which parts share it, so an edit must refresh the

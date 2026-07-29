@@ -10,14 +10,22 @@ from __future__ import annotations
 
 import math
 import time
+from collections.abc import Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 from threading import Event, Lock, Thread, current_thread
 
 from stockroom.workflow import (
+    BatchCancellationRecord,
+    BatchRecord,
     DispatchRecord,
+    IntakeIdentity,
+    ItemRecord,
+    ItemStatus,
     StageHandlerError,
+    StageRecord,
+    WorkflowEvent,
     WorkflowRuntime,
     WorkflowStore,
 )
@@ -307,6 +315,110 @@ class WorkflowCoordinator:
                 last_error_code=self._last_error_code,
                 thread_alive=thread is not None and thread.is_alive(),
             )
+
+    def get_batch(self, batch_id: str) -> BatchRecord:
+        """Read one durable batch through the active service authority."""
+
+        self._require_api_authority()
+        return self._store.get_batch(batch_id)
+
+    def submit_batch(
+        self,
+        identities: Sequence[IntakeIdentity],
+        *,
+        idempotency_key: str | None = None,
+    ) -> BatchRecord:
+        """Persist one intake batch only while this coordinator owns authority.
+
+        The store owns atomicity and request idempotency.  Keeping submission
+        behind the same live-generation check as workflow reads and controls
+        prevents an API process from enqueueing work through a stale owner.
+        """
+
+        self._require_api_authority()
+        return self._store.submit_batch(
+            identities,
+            idempotency_key=idempotency_key,
+        )
+
+    def list_items(self, batch_id: str) -> list[ItemRecord]:
+        """Read batch items; callers must project away raw identity and payload."""
+
+        self._require_api_authority()
+        return self._store.list_items(batch_id)
+
+    def item_status_counts(self, batch_id: str) -> dict[ItemStatus, int]:
+        self._require_api_authority()
+        return self._store.item_status_counts(batch_id)
+
+    def list_stages(self, item_id: str) -> list[StageRecord]:
+        """Read item stages; callers must not expose results, errors, or leases."""
+
+        self._require_api_authority()
+        return self._store.list_stages(item_id)
+
+    def events(
+        self,
+        batch_id: str,
+        *,
+        after_sequence: int = 0,
+        limit: int = 10_000,
+    ) -> list[WorkflowEvent]:
+        """Replay durable events through the active service authority."""
+
+        self._require_api_authority()
+        return self._store.events(
+            batch_id,
+            after_sequence=after_sequence,
+            limit=limit,
+        )
+
+    def latest_event_sequence(self, batch_id: str) -> int:
+        self._require_api_authority()
+        return self._store.latest_event_sequence(batch_id)
+
+    def get_batch_cancellation(
+        self,
+        batch_id: str,
+    ) -> BatchCancellationRecord | None:
+        self._require_api_authority()
+        return self._store.get_batch_cancellation(batch_id)
+
+    def pause_batch(self, batch_id: str) -> BatchRecord:
+        self._require_api_authority()
+        return self._store.pause_batch(batch_id)
+
+    def resume_batch(self, batch_id: str) -> BatchRecord:
+        self._require_api_authority()
+        return self._store.resume_batch(batch_id)
+
+    def retry_batch(self, batch_id: str) -> BatchRecord:
+        self._require_api_authority()
+        return self._store.retry_batch(batch_id)
+
+    def cancel_batch(self, batch_id: str) -> BatchRecord:
+        self._require_api_authority()
+        return self._store.cancel_batch(batch_id)
+
+    def _require_api_authority(self) -> None:
+        """Reject reads and controls from a stopped or stale coordinator."""
+
+        with self._lock:
+            state = self._state
+            thread = self._thread
+        if state is not WorkflowCoordinatorState.RUNNING or thread is None or not thread.is_alive():
+            raise WorkflowCoordinatorLifecycleError(
+                "workflow coordinator is not accepting API requests"
+            )
+        try:
+            self._require_active_fence()
+        except CoordinatorConflict as exc:
+            # API callers understand coordinator availability failures, not
+            # service-control internals.  Preserve the original conflict as
+            # the cause while mapping the public seam to the established 503.
+            raise WorkflowCoordinatorLifecycleError(
+                "workflow coordinator generation fence is stale"
+            ) from exc
 
     def _supervise(self) -> None:
         terminal_state = WorkflowCoordinatorState.STOPPED

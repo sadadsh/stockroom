@@ -44,7 +44,7 @@ vi.mock("../api/cadVariantClient", async (importActual) => {
     ...actual,
     cadVariantApi: {
       inventory: vi.fn(),
-      activate: vi.fn(),
+      activatePair: vi.fn(),
     },
   };
 });
@@ -92,11 +92,13 @@ beforeEach(() => {
   mockCadVariantApi.inventory.mockResolvedValue({
     partId: "lm358",
     inventories: [],
+    pairs: [],
     supplementary: [],
   });
-  mockCadVariantApi.activate.mockResolvedValue({
+  mockCadVariantApi.activatePair.mockResolvedValue({
     partId: "lm358",
     inventories: [],
+    pairs: [],
     supplementary: [],
   });
 });
@@ -137,6 +139,15 @@ const BASE = {
 };
 
 describe("DetailPanel files previews (M6d)", () => {
+  it("puts the 3D canvas on the theme-aware stage instead of painting a local backdrop", () => {
+    const { container } = wrap(<DetailPanel detail={detail()} {...BASE} />);
+    const stage = container.querySelector('[data-dev-id="detail.asset-stage"]') as HTMLElement;
+
+    expect(stage).toHaveClass("bg-stage");
+    expect(stage.style.background).toBe("");
+    expect(stage.style.backgroundColor).toBe("");
+  });
+
   it("opens the preview modal on the clicked kind when a Files card is clicked", async () => {
     mockApi.previewSvg.mockResolvedValue(new Blob(["<svg/>"], { type: "image/svg+xml" }));
     wrap(<DetailPanel detail={detail()} {...BASE} />);
@@ -331,47 +342,47 @@ describe("DetailPanel pinout (M6i)", () => {
   });
 });
 
-describe("DetailPanel attach-after affordance", () => {
-  it("adds a missing symbol by lib + name through the one Complete Part window", async () => {
-    const onAttachSymbol = vi.fn();
+describe("DetailPanel network-only completion affordance", () => {
+  it("never exposes manual symbol or footprint reference controls", async () => {
     wrap(
       <DetailPanel
         detail={detail({ assets: { kicad: { symbol: null, footprint: FP, model: MODEL } } })}
         {...BASE}
-        onAttachSymbol={onAttachSymbol}
-        onAttachFootprint={vi.fn()}
+        onEditField={vi.fn()}
       />,
     );
-    // readiness is tucked in a popover: open it, then the one Complete Part action opens the window
+    // Readiness opens the one completion workflow. CAD must be collected from the network; the
+    // former Library + Name + Attach reference form cannot survive as a fallback.
     await userEvent.click(screen.getByRole("button", { name: /CAD/ }));
     await userEvent.click(screen.getByRole("button", { name: /Complete Part/ }));
     const dialog = await screen.findByRole("dialog", { name: /complete this part/i });
-    await userEvent.click(within(dialog).getByRole("button", { name: "Add Symbol" }));
-    // Library is pre-filled "Device" for a symbol; enter the device name and attach
-    await userEvent.type(within(dialog).getByLabelText("Name"), "R");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Attach" }));
 
-    expect(onAttachSymbol).toHaveBeenCalledWith("Device", "R");
+    expect(within(dialog).getByRole("button", { name: "Collect All Sources" })).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Library")).toBeNull();
+    expect(within(dialog).queryByLabelText("Name")).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "Attach" })).toBeNull();
   });
 
-  it("disables the attach action until a footprint lib + name are entered", async () => {
+  it("keeps metadata editing available while CAD stays network-only", async () => {
+    const onEditField = vi.fn();
     wrap(
       <DetailPanel
         detail={detail({ assets: { kicad: { symbol: SYM, footprint: null, model: MODEL } } })}
         {...BASE}
-        onAttachSymbol={vi.fn()}
-        onAttachFootprint={vi.fn()}
+        onEditField={onEditField}
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: /CAD/ }));
     await userEvent.click(screen.getByRole("button", { name: /Complete Part/ }));
     const dialog = await screen.findByRole("dialog", { name: /complete this part/i });
-    await userEvent.click(within(dialog).getByRole("button", { name: "Add Footprint" }));
-    // both fields empty -> Attach disabled
-    expect(within(dialog).getByRole("button", { name: "Attach" })).toBeDisabled();
-    await userEvent.type(within(dialog).getByLabelText("Library"), "Resistor_SMD");
-    await userEvent.type(within(dialog).getByLabelText("Name"), "R_0603_1608Metric");
-    expect(within(dialog).getByRole("button", { name: "Attach" })).toBeEnabled();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Add Datasheet" }));
+    await userEvent.type(within(dialog).getByLabelText("URL"), "https://example.test/lm358.pdf");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(onEditField).toHaveBeenCalledWith(
+      "datasheet",
+      "https://example.test/lm358.pdf",
+    );
   });
 
   it("offers no Complete Part affordance in a read-only panel (no handlers)", () => {
@@ -387,7 +398,7 @@ describe("DetailPanel attach-after affordance", () => {
     // detail() is fully KiCad-complete (symbol + footprint + model) with NO altium_* refs, so the
     // Altium gap comes straight off the record (assetReadiness reads altium_symbol/altium_footprint,
     // not the cad-source query) and the trigger names it.
-    wrap(<DetailPanel detail={detail()} {...BASE} onAttachSymbol={vi.fn()} />);
+    wrap(<DetailPanel detail={detail()} {...BASE} onEditField={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: /CAD/ }));
     const trigger = await screen.findByRole("button", { name: /Complete Part/ });
     expect(trigger).toHaveTextContent("Altium Symbol");
@@ -407,7 +418,7 @@ describe("DetailPanel attach-after affordance", () => {
         },
       },
     });
-    wrap(<DetailPanel detail={complete} {...BASE} onAttachSymbol={vi.fn()} />);
+    wrap(<DetailPanel detail={complete} {...BASE} onEditField={vi.fn()} />);
     expect(screen.getByText("Complete")).toBeInTheDocument();
     expect(screen.queryByText("Incomplete")).not.toBeInTheDocument();
   });
@@ -553,6 +564,21 @@ describe("DetailPanel dev-mode ids (IDSYS-01)", () => {
     // both derived ids are real catalog entries, not invented strings
     expect(DEV_ID_BY_ID.has("detail.tabs")).toBe(true);
     expect(DEV_ID_BY_ID.has("detail.tab-specs")).toBe(true);
+  });
+
+  it("uses the specimen column across both stacked rows while each long pane remains scrollable", () => {
+    const { container } = wrap(<DetailPanel detail={detail()} {...BASE} />);
+    const canvas = container.querySelector('[data-dev-id="detail.canvas"]') as HTMLElement;
+    const specimen = canvas.parentElement as HTMLElement;
+    const specsList = container.querySelector('[data-dev-id="detail.specs-list"]') as HTMLElement;
+    const specsPane = specsList.parentElement as HTMLElement;
+    const workbench = container.querySelector("#workbench-panel-specs") as HTMLElement;
+
+    expect(workbench).toHaveClass("content-start", "overflow-y-auto");
+    expect(workbench.className).toContain("@4xl:overflow-hidden");
+    expect(specimen.className).toContain("@xl:row-span-2");
+    expect(specimen).toHaveClass("overflow-y-auto");
+    expect(specsPane).toHaveClass("overflow-y-auto");
   });
 });
 
@@ -1000,6 +1026,33 @@ describe("DetailPanel spec row pairing", () => {
 });
 
 describe("DetailPanel key specifications", () => {
+  it("fills the unused second cell when an odd key-spec count reaches the two-column grid", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({
+          derived: {
+            category: "Resistors",
+            specs: {
+              Resistance: "10 kOhm",
+              Tolerance: "1%",
+              Power: "0.1 W",
+              "Voltage Rating": "50 V",
+              "Temperature Coefficient": "100 ppm/K",
+            },
+          },
+        })}
+        {...BASE}
+      />,
+    );
+
+    const key = screen.getByRole("region", { name: "Key Specifications" });
+    const filler = [...key.querySelectorAll('div[aria-hidden="true"]')].find((element) =>
+      element.className.includes("@sm:block"),
+    );
+    expect(filler).toBeDefined();
+    expect(filler?.className).toContain("bg-surface");
+  });
+
   it("promotes key rows once instead of duplicating them in the full specification list", () => {
     wrap(
       <DetailPanel
@@ -1325,11 +1378,10 @@ describe("a spec group's count", () => {
 describe("the Complete-Part needs line respects the part's class (cold-eyes finding 3)", () => {
   async function needsText(over: Partial<PartDetail> = {}) {
     // `canComplete` gates the whole "Add X to make this part usable" sentence
-    // (`!!(onEditField || onAttachSymbol || onAttachFootprint)`), so at least one write callback
-    // must be present or the sentence never renders and every assertion below passes vacuously
-    // regardless of what missingAssets/needsList computed - which is exactly what happened on
-    // the first version of this test, caught before it was trusted.
-    wrap(<DetailPanel detail={detail(over)} {...BASE} onAttachSymbol={vi.fn()} />);
+    // (`!!onEditField`), so the metadata write callback must be present or the sentence never
+    // renders and every assertion below passes vacuously regardless of what
+    // missingAssets/needsList computed.
+    wrap(<DetailPanel detail={detail(over)} {...BASE} onEditField={vi.fn()} />);
     await userEvent.click(await screen.findByRole("button", { name: /CAD/ }));
     return document.body.textContent ?? "";
   }

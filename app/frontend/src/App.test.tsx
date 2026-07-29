@@ -37,6 +37,7 @@ const SUMMARY: PartSummary = {
   manufacturer: "Texas Instruments",
   is_complete: true,
   missing: [],
+  eda_readiness: {},
 };
 
 const DETAIL: PartDetail = makePartDetail({

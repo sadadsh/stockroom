@@ -109,6 +109,15 @@ def test_two_different_repos_are_not_serialized_against_each_other(tmp_path):
     assert a._write_lock() is not b._write_lock()
 
 
+def test_root_and_in_repo_library_handles_share_the_same_lock(tmp_path):
+    root = GitRepo(tmp_path / "embedded")
+    root.init()
+    libraries = root.root / "libraries"
+    libraries.mkdir()
+
+    assert GitRepo(libraries)._write_lock() is root._write_lock()
+
+
 def test_a_transaction_holds_the_lock_for_its_WHOLE_window_not_just_its_commit(tmp_path):
     """Locking only `GitRepo.commit` stops two commits colliding and still lets two transactions
     interleave their file WRITES - one staging a file the other had half-rewritten, or rolling

@@ -6,13 +6,13 @@ needs immediately. The complete-to-add gate lives in add_part, unchanged."""
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request
 from sse_starlette.sse import EventSourceResponse
 
+from stockroom.api.errors import ApiError
 from stockroom.api.jobs import to_sse
 from stockroom.enrich.distributor_url import vendor_from_url
 from stockroom.ingest.pipeline import IngestPipeline
@@ -125,116 +125,69 @@ def dto_to_candidate(d: dict) -> StagingCandidate:
     )
 
 
-def _attach_local_datasheet(ctx, candidate: StagingCandidate, path: Path, notes: list[str]) -> None:
-    """Copy a user-picked PDF under the app's datasheet store and attach it to the
-    candidate. Refusals are stated in notes, never silent: a non-PDF or unreadable
-    file leaves the candidate untouched. The stored name carries a content hash so
-    two staged parts with the same normalized identity never clobber each other."""
-    import hashlib
-
-    from stockroom.enrich.datasheet import looks_like_pdf
-    from stockroom.enrich.schema import normalize_mpn
-
-    try:
-        with open(path, "rb") as fh:
-            head = fh.read(5)
-    except OSError:
-        notes.append(f"Could not read the datasheet file: {path.name}")
-        return
-    if not looks_like_pdf(head):
-        notes.append(f"{path.name} is not a PDF, so it was not attached")
-        return
-    digest = hashlib.sha256()
-    with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 16), b""):
-            digest.update(chunk)
-    dest_dir = Path(ctx.enrich_cache_dir) / "datasheets"
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    key = normalize_mpn(
-        candidate.mpn or candidate.entry_name or candidate.display_name or path.stem
+def _has_local_files(candidate: StagingCandidate) -> bool:
+    return (
+        candidate.symbol_lib_path is not None
+        or bool(candidate.symbol_name)
+        or bool(candidate.footprint_variants)
+        or candidate.model_path is not None
+        or candidate.datasheet_path is not None
     )
-    dst = dest_dir / f"{key}-{digest.hexdigest()[:8]}.pdf"
-    shutil.copyfile(path, dst)
-    candidate.datasheet_path = dst
 
 
 def ingest_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api", dependencies=[Depends(require_token)])
 
     @r.post("/ingest/inspect")
-    def inspect(request: Request, body: dict) -> dict:
-        ctx = request.app.state.ctx
-        paths = [Path(p) for p in body.get("paths", [])]
-        lcsc_ids = list(body.get("lcsc_ids", []))
-
-        def work(progress):
-            progress({"pct": 5, "message": "unpacking"})
-            pipeline = _make_pipeline(ctx)
-            candidates = pipeline.inspect(inputs=paths, lcsc_ids=lcsc_ids)
-            progress({"pct": 90, "message": "staged"})
-            return [candidate_to_dto(c) for c in candidates]
-
-        return {"job_id": ctx.jobs.submit(work)}
+    def inspect(_request: Request, _body: dict) -> dict:
+        raise ApiError(
+            422,
+            (
+                "local ZIP and LCSC/EasyEDA CAD ingest are disabled; add an exact "
+                "part identity, then use network capture for one coherent KiCad, "
+                "Altium, and STEP evidence set"
+            ),
+        )
 
     @r.post("/ingest/commit")
     def commit(request: Request, body: dict) -> dict:
         ctx = request.app.state.ctx
         pipeline = _make_pipeline(ctx)
         candidate = dto_to_candidate(body)
+        if _has_local_files(candidate):
+            raise ApiError(
+                422,
+                (
+                    "local files cannot be added through ingest; add the identity first, "
+                    "then use network capture for one coherent KiCad, Altium, and STEP set"
+                ),
+            )
         record = pipeline.commit(candidate)  # IncompleteError -> 422 via the handler
         ctx.rebuild_index()
         ctx.auto_push()  # adding a part auto-pushes it to git so collaborators get it on next launch
         return record.to_dict()
 
     @r.post("/parts/{part_id}/assets/inspect")
-    def inspect_assets_for_part(request: Request, part_id: str, body: dict) -> dict:
-        """Unpack a downloaded CAD ZIP for an EXISTING part (the owner's DigiKey-CAD
-        flow, spec section 5). Same read-lane job + candidate DTO as /ingest/inspect;
-        the only difference is the caller already knows the target part_id, so this
-        checks it exists up front instead of discovering it only at commit time.
-        Deliberately does NOT call pipeline.cleanup() here (same as /ingest/inspect):
-        a candidate's symbol/footprint/model paths point INTO the pipeline's owned
-        tempdir and a fresh pipeline instance handles the follow-up commit call, so
-        cleaning up here would delete the very files that commit still needs."""
-        ctx = request.app.state.ctx
-        if ctx.index.get(part_id) is None:
-            raise FileNotFoundError(f"no such part: {part_id}")
-        paths = [Path(p) for p in (body.get("paths") or [])]
-
-        def work(progress):
-            progress({"pct": 5, "message": "unpacking"})
-            pipeline = _make_pipeline(ctx)
-            cands = pipeline.inspect(inputs=paths)
-            progress({"pct": 90, "message": "staged"})
-            return [candidate_to_dto(c) for c in cands]
-
-        return {"job_id": ctx.jobs.submit(work)}  # read lane (no git)
+    def inspect_assets_for_part(_request: Request, part_id: str, _body: dict) -> dict:
+        del part_id
+        raise ApiError(
+            422,
+            (
+                "local CAD files cannot be inspected for activation; use network "
+                "capture so KiCad, Altium, and STEP share one evidence set"
+            ),
+        )
 
     @r.post("/parts/{part_id}/assets/commit")
-    def commit_assets_for_part(request: Request, part_id: str, body: dict) -> dict:
-        """Attach the reviewed candidate's symbol/footprint/3D onto the existing part,
-        synchronously (one atomic Transaction whose added-or-rejected result the caller
-        needs immediately, same reasoning as /ingest/commit)."""
-        ctx = request.app.state.ctx
-        if ctx.index.get(part_id) is None:
-            raise FileNotFoundError(f"no such part: {part_id}")
-        pipeline = _make_pipeline(ctx)
-        candidate = dto_to_candidate(body)
-        # WHERE these files came from. The guided flow knows which vendor page the person actually
-        # downloaded from; the server supplies the clock, because a provenance timestamp a client
-        # can set is not evidence.
-        from datetime import datetime, timezone
-
-        from stockroom.api.routers.library import _origin_from
-
-        record = pipeline.attach_assets(
-            part_id, candidate,
-            origin=_origin_from(body),
-            now_iso=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    def commit_assets_for_part(_request: Request, part_id: str, _body: dict) -> dict:
+        del part_id
+        raise ApiError(
+            422,
+            (
+                "single-tool CAD attachment is disabled; use network capture so "
+                "KiCad, Altium, and STEP activate atomically from one evidence set"
+            ),
         )
-        ctx.rebuild_index()
-        ctx.auto_push()  # attaching assets changes the part, so push it like any other mutation
-        return record.to_dict()
 
     @r.get("/jobs/{job_id}/events")
     def job_events(request: Request, job_id: str) -> EventSourceResponse:

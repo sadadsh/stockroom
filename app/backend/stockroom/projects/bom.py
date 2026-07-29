@@ -387,7 +387,7 @@ def _bom_from_components(comps, lookup=None,
                         if not g.get(f) and res.get(f):
                             g[f] = res[f]
 
-    rows = []
+    rows: list[dict] = []
     for g in groups.values():
         refs = sorted(g["refs"], key=_natural_ref)
         rows.append({"refs": refs, "qty": len(refs), "value": g["value"],
@@ -425,12 +425,12 @@ def _bom_from_components(comps, lookup=None,
 # complete and priced FROM YOUR OWN LIBRARY, offline, before ever touching a distributor.
 
 
-def library_match_index(library_parts):
+def library_match_index(library_parts, tool="kicad"):
     """The fill match index (by symbol name + MPN) from the active profile's PartRecords, so a
     schematic component can be matched to its library part for the BOM."""
     from stockroom.projects import fill
 
-    return fill.library_match_records(list(library_parts or ()))
+    return fill.library_match_records(list(library_parts or ()), tool=tool)
 
 
 def library_enrich(comps, match_index):
@@ -1231,7 +1231,8 @@ def _bom_state(line_count: int, priced: bool, summary: dict) -> str:
 
 
 def project_bom(root, pro_path, sheet_paths, name="", boards=1, tax_rate=0.0,
-                price_lookup=None, progress=None, library_parts=None, bindings=None) -> dict:
+                price_lookup=None, progress=None, library_parts=None, bindings=None,
+                tool="kicad") -> dict:
     """Build a grouped, optionally priced BOM for a registered project (M7c), combining the KiCad
     schematic with the Stockroom library (M7c library-combining).
 
@@ -1254,7 +1255,7 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1, tax_rate=0.0,
 
     _p(40, "Grouping components")
     parts = list(library_parts or ())
-    match_index = library_match_index(parts) if parts else None
+    match_index = library_match_index(parts, tool=tool) if parts else None
     # Price from the library first (offline), then the enrich layer; None only if neither can price.
     combined = combined_price_lookup(parts, price_lookup) if parts else price_lookup
     priced = combined is not None

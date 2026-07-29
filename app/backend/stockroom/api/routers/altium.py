@@ -1,6 +1,4 @@
-"""Altium Database Library surface for the active profile: a status view over every part, a
-synchronous regenerate of the DbLib, and a per-part asset attach. The engine lives in
-LibraryOps (regenerate_altium_dblib / attach_altium_assets); this router is thin and guarded.
+"""Altium Database Library surface for the active profile.
 
 Everything is scoped to the ACTIVE profile via ctx.ops / ctx.profile, so switching profiles
 switches the DbLib this surface reflects."""
@@ -16,10 +14,9 @@ from stockroom.api.errors import ApiError
 from stockroom.ingest.component_naming import derive_display_value
 from stockroom.model.part import PartRecord, tool_place_ready
 
-# regenerate + attach both commit to the one git repo and write the shared .db/.DbLib, and
-# FastAPI runs these sync handlers in the threadpool, so two triggers (the Settings Regenerate,
-# the modal's attach-then-regenerate, two quick attaches) can overlap. Serialize every
-# library-mutating altium call so concurrent git commits can never collide on .git/index.lock.
+# Regenerate and model embedding both write the shared .db/.DbLib. FastAPI runs these sync
+# handlers in the threadpool, so two triggers can overlap. Serialize every library-mutating
+# Altium call so concurrent git commits never collide on .git/index.lock.
 _WRITE_LOCK = threading.Lock()
 
 
@@ -184,17 +181,20 @@ def altium_router(require_token) -> APIRouter:
         return {"pending": pending, "count": len(pending)}
 
     @r.post("/parts/{part_id}/attach")
-    def attach(request: Request, part_id: str, body: dict) -> dict:
-        ctx = request.app.state.ctx
-        if ctx.index.get(part_id) is None:
-            raise FileNotFoundError(f"no such part: {part_id}")
-        sources = [Path(p) for p in body.get("paths", [])]
-        if not sources:
-            raise ApiError(422, "attach needs a .SchLib and .PcbLib pair, or a single .IntLib")
-        with _WRITE_LOCK:
-            record = ctx.ops.attach_altium_assets(part_id, *sources)  # ValueError -> 400 on bad source
-            ctx.rebuild_index()
-            ctx.auto_push()
-        return record.to_dict()
+    def attach(_request: Request, part_id: str, _body: dict) -> dict:
+        """Reject the retired local, single-tool activation lane.
+
+        Keep the route as an explicit fail-closed compatibility boundary so an older frontend
+        cannot silently mutate only Altium while the application updates around it.
+        """
+
+        del part_id
+        raise ApiError(
+            422,
+            (
+                "local Altium file attachment is disabled; use network collection so KiCad, "
+                "Altium, and STEP activate atomically from one verified evidence set"
+            ),
+        )
 
     return r

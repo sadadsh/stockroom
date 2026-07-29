@@ -30,14 +30,7 @@ from urllib.request import Request, urlopen
 
 FIXTURES = Path(__file__).resolve().parents[1] / "host" / "fixtures"
 READABLE_STEP = Path(__file__).parent / "fixtures" / "readable_geometry.step"
-_NATIVE_DOWNLOADS = {
-    "/downloads/native-kicad.zip": ("native-kicad.zip", b"native-kicad"),
-    "/downloads/native-altium.zip": ("native-altium.zip", b"native-altium"),
-    "/downloads/native-step.step": (
-        "native-step.step",
-        b"ISO-10303-21;\nEND-ISO-10303-21;",
-    ),
-}
+ALTIUM_FIXTURES = Path(__file__).resolve().parents[1] / "altium" / "fixtures"
 
 # Stands in for the vendor's own submit script (see the module docstring). Enables the disabled
 # submit link once any export is selected, and posts the form when it is clicked.
@@ -92,6 +85,36 @@ _FOOTPRINT = """(footprint "RVZ0014A" (version 20211014) (generator stockroom_te
 )
 """
 
+_NATIVE_SYMBOL_LIB = """(kicad_symbol_lib
+  (version 20240101)
+  (generator stockroom-test)
+  (symbol "S1M"
+    (property "Reference" "D" (at 0 0 0))
+    (property "Value" "S1M" (at 0 0 0))
+    (property "Footprint" "Test:D_SMA" (at 0 0 0))
+    (property "Manufacturer" "ON Semiconductor" (at 0 0 0))
+    (property "Manufacturer Part Number" "S1M" (at 0 0 0))
+    (symbol "S1M_0_1"
+      (pin passive line (at -5 0 0) (length 2.54)
+        (name "K" (effects (font (size 1 1))))
+        (number "1" (effects (font (size 1 1)))))
+      (pin passive line (at 5 0 180) (length 2.54)
+        (name "A" (effects (font (size 1 1))))
+        (number "2" (effects (font (size 1 1))))))))
+"""
+
+_NATIVE_FOOTPRINT = """(footprint "D_SMA"
+  (version 20240108)
+  (generator stockroom-test)
+  (layer "F.Cu")
+  (pad "1" smd rect (at -2.14 0) (size 2.33 1.56) (layers "F.Cu"))
+  (pad "2" smd rect (at 2.14 0) (size 2.33 1.56) (layers "F.Cu"))
+  (model "D_SMA.step"
+    (offset (xyz 0 0 0))
+    (scale (xyz 1 1 1))
+    (rotate (xyz 0 0 0))))
+"""
+
 # A P-CAD ASCII library shaped like the real one: ACCEL_ASCII header, one symbolDef (the schematic
 # symbol) and one patternDef (the PCB footprint), so ONE file satisfies BOTH Altium requirements.
 # This is what the captured legacy Ultra Librarian PCAD row delivers.
@@ -126,6 +149,48 @@ def _kicad_only_zip() -> bytes:
         zf.writestr("footprints.pretty/RVZ0014A.kicad_mod", _FOOTPRINT)
         zf.writestr("RVZ0014A.stp", READABLE_STEP.read_bytes())
     return buffer.getvalue()
+
+
+def _native_kicad_zip() -> bytes:
+    """The KiCad sibling for the same S1M definition carried by the Altium fixtures."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zf:
+        zf.writestr("S1M.kicad_sym", _NATIVE_SYMBOL_LIB)
+        zf.writestr("footprints.pretty/D_SMA.kicad_mod", _NATIVE_FOOTPRINT)
+        zf.writestr("D_SMA.step", READABLE_STEP.read_bytes())
+    return buffer.getvalue()
+
+
+def _native_altium_zip() -> bytes:
+    """A native UL sibling archive with real readable Altium libraries."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zf:
+        zf.writestr(
+            "Altium Designer (Native)/S1M.LibPkg",
+            b"native package descriptor",
+        )
+        zf.writestr(
+            "Altium Designer (Native)/S1M.SchLib",
+            (ALTIUM_FIXTURES / "sample.SchLib").read_bytes(),
+        )
+        zf.writestr(
+            "Altium Designer (Native)/S1M.PcbLib",
+            (ALTIUM_FIXTURES / "sample.PcbLib").read_bytes(),
+        )
+    return buffer.getvalue()
+
+
+_NATIVE_DOWNLOADS = {
+    # The native UL page delivers sibling downloads in one export action. The KiCad archive must
+    # itself contain the exact symbol, footprint, and STEP candidate because production inspects
+    # each sibling atomically before binding the complete sibling set into one evidence manifest.
+    "/downloads/native-kicad.zip": ("native-kicad.zip", _native_kicad_zip()),
+    "/downloads/native-altium.zip": ("native-altium.zip", _native_altium_zip()),
+    "/downloads/native-step.step": (
+        "native-step.step",
+        READABLE_STEP.read_bytes(),
+    ),
+}
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):

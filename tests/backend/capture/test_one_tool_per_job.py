@@ -165,6 +165,10 @@ _TOOLS = {
     "shotcrop.py": "Crop a screenshot to a region.",
     "uishot.py": "THE app screenshotter: boots the REAL app headlessly, both themes.",
     "verify_derive.py": "Verify the derive engine reproduces records byte-identically.",
+    "verify_3d_rotation_corpus.py": (
+        "Compare Stockroom's production 3D placement transform with native KiCad geometry "
+        "across the immutable historical footprint/model corpus."
+    ),
     "webread.py": "THE page reader: render a page and report its text / controls / links.",
     "windesk.py": "Real Windows pointer + desktop capture (what CDP cannot do).",
     "windrive.py": "THE app driver on Windows: one CDP connection, click/shot/text.",

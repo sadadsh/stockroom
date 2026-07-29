@@ -44,13 +44,13 @@ package only for a genuinely new domain.
 | `mutation/` | The atomic write engine: `Transaction` (one scoped git commit or full rollback), plus the library/project mutation ops. The ONLY committer. |
 | `sexp/` | Layer 0: the byte-preserving s-expression editor. The ONLY thing that edits `.kicad_*` files (scoped span-splices, never a re-serialize). |
 | `kicad/` | KiCad domain logic: symbols, footprints, boards, netlists, the CLI wrapper. |
-| `ingest/` | Turning a dropped ZIP / vendor bundle into a staged, complete-to-add candidate. |
+| `ingest/` | Turning verified provider/download evidence into staged, complete-to-add candidates. |
 | `enrich/` | Filling a part's data from distributor APIs + scraped pages (the pipeline, per-field sourcing, passives). |
 | `scrape/` | Fetching + extracting distributor/vendor pages (`extract/sites/` is one module per site). |
 | `projects/` | Project-level analysis: BOM, fill, checks, buildability. |
 | `altium/` | The Altium DbLib emitter + status. |
-| `capture/` | The guided cross-EDA asset-capture flow (requirements + session). |
-| `host/` | The WebView2 window + launcher + the Windows capture driver. The ONLY place `pywebview` may be imported. |
+| `capture/` | The API-owned provider browser, task-bound download broker, evidence, requirements, and acquisition orchestration. |
+| `host/` | The WebView2 app shell, lifecycle, rendered-DOM bridge, and diagnostics. The ONLY place `pywebview` may be imported. |
 | `vcs/` | Git: the repo wrapper, GitHub auth. |
 | `verify/` | Self-check / doctor helpers. |
 

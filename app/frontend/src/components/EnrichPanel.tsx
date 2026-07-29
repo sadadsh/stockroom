@@ -74,11 +74,13 @@ export function EnrichPanel({
   const running = enrich.status === "running";
 
   return (
-    <div>
-      <Eyebrow className="mb-2.5 mt-6">Enrich</Eyebrow>
-      <Card className="px-4 py-3.5">
+    <section className="mx-auto w-full max-w-[980px]">
+      <Eyebrow className="mb-2 flex h-6 items-center text-xs font-semibold text-t1">
+        Source Lookup
+      </Eyebrow>
+      <Card className="px-3 py-2.5">
         <div className="flex items-center gap-3">
-          <span className="text-sm text-t2">
+          <span className="text-xs text-t2">
             Look up this part's manufacturer, description, and datasheet from its part number.
           </span>
           <Button
@@ -95,7 +97,7 @@ export function EnrichPanel({
         {running ? <EnrichStages progress={enrich.progress} className="mt-3.5" /> : null}
 
         {enrich.status === "error" ? (
-          <div className="mt-3 text-sm text-err">
+          <div className="mt-3 text-xs text-err">
             Lookup failed. {enrich.error ?? "Unknown error."}
           </div>
         ) : null}
@@ -124,13 +126,13 @@ export function EnrichPanel({
               <AlsoFound result={result} />
             </div>
           ) : (
-            <div className="mt-3 text-sm text-t3">
+            <div className="mt-3 text-xs text-t3">
               No new data found for this part number.
             </div>
           )
         ) : null}
       </Card>
-    </div>
+    </section>
   );
 }
 
@@ -154,8 +156,8 @@ function CandidateRow({
       <span className="w-[116px] flex-none text-xs text-t3">{label}</span>
       {sourced ? (
         <>
-          <span className="min-w-0 flex-1 break-words text-base text-t1">{value}</span>
-          <Badge tone={confidenceTone(sourced.confidence)}>
+          <span className="min-w-0 flex-1 break-words text-xs text-t1">{value}</span>
+          <Badge tone={confidenceTone(sourced.confidence)} size="sm">
             {sourced.source} · {sourced.confidence}
           </Badge>
           {already ? (
@@ -167,7 +169,7 @@ function CandidateRow({
           )}
         </>
       ) : (
-        <span className="flex-1 text-sm text-t3">Not Found</span>
+        <span className="flex-1 text-xs text-t3">Not Found</span>
       )}
     </div>
   );
@@ -188,10 +190,10 @@ function PinoutRow({
   return (
     <div className="flex items-center gap-3 border-b border-line py-2 last:border-b-0">
       <span className="w-[116px] flex-none text-xs text-t3">Pinout</span>
-      <span className="min-w-0 flex-1 break-words text-base text-t1">
+      <span className="min-w-0 flex-1 break-words text-xs text-t1">
         {count} {count === 1 ? "pin" : "pins"}
       </span>
-      <Badge tone={confidenceTone(sourced.confidence)}>
+      <Badge tone={confidenceTone(sourced.confidence)} size="sm">
         {sourced.source} · {sourced.confidence}
       </Badge>
       {already ? (

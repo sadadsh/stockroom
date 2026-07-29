@@ -1,8 +1,8 @@
 /**
  * Altium Database Library, a Settings section. Shows the one git-synced library Altium reads for
- * the ACTIVE profile: how many parts are place-ready, the install path, and a Regenerate action;
- * a View Library button opens the full data table with per-part attach. The DbLib is a projection
- * of this profile's records, so switching profiles switches what this reflects.
+ * the ACTIVE profile: how many parts are place-ready, the automatically managed path, and an
+ * explicit recovery rebuild. A View Library button opens the read-only mapping table. The DbLib
+ * is a projection of this profile's records, so switching profiles switches what this reflects.
  *
  * Placement: Settings, the natural sibling of Procurement Rescan and Library Health, which host
  * the other library-wide maintenance surfaces in this same status + action shape.
@@ -60,89 +60,91 @@ export function AltiumDbLibSection() {
 
   return (
     <>
-        {status.isLoading ? (
-          <p className="py-1 text-sm text-t3">Reading the library...</p>
-        ) : status.isError ? (
-          <p className="py-1 text-sm text-err">Could not read the Altium library.</p>
-        ) : data ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-baseline justify-between gap-4">
-              <div className="flex items-baseline gap-2">
-                <span className="tnum font-mono text-title font-bold leading-none text-t1">
-                  {data.ready}
-                </span>
-                <span className="text-sm text-t3">
-                  of <span className="tnum font-mono text-t2">{data.total}</span> parts ready to
-                  place
-                </span>
-              </div>
-              <span className="text-xs text-t3">
-                Profile <span className="text-t2">{data.profile}</span>
+      {status.isLoading ? (
+        <p className="py-1 text-sm text-t3">Reading the library...</p>
+      ) : status.isError ? (
+        <p className="py-1 text-sm text-err">Could not read the Altium library.</p>
+      ) : data ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between gap-4">
+            <div className="flex items-baseline gap-2">
+              <span className="tnum font-mono text-title font-bold leading-none text-t1">
+                {data.ready}
+              </span>
+              <span className="text-sm text-t3">
+                of <span className="tnum font-mono text-t2">{data.total}</span> parts ready to place
               </span>
             </div>
-
-            <div className="h-1.5 w-full overflow-hidden bg-raise2" data-dev-id="altiumdb.section-progress">
-              <div
-                className="h-full bg-acc transition-[width]"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-3 border-t border-line pt-2.5" data-dev-id="altiumdb.section-path">
-              <span className="min-w-0 truncate font-mono text-xs text-t3" title={data.dblib}>
-                {data.dblib}
-              </span>
-              <Button small onClick={onCopyPath} className="flex-none">
-                Copy Path
-              </Button>
-            </div>
-            <p className="text-xs text-t3">
-              <Text id="altiumdb.section-install-note">
-                Install it into Altium once as an Installed library, not in the project folder.
-              </Text>
-            </p>
-            {!data.datasource_present ? (
-              // The data source is derived and is not shared through git, so a clone that has
-              // never been opened here has none. Saying so beats letting Altium fail with an ODBC
-              // error against a file nobody mentioned.
-              <p className="text-xs text-warn" data-testid="altium-datasource-missing">
-                The data source this library reads has not been built on this machine yet.
-                Regenerate to build it.
-              </p>
-            ) : null}
+            <span className="text-xs text-t3">
+              Profile <span className="text-t2">{data.profile}</span>
+            </span>
           </div>
-        ) : null}
 
-        <OdbcDriverRow />
+          <div
+            className="h-1.5 w-full overflow-hidden bg-raise2"
+            data-dev-id="altiumdb.section-progress"
+          >
+            <div className="h-full bg-acc transition-[width]" style={{ width: `${pct}%` }} />
+          </div>
 
-        <div className="mt-3.5 flex flex-wrap items-center gap-3" data-dev-id="altiumdb.section-actions">
-          <Button
-            variant="accent"
-            onClick={onRegenerate}
-            disabled={regenerate.isPending || !data}
-            icon={<RefreshIcon className="h-3.5 w-3.5" />}
+          <div
+            className="flex items-center justify-between gap-3 border-t border-line pt-2.5"
+            data-dev-id="altiumdb.section-path"
           >
-            {regenerate.isPending ? "Regenerating..." : "Regenerate DbLib"}
-          </Button>
-          <EmbedAllModelsButton />
-          <Button
-            onClick={() => setOpen(true)}
-            disabled={!data}
-            icon={<LibraryIcon className="h-3.5 w-3.5" />}
-          >
-            View Library
-          </Button>
-          <Button
-            onClick={() => setSetupOpen(true)}
-            icon={<ExternalIcon className="h-3.5 w-3.5" />}
-          >
-            <Text id="altiumdb.section-setup">Setup Guide</Text>
-          </Button>
+            <span className="min-w-0 truncate font-mono text-xs text-t3" title={data.dblib}>
+              {data.dblib}
+            </span>
+            <Button small onClick={onCopyPath} className="flex-none">
+              Copy Path
+            </Button>
+          </div>
+          <p className="text-xs text-t3">
+            <Text id="altiumdb.section-install-note">
+              Stockroom builds, installs, and verifies this DbLib automatically for the active
+              profile. Copy the path only for diagnostics.
+            </Text>
+          </p>
+          {!data.datasource_present ? (
+            // The data source is derived and is not shared through git, so a clone that has
+            // never been opened here has none. Saying so beats letting Altium fail with an ODBC
+            // error against a file nobody mentioned.
+            <p className="text-xs text-warn" data-testid="altium-datasource-missing">
+              Automatic setup has not built this machine-local data source yet. Rebuild it now;
+              Stockroom will retry installation and verification in the background.
+            </p>
+          ) : null}
         </div>
+      ) : null}
+
+      <OdbcDriverRow />
+
+      <div
+        className="mt-3.5 flex flex-wrap items-center gap-3"
+        data-dev-id="altiumdb.section-actions"
+      >
+        <Button
+          variant="accent"
+          onClick={onRegenerate}
+          disabled={regenerate.isPending || !data}
+          icon={<RefreshIcon className="h-3.5 w-3.5" />}
+        >
+          {regenerate.isPending ? "Rebuilding..." : "Rebuild DbLib"}
+        </Button>
+        <EmbedAllModelsButton />
+        <Button
+          onClick={() => setOpen(true)}
+          disabled={!data}
+          icon={<LibraryIcon className="h-3.5 w-3.5" />}
+        >
+          View Library
+        </Button>
+        <Button onClick={() => setSetupOpen(true)} icon={<ExternalIcon className="h-3.5 w-3.5" />}>
+          <Text id="altiumdb.section-setup">Setup Guide</Text>
+        </Button>
+      </div>
 
       <AltiumDbLibModal open={open} onClose={() => setOpen(false)} />
       <AltiumSetupModal open={setupOpen} onClose={() => setSetupOpen(false)} />
-
     </>
   );
 }
@@ -165,11 +167,12 @@ function EmbedAllModelsButton() {
   if (count === 0) return null;
 
   const cap = capability.data;
-  const blocked = cap && !cap.available
-    ? cap.busy
-      ? `Close Altium first: ${cap.busy} is holding the license seat.`
-      : cap.reason || "Altium is not installed on this machine."
-    : "";
+  const blocked =
+    cap && !cap.available
+      ? cap.busy
+        ? `Close Altium first: ${cap.busy} is holding the license seat.`
+        : cap.reason || "Altium is not installed on this machine."
+      : "";
   const running = embed.status === "running";
 
   async function onEmbed() {
@@ -202,9 +205,7 @@ function EmbedAllModelsButton() {
       data-dev-id="altiumdb.embed-all"
       icon={<Icon id="layer.model" className="h-3.5 w-3.5" />}
     >
-      {running
-        ? embed.progress?.message || "Embedding..."
-        : `Embed 3D Models (${count})`}
+      {running ? embed.progress?.message || "Embedding..." : `Embed 3D Models (${count})`}
     </Button>
   );
 }

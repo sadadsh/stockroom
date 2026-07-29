@@ -1769,6 +1769,22 @@ class WorkflowStore:
             ).fetchall()
             return [self._item_from_row(row) for row in rows]
 
+    def item_status_counts(self, batch_id: str) -> dict[ItemStatus, int]:
+        """Return one bounded aggregate query for a batch's UI projection."""
+
+        with self._reading() as connection:
+            self._require_batch_row(connection, batch_id)
+            rows = connection.execute(
+                """
+                SELECT status, COUNT(*) AS count
+                FROM items
+                WHERE batch_id = ?
+                GROUP BY status
+                """,
+                (batch_id,),
+            ).fetchall()
+            return {ItemStatus(row["status"]): int(row["count"]) for row in rows}
+
     def get_item(self, item_id: str) -> ItemRecord:
         with self._reading() as connection:
             row = connection.execute(
@@ -4387,6 +4403,101 @@ class WorkflowStore:
             )
             return self._batch_from_row(self._require_batch_row(connection, batch_id))
 
+    def retry_batch(
+        self,
+        batch_id: str,
+        *,
+        now: float | None = None,
+    ) -> BatchRecord:
+        """Requeue only terminally failed stages in a failed batch.
+
+        Completed stages are immutable evidence and are never replayed.  The
+        transition is state-idempotent: once the failed stages have been made
+        ready, repeating the request returns the current nonterminal batch
+        without adding events or changing timestamps.
+        """
+
+        timestamp = self._timestamp(now)
+        with self._serialized_writing() as connection:
+            row = self._require_batch_row(connection, batch_id)
+            status = BatchStatus(row["status"])
+            if status in {
+                BatchStatus.QUEUED,
+                BatchStatus.RUNNING,
+                BatchStatus.BLOCKED,
+            }:
+                return self._batch_from_row(row)
+            if status is BatchStatus.COMPLETED:
+                raise WorkflowConflict("cannot retry a completed batch")
+            if status is BatchStatus.CANCELLED:
+                raise WorkflowConflict("cannot retry a cancelled batch")
+            if status is BatchStatus.PAUSED:
+                raise WorkflowConflict("resume a paused batch before retrying it")
+            if connection.execute(
+                """
+                SELECT 1 FROM batch_cancellations
+                WHERE batch_id = ? AND state = ?
+                """,
+                (batch_id, BatchCancellationState.REQUESTED.value),
+            ).fetchone():
+                raise WorkflowConflict("cannot retry a cancelling batch")
+
+            failed = connection.execute(
+                f"""
+                {_STAGE_SELECT}
+                WHERE s.status = ?
+                  AND s.item_id IN (
+                      SELECT id FROM items WHERE batch_id = ?
+                  )
+                ORDER BY s.item_id, s.ordinal
+                """,
+                (StageStatus.FAILED.value, batch_id),
+            ).fetchall()
+            if not failed:
+                raise WorkflowDataCorruption("failed batch has no failed stage to retry")
+
+            for stage in failed:
+                updated = connection.execute(
+                    """
+                    UPDATE stages
+                    SET status = ?, next_attempt_at = NULL,
+                        lease_owner = NULL, lease_expires_at = NULL,
+                        lease_token = NULL, updated_at = ?
+                    WHERE id = ? AND status = ?
+                    """,
+                    (
+                        StageStatus.READY.value,
+                        timestamp,
+                        stage["id"],
+                        StageStatus.FAILED.value,
+                    ),
+                )
+                if updated.rowcount != 1:
+                    raise WorkflowConflict("failed stage changed before retry")
+                self._emit(
+                    connection,
+                    batch_id=batch_id,
+                    item_id=stage["item_id"],
+                    stage_id=stage["id"],
+                    kind="stage_retry_ready",
+                    now=timestamp,
+                    payload={"attempts_completed": stage["attempt_count"]},
+                )
+
+            self._refresh_items_and_batches(
+                connection,
+                {stage["item_id"] for stage in failed},
+                timestamp,
+            )
+            self._emit(
+                connection,
+                batch_id=batch_id,
+                kind="batch_retry_requested",
+                now=timestamp,
+                payload={"failed_stage_count": len(failed)},
+            )
+            return self._batch_from_row(self._require_batch_row(connection, batch_id))
+
     def cancel_batch(
         self,
         batch_id: str,
@@ -4641,6 +4752,17 @@ class WorkflowStore:
                 )
                 for row in rows
             ]
+
+    def latest_event_sequence(self, batch_id: str) -> int:
+        """Return the batch's latest durable cursor without loading its journal."""
+
+        with self._reading() as connection:
+            self._require_batch_row(connection, batch_id)
+            row = connection.execute(
+                "SELECT COALESCE(MAX(sequence), 0) AS sequence FROM events WHERE batch_id = ?",
+                (batch_id,),
+            ).fetchone()
+            return int(row["sequence"])
 
     def list_publication_receipts(
         self,

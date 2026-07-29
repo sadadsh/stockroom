@@ -26,9 +26,7 @@ def _make_project(dir_path, sheet_body=_UNANNOTATED):
     holding the given symbols, so register() discovers it and audit() reads it."""
     dir_path.mkdir(parents=True, exist_ok=True)
     (dir_path / "board.kicad_pro").write_text("{}", encoding="utf-8")
-    (dir_path / "board.kicad_sch").write_text(
-        "(kicad_sch\n" + sheet_body + ")\n", encoding="utf-8"
-    )
+    (dir_path / "board.kicad_sch").write_text("(kicad_sch\n" + sheet_body + ")\n", encoding="utf-8")
     return dir_path
 
 
@@ -114,6 +112,731 @@ def test_register_an_already_registered_root_is_a_400(client, tmp_path):
     assert r.status_code == 400
 
 
+def test_discover_previews_every_project_before_linking(client, tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    _make_project(root, sheet_body=_UNANNOTATED)
+    (root / "Amp.PrjPcb").write_text(
+        "[Design]\n[Document1]\nDocumentPath=Amp.SchDoc\n[Document2]\nDocumentPath=Amp.PcbDoc\n",
+        encoding="utf-8",
+    )
+    (root / "Amp.SchDoc").write_bytes(b"binary")
+    (root / "Amp.PcbDoc").write_bytes(b"binary")
+
+    response = client.post("/api/projects/discover", json={"candidate": root.as_posix()})
+    assert response.status_code == 200
+    rows = response.json()["projects"]
+    assert [(row["eda"], row["name"]) for row in rows] == [
+        ("kicad", "board"),
+        ("altium", "Amp"),
+    ]
+    assert rows[0]["schematics"] == ["board.kicad_sch"]
+    assert rows[1]["boards"] == ["Amp.PcbDoc"]
+
+
+def test_workspace_has_the_same_tools_and_document_shape_for_both_edas(client, tmp_path):
+    kicad = _register(client, _make_project(tmp_path / "kicad"))
+    altium_root = tmp_path / "altium"
+    altium_root.mkdir()
+    (altium_root / "Amp.PrjPcb").write_text(
+        "[Design]\n[Document1]\nDocumentPath=Amp.SchDoc\n",
+        encoding="utf-8",
+    )
+    (altium_root / "Amp.SchDoc").write_bytes(b"binary")
+    altium = _register(client, altium_root)
+
+    workspaces = [
+        client.get(f"/api/projects/{project['id']}/workspace").json() for project in (kicad, altium)
+    ]
+    assert (
+        workspaces[0]["tools"]
+        == workspaces[1]["tools"]
+        == [
+            "design",
+            "bom",
+            "assemble",
+            "changes",
+            "releases",
+        ]
+    )
+    assert [document["kind"] for document in workspaces[0]["documents"]] == [
+        "project",
+        "schematic",
+    ]
+    assert [document["kind"] for document in workspaces[1]["documents"]] == [
+        "project",
+        "schematic",
+    ]
+    assert {workspace["runtime"]["adapter_key"] for workspace in workspaces} == {
+        "kicad",
+        "altium",
+    }
+
+
+def test_live_bom_has_the_same_evidenced_shape_for_both_edas(client, tmp_path):
+    kicad = _register(
+        client,
+        _make_project(
+            tmp_path / "bom-kicad",
+            sheet_body=(
+                '  (symbol (lib_id "Amplifier_Operational:LM358")'
+                ' (property "Reference" "U1" (at 0 0 0))'
+                ' (property "Value" "LM358DR" (at 0 0 0))'
+                ' (property "MPN" "LM358DR" (at 0 0 0))'
+                ' (property "Manufacturer" "TI" (at 0 0 0))'
+                ' (property "Footprint" "Package_SO:SOIC-8" (at 0 0 0)))\n'
+            ),
+        ),
+    )
+    altium = _register(client, _make_altium_api_project(tmp_path / "bom-altium"))
+
+    payloads = [
+        client.get(f"/api/projects/{project['id']}/bom/live?boards=3").json()
+        for project in (kicad, altium)
+    ]
+    for payload, eda in zip(payloads, ("kicad", "altium"), strict=True):
+        assert payload["boards"] == 3
+        assert payload["line_count"] == 1
+        assert payload["component_count"] == 1
+        assert payload["lines"][0]["mpn"] == "LM358DR"
+        assert payload["lines"][0]["final_qty"] == 3
+        assert payload["evidence"]["eda"] == eda
+        assert payload["evidence"]["variant"] == "Default"
+        assert len(payload["evidence"]["bom_digest"]) == 64
+        assert payload["evidence"]["source_documents"]
+
+
+def test_live_bom_export_is_the_same_one_click_csv_workflow_for_both_edas(
+    client, tmp_path
+):
+    kicad = _register(
+        client,
+        _make_project(
+            tmp_path / "export-kicad",
+            sheet_body=(
+                '  (symbol (lib_id "Amplifier_Operational:LM358")'
+                ' (property "Reference" "U1" (at 0 0 0))'
+                ' (property "Value" "LM358DR" (at 0 0 0))'
+                ' (property "MPN" "LM358DR" (at 0 0 0))'
+                ' (property "Manufacturer" "TI" (at 0 0 0))'
+                ' (property "Footprint" "Package_SO:SOIC-8" (at 0 0 0)))\n'
+            ),
+        ),
+    )
+    altium = _register(
+        client,
+        _make_altium_api_project(tmp_path / "export-altium"),
+    )
+
+    exports = [
+        client.get(
+            f"/api/projects/{project['id']}/bom/live/export",
+            params={"boards": 3, "kind": "csv"},
+        )
+        for project in (kicad, altium)
+    ]
+    assert all(response.status_code == 200 for response in exports)
+    assert all(
+        response.headers["content-type"].startswith("text/csv")
+        for response in exports
+    )
+    assert all(
+        "attachment" in response.headers["content-disposition"]
+        for response in exports
+    )
+    headers = [response.text.splitlines()[0] for response in exports]
+    assert headers[0] == headers[1]
+    assert all("LM358DR" in response.text for response in exports)
+
+
+def test_assembly_routes_use_the_same_project_service_contract(client, app_ctx, tmp_path):
+    project = _register(client, _make_project(tmp_path / "assembly"))
+    calls = []
+
+    class Store:
+        def start(self, rec, *, operator, boards, library_parts):
+            assert isinstance(library_parts, list)
+            calls.append(("start", rec.id, operator, boards))
+            return {"id": "run-a", "project_id": rec.id}
+
+        def active(self, project_id):
+            calls.append(("active", project_id))
+            return {"id": "run-a", "project_id": project_id}
+
+        def get(self, project_id, run_id):
+            calls.append(("get", project_id, run_id))
+            return {"id": run_id, "project_id": project_id}
+
+        def record_event(
+            self,
+            project_id,
+            run_id,
+            *,
+            placement_id,
+            state,
+            scanned_mpn,
+            note,
+        ):
+            calls.append(
+                (
+                    "event",
+                    project_id,
+                    run_id,
+                    placement_id,
+                    state,
+                    scanned_mpn,
+                    note,
+                )
+            )
+            return {"id": run_id, "project_id": project_id, "event_count": 1}
+
+        def complete(self, project_id, run_id):
+            calls.append(("complete", project_id, run_id))
+            return {"id": run_id, "project_id": project_id, "status": "completed"}
+
+    app_ctx.assembly_store = Store()
+    project_id = project["id"]
+    assert (
+        client.post(
+            f"/api/projects/{project_id}/assemblies",
+            json={"operator": "Sadad", "boards": 2},
+        ).json()["id"]
+        == "run-a"
+    )
+    assert client.get(f"/api/projects/{project_id}/assemblies/active").json()["id"] == "run-a"
+    assert client.get(f"/api/projects/{project_id}/assemblies/run-a").json()["id"] == "run-a"
+    assert (
+        client.post(
+            f"/api/projects/{project_id}/assemblies/run-a/events",
+            json={
+                "placement_id": "p1",
+                "state": "done",
+                "scanned_mpn": "ABC",
+                "note": "placed",
+            },
+        ).json()["event_count"]
+        == 1
+    )
+    assert (
+        client.post(f"/api/projects/{project_id}/assemblies/run-a/complete").json()["status"]
+        == "completed"
+    )
+    assert calls == [
+        ("start", project_id, "Sadad", 2),
+        ("active", project_id),
+        ("get", project_id, "run-a"),
+        ("event", project_id, "run-a", "p1", "done", "ABC", "placed"),
+        ("complete", project_id, "run-a"),
+    ]
+
+
+def test_work_session_routes_persist_start_and_share(
+    client, app_ctx, tmp_path, monkeypatch
+):
+    from dataclasses import replace
+
+    from stockroom.projects.collaboration import WorkSession
+    from stockroom.vcs.locks import DocumentLock
+
+    project_root, head = _make_git_project(tmp_path / "work-session", _UNANNOTATED)
+    project = _register(client, project_root)
+    calls = []
+
+    class Manager:
+        def __init__(self, repo, locks):
+            calls.append(("manager", repo.root.as_posix(), type(locks).__name__))
+
+        def start(self, *, owner, branch, documents):
+            calls.append(
+                (
+                    "start",
+                    owner,
+                    branch,
+                    tuple(path.name for path in documents),
+                )
+            )
+            return WorkSession(
+                id="session-a",
+                owner=owner,
+                branch=branch,
+                base_branch="main",
+                base_commit=head,
+                documents=("board.kicad_sch",),
+                locks=(
+                    DocumentLock(
+                        id="lock-a",
+                        path="board.kicad_sch",
+                        owner=owner,
+                    ),
+                ),
+                started_at="2026-07-28T12:00:00Z",
+            )
+
+        def share(self, session, *, message):
+            calls.append(("share", session.id, message))
+            return replace(session, shared_commit="b" * 40)
+
+    monkeypatch.setattr(
+        "stockroom.api.routers.projects.WorkSessionManager",
+        Manager,
+    )
+    project_id = project["id"]
+    started = client.post(
+        f"/api/projects/{project_id}/work-sessions",
+        json={
+            "owner": "Sadad",
+            "branch": "work/sadad/power",
+            "documents": ["board.kicad_sch"],
+        },
+    )
+    assert started.status_code == 200, started.text
+    assert started.json()["session"]["id"] == "session-a"
+    assert (
+        app_ctx.work_session_store.active(project_id).documents
+        == ("board.kicad_sch",)
+    )
+
+    shared = client.post(
+        f"/api/projects/{project_id}/work-sessions/session-a/share",
+        json={"message": "Update power stage"},
+    )
+    assert shared.status_code == 200, shared.text
+    assert shared.json()["session"]["shared_commit"] == "b" * 40
+    assert calls[-1] == ("share", "session-a", "Update power stage")
+
+
+def test_review_routes_discover_and_approve_the_exact_remote_commit(
+    client, tmp_path, monkeypatch
+):
+    from stockroom.projects.collaboration import (
+        ReviewCandidate,
+        ReviewEvent,
+        ReviewListing,
+    )
+
+    project_root, head = _make_git_project(tmp_path / "review", _UNANNOTATED)
+    project = _register(client, project_root)
+    review_commit = "b" * 40
+    calls = []
+
+    class Manager:
+        def __init__(self, repo):
+            calls.append(("manager", repo.root.as_posix()))
+
+        def list_candidates(self, *, base_branch):
+            calls.append(("list", base_branch))
+            return (
+                ReviewListing(
+                    branch="work/mina/power",
+                    commit=review_commit,
+                    base_branch=base_branch,
+                    base_commit=head,
+                    fork_commit=head,
+                    changed_paths=("board.kicad_sch",),
+                    commit_count=1,
+                    ready=True,
+                ),
+            )
+
+        def discover(self, *, branch, base_branch):
+            calls.append(("discover", branch, base_branch))
+            return ReviewCandidate(
+                branch=branch,
+                commit=review_commit,
+                base_branch=base_branch,
+                base_commit=head,
+                changed_paths=("board.kicad_sch",),
+            )
+
+        def approve_fast_forward(self, candidate):
+            calls.append(("approve", candidate.commit))
+            return candidate.commit
+
+        def request_changes(self, candidate, *, reviewer, message):
+            calls.append(("request", candidate.commit, reviewer, message))
+            return ReviewEvent(
+                id="event-1",
+                kind="changes_requested",
+                branch=candidate.branch,
+                commit=candidate.commit,
+                base_branch=candidate.base_branch,
+                base_commit=candidate.base_commit,
+                reviewer=reviewer,
+                message=message,
+                created_at="2026-07-28T12:30:00Z",
+            )
+
+    monkeypatch.setattr("stockroom.api.routers.projects.ReviewManager", Manager)
+    monkeypatch.setattr(
+        "stockroom.api.routers.projects.build_review_evidence",
+        lambda manager, rec, candidate: {
+            "schema_version": 1,
+            "project_id": rec.id,
+            "project_name": rec.name,
+            "eda": rec.eda,
+            "branch": candidate.branch,
+            "commit": candidate.commit,
+            "base_branch": candidate.base_branch,
+            "base_commit": candidate.base_commit,
+            "source_digest": "s" * 64,
+            "blockers": [],
+            "reviewable": True,
+            "native_validation": {
+                "status": "pending",
+                "detail": "Native checks are pending.",
+            },
+            "digest": "d" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        "stockroom.api.routers.projects.run_review_native_validation",
+        lambda manager, rec, candidate: {
+            "schema_version": 1,
+            "adapter": rec.eda,
+            "status": "passed",
+            "runtime": {"name": "KiCad", "version": "9.0.4"},
+            "checks": [],
+            "summary": {"checked": 0, "errors": 0, "warnings": 0},
+            "detail": "Native checks passed.",
+            "project_id": rec.id,
+            "branch": candidate.branch,
+            "commit": candidate.commit,
+            "base_branch": candidate.base_branch,
+            "base_commit": candidate.base_commit,
+            "source_digest": "s" * 64,
+            "digest": "v" * 64,
+        },
+    )
+    project_id = project["id"]
+
+    listed = client.get(f"/api/projects/{project_id}/reviews")
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["candidates"][0]["commit"] == review_commit
+    assert listed.json()["candidates"][0]["changed_paths"] == ["board.kicad_sch"]
+    assert listed.json()["candidates"][0]["events"] == []
+
+    requested = client.post(
+        f"/api/projects/{project_id}/reviews/request-changes",
+        json={
+            "branch": "work/mina/power",
+            "commit": review_commit,
+            "base_branch": "main",
+            "base_commit": head,
+            "reviewer": "Sadad",
+            "message": "Verify the power-stage clearance.",
+        },
+    )
+    assert requested.status_code == 200, requested.text
+    assert requested.json()["event"]["kind"] == "changes_requested"
+    assert requested.json()["event"]["commit"] == review_commit
+    assert calls[-2:] == [
+        ("discover", "work/mina/power", "main"),
+        (
+            "request",
+            review_commit,
+            "Sadad",
+            "Verify the power-stage clearance.",
+        ),
+    ]
+
+    validated = client.post(
+        f"/api/projects/{project_id}/reviews/validate",
+        json={
+            "branch": "work/mina/power",
+            "commit": review_commit,
+            "base_branch": "main",
+            "base_commit": head,
+        },
+    )
+    assert validated.status_code == 200, validated.text
+    assert validated.json()["status"] == "passed"
+
+    evidence = client.post(
+        f"/api/projects/{project_id}/reviews/evidence",
+        json={
+            "branch": "work/mina/power",
+            "commit": review_commit,
+            "base_branch": "main",
+            "base_commit": head,
+        },
+    )
+    assert evidence.status_code == 200, evidence.text
+    assert evidence.json()["reviewable"] is True
+    assert evidence.json()["native_validation"]["status"] == "passed"
+    assert len(evidence.json()["digest"]) == 64
+    assert calls[-1] == ("discover", "work/mina/power", "main")
+
+    approved = client.post(
+        f"/api/projects/{project_id}/reviews/approve",
+        json={
+            "branch": "work/mina/power",
+            "commit": review_commit,
+            "base_branch": "main",
+            "base_commit": head,
+        },
+    )
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["integrated_commit"] == review_commit
+    assert len(approved.json()["evidence_digest"]) == 64
+    assert calls[-2:] == [("discover", "work/mina/power", "main"), ("approve", review_commit)]
+
+
+def test_review_approval_refuses_an_exact_commit_with_evidence_blockers(
+    client,
+    tmp_path,
+    monkeypatch,
+):
+    from stockroom.projects.collaboration import ReviewCandidate
+
+    project_root, head = _make_git_project(tmp_path / "blocked-evidence", _UNANNOTATED)
+    project = _register(client, project_root)
+    review_commit = "b" * 40
+    approved = []
+
+    class Manager:
+        def __init__(self, repo):
+            pass
+
+        def discover(self, *, branch, base_branch):
+            return ReviewCandidate(
+                branch=branch,
+                commit=review_commit,
+                base_branch=base_branch,
+                base_commit=head,
+                changed_paths=("board.kicad_sch",),
+            )
+
+        def approve_fast_forward(self, candidate):
+            approved.append(candidate.commit)
+            return candidate.commit
+
+    monkeypatch.setattr("stockroom.api.routers.projects.ReviewManager", Manager)
+    monkeypatch.setattr(
+        "stockroom.api.routers.projects.build_review_evidence",
+        lambda manager, rec, candidate: {
+            "schema_version": 1,
+            "project_id": rec.id,
+            "project_name": rec.name,
+            "eda": rec.eda,
+            "branch": candidate.branch,
+            "commit": candidate.commit,
+            "base_branch": candidate.base_branch,
+            "base_commit": candidate.base_commit,
+            "source_digest": "s" * 64,
+            "blockers": [
+                {
+                    "kind": "missing_identity",
+                    "path": "board.kicad_sch",
+                    "detail": "R1 has no MPN.",
+                }
+            ],
+            "reviewable": False,
+            "native_validation": {
+                "status": "pending",
+                "detail": "Native checks are pending.",
+            },
+            "digest": "d" * 64,
+        },
+    )
+
+    response = client.post(
+        f"/api/projects/{project['id']}/reviews/approve",
+        json={
+            "branch": "work/mina/power",
+            "commit": review_commit,
+            "base_branch": "main",
+            "base_commit": head,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "review_evidence_blocked"
+    assert approved == []
+
+
+def test_review_listing_uses_the_active_sessions_base_branch(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from stockroom.projects.collaboration import WorkSession
+
+    project_root, head = _make_git_project(tmp_path / "session-reviews", _UNANNOTATED)
+    project = _register(client, project_root)
+    session = WorkSession(
+        id="session-a",
+        owner="Mina",
+        branch="work/mina/power",
+        base_branch="release",
+        base_commit=head,
+        documents=("board.kicad_sch",),
+        locks=(),
+        started_at="2026-07-28T12:00:00Z",
+        shared_commit="b" * 40,
+    )
+    app_ctx.work_session_store.save(project["id"], session)
+    seen = []
+
+    class Manager:
+        def __init__(self, repo):
+            pass
+
+        def list_candidates(self, *, base_branch):
+            seen.append(base_branch)
+            return ()
+
+    monkeypatch.setattr("stockroom.api.routers.projects.ReviewManager", Manager)
+    response = client.get(f"/api/projects/{project['id']}/reviews")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"base_branch": "release", "candidates": []}
+    assert seen == ["release"]
+
+
+def test_review_approval_refuses_a_commit_other_than_the_one_displayed(
+    client, tmp_path, monkeypatch
+):
+    from stockroom.projects.collaboration import ReviewCandidate
+
+    project_root, head = _make_git_project(tmp_path / "changed-review", _UNANNOTATED)
+    project = _register(client, project_root)
+
+    class Manager:
+        def __init__(self, repo):
+            pass
+
+        def discover(self, *, branch, base_branch):
+            return ReviewCandidate(
+                branch=branch,
+                commit="c" * 40,
+                base_branch=base_branch,
+                base_commit=head,
+                changed_paths=("board.kicad_sch",),
+            )
+
+    monkeypatch.setattr("stockroom.api.routers.projects.ReviewManager", Manager)
+    response = client.post(
+        f"/api/projects/{project['id']}/reviews/approve",
+        json={
+            "branch": "work/mina/power",
+            "commit": "b" * 40,
+            "base_branch": "main",
+            "base_commit": head,
+        },
+    )
+    assert response.status_code == 409
+    assert response.json()["code"] == "review_changed"
+
+
+def test_finish_work_session_releases_claims_only_after_integration(
+    client, app_ctx, tmp_path, monkeypatch
+):
+    from stockroom.projects.collaboration import WorkSession
+
+    project_root, head = _make_git_project(tmp_path / "finish-session", _UNANNOTATED)
+    project = _register(client, project_root)
+    session = WorkSession(
+        id="session-a",
+        owner="Sadad",
+        branch="work/sadad/power",
+        base_branch="main",
+        base_commit=head,
+        documents=("board.kicad_sch",),
+        locks=(),
+        started_at="2026-07-28T12:00:00Z",
+        shared_commit="b" * 40,
+    )
+    app_ctx.work_session_store.save(project["id"], session)
+    calls = []
+
+    class Manager:
+        def __init__(self, repo, locks):
+            calls.append(("manager", repo.root.as_posix(), type(locks).__name__))
+
+        def finish_after_remote_integration(self, current):
+            calls.append(("finish", current.id))
+            return "c" * 40
+
+    monkeypatch.setattr("stockroom.api.routers.projects.WorkSessionManager", Manager)
+    response = client.post(
+        f"/api/projects/{project['id']}/work-sessions/session-a/finish"
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["integrated_commit"] == "c" * 40
+    assert response.json()["collaboration"]["session"] is None
+    assert app_ctx.work_session_store.active(project["id"]) is None
+    assert calls[-1] == ("finish", "session-a")
+
+
+def test_resume_work_session_persists_recovered_claim_identities(
+    client, app_ctx, tmp_path, monkeypatch
+):
+    from dataclasses import replace
+
+    from stockroom.projects.collaboration import WorkSession
+    from stockroom.vcs.locks import DocumentLock
+    from stockroom.vcs.repo import GitRepo
+
+    project_root, head = _make_git_project(tmp_path / "resume-session", _UNANNOTATED)
+    project = _register(client, project_root)
+    session = WorkSession(
+        id="session-a",
+        owner="Sadad",
+        branch="work/sadad/power",
+        base_branch="main",
+        base_commit=head,
+        documents=("board.kicad_sch",),
+        locks=(DocumentLock("old-lock", "board.kicad_sch", "Sadad"),),
+        started_at="2026-07-28T12:00:00Z",
+    )
+    assert GitRepo(project_root)._run("branch", session.branch, head).returncode == 0
+    app_ctx.work_session_store.save(project["id"], session)
+    calls = []
+    recovered = client.get(f"/api/projects/{project['id']}/collaboration")
+    assert recovered.status_code == 200, recovered.text
+    assert recovered.json()["recovery"]["state"] == "resume_available"
+    assert recovered.json()["recovery"]["claims"]["unknown"] == ["board.kicad_sch"]
+
+    class Manager:
+        def __init__(self, repo, locks):
+            self.repo = repo
+            calls.append(("manager", repo.root.as_posix(), type(locks).__name__))
+
+        def resume(self, current):
+            calls.append(("resume", current.id))
+            assert self.repo._run("switch", current.branch).returncode == 0
+            return replace(
+                current,
+                locks=(DocumentLock("recovered-lock", "board.kicad_sch", "Sadad"),),
+            )
+
+    monkeypatch.setattr("stockroom.api.routers.projects.WorkSessionManager", Manager)
+    response = client.post(
+        f"/api/projects/{project['id']}/work-sessions/session-a/resume"
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["session"]["locks"][0]["id"] == "recovered-lock"
+    assert response.json()["recovery"]["state"] == "healthy"
+    assert response.json()["recovery"]["claims"]["held"] == ["board.kicad_sch"]
+    assert app_ctx.work_session_store.active(project["id"]).locks[0].id == "recovered-lock"
+    assert calls[-1] == ("resume", "session-a")
+
+
+def test_collaboration_status_explains_when_git_is_not_linked(client, tmp_path):
+    project = _register(client, _make_project(tmp_path / "local-only"))
+    response = client.get(f"/api/projects/{project['id']}/collaboration")
+    assert response.status_code == 200
+    assert response.json() == {
+        "repository": None,
+        "session": None,
+        "recovery": None,
+        "blocked_reason": "Link this project to a Git repository to collaborate.",
+    }
+
+
 # ---- get --------------------------------------------------------------------
 
 
@@ -148,6 +871,32 @@ def test_delete_an_unknown_project_is_a_404(client):
     assert client.delete("/api/projects/nope").status_code == 404
 
 
+def test_delete_preserves_a_project_with_an_active_work_session(
+    client, app_ctx, tmp_path
+):
+    from stockroom.projects.collaboration import WorkSession
+
+    rec = _register(client, _make_project(tmp_path / "claimed"))
+    app_ctx.work_session_store.save(
+        rec["id"],
+        WorkSession(
+            id="session-a",
+            owner="Sadad",
+            branch="work/sadad/board",
+            base_branch="main",
+            base_commit="a" * 40,
+            documents=("board.kicad_sch",),
+            locks=(),
+            started_at="2026-07-28T12:00:00Z",
+        ),
+    )
+
+    response = client.delete(f"/api/projects/{rec['id']}")
+    assert response.status_code == 409
+    assert response.json()["code"] == "session_active"
+    assert client.get(f"/api/projects/{rec['id']}").status_code == 200
+
+
 # ---- audit ------------------------------------------------------------------
 
 
@@ -172,12 +921,26 @@ def test_audit_an_unknown_project_is_a_404(client):
 
 # ---- buildability (M7g) -----------------------------------------------------
 
-_BUILD_CHECKS_OK = {"ran_at": "2026-07-14T00:00:00Z",
-                    "summary": {"ok": True, "errors": 0, "warnings": 0, "checked": 1}}
-_BUILD_BOM_OK = {"ran_at": "2026-07-14T00:00:00Z", "boards": 1, "priced": True,
-                 "lines": [{"mpn": "X", "qty": 1, "stock": 100, "unit_price": 0.1,
-                            "extended": 0.1, "lifecycle": "Active"}],
-                 "summary": {"unpriced_lines": 0}}
+_BUILD_CHECKS_OK = {
+    "ran_at": "2026-07-14T00:00:00Z",
+    "summary": {"ok": True, "errors": 0, "warnings": 0, "checked": 1},
+}
+_BUILD_BOM_OK = {
+    "ran_at": "2026-07-14T00:00:00Z",
+    "boards": 1,
+    "priced": True,
+    "lines": [
+        {
+            "mpn": "X",
+            "qty": 1,
+            "stock": 100,
+            "unit_price": 0.1,
+            "extended": 0.1,
+            "lifecycle": "Active",
+        }
+    ],
+    "summary": {"unpriced_lines": 0},
+}
 
 
 def test_buildability_cold_caches_are_honest_blockers(client, tmp_path):
@@ -275,16 +1038,29 @@ def test_run_checks_returns_a_job_and_caches_the_result(client, app_ctx, tmp_pat
     app_ctx.cli.binary = "/fake/kicad-cli"  # deterministic: never a real subprocess
 
     def fake_erc(path, cli):
-        return {"ok": True, "findings": [{"severity": "warning", "rule": "unconnected",
-                "message": "pin floating", "where": "U1"}],
-                "summary": checks_mod.summarize([{"severity": "warning", "rule": "unconnected"}]),
-                "error": ""}
+        return {
+            "ok": True,
+            "findings": [
+                {
+                    "severity": "warning",
+                    "rule": "unconnected",
+                    "message": "pin floating",
+                    "where": "U1",
+                }
+            ],
+            "summary": checks_mod.summarize([{"severity": "warning", "rule": "unconnected"}]),
+            "error": "",
+        }
 
     def fake_drc(path, cli):
-        return {"ok": True, "findings": [{"severity": "error", "rule": "clearance",
-                "message": "too close", "where": ""}],
-                "summary": checks_mod.summarize([{"severity": "error", "rule": "clearance"}]),
-                "error": ""}
+        return {
+            "ok": True,
+            "findings": [
+                {"severity": "error", "rule": "clearance", "message": "too close", "where": ""}
+            ],
+            "summary": checks_mod.summarize([{"severity": "error", "rule": "clearance"}]),
+            "error": "",
+        }
 
     monkeypatch.setattr(checks_mod, "run_erc", fake_erc)
     monkeypatch.setattr(checks_mod, "run_drc", fake_drc)
@@ -297,6 +1073,7 @@ def test_run_checks_returns_a_job_and_caches_the_result(client, app_ctx, tmp_pat
         for line in s.iter_lines():
             if line.startswith("data:") and '"result"' in line:
                 import json as _j
+
                 result = _j.loads(line[5:].strip())["result"]
     assert result is not None
     assert result["summary"] == {"ok": True, "errors": 1, "warnings": 1, "total": 2, "checked": 2}
@@ -368,9 +1145,7 @@ def _stream_job_result(client, job_id):
 
 
 def test_run_bom_prices_and_caches_the_result(client, app_ctx, tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline()
-    )
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline())
     proj = _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE)
     rec = _register(client, proj)
 
@@ -422,10 +1197,16 @@ def test_get_bom_for_an_unknown_project_is_a_404(client):
 def test_reprice_bom_recosts_the_cached_build_for_a_new_qty_and_tax(client, app_ctx, tmp_path):
     rec = _register(client, _make_project(tmp_path / "ext" / "board"))
     app_ctx.bom_cache[rec["id"]] = {
-        "project": rec["name"], "ran_at": "t", "boards": 1, "priced": True,
-        "line_count": 1, "component_count": 1,
+        "project": rec["name"],
+        "ran_at": "t",
+        "boards": 1,
+        "priced": True,
+        "line_count": 1,
+        "component_count": 1,
         "lines": [{"mpn": "X", "qty": 2, "price_breaks": [{"qty": 100, "price": 0.05}]}],
-        "summary": {"priced": True}, "by_source": None, "cost_at_qty": None,
+        "summary": {"priced": True},
+        "by_source": None,
+        "cost_at_qty": None,
     }
     body = client.post(
         f"/api/projects/{rec['id']}/bom/reprice", json={"boards": 10, "tax_rate": 8.25}
@@ -449,9 +1230,7 @@ def test_reprice_bom_for_an_unknown_project_is_a_404(client):
 
 
 def test_delete_evicts_the_cached_bom(client, app_ctx, tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline()
-    )
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline())
     proj = _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE)
     rec = _register(client, proj)
     _stream_job_result(client, client.post(f"/api/projects/{rec['id']}/bom").json()["job_id"])
@@ -460,12 +1239,12 @@ def test_delete_evicts_the_cached_bom(client, app_ctx, tmp_path, monkeypatch):
     assert rec["id"] not in app_ctx.bom_cache
 
 
-def test_bom_job_does_not_resurrect_cache_for_a_deleted_project(client, app_ctx, tmp_path, monkeypatch):
+def test_bom_job_does_not_resurrect_cache_for_a_deleted_project(
+    client, app_ctx, tmp_path, monkeypatch
+):
     # A DELETE landing while a BOM job runs evicts the cache; the job's write-back must
     # NOT re-insert a stale entry for the now-gone id (project ids are reusable slugs).
-    monkeypatch.setattr(
-        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline()
-    )
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline())
     proj = _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE)
     rec = _register(client, proj)
     real_bom = app_ctx.project_ops.bom
@@ -503,9 +1282,7 @@ class _ProcPipeline:
 
 
 def _build_bom(client, monkeypatch, tmp_path, pipeline_cls):
-    monkeypatch.setattr(
-        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: pipeline_cls()
-    )
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline", lambda ctx: pipeline_cls())
     rec = _register(client, _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE))
     _stream_job_result(client, client.post(f"/api/projects/{rec['id']}/bom").json()["job_id"])
     return rec
@@ -539,7 +1316,10 @@ def test_export_xlsx_kinds_are_valid_binary_workbooks(client, tmp_path, monkeypa
 
 def test_export_an_unknown_kind_is_a_400(client, tmp_path, monkeypatch):
     rec = _build_bom(client, monkeypatch, tmp_path, _FakePipeline)
-    assert client.get(f"/api/projects/{rec['id']}/bom/export", params={"kind": "pdf"}).status_code == 400
+    assert (
+        client.get(f"/api/projects/{rec['id']}/bom/export", params={"kind": "pdf"}).status_code
+        == 400
+    )
 
 
 def test_export_before_a_build_is_an_honest_400(client, tmp_path):
@@ -561,13 +1341,21 @@ def _make_git_project(dir_path, sheet_body):
     """A registered-able project dir that is its OWN git repo, with one commit."""
     dir_path.mkdir(parents=True, exist_ok=True)
     (dir_path / "board.kicad_pro").write_text("{}", encoding="utf-8")
-    (dir_path / "board.kicad_sch").write_text(
-        "(kicad_sch\n" + sheet_body + ")\n", encoding="utf-8")
-    for args in (["init", "-b", "main"], ["config", "user.email", "t@t"],
-                 ["config", "user.name", "t"], ["add", "."], ["commit", "-m", "rev A"]):
+    (dir_path / "board.kicad_sch").write_text("(kicad_sch\n" + sheet_body + ")\n", encoding="utf-8")
+    for args in (
+        ["init", "-b", "main"],
+        ["config", "user.email", "t@t"],
+        ["config", "user.name", "t"],
+        ["add", "."],
+        ["commit", "-m", "rev A"],
+    ):
         subprocess.run(["git", "-C", str(dir_path), *args], check=True, capture_output=True)
-    head = subprocess.run(["git", "-C", str(dir_path), "rev-parse", "HEAD"],
-                          check=True, capture_output=True, text=True).stdout.strip()
+    head = subprocess.run(
+        ["git", "-C", str(dir_path), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     return dir_path, head
 
 
@@ -601,9 +1389,12 @@ def test_bom_diff_reconstructs_rev_a_against_the_working_tree(client, tmp_path):
     rec = _register(client, proj)
     # add a third 10k in the working tree after registration
     (proj / "board.kicad_sch").write_text(
-        "(kicad_sch\n" + _TWO_RES
+        "(kicad_sch\n"
+        + _TWO_RES
         + '  (symbol (lib_id "Device:R") (property "Reference" "R3" (at 0 0 0))'
-          ' (property "Value" "10k" (at 0 0 0)))\n)\n', encoding="utf-8")
+        ' (property "Value" "10k" (at 0 0 0)))\n)\n',
+        encoding="utf-8",
+    )
     body = client.get(f"/api/projects/{rec['id']}/bom/diff", params={"a": rev_a}).json()
     assert body["rev_a"] == rev_a
     assert body["rev_b"] == "current"
@@ -614,9 +1405,7 @@ def test_bom_diff_reconstructs_rev_a_against_the_working_tree(client, tmp_path):
 def test_bom_diff_cost_delta_comes_from_the_cached_priced_build(client, tmp_path, monkeypatch):
     # Locks the router wire that feeds the cached PRICED build as rev B (current_rows) into
     # the diff: without it the working tree is reconstructed unpriced and the cost delta is 0.
-    monkeypatch.setattr(
-        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline()
-    )
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline())
     # rev A holds only the passive (with the current footprint so it does not itself diff).
     rev_a_body = (
         '  (symbol (lib_id "Device:R") (property "Reference" "R1" (at 0 0 0))'
@@ -625,7 +1414,9 @@ def test_bom_diff_cost_delta_comes_from_the_cached_priced_build(client, tmp_path
     proj, rev_a = _make_git_project(tmp_path / "board", rev_a_body)
     rec = _register(client, proj)
     # working tree adds the priced IC (TPS2121RUXR, $1.25 from the fake pipeline)
-    (proj / "board.kicad_sch").write_text("(kicad_sch\n" + _IC_AND_PASSIVE + ")\n", encoding="utf-8")
+    (proj / "board.kicad_sch").write_text(
+        "(kicad_sch\n" + _IC_AND_PASSIVE + ")\n", encoding="utf-8"
+    )
     _stream_job_result(client, client.post(f"/api/projects/{rec['id']}/bom").json()["job_id"])
 
     body = client.get(f"/api/projects/{rec['id']}/bom/diff", params={"a": rev_a}).json()
@@ -691,11 +1482,20 @@ def _make_git_pro_project(dir_path, pro_text=_PRO_FULL):
     dir_path.mkdir(parents=True, exist_ok=True)
     (dir_path / "board.kicad_pro").write_text(pro_text, encoding="utf-8")
     (dir_path / "board.kicad_sch").write_text("(kicad_sch)\n", encoding="utf-8")
-    for args in (["init", "-b", "main"], ["config", "user.email", "t@t"],
-                 ["config", "user.name", "t"], ["add", "."], ["commit", "-m", "init"]):
+    for args in (
+        ["init", "-b", "main"],
+        ["config", "user.email", "t@t"],
+        ["config", "user.name", "t"],
+        ["add", "."],
+        ["commit", "-m", "init"],
+    ):
         subprocess.run(["git", "-C", str(dir_path), *args], check=True, capture_output=True)
-    head = subprocess.run(["git", "-C", str(dir_path), "rev-parse", "HEAD"],
-                          check=True, capture_output=True, text=True).stdout.strip()
+    head = subprocess.run(
+        ["git", "-C", str(dir_path), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     return dir_path, head
 
 
@@ -717,8 +1517,10 @@ def test_get_design_unknown_project_is_404(client):
 def test_patch_net_classes_edits_the_kicad_pro_and_commits(client, tmp_path):
     proj, head = _make_git_pro_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/net-classes",
-                     json={"classes": [{"name": "Default", "track_width": 0.15}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/net-classes",
+        json={"classes": [{"name": "Default", "track_width": 0.15}]},
+    )
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["committed"] and body["committed"] != head
@@ -731,16 +1533,19 @@ def test_patch_net_classes_edits_the_kicad_pro_and_commits(client, tmp_path):
 def test_patch_net_classes_returns_fab_validation(client, tmp_path):
     proj, _ = _make_git_pro_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/net-classes",
-                     json={"classes": [{"name": "Default", "track_width": 0.05}], "floor": "oshpark_2"})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/net-classes",
+        json={"classes": [{"name": "Default", "track_width": 0.05}], "floor": "oshpark_2"},
+    )
     assert any("track" in f["issue"] for f in r.json()["validation"])
 
 
 def test_patch_design_rules_edits_the_rules(client, tmp_path):
     proj, _ = _make_git_pro_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/design-rules",
-                     json={"rules": {"min_track_width": 0.13}})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/design-rules", json={"rules": {"min_track_width": 0.13}}
+    )
     assert r.status_code == 200, r.text
     on_disk = (proj / "board.kicad_pro").read_text(encoding="utf-8")
     assert '"min_track_width": 0.13' in on_disk
@@ -750,8 +1555,9 @@ def test_patch_design_rules_edits_the_rules(client, tmp_path):
 def test_patch_net_classes_class_without_name_is_422(client, tmp_path):
     proj, _ = _make_git_pro_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/net-classes",
-                     json={"classes": [{"track_width": 0.15}]})  # no name
+    r = client.patch(
+        f"/api/projects/{rec['id']}/net-classes", json={"classes": [{"track_width": 0.15}]}
+    )  # no name
     assert r.status_code == 422
 
 
@@ -760,21 +1566,24 @@ def test_patch_net_classes_empty_name_is_422(client, tmp_path):
     # silently drop it and still report success. The DTO must reject it as a clean 422.
     proj, _ = _make_git_pro_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/net-classes",
-                     json={"classes": [{"name": "  ", "track_width": 0.15}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/net-classes",
+        json={"classes": [{"name": "  ", "track_width": 0.15}]},
+    )
     assert r.status_code == 422
 
 
 def test_patch_net_classes_on_a_non_git_project_is_400(client, tmp_path):
     rec = _register(client, _make_project(tmp_path / "ext" / "board"))  # not a git repo
-    r = client.patch(f"/api/projects/{rec['id']}/net-classes",
-                     json={"classes": [{"name": "Default", "track_width": 0.15}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/net-classes",
+        json={"classes": [{"name": "Default", "track_width": 0.15}]},
+    )
     assert r.status_code == 400
 
 
 def test_patch_net_classes_unknown_project_is_404(client):
-    r = client.patch("/api/projects/nope/net-classes",
-                     json={"classes": [{"name": "Default"}]})
+    r = client.patch("/api/projects/nope/net-classes", json={"classes": [{"name": "Default"}]})
     assert r.status_code == 404
 
 
@@ -784,7 +1593,9 @@ def test_patch_design_rules_evicts_the_stale_checks_cache(client, tmp_path, app_
     proj, _ = _make_git_pro_project(tmp_path / "board")
     rec = _register(client, proj)
     app_ctx.checks_cache[rec["id"]] = {"stale": True}
-    client.patch(f"/api/projects/{rec['id']}/design-rules", json={"rules": {"min_track_width": 0.13}})
+    client.patch(
+        f"/api/projects/{rec['id']}/design-rules", json={"rules": {"min_track_width": 0.13}}
+    )
     assert rec["id"] not in app_ctx.checks_cache
 
 
@@ -794,8 +1605,10 @@ def test_patch_design_rules_evicts_the_stale_checks_cache(client, tmp_path, app_
 def test_patch_netclass_patterns_edits_the_kicad_pro_and_commits(client, tmp_path):
     proj, head = _make_git_pro_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/netclass-patterns",
-                     json={"patterns": [{"pattern": "*GND", "netclass": "Default"}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/netclass-patterns",
+        json={"patterns": [{"pattern": "*GND", "netclass": "Default"}]},
+    )
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["committed"] and body["committed"] != head
@@ -809,29 +1622,34 @@ def test_patch_netclass_patterns_edits_the_kicad_pro_and_commits(client, tmp_pat
 def test_patch_netclass_patterns_unknown_netclass_is_400(client, tmp_path):
     proj, _ = _make_git_pro_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/netclass-patterns",
-                     json={"patterns": [{"pattern": "*X", "netclass": "Nope"}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/netclass-patterns",
+        json={"patterns": [{"pattern": "*X", "netclass": "Nope"}]},
+    )
     assert r.status_code == 400
 
 
 def test_patch_netclass_patterns_blank_pattern_is_422(client, tmp_path):
     proj, _ = _make_git_pro_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/netclass-patterns",
-                     json={"patterns": [{"pattern": "   ", "netclass": "Default"}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/netclass-patterns",
+        json={"patterns": [{"pattern": "   ", "netclass": "Default"}]},
+    )
     assert r.status_code == 422
 
 
 def test_patch_netclass_patterns_on_a_non_git_project_is_400(client, tmp_path):
     rec = _register(client, _make_project(tmp_path / "ext" / "board"))  # not a git repo
-    r = client.patch(f"/api/projects/{rec['id']}/netclass-patterns",
-                     json={"patterns": [{"pattern": "*GND", "netclass": "Default"}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/netclass-patterns",
+        json={"patterns": [{"pattern": "*GND", "netclass": "Default"}]},
+    )
     assert r.status_code == 400
 
 
 def test_patch_netclass_patterns_unknown_project_is_404(client):
-    r = client.patch("/api/projects/nope/netclass-patterns",
-                     json={"patterns": []})
+    r = client.patch("/api/projects/nope/netclass-patterns", json={"patterns": []})
     assert r.status_code == 404
 
 
@@ -841,8 +1659,10 @@ def test_patch_netclass_patterns_evicts_the_stale_checks_cache(client, tmp_path,
     proj, _ = _make_git_pro_project(tmp_path / "board")
     rec = _register(client, proj)
     app_ctx.checks_cache[rec["id"]] = {"stale": True}
-    client.patch(f"/api/projects/{rec['id']}/netclass-patterns",
-                 json={"patterns": [{"pattern": "*GND", "netclass": "Default"}]})
+    client.patch(
+        f"/api/projects/{rec['id']}/netclass-patterns",
+        json={"patterns": [{"pattern": "*GND", "netclass": "Default"}]},
+    )
     assert rec["id"] not in app_ctx.checks_cache
 
 
@@ -871,11 +1691,20 @@ def _make_git_pcb_project(dir_path, pro_text=_PRO_FULL, pcb_text=_PCB_FULL):
     (dir_path / "board.kicad_pro").write_text(pro_text, encoding="utf-8")
     (dir_path / "board.kicad_sch").write_text("(kicad_sch)\n", encoding="utf-8")
     (dir_path / "board.kicad_pcb").write_text(pcb_text, encoding="utf-8")
-    for args in (["init", "-b", "main"], ["config", "user.email", "t@t"],
-                 ["config", "user.name", "t"], ["add", "."], ["commit", "-m", "init"]):
+    for args in (
+        ["init", "-b", "main"],
+        ["config", "user.email", "t@t"],
+        ["config", "user.name", "t"],
+        ["add", "."],
+        ["commit", "-m", "init"],
+    ):
         subprocess.run(["git", "-C", str(dir_path), *args], check=True, capture_output=True)
-    head = subprocess.run(["git", "-C", str(dir_path), "rev-parse", "HEAD"],
-                          check=True, capture_output=True, text=True).stdout.strip()
+    head = subprocess.run(
+        ["git", "-C", str(dir_path), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     return dir_path, head
 
 
@@ -906,8 +1735,9 @@ def test_get_settings_unknown_project_is_404(client):
 def test_patch_settings_edits_the_kicad_pcb_and_commits(client, tmp_path):
     proj, head = _make_git_pcb_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/settings",
-                     json={"board_setup": {"pad_to_mask_clearance": 0.1}})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/settings", json={"board_setup": {"pad_to_mask_clearance": 0.1}}
+    )
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["committed"] and body["committed"] != head
@@ -927,8 +1757,9 @@ def test_patch_settings_writes_thickness(client, tmp_path):
 def test_patch_settings_bad_key_is_400(client, tmp_path):
     proj, _ = _make_git_pcb_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/settings",
-                     json={"board_setup": {"not_a_real_key": 1}})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/settings", json={"board_setup": {"not_a_real_key": 1}}
+    )
     assert r.status_code == 400
 
 
@@ -1015,8 +1846,10 @@ def test_patch_settings_edits_severities_and_commits(client, tmp_path):
     rec = _register(client, proj)
     r = client.patch(
         f"/api/projects/{rec['id']}/settings",
-        json={"erc_severities": {"pin_not_connected": "warning"},
-              "drc_severities": {"clearance": "ignore"}},
+        json={
+            "erc_severities": {"pin_not_connected": "warning"},
+            "drc_severities": {"clearance": "ignore"},
+        },
     )
     assert r.status_code == 200, r.text
     assert r.json()["committed"] != head
@@ -1039,8 +1872,9 @@ def test_patch_settings_writes_pin_map(client, tmp_path):
 def test_patch_settings_writes_and_deletes_text_variables(client, tmp_path):
     proj, _ = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/settings",
-                     json={"text_variables": {"REV": "B", "NEW": "x"}})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/settings", json={"text_variables": {"REV": "B", "NEW": "x"}}
+    )
     assert r.status_code == 200, r.text
     tv = r.json()["text_variables"]
     assert tv == {"REV": "B", "NEW": "x"} and "OLD" not in tv
@@ -1049,16 +1883,18 @@ def test_patch_settings_writes_and_deletes_text_variables(client, tmp_path):
 def test_patch_settings_unknown_severity_rule_is_400(client, tmp_path):
     proj, _ = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/settings",
-                     json={"erc_severities": {"not_a_rule_xyz": "error"}})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/settings", json={"erc_severities": {"not_a_rule_xyz": "error"}}
+    )
     assert r.status_code == 400
 
 
 def test_patch_settings_bad_pin_map_is_400(client, tmp_path):
     proj, _ = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/settings",
-                     json={"erc_pin_map": [[0] * 12 for _ in range(11)]})  # 11 rows
+    r = client.patch(
+        f"/api/projects/{rec['id']}/settings", json={"erc_pin_map": [[0] * 12 for _ in range(11)]}
+    )  # 11 rows
     assert r.status_code == 400
 
 
@@ -1074,15 +1910,25 @@ def test_patch_settings_board_and_pro_land_in_one_commit(client, tmp_path):
     rec = _register(client, proj)
     r = client.patch(
         f"/api/projects/{rec['id']}/settings",
-        json={"board_setup": {"pad_to_mask_clearance": 0.1},
-              "erc_severities": {"pin_not_connected": "warning"}},
+        json={
+            "board_setup": {"pad_to_mask_clearance": 0.1},
+            "erc_severities": {"pin_not_connected": "warning"},
+        },
     )
     assert r.status_code == 200, r.text
-    added = subprocess.run(["git", "-C", str(proj), "rev-list", "--count", f"{head}..HEAD"],
-                           check=True, capture_output=True, text=True).stdout.strip()
+    added = subprocess.run(
+        ["git", "-C", str(proj), "rev-list", "--count", f"{head}..HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     assert added == "1"  # both edits in a single commit
-    names = subprocess.run(["git", "-C", str(proj), "show", "--name-only", "--format=", "HEAD"],
-                           check=True, capture_output=True, text=True).stdout.split()
+    names = subprocess.run(
+        ["git", "-C", str(proj), "show", "--name-only", "--format=", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
     assert "board.kicad_pcb" in names and "board.kicad_pro" in names
 
 
@@ -1090,8 +1936,10 @@ def test_patch_settings_severity_change_evicts_the_checks_cache(client, tmp_path
     proj, _ = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
     rec = _register(client, proj)
     app_ctx.checks_cache[rec["id"]] = {"stale": True}
-    client.patch(f"/api/projects/{rec['id']}/settings",
-                 json={"erc_severities": {"pin_not_connected": "warning"}})
+    client.patch(
+        f"/api/projects/{rec['id']}/settings",
+        json={"erc_severities": {"pin_not_connected": "warning"}},
+    )
     assert rec["id"] not in app_ctx.checks_cache
 
 
@@ -1106,7 +1954,10 @@ def test_projects_requires_a_token(anon_client):
     assert anon_client.get("/api/projects/x/design").status_code == 401
     assert anon_client.patch("/api/projects/x/net-classes", json={"classes": []}).status_code == 401
     assert anon_client.patch("/api/projects/x/design-rules", json={"rules": {}}).status_code == 401
-    assert anon_client.patch("/api/projects/x/netclass-patterns", json={"patterns": []}).status_code == 401
+    assert (
+        anon_client.patch("/api/projects/x/netclass-patterns", json={"patterns": []}).status_code
+        == 401
+    )
     assert anon_client.get("/api/projects/x/settings").status_code == 401
     assert anon_client.patch("/api/projects/x/settings", json={"thickness": 1.2}).status_code == 401
     assert anon_client.get("/api/projects/x/fields").status_code == 401
@@ -1140,11 +1991,20 @@ def _make_git_conform_project(dir_path):
     (dir_path / "board.kicad_pro").write_text("{}", encoding="utf-8")
     (dir_path / "board.kicad_sch").write_text(_SCH_CONFORM, encoding="utf-8")
     (dir_path / "board.kicad_pcb").write_text(_PCB_CONFORM, encoding="utf-8")
-    for args in (["init", "-b", "main"], ["config", "user.email", "t@t"],
-                 ["config", "user.name", "t"], ["add", "."], ["commit", "-m", "init"]):
+    for args in (
+        ["init", "-b", "main"],
+        ["config", "user.email", "t@t"],
+        ["config", "user.name", "t"],
+        ["add", "."],
+        ["commit", "-m", "init"],
+    ):
         subprocess.run(["git", "-C", str(dir_path), *args], check=True, capture_output=True)
-    head = subprocess.run(["git", "-C", str(dir_path), "rev-parse", "HEAD"],
-                          check=True, capture_output=True, text=True).stdout.strip()
+    head = subprocess.run(
+        ["git", "-C", str(dir_path), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     return dir_path, head
 
 
@@ -1166,9 +2026,10 @@ def test_get_conform_unknown_project_is_404(client):
 def test_post_conform_preview_counts_without_writing(client, tmp_path):
     proj, head = _make_git_conform_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.post(f"/api/projects/{rec['id']}/conform/preview",
-                    json={"pcb_targets": {"silk": {"size": 2.0}},
-                          "sch_targets": {"labels": {"size": 2.0}}})
+    r = client.post(
+        f"/api/projects/{rec['id']}/conform/preview",
+        json={"pcb_targets": {"silk": {"size": 2.0}}, "sch_targets": {"labels": {"size": 2.0}}},
+    )
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["total"] == 3  # 2 silk + 1 label
@@ -1186,9 +2047,10 @@ def test_post_conform_preview_empty_selection_is_400(client, tmp_path):
 def test_patch_conform_applies_and_commits(client, tmp_path):
     proj, head = _make_git_conform_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/conform",
-                     json={"pcb_targets": {"silk": {"size": 2.0}},
-                           "sch_targets": {"labels": {"size": 2.0}}})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/conform",
+        json={"pcb_targets": {"silk": {"size": 2.0}}, "sch_targets": {"labels": {"size": 2.0}}},
+    )
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["committed"] and body["committed"] != head
@@ -1200,16 +2062,18 @@ def test_patch_conform_applies_and_commits(client, tmp_path):
 def test_patch_conform_bad_size_is_400(client, tmp_path):
     proj, _ = _make_git_conform_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/conform",
-                     json={"pcb_targets": {"silk": {"size": 0}}})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/conform", json={"pcb_targets": {"silk": {"size": 0}}}
+    )
     assert r.status_code == 400
 
 
 def test_patch_conform_unknown_category_is_400(client, tmp_path):
     proj, _ = _make_git_conform_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/conform",
-                     json={"pcb_targets": {"bogus": {"size": 1.0}}})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/conform", json={"pcb_targets": {"bogus": {"size": 1.0}}}
+    )
     assert r.status_code == 400
 
 
@@ -1217,8 +2081,9 @@ def test_patch_conform_non_git_is_400(client, tmp_path):
     proj = _make_project(tmp_path / "ext" / "board")
     (proj / "board.kicad_pcb").write_text(_PCB_CONFORM, encoding="utf-8")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/conform",
-                     json={"pcb_targets": {"silk": {"size": 2.0}}})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/conform", json={"pcb_targets": {"silk": {"size": 2.0}}}
+    )
     assert r.status_code == 400
 
 
@@ -1233,7 +2098,9 @@ def test_patch_conform_evicts_the_stale_checks_cache(client, tmp_path, app_ctx):
     proj, _ = _make_git_conform_project(tmp_path / "board")
     rec = _register(client, proj)
     app_ctx.checks_cache[rec["id"]] = {"stale": True}
-    client.patch(f"/api/projects/{rec['id']}/conform", json={"pcb_targets": {"silk": {"size": 2.0}}})
+    client.patch(
+        f"/api/projects/{rec['id']}/conform", json={"pcb_targets": {"silk": {"size": 2.0}}}
+    )
     assert rec["id"] not in app_ctx.checks_cache
 
 
@@ -1270,11 +2137,20 @@ def _make_git_stackup_project(dir_path, pcb_text=_PCB_STACKUP):
     dir_path.mkdir(parents=True, exist_ok=True)
     (dir_path / "board.kicad_pro").write_text("{}", encoding="utf-8")
     (dir_path / "board.kicad_pcb").write_text(pcb_text, encoding="utf-8")
-    for args in (["init", "-b", "main"], ["config", "user.email", "t@t"],
-                 ["config", "user.name", "t"], ["add", "."], ["commit", "-m", "init"]):
+    for args in (
+        ["init", "-b", "main"],
+        ["config", "user.email", "t@t"],
+        ["config", "user.name", "t"],
+        ["add", "."],
+        ["commit", "-m", "init"],
+    ):
         subprocess.run(["git", "-C", str(dir_path), *args], check=True, capture_output=True)
-    head = subprocess.run(["git", "-C", str(dir_path), "rev-parse", "HEAD"],
-                          check=True, capture_output=True, text=True).stdout.strip()
+    head = subprocess.run(
+        ["git", "-C", str(dir_path), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     return dir_path, head
 
 
@@ -1332,8 +2208,10 @@ def test_patch_stackup_applies_preset_and_commits(client, tmp_path):
 def test_patch_stackup_field_edit_applies(client, tmp_path):
     proj, _ = _make_git_stackup_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/stackup",
-                     json={"copper_finish": "ENIG", "dielectric_constraints": True})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/stackup",
+        json={"copper_finish": "ENIG", "dielectric_constraints": True},
+    )
     assert r.status_code == 200, r.text
     after = (proj / "board.kicad_pcb").read_text(encoding="utf-8")
     assert '(copper_finish "ENIG")' in after
@@ -1343,16 +2221,20 @@ def test_patch_stackup_field_edit_applies(client, tmp_path):
 def test_patch_stackup_both_modes_is_400(client, tmp_path):
     proj, _ = _make_git_stackup_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/stackup",
-                     json={"preset_key": "oshpark_4", "copper_finish": "ENIG"})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/stackup",
+        json={"preset_key": "oshpark_4", "copper_finish": "ENIG"},
+    )
     assert r.status_code == 400
 
 
 def test_patch_stackup_bad_thickness_is_400(client, tmp_path):
     proj, _ = _make_git_stackup_project(tmp_path / "board")
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/stackup",
-                     json={"layer_edits": {"dielectric 1": {"thickness": -1}}})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/stackup",
+        json={"layer_edits": {"dielectric 1": {"thickness": -1}}},
+    )
     assert r.status_code == 400
 
 
@@ -1416,7 +2298,9 @@ def test_get_prepare_previews_annotate_fill_and_residual(client, tmp_path):
     body = r.json()
     assert body["under_git"] is True and body["has_sch"] is True
     assert body["annotate"] == 1
-    assert body["fill_fields"] >= 2  # MPN + Manufacturer (+ Description + Footprint) from the library
+    assert (
+        body["fill_fields"] >= 2
+    )  # MPN + Manufacturer (+ Description + Footprint) from the library
     assert any(i["part_id"] == "tps62130" for i in body["plan"]["items"])
     # a preview never commits: the file is unchanged
     assert '"U?"' in (proj / "board.kicad_sch").read_text(encoding="utf-8")
@@ -1461,8 +2345,9 @@ def test_manual_fill_links_a_component(client, tmp_path):
     )
     proj, _head = _make_git_project(tmp_path / "mf", sheet)
     rec = _register(client, proj)
-    r = client.post(f"/api/projects/{rec['id']}/prepare/fill",
-                    json={"ref": "R1", "part_id": "tps62130"})
+    r = client.post(
+        f"/api/projects/{rec['id']}/prepare/fill", json={"ref": "R1", "part_id": "tps62130"}
+    )
     assert r.status_code == 200, r.text
     assert r.json()["committed"]
     assert '(lib_id "SR-ICs:TPS62130")' in (proj / "board.kicad_sch").read_text(encoding="utf-8")
@@ -1471,8 +2356,9 @@ def test_manual_fill_links_a_component(client, tmp_path):
 def test_manual_fill_unknown_part_is_400(client, tmp_path):
     proj, _head = _make_git_project(tmp_path / "mf", _PREPARE_SHEET)
     rec = _register(client, proj)
-    r = client.post(f"/api/projects/{rec['id']}/prepare/fill",
-                    json={"ref": "U?", "part_id": "nope"})
+    r = client.post(
+        f"/api/projects/{rec['id']}/prepare/fill", json={"ref": "U?", "part_id": "nope"}
+    )
     assert r.status_code == 400
 
 
@@ -1542,11 +2428,16 @@ def test_get_fields_unknown_project_is_404(client):
 def test_patch_fields_writes_only_the_edited_cells_and_commits(client, tmp_path):
     proj, head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
-        {"ref": "R1", "field": "MPN", "value": "RC0402FR-0710KL"},
-        {"ref": "R1", "field": "Value", "value": "22k"},
-        {"ref": "C1", "field": "Footprint", "value": "Capacitor_SMD:C_0603"},
-    ]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/fields",
+        json={
+            "edits": [
+                {"ref": "R1", "field": "MPN", "value": "RC0402FR-0710KL"},
+                {"ref": "R1", "field": "Value", "value": "22k"},
+                {"ref": "C1", "field": "Footprint", "value": "Capacitor_SMD:C_0603"},
+            ]
+        },
+    )
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["committed"] and body["committed"] != head
@@ -1563,8 +2454,10 @@ def test_patch_fields_writes_only_the_edited_cells_and_commits(client, tmp_path)
 def test_patch_fields_adds_a_new_field_column(client, tmp_path):
     proj, _head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
-        {"ref": "R1", "field": "Tolerance", "value": "1%"}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/fields",
+        json={"edits": [{"ref": "R1", "field": "Tolerance", "value": "1%"}]},
+    )
     assert r.status_code == 200, r.text
     assert r.json()["committed"]
     assert '(property "Tolerance" "1%"' in (proj / "board.kicad_sch").read_text(encoding="utf-8")
@@ -1573,16 +2466,20 @@ def test_patch_fields_adds_a_new_field_column(client, tmp_path):
 def test_patch_fields_editing_reference_is_400(client, tmp_path):
     proj, _head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
-        {"ref": "R1", "field": "Reference", "value": "R9"}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/fields",
+        json={"edits": [{"ref": "R1", "field": "Reference", "value": "R9"}]},
+    )
     assert r.status_code == 400
 
 
 def test_patch_fields_blank_field_is_422(client, tmp_path):
     proj, _head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
     rec = _register(client, proj)
-    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
-        {"ref": "R1", "field": "   ", "value": "x"}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/fields",
+        json={"edits": [{"ref": "R1", "field": "   ", "value": "x"}]},
+    )
     assert r.status_code == 422
 
 
@@ -1590,18 +2487,23 @@ def test_patch_fields_noop_does_not_commit(client, tmp_path):
     proj, head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
     rec = _register(client, proj)
     # write the value already on disk -> byte no-op -> no commit, HEAD unchanged
-    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
-        {"ref": "R1", "field": "Value", "value": "10k"}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/fields",
+        json={"edits": [{"ref": "R1", "field": "Value", "value": "10k"}]},
+    )
     assert r.status_code == 200 and r.json()["committed"] is None
-    now = subprocess.run(["git", "-C", str(proj), "rev-parse", "HEAD"],
-                         check=True, capture_output=True, text=True).stdout.strip()
+    now = subprocess.run(
+        ["git", "-C", str(proj), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
     assert now == head
 
 
 def test_patch_fields_non_git_is_400(client, tmp_path):
     rec = _register(client, _make_project(tmp_path / "ext" / "board", _FIELDS_SHEET))
-    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
-        {"ref": "R1", "field": "MPN", "value": "x"}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/fields",
+        json={"edits": [{"ref": "R1", "field": "MPN", "value": "x"}]},
+    )
     assert r.status_code == 400
 
 
@@ -1610,8 +2512,10 @@ def test_patch_fields_dirty_tree_is_400(client, tmp_path):
     rec = _register(client, proj)
     sch = proj / "board.kicad_sch"
     sch.write_text(sch.read_text(encoding="utf-8") + "\n", encoding="utf-8")  # dirty after register
-    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
-        {"ref": "R1", "field": "MPN", "value": "x"}]})
+    r = client.patch(
+        f"/api/projects/{rec['id']}/fields",
+        json={"edits": [{"ref": "R1", "field": "MPN", "value": "x"}]},
+    )
     assert r.status_code == 400
 
 
@@ -1620,8 +2524,10 @@ def test_patch_fields_evicts_stale_caches(client, app_ctx, tmp_path):
     rec = _register(client, proj)
     app_ctx.checks_cache[rec["id"]] = {"stale": True}
     app_ctx.bom_cache[rec["id"]] = {"stale": True}
-    client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
-        {"ref": "R1", "field": "MPN", "value": "NEW"}]})
+    client.patch(
+        f"/api/projects/{rec['id']}/fields",
+        json={"edits": [{"ref": "R1", "field": "MPN", "value": "NEW"}]},
+    )
     assert rec["id"] not in app_ctx.checks_cache
     assert rec["id"] not in app_ctx.bom_cache
 
@@ -1667,8 +2573,12 @@ def test_fab_export_streams_the_zip(client, tmp_path, monkeypatch):
     rec = _register(client, _make_board_project(tmp_path / "brd"))
 
     def fake_bundle(pcb, cli, **kw):
-        return {"data": b"PK\x03\x04zip", "filename": "board-fab.zip",
-                "content_type": "application/zip", "files": ["board-F_Cu.gtl"]}
+        return {
+            "data": b"PK\x03\x04zip",
+            "filename": "board-fab.zip",
+            "content_type": "application/zip",
+            "files": ["board-F_Cu.gtl"],
+        }
 
     monkeypatch.setattr(fx, "build_fab_bundle", fake_bundle)
     r = client.get(f"/api/projects/{rec['id']}/fab/export")
@@ -1710,12 +2620,18 @@ def test_fab_export_passes_options_through(client, tmp_path, monkeypatch):
 
     def capture(pcb, cli, **kw):
         seen.update(kw)
-        return {"data": b"z", "filename": "board-fab.zip",
-                "content_type": "application/zip", "files": []}
+        return {
+            "data": b"z",
+            "filename": "board-fab.zip",
+            "content_type": "application/zip",
+            "files": [],
+        }
 
     monkeypatch.setattr(fx, "build_fab_bundle", capture)
-    client.get(f"/api/projects/{rec['id']}/fab/export"
-               "?drill_format=gerber&drill_map=false&include_pos=false&protel_ext=false")
+    client.get(
+        f"/api/projects/{rec['id']}/fab/export"
+        "?drill_format=gerber&drill_map=false&include_pos=false&protel_ext=false"
+    )
     assert seen["drill_format"] == "gerber"
     assert seen["drill_map"] is False
     assert seen["include_pos"] is False
@@ -1737,29 +2653,42 @@ def test_project_file_rejects_an_unregistered_path_as_404(client, tmp_path):
     proj = _make_board_project(tmp_path / "brd")
     (proj / "secret.txt").write_text("secret", encoding="utf-8")
     rec = _register(client, proj)
-    assert client.get(f"/api/projects/{rec['id']}/file",
-                      params={"path": "secret.txt"}).status_code == 404
+    assert (
+        client.get(f"/api/projects/{rec['id']}/file", params={"path": "secret.txt"}).status_code
+        == 404
+    )
 
 
 def test_project_file_rejects_path_traversal_as_404(client, tmp_path):
     # a ../ escape is not a registered project file: never serve outside the project
     rec = _register(client, _make_board_project(tmp_path / "brd"))
     (tmp_path / "outside.txt").write_text("nope", encoding="utf-8")
-    assert client.get(f"/api/projects/{rec['id']}/file",
-                      params={"path": "../outside.txt"}).status_code == 404
-    assert client.get(f"/api/projects/{rec['id']}/file",
-                      params={"path": "../../etc/passwd"}).status_code == 404
+    assert (
+        client.get(f"/api/projects/{rec['id']}/file", params={"path": "../outside.txt"}).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/projects/{rec['id']}/file", params={"path": "../../etc/passwd"}
+        ).status_code
+        == 404
+    )
 
 
 def test_project_file_unknown_id_is_404(client):
-    assert client.get("/api/projects/nope/file",
-                      params={"path": "board.kicad_pcb"}).status_code == 404
+    assert (
+        client.get("/api/projects/nope/file", params={"path": "board.kicad_pcb"}).status_code == 404
+    )
 
 
 def test_project_file_requires_the_token(anon_client, client, tmp_path):
     rec = _register(client, _make_board_project(tmp_path / "brd"))
-    assert anon_client.get(f"/api/projects/{rec['id']}/file",
-                           params={"path": "board.kicad_pcb"}).status_code == 401
+    assert (
+        anon_client.get(
+            f"/api/projects/{rec['id']}/file", params={"path": "board.kicad_pcb"}
+        ).status_code
+        == 401
+    )
 
 
 # ---- EDA-neutral projects: Altium registration + per-EDA capabilities --------
@@ -1775,13 +2704,24 @@ def _make_altium_api_project(dir_path, name="Amp", blocks=None):
     )
     _write_schdoc(
         dir_path / f"{name}.SchDoc",
-        *(blocks if blocks is not None else [
-            {"designator": "U1", "lib_ref": "LM358",
-             "params": {"MPN": "LM358DR", "Manufacturer": "TI", "Value": "LM358DR",
+        *(
+            blocks
+            if blocks is not None
+            else [
+                {
+                    "designator": "U1",
+                    "lib_ref": "LM358",
+                    "params": {
+                        "MPN": "LM358DR",
+                        "Manufacturer": "TI",
+                        "Value": "LM358DR",
                         "Datasheet": "https://ti.com/lm358.pdf",
-                        "Description": "Dual op-amp"},
-             "footprint": "SOIC-8"},
-        ]),
+                        "Description": "Dual op-amp",
+                    },
+                    "footprint": "SOIC-8",
+                },
+            ]
+        ),
     )
     return dir_path
 
@@ -1807,23 +2747,54 @@ def test_register_an_ambiguous_dir_needs_an_explicit_eda(client, tmp_path):
     assert r.json()["eda"] == "altium"
 
 
-def test_project_detail_carries_capabilities_per_eda(client, tmp_path):
+def test_project_detail_carries_the_same_workspace_capabilities_for_every_eda(
+    client, tmp_path
+):
     kicad = _register(client, _make_project(tmp_path / "ext" / "board"))
     altium = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
     k = client.get(f"/api/projects/{kicad['id']}").json()
     a = client.get(f"/api/projects/{altium['id']}").json()
-    assert "checks" in k["capabilities"] and "setup" in k["capabilities"]
-    assert "bom" in a["capabilities"] and "audit" in a["capabilities"]
-    for kicad_only in ("checks", "fab", "setup", "netclasses", "prepare", "viewer"):
-        assert kicad_only not in a["capabilities"]
+    assert k["capabilities"] == a["capabilities"] == [
+        "design",
+        "bom",
+        "assemble",
+        "changes",
+        "releases",
+    ]
+
+
+def test_workspace_exposes_one_executable_parity_contract_for_both_edas(
+    client, tmp_path
+):
+    kicad = _register(client, _make_project(tmp_path / "parity" / "board"))
+    altium = _register(
+        client, _make_altium_api_project(tmp_path / "parity" / "amp")
+    )
+
+    workspaces = [
+        client.get(f"/api/projects/{project['id']}/workspace").json()
+        for project in (kicad, altium)
+    ]
+    assert workspaces[0]["parity"] == workspaces[1]["parity"]
+    parity = workspaces[0]["parity"]
+    assert parity["schema"] == "stockroom-project-parity/1"
+    assert parity["edas"] == ["kicad", "altium"]
+    assert parity["strict"] is True
+    assert [tool["key"] for tool in parity["tools"]] == workspaces[0]["tools"]
+    assert all(tool["behavior"] == "identical" for tool in parity["tools"])
+    assert all(tool["actions"] for tool in parity["tools"] if tool["status"] == "active")
 
 
 def test_audit_reads_an_altium_project(client, tmp_path):
     proj = _make_altium_api_project(
         tmp_path / "ext" / "amp",
         blocks=[
-            {"designator": "U1", "lib_ref": "LM358",
-             "params": {"MPN": "LM358DR", "Manufacturer": "TI"}, "footprint": "SOIC-8"},
+            {
+                "designator": "U1",
+                "lib_ref": "LM358",
+                "params": {"MPN": "LM358DR", "Manufacturer": "TI"},
+                "footprint": "SOIC-8",
+            },
             {"designator": "R?", "lib_ref": "RES", "params": {"Value": "10k"}},
         ],
     )
@@ -1900,14 +2871,34 @@ def _write_stock_passive(app_ctx, part_id="r10k"):
 
     parts_dir = app_ctx.profile.library.parts_dir
     parts_dir.mkdir(parents=True, exist_ok=True)
-    (parts_dir / f"{part_id}.json").write_text(json.dumps({
-        "id": part_id, "display_name": "10k 0402", "category": "Resistors",
-        "description": "10k 1% 0402", "mpn": "RC0402FR-0710KL", "manufacturer": "Yageo",
-        "passive": True,
-        "eda": {"kicad": {"symbol": {"lib": "Device", "name": "R"},
-                          "footprint": {"lib": "Resistor_SMD", "name": "R_0402_1005Metric"}}},
-        "specs": {"Resistance": "10 kOhm", "Package": "0402"},
-    }), encoding="utf-8")
+    (parts_dir / f"{part_id}.json").write_text(
+        json.dumps(
+            {
+                "id": part_id,
+                "display_name": "10k 0402",
+                "category": "Resistors",
+                "description": "10k 1% 0402",
+                "mpn": "RC0402FR-0710KL",
+                "manufacturer": "Yageo",
+                "passive": True,
+                "eda": {
+                    "kicad": {
+                        "symbol": {"lib": "Device", "name": "R"},
+                        "footprint": {"lib": "Resistor_SMD", "name": "R_0402_1005Metric"},
+                    },
+                    "altium": {
+                        "symbol": {"lib": "Stockroom.SchLib", "name": "R"},
+                        "footprint": {
+                            "lib": "Stockroom.PcbLib",
+                            "name": "R_0402_1005Metric",
+                        },
+                    },
+                },
+                "specs": {"Resistance": "10 kOhm", "Package": "0402"},
+            }
+        ),
+        encoding="utf-8",
+    )
     return part_id
 
 
@@ -1932,8 +2923,9 @@ def test_post_assign_fills_the_group(client, app_ctx, tmp_path):
     _write_stock_passive(app_ctx)
     proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
     rec = _register(client, proj)
-    r = client.post(f"/api/projects/{rec['id']}/assign",
-                    json={"refs": ["R1", "R2"], "part_id": "r10k"})
+    r = client.post(
+        f"/api/projects/{rec['id']}/assign", json={"refs": ["R1", "R2"], "part_id": "r10k"}
+    )
     assert r.status_code == 200, r.text
     assert r.json()["committed"]
     after = (proj / "board.kicad_sch").read_text(encoding="utf-8")
@@ -1948,8 +2940,7 @@ def test_post_assign_unknown_part_is_400(client, app_ctx, tmp_path):
     _write_stock_passive(app_ctx)
     proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
     rec = _register(client, proj)
-    r = client.post(f"/api/projects/{rec['id']}/assign",
-                    json={"refs": ["R1"], "part_id": "nope"})
+    r = client.post(f"/api/projects/{rec['id']}/assign", json={"refs": ["R1"], "part_id": "nope"})
     assert r.status_code == 400
 
 
@@ -1958,8 +2949,9 @@ def test_post_assign_stale_ref_is_400_and_writes_nothing(client, app_ctx, tmp_pa
     proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
     rec = _register(client, proj)
     before = (proj / "board.kicad_sch").read_text(encoding="utf-8")
-    r = client.post(f"/api/projects/{rec['id']}/assign",
-                    json={"refs": ["R1", "Z99"], "part_id": "r10k"})
+    r = client.post(
+        f"/api/projects/{rec['id']}/assign", json={"refs": ["R1", "Z99"], "part_id": "r10k"}
+    )
     assert r.status_code == 400
     assert (proj / "board.kicad_sch").read_text(encoding="utf-8") == before
 
@@ -1968,25 +2960,33 @@ def test_post_assign_empty_refs_is_400(client, app_ctx, tmp_path):
     _write_stock_passive(app_ctx)
     proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
     rec = _register(client, proj)
-    assert client.post(f"/api/projects/{rec['id']}/assign",
-                       json={"refs": [], "part_id": "r10k"}).status_code == 400
+    assert (
+        client.post(
+            f"/api/projects/{rec['id']}/assign", json={"refs": [], "part_id": "r10k"}
+        ).status_code
+        == 400
+    )
 
 
 def test_post_assign_non_git_is_400(client, app_ctx, tmp_path):
     _write_stock_passive(app_ctx)
     rec = _register(client, _make_project(tmp_path / "ext" / "asg2", _ASSIGN_SHEET))
-    assert client.post(f"/api/projects/{rec['id']}/assign",
-                       json={"refs": ["R1"], "part_id": "r10k"}).status_code == 400
+    assert (
+        client.post(
+            f"/api/projects/{rec['id']}/assign", json={"refs": ["R1"], "part_id": "r10k"}
+        ).status_code
+        == 400
+    )
 
 
-def test_assign_is_a_capability_of_every_eda_stockroom_can_read_placements_for(client, tmp_path):
-    """Bulk assign is registry-generic, so it is NOT in the KiCad-only set. Gating it on `prepare`
-    (a KiCad-only writer) hid the whole surface from an Altium project that can be assigned."""
+def test_identity_resolution_is_in_the_bom_contract_for_every_eda(client, tmp_path):
+    """Identity resolution is one shared BOM action, never an EDA-specific capability."""
     kicad = _register(client, _make_project(tmp_path / "ext" / "board"))
     altium = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
     for proj in (kicad, altium):
-        caps = client.get(f"/api/projects/{proj['id']}").json()["capabilities"]
-        assert "assign" in caps, caps
+        workspace = client.get(f"/api/projects/{proj['id']}/workspace").json()
+        bom = next(tool for tool in workspace["parity"]["tools"] if tool["key"] == "bom")
+        assert "resolve_identity" in bom["actions"]
 
 
 def test_the_assign_endpoint_serves_an_altium_project(client, tmp_path):
@@ -1998,6 +2998,51 @@ def test_the_assign_endpoint_serves_an_altium_project(client, tmp_path):
     # The surface states where an assignment LANDS, because for this tool it is not the schematic.
     assert data["binding"]["writable"] is False
     assert data["binding"]["reason"]
+
+
+def test_altium_assignment_uses_the_same_group_decision_and_updates_the_live_bom(
+    client, app_ctx, tmp_path
+):
+    _write_stock_passive(app_ctx)
+    project = _make_altium_api_project(
+        tmp_path / "ext" / "altium-passives",
+        blocks=[
+            {
+                "designator": "R1",
+                "lib_ref": "R",
+                "params": {"Value": "10k"},
+                "footprint": "R_0402_1005Metric",
+                "unique_id": "ALTIUM-R1",
+            },
+            {
+                "designator": "R2",
+                "lib_ref": "R",
+                "params": {"Value": "10k"},
+                "footprint": "R_0402_1005Metric",
+                "unique_id": "ALTIUM-R2",
+            },
+        ],
+    )
+    record = _register(client, project)
+
+    unresolved = client.get(f"/api/projects/{record['id']}/assign").json()
+    assert [group["refs"] for group in unresolved["groups"]] == [["R1", "R2"]]
+    assert unresolved["groups"][0]["candidates"][0]["part_id"] == "r10k"
+
+    assigned = client.post(
+        f"/api/projects/{record['id']}/assign",
+        json={"refs": ["R1", "R2"], "part_id": "r10k"},
+    )
+    assert assigned.status_code == 200, assigned.text
+    assert assigned.json()["bound"] == 2
+    assert (project / "Amp.SchDoc").exists()
+
+    job_id = client.post(f"/api/projects/{record['id']}/bom", json={}).json()["job_id"]
+    _drain_job(client, job_id)
+    live_bom = client.get(f"/api/projects/{record['id']}/bom").json()
+    assert live_bom["lines"][0]["refs"] == ["R1", "R2"]
+    assert live_bom["lines"][0]["mpn"] == "RC0402FR-0710KL"
+    assert live_bom["lines"][0]["in_library"] is True
 
 
 def test_workspace_hygiene_endpoints_preview_then_apply(client, tmp_path):

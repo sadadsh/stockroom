@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from stockroom.derive.engine import Identity, derive_block, load_payloads, rederive
+from stockroom.derive.engine import Identity, derive_block, load_payloads, merged_result, rederive
 from stockroom.derive.naming import UnknownNamingScheme, scheme_names
 from stockroom.model.part import PartRecord
 from stockroom.model.part_class import PartClass
@@ -146,14 +146,12 @@ def test_the_derivation_does_not_depend_on_a_clock(tmp_path):
     assert a == b, "something other than derived_at changed with the timestamp"
 
 
-def test_the_merge_follows_REGISTRY_priority_not_the_order_the_payloads_arrive_in(tmp_path):
-    """Determinism, which is what idempotency actually rests on.
+def test_the_merge_follows_PER_FIELD_priority_not_the_order_payloads_arrive_in(tmp_path):
+    """Determinism and field-level choice, which is what idempotency actually rests on.
 
-    `merge_missing` gives a field to whoever fills it FIRST, so if the engine iterated the payload
-    mapping instead of the registry, the winning description would depend on dict/listing order -
-    and `sourced/` is listed ALPHABETICALLY (`list_sources` sorts), which is not the priority order.
-    Mouser outranks DigiKey in PAYLOAD_PARSERS but sorts second, so alphabetical iteration would
-    silently hand every contested field to DigiKey.
+    The owner-library sample measured DigiKey's detailed prose as the clean description and
+    Mouser's text as truncated/polluted. That supports a priority choice for DESCRIPTION, not a
+    global reversal that would also move unrelated procurement fields.
 
     Added after a mutation survived: reversing the loop to `for source in payloads` left the whole
     suite green, because every other test seeds ONE payload and order cannot matter with one source.
@@ -164,7 +162,12 @@ def test_the_merge_follows_REGISTRY_priority_not_the_order_the_payloads_arrive_i
             "Products": [
                 {
                     "ManufacturerProductNumber": "ERJ-P03F1101V",
-                    "Description": {"ProductDescription": "DIGIKEY WORDING"},
+                    "Description": {
+                        "DetailedDescription": (
+                            "1.1 kOhms +/-1% 0.1W Thick Film Resistor 0603 (1608 Metric)"
+                        )
+                    },
+                    "DatasheetUrl": "https://digikey.example/datasheet.pdf",
                 }
             ]
         },
@@ -172,14 +175,20 @@ def test_the_merge_follows_REGISTRY_priority_not_the_order_the_payloads_arrive_i
     }
     assert list(payloads) == ["digikey", "mouser"], "the fixture must present the WRONG order"
 
+    merged = merged_result(Identity.of(_record()), payloads)
+    assert merged.description is not None
+    assert merged.description.source == "digikey"
+    assert merged.description.value.startswith("1.1 kOhms")
+    assert [v.source for v in merged.field_conflicts["description"]] == [
+        "digikey",
+        "mouser",
+    ]
+    # The field rule must not become an accidental global source reversal.
+    assert merged.datasheet_url is not None
+    assert merged.datasheet_url.source == "mouser"
+
     block = derive_block(Identity.of(_record()), payloads, derived_at=AT)
-    assert "DIGIKEY WORDING" not in block.description, (
-        f"the lower-priority source won the description slot: {block.description!r}. The merge is "
-        f"following payload order, not PAYLOAD_PARSERS order."
-    )
-    assert "Thick Film" in block.description, (
-        f"Mouser is first in PAYLOAD_PARSERS so its description must win: {block.description!r}"
-    )
+    assert block.description.startswith("1.1 kOhms")
 
 
 def test_the_canonical_vendor_fields_reach_the_derived_block(tmp_path):

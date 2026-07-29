@@ -16,24 +16,40 @@ vi.mock("../api/cadVariantClient", async (importActual) => {
     ...actual,
     cadVariantApi: {
       inventory: vi.fn(),
-      activate: vi.fn(),
+      activatePair: vi.fn(),
     },
   };
 });
 
 const mockCadVariantApi = vi.mocked(cadVariantApi);
 
-function document(activeVariantId: string | null = "snap-kicad"): CadVariantDocument {
+function document(activeVariantId: string | null = "snap-shared"): CadVariantDocument {
   return {
     partId: "lm358",
     supplementary: [],
+    pairs: [
+      {
+        kicadVariantId: "ul-shared",
+        altiumVariantId: "ul-shared",
+        provider: "Ultra Librarian",
+        trustRank: 0,
+        trustLabel: "Same-Download Validated Pair",
+      },
+      {
+        kicadVariantId: "snap-shared",
+        altiumVariantId: "snap-shared",
+        provider: "SnapMagic",
+        trustRank: 1,
+        trustLabel: "Same-Download Validated Pair",
+      },
+    ],
     inventories: [
       {
         tool: "kicad",
         activeVariantId,
         variants: [
           {
-            id: "ul-kicad",
+            id: "ul-shared",
             provider: "Ultra Librarian",
             format: "KiCad 10",
             artifacts: [
@@ -41,13 +57,13 @@ function document(activeVariantId: string | null = "snap-kicad"): CadVariantDocu
               { kind: "footprint", fileName: "LM358.kicad_mod" },
               { kind: "model", fileName: "LM358.step" },
             ],
-            evidenceDigest: "sha256:ul-kicad",
+            evidenceDigest: "sha256:ul-shared",
             validationChecks: 12,
             trustRank: 10,
-            trustLabel: "Manufacturer Verified",
+            trustLabel: "Preferred Source",
           },
           {
-            id: "snap-kicad",
+            id: "snap-shared",
             provider: "SnapMagic",
             format: "KiCad 10",
             artifacts: [
@@ -55,7 +71,7 @@ function document(activeVariantId: string | null = "snap-kicad"): CadVariantDocu
               { kind: "footprint", fileName: "LM358.kicad_mod" },
               { kind: "model", fileName: "LM358.step" },
             ],
-            evidenceDigest: "sha256:snap-kicad",
+            evidenceDigest: "sha256:snap-shared",
             validationChecks: 10,
             trustRank: 20,
             trustLabel: "Validated Fallback",
@@ -64,20 +80,33 @@ function document(activeVariantId: string | null = "snap-kicad"): CadVariantDocu
       },
       {
         tool: "altium",
-        activeVariantId: "ul-altium",
+        activeVariantId,
         variants: [
           {
-            id: "ul-altium",
+            id: "ul-shared",
             provider: "Ultra Librarian",
             format: "Altium Designer (Native)",
             artifacts: [
               { kind: "symbol", fileName: "LM358.SchLib" },
               { kind: "footprint", fileName: "LM358.PcbLib" },
             ],
-            evidenceDigest: "sha256:ul-altium",
+            evidenceDigest: "sha256:ul-shared",
             validationChecks: 11,
             trustRank: 10,
-            trustLabel: "Manufacturer Verified",
+            trustLabel: "Preferred Source",
+          },
+          {
+            id: "snap-shared",
+            provider: "SnapMagic",
+            format: "Altium Designer (Native)",
+            artifacts: [
+              { kind: "symbol", fileName: "LM358.SchLib" },
+              { kind: "footprint", fileName: "LM358.PcbLib" },
+            ],
+            evidenceDigest: "sha256:snap-shared",
+            validationChecks: 9,
+            trustRank: 20,
+            trustLabel: "Validated Fallback",
           },
         ],
       },
@@ -100,7 +129,7 @@ function wrap(ui: ReactNode) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockCadVariantApi.inventory.mockResolvedValue(document());
-  mockCadVariantApi.activate.mockResolvedValue(document("ul-kicad"));
+  mockCadVariantApi.activatePair.mockResolvedValue(document("ul-shared"));
 });
 
 describe("CadVariantSection", () => {
@@ -114,15 +143,15 @@ describe("CadVariantSection", () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByText("3 Retained")).toBeInTheDocument();
+    expect(await screen.findByText("4 Retained")).toBeInTheDocument();
     expect(mockCadVariantApi.inventory).toHaveBeenCalledTimes(1);
     expect(mockCadVariantApi.inventory).toHaveBeenCalledWith("lm358");
   });
 
-  it("activates one coherent tool bundle and refreshes inventory plus part detail", async () => {
+  it("switches one same-download pair and refreshes inventory plus part detail", async () => {
     mockCadVariantApi.inventory
       .mockResolvedValueOnce(document())
-      .mockResolvedValue(document("ul-kicad"));
+      .mockResolvedValue(document("ul-shared"));
     const { queryClient } = wrap(
       <CadVariantSection partId="lm358" enabled />,
     );
@@ -130,14 +159,15 @@ describe("CadVariantSection", () => {
 
     await userEvent.click(
       await screen.findByRole("button", {
-        name: "Use Ultra Librarian variant for KiCad",
+        name: "Use Ultra Librarian for KiCad and Altium",
       }),
     );
 
-    expect(mockCadVariantApi.activate).toHaveBeenCalledWith("lm358", {
-      tool: "kicad",
-      variantId: "ul-kicad",
-      expectedActiveVariantId: "snap-kicad",
+    expect(mockCadVariantApi.activatePair).toHaveBeenCalledWith("lm358", {
+      kicadVariantId: "ul-shared",
+      altiumVariantId: "ul-shared",
+      expectedActiveKicadVariantId: "snap-shared",
+      expectedActiveAltiumVariantId: "snap-shared",
     });
     await waitFor(() =>
       expect(invalidate).toHaveBeenCalledWith({
@@ -147,30 +177,23 @@ describe("CadVariantSection", () => {
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: ["cad-variants", "lm358"],
     });
-    expect(
-      await screen.findByRole("article", {
-        name: "Ultra Librarian KiCad variant, active",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(await screen.findByText("Active In Both")).toBeInTheDocument();
   });
 
-  it("surfaces a stale compare-and-switch and refetches the latest pointer", async () => {
-    mockCadVariantApi.activate.mockRejectedValue(
-      new CadVariantApiError(409, "active variant changed"),
+  it("surfaces a stale pair switch and refetches both latest pointers", async () => {
+    mockCadVariantApi.activatePair.mockRejectedValue(
+      new CadVariantApiError(409, "active pair changed"),
     );
     wrap(<CadVariantSection partId="lm358" enabled />);
 
     await userEvent.click(
       await screen.findByRole("button", {
-        name: "Use Ultra Librarian variant for KiCad",
+        name: "Use Ultra Librarian for KiCad and Altium",
       }),
     );
 
-    expect(
-      await screen.findByRole("alert"),
-    ).toHaveTextContent(
-      "The active variant changed before this switch completed. The latest choices are loading.",
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The active CAD pair changed before this switch completed. The latest choices are loading.",
     );
     await waitFor(() =>
       expect(mockCadVariantApi.inventory).toHaveBeenCalledTimes(2),
@@ -187,6 +210,6 @@ describe("CadVariantSection", () => {
       "Could not read CAD variants. evidence store is unavailable",
     );
     await userEvent.click(screen.getByRole("button", { name: "Try Again" }));
-    expect(await screen.findByText("3 Retained")).toBeInTheDocument();
+    expect(await screen.findByText("4 Retained")).toBeInTheDocument();
   });
 });

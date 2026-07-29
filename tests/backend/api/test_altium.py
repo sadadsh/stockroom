@@ -48,20 +48,16 @@ def test_regenerate_over_empty_is_ok(client):
     assert body["dblib"].endswith("/altium/Stockroom.DbLib")
 
 
-def test_attach_then_status_marks_ready(client):
-    # attach the S1M sample assets to the (identity-complete) fixture part tps62130
+def test_local_altium_attach_is_not_a_public_activation_lane(client):
+    before = client.get("/api/altium/status").json()
     r = client.post(
         "/api/altium/parts/tps62130/attach",
         json={"paths": [str(ALTIUM_FIX / "sample.SchLib"), str(ALTIUM_FIX / "sample.PcbLib")]},
     )
-    assert r.status_code == 200
-    rec = r.json()
-    assert rec["assets"]["altium"]["symbol"]["ref"]["name"] and rec["assets"]["altium"]["footprint"]["ref"]["name"]
-
-    status = client.get("/api/altium/status").json()
-    assert status["ready"] == 1
-    row = next(x for x in status["rows"] if x["id"] == "tps62130")
-    assert row["ready"] is True and row["symbol"] and row["footprint"]
+    assert r.status_code == 422
+    assert "local Altium file attachment is disabled" in r.json()["detail"]
+    assert "KiCad, Altium, and STEP" in r.json()["detail"]
+    assert client.get("/api/altium/status").json() == before
 
 
 def test_status_skips_a_bad_record_instead_of_404ing_the_surface(client, app_ctx):
@@ -74,14 +70,16 @@ def test_status_skips_a_bad_record_instead_of_404ing_the_surface(client, app_ctx
     assert ids == {"tps62130", "mystery"}  # the two valid fixtures still shown
 
 
-def test_attach_unknown_part_is_404(client):
+def test_retired_altium_attach_fails_closed_before_resolving_a_part(client):
     r = client.post("/api/altium/parts/nope/attach", json={"paths": [str(ALTIUM_FIX / "sample.IntLib")]})
-    assert r.status_code == 404
+    assert r.status_code == 422
+    assert "network collection" in r.json()["detail"]
 
 
-def test_attach_without_paths_is_422(client):
+def test_retired_altium_attach_without_paths_has_the_same_network_only_boundary(client):
     r = client.post("/api/altium/parts/tps62130/attach", json={"paths": []})
     assert r.status_code == 422
+    assert "activate atomically" in r.json()["detail"]
 
 
 def test_status_resistor_value_keeps_ohm_unit(client, app_ctx):

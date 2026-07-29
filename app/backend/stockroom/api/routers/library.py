@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import threading
+from types import MappingProxyType
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 
@@ -26,7 +27,9 @@ from stockroom.ingest.passive_add import (
     build_passive_record,
 )
 from stockroom.model.part import PartRecord
+from stockroom.model.part_id import is_valid_part_id
 from stockroom.verify.record_diff import extract_symbol_node, field_diff
+from stockroom.workflow import IntakeIdentity
 
 # How deep the per-part timeline reads. A part rarely accrues this many commits;
 # the same cap governs history and the diff rev-validation so the two agree on what
@@ -37,6 +40,128 @@ _AUTOMATIC_CAPTURE_INSTRUCTION = (
     "opens the exact result, chooses the required formats, captures, validates, and attaches every "
     "delivered file automatically. It stops only for a provider security check."
 )
+_COMPLETION_MAX_BATCH = 1000
+_COMPLETION_BODY_FIELDS = frozenset({"part_ids", "limit", "idempotency_key"})
+
+
+def _completion_request(
+    request: Request,
+    body: dict | None,
+) -> tuple[list[str] | None, int, str | None]:
+    """Validate the completion command without coercing caller mistakes."""
+
+    payload = {} if body is None else body
+    unexpected = sorted(str(key) for key in payload if key not in _COMPLETION_BODY_FIELDS)
+    if unexpected:
+        raise ValueError("unknown completion fields: " + ", ".join(unexpected))
+
+    raw_part_ids = payload.get("part_ids")
+    if raw_part_ids is None:
+        part_ids = None
+    elif type(raw_part_ids) is not list or not raw_part_ids:
+        raise ValueError("part_ids must be a non-empty list of part identifiers")
+    else:
+        part_ids = []
+        for raw_part_id in raw_part_ids:
+            if type(raw_part_id) is not str or raw_part_id != raw_part_id.strip():
+                raise ValueError("part_ids must contain exact non-empty strings")
+            if not is_valid_part_id(raw_part_id):
+                raise ValueError(f"invalid part identifier: {raw_part_id!r}")
+            part_ids.append(raw_part_id)
+        if len(part_ids) > _COMPLETION_MAX_BATCH:
+            raise ValueError(
+                f"part_ids must contain at most {_COMPLETION_MAX_BATCH} identifiers"
+            )
+        if len(set(part_ids)) != len(part_ids):
+            raise ValueError("part_ids must not contain duplicates")
+
+    raw_limit = payload.get("limit")
+    if raw_limit is None:
+        limit = _COMPLETION_MAX_BATCH
+    elif type(raw_limit) is not int or not 1 <= raw_limit <= _COMPLETION_MAX_BATCH:
+        raise ValueError(f"limit must be an integer between 1 and {_COMPLETION_MAX_BATCH}")
+    else:
+        limit = raw_limit
+
+    body_key = payload.get("idempotency_key")
+    if body_key is not None and (
+        type(body_key) is not str or not body_key.strip()
+    ):
+        raise ValueError("idempotency_key must be a non-empty string")
+    header_key = request.headers.get("Idempotency-Key")
+    if header_key is not None and not header_key.strip():
+        raise ValueError("Idempotency-Key must not be blank")
+    if body_key is not None and header_key is not None and body_key != header_key:
+        raise ValueError("body and header idempotency keys must match")
+    idempotency_key = header_key if header_key is not None else body_key
+    return part_ids, limit, idempotency_key
+
+
+def _current_completion_record(ctx, part_id: str) -> PartRecord:
+    """Load one exact current source record after the path-safe ID gate."""
+
+    path = ctx.profile.library.parts_dir / f"{part_id}.json"
+    if not path.is_file():
+        raise FileNotFoundError(f"no such part: {part_id}")
+    try:
+        record = ctx.ops.load_record(part_id)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"no such part: {part_id}") from None
+    if record.id != part_id:
+        raise ApiError(
+            409,
+            f"Part file {part_id!r} declares a different record id {record.id!r}.",
+        )
+    return record
+
+
+def _needs_durable_completion(record: PartRecord) -> bool:
+    return bool(record.missing_fields()) or any(record.missing_assets_by_tool().values())
+
+
+def _durable_completion_records(
+    ctx,
+    part_ids: list[str] | None,
+    limit: int,
+) -> list[PartRecord]:
+    """Resolve the exact bounded intake from current canonical JSON records."""
+
+    if part_ids is not None:
+        # Validate every requested ID before applying a preview limit.  A typo
+        # outside the selected prefix must not be hidden by silent truncation.
+        requested = [_current_completion_record(ctx, part_id) for part_id in part_ids]
+        return requested[:limit]
+
+    records: list[PartRecord] = []
+    for path in sorted(ctx.profile.library.parts_dir.glob("*.json")):
+        part_id = path.stem
+        if not is_valid_part_id(part_id):
+            raise ApiError(409, f"Part file has an invalid identifier: {part_id!r}.")
+        record = _current_completion_record(ctx, part_id)
+        if not _needs_durable_completion(record):
+            continue
+        records.append(record)
+        if len(records) == limit:
+            break
+    return records
+
+
+def _completion_identities(records: list[PartRecord]) -> list[IntakeIdentity]:
+    identities: list[IntakeIdentity] = []
+    for record in records:
+        if not record.mpn.strip():
+            raise ApiError(
+                422,
+                f"Part {record.id!r} needs an MPN before durable completion can start.",
+            )
+        identities.append(
+            IntakeIdentity(
+                manufacturer=record.manufacturer,
+                mpn=record.mpn,
+                payload=MappingProxyType({"part_id": record.id}),
+            )
+        )
+    return identities
 
 
 # Single-flight guard for POST /rescan: two concurrent rescans would double the API quota
@@ -45,28 +170,6 @@ _AUTOMATIC_CAPTURE_INSTRUCTION = (
 # in-flight job rather than submit a new one. One lock per process is correct here - there
 # is one rescan job slot per app instance (tracked on request.app.state).
 _rescan_lock = threading.Lock()
-
-
-def _origin_from(body: dict):
-    """The provenance a caller claims for an asset, or None.
-
-    `vendor` and `url` are the caller's to state -- only the guided flow knows which page the
-    person actually downloaded from. `captured_at` is NOT accepted: `LibraryOps` stamps it from
-    the server clock, because a provenance timestamp a client can set is not evidence.
-
-    A body with no vendor AND no url returns None rather than an empty origin, so an attach that
-    records nothing leaves the asset honestly UNATTRIBUTED instead of claiming a blank vendor.
-    """
-    from stockroom.model.asset import AssetOrigin
-
-    raw = body.get("origin")
-    if not isinstance(raw, dict):
-        return None
-    vendor = str(raw.get("vendor") or "").strip()
-    url = str(raw.get("url") or "").strip()
-    if not (vendor or url):
-        return None
-    return AssetOrigin(vendor=vendor, url=url)
 
 
 def _part_json_path(ctx, part_id: str):
@@ -512,41 +615,30 @@ def library_router(require_token) -> APIRouter:
         return {"parts": parts, "counts": counts}
 
     @r.post("/parts/{part_id}/symbol")
-    def attach_symbol(request: Request, part_id: str, body: dict) -> dict:
-        """Attach (or repoint) a symbol REFERENCE on an existing part, tagged with its EDA
-        tool ("kicad" default; "altium" later). Reference-only (a lib_id, no file copied) -
-        the "attach an asset after adding the part" path. 422 if lib/name is missing."""
-        ctx = request.app.state.ctx
-        if ctx.index.get(part_id) is None:
-            raise FileNotFoundError(f"no such part: {part_id}")
-        lib, name = (body.get("lib") or "").strip(), (body.get("name") or "").strip()
-        if not name:
-            raise ApiError(422, "a symbol reference needs a name")
-        rec = ctx.ops.attach_symbol(
-            part_id, lib, name, tool=(body.get("tool") or "kicad").strip(),
-            origin=_origin_from(body),
+    def attach_symbol(_request: Request, part_id: str, _body: dict) -> dict:
+        """Reject the retired reference-only, single-tool activation lane."""
+
+        del part_id
+        raise ApiError(
+            422,
+            (
+                "single-tool symbol attachment is disabled; use network collection so KiCad, "
+                "Altium, and STEP activate atomically from one verified evidence set"
+            ),
         )
-        ctx.rebuild_index()
-        ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
-        return rec.to_dict()
 
     @r.post("/parts/{part_id}/footprint")
-    def attach_footprint(request: Request, part_id: str, body: dict) -> dict:
-        """Attach (or repoint) a footprint REFERENCE on an existing part, tagged with its EDA
-        tool. Reference-only (lib_id, no file copied). 422 if lib/name is missing."""
-        ctx = request.app.state.ctx
-        if ctx.index.get(part_id) is None:
-            raise FileNotFoundError(f"no such part: {part_id}")
-        lib, name = (body.get("lib") or "").strip(), (body.get("name") or "").strip()
-        if not name:
-            raise ApiError(422, "a footprint reference needs a name")
-        rec = ctx.ops.attach_footprint(
-            part_id, lib, name, tool=(body.get("tool") or "kicad").strip(),
-            origin=_origin_from(body),
+    def attach_footprint(_request: Request, part_id: str, _body: dict) -> dict:
+        """Reject the retired reference-only, single-tool activation lane."""
+
+        del part_id
+        raise ApiError(
+            422,
+            (
+                "single-tool footprint attachment is disabled; use network collection so "
+                "KiCad, Altium, and STEP activate atomically from one verified evidence set"
+            ),
         )
-        ctx.rebuild_index()
-        ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
-        return rec.to_dict()
 
     @r.get("/parts/{part_id}/history")
     def part_history(request: Request, part_id: str) -> dict:
@@ -633,6 +725,17 @@ def library_router(require_token) -> APIRouter:
         ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return Response(status_code=204)
 
+    @r.post("/parts/{part_id}/undo-delete")
+    def undo_delete_part(request: Request, part_id: str) -> dict:
+        """Restore one exact Stockroom deletion through Git's non-destructive revert."""
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is not None:
+            raise ValueError(f"{part_id} already exists; there is no deletion to undo")
+        record = ctx.ops.restore_deleted_part(part_id)
+        ctx.rebuild_index()
+        ctx.auto_push()
+        return record.to_dict()
+
     @r.get("/completion")
     def completion_coverage(request: Request) -> dict:
         """Is my library complete, and what is missing?
@@ -648,20 +751,43 @@ def library_router(require_token) -> APIRouter:
 
     @r.post("/completion/run")
     def completion_run(request: Request, body: dict | None = None) -> dict:
-        """Give every part the files it still needs, from sources that need no human.
+        """Submit completion to the durable owner, or use the bounded dev fallback.
 
-        A cancellable background job. It has to be cancellable: at the measured catalogue
-        pace a 10,000-part library is around 21 hours, and starting a run you cannot stop is
-        a commitment nobody should have to make. Stopping is safe at any moment because every
-        part is its own atomic commit, and resuming is just running it again -- the worklist
-        is derived from the library, never bookkept.
+        A mounted coordinator is authoritative: this route persists exactly one
+        durable intake request and returns before stage execution.  It never
+        launches the process-local job runner in that mode.  Standalone source
+        development keeps the former cancellable runner, capped to the same
+        one-thousand-item batch boundary.
         """
         from stockroom.capture.runner import run_completion
 
         ctx = request.app.state.ctx
-        payload = body or {}
-        part_ids = payload.get("part_ids") or None
-        limit = payload.get("limit")
+        part_ids, limit, idempotency_key = _completion_request(request, body)
+        coordinator = ctx.workflow_coordinator
+        if coordinator is not None:
+            records = _durable_completion_records(ctx, part_ids, limit)
+            if not records:
+                raise ApiError(409, "No current parts need completion.")
+            batch = coordinator.submit_batch(
+                _completion_identities(records),
+                idempotency_key=idempotency_key,
+            )
+            return {
+                "workflow_batch_id": batch.id,
+                "event_cursor": 0,
+            }
+
+        if idempotency_key is not None:
+            raise ApiError(
+                503,
+                "Idempotent completion requires the durable workflow coordinator.",
+            )
+        if part_ids is not None:
+            # The legacy job used to turn an unknown ID into a delayed SSE
+            # failure. Resolve all requested IDs now so the command response is
+            # deterministic and cannot launch work for a partial bad request.
+            for part_id in part_ids:
+                _current_completion_record(ctx, part_id)
 
         def work(progress, should_stop):
             return run_completion(
@@ -669,7 +795,7 @@ def library_router(require_token) -> APIRouter:
                 progress=progress,
                 should_stop=should_stop,
                 part_ids=part_ids,
-                limit=(int(limit) if limit else None),
+                limit=limit,
             )
 
         return {"job_id": ctx.jobs.submit_cancellable(work)}
@@ -678,12 +804,11 @@ def library_router(require_token) -> APIRouter:
     def capture_run(request: Request, body: dict | None = None) -> dict:
         """Automatically acquire missing CAD, or explicitly open the assisted fallback.
 
-        Automatic mode is the default and supports one component or the derived incomplete
-        worklist. It tries keyless/direct and policy-permitted machine sources without opening a
-        commercial page. Assisted mode is deliberately one component + one selected provider:
-        that click authorizes Stockroom to use saved login state and operate the provider's
-        ordinary export controls. Only a real CAPTCHA, MFA, or security gate is handed back to
-        the person.
+        Automatic mode is the bounded batch-safe default. Assisted mode is one component plus one
+        selected provider. Collect-all is one exact-MPN component and exhausts direct evidence,
+        every policy-permitted automatic provider, and then every remaining provider sequentially.
+        Only a real CAPTCHA, MFA, passkey, security check, or person-only provider control is
+        handed back to the person.
         """
         from stockroom.capture.runner import run_guided_capture
         from stockroom.capture.vendors import get_adapter
@@ -691,8 +816,10 @@ def library_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         payload = body or {}
         mode = payload.get("mode", "automatic")
-        if mode not in {"automatic", "assisted"}:
-            raise ValueError("capture mode must be 'automatic' or 'assisted'")
+        if mode not in {"automatic", "assisted", "collect-all"}:
+            raise ValueError(
+                "capture mode must be 'automatic', 'assisted', or 'collect-all'"
+            )
         background = payload.get("background", False)
         if type(background) is not bool:
             raise ValueError("background must be a boolean")
@@ -737,8 +864,29 @@ def library_router(require_token) -> APIRouter:
                 raise ValueError(
                     f"{adapter.capability.label} requires a visible person-driven provider page"
                 )
+        if mode == "collect-all":
+            if part_ids is None or len(part_ids) != 1:
+                raise ValueError("collect-all capture requires exactly one selected part")
+            if limit is not None:
+                raise ValueError(
+                    "collect-all capture does not accept a batch limit; select exactly one part"
+                )
+            if background:
+                raise ValueError(
+                    "collect-all capture requires visible sequential provider handoffs"
+                )
         if part_ids is not None and len(part_ids) == 1 and ctx.index.get(part_ids[0]) is None:
             raise FileNotFoundError(f"no such part: {part_ids[0]}")
+        if mode == "collect-all":
+            from stockroom.capture.evidence import exact_identity
+
+            assert part_ids is not None
+            try:
+                exact_identity(ctx.ops.load_record(part_ids[0]))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "collect-all capture requires one exact manufacturer and MPN"
+                ) from exc
 
         def work(progress, should_stop):
             return run_guided_capture(
@@ -750,6 +898,7 @@ def library_router(require_token) -> APIRouter:
                 limit=(int(limit) if limit else None),
                 headless=background,
                 operator_authorized=mode == "assisted",
+                collect_all=mode == "collect-all",
             )
 
         return {"job_id": ctx.jobs.submit_cancellable(work)}

@@ -148,6 +148,60 @@ def test_user_driven_capture_route_requires_one_part_and_one_provider(client, ap
         assert detail in response.json()["detail"]
 
 
+def test_collect_all_route_is_one_exact_visible_part_without_batch_controls(
+    client,
+    app_ctx,
+):
+    part_id = _land_bare_part(app_ctx)
+    cases = (
+        ({"mode": "collect-all"}, "exactly one selected part"),
+        (
+            {
+                "mode": "collect-all",
+                "part_ids": [part_id, "another-part"],
+            },
+            "exactly one selected part",
+        ),
+        (
+            {"mode": "collect-all", "part_ids": [part_id], "limit": 1},
+            "does not accept a batch limit",
+        ),
+        (
+            {"mode": "collect-all", "part_ids": [part_id], "background": True},
+            "requires visible sequential provider handoffs",
+        ),
+    )
+
+    for payload, detail in cases:
+        response = client.post("/api/library/capture/run", json=payload)
+        assert response.status_code == 400, (payload, response.text)
+        assert detail in response.json()["detail"]
+
+
+def test_collect_all_rejects_incomplete_identity_before_starting_a_job(client, app_ctx):
+    record = PartRecord(
+        id="collect-without-maker",
+        display_name="UNKNOWN",
+        category="ICs",
+        description="missing manufacturer",
+        mpn="ABC-123",
+        manufacturer="",
+    )
+    (app_ctx.ops.lib.parts_dir / f"{record.id}.json").write_text(
+        record.dumps(),
+        encoding="utf-8",
+    )
+    app_ctx.rebuild_index()
+
+    response = client.post(
+        "/api/library/capture/run",
+        json={"mode": "collect-all", "part_ids": [record.id]},
+    )
+
+    assert response.status_code == 400
+    assert "exact manufacturer and MPN" in response.json()["detail"]
+
+
 def test_digikey_is_marked_an_AGGREGATOR_and_the_model_libraries_are_not(client, app_ctx):
     """DigiKey HOSTS models the other three authored; it is not a fourth library. Carried as data
     so a surface can order and label it honestly instead of implying one."""

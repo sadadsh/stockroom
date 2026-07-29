@@ -89,7 +89,7 @@ export function PartTimeline({ partId }: { partId: string }) {
 
   return (
     <>
-      <Card className="overflow-hidden">
+      <Card className="mx-auto w-full max-w-[980px] overflow-hidden">
         <ul>
           {commits.map((c) => {
             const active = selectedSha === c.sha;
@@ -100,12 +100,12 @@ export function PartTimeline({ partId }: { partId: string }) {
                   aria-expanded={active}
                   onClick={() => setSelectedSha(active ? null : c.sha)}
                   className={
-                    "flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors " +
+                    "flex w-full items-start gap-3 px-3 py-2 text-left transition-colors " +
                     (active ? "bg-inset" : "hover:bg-inset")
                   }
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm text-t1">{c.subject}</span>
+                    <span className="block truncate text-xs text-t1">{c.subject}</span>
                     <span className="mt-0.5 block text-xs text-t3">
                       {c.author} · {formatDate(c.iso_date)}
                     </span>
@@ -217,8 +217,8 @@ function Message({
   tone?: "err";
 }) {
   return (
-    <Card className="px-4 py-3.5">
-      <span className={"text-sm " + (tone === "err" ? "text-err" : "text-t2")}>
+    <Card className="mx-auto w-full max-w-[980px] px-3 py-2.5">
+      <span className={"text-xs " + (tone === "err" ? "text-err" : "text-t2")}>
         {children}
       </span>
     </Card>

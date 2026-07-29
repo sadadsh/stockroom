@@ -14,11 +14,273 @@ import {
 import type {
   EnrichmentResult,
   PartDetail,
+  DiscoveredProject,
+  ProjectReviewCandidate,
   SetLibraryBody,
   SettingsPatch,
 } from "./types";
 import { api, type ListPartsArgs, type SearchArgs } from "./client";
 import { useJob } from "../lib/useJob";
+
+export function useProjects() {
+  return useQuery({
+    queryKey: ["projects"],
+    queryFn: () => api.listProjects(),
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useProjectWorkspace(projectId: string | null) {
+  return useQuery({
+    queryKey: ["project-workspace", projectId],
+    queryFn: () => api.projectWorkspace(projectId!),
+    enabled: !!projectId,
+  });
+}
+
+export function useLiveProjectBom(projectId: string, boards: number) {
+  return useQuery({
+    queryKey: ["project-bom-live", projectId, boards],
+    queryFn: () => api.liveProjectBom(projectId, boards),
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useProjectBomExport(projectId: string) {
+  return useMutation({
+    mutationFn: (boards: number) => api.liveProjectBomExport(projectId, boards),
+  });
+}
+
+export function useProjectAssignments(projectId: string) {
+  return useQuery({
+    queryKey: ["project-assignments", projectId],
+    queryFn: () => api.projectAssignments(projectId),
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useAssignProjectGroup(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ refs, partId }: { refs: string[]; partId: string }) =>
+      api.assignProjectGroup(projectId, refs, partId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["project-assignments", projectId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["project-bom-live", projectId],
+      });
+    },
+  });
+}
+
+export function useProjectCollaboration(projectId: string) {
+  return useQuery({
+    queryKey: ["project-collaboration", projectId],
+    queryFn: () => api.projectCollaboration(projectId),
+    refetchInterval: (query) => (query.state.data?.session ? 15_000 : 5_000),
+  });
+}
+
+export function useStartWorkSession(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { owner: string; branch: string; documents: string[] }) =>
+      api.startWorkSession(projectId, body),
+    onSuccess: (state) =>
+      queryClient.setQueryData(["project-collaboration", projectId], state),
+  });
+}
+
+export function useShareWorkSession(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      sessionId,
+      message,
+    }: {
+      sessionId: string;
+      message: string;
+    }) => api.shareWorkSession(projectId, sessionId, message),
+    onSuccess: (state) =>
+      queryClient.setQueryData(["project-collaboration", projectId], state),
+  });
+}
+
+export function useResumeWorkSession(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => api.resumeWorkSession(projectId, sessionId),
+    onSuccess: (state) =>
+      queryClient.setQueryData(["project-collaboration", projectId], state),
+  });
+}
+
+export function useFinishWorkSession(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => api.finishWorkSession(projectId, sessionId),
+    onSuccess: (result) => {
+      queryClient.setQueryData(
+        ["project-collaboration", projectId],
+        result.collaboration,
+      );
+      queryClient.invalidateQueries({ queryKey: ["project-reviews", projectId] });
+    },
+  });
+}
+
+export function useProjectReviews(projectId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["project-reviews", projectId],
+    queryFn: () => api.projectReviews(projectId),
+    enabled,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useProjectReviewEvidence(
+  projectId: string,
+  candidate: ProjectReviewCandidate | undefined,
+) {
+  return useQuery({
+    queryKey: [
+      "project-review-evidence",
+      projectId,
+      candidate?.branch,
+      candidate?.commit,
+      candidate?.base_branch,
+      candidate?.base_commit,
+    ],
+    queryFn: () => api.projectReviewEvidence(projectId, candidate!),
+    enabled: !!candidate?.ready,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+}
+
+export function useValidateProjectReview(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (candidate: {
+      branch: string;
+      commit: string;
+      base_branch: string;
+      base_commit: string;
+    }) => api.validateProjectReview(projectId, candidate),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ["project-review-evidence", projectId],
+      }),
+  });
+}
+
+export function useApproveProjectReview(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (candidate: {
+      branch: string;
+      commit: string;
+      base_branch: string;
+      base_commit: string;
+    }) => api.approveProjectReview(projectId, candidate),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-reviews", projectId] });
+      queryClient.invalidateQueries({
+        queryKey: ["project-collaboration", projectId],
+      });
+    },
+  });
+}
+
+export function useRequestProjectChanges(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (decision: {
+      branch: string;
+      commit: string;
+      base_branch: string;
+      base_commit: string;
+      reviewer: string;
+      message: string;
+    }) => api.requestProjectChanges(projectId, decision),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-reviews", projectId] });
+      queryClient.invalidateQueries({
+        queryKey: ["project-collaboration", projectId],
+      });
+    },
+  });
+}
+
+export function useDiscoverProjects() {
+  return useMutation({
+    mutationFn: (candidate: string) => api.discoverProjects(candidate),
+  });
+}
+
+export function useRegisterProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (project: Pick<DiscoveredProject, "root" | "eda">) =>
+      api.registerProject(project.root, project.eda),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["projects"] }),
+  });
+}
+
+export function useActiveAssembly(projectId: string) {
+  return useQuery({
+    queryKey: ["project-assembly", projectId],
+    queryFn: () => api.activeAssembly(projectId),
+    refetchInterval: 2_000,
+  });
+}
+
+export function useStartAssembly(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ operator, boards }: { operator: string; boards: number }) =>
+      api.startAssembly(projectId, operator, boards),
+    onSuccess: (run) =>
+      queryClient.setQueryData(["project-assembly", projectId], run),
+  });
+}
+
+export function useRecordAssemblyEvent(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      runId,
+      placementId,
+      state,
+      scannedMpn = "",
+      note = "",
+    }: {
+      runId: string;
+      placementId: string;
+      state: "done" | "skipped" | "reworked" | "issue";
+      scannedMpn?: string;
+      note?: string;
+    }) =>
+      api.recordAssemblyEvent(projectId, runId, {
+        placement_id: placementId,
+        state,
+        scanned_mpn: scannedMpn,
+        note,
+      }),
+    onSuccess: (run) =>
+      queryClient.setQueryData(["project-assembly", projectId], run),
+  });
+}
+
+export function useCompleteAssembly(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (runId: string) => api.completeAssembly(projectId, runId),
+    onSuccess: () => queryClient.setQueryData(["project-assembly", projectId], null),
+  });
+}
 
 // First-run library onboarding (M9c). Set/complete repoint the running engine at a
 // different library, so EVERY server query is invalidated.
@@ -192,28 +454,6 @@ export function useMoveCategory() {
   });
 }
 
-// Attach a symbol / footprint reference to an existing part (assets no longer gate
-// entry, so they are attached after the part lands). A write commits and can change
-// the footprint-duplicate set, so it invalidates the same derived caches as any other
-// write (list, facets, duplicates, the affected detail, the grown git timeline).
-export function useAttachSymbol() {
-  const invalidate = useInvalidateAfterWrite();
-  return useMutation({
-    mutationFn: (vars: { id: string; lib: string; name: string; tool?: string }) =>
-      api.attachSymbol(vars.id, vars.lib, vars.name, vars.tool),
-    onSuccess: (_data, vars) => invalidate(vars.id),
-  });
-}
-
-export function useAttachFootprint() {
-  const invalidate = useInvalidateAfterWrite();
-  return useMutation({
-    mutationFn: (vars: { id: string; lib: string; name: string; tool?: string }) =>
-      api.attachFootprint(vars.id, vars.lib, vars.name, vars.tool),
-    onSuccess: (_data, vars) => invalidate(vars.id),
-  });
-}
-
 // Removing one element is a write like any other; the altium status and the capture
 // needs both change with it, so those refresh too.
 export function useDetachAsset() {
@@ -240,6 +480,14 @@ export function useDeletePart() {
       qc.removeQueries({ queryKey: ["part", id] });
       qc.removeQueries({ queryKey: ["part-history", id] });
     },
+  });
+}
+
+export function useRestoreDeletedPart() {
+  const invalidate = useInvalidateAfterWrite();
+  return useMutation({
+    mutationFn: (id: string) => api.restoreDeletedPart(id),
+    onSuccess: (_data, id) => invalidate(id),
   });
 }
 
@@ -633,20 +881,6 @@ export function useAltiumEmbedModel() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["altium-status"] });
       qc.invalidateQueries({ queryKey: ["altium-embed-capability"] });
-      qc.invalidateQueries({ queryKey: ["parts"] });
-      qc.invalidateQueries({ queryKey: ["part", vars.id] });
-    },
-  });
-}
-
-// Attach a part's Altium assets by native paths, then the part becomes place-ready. Invalidates
-// the Altium status plus the part list/detail (the record gained altium refs).
-export function useAltiumAttach() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (vars: { id: string; paths: string[] }) => api.altiumAttach(vars.id, vars.paths),
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["altium-status"] });
       qc.invalidateQueries({ queryKey: ["parts"] });
       qc.invalidateQueries({ queryKey: ["part", vars.id] });
     },

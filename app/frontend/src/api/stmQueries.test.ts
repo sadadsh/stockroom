@@ -41,17 +41,14 @@ const TARGET_POLICY: TargetDefinitionPolicy = {
   revision: 1,
   requirements: [],
   safety_rules: [],
-  channel_fabric: {
-    part_mpn: "TEST-SWITCH",
-    channels_per_device: 8,
-    max_devices: 1,
-    default_state: "open",
+  routing_constraints: {
+    safe_default: "open",
   },
 };
 
 const TARGET_DEFINITION: TargetDefinitionDTO = {
-  format: "stm-target-definition/1",
-  compiler_rev: 4,
+  format: "stm-target-definition/2",
+  compiler_rev: 8,
   artifact_digest: "a".repeat(64),
   profile: {
     id: "test",
@@ -89,16 +86,35 @@ const TARGET_DEFINITION: TargetDefinitionDTO = {
     groups: [],
   },
   safety_rules: [],
-  channel_fabric: {
-    part_mpn: "TEST-SWITCH",
-    channels_per_device: 8,
-    max_devices: 1,
-    default_state: "open",
-    reference_prefix: "U_ROUTE",
-    required_channels: 0,
-    capacity: 8,
-    used_devices: 0,
-    allocations: [],
+  routing_requirements: {
+    strategy: "implementation-neutral-independent-paths",
+    safe_default: "open",
+    required_independent_paths: 0,
+    maximum_independent_paths: null,
+    limit_status: "unbounded",
+    paths: [],
+  },
+  universalization: {
+    strategy: "one-package-universal-support",
+    implementation_owner: "consuming-design",
+    implementation_technology: "unspecified",
+    required_independent_paths: 0,
+    safe_default: "open",
+    state_contract: {
+      unknown_target: "all-independent-paths-open",
+      controller_startup: "all-independent-paths-open",
+      controller_reset: "all-independent-paths-open",
+      power_loss: "all-independent-paths-open",
+      target_change: "open-before-reconfigure",
+      identity_mismatch: "refuse-activation",
+      configured: "only-target-permitted-paths-may-conduct",
+    },
+    summary: {
+      direct_or_fixed: 0,
+      selectable: 0,
+      excluded_from_common_interface: 0,
+    },
+    strategies: [],
   },
   positions: [],
 };

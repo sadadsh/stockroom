@@ -13,11 +13,13 @@ No em dashes anywhere (standing owner rule).
 
 from __future__ import annotations
 
+import builtins
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 from stockroom.model.project import ProjectRecord, new_project_id
+from stockroom.projects.adapters import detect_project
 from stockroom.vcs.repo import GitRepo
 
 # Project ids come from new_project_id (a slug of the project name), so they are always
@@ -128,29 +130,12 @@ class ProjectStore:
         root = Path(root)
         if not root.is_dir():
             raise ValueError(f"not a directory: {root.as_posix()}")
-        if eda not in (None, "kicad", "altium"):
-            raise ValueError(f"unknown eda: {eda!r} (expected 'kicad' or 'altium')")
-        kicad = _discover(root)
-        altium = _discover_altium(root)
-        has_kicad = any(kicad[:3])
-        has_altium = any(altium[:3])
-        if eda is None:
-            # Auto-detect by which EDA's files exist; a dir holding BOTH is ambiguous
-            # and needs an explicit choice rather than a silent guess.
-            if has_kicad and has_altium:
-                raise ValueError(
-                    f"{root.as_posix()} holds both KiCad and Altium project files; "
-                    "pass eda='kicad' or eda='altium' to choose"
-                )
-            eda = "altium" if has_altium else "kicad"
-        if eda == "altium":
-            if not has_altium:
-                raise ValueError(f"no Altium project files found in {root.as_posix()}")
-            pro, boards, sheets, name = altium
-        else:
-            if not has_kicad:
-                raise ValueError(f"no KiCad project files found in {root.as_posix()}")
-            pro, boards, sheets, name = kicad
+        description = detect_project(root, requested=eda)
+        eda = description.adapter_key
+        pro = description.descriptor
+        boards = list(description.boards)
+        sheets = list(description.schematics)
+        name = description.name
         root_posix = root.as_posix()
         if any(rec.root == root_posix for rec in self.list()):
             raise ValueError(f"project already registered: {root_posix}")
@@ -172,7 +157,7 @@ class ProjectStore:
         self.repo.commit(f"Register project {name}", [path])
         return rec
 
-    def list(self) -> list[ProjectRecord]:
+    def list(self) -> builtins.list[ProjectRecord]:
         if not self.projects_root.exists():
             return []
         recs = [

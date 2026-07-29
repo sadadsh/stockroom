@@ -16,23 +16,150 @@ No em dashes anywhere (standing owner rule).
 
 from __future__ import annotations
 
+import hashlib
+import json
+import threading
+from dataclasses import asdict
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Request, Response
 
 from stockroom.api.schemas import (
+    ApproveReviewBody,
+    AssemblyEventBody,
     AssignGroupBody,
     ConformBody,
+    DiscoverProjectsBody,
     ManualFillBody,
     ProjectSummary,
     RegisterProjectBody,
+    RequestChangesBody,
     SetDesignRulesBody,
     SetFieldsBody,
     SetNetClassesBody,
     SetNetclassPatternsBody,
     SetSettingsBody,
+    ShareWorkBody,
     StackupBody,
+    StartAssemblyBody,
+    StartWorkBody,
 )
 from stockroom.kicad.errors import KiCadCliError
 from stockroom.mutation.project_ops import project_capabilities
+from stockroom.projects.adapters import discover_projects, get_adapter
+from stockroom.projects.collaboration import (
+    CollaborationError,
+    ReviewManager,
+    WorkSessionManager,
+    work_session_recovery,
+)
+from stockroom.projects.parity import PROJECT_TOOLS, parity_payload
+from stockroom.projects.review_evidence import (
+    attach_native_validation,
+    build_review_evidence,
+    review_validation_key,
+    run_review_native_validation,
+)
+from stockroom.vcs.locks import GitLfsLockService
+from stockroom.vcs.repo import GitRepo
+
+_WORK_SESSION_LOCKS: dict[str, threading.RLock] = {}
+_WORK_SESSION_LOCKS_GUARD = threading.Lock()
+
+
+def _description_payload(description) -> dict:
+    adapter = get_adapter(description.adapter_key)
+    return {
+        "eda": description.adapter_key,
+        "eda_label": adapter.label,
+        "name": description.name,
+        "root": description.root.as_posix(),
+        "descriptor": description.descriptor,
+        "boards": list(description.boards),
+        "schematics": list(description.schematics),
+    }
+
+
+def _work_session_lock(project_id: str) -> threading.RLock:
+    with _WORK_SESSION_LOCKS_GUARD:
+        return _WORK_SESSION_LOCKS.setdefault(project_id, threading.RLock())
+
+
+def _project_repo(rec) -> GitRepo:
+    if not rec.git_root:
+        raise ValueError("link the project to a Git repository before starting work")
+    repo = GitRepo(Path(rec.git_root))
+    if not repo.is_git_repo():
+        raise ValueError("the linked project repository is unavailable")
+    return repo
+
+
+def _collaboration_payload(rec, ctx) -> dict:
+    repo = _project_repo(rec)
+    session = ctx.work_session_store.active(rec.id)
+    ahead_behind = repo.ahead_behind() if repo.has_upstream() else None
+    ahead, behind = ahead_behind or (0, 0)
+    dirty = [repo._rel(path) for path in repo.dirty_paths()]
+    recovery = (
+        work_session_recovery(
+            repo,
+            GitLfsLockService(repo),
+            session,
+            verify_claims=False,
+            trust_claims=session.id in ctx.work_session_verified,
+        )
+        if session is not None
+        else None
+    )
+    return {
+        "repository": {
+            "root": repo.root.as_posix(),
+            "remote": repo.remote_url(),
+            "branch": repo.current_branch(),
+            "commit": repo.head(),
+            "clean": not dirty,
+            "dirty_paths": dirty,
+            "has_remote": repo.has_remote(),
+            "has_upstream": repo.has_upstream(),
+            "ahead": ahead,
+            "behind": behind,
+        },
+        "session": asdict(session) if session is not None else None,
+        "recovery": recovery,
+    }
+
+
+def _bom_evidence(rec, rows: list[dict]) -> dict:
+    """Stable provenance for the live, format-neutral BOM snapshot."""
+
+    source_commit = ""
+    if rec.git_root:
+        repo = GitRepo(Path(rec.git_root))
+        if repo.is_git_repo():
+            source_commit = repo.head()
+    payload = {
+        "eda": rec.eda,
+        "variant": "Default",
+        "source_commit": source_commit,
+        "source_documents": list(rec.sheet_paths),
+        "rows": rows,
+    }
+    digest = hashlib.sha256(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    return {
+        "eda": rec.eda,
+        "variant": "Default",
+        "source_commit": source_commit,
+        "source_documents": list(rec.sheet_paths),
+        "bom_digest": digest,
+        "repository_pinned": bool(source_commit),
+    }
 
 
 def projects_router(require_token) -> APIRouter:
@@ -53,6 +180,356 @@ def projects_router(require_token) -> APIRouter:
         ctx.rebuild_project_index()
         return dict(rec.to_dict(), capabilities=project_capabilities(rec))
 
+    @r.post("/discover")
+    def discover_linkable_projects(body: DiscoverProjectsBody) -> dict:
+        projects = discover_projects(Path(body.candidate), requested=body.eda)
+        return {"projects": [_description_payload(project) for project in projects]}
+
+    @r.get("/{project_id}/workspace")
+    def project_workspace(request: Request, project_id: str) -> dict:
+        """The format-neutral shell used by every rebuilt Projects route."""
+
+        rec = request.app.state.ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        adapter = get_adapter(rec.eda)
+        return {
+            "project": rec.to_dict(),
+            "eda_label": adapter.label,
+            "tools": list(PROJECT_TOOLS),
+            "parity": parity_payload(),
+            "runtime": asdict(adapter.runtime(rec)),
+            "documents": [asdict(document) for document in adapter.documents(rec)],
+        }
+
+    @r.get("/{project_id}/collaboration")
+    def project_collaboration(request: Request, project_id: str) -> dict:
+        rec = request.app.state.ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        if not rec.git_root:
+            return {
+                "repository": None,
+                "session": None,
+                "recovery": None,
+                "blocked_reason": "Link this project to a Git repository to collaborate.",
+            }
+        return _collaboration_payload(rec, request.app.state.ctx)
+
+    @r.post("/{project_id}/work-sessions")
+    def start_work_session(
+        request: Request,
+        project_id: str,
+        body: StartWorkBody,
+    ) -> dict:
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        with _work_session_lock(project_id):
+            if ctx.work_session_store.active(project_id) is not None:
+                raise CollaborationError(
+                    "session_active",
+                    "this project already has an active work session",
+                )
+            allowed = {
+                document.path
+                for document in get_adapter(rec.eda).documents(rec)
+                if document.lock_required
+            }
+            requested = tuple(dict.fromkeys(body.documents))
+            unknown = sorted(set(requested) - allowed)
+            if unknown:
+                raise CollaborationError(
+                    "unknown_document",
+                    "only linked project documents can be claimed: " + ", ".join(unknown),
+                )
+            repo = _project_repo(rec)
+            manager = WorkSessionManager(repo, GitLfsLockService(repo))
+            session = manager.start(
+                owner=body.owner,
+                branch=body.branch,
+                documents=[Path(rec.root) / path for path in requested],
+            )
+            ctx.work_session_store.save(project_id, session)
+            ctx.work_session_verified.add(session.id)
+        return _collaboration_payload(rec, ctx)
+
+    @r.post("/{project_id}/work-sessions/{session_id}/share")
+    def share_work_session(
+        request: Request,
+        project_id: str,
+        session_id: str,
+        body: ShareWorkBody,
+    ) -> dict:
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        with _work_session_lock(project_id):
+            session = ctx.work_session_store.active(project_id)
+            if session is None or session.id != session_id:
+                raise FileNotFoundError(f"no such active work session: {session_id}")
+            repo = _project_repo(rec)
+            updated = WorkSessionManager(repo, GitLfsLockService(repo)).share(
+                session,
+                message=body.message,
+            )
+            ctx.work_session_store.save(project_id, updated)
+            ctx.work_session_verified.add(updated.id)
+        return _collaboration_payload(rec, ctx)
+
+    @r.post("/{project_id}/work-sessions/{session_id}/resume")
+    def resume_work_session(
+        request: Request,
+        project_id: str,
+        session_id: str,
+    ) -> dict:
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        with _work_session_lock(project_id):
+            session = ctx.work_session_store.active(project_id)
+            if session is None or session.id != session_id:
+                raise FileNotFoundError(f"no such active work session: {session_id}")
+            repo = _project_repo(rec)
+            resumed = WorkSessionManager(repo, GitLfsLockService(repo)).resume(session)
+            ctx.work_session_store.save(project_id, resumed)
+            ctx.work_session_verified.add(resumed.id)
+        return _collaboration_payload(rec, ctx)
+
+    @r.post("/{project_id}/work-sessions/{session_id}/finish")
+    def finish_work_session(
+        request: Request,
+        project_id: str,
+        session_id: str,
+    ) -> dict:
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        with _work_session_lock(project_id):
+            session = ctx.work_session_store.active(project_id)
+            if session is None or session.id != session_id:
+                raise FileNotFoundError(f"no such active work session: {session_id}")
+            repo = _project_repo(rec)
+            integrated = WorkSessionManager(
+                repo,
+                GitLfsLockService(repo),
+            ).finish_after_remote_integration(session)
+            ctx.work_session_store.clear(project_id, session_id)
+            ctx.work_session_verified.discard(session_id)
+        return {
+            "integrated_commit": integrated,
+            "collaboration": _collaboration_payload(rec, ctx),
+        }
+
+    @r.get("/{project_id}/reviews")
+    def list_reviews(request: Request, project_id: str) -> dict:
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        repo = _project_repo(rec)
+        session = ctx.work_session_store.active(project_id)
+        base_branch = session.base_branch if session is not None else repo.current_branch()
+        candidates = ReviewManager(repo).list_candidates(base_branch=base_branch)
+        return {
+            "base_branch": base_branch,
+            "candidates": [asdict(candidate) for candidate in candidates],
+        }
+
+    @r.post("/{project_id}/reviews/approve")
+    def approve_review(
+        request: Request,
+        project_id: str,
+        body: ApproveReviewBody,
+    ) -> dict:
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        with _work_session_lock(project_id):
+            manager = ReviewManager(_project_repo(rec))
+            candidate = manager.discover(
+                branch=body.branch,
+                base_branch=body.base_branch,
+            )
+            if candidate.commit != body.commit:
+                raise CollaborationError(
+                    "review_changed",
+                    "the work branch changed after this commit was displayed",
+                )
+            if candidate.base_commit != body.base_commit:
+                raise CollaborationError(
+                    "base_changed",
+                    "the shared branch changed after this commit was displayed",
+                )
+            evidence = attach_native_validation(
+                build_review_evidence(manager, rec, candidate),
+                ctx.review_validation_cache.get(review_validation_key(rec, candidate)),
+            )
+            if not evidence["reviewable"]:
+                raise CollaborationError(
+                    "review_evidence_blocked",
+                    "resolve the exact commit's source, BOM, semantic, and native validation "
+                    "blockers before approval",
+                )
+            integrated = manager.approve_fast_forward(candidate)
+        return {
+            "integrated_commit": integrated,
+            "candidate": asdict(candidate),
+            "evidence_digest": evidence["digest"],
+        }
+
+    @r.post("/{project_id}/reviews/evidence")
+    def review_evidence(
+        request: Request,
+        project_id: str,
+        body: ApproveReviewBody,
+    ) -> dict:
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        manager = ReviewManager(_project_repo(rec))
+        candidate = manager.discover(
+            branch=body.branch,
+            base_branch=body.base_branch,
+        )
+        if candidate.commit != body.commit:
+            raise CollaborationError(
+                "review_changed",
+                "the work branch changed after this commit was displayed",
+            )
+        if candidate.base_commit != body.base_commit:
+            raise CollaborationError(
+                "base_changed",
+                "the shared branch changed after this commit was displayed",
+            )
+        return attach_native_validation(
+            build_review_evidence(manager, rec, candidate),
+            ctx.review_validation_cache.get(review_validation_key(rec, candidate)),
+        )
+
+    @r.post("/{project_id}/reviews/validate")
+    def validate_review(
+        request: Request,
+        project_id: str,
+        body: ApproveReviewBody,
+    ) -> dict:
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        with _work_session_lock(project_id):
+            manager = ReviewManager(_project_repo(rec))
+            candidate = manager.discover(
+                branch=body.branch,
+                base_branch=body.base_branch,
+            )
+            if candidate.commit != body.commit:
+                raise CollaborationError(
+                    "review_changed",
+                    "the work branch changed after this commit was displayed",
+                )
+            if candidate.base_commit != body.base_commit:
+                raise CollaborationError(
+                    "base_changed",
+                    "the shared branch changed after this commit was displayed",
+                )
+            validation = run_review_native_validation(manager, rec, candidate)
+            ctx.review_validation_cache[review_validation_key(rec, candidate)] = validation
+            return validation
+
+    @r.post("/{project_id}/reviews/request-changes")
+    def request_review_changes(
+        request: Request,
+        project_id: str,
+        body: RequestChangesBody,
+    ) -> dict:
+        rec = request.app.state.ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        with _work_session_lock(project_id):
+            manager = ReviewManager(_project_repo(rec))
+            candidate = manager.discover(
+                branch=body.branch,
+                base_branch=body.base_branch,
+            )
+            if candidate.commit != body.commit:
+                raise CollaborationError(
+                    "review_changed",
+                    "the work branch changed after this commit was displayed",
+                )
+            if candidate.base_commit != body.base_commit:
+                raise CollaborationError(
+                    "base_changed",
+                    "the shared branch changed after this commit was displayed",
+                )
+            event = manager.request_changes(
+                candidate,
+                reviewer=body.reviewer,
+                message=body.message,
+            )
+        return {
+            "event": asdict(event),
+            "candidate": asdict(candidate),
+        }
+
+    @r.post("/{project_id}/assemblies")
+    def start_assembly(
+        request: Request,
+        project_id: str,
+        body: StartAssemblyBody,
+    ) -> dict:
+        rec = request.app.state.ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        return request.app.state.ctx.assembly_store.start(
+            rec,
+            operator=body.operator,
+            boards=body.boards,
+            library_parts=_library_parts(request.app.state.ctx),
+        )
+
+    @r.get("/{project_id}/assemblies/active")
+    def active_assembly(request: Request, project_id: str) -> dict | None:
+        if request.app.state.ctx.project_ops.get(project_id) is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        return request.app.state.ctx.assembly_store.active(project_id)
+
+    @r.get("/{project_id}/assemblies/{run_id}")
+    def get_assembly(request: Request, project_id: str, run_id: str) -> dict:
+        if request.app.state.ctx.project_ops.get(project_id) is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        return request.app.state.ctx.assembly_store.get(project_id, run_id)
+
+    @r.post("/{project_id}/assemblies/{run_id}/events")
+    def record_assembly_event(
+        request: Request,
+        project_id: str,
+        run_id: str,
+        body: AssemblyEventBody,
+    ) -> dict:
+        if request.app.state.ctx.project_ops.get(project_id) is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        return request.app.state.ctx.assembly_store.record_event(
+            project_id,
+            run_id,
+            placement_id=body.placement_id,
+            state=body.state,
+            scanned_mpn=body.scanned_mpn,
+            note=body.note,
+        )
+
+    @r.post("/{project_id}/assemblies/{run_id}/complete")
+    def complete_assembly(request: Request, project_id: str, run_id: str) -> dict:
+        if request.app.state.ctx.project_ops.get(project_id) is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        return request.app.state.ctx.assembly_store.complete(project_id, run_id)
+
     @r.get("/{project_id}")
     def project_detail(request: Request, project_id: str) -> dict:
         ctx = request.app.state.ctx
@@ -68,6 +545,17 @@ def projects_router(require_token) -> APIRouter:
         # An unknown id raises FileNotFoundError -> 404; a known one unregisters (the
         # external files are never touched) and the index is rebuilt.
         ctx = request.app.state.ctx
+        if ctx.project_ops.get(project_id) is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        if ctx.work_session_store.active(project_id) is not None:
+            raise CollaborationError(
+                "session_active",
+                "finish or recover the active work session before unlinking this project",
+            )
+        if ctx.assembly_store.active(project_id) is not None:
+            raise ValueError(
+                "complete the active assembly run before unlinking this project"
+            )
         ctx.project_ops.delete(project_id)
         ctx.checks_cache.pop(project_id, None)  # the cached ERC/DRC is now stale
         ctx.bom_cache.pop(project_id, None)  # the cached BOM is now stale too
@@ -160,8 +648,12 @@ def projects_router(require_token) -> APIRouter:
             # from the library's stored prices first, the enrich layer second.
             library_parts = _library_parts(ctx)
             result = ctx.project_ops.bom(
-                project_id, boards=boards, tax_rate=tax_rate, library_parts=library_parts,
-                price_lookup=price_lookup, progress=progress,
+                project_id,
+                boards=boards,
+                tax_rate=tax_rate,
+                library_parts=library_parts,
+                price_lookup=price_lookup,
+                progress=progress,
             )
             # A DELETE may have landed (and evicted the cache) during this network-bound
             # build; do not resurrect a cache entry for a now-gone id (ids are reusable
@@ -171,6 +663,57 @@ def projects_router(require_token) -> APIRouter:
             return result
 
         return {"job_id": ctx.jobs.submit(work)}
+
+    @r.get("/{project_id}/bom/live")
+    def get_live_bom(request: Request, project_id: str, boards: int = 1) -> dict:
+        """Build the current native BOM immediately without a network pricing pass.
+
+        KiCad and Altium terminate at their placement readers. Grouping, library
+        identity, quantities, build math, and the response shape are shared.
+        """
+
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        result = ctx.project_ops.bom(
+            project_id,
+            boards=boards,
+            library_parts=_library_parts(ctx),
+            price_lookup=None,
+        )
+        result["evidence"] = _bom_evidence(rec, result["lines"])
+        return result
+
+    @r.get("/{project_id}/bom/live/export")
+    def export_live_bom(
+        request: Request,
+        project_id: str,
+        boards: int = 1,
+        kind: str = "csv",
+    ) -> Response:
+        """Export the same immediate, format-neutral BOM shown in the rebuilt UI."""
+
+        from stockroom.projects.bom_export import project_bom_export
+
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        live = ctx.project_ops.bom(
+            project_id,
+            boards=boards,
+            library_parts=_library_parts(ctx),
+            price_lookup=None,
+        )
+        out = project_bom_export(live, kind, boards=boards)
+        data = out["data"]
+        body = data.encode("utf-8") if isinstance(data, str) else data
+        return Response(
+            content=body,
+            media_type=out["content_type"],
+            headers={"Content-Disposition": f'attachment; filename="{out["filename"]}"'},
+        )
 
     @r.get("/{project_id}/bom")
     def get_bom(request: Request, project_id: str) -> dict:
@@ -182,9 +725,20 @@ def projects_router(require_token) -> APIRouter:
             raise FileNotFoundError(f"no such project: {project_id}")
         cached = ctx.bom_cache.get(project_id)
         if cached is None:
-            return {"project": rec.name, "ran_at": None, "boards": 1, "tax_rate": 0.0,
-                    "priced": False, "line_count": 0, "component_count": 0, "lines": [],
-                    "summary": None, "by_source": None, "cost_at_qty": None, "build": None}
+            return {
+                "project": rec.name,
+                "ran_at": None,
+                "boards": 1,
+                "tax_rate": 0.0,
+                "priced": False,
+                "line_count": 0,
+                "component_count": 0,
+                "lines": [],
+                "summary": None,
+                "by_source": None,
+                "cost_at_qty": None,
+                "build": None,
+            }
         return cached
 
     @r.post("/{project_id}/bom/reprice")
@@ -205,18 +759,37 @@ def projects_router(require_token) -> APIRouter:
         tax_rate = (body or {}).get("tax_rate", 0.0)
         cached = ctx.bom_cache.get(project_id)
         if cached is None:
-            return {"project": rec.name, "ran_at": None, "boards": 1, "tax_rate": 0.0,
-                    "priced": False, "line_count": 0, "component_count": 0, "lines": [],
-                    "summary": None, "by_source": None, "cost_at_qty": None, "build": None}
+            return {
+                "project": rec.name,
+                "ran_at": None,
+                "boards": 1,
+                "tax_rate": 0.0,
+                "priced": False,
+                "line_count": 0,
+                "component_count": 0,
+                "lines": [],
+                "summary": None,
+                "by_source": None,
+                "cost_at_qty": None,
+                "build": None,
+            }
         result = reprice_bom(cached, boards, tax_rate)
         ctx.bom_cache[project_id] = result
         return result
 
     @r.get("/{project_id}/bom/export")
-    def export_bom(request: Request, project_id: str, kind: str = "csv",
-                   boards: int | None = None, spares_pct: float = 0.0,
-                   pcb_multiple: int = 3, tax_rate: float = 0.0, shipping: float = 0.0,
-                   labour_per_board: float = 0.0, assembly_surcharge_rate: float = 0.0):
+    def export_bom(
+        request: Request,
+        project_id: str,
+        kind: str = "csv",
+        boards: int | None = None,
+        spares_pct: float = 0.0,
+        pcb_multiple: int = 3,
+        tax_rate: float = 0.0,
+        shipping: float = 0.0,
+        labour_per_board: float = 0.0,
+        assembly_surcharge_rate: float = 0.0,
+    ):
         # Render the CACHED BOM into a downloadable export (M7d): kind is one of
         # csv/priced/cart/jlcpcb/xlsx/procurement. Read-only, offline. An unknown kind is a
         # ValueError -> 400; an unbuilt project is a 400 (nothing to export yet, never an
@@ -232,14 +805,21 @@ def projects_router(require_token) -> APIRouter:
         if cached is None or cached.get("ran_at") is None:
             raise ValueError("build the BOM before exporting it")
         out = project_bom_export(
-            cached, kind, boards=boards, spares_pct=spares_pct, pcb_multiple=pcb_multiple,
-            tax_rate=tax_rate, shipping=shipping, labour_per_board=labour_per_board,
+            cached,
+            kind,
+            boards=boards,
+            spares_pct=spares_pct,
+            pcb_multiple=pcb_multiple,
+            tax_rate=tax_rate,
+            shipping=shipping,
+            labour_per_board=labour_per_board,
             assembly_surcharge_rate=assembly_surcharge_rate,
         )
         data = out["data"]
         body = data.encode("utf-8") if isinstance(data, str) else data
         return Response(
-            content=body, media_type=out["content_type"],
+            content=body,
+            media_type=out["content_type"],
             headers={"Content-Disposition": f'attachment; filename="{out["filename"]}"'},
         )
 
@@ -250,21 +830,32 @@ def projects_router(require_token) -> APIRouter:
         return request.app.state.ctx.project_ops.fab_preview(project_id)
 
     @r.get("/{project_id}/fab/export")
-    def fab_export(request: Request, project_id: str, board: str = "",
-                   drill_format: str = "excellon", drill_map: bool = True,
-                   include_pos: bool = True, pos_format: str = "csv",
-                   protel_ext: bool = True):
+    def fab_export(
+        request: Request,
+        project_id: str,
+        board: str = "",
+        drill_format: str = "excellon",
+        drill_map: bool = True,
+        include_pos: bool = True,
+        pos_format: str = "csv",
+        protel_ext: bool = True,
+    ):
         # Plot the manufacturing bundle (gerbers + drill + placement) via kicad-cli and stream
         # it as a downloadable zip (M7i). Read-only: nothing is written into the project tree.
         # A project with no board is a ValueError -> 400; a missing/failed kicad-cli is a
         # KiCadCliError -> 502 (never a fabricated or empty zip); an unknown id -> 404.
         out = request.app.state.ctx.project_ops.fab_export(
-            project_id, board=board or None, drill_format=drill_format,
-            drill_map=drill_map, include_pos=include_pos, pos_format=pos_format,
+            project_id,
+            board=board or None,
+            drill_format=drill_format,
+            drill_map=drill_map,
+            include_pos=include_pos,
+            pos_format=pos_format,
             protel_ext=protel_ext,
         )
         return Response(
-            content=out["data"], media_type=out["content_type"],
+            content=out["data"],
+            media_type=out["content_type"],
             headers={"Content-Disposition": f'attachment; filename="{out["filename"]}"'},
         )
 
@@ -314,8 +905,10 @@ def projects_router(require_token) -> APIRouter:
         # fabricated pass) and the next check re-runs honestly.
         ctx = request.app.state.ctx
         result = ctx.project_ops.set_net_classes(
-            project_id, [c.model_dump() for c in body.classes],
-            deleted=body.deleted, floor=body.floor,
+            project_id,
+            [c.model_dump() for c in body.classes],
+            deleted=body.deleted,
+            floor=body.floor,
         )
         ctx.checks_cache.pop(project_id, None)
         return result
@@ -328,15 +921,19 @@ def projects_router(require_token) -> APIRouter:
         # stale cached ERC/DRC is evicted since a design-rule change can alter DRC outcomes.
         ctx = request.app.state.ctx
         result = ctx.project_ops.set_design_rules(
-            project_id, body.rules, track_widths=body.track_widths,
-            via_dimensions=body.via_dimensions, diff_pair_dimensions=body.diff_pair_dimensions,
+            project_id,
+            body.rules,
+            track_widths=body.track_widths,
+            via_dimensions=body.via_dimensions,
+            diff_pair_dimensions=body.diff_pair_dimensions,
         )
         ctx.checks_cache.pop(project_id, None)
         return result
 
     @r.patch("/{project_id}/netclass-patterns")
-    def patch_netclass_patterns(request: Request, project_id: str,
-                                body: SetNetclassPatternsBody) -> dict:
+    def patch_netclass_patterns(
+        request: Request, project_id: str, body: SetNetclassPatternsBody
+    ) -> dict:
         # Replace the project's netclass-pattern assignments (net-name glob -> net class),
         # one scoped commit on the project's OWN git (roadmap #4). A blank pattern/net class is
         # a clean 422; an unknown id -> 404; a project not under git (or without a .kicad_pro),
@@ -369,9 +966,13 @@ def projects_router(require_token) -> APIRouter:
         # ERC/DRC outcomes, so the stale cached ERC/DRC is evicted and the next check re-runs.
         ctx = request.app.state.ctx
         result = ctx.project_ops.set_settings(
-            project_id, board_setup=body.board_setup, thickness=body.thickness,
-            erc_severities=body.erc_severities, drc_severities=body.drc_severities,
-            erc_pin_map=body.erc_pin_map, text_variables=body.text_variables,
+            project_id,
+            board_setup=body.board_setup,
+            thickness=body.thickness,
+            erc_severities=body.erc_severities,
+            drc_severities=body.drc_severities,
+            erc_pin_map=body.erc_pin_map,
+            text_variables=body.text_variables,
         )
         ctx.checks_cache.pop(project_id, None)
         return result
@@ -441,8 +1042,11 @@ def projects_router(require_token) -> APIRouter:
         # an unknown or layer-mismatched preset, or a bad field value -> 400.
         ctx = request.app.state.ctx
         return ctx.project_ops.stackup_preview(
-            project_id, preset_key=body.preset_key, copper_finish=body.copper_finish,
-            dielectric_constraints=body.dielectric_constraints, layer_edits=body.layer_edits,
+            project_id,
+            preset_key=body.preset_key,
+            copper_finish=body.copper_finish,
+            dielectric_constraints=body.dielectric_constraints,
+            layer_edits=body.layer_edits,
         )
 
     @r.patch("/{project_id}/stackup")
@@ -453,8 +1057,11 @@ def projects_router(require_token) -> APIRouter:
         # outcomes, so the stale cached ERC/DRC is evicted and the next check re-runs honestly.
         ctx = request.app.state.ctx
         result = ctx.project_ops.stackup_apply(
-            project_id, preset_key=body.preset_key, copper_finish=body.copper_finish,
-            dielectric_constraints=body.dielectric_constraints, layer_edits=body.layer_edits,
+            project_id,
+            preset_key=body.preset_key,
+            copper_finish=body.copper_finish,
+            dielectric_constraints=body.dielectric_constraints,
+            layer_edits=body.layer_edits,
         )
         ctx.checks_cache.pop(project_id, None)
         return result
@@ -484,7 +1091,9 @@ def projects_router(require_token) -> APIRouter:
 
         def work(progress):
             parts = _library_parts(ctx)
-            result = ctx.project_ops.prepare_apply(project_id, library_parts=parts, progress=progress)
+            result = ctx.project_ops.prepare_apply(
+                project_id, library_parts=parts, progress=progress
+            )
             # A DELETE may have landed (and evicted the caches) while this ran; do not resurrect a
             # cache entry for a now-gone id. Evict the stale ERC/DRC + BOM either way.
             if ctx.project_ops.get(project_id) is not None:

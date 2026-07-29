@@ -20,6 +20,7 @@ from stockroom.capture.requirements import Requirement
 from stockroom.evidence import EvidenceStore
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.model.asset import Asset, AssetOrigin, AssetRef, EdaAssets
+from stockroom.model.cad_variant import CadVariantSelections
 from stockroom.planning import KICAD_CAD_OPERATION, ExactPartIdentity
 
 _CFB_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
@@ -59,6 +60,13 @@ class _InstalledRecord(_Record):
 
     def assets_for(self, tool: str) -> EdaAssets:
         return self.assets[tool]
+
+    def capturable(self, tool: str) -> set[str]:
+        return (
+            {"symbol", "footprint", "model"}
+            if tool == "kicad"
+            else {"symbol", "footprint"}
+        )
 
 
 def _candidate(tmp_path: Path, *, model: bool = True) -> StagingCandidate:
@@ -351,7 +359,7 @@ def test_cross_eda_success_requires_explicit_equivalence_proof(tmp_path: Path) -
     assert verified is True
 
 
-def test_guided_attach_persists_digest_and_refuses_unverified_altium(
+def test_guided_attach_never_projects_a_one_tool_provider_download(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -363,7 +371,6 @@ def test_guided_attach_persists_digest_and_refuses_unverified_altium(
 
     origins = []
     active_variants = []
-    altium_calls = []
 
     class _Pipeline:
         def inspect(self, inputs):
@@ -391,7 +398,6 @@ def test_guided_attach_persists_digest_and_refuses_unverified_altium(
         lambda: _Pipeline(),
         vendor="snapmagic",
         download_root=tmp_path / "Downloads",
-        attach_altium=lambda *_args, **_kwargs: altium_calls.append(True),
         evidence_store=EvidenceStore(tmp_path / "Evidence"),
         now_iso=lambda: "2026-07-28T00:00:00Z",
     )
@@ -404,23 +410,13 @@ def test_guided_attach_persists_digest_and_refuses_unverified_altium(
         detail_url=_DETAIL_URL,
     )
 
-    assert set(outcome.satisfied) == {
-        Requirement.KICAD_SYMBOL,
-        Requirement.KICAD_FOOTPRINT,
-        Requirement.KICAD_MODEL,
-    }
-    assert "cross-EDA terminal, pad, and package equivalence is not verified" in outcome.error
-    assert not altium_calls
-    assert len(origins) == 1
-    digest = origins[0].extra["evidence_manifest_digest"]
-    assert digest.startswith("sha256:")
-    assert origins[0].extra["evidence_operation"] == "cad:kicad"
-    assert len(active_variants) == 1
-    assert active_variants[0].manifest_digest == digest
-    active_variants[0].validate_for_tool("kicad")
+    assert outcome.satisfied == ()
+    assert "same-set cross-EDA verification" in outcome.error
+    assert origins == []
+    assert active_variants == []
 
 
-def test_each_route_reloads_the_record_before_selecting_and_attaching(
+def test_each_route_reloads_the_record_before_rejecting_a_partial_set(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -465,13 +461,9 @@ def test_each_route_reloads_the_record_before_selecting_and_attaching(
         detail_url=_DETAIL_URL,
     )
 
-    assert outcome.error == ""
-    assert attached == ["s1m"]
-    assert set(outcome.satisfied) == {
-        Requirement.KICAD_SYMBOL,
-        Requirement.KICAD_FOOTPRINT,
-        Requirement.KICAD_MODEL,
-    }
+    assert "not one complete dual-EDA source set" in outcome.error
+    assert attached == []
+    assert outcome.satisfied == ()
 
 
 def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_variant(
@@ -518,9 +510,20 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
                     altium_active_variant,
                 )
             )
+            record.assets["kicad"] = EdaAssets(
+                symbol=AssetRef(lib="Diodes", name="S1M"),
+                footprint=AssetRef(lib="Diodes", name="D_SMA"),
+                model=AssetRef(file="models/S1M.step"),
+            )
             record.assets["altium"] = EdaAssets(
                 symbol=AssetRef(lib="S1M.SchLib", name="S1M"),
                 footprint=AssetRef(lib="S1M.PcbLib", name="S1M"),
+            )
+            record.cad_variants = CadVariantSelections(
+                active={
+                    "kicad": kicad_active_variant,
+                    "altium": altium_active_variant,
+                }
             )
             return record
 
@@ -539,9 +542,6 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
         lambda: _Pipeline(),
         vendor="snapmagic",
         download_root=tmp_path / "Downloads",
-        attach_altium=lambda *_args, **_kwargs: pytest.fail(
-            "verified pairs must use one coherent transaction"
-        ),
         evidence_store=EvidenceStore(tmp_path / "Evidence"),
         cross_eda_verifier=lambda **_kwargs: {
             "valid": True,
@@ -574,6 +574,29 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
     assert kicad_variant.manifest_digest == altium_variant.manifest_digest
     kicad_variant.validate_for_tool("kicad")
     altium_variant.validate_for_tool("altium")
+    active_before = dict(record.cad_variants.active)
+
+    # Capturing another trusted provider after completion must preserve its immutable pair without
+    # silently switching either tool. The pair selector owns that explicit user decision.
+    source._collect_variants = True
+    retained = source._attach(
+        record,
+        [
+            type("_Captured", (), {"path": kicad_zip})(),
+            type("_Captured", (), {"path": intlib})(),
+        ],
+        _DETAIL_URL,
+        detail_url=_DETAIL_URL,
+    )
+    assert retained.retained == 5
+    assert retained.satisfied == ()
+    assert "active KiCad/Altium pair is unchanged" in retained.skipped
+    assert len(pair_calls) == 1
+    assert record.cad_variants.active == active_before
+    assert (
+        record.cad_variants.active["kicad"].manifest_digest
+        == record.cad_variants.active["altium"].manifest_digest
+    )
 
 
 def test_provider_script_conversion_feeds_the_normal_verified_altium_attach(
@@ -608,6 +631,11 @@ def test_provider_script_conversion_feeds_the_normal_verified_altium_attach(
             **kwargs,
         ):
             pair_calls.append((part_id, selected, sources, kwargs))
+            record.assets["kicad"] = EdaAssets(
+                symbol=AssetRef(lib="Diodes", name="S1M"),
+                footprint=AssetRef(lib="Diodes", name="D_SMA"),
+                model=AssetRef(file="models/S1M.step"),
+            )
             record.assets["altium"] = EdaAssets(
                 symbol=AssetRef(lib="S1M.SchLib", name="S1M"),
                 footprint=AssetRef(lib="S1M.PcbLib", name="S1M"),
@@ -640,9 +668,6 @@ def test_provider_script_conversion_feeds_the_normal_verified_altium_attach(
         lambda: _Pipeline(),
         vendor="digikey",
         download_root=tmp_path / "Downloads",
-        attach_altium=lambda *_args, **_kwargs: pytest.fail(
-            "verified pairs must use one coherent transaction"
-        ),
         convert_altium=_convert,
         evidence_store=EvidenceStore(tmp_path / "Evidence"),
         cross_eda_verifier=lambda **_kwargs: {
@@ -705,7 +730,7 @@ def _installed_kicad(
     return record, profile
 
 
-def test_altium_only_download_composes_with_reverified_active_kicad_without_replacing_it(
+def test_altium_only_download_never_composes_with_an_independent_active_kicad_set(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -729,8 +754,6 @@ def test_altium_only_download_composes_with_reverified_active_kicad_without_repl
         model_path=candidate.model_path,
     )
     store = EvidenceStore(tmp_path / "Evidence")
-    attach_origins = []
-    attached_variants = []
     conversion_cleanups = []
     original_kicad = record.assets_for("kicad")
 
@@ -744,24 +767,6 @@ def test_altium_only_download_composes_with_reverified_active_kicad_without_repl
 
         def cleanup(self):
             return None
-
-    def _attach_altium(
-        part_id,
-        *sources,
-        origin=None,
-        active_variant=None,
-        compatible_kicad_variant=None,
-    ):
-        assert part_id == "s1m"
-        assert {path.suffix.casefold() for path in sources} == {".schlib", ".pcblib"}
-        assert all(path.read_bytes().startswith(_CFB_MAGIC) for path in sources)
-        attach_origins.append(origin)
-        attached_variants.append((active_variant, compatible_kicad_variant))
-        record.assets["altium"] = EdaAssets(
-            symbol=AssetRef(lib="S1M", name="S1M"),
-            footprint=AssetRef(lib="S1M", name="S1M"),
-        )
-        return record
 
     monkeypatch.setattr(
         "stockroom.capture.guided.get_adapter",
@@ -787,7 +792,6 @@ def test_altium_only_download_composes_with_reverified_active_kicad_without_repl
         lambda: _Pipeline(),
         vendor="ultralibrarian",
         download_root=tmp_path / "Downloads",
-        attach_altium=_attach_altium,
         convert_altium=lambda _inputs, _manufacturer, _mpn: type(
             "_Converted",
             (),
@@ -808,39 +812,17 @@ def test_altium_only_download_composes_with_reverified_active_kicad_without_repl
         detail_url=("https://app.ultralibrarian.com/details/example/ON%20Semiconductor/S1M"),
     )
 
-    assert set(outcome.satisfied) == {
-        Requirement.ALTIUM_SYMBOL,
-        Requirement.ALTIUM_FOOTPRINT,
-    }
-    assert outcome.error == ""
+    assert outcome.satisfied == ()
+    assert "no exact KiCad symbol, footprint, and STEP" in outcome.error
     assert conversion_cleanups == ["cleaned"]
     assert record.assets_for("kicad") is original_kicad
-    assert len(attach_origins) == 1
-    origin = attach_origins[0]
-    assert origin.extra["evidence_operation"] == "cad:altium"
-    manifest = store.verify_role_artifact_success(
-        origin.extra["evidence_manifest_digest"],
+    assert store.list_role_variants(
         identity=ExactPartIdentity("ON Semiconductor", "S1M"),
-        required_roles=("altium_symbol", "altium_footprint"),
-    )
-    assert manifest["provider"] == "ultralibrarian"
-    assert len(manifest["source_manifests"]) == 1
-    assert len(attached_variants) == 1
-    active_altium, compatible_kicad = attached_variants[0]
-    assert active_altium.manifest_digest == origin.extra["evidence_manifest_digest"]
-    assert active_altium.source_manifests == (compatible_kicad.manifest_digest,)
-    active_altium.validate_for_tool("altium")
-    compatible_kicad.validate_for_tool("kicad")
-    assert [
-        item.provider_key
-        for item in store.list_role_variants(
-            identity=ExactPartIdentity("ON Semiconductor", "S1M"),
-            role="altium_symbol",
-        )
-    ] == ["ultralibrarian"]
+        role="altium_symbol",
+    ) == ()
 
 
-def test_altium_only_download_switches_to_a_compatible_retained_kicad_pair(
+def test_altium_only_download_never_switches_to_a_compatible_but_separate_retained_set(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -919,9 +901,6 @@ def test_altium_only_download_switches_to_a_compatible_retained_kicad_pair(
         lambda: _Pipeline(),
         vendor="ultralibrarian",
         download_root=tmp_path / "Downloads",
-        attach_altium=lambda *_args, **_kwargs: pytest.fail(
-            "a retained compatible pair must use one coherent transaction"
-        ),
         evidence_store=store,
         cross_eda_verifier=_verify,
         now_iso=lambda: "2026-07-29T00:00:00Z",
@@ -933,32 +912,10 @@ def test_altium_only_download_switches_to_a_compatible_retained_kicad_pair(
         detail_url="https://app.ultralibrarian.com/details/example/ON%20Semiconductor/S1M",
     )
 
-    assert set(outcome.satisfied) == {
-        Requirement.KICAD_SYMBOL,
-        Requirement.KICAD_FOOTPRINT,
-        Requirement.KICAD_MODEL,
-        Requirement.ALTIUM_SYMBOL,
-        Requirement.ALTIUM_FOOTPRINT,
-    }
-    assert outcome.error == ""
-    assert len(pair_calls) == 1
-    selected, altium_sources, kwargs = pair_calls[0]
-    compatible_manifest = kwargs["kicad_active_variant"].manifest_digest
-    assert compatible_manifest != retained_manifest
-    assert kwargs["altium_active_variant"].source_manifests == (compatible_manifest,)
-    assert kwargs["kicad_origin"].vendor == "ultralibrarian"
-    store.verify_role_artifact_success(
-        compatible_manifest,
-        identity=ExactPartIdentity("ON Semiconductor", "S1M"),
-        required_roles=("symbol", "footprint", "model"),
-    )
-    report = store.verified_cad_validation_report(
-        compatible_manifest,
-        identity=ExactPartIdentity("ON Semiconductor", "S1M"),
-    )
-    assert report["observations"]["promoted_from_retained_manifest"] == retained_manifest
-    assert not selected.symbol_lib_path.parent.exists()
-    assert not altium_sources[0].parent.exists()
+    assert outcome.satisfied == ()
+    assert "no exact KiCad symbol, footprint, and STEP" in outcome.error
+    assert pair_calls == []
+    assert retained_manifest
 
 
 def test_altium_only_download_stays_unattached_without_complete_equivalence_proof(
@@ -971,7 +928,6 @@ def test_altium_only_download_stays_unattached_without_complete_equivalence_proo
     with zipfile.ZipFile(bundle, "w") as archive:
         archive.writestr("S1M.SchLib", _CFB_MAGIC + b"symbol")
         archive.writestr("S1M.PcbLib", _CFB_MAGIC + b"footprint")
-    attached = []
 
     class _Pipeline:
         def __init__(self) -> None:
@@ -996,7 +952,6 @@ def test_altium_only_download_stays_unattached_without_complete_equivalence_proo
         lambda: _Pipeline(),
         vendor="ultralibrarian",
         download_root=tmp_path / "Downloads",
-        attach_altium=lambda *_args, **_kwargs: attached.append(True),
         evidence_store=EvidenceStore(tmp_path / "Evidence"),
         cross_eda_verifier=lambda **_kwargs: {"valid": True},
     )
@@ -1008,6 +963,5 @@ def test_altium_only_download_stays_unattached_without_complete_equivalence_proo
         detail_url="https://app.ultralibrarian.com/details/example/ON%20Semiconductor/S1M",
     )
 
-    assert not attached
     assert outcome.satisfied == ()
-    assert "terminal, pad, and package equivalence" in outcome.error
+    assert "no exact KiCad symbol, footprint, and STEP" in outcome.error

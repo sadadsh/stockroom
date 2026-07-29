@@ -118,6 +118,7 @@ function FamilyGroup({
       >
         <button
           type="button"
+          data-dev-id={`stm.family-${family.family}`}
           onClick={onToggleFamily}
           aria-pressed={active}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
