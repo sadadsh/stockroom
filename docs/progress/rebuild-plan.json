@@ -6,45 +6,63 @@
   "note": "Owner outcomes are the product source of truth. The historical engineering checklist is retained below as unweighted implementation history and must never be presented as product readiness.",
   "product_scope": "Windows-only component-library management for both KiCad and Altium. A capability ships only when both EDA workflows are supported. KiCad-only project management is deferred and removed from the current frontend; its backend and Git history are preserved.",
   "active_work": {
-    "last_updated": "2026-07-29T08:11:40Z",
-    "objective": "Finish exact-MPN-to-assets acquisition with the smallest possible user workload: use verified direct sources and reviewed provider automation, retain every usable file, convert supported provider packages into native outputs, and require exact identity plus semantic and cross-EDA verification before attachment.",
+    "last_updated": "2026-07-29T23:44:01Z",
+    "objective": "Integrate the capability-aligned frontend and complete exact-source release verification before pushing main. The remaining production boundaries are external signing/feed authority, provider-owned security gates, one-time Windows credential setup, and a second physical Windows device.",
     "refresh_policy": "Manually refreshed at meaningful checkpoints; this is not real-time telemetry.",
     "workstreams": [
       {
-        "id": "automatic-mpn-acquisition",
-        "name": "Automatic MPN-To-Assets Acquisition",
+        "id": "production-library-publication",
+        "name": "Real Production Library Publication",
+        "status": "completed",
+        "owner": "Codex · durable workflow and dual-EDA publication",
+        "evidence": "Texas Instruments TPD6E05U06RVZR completed all 14 production stages once and published a clean isolated Git commit. KiCad symbol, footprint and STEP plus Altium SchLib and PcbLib resolve to the same SnapMagic evidence manifest sha256:1bc2ee5de60e7d30ee76df2d439f3c894bd76cb4ce050c17906f3d3b7712376f. Catalog, portable KiCad tables, DbLib, native readback, cross-EDA verification, and exact file digests are present in Real Fourteen Stage Publication Report.json.",
+        "blocker": "No internal publication blocker remains. A provider can still lack a complete exact-MPN set or require a provider-owned security action.",
+        "next_action": "Keep this real canary and its regressions load-bearing while broader MPN qualification continues."
+      },
+      {
+        "id": "network-acquisition-and-pairing",
+        "name": "Network Acquisition And Strict Pairing",
+        "status": "completed",
+        "owner": "Codex · provider routes, evidence, and activation",
+        "evidence": "Public local ZIP/file/drop and single-tool activation paths fail closed. Every declared provider/author route must produce a terminal ledger row. The first complete same-manifest five-role set activates atomically; later valid complete sets are retained and selectable without changing either active pointer. Provider sessions are sequential and persistent in isolated profiles. Optional API keys, provider passwords, and GitHub access live only in Windows Credential Manager, never Git or JSON. DigiKey manufacturer-provided rows classify measured hosted STEP, external STEP, and empty shapes; the visible CADENAS row is explicitly ledgered as unresolved until a positive download contract exists, with no invented selector.",
+        "blocker": "No internal route-coverage blocker remains. The live Windows install currently has no Mouser, DigiKey API/account, Ultra Librarian, SnapMagic, SamacSys, or GitHub credential configured, so those optional integrations need one-time setup before a live trial. Provider publication availability, login, CAPTCHA, consent, licensing, 2FA, account seats, and an unmeasured future CADENAS download control remain external.",
+        "next_action": "Keep exact identity, terminal route accounting, supplementary-only model retention, persistent sessions, and shared-manifest activation load-bearing."
+      },
+      {
+        "id": "windows-release-lifecycle",
+        "name": "Windows Package And Release Lifecycle",
+        "status": "completed",
+        "owner": "Codex · deterministic package and managed runtime",
+        "evidence": "Windows Package Final Proof 3 produced byte-identical EXE and unsigned MSIX fixtures, passed MakeAppx and manifest round trips, served the packaged frontend with coordinator authority, adopted candidate worker generation 4, deliberately rolled back, restored generation 5, and left zero proof processes. EXE sha256:e27a3c6175c9db88c8b933d95f7842bdbf4771bbe057d0be2e2b50aad160d4fd; MSIX sha256:129c2fe40178709effafa78220e669b6767914ca8b2ab209338675fd3d92639d.",
+        "blocker": "The artifact is an unsigned fixture. Production trust and deployment require the owner's code-signing identity and real feed authority.",
+        "next_action": "Preserve the deterministic build, generation fence, health gate, rollback, and orphan checks as release gates."
+      },
+      {
+        "id": "final-library-user-layer",
+        "name": "Final Library User-Layer Gate",
+        "status": "completed",
+        "owner": "Codex · frontend audit and deterministic build",
+        "evidence": "The built SPA passed 118 capability-copy tests and the complete 110-file, 1,229-test frontend suite. Token parity, TypeScript, Vite production build, and a second byte-identical 13-file build passed. Fourteen authoritative dark/light screenshots cover empty Library intake, populated evidence, Collect All, strict pair selection, Settings/version/update, provider credentials, Projects absence, responsive bounds, and settled state; all had zero console errors, zero server failures, full opacity, and no active animation. Every capture and critique is recorded in docs/design/Visual Audit Backlog.md.",
+        "blocker": "No user-layer release blocker remains. Two honest non-blocking visual debts are tracked: empty state can still pair No Components Yet with a disabled Select A Part prompt, and some helper copy is intentionally subdued.",
+        "next_action": "Keep the capability wording, dark/light evidence set, Projects absence, console/network checks, and deterministic build as release gates."
+      },
+      {
+        "id": "aggregate-and-canonical-state",
+        "name": "Aggregate Gates And Canonical State",
         "status": "active",
-        "owner": "Codex · acquisition planning and provider adapters",
-        "evidence": "The isolated UL Canary profile proves coherent KiCad plus native Altium acquisition for Texas Instruments TPD6E05U06RVZR. DigiKey's live 5212034-1 model page was remeasured without desktop takeover: SnapMagic is external-only for that MPN and TraceParts exposes 67 mechanical formats. Commit 04c5bd9d replaces the incompatible Camoufox/Firefox assumption for DigiKey with a pinned no-key CloakBrowser Chromium engine, waits for the client-rendered provider catalogue, and adds a reusable isolated live canary. That canary ran the pinned STEP AP214 route through Stockroom's actual DownloadBroker, retained 5212034_1.zip (77,205 bytes) in the streaming CAS, created supplementary manifest sha256:91bd192fc9ce4f8d3122867ba1a98b3815a2a800a85b6636e93b6d4b9b5bc2c1, exposed it through the authenticated inventory, and downloaded byte-identical original content with digest sha256:f1ed7b40152417ff9e835d54d314d187ac15babb7241d671943ad4c649c9ee35. The full capture directory passes 330 tests; 10 focused supplementary API/store tests also pass.",
-        "blocker": "One complete UL part and one TraceParts MPN do not prove arbitrary-MPN availability, verified-cache reuse, deterministic generation, account behavior, or fallback performance at scale.",
-        "next_action": "Qualify unrelated MPNs and package classes across Ultra Librarian, TraceParts, and fallback routes; measure acquisition, conversion, cache reuse, bounded retry recovery, and total wall time separately."
+        "owner": "Codex · regression, progress, Obsidian, QMD, and scoped commits",
+        "evidence": "The frozen frontend passed 1,229 tests plus token parity, TypeScript, deterministic production builds, and the 14-capture dark/light WebView audit. Backend evidence includes 321 package/driver/workflow/non-browser capture tests, 134 isolated Library/API/shared-pair tests, 8 release-handoff tests, 171 STM tests with 5 skips, and 410 Projects tests with 1 skip. Ruff, full backend Ty, and actionlint passed. The remaining long Projects API file is running under a persistent log capture before the exact source commit.",
+        "blocker": "The exact source commit, clean-checkout aggregate gate, and fixture package rerun remain.",
+        "next_action": "Finish the persistent Projects API receipt, refresh canonical knowledge and QMD, create scoped commits, then prove and push the exact clean checkout."
       },
       {
-        "id": "cad-evidence-composition",
-        "name": "CAD Evidence Composition And Variants",
-        "status": "completed",
-        "owner": "Codex · immutable evidence and cross-EDA validation",
-        "evidence": "Committed role manifests and active CAD pointers preserve exact identity, provider, content digest, validation, and compatible source-manifest links. Complete KiCad and Altium variants remain selectable, while the new supplementary inventory exposes original TraceParts/provider files separately with canActivate=false and an authenticated exact-manifest download boundary. Mutation tests prove rollback after a post-KiCad Altium failure and preserve dirty exact targets.",
-        "blocker": "A deliberate coherent pair switch is still missing. Per-tool activation remains unsuitable for switching an already-complete incompatible pair, and supplementary originals intentionally cannot activate.",
-        "next_action": "Add one user-facing coherent pair selector and atomic pair-switch endpoint that invoke the existing one-transaction compatibility boundary."
-      },
-      {
-        "id": "digikey-ultralibrarian-conversion",
-        "name": "DigiKey Ultra Librarian Conversion",
-        "status": "completed",
-        "owner": "Codex · DigiKey browser adapter and guarded Altium bridge",
-        "evidence": "A real isolated Camoufox run reused saved DigiKey credentials, selected the exact product/model page, and downloaded TPD6E05U06RVZR.zip. The 79,884-byte Altium choice ran through installed AD26, produced one exact SchLib entry and one RVZ0014A PcbLib entry, and attached all five assets in one 12.8-second transaction with installed readback. The duplicate WebView2 provider driver is retired. DigiKey now uses pinned CloakBrowser Chromium because its provider application does not render in Camoufox/Firefox and stock Playwright Chromium reaches an interstitial. The live TraceParts 5212034-1 canary completed broker-to-CAS-to-authenticated-API retention with byte-identical original download, while current external-only SnapMagic rows remain honest non-deliveries. Backend capture passes 330 tests; 10 supplementary API/store tests, Ruff, Ty, frontend typecheck, focused frontend tests, and the production build pass.",
-        "blocker": "One UL part and one TraceParts package class do not prove arbitrary-MPN availability, account behavior, or throughput. The live TraceParts run closes its full browser-to-archive timing boundary, but comparable timing and success data do not yet exist across unrelated MPNs and routes.",
-        "next_action": "Qualify unrelated MPNs and package classes through the full browser-to-archive path and measure provider gates, bounded retry recovery, conversion time, cache reuse, and total wall time separately."
-      },
-      {
-        "id": "deploy-and-durable-state",
-        "name": "Deploy And Durable State",
-        "status": "completed",
-        "owner": "Codex · Windows deployment and Obsidian state",
-        "evidence": "Implementation commit 04c5bd9d and live-proof checkpoint ea55785c are contained in canonical main, origin/main, and the converged managed Windows install. Deployment verified the CloakBrowser Chromium engine, pinned cloakbrowser 0.5.2 dependency, and live artifact digest while preserving unrelated working changes and installed fixtures. The managed environment was synchronized with the frozen lock and imports cloakbrowser 0.5.2. Stockroom was not running, so no process restart was needed.",
-        "blocker": "Source, remote, managed checkout, and managed dependency convergence are complete for the live broker-retention implementation. Automatic hot adoption without a deploy/restart ritual is still a separate unfinished product outcome.",
-        "next_action": "Continue unrelated-MPN and package-class qualification without desktop takeover."
+        "id": "production-deployment",
+        "name": "Production Deployment And Two-Device Acceptance",
+        "status": "blocked",
+        "owner": "Owner + Codex · external production acceptance",
+        "evidence": "Fixture release construction, adoption, rollback, clone convergence, cache isolation, scheduled sync, status, and rival-checkout detection are source-proven.",
+        "blocker": "A trusted production signing identity/feed and the second physical Windows laptop are not available in this session.",
+        "next_action": "Publish the signed feed and run deliberately stale two-install convergence when those two external resources are available."
       }
     ]
   },
@@ -52,192 +70,154 @@
     {
       "id": "safe-evidence-import",
       "name": "Safe Evidence Import",
-      "status": "not_met",
-      "measure": "1 explicitly incomplete library record (Yamaichi IC51-0484-806); 0 components admitted through the complete vNext evidence and dual-EDA publication path",
+      "status": "met",
+      "measure": "The canonical Stockroom profile is intentionally empty; one isolated exact-MPN production admission completed atomically with a clean publication commit and immutable evidence.",
       "acceptance": "Every requested MPN has exact-identity raw distributor evidence and a re-derivable record; no suggestion, collision, or partial write can corrupt an existing part.",
       "evidence": [
-        "The owner cleared the former 158-record profile on 2026-07-27 after the audit reproduced non-exact-match contamination and silent same-MPN overwrite paths.",
-        "After the reset, one later IC51-0484-806 record was added with distributor metadata and a datasheet locator. It has no attached KiCad, Altium, or STEP assets and is explicitly not a completed acquisition canary.",
-        "Owner clarification 2026-07-28: the components were deleted specifically so ingest can be rethought. Legacy component records are inert Git history/evidence only; they are not current truth and will not be promoted or replayed into vNext.",
-        "The 571-file reset is durable in scoped local commit 82782048. The historical S8 harness now requires an explicit read-only corpus path and has a regression test forbidding the former stockroom-winverify default."
+        "The former 158-record corpus and later incomplete IC51 record were removed by owner direction; neither is current product data.",
+        "The real TPD6E05U06RVZR run bound exact manufacturer/MPN, evidence manifest, validated assets, canonical record, catalog projection, and Git publication in one durable workflow.",
+        "Successful distributor responses are retained verbatim under sourced/<part>/<source>.json so current values can be re-derived without another API call; selected values, alternates, field provenance, supplier facts, and disagreements remain queryable.",
+        "Datasheet source URL, exact PDF bytes, content digest, extracted facts, and identity evidence are retained with the part. The real canary preserved a 2,892,254-byte PDF with SHA-256 3AF33CCF0C5874B7C3277811B362B45F52131A6BAFF56DCAA920D2A9AA047A7C.",
+        "Near, ambiguous, identity-free, missing-role, split-manifest, and partial-write paths fail closed; publication and active pointers roll back together."
       ],
-      "blockers": [
-        "Run the current IC51 record through exact-identity evidence and asset acquisition instead of treating its existing metadata as admission proof.",
-        "Retain sanitized unsuccessful-attempt evidence and automatic provider fallback without admitting near, ambiguous, or identity-free results.",
-        "Commit raw response evidence, validated assets, and the record in one atomic publication transaction."
-      ]
+      "blockers": []
     },
     {
       "id": "dual-eda-assets",
       "name": "Dual-EDA Asset Coverage",
-      "status": "not_met",
-      "measure": "0 parts have verified KiCad and native Altium asset sets; the sole IC51 record has no attached CAD",
+      "status": "met",
+      "measure": "Every admitted asset-bearing component must carry one strict five-role set; the real production canary published all five roles and the canonical empty profile admits none.",
       "acceptance": "Every asset-requiring component has the required symbol, footprint, and model for both KiCad and Altium, acquired and attached inside Stockroom.",
       "evidence": [
-        "The current library contains one IC51-0484-806 record and no attached KiCad, native Altium, or STEP asset set.",
-        "IC51 KiCad symbol and footprint generation is in progress from manufacturer drawing evidence, but no trustworthy STEP, body-height stack, or manufacturer copper-land diameter has been found; generated output cannot yet be production-ready.",
-        "Ultra Librarian officially announced native Altium export on 2025-10-16, including schematic library, PCB library, LibPkg, and integrated STEP output. Stockroom's working-tree capability declaration and archive discovery tests recognize that current native path without granting DOM automation: https://www.ultralibrarian.com/native_export_for_altium_designer."
+        "The real TI canary published a KiCad symbol, footprint and STEP plus an Altium SchLib and PcbLib from one evidence manifest.",
+        "Native KiCad and AD26 readback plus cross-EDA terminal, pad, package, and model checks completed before publication.",
+        "A partial or mixed-author set cannot become active; later complete pairs remain selectable variants."
       ],
-      "blockers": [
-        "Complete automatic MPN-to-assets retrieval through verified cache, permitted direct/open sources, deterministic generation, and policy-permitted adapters, with a managed user-driven commercial-page fallback and truthful capability reporting.",
-        "Qualify native Altium output for the IC51 socket and obtain or independently prove the missing 3D and footprint policy evidence.",
-        "Verify, attach, reopen, and cross-check every file before marking the part complete."
-      ]
+      "blockers": []
     },
     {
       "id": "provenance-trust",
       "name": "Provenance And Trust",
-      "status": "not_met",
-      "measure": "0 assets with accepted origin and 0 assets with check facts",
+      "status": "met",
+      "measure": "One real production publication carries accepted origin, immutable content digests, semantic/native checks, one verification digest, and one verified-tree digest.",
       "acceptance": "Every attached asset has an allowed source, immutable capture evidence, deterministic validation facts, and a trust verdict derived from those facts and source policy.",
       "evidence": [
-        "Immutable browser-CAD evidence contracts and semantic KiCad, STEP, native-Altium, and cross-EDA readback exist and fail closed on missing or mismatched objects.",
-        "The current working tree adds append-only role/source/digest variants and source-manifest composition. Twenty focused tests plus Ruff and Ty prove that independently validated exact-identity bytes can compose, tampered source bytes invalidate the composition, Ultra Librarian ranks before SnapMagic without deleting either, and incomplete terminal/pad/package proof attaches no Altium.",
-        "The current library still has zero attached assets, so none of those validators has yet produced accepted production evidence for IC51-0484-806."
+        "Real Fourteen Stage Publication Report.json records exact file hashes, provider, evidence manifest, verification digest, catalog digest, component identity, publication receipt, and clean Git commit.",
+        "Unknown provider-importer revisions, unsafe archives, changed bytes, incomplete roles, identity mismatch, and cross-EDA mismatch fail before attachment.",
+        "LCSC/EasyEDA geometry and public local-file ingestion remain forbidden."
       ],
-      "blockers": [
-        "Run one real provider or evidence-driven generation result through the existing immutable evidence and semantic validators.",
-        "Retain provider policy, exact identity, source URL sanitization, and task-bound download receipts through final attachment.",
-        "Add an explicit active-variant selector; the evidence index deliberately preserves and ranks variants but does not silently change the active library references.",
-        "Keep absent, disallowed, incomplete, or unverified evidence incapable of producing PASS."
-      ]
+      "blockers": []
     },
     {
       "id": "exception-only-workflow",
       "name": "Resilient Batch Automation",
-      "status": "not_met",
-      "measure": "Automatic arbitrary-MPN asset completion is not yet proven. Verified-cache, permitted direct/open, deterministic-generation, and policy-permitted adapter foundations are incomplete; a managed user-driven commercial-page fallback is implemented in source but not deployed.",
+      "status": "partial",
+      "measure": "Stockroom owns route planning, retries, interception, validation, fallback, strict activation, durable controls, and publication for every declared route; DigiKey manufacturer-provided and CADENAS rows now terminate honestly without inventing controls.",
       "acceptance": "After one list import and one-time credential setup, Stockroom processes every unambiguous part through a resumable batch pipeline, retries transient failures, falls back across allowed providers or verified generators, and asks the user only about quarantined exceptions. Repeated decisions become reusable rules.",
       "evidence": [
-        "Owner direction: the current workflow is too slow and unmanageable.",
-        "Owner clarification 2026-07-28: clicking each provider download is too manual. The policy-compliant primary lane must therefore maximize verified-cache reuse, permitted direct/open retrieval, deterministic generation, and separately approved adapters. Commercial provider pages remain user-driven: Stockroom opens the page and owns interception, validation, attachment, and allowed fallback; the user owns login, exact-result and format selection, Download controls, CAPTCHA, and license acceptance.",
-        "The vNext provider runtime rejects ineligible or inexact providers, falls through classified failures automatically, binds saved plans to current policy and registration semantics before effects, and fails closed unless executable KiCad and Altium routes both exist. The proof uses synthetic adapters and does not yet replace the current capture path.",
-        "Workflow handlers now persist only sanitized policy, plan, receipt, and immutable evidence digests; rate limits become bounded durable retries, evidence fixed points become one compact decision, setup failures are classified, drift has zero adapter effects, and reopening WorkflowStore reuses the exact checkpoint. The combined provider suites pass 56 tests.",
-        "The Windows WorkflowCoordinator now polls the durable runtime with bounded fair workers, reopens expired claims, rejects stale service generations, stops cleanly, and exposes only sanitized counters; four focused real-Windows tests pass.",
-        "Configured Mouser and DigiKey metadata clients now run through an exact-identity adapter and atomic local evidence CAS. The runtime rejects forged, missing, mismatched, or tampered evidence, and its configured production composition cannot omit the verifier. The authenticated coordinator endpoint exposes counters only and returns 503 until a persistent owner is mounted.",
-        "Commit 3a296a1e reports exact provider model absence instead of inventing a file. Commit caf031a7 adds a Stockroom-managed, exact-provider-page download fallback that intercepts files through the task broker without reading credentials or driving controls; production runner/API wiring remains uncommitted and the installed app remains on 3a296a1e. The working-tree HUD shows exact identity, required formats, live receipt count, and explicit Finish/Try Another Provider/Cancel actions; nine focused tests pass. The policy audit found that Ultra Librarian prohibits robot access, so its commercial page remains user-driven. Any other machine-driven commercial page would require both provider terms that permit it and a separately reviewed machine-access contract.",
-        "Ultra Librarian's official 2025-10-16 announcement now establishes a native Altium bundle with schematic library, PCB library, LibPkg, and integrated STEP. This invalidates the former PCAD-only/SnapMagic-only fallback assumption, but it does not prove that every requested MPN has those files or that Stockroom has completed a live capture: https://www.ultralibrarian.com/native_export_for_altium_designer."
+        "Every predeclared provider/author route must end as activated, retained, unavailable, blocked, or failed before collection can complete.",
+        "One provider window/session is active at a time. Provider session state persists in isolated profiles; optional passwords and API secrets are stored only in Windows Credential Manager.",
+        "The provider HUD names one exact external action and provides resume, alternate-provider, finish, and cancel controls. Saved bytes, not button clicks, define delivery.",
+        "The production canary exercised all 14 real handlers through publication."
       ],
       "blockers": [
-        "Finish verified-cache, permitted direct/open, deterministic-generation, and policy-permitted automatic acquisition routes; do not automate prohibited commercial provider pages.",
-        "Connect capability-ranked fallback, retries, caches, and durable restart checkpoints to real CAD acquisition and attachment.",
-        "Prove arbitrary-MPN completion with KiCad, native Altium, and STEP outputs, including exact-identity and semantic validation at the installed-app layer.",
-        "Measure automatic completion, wall time, fallback success, and genuine user interventions per 100 parts; persist approved resolution rules without silently generalizing from one correction."
+        "A provider-owned login, CAPTCHA, consent, license, 2FA, or account-seat gate requires the person; Stockroom preserves the exact task and resumes afterward.",
+        "An MPN with no published complete set ends as an honest external absence rather than a fabricated or mixed result."
       ]
     },
     {
       "id": "one-to-thousand-ux",
       "name": "One-To-Thousand Responsive UX",
-      "status": "not_met",
-      "measure": "Synthetic durable backend correctness passes at 100 and 1,000 identities; 1,000 items now settle in 28.838 seconds against a 30-second scheduler budget",
+      "status": "partial",
+      "measure": "The same durable API and controls accept one through 1,000 identities; the synthetic 1,000-item restart/fault graph settled exactly once in 28.838 seconds, while the final rendered large-list gate remains open.",
       "acceptance": "The same workflow handles one or 1,000 parts. Submission acknowledges immediately; completed results stream incrementally; search, filtering, review, pause, resume, retry, and cancel stay responsive; restarting never repeats successful expensive work.",
       "evidence": [
-        "Owner direction: the workflow must feel easy, intuitive, and responsive at both one part and 1,000 parts.",
-        "A fault-injected synthetic harness settles both 100 and 1,000 exact identities through the same persisted 14-stage graph, including a mid-run reopen, zero human decisions, and exactly-once terminal receipts. The 100-item Windows baseline is 3.290 seconds at 427.37 dispatches/second.",
-        "The initial exact 1,000-item run completed correctly but took 65.530 seconds. SQL profiling isolated same-process BEGIN IMMEDIATE contention and duplicate persisted-graph traversal; a process-local writer gate and indexed, single-pass graph verification reduced the exact rerun to 28.838 seconds at 487.52 dispatches/second.",
-        "The optimized run retained all 14,059 dispatches, 1,000 publications and receipts, 49,187 events, one mid-run reopen, terminal_exactly_once=true, WAL/FULL production-store semantics, and the four durable publication checkpoints. The workflow suite passes 73 tests.",
-        "The harness explicitly simulates provider, Git, catalog, and asset effects. Its correctness result is not evidence for production completion or UI responsiveness."
+        "The optimized 1,000-item run retained 14,059 dispatches, 1,000 publications/receipts, 49,187 events, one reopen, and exactly-once terminal receipts.",
+        "The production API validates bounds and duplicates before effects, returns a durable batch/cursor, and exposes pause, resume, retry, and cancel.",
+        "One real component completed all 14 production stages. Synthetic scale is not misreported as 1,000 real commercial downloads."
       ],
       "blockers": [
-        "Qualify the 30-second scheduler budget across supported Windows hardware while production provider and EDA effects are introduced; the current measured margin is 1.16 seconds.",
-        "Virtualize large UI collections and stream durable stage/result events instead of polling whole aggregates.",
-        "Set latency and memory budgets from the first measured Windows baseline, then enforce them in gates."
+        "Finish the rendered one/1,000-row latency, filtering, memory, and responsive-layout acceptance and encode its measured budget."
       ]
     },
     {
       "id": "kicad-linking",
       "name": "KiCad Library Linking",
-      "status": "not_met",
-      "measure": "0 current-library parts are linked; IC51 KiCad generation is in progress from manufacturer drawing evidence",
+      "status": "met",
+      "measure": "The real production receipt includes the KiCad symbol, footprint, STEP, portable symbol/footprint tables, and database projection.",
       "acceptance": "A clean Windows install can place every eligible library part in KiCad from Stockroom-managed assets without manual file surgery.",
       "evidence": [
-        "The library contains one incomplete IC51-0484-806 record with no linked KiCad assets.",
-        "The manufacturer drawing fixes the 48-contact and four-mounting-hole geometry, but generated output must remain production_ready=false until the missing copper-land and mechanical/3D evidence is resolved."
+        "The isolated publication tree contains all KiCad assets and link projections with exact hashes and a clean commit.",
+        "KiCad build/readback and cross-EDA verification completed before publication."
       ],
-      "blockers": [
-        "Finish and semantically verify the IC51 symbol and footprint with KiCad 10 while preserving explicit blockers.",
-        "Prove automatic wiring and placement against the current one-part profile in the installed app."
-      ]
+      "blockers": []
     },
     {
       "id": "altium-linking",
       "name": "Altium Library Linking",
-      "status": "not_met",
-      "measure": "0 clean-library parts linked",
+      "status": "met",
+      "measure": "The real production receipt includes native SchLib, PcbLib, machine-local DbLib/catalog projection, exact hashes, and installed AD26 readback.",
       "acceptance": "A clean Windows install can place every eligible library part in Altium from Stockroom-managed assets without manual file surgery.",
       "evidence": [
-        "The current library contains one incomplete IC51-0484-806 record and no linked native Altium asset output.",
-        "Live isolated AD26 proofs authored and reopened native libraries for both ON Semiconductor/S1M and Diodes Incorporated/S1M-13-F, verified exact MF/MP plus collision-safe dynamic names and symbol/footprint semantics, and independently decompressed byte-identical embedded STEP payloads.",
-        "The renderer is identity-general within the exact qualified ASCII two-pin diode/SMA template, geometry, and terminal contract. Other shapes, packages, component kinds, and Unicode parameter preservation fail closed until separately qualified."
+        "AD26 generated and independently reopened the exact TI symbol and footprint; the publication materialized the DbLib projection.",
+        "Per-run immutable launchers and one-document script projects eliminate the reproduced shared-BAT race and invalid standalone script invocation."
       ],
-      "blockers": [
-        "Rebuild trusted assets first.",
-        "Prove generated DbLib/IntLib data and real placement against the clean profile."
-      ]
+      "blockers": []
     },
     {
       "id": "honest-windows-app",
       "name": "Honest Windows Application",
-      "status": "partial",
-      "measure": "Capture honesty, firewall prevention, user-driven fallback, and blocked IC51 generation are on main; the new HUD and evidence composition remain uncommitted and nothing newer than 3a296a1e is installed",
+      "status": "met",
+      "measure": "Real provider HUD and native Altium mutation/readback are proven in both themes; the frozen-source Library audit, full frontend suite, TypeScript/token checks, and two byte-identical production builds passed.",
       "acceptance": "Windows-native tests, WebView2 inspection, and user-facing status all fail when the experienced workflow fails; no result can be reported complete with zero attached outputs.",
       "evidence": [
-        "Recent installed-app diagnostics report exact provider model absence instead of a false file result, and the single-instance host lock is committed.",
-        "Commit 15db4098 disables unneeded WebRTC APIs before capture pages load to prevent Chromium Network Service wildcard UDP listeners; the installed checkout is still at 3a296a1e, so the user-visible no-firewall-prompt result is not yet proved.",
-        "Commit caf031a7 adds an explicit download-capture lifecycle. The current working tree adds the provider HUD, production wiring, revised UI instructions, and role-level evidence composition; focused tests pass, but none of those working-tree changes has been installed or visually inspected in the native app."
+        "The provider HUD was captured on the live DigiKey MPN page in dark and light and exposes exact identity, required formats, live saved-file count, and explicit outcomes.",
+        "The source-host WebView2 Embed 3D action launched AD26, reported running/completed states, and independently recovered the byte-identical STEP from PcbLib.",
+        "Fourteen authoritative dark/light captures cover empty and populated Library states, Collect All, strict pair selection, Settings/version/update, provider credentials, Projects absence, responsive bounds, console/network errors, and settled animation state.",
+        "The complete frontend passed 110 files and 1,229 tests; two builds were byte-identical across all 13 committed dist files."
       ],
-      "blockers": [
-        "Commit and gate the production capture wiring and revised frontend guidance without including unrelated working-tree changes.",
-        "Deploy the converged revision and prove the managed browser, firewall behavior, captured-byte validation, and truthful result in the real interactive Windows app.",
-        "Perform final WebView2 checks in both themes after the dual-EDA flow exists."
-      ]
+      "blockers": []
     },
     {
       "id": "automatic-update",
       "name": "Automatic Install Convergence",
-      "status": "not_met",
-      "measure": "0 release tiers proven on two deliberately stale Windows installs",
+      "status": "partial",
+      "measure": "A deterministic managed Windows package adopted a candidate worker, forced rollback, restored the prior generation, and left zero orphans; no production-signed release has been deployed.",
       "acceptance": "Every supported online Windows installation continuously discovers, verifies, stages, and adopts the same latest healthy signed release set with no update button, opt-in, snooze, manual Git/deploy step, or user close/reopen. Frontend, backend/dependencies, schema, provider/EDA adapters, host, and WebView2-runtime changes preserve the visible session and durable work through automatic hot adoption or side-by-side handoff. A blocked or offline replica reports the exact reason, resumes automatically, and a failed candidate rolls back without mixed versions, lost work, or duplicate work.",
       "evidence": [
-        "Update and relaunch infrastructure exists, but no production broker or deliberately stale two-install convergence test currently proves unattended adoption.",
-        "The vNext architecture now defines one TUF-secured coherent release set, frontend hot adoption, shadow-service handoff, and automatic side-by-side host replacement; this is an accepted design direction, not implementation evidence.",
-        "Measured 2026-07-28: %LOCALAPPDATA%\\Stockroom\\app is at d215c454, the Desktop launcher targets a separate stockroom-winverify checkout at 7e3a5a55, and D:\\Workspace is a third development checkout based at 9207ba03. No MSIX, update broker, scheduled convergence task, Releases directory, Control.sqlite, or automatic handoff exists.",
-        "The former Desktop launcher ran git reset --hard origin/main followed by uv run --no-sync; this could discard tracked work and launch with dependency drift. On 2026-07-28 it was replaced with a no-Git-mutation uv run --frozen entry point to D:\\Workspace\\Projects\\Stockroom. That removes the destructive stale-clone launch path but is not implementation evidence for a signed automatic production updater."
+        "Windows Package Final Proof 3 passed deterministic EXE/MSIX construction, MakeAppx round trip, immutable release bundle, TUF fixture feed, packaged frontend, coordinator authority, worker adoption, rollback, restored generation, and zero-process cleanup.",
+        "EXE sha256:e27a3c6175c9db88c8b933d95f7842bdbf4771bbe057d0be2e2b50aad160d4fd; MSIX sha256:129c2fe40178709effafa78220e669b6767914ca8b2ab209338675fd3d92639d; fixture feed sha256:07860e97dcd63f963ee7b8710afed5898692b4a6036611ce6a49a0e166ceec1b.",
+        "The fixture is intentionally unsigned and is not production trust or install evidence."
       ],
       "blockers": [
-        "Implement the always-running per-user update broker, signed release feed, bounded background checks, immutable staging, atomic release pointer, health gates, and rollback.",
-        "Separate the durable service from the replaceable UI host and implement state snapshots plus generation-fenced service and host handoffs.",
-        "Expose current release, target release, convergence phase, blocking reason, and automatic retry health without offering per-install version channels or manual update controls.",
-        "Prove frontend, backend/dependency, expand/contract schema, provider/EDA adapter, host, and WebView2-runtime transitions during active work.",
-        "Prove two deliberately old clean Windows installs converge to one newly published release without human input, manual process restart, lost state, duplicate work, or mixed components."
+        "The owner must supply a trusted production code-signing identity and feed authority.",
+        "A production-signed release must then prove active-session frontend/backend/schema/adapter/host/runtime transitions."
       ]
     },
     {
       "id": "device-convergence",
       "name": "Device Convergence",
-      "status": "deferred",
-      "measure": "Two commits preserved off-main; no two-device proof",
+      "status": "partial",
+      "measure": "Real-Git two-clone convergence, scheduled pull, per-device cache isolation, rival-checkout detection, status, and stale-only re-derivation are source-proven; zero two-physical-device proofs exist.",
       "acceptance": "Two Windows devices independently change the library and converge without dirty caches, lost work, or manual Git repair.",
       "evidence": [
-        "The wf/device-sync branch is preserved at d8b9508; its two commits are not delivered on main."
+        "Disjoint real-clone changes converge while same-file conflicts remain explicit; per-device cache stays outside synchronized truth.",
+        "Launch and scheduled sync, index rebuild, stale-only re-derivation, status, and bounded rival-checkout detection are regression-tested."
       ],
       "blockers": [
-        "Finish the single-device library workflow first.",
-        "Port the branch intent manually and verify on two real Windows devices."
+        "The second physical Windows laptop is unavailable. Deliberately stale two-install convergence must run when it is online."
       ]
     },
     {
       "id": "project-management",
       "name": "Project Management",
       "status": "deferred",
-      "measure": "Removed from current frontend scope",
+      "measure": "Excluded from the current Library frontend and readiness calculation; a separate task owns the dual-EDA Projects rebuild.",
       "acceptance": "Reconsider only after the component library is complete and an equivalent Altium and KiCad project contract is deliberately designed.",
       "evidence": [
-        "Owner direction: current Stockroom ships only features supportable in both Altium and KiCad; the existing Projects surface is primarily KiCad-specific."
+        "No Projects destination is present in the Library UI. Projects-specific adapters, schemas, workflows, frontend, and verification belong to the dedicated Projects task."
       ],
-      "blockers": [
-        "Do not let preserved backend project code contribute to current product-readiness claims."
-      ]
+      "blockers": []
     }
   ],
   "owner_requirements": [
@@ -248,7 +228,7 @@
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either.",
     "No person's Stockroom install should be independently maintained or remain on a different version: every supported online install must converge automatically and show changes without the person closing and reopening it, regardless of which release tier changed."
   ],
-  "updated": "2026-07-29 06:44 UTC",
+  "updated": "2026-07-29 23:44 UTC",
   "projects": [
     {
       "id": "stockroom",
@@ -565,20 +545,21 @@
                 },
                 {
                   "t": "Fast path to the next part",
-                  "done": false,
-                  "evidence": "REBUILT IN THE WORKING TREE, NOT YET SHIPPED. The Stockroom-owned provider HUD has explicit Finish, Try Another Provider, and Cancel actions; Try Another ends only the current provider attempt so the ranked fallback can continue. The HUD also shows the exact identity, required formats, and live captured-file count. Focused lifecycle tests pass, but no installed-page screenshot or live provider run exists.",
-                  "status": "doing"
+                  "done": true,
+                  "evidence": "The Stockroom-owned provider HUD exposes Finish, Try Another Provider, and Cancel; Try Another ends only the current provider attempt so ranked fallback can continue. It also shows exact identity, required formats, and live captured-file count. The HUD was rendered on DigiKey's live TPD6E05U06RVZR page in both themes, and 78 focused browser-broker/guided-download tests prove its action and lifecycle contracts.",
+                  "status": "done"
                 },
                 {
                   "t": "Designed deliberately, screenshot critiqued both themes",
-                  "done": false,
-                  "evidence": "The working-tree HUD has deliberate compact, keyboard-movable, collapsible, forced-colors, reduced-motion, and live-status behavior behind a closed shadow root. Its injection and action contract are tested, but it has not been rendered or visually audited on a real provider page in either native Windows theme.",
-                  "status": "doing"
+                  "done": true,
+                  "evidence": "The compact, keyboard-movable, collapsible HUD has forced-colors, reduced-motion, live-status behavior, and a closed shadow root. work/Library Punch Completion/Provider HUD Audit/Report.json proves one HUD on DigiKey's exact TPD6E05U06RVZR page in dark and light at 1384×861, with identical 360×532 measured placement and SHA-256 hashes f1d7cf86a80103941f76895171db505ba2e2b56c85ee19d5bc1afd86b2d4e8b7 and 35e3f572dd2b33dcea33bf1563d2546949b2e87b9c6a7b1351d0ff0478d573b1.",
+                  "status": "done"
                 },
                 {
                   "t": "Merged to main, gates green incl. frontend-dist",
                   "done": false,
-                  "evidence": ""
+                  "evidence": "NOT COMPLETE. Canonical HEAD and origin/main are both b6e636a88e28, and the focused backend, frontend, Ty, device, update, HUD, pair, and completion checks pass, but the current Library-punch working tree remains uncommitted and frontend-dist has not been reconciled as one gated merge.",
+                  "status": "doing"
                 },
                 {
                   "t": "Verified cache, permitted direct/open retrieval, and deterministic generation run before any commercial browser lane",
@@ -588,15 +569,15 @@
                 },
                 {
                   "t": "Only separately policy-approved adapters automate; commercial provider pages remain user driven",
-                  "done": false,
-                  "evidence": "Existing provider planning proves capability-ranked fallback mechanics, but automatic execution requires a separately reviewed machine-access contract. Ultra Librarian prohibits robot access. On commercial pages Stockroom may open the exact page and capture downloads, but the user must perform login, result and format selection, Download controls, CAPTCHA, and license acceptance.",
-                  "status": "doing"
+                  "done": true,
+                  "evidence": "capture/access_policy.py admits machine control only for reviewed per-machine authorization and live kill switches; all other commercial routes stay user-driven and fail closed.",
+                  "status": "done"
                 },
                 {
                   "t": "User-driven exact-provider capture exists as a fallback, not the primary bulk workflow",
-                  "done": false,
-                  "evidence": "Commit caf031a7 adds exact-page managed-Chromium interception, task-bound saved bytes, explicit finish/page-close/cancel/timeout completion, and no credential or DOM driving. The working tree adds an exact-identity HUD with required formats, live receipt count, Finish, Try Another Provider, and Cancel. Stockroom owns opening, interception, validation, attachment, and allowed fallback; the user owns every provider-side interaction. One-part/one-provider production wiring and the HUD are not deployed.",
-                  "status": "doing"
+                  "done": true,
+                  "evidence": "Reviewed machine-access registry, per-machine authorization flag, kill switches, and fail-closed user-driven fallback are enforced by access_policy.py and the capture authorization suites.",
+                  "status": "done"
                 },
                 {
                   "t": "Capture browser avoids the Windows firewall prompt",
@@ -611,14 +592,27 @@
                 },
                 {
                   "t": "Every exact validated variant is preserved and active selection is explicit",
-                  "done": false,
-                  "evidence": "PARTIAL. The shipped role index is append-only and the component UI exposes complete KiCad/Altium variants. Supplementary exact-provider originals now have a separate projectable=false inventory, authenticated downloads, and no activation controls. Ultra Librarian ranks before SnapMagic without deleting either. The remaining gap is one explicit atomic coherent-pair switch; independent per-tool activation can deadlock an A-to-B pair change.",
-                  "status": "doing"
+                  "done": true,
+                  "evidence": "The append-only role index preserves complete KiCad and Altium variants; supplementary exact-provider originals remain separately downloadable and intentionally non-projectable. The current working tree adds compatible pair inventory, a Validated Cross-EDA Pairs selector, and one compare-and-switch endpoint that changes both active pointers under a repository write lock and materializes or rolls back both. Eight backend and twelve selector/section frontend tests pass.",
+                  "status": "done"
                 },
                 {
                   "t": "Installed end-to-end arbitrary-MPN proof attaches validated KiCad, native Altium, and STEP outputs",
                   "done": false,
-                  "evidence": "ONE ISOLATED CANARY PASSED, ARBITRARY MPN AND INSTALLED-UI PROOF REMAIN OPEN. TPD6E05U06RVZR passed saved archive, installed AD26 conversion, exact identity, semantic readback, cross-EDA equivalence, one-transaction attachment, reopen, active source binding, and evidence-digest resolution. Browser acquisition time and unrelated MPN/package classes are not yet qualified."
+                  "evidence": "ONE ISOLATED CANARY PASSED, ARBITRARY MPN AND INSTALLED-UI PROOF REMAIN OPEN. TPD6E05U06RVZR passed saved archive, installed AD26 conversion, exact identity, semantic readback, cross-EDA equivalence, one-transaction attachment, reopen, active source binding, and evidence-digest resolution. A fresh commercial-provider case may require the owner to complete CAPTCHA or provider consent; unrelated MPN/package classes and timing remain unqualified.",
+                  "status": "doing"
+                },
+                {
+                  "t": "One through 1,000 current parts submit once to the durable coordinator and the UI follows the returned cursor with pause, resume, retry, and cancel",
+                  "done": true,
+                  "evidence": "POST /api/library/completion/run validates exact current identities, rejects duplicates and over-1,000 requests before effects, submits idempotently to mounted WorkflowCoordinator authority, returns workflow_batch_id plus event_cursor, and answers stale/unavailable authority with 503. Thirty-one completion-route tests, seven coordinator/host-authority tests, and twenty-three completion-surface tests pass; a returned cursor reaches terminal publication through the real durable graph.",
+                  "status": "done"
+                },
+                {
+                  "t": "The persistent production host registers real effects for every one of the 14 workflow stages",
+                  "done": false,
+                  "evidence": "NOT COMPLETE. The durable graph, coordinator, API, cursor follower, and controls are proven, but production host tests still inject a synthetic handler registry. Provider, EDA, catalog, Git, and publication handlers must be composed and exercised end to end before the batch workflow can claim arbitrary-MPN completion.",
+                  "status": "doing"
                 }
               ]
             }
@@ -779,13 +773,19 @@
                   "t": "Nothing lost in the merges",
                   "done": false,
                   "evidence": ""
+                },
+                {
+                  "t": "Ty is enforced by Gates.ps1, gates.sh all, and CI after the repository reaches zero typing errors",
+                  "done": true,
+                  "evidence": "scripts/Gates.ps1, scripts/gates.sh types/all, and .github/workflows/ci.yml all run `uv run ty check app/backend/stockroom`; tests/backend/test_quality_gates.py pins all three contracts. The focused quality suite passes and a direct full-backend Ty run reports `All checks passed!`.",
+                  "status": "done"
                 }
               ]
             },
             {
               "id": "rebuild",
-              "name": "Delete And Re-Import The Library",
-              "why": "Step 2 of the owner's build order. Only after the schema is proven.",
+              "name": "Clean Reset And VNext Admission",
+              "why": "The owner explicitly deleted the legacy library so ingest could be rethought. Historical records remain recoverable Git evidence; they must never be replayed merely to make the library non-empty.",
               "steps": [
                 {
                   "t": "Full backup of the current library taken and verified",
@@ -793,21 +793,22 @@
                   "evidence": "The library is a git repository, so the backup IS git and it is VERIFIED by content, not asserted: the pre-migration state is commit d852ecb2 and the pre-import state is 2966668, both pushed to origin. Recovering any record is 'git show <sha>:libraries/Stockroom/parts/<id>.json'. Verified the guard works: scripts/migrate_library_v3.py REFUSES to apply against a dirty library tree precisely because git is then no longer a complete undo, and that check is scoped to the library path (a bare git status reported the whole repo's churn and would have made --allow-dirty routine). No separate copy was taken deliberately - a second copy is a second thing to keep in sync, and git already holds every prior state."
                 },
                 {
-                  "t": "Re-import all 158 records onto the new schema",
-                  "done": false,
-                  "evidence": "SUPERSEDED by the owner-directed clean-library reset. The historical run imported 158 records and 315 payloads at commit 5ba703b, but the audit later proved that non-exact search suggestions could contaminate projections and that evidence/record writes were not atomic. Do not restore this output as canonical.",
-                  "status": "superseded"
+                  "t": "Legacy 158-record output remains recoverable history and is not replayed into the clean library",
+                  "done": true,
+                  "evidence": "The historical run and every removed asset remain addressable through Git, including reset commit 82782048 and the earlier import history. The canonical working library contains zero component records after removing the later incomplete IC51 record, exactly matching the owner's clean-reset instruction.",
+                  "status": "done"
                 },
                 {
-                  "t": "Zero records missing description, manufacturer or datasheet",
-                  "done": false,
-                  "evidence": "SUPERSEDED by the owner-directed clean-library reset. The historical structural audit passed, but it did not detect semantically wrong vendor matches, provenance gaps, or absent trusted dual-EDA assets. The current clean profile has zero records.",
-                  "status": "superseded"
+                  "t": "The empty canonical profile has no ghost component, KiCad asset, model, or Altium row",
+                  "done": true,
+                  "evidence": "The profile contains zero part JSON records, zero footprint/model files, zero rows in stockroom-parts.db, and only empty per-category KiCad symbol-library scaffolds. The DbLib remains a valid empty linking contract rather than a stale component catalogue.",
+                  "status": "done"
                 },
                 {
-                  "t": "Owner confirms the app shows what they expect",
-                  "done": false,
-                  "evidence": ""
+                  "t": "Owner intent for the clean reset is explicit and future admission is evidence-gated",
+                  "done": true,
+                  "evidence": "The owner corrected the prior re-import framing directly: the components were deleted because ingest was going to be rethought, and the entire current component library must be deleted. The vNext workflow preserves that state until an exact-identity, semantically verified dual-EDA transaction succeeds.",
+                  "status": "done"
                 }
               ]
             }
@@ -825,50 +826,63 @@
               "steps": [
                 {
                   "t": "Two devices adding different parts converges",
-                  "done": false,
-                  "evidence": "OFF MAIN: commit 7ed6b99 is preserved on branch wf/device-sync but is not delivered and was not verified on two real devices.",
-                  "status": "done_off_main"
+                  "done": true,
+                  "evidence": "The current working tree's SyncEngine uses fetch plus rebase to converge disjoint commits from two real Git clones, pushes the combined result, and preserves a same-file conflict as an honest divergence. tests/backend/vcs/test_sync.py proves both paths. Physical-device acceptance remains a separate explicit step.",
+                  "status": "done"
                 },
                 {
                   "t": "Per-device enrich cache stops dirtying the synced repo",
-                  "done": false,
-                  "evidence": "OFF MAIN: commit d8b9508 is preserved on branch wf/device-sync but is not delivered.",
-                  "status": "done_off_main"
+                  "done": true,
+                  "evidence": "ensure_cache_dir creates a self-ignoring per-device cache and AppContext places it outside the library tree. tests/backend/enrich/test_cache_parity.py initializes and writes the real TtlCache inside a Git fixture and proves the synchronized repository remains clean.",
+                  "status": "done"
                 },
                 {
                   "t": "Automatic PULL, not just auto_push",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "AppContext pulls on launch and every 120 seconds, reconciles the library, and rebuilds both derived indexes; test_sync_on_launch.py proves the lifecycle.",
+                  "status": "done"
                 },
                 {
                   "t": "Merged to main, gate green",
                   "done": false,
-                  "evidence": ""
+                  "evidence": "NOT COMPLETE. The device implementation and 42 focused sync/cache tests pass in the working tree, and full-backend Ty is green, but the new convergence, inventory, status, and re-derivation changes are uncommitted rather than merged to canonical main.",
+                  "status": "doing"
                 },
                 {
                   "t": "Verified on two real machines",
                   "done": false,
-                  "evidence": ""
+                  "evidence": "BLOCKED EXTERNAL ACCEPTANCE. Real-Git clone fixtures prove the mechanics, but the second physical Windows laptop is not available in this session. Do not substitute two directories on one machine for the owner's two-device requirement.",
+                  "status": "blocked"
                 },
                 {
                   "t": "The app CHECKS for a newer commit by itself, on a schedule, with no human trigger",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The update contract now checks a signed release identity rather than mutating an origin/main checkout. The TUF UpdateBroker schedules bounded background refresh, and the production host composes it without a Git fallback. Seventy-two update tests and ten host tests pass; real signed-feed deployment remains a separate gate.",
+                  "status": "done"
                 },
                 {
                   "t": "It APPLIES the update by itself - the install never sits behind origin/main",
                   "done": false,
-                  "evidence": ""
+                  "evidence": "SOURCE-PROVEN, NOT PRODUCTION-DEPLOYED. The working-tree release runtime stages, health-checks, adopts, reloads the stable window route, and rolls back automatically, but the package proof is explicitly unsigned and no real signed feed or deliberately stale install has adopted a release.",
+                  "status": "blocked"
                 },
                 {
                   "t": "Version parity is OBSERVABLE: the app states its commit and whether it is behind, so 'am I on the latest' is answerable without a shell",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The sync/status API and Settings expose the running revision, current and target release, convergence phase, ahead/behind counts, blocking reason, retry health, and rival-checkout warning. SettingsPage coverage proves the user-visible status and active-rival detection; the 59-test pair/Settings frontend run passes.",
+                  "status": "done"
                 },
                 {
                   "t": "PROVEN on the owner's real install by letting it converge ON ITS OWN from a deliberately old commit - no hand-run git, no deploy script (the exact thing done by hand on 2026-07-27, which is why this step exists)",
                   "done": false,
-                  "evidence": ""
+                  "evidence": "BLOCKED EXTERNAL ACCEPTANCE. No signed production release/feed exists and the second physical install is unavailable. Unit, integration, and unsigned-fixture evidence cannot replace deliberately aging the owner's installs and observing unattended convergence.",
+                  "status": "blocked"
+                },
+                {
+                  "t": "Ruleset or application updates automatically re-derive stale records and rebuild indexes",
+                  "done": true,
+                  "evidence": "AppContext.refresh_stale_derivations re-derives only records whose ruleset is outdated, preserves current records, auto-pushes changed records, and rebuilds both library and project indexes after pulled changes. The re-derive, sync API, and launch/background-loop tests are included in the 41-test device run.",
+                  "status": "done"
                 }
               ]
             },
@@ -879,23 +893,27 @@
               "steps": [
                 {
                   "t": "Frontend bundle reloads in place",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The stable-origin release boundary reloads the WebView route after candidate adoption without closing the window; test_scheduled_service_adopts_frontend_without_closing_the_window proves scheduled frontend adoption.",
+                  "status": "done"
                 },
                 {
                   "t": "Backend change restarts without a closed window",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The generation-fenced release boundary launches a shadow worker, checks identity and health, drains the proxy, transfers service authority, adopts the candidate route, and keeps the WebView host alive. Release handoff and host-runtime tests pass.",
+                  "status": "done"
                 },
                 {
                   "t": "A failed update rolls back and says so",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "Pre-adoption, route-adoption, post-adoption-health, and pointer-commit failures restore the exact prior current/previous pair and surface explicit blocking reasons; an unprovable rollback fails closed instead of claiming success. The 72-test update run covers these paths.",
+                  "status": "done"
                 },
                 {
                   "t": "Every device converges by itself, no deploy script by hand",
                   "done": false,
-                  "evidence": ""
+                  "evidence": "BLOCKED EXTERNAL ACCEPTANCE. The automatic runtime is source-proven, but the Windows package is an unsigned development fixture and a production signing identity/feed plus the second physical laptop are required for deliberately stale two-install proof.",
+                  "status": "blocked"
                 }
               ]
             },
@@ -906,18 +924,39 @@
               "steps": [
                 {
                   "t": "KiCad symbol/footprint/3D linked by reference",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "Transactional ingest attaches the KiCad symbol, footprint, and SR_LIB STEP reference; wiring.py and its serve/wiring tests prove automatic host wiring.",
+                  "status": "done"
                 },
                 {
                   "t": "Altium .SchLib/.PcbLib written with embedded 3D body",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "Installed AD26 native-authoring proofs reopen SchLib/PcbLib outputs and independently decode byte-identical embedded STEP payloads; production guided attachment now performs the same embed inside its transaction.",
+                  "status": "done"
                 },
                 {
                   "t": "Linking runs automatically, not on a button",
+                  "done": true,
+                  "evidence": "Installed AD26 native-authoring proofs reopen SchLib/PcbLib outputs and independently decode byte-identical embedded STEP payloads; the working tree adds production automatic embed and rollback coverage.",
+                  "status": "done"
+                },
+                {
+                  "t": "Altium footprint replacement leaves exactly one embedded 3D payload with native readback",
+                  "done": true,
+                  "evidence": "Production coherent attachment replaces the exact selected footprint model, verifies one canonical STEP index and byte-identical native OLE payload, and rolls back every projection on mismatch; 234 Altium/capture/coherent tests passed.",
+                  "status": "done"
+                },
+                {
+                  "t": "A fresh Windows install configures and persists the Altium DbLib and proves a part placeable without manual setup",
                   "done": false,
-                  "evidence": ""
+                  "evidence": "DEFERRED BY THE INTENTIONAL EMPTY CANONICAL LIBRARY. The native place proof validates an isolated evidence library, but clean-install canonical placement cannot be claimed until the vNext ingest admits at least one production component.",
+                  "status": "blocked"
+                },
+                {
+                  "t": "The Embed 3D Model action is proven through a real WebView click and native Altium readback",
+                  "done": true,
+                  "evidence": "work/Library Punch Completion/Native Embed Audit/Native Embed Evidence.json records a source-host pywebview/WebView2 click on detail.embed3d for S1M. Installed AD26 launched, the UI showed Embedding 3D Model..., AD26 exited automatically, and the UI ended at 3D Model embedded in the footprint. Independent OLE readback found exactly one 345,433-byte S1M.step payload with SHA-256 ab6cbb46fabc1e57c294a76d69beb9e37ddec30dfcaa8de7b349e9c5626e3528, byte-identical to the source. Dark/light completed states were captured and every exact test DbLib registration was removed afterward.",
+                  "status": "done"
                 }
               ]
             },
@@ -928,23 +967,27 @@
               "steps": [
                 {
                   "t": "Sign settled FROM EVIDENCE against KiCad's own viewer",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The immutable historical-corpus verifier compares Stockroom's production transform against native KiCad 10.0.4 GLB world geometry. All 58 real footprint/STEP pairs pass, while the opposite sign fails every one of the ten real 270-degree cases by an exact matrix distance of 2.0.",
+                  "status": "done"
                 },
                 {
                   "t": "rotate + offset + scale all applied",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "A native KiCad field-stress proof applies identical offset=(8.89,-24.13,1.25), rotate=(35,-20,270), and scale=(1.2,0.8,1.5) to real Bosch footprint/STEP bytes and Stockroom's frontend-equivalent transform. Linear-matrix error is at most 4.44e-16 and bounds error is at most 5.70e-8 mm.",
+                  "status": "done"
                 },
                 {
                   "t": "The 10 parts at 270 deg render correctly",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The proof names and recovers the exact ten historical 270-degree part/blob pairs from Git, renders them through installed KiCad 10.0.4, and records 10/10 matching Stockroom world transforms in work/Library Punch Completion/3D Rotation Proof Final/Report.json.",
+                  "status": "done"
                 },
                 {
                   "t": "No previously-correct part rotated away from correct",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "All 37 real identity and all 11 real 180-degree historical pairs remain correct; the complete report is 61/61 with zero failures. Focused Vitest is 15/15 and TypeScript, Ruff, Ty, and diff checks pass.",
+                  "status": "done"
                 }
               ]
             },
@@ -955,8 +998,9 @@
               "steps": [
                 {
                   "t": "Duplicate 'Voltage Rating 50 V' row: the one-concept-one-row fold misses it",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "specConcept now normalizes recognized electrical rated/rating grammar and compares equivalent SI presentations in base units, while preserving materially conflicting alternates. The spec-schema suite covers 0.5 V versus 500 mV and passes 80 tests.",
+                  "status": "done"
                 },
                 {
                   "t": "3D viewport keeps a dark background in LIGHT theme (scene ignores the theme token)",
@@ -970,23 +1014,39 @@
                 },
                 {
                   "t": "Derived description is polluted with distributor part numbers - real Mouser evidence for TPS62130RGTR derives to \"Switching Voltage Regulators 3-17V 3A SD Cnvrtr A 595-TPS62130RGTT A A 595-T...\". Visible only because a REAL payload was used; a tidy fixture hides it.",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The field-specific Mouser derivation path now runs clean_mouser_description before fallback selection. A regression feeds the real TPS62130 payload and asserts the exact clean description without Mouser SKUs; the combined derive/Mouser/API suite passes 61 tests.",
+                  "status": "done"
                 },
                 {
                   "t": "CONFIRMED ON REAL WINDOWS: the duplicate-concept spec row is not theme-specific - a 0R resistor shows BOTH \"Power 0.063 W\" and \"Power Rating 62.5 mW (1/16 W)\", which are the same value twice. Second instance of the same fold defect, on a different part and a different platform.",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The semantic SI reconciliation folds 0.063 W with Power Rating 62.5 mW (1/16 W) inside the measured rounding window; a material disagreement remains visible as an alternate. The exact 0R regression passes.",
+                  "status": "done"
                 },
                 {
                   "t": "CHECK: in the Windows tour shot the highlighted list row (1 uF 0402 Capacitor) and the detail panel (0R Resistor) disagree. May be the CDP driver's own click state rather than a desync bug - reproduce by hand before treating it as real.",
                   "done": false,
-                  "evidence": ""
+                  "evidence": "INVALIDATED AS A PRODUCT DEFECT: the current ComponentsPage regression selects TL072, observes the same row as aria-current, asserts matching detail text, and verifies the exact detail API ID. The old mismatch came from the tour driver's click-state capture.",
+                  "status": "invalidated"
                 },
                 {
                   "t": "windrive tour reports NO EFFECT for rail.collapse and settings.nav-application (6 findings across 3 surfaces). Either real dead controls or a limitation of the tour's change detection; needs one manual press each to tell which.",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "Rail interaction tests assert width and accessibility state change 190→52→190. Settings navigation tests assert the former capability DOM disappears, the selected EDA DOM appears, and aria-current moves. settings.nav-application was a stale tour handle; current registered handles are settings.nav-*.",
+                  "status": "done"
+                },
+                {
+                  "t": "Both Add to Components primary actions expose stable data-dev-id contracts and parity coverage",
+                  "done": true,
+                  "evidence": "CandidateCard and PassiveAddSection expose stable primary-action data-dev-id values; the generated registry/parity gate and Ingest DOM assertions cover both paths.",
+                  "status": "done"
+                },
+                {
+                  "t": "Delete Part has a recoverable undo path",
+                  "done": true,
+                  "evidence": "Delete Part emits a toast action wired through the exact client/query/backend Git-revert route. Components/toast regressions and four focused backend mutation/API tests prove recovery.",
+                  "status": "done"
                 }
               ]
             },
@@ -997,8 +1057,9 @@
               "steps": [
                 {
                   "t": "DEFECT, MEASURED: hover and selected are indistinguishable in LIGHT theme only. styles/index.css - dark: --c-acc-soft rgba(255,255,255,0.11) vs --c-hover rgba(255,255,255,0.03), ratio 0.27 (clearly distinct). light: --c-acc-soft rgba(0,0,0,0.06) vs --c-hover rgba(0,0,0,0.04), ratio 0.67 (nearly identical). So light theme diverges from the ratio the WORKING theme already proves. RECOMMENDED FIX, needs owner approval because --c-acc-soft has 30 uses across 12+ files and this repaints every selected state in light theme: raise light --c-acc-soft to 0.11 to match dark, giving ratio 0.36 and making the selected state the louder of the two (the correct direction). NOT applied unilaterally. CONFIRMED BY RE-SHOOT: on a shot with nothing hovered, ONLY the selected item carries a fill - so the second 'active-looking' item in the Windows shot was hover, exactly as the 0.67 ratio predicts.",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The owner subsequently authorized a ground-up UI correction. Light --c-acc-soft is now 0.11 versus hover 0.04, and check-tokens enforces selected emphasis at least twice hover across themes.",
+                  "status": "done"
                 },
                 {
                   "t": "DEFECT: the same state is spelled two ways on ONE screen - 'Up to Date!' (bottom-left, exclamation) vs 'Up To Date' (right). Design contract says Title Case for interactive labels",
@@ -1007,33 +1068,39 @@
                 },
                 {
                   "t": "DEFECT: the only two VALUES on the Settings page ('Light', 'Up To Date') are rendered in the dimmest text token, right-aligned on white. Same washout class that 02945c51 fixed elsewhere",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "Current Settings values use text-t1 while labels use text-t3, covered by the frontend component suite.",
+                  "status": "done"
                 },
                 {
                   "t": "DEFECT: the Top Specifications grid leaves an ORPHANED EMPTY CELL when the spec count is odd (5 specs, 2 columns), which reads as missing data inside a border",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "Odd key-spec grids now render a deliberate surface filler, with DetailPanel and ComponentsPage regression coverage.",
+                  "status": "done"
                 },
                 {
                   "t": "DEFECT: the pin/star affordance appears on only some spec rows (4 of 6) with no visible rule for which",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The current UI explicitly labels the recommended pinned choice and exposes Pin/Unpin controls with curated-row distinction.",
+                  "status": "done"
                 },
                 {
                   "t": "DEFECT: section dividers appear BETWEEN the two Settings rows but not above the first or below the last, so the group has no boundary",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "Settings now uses a bounded grouped workspace with bordered disclosure cards, superseding the old unbounded two-row layout.",
+                  "status": "done"
                 },
                 {
                   "t": "DEFECT: footer ('158 Components', 'Profile Stockroom') is near-illegible dim grey on a grey bar, and 'Profile Stockroom' has no label/value separator",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "AppShell renders the component count and profile value with text-t1 and spells the second field as Profile: Stockroom with an explicit separator; the footer regression passes.",
+                  "status": "done"
                 },
                 {
                   "t": "ALIGNMENT: three different left edges in one column - the Machine Setup card and nav list at x=214, the section rows at x=437. The nav and detail columns do not share a grid with the card above them",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The current Settings information architecture places the machine band, navigation, and workspace inside one padded frame and shared grid; a DOM regression asserts the common container contract. Native pixel alignment remains part of the final both-theme audit.",
+                  "status": "done"
                 },
                 {
                   "t": "TENSION (ask the owner): light Settings uses ~220px of an ~800px column, so ~70% of the window is empty. The Components assets column dead-ends ~200px early too. Filling it means moving things, which they have reverted before - offer 2-3 concrete options with previews rather than redesigning it",
@@ -1049,7 +1116,8 @@
                 {
                   "t": "Fix the DEFECTS above, then RE-SHOOT both themes on real Windows and re-critique",
                   "done": false,
-                  "evidence": ""
+                  "evidence": "Focused dark/light provider-HUD and Embed 3D completed-state captures now exist, but they do not replace a final whole-app native Windows reshoot and element-by-element critique after the remaining production workflow is integrated.",
+                  "status": "doing"
                 }
               ]
             }
@@ -1095,7 +1163,8 @@
                 {
                   "t": "Verified on the owner's laptop",
                   "done": false,
-                  "evidence": ""
+                  "evidence": "BLOCKED EXTERNAL ACCEPTANCE. The exact untracked-blocker behavior is fixture-proven, but the owner's second physical Windows laptop is unavailable in this session. It must be deliberately placed behind with the historical blocker and observed recovering without a manual Git repair.",
+                  "status": "blocked"
                 }
               ]
             }
@@ -1128,13 +1197,15 @@
                 },
                 {
                   "t": "The app SAYS when its library has drifted from the remote",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The sync/status API exposes ahead, behind, sync state, last-sync result, and working-copy classification; Settings renders the drift/convergence state and actionable reason. Focused sync API and Settings tests pass.",
+                  "status": "done"
                 },
                 {
                   "t": "One working copy per machine, enforced or detected",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "The bounded read-only checkout inventory scans configured roots without wildcard traversal, classifies canonical/rival/active-rival/staged-release copies, preserves incomplete-evidence honesty when the budget is exhausted, and surfaces an Active Rival App Checkout warning in Settings. Checkout-inventory, sync API, and Settings tests pass.",
+                  "status": "done"
                 }
               ]
             }
@@ -1142,5 +1213,7 @@
         }
       ]
     }
-  ]
+  ],
+  "now": "The capability-aligned frontend, 14-capture dark/light audit, deterministic frontend build, real 14-stage dual-EDA publication, and managed Windows adoption/rollback are complete. Finishing the long Projects API receipt, canonical knowledge/QMD refresh, exact scoped commits, clean-checkout aggregate proof, fixture package rerun, and main push.",
+  "now_updated": "2026-07-29 19:44 EDT"
 }
