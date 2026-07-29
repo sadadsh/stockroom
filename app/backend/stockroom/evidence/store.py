@@ -821,6 +821,27 @@ class EvidenceStore:
         assert isinstance(validation, dict)
         return validation
 
+    def verified_cad_validation_report(
+        self,
+        digest: str,
+        *,
+        identity: ExactIdentity,
+    ) -> dict[str, JsonValue]:
+        """Return validation from either current role evidence or retained full CAD evidence."""
+
+        manifest = self._canonical_manifest(digest)
+        if manifest.get("schema") == "stockroom.cad-role-evidence/1":
+            return self.verified_role_validation_report(digest, identity=identity)
+        artifact = self.verified_role_artifacts(
+            digest,
+            identity=identity,
+            roles=("validation_report",),
+        )["validation_report"]
+        validation = json.loads(artifact.data)
+        if not isinstance(validation, dict):
+            raise EvidenceCorruption("CAD validation report is not a JSON object")
+        return validation
+
     def list_role_variants(
         self,
         *,
