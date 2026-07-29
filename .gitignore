@@ -108,6 +108,14 @@ tests/backend/api/test_gitshim.py
 # headless UI shot output
 build/shots/
 
+# Task-owned runtime evidence, browser profiles, package proofs, and exploratory
+# captures. Durable findings belong in source/tests/docs, never in these outputs.
+/work/
+/drive-shots/
+/prototypes/
+/*.png
+/debug.log
+
 # Generated progress page (rendered from rebuild-plan.json by scripts/progress.py on service start)
 docs/progress/index.html
 
