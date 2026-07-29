@@ -3,12 +3,12 @@
     "kicad": {
       "footprint": {
         "origin": {
-          "captured_at": "2026-07-29T02:54:42Z",
+          "captured_at": "2026-07-29T03:43:59.625051Z",
           "evidence_adapter_version": "browser-guided-cad-v1",
-          "evidence_manifest_digest": "sha256:7d4d8a724456883ca8af3a81485eea8ed5e8760362461749da4795ab2838d8dd",
+          "evidence_manifest_digest": "sha256:5b0cb30d1b83ab28b392032602469fef0c20aa0725861d03b60e747c24e2092a",
           "evidence_operation": "cad:kicad",
-          "url": "https://app.ultralibrarian.com/search?queryText=TPD6E05U06RVZR",
-          "vendor": "ultralibrarian"
+          "url": "https://www.snapeda.com/parts/TPD6E05U06RVZR/Texas%20Instruments/view-part/",
+          "vendor": "snapmagic"
         },
         "ref": {
           "file": "",
@@ -18,27 +18,27 @@
       },
       "model": {
         "origin": {
-          "captured_at": "2026-07-29T02:54:42Z",
+          "captured_at": "2026-07-29T03:43:59.625051Z",
           "evidence_adapter_version": "browser-guided-cad-v1",
-          "evidence_manifest_digest": "sha256:7d4d8a724456883ca8af3a81485eea8ed5e8760362461749da4795ab2838d8dd",
+          "evidence_manifest_digest": "sha256:5b0cb30d1b83ab28b392032602469fef0c20aa0725861d03b60e747c24e2092a",
           "evidence_operation": "cad:kicad",
-          "url": "https://app.ultralibrarian.com/search?queryText=TPD6E05U06RVZR",
-          "vendor": "ultralibrarian"
+          "url": "https://www.snapeda.com/parts/TPD6E05U06RVZR/Texas%20Instruments/view-part/",
+          "vendor": "snapmagic"
         },
         "ref": {
-          "file": "models/TPD6E05U06RVZR.stp",
+          "file": "models/TPD6E05U06RVZR.step",
           "lib": "",
           "name": ""
         }
       },
       "symbol": {
         "origin": {
-          "captured_at": "2026-07-29T02:54:42Z",
+          "captured_at": "2026-07-29T03:43:59.625051Z",
           "evidence_adapter_version": "browser-guided-cad-v1",
-          "evidence_manifest_digest": "sha256:7d4d8a724456883ca8af3a81485eea8ed5e8760362461749da4795ab2838d8dd",
+          "evidence_manifest_digest": "sha256:5b0cb30d1b83ab28b392032602469fef0c20aa0725861d03b60e747c24e2092a",
           "evidence_operation": "cad:kicad",
-          "url": "https://app.ultralibrarian.com/search?queryText=TPD6E05U06RVZR",
-          "vendor": "ultralibrarian"
+          "url": "https://www.snapeda.com/parts/TPD6E05U06RVZR/Texas%20Instruments/view-part/",
+          "vendor": "snapmagic"
         },
         "ref": {
           "file": "",
@@ -53,20 +53,20 @@
       "kicad": {
         "artifacts": {
           "footprint": {
-            "artifact_digest": "sha256:06444bcb64cc763ce0f1d6c3a5d23dd1b3dc6c6864213f3d4c55e9a235ae1550",
+            "artifact_digest": "sha256:c5caaeb36da2f6e32165b542aa7b4d5bcb7181d847f910cd6336da50eca60869",
             "evidence_role": "footprint"
           },
           "model": {
-            "artifact_digest": "sha256:ab6cbb46fabc1e57c294a76d69beb9e37ddec30dfcaa8de7b349e9c5626e3528",
+            "artifact_digest": "sha256:ea44d88710026e2052dc8afc527f465afbd4290621727ce75f4ca30afbca078b",
             "evidence_role": "model"
           },
           "symbol": {
-            "artifact_digest": "sha256:8b743a97b9d59d68ac4692403eea8cd9a294bffa97255fdc12e6a0c316d87c62",
+            "artifact_digest": "sha256:dbc14ac5450bf4e0d1967879a05e9c162c72fd4a0c25fb44ed7a6ffad664a9c5",
             "evidence_role": "symbol"
           }
         },
-        "manifest_digest": "sha256:7d4d8a724456883ca8af3a81485eea8ed5e8760362461749da4795ab2838d8dd",
-        "provider": "ultralibrarian",
+        "manifest_digest": "sha256:5b0cb30d1b83ab28b392032602469fef0c20aa0725861d03b60e747c24e2092a",
+        "provider": "snapmagic",
         "source_manifests": []
       }
     }
