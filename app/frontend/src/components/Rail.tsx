@@ -15,6 +15,7 @@ import { Text, useText } from "../lib/copy";
 import { Icon } from "./Icon";
 import { readPref, writePref } from "../lib/uiPrefs";
 import { useModalDismiss } from "../lib/useModalDismiss";
+import { deriveUpdateStanding } from "../lib/updateStanding";
 
 // The peek's label reveal, in ONE place. Every label in the rail uses it, because the first cut wired
 // only the primary nav and Settings - so hovering produced a panel where three of the bottom controls
@@ -125,7 +126,12 @@ export function Rail() {
   const active = railRouteFor(route);
 
   const update = useUpdateCheck();
-  const hasUpdate = !!update.data?.update_available;
+  const updateView = deriveUpdateStanding({
+    data: update.data,
+    checking: !!(update.isPending || update.isFetching),
+    failed: !!update.isError,
+  });
+  const hasUpdate = updateView.standing === "available";
   const [aboutOpen, setAboutOpen] = useState(false);
 
   // The Update pill applies the update right here - the same flow (and the same toasts) as
@@ -331,20 +337,34 @@ export function Rail() {
               className={
                 RAIL_ROW + " text-xs font-medium text-t2"
               }
-              title="You have the latest version"
+              title={updateView.detail}
             >
-              {/* The registry stores the plain check (currentColor); the --c-ok tint was a call-site
-                  inline style on the svg. Reapply it on a wrapping span so currentColor resolves to
-                  the ok green exactly as before, without tinting the adjacent label. */}
               <span
                 aria-hidden
                 className={RAIL_GLYPH}
-                style={{ color: "var(--c-ok)" }}
+                style={
+                  updateView.standing === "current"
+                    ? { color: "var(--c-ok)" }
+                    : undefined
+                }
               >
-                <Icon id="nav.up-to-date" className="h-4 w-4 flex-none" />
+                <Icon
+                  id={
+                    updateView.standing === "current"
+                      ? "nav.up-to-date"
+                      : "nav.update"
+                  }
+                  className="h-4 w-4 flex-none"
+                />
               </span>
               <span className={collapsed ? PEEK_LABEL + " whitespace-nowrap" : ""}>
-                <Text id="nav.up-to-date">Up To Date</Text>
+                {updateView.standing === "current" ? (
+                  <Text id="nav.update-current">Current</Text>
+                ) : updateView.standing === "checking" ? (
+                  <Text id="nav.update-checking">Checking...</Text>
+                ) : (
+                  <Text id="nav.update-unknown">Update Unknown</Text>
+                )}
               </span>
             </div>
           )}

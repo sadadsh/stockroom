@@ -11,7 +11,15 @@ const { state, navigate, applyMutate, updateState, applyState } = vi.hoisted(() 
   state: { route: "components" },
   navigate: vi.fn(),
   applyMutate: vi.fn(),
-  updateState: { update_available: false },
+  updateState: {
+    update_available: false,
+    state: "up_to_date",
+    current_revision: "123456789abc",
+    target_revision: "123456789abc",
+    isPending: false,
+    isFetching: false,
+    isError: false,
+  },
   applyState: { isPending: false },
 }));
 vi.mock("../lib/router", () => ({
@@ -25,7 +33,17 @@ vi.mock("../lib/theme", () => ({
 vi.mock("../api/queries", () => ({
   useFacetsQuery: () => ({ data: { complete: 80, incomplete: 8 } }),
   useSyncStatus: () => ({ data: { current_branch: "main", ahead: 0, behind: 0 } }),
-  useUpdateCheck: () => ({ data: { update_available: updateState.update_available } }),
+  useUpdateCheck: () => ({
+    data: {
+      update_available: updateState.update_available,
+      state: updateState.state,
+      current_revision: updateState.current_revision,
+      target_revision: updateState.target_revision,
+    },
+    isPending: updateState.isPending,
+    isFetching: updateState.isFetching,
+    isError: updateState.isError,
+  }),
   useApplyUpdate: () => ({ mutate: applyMutate, isPending: applyState.isPending }),
 }));
 vi.mock("../lib/toast", () => ({
@@ -45,6 +63,12 @@ describe("Rail", () => {
   beforeEach(() => {
     state.route = "components";
     updateState.update_available = false;
+    updateState.state = "up_to_date";
+    updateState.current_revision = "123456789abc";
+    updateState.target_revision = "123456789abc";
+    updateState.isPending = false;
+    updateState.isFetching = false;
+    updateState.isError = false;
     applyState.isPending = false;
     applyMutate.mockReset();
   });
@@ -88,6 +112,24 @@ describe("Rail", () => {
     // clicking a disabled busy button must not fire a second apply
     fireEvent.click(button);
     expect(applyMutate).not.toHaveBeenCalled();
+  });
+
+  it("calls the installed version Current only with an exact upstream match", () => {
+    const { rerender } = render(<Rail />);
+    expect(screen.getByText("Current")).toBeInTheDocument();
+
+    updateState.state = "offline";
+    updateState.target_revision = "";
+    rerender(<Rail />);
+    expect(screen.getByText("Update Unknown")).toBeInTheDocument();
+    expect(screen.queryByText("Current")).toBeNull();
+  });
+
+  it("shows that the remote comparison is in progress", () => {
+    updateState.isFetching = true;
+    render(<Rail />);
+    expect(screen.getByText("Checking...")).toBeInTheDocument();
+    expect(screen.queryByText("Current")).toBeNull();
   });
 
   it("carries stable data-dev-id attributes, including the derived rail.nav-* ids, that all resolve via DEV_ID_BY_ID", () => {

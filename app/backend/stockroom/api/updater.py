@@ -25,6 +25,7 @@ class UpdateState:
     OFFLINE = "offline"
     DIVERGED = "diverged"
     NO_REMOTE = "no_remote"
+    UNVERIFIED = "unverified"
 
 
 @dataclass
@@ -78,6 +79,7 @@ class AppUpdater:
                 "update_available": False,
                 "state": UpdateState.NO_REMOTE,
                 "detail": "no application remote is configured",
+                "target_revision": "",
             }
         # A real check must FETCH first: ahead_behind reads the local view of the
         # remote refs, so without a fetch the running app can never learn that a
@@ -90,14 +92,25 @@ class AppUpdater:
                 "update_available": False,
                 "state": UpdateState.OFFLINE,
                 "detail": reason,
+                "target_revision": "",
             }
         ab = self.repo.ahead_behind()
-        behind = ab[1] if ab else 0
+        target = self.repo.upstream_head()
+        if ab is None or not target:
+            return {
+                **identity,
+                "update_available": False,
+                "state": UpdateState.UNVERIFIED,
+                "detail": "the application branch has no verifiable upstream revision",
+                "target_revision": "",
+            }
+        behind = ab[1]
         return {
             **identity,
             "update_available": behind > 0,
             "state": "update_available" if behind > 0 else UpdateState.UP_TO_DATE,
             "behind": behind,
+            "target_revision": target[:12],
         }
 
     def _apply(self) -> UpdateResult:

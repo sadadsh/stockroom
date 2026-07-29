@@ -17,6 +17,7 @@ import {
   useProfiles,
   useUpdateCheck,
 } from "../api/queries";
+import { RunningVersionIndicator } from "./RunningVersionIndicator";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { open: openAddPart } = useAddPart();
@@ -64,8 +65,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 // The bottom status bar: an Altium signature, and honest about the app's real state. Left:
 // the components load state (Title Case, no status dot) and the active section, named from
 // the nav registry so "stm" reads "STM Viewer", never a capitalized route slug. Right: the
-// working context that matters day to day - the active profile and an update notice when one
-// exists. All read from queries the app already caches, so the bar costs nothing extra.
+// working context that matters day to day - the exact running revision, its remotely proven
+// standing, and the active profile. All read from queries the app already caches.
 function ShellStatusBar() {
   const facets = useFacetsQuery();
   const update = useUpdateCheck();
@@ -109,14 +110,11 @@ function ShellStatusBar() {
         </>
       )}
       <span className="ml-auto flex items-center gap-2.5 text-t3">
-        {update.data?.update_available ? (
-          <>
-            <span className="text-t2">
-              <Text id="shell.status.update">Update Available</Text>
-            </span>
-            <span className="text-line2">|</span>
-          </>
-        ) : null}
+        <RunningVersionIndicator
+          data={update.data}
+          checking={update.isPending || update.isFetching}
+          failed={update.isError}
+        />
         <ProfileSwitch />
       </span>
     </footer>

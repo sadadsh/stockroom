@@ -12,6 +12,7 @@ def test_check_explains_an_unmanaged_installation(client, app_ctx):
         "state": UpdateState.NO_REMOTE,
         "detail": "this installation is not managed by an application checkout",
         "current_revision": "",
+        "target_revision": "",
         "channel": "unmanaged",
         "automatic_on_launch": False,
         "check_interval_seconds": 120,

@@ -34,7 +34,13 @@ beforeEach(() => {
     by_category: {}, by_manufacturer: {}, complete: 0, incomplete: 0,
   } as never);
   mockApi.listProfiles.mockResolvedValue({ profiles: [], active: "" } as never);
-  mockApi.checkUpdate.mockResolvedValue({ update_available: false } as never);
+  mockApi.checkUpdate.mockResolvedValue({
+    update_available: false,
+    state: "up_to_date",
+    current_revision: "123456789abc",
+    target_revision: "123456789abc",
+    behind: 0,
+  } as never);
 });
 
 function AddPartProbe() {
@@ -107,6 +113,54 @@ describe("AppShell native drop bridge", () => {
 // "Components Loaded / Components", saying Components twice, while carrying no information - the
 // state it reported is true almost always.
 describe("AppShell status bar", () => {
+  it("shows the exact running revision and only calls a remotely proven match Current", async () => {
+    renderShell();
+    expect(
+      await screen.findByRole("status", {
+        name: "running revision 1234567, Current",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the running-to-target revision path when an update is available", async () => {
+    mockApi.checkUpdate.mockResolvedValue({
+      update_available: true,
+      state: "update_available",
+      current_revision: "111111111111",
+      target_revision: "222222222222",
+      behind: 1,
+    } as never);
+    renderShell();
+    expect(
+      await screen.findByRole("status", {
+        name: "running revision 1111111, Update Available, target revision 2222222",
+      }),
+    ).toHaveTextContent("1111111→2222222Update Available");
+  });
+
+  it("reports Unknown instead of Current when the remote cannot be proven", async () => {
+    mockApi.checkUpdate.mockResolvedValue({
+      update_available: false,
+      state: "offline",
+      current_revision: "123456789abc",
+      detail: "network unavailable",
+    } as never);
+    renderShell();
+    const status = await screen.findByRole("status", {
+      name: "running revision 1234567, Unknown",
+    });
+    expect(status).toBeInTheDocument();
+    expect(status).not.toHaveTextContent("Current");
+  });
+
+  it("shows Checking while the first remote comparison is still pending", () => {
+    mockApi.checkUpdate.mockReturnValue(new Promise(() => {}) as never);
+    renderShell();
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Checking…");
+    expect(status).not.toHaveTextContent("Current");
+  });
+
   it("states the library's scale instead of announcing that loading finished", async () => {
     mockApi.facets.mockResolvedValue({
       by_category: { ICs: 5, Resistors: 2 },

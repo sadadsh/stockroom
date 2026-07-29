@@ -437,6 +437,11 @@ class GitRepo:
         behind, ahead = proc.stdout.split()
         return int(ahead), int(behind)
 
+    def upstream_head(self) -> str:
+        """Exact commit currently recorded for this branch's upstream, or empty when unproven."""
+        proc = self._run("rev-parse", "--verify", "@{upstream}^{commit}", check=False)
+        return proc.stdout.strip() if proc.returncode == 0 else ""
+
     @_serialized
     def pull_ff(self) -> PullResult:
         before = self.head()
