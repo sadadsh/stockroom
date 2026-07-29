@@ -135,7 +135,11 @@ describe("CaptureProvider store", () => {
     });
 
     expect(capture.run).toHaveBeenCalledWith(
-      expect.objectContaining({ partIds: ["p1"], vendor: "ultralibrarian" }),
+      expect.objectContaining({
+        partIds: ["p1"],
+        vendor: undefined,
+        mode: "automatic",
+      }),
     );
     // and nothing reached for the host bridge that used to exist
     expect((window as { pywebview?: unknown }).pywebview).toBeUndefined();

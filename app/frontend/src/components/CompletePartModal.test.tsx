@@ -139,7 +139,7 @@ afterEach(() => {
 
 const track = (tool: string) => document.querySelector(`[data-track='${tool}']`) as HTMLElement;
 
-describe("CompletePartModal - guided capture", () => {
+describe("CompletePartModal - automatic capture", () => {
   it("lays out the FILES and DETAILS regions with the both-format checklist", async () => {
     mockCadSource(["kicad_symbol", "kicad_footprint", "altium_symbol"]);
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
@@ -182,11 +182,13 @@ describe("CompletePartModal - guided capture", () => {
     );
   });
 
-  it("names the first implemented provider in the guided-capture subline", async () => {
+  it("names the preferred first provider in the automatic-completion subline", async () => {
     mockCadSource(["kicad_symbol", "altium_symbol"]);
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
     await screen.findByText("Files");
-    expect(screen.getByText(/from Ultra Librarian\.?$/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/try Ultra Librarian first if a provider window is needed\.?$/),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/the vendor/)).toBeNull();
   });
 
@@ -266,7 +268,7 @@ describe("CompletePartModal - copy + icon adoption", () => {
     expect(
       await screen.findByText("Add the files and data this part still needs."),
     ).toBeInTheDocument();
-    expect(await screen.findByText("Guided Capture")).toBeInTheDocument();
+    expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
     // The three glyphs (modal.check on rows, action.download on the CAD button, modal.close on the
     // header button) all draw as <svg> via <Icon>.
     expect(container.querySelectorAll("svg").length).toBeGreaterThanOrEqual(3);
@@ -288,7 +290,7 @@ describe("CompletePartModal - copy + icon adoption", () => {
       { wrapper: devWrapper },
     );
     // Wait for the CAD section (async cad-source query) so cad-title / row-symbol are mounted.
-    await screen.findByText("Guided Capture");
+    await screen.findByText("Automatic Completion");
 
     toggleDevMode();
 
@@ -315,7 +317,7 @@ describe("CompletePartModal - copy + icon adoption", () => {
   });
 });
 
-// ------------------------------------------------------- choosing WHERE the files come from
+// --------------------------------------------- choosing the preferred first browser provider
 //
 // The control the four-vendor module existed for and nothing rendered. Before this the route
 // resolved a single DigiKey link, so a person who wanted Ultra Librarian's manufacturer-verified
@@ -328,7 +330,7 @@ const RENDER = () =>
 // carries `data-dev-id`, not `data-testid`, and querying the wrong attribute is a test that fails
 // for a reason unrelated to the thing it is about.
 const vendorGroup = () =>
-  screen.getByText("Download From").parentElement!.querySelector("div")!.parentElement!;
+  screen.getByText("Preferred Source").parentElement!.querySelector("div")!.parentElement!;
 const vendorButton = (name: RegExp) =>
   within(vendorGroup()).getByRole("button", { name });
 
@@ -340,7 +342,7 @@ describe("CompletePartModal - vendor choice", () => {
   it("offers implemented capture providers in trust order", async () => {
     mockCadSource(["kicad_symbol", "altium_symbol"]);
     RENDER();
-    await screen.findByText("Download From");
+    await screen.findByText("Preferred Source");
 
     const names = within(vendorGroup())
       .getAllByRole("button")
@@ -351,58 +353,110 @@ describe("CompletePartModal - vendor choice", () => {
   it("does not offer discovery-only providers as working capture routes", async () => {
     mockCadSource(["kicad_symbol"]);
     RENDER();
-    await screen.findByText("Download From");
+    await screen.findByText("Preferred Source");
 
     expect(within(vendorGroup()).queryByRole("button", { name: /DigiKey/ })).toBeNull();
     expect(within(vendorGroup()).queryByRole("button", { name: /SamacSys/ })).toBeNull();
   });
 
-  it("opens the vendor that was CHOSEN, not the default", async () => {
+  it("passes the chosen provider as the automatic attempt's preference", async () => {
     mockCadSource(["kicad_symbol"]);
     const capture = mockCapture();
     RENDER();
-    await screen.findByText("Download From");
+    await screen.findByText("Preferred Source");
 
     await userEvent.click(vendorButton(/Ultra Librarian/));
     await userEvent.click(screen.getByRole("button", { name: "Get Files" }));
 
     await waitFor(() => expect(capture.run).toHaveBeenCalled());
     expect(capture.run).toHaveBeenCalledWith(
-      expect.objectContaining({ vendor: "ultralibrarian" }),
+      expect.objectContaining({
+        vendor: "ultralibrarian",
+        mode: "automatic",
+      }),
+    );
+  });
+
+  it("turns an incomplete automatic result into an assisted Open Provider retry", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol"]);
+    const run = vi
+      .spyOn(api, "runCapture")
+      .mockResolvedValueOnce({ job_id: "automatic-job" })
+      .mockResolvedValueOnce({ job_id: "assisted-job" });
+    vi.spyOn(api, "openJobStream")
+      .mockResolvedValueOnce(
+        streamOf([
+          'event: result\ndata: {"result":{"items":[{"part_id":"part1","mpn":"BQ24074","display_name":"BQ24074","category":"ICs","status":"unchanged","needed":["kicad_symbol"],"satisfied":[],"remaining":["kicad_symbol"],"sources":[],"notes":["SnapMagic: provider interaction required"],"error":""}],"counts":{"unchanged":1},"stopped":false,"stop_reason":""}}\n\n',
+          "event: done\ndata: {}\n\n",
+        ]),
+      )
+      .mockResolvedValueOnce(
+        streamOf([
+          'event: result\ndata: {"result":{"items":[{"part_id":"part1","mpn":"BQ24074","display_name":"BQ24074","category":"ICs","status":"completed","needed":["kicad_symbol"],"satisfied":["kicad_symbol"],"remaining":[],"sources":["snapmagic"],"notes":[],"error":""}],"counts":{"completed":1},"stopped":false,"stop_reason":""}}\n\n',
+          "event: done\ndata: {}\n\n",
+        ]),
+      );
+    RENDER();
+    await screen.findByText("Preferred Source");
+    await user.click(vendorButton(/SnapMagic/));
+
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
+    const openProvider = await screen.findByRole("button", { name: "Open Provider" });
+    expect(run).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        partIds: [DETAIL.id],
+        vendor: "snapmagic",
+        mode: "automatic",
+      }),
+    );
+
+    await user.click(openProvider);
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(2));
+    expect(run).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        partIds: [DETAIL.id],
+        vendor: "snapmagic",
+        mode: "assisted",
+      }),
     );
   });
 
   it("remembers the choice, because over 90 parts one decision beats ninety", async () => {
     mockCadSource(["kicad_symbol"]);
     const { unmount } = RENDER();
-    await screen.findByText("Download From");
+    await screen.findByText("Preferred Source");
     await userEvent.click(vendorButton(/SnapMagic/));
     unmount();
 
     mockCadSource(["kicad_symbol"]);
     RENDER();
-    await screen.findByText("Download From");
+    await screen.findByText("Preferred Source");
 
     expect(vendorButton(/SnapMagic/)).toHaveAttribute("aria-pressed", "true");
   });
 
   it("falls back to the trust order's head when the remembered vendor is not offered", async () => {
     // A stored key from a build that knew a vendor this one does not must not open nowhere.
-    window.localStorage.setItem("stockroom.capture.vendor", "a-vendor-that-retired");
+    window.localStorage.setItem("stockroom.capture.vendor.v2", "a-vendor-that-retired");
     mockCadSource(["kicad_symbol"]);
     RENDER();
-    await screen.findByText("Download From");
+    await screen.findByText("Preferred Source");
 
     expect(vendorButton(/Ultra Librarian/)).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("names the CHOSEN vendor in the subline, so the sentence matches the button", async () => {
+  it("names the chosen preferred provider in the subline", async () => {
     mockCadSource(["kicad_symbol"]);
     RENDER();
-    await screen.findByText("Download From");
+    await screen.findByText("Preferred Source");
 
     await userEvent.click(vendorButton(/SnapMagic/));
 
-    expect(await screen.findByText(/from SnapMagic\.?$/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/try SnapMagic first if a provider window is needed\.?$/),
+    ).toBeInTheDocument();
   });
 });

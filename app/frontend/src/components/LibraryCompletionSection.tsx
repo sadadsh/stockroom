@@ -112,7 +112,13 @@ function CoverageBody({
   onRun: () => void;
   running: boolean;
 }) {
-  const { total, complete, needs_files: needsFiles, unsourced } = data;
+  const {
+    total,
+    complete,
+    needs_files: needsFiles,
+    needs_assistance: needsAssistance = 0,
+    unsourced,
+  } = data;
   const allDone = total > 0 && complete === total;
 
   return (
@@ -153,11 +159,20 @@ function CoverageBody({
         </p>
       </div>
 
+      {needsAssistance > 0 ? (
+        <p className="border-l-2 border-acc pl-3 text-sm text-t2">
+          <span className="tnum text-t1">{needsAssistance}</span>{" "}
+          {needsAssistance === 1 ? "component has a gap" : "components have gaps"} a managed
+          provider window may fill. Open Complete Part once; Stockroom remembers the provider
+          session, captures the downloads, validates them, and advances through fallbacks.
+        </p>
+      ) : null}
+
       {unsourced > 0 ? (
         <p className="border-l-2 border-line pl-3 text-sm text-t2">
           <span className="tnum text-t2">{unsourced}</span>{" "}
-          {unsourced === 1 ? "component needs a file" : "components need files"} that no
-          automatic source can supply yet. Open one and use Complete Part to fetch those by hand.
+          {unsourced === 1 ? "component needs a file" : "components need files"} that neither an
+          automatic source nor a managed provider can supply yet.
         </p>
       ) : null}
     </div>
@@ -170,7 +185,12 @@ function CoverageBody({
  * seeing an entire row at zero is what makes a missing tool obvious instead of averaged away.
  */
 function CoverageMatrix({ data }: { data: LibraryCoverage }) {
-  const { total, by_requirement: missing, can_provide: canProvide } = data;
+  const {
+    total,
+    by_requirement: missing,
+    can_provide: canProvide,
+    assisted_can_provide: assistedCanProvide = [],
+  } = data;
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[26rem] border-collapse text-sm">
@@ -205,6 +225,7 @@ function CoverageMatrix({ data }: { data: LibraryCoverage }) {
                     total={total}
                     lacking={missing[`${tool.key}_${kind.key}`]}
                     sourced={canProvide.includes(`${tool.key}_${kind.key}`)}
+                    assisted={assistedCanProvide.includes(`${tool.key}_${kind.key}`)}
                     requirement={`${tool.key}_${kind.key}`}
                   />
                 </td>
@@ -221,6 +242,7 @@ function CoverageMatrix({ data }: { data: LibraryCoverage }) {
  * One cell. Three genuinely different states, and they must not look alike:
  *  - every component has it (ok),
  *  - some are missing it and a source can get them (warn, and a run will act on it),
+ *  - some are missing it and a managed provider can get them (warn + Provider),
  *  - some are missing it and nothing can (neutral, honest, not presented as pending work).
  * A kind the tool cannot hold at all (an Altium 3D body lives inside its footprint binary, so
  * no requirement exists for it) renders as a dash rather than a misleading zero.
@@ -229,11 +251,13 @@ function Cell({
   total,
   lacking,
   sourced,
+  assisted,
   requirement,
 }: {
   total: number;
   lacking: number | undefined;
   sourced: boolean;
+  assisted: boolean;
   requirement: string;
 }) {
   // No requirement for this pair at all: not a gap, not a score. Say nothing rather than "0".
@@ -251,12 +275,17 @@ function Cell({
       </span>
     );
   }
+  const reachable = sourced || assisted;
   return (
     <span className="inline-flex items-center gap-1.5 text-t2">
-      <Dot tone={sourced ? "warn" : "neutral"} />
+      <Dot tone={reachable ? "warn" : "neutral"} />
       <span className="tnum w-8 text-right">{have}</span>
       <span className="text-t3">of {total}</span>
-      {!sourced ? (
+      {assisted && !sourced ? (
+        <Badge tone="warn" size="sm">
+          Provider
+        </Badge>
+      ) : !reachable ? (
         <Badge tone="neutral" size="sm">
           No Source
         </Badge>

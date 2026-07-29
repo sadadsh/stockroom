@@ -30,11 +30,13 @@ interface Props {
 }
 
 // The registry check glyph (dev-mode editable), sized for the small badge slots here.
-// The chosen vendor, remembered. Deliberately localStorage and not a machine-config field: it is a
-// per-person habit that changes nothing another device would render differently, which is the one
-// case the device-parity rule allows per-machine state. Reads are guarded because the WebView2
-// host has denied storage before, and a capture flow must not die for a preference.
-const VENDOR_PREF_KEY = "stockroom.capture.vendor";
+// The preferred first browser provider, remembered. It never disables direct/keyless acquisition
+// or the assisted job's subsequent provider fallback. Deliberately localStorage and not a
+// machine-config field: it is
+// a per-person preference that changes nothing another device renders differently.
+// v2 resets the earlier SnapMagic-first default now that the owner selected Ultra Librarian's
+// manufacturer-verified assets as the trust-order head.
+const VENDOR_PREF_KEY = "stockroom.capture.vendor.v2";
 
 function readVendorPref(): string | null {
   try {
@@ -183,7 +185,7 @@ function CaptureRow({ label, copyId, done }: { label: string; copyId: string; do
 
 // A needs-accurate one-liner: never promise KiCad when only Altium is missing (or vice versa).
 /**
- * WHERE the files come from. One row per vendor, in the owner's trust order.
+ * Which browser provider automatic acquisition should try first.
  *
  * This is the control the whole four-vendor module existed for and nothing rendered: the route
  * resolved a single DigiKey link, so a person who wanted Ultra Librarian's manufacturer-verified
@@ -191,8 +193,9 @@ function CaptureRow({ label, copyId, done }: { label: string; copyId: string; do
  * community and automatically generated models, which is exactly the defect that started the trust
  * workstream, so it must be VISIBLY last and never the silent default.
  *
- * The choice STICKS (localStorage). Over a 90-part sitting, re-picking a vendor per part is 90
- * extra decisions, and the whole point of this surface is that every click is multiplied by 90.
+ * The choice STICKS (localStorage), but it is optional: Stockroom still tries direct sources first.
+ * If provider help is needed, this choice opens first and the same assisted job can advance to the
+ * other provider without another visit to this window.
  */
 function VendorPicker({
   sources,
@@ -209,7 +212,7 @@ function VendorPicker({
   return (
     <div className="mt-3" data-dev-id="complete.cad-vendor">
       <div className="mb-1.5 text-2xs font-medium uppercase tracking-wide text-t3">
-        <Text id="modal.completePart.vendor">Download From</Text>
+        <Text id="modal.completePart.vendor">Preferred Source</Text>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {sources.map((v) => {
@@ -245,9 +248,12 @@ function VendorPicker({
 }
 
 function needsSubline(hasKicad: boolean, hasAltium: boolean, vendor: string): string {
-  if (hasKicad && hasAltium) return `Get its KiCad and Altium libraries from ${vendor}.`;
-  if (hasAltium) return `Get its Altium symbol and footprint from ${vendor}.`;
-  return `Get its KiCad symbol, footprint and 3D model from ${vendor}.`;
+  const scope = hasKicad && hasAltium
+    ? "KiCad and Altium libraries"
+    : hasAltium
+      ? "Altium symbol and footprint"
+      : "KiCad symbol, footprint and 3D model";
+  return `Find, verify and attach its ${scope}; try ${vendor} first if a provider window is needed.`;
 }
 
 function cadLabel(status: GuidedStatus): string {
@@ -263,8 +269,9 @@ function cadLabel(status: GuidedStatus): string {
       return "Files Complete";
     case "timed-out":
     case "unavailable":
-    case "error":
       return "Try Again";
+    case "error":
+      return "Open Provider";
     default:
       return "Get Files";
   }
@@ -513,7 +520,7 @@ export function CompletePartModal({
                         {isDone ? (
                           <Text id="modal.completePart.cad-done-title">Files Complete</Text>
                         ) : (
-                          <Text id="modal.completePart.cad-title">Guided Capture</Text>
+                          <Text id="modal.completePart.cad-title">Automatic Completion</Text>
                         )}
                       </div>
                       <div className="mt-0.5 text-2xs leading-snug text-t3">
@@ -572,23 +579,29 @@ export function CompletePartModal({
                 ) : null}
 
                 <div data-dev-id="complete.cad-actions" className="mt-3 flex flex-wrap items-center gap-2">
-                  {chosen && !isDone ? (
+                  {!isDone ? (
                     <Button
                       variant="accent"
                       small
                       icon={<DownloadIcon className="h-3.5 w-3.5" />}
                       disabled={cadBusy}
-                      onClick={() => void download.start(vendorKey)}
+                      onClick={() =>
+                        void download.start(
+                          vendorKey || undefined,
+                          download.status === "error" && vendorKey
+                            ? "assisted"
+                            : "automatic",
+                        )
+                      }
                     >
                       <Text id={cadButtonId(download.status)}>{cadLabel(download.status)}</Text>
                     </Button>
                   ) : null}
                   {!isDone ? (
-                    // When no guided source resolves (no CAD URL), Browse is the ONLY path,
-                    // so it becomes the primary; otherwise it stays the quiet manual fallback.
+                    // Direct/keyless acquisition can succeed even when no provider page resolves,
+                    // so Browse always remains the quiet manual fallback.
                     <Button
                       small
-                      variant={chosen ? undefined : "accent"}
                       disabled={cadBusy}
                       onClick={() => void browse()}
                     >

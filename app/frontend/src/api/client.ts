@@ -748,25 +748,37 @@ export const api = {
     });
   },
 
-  // GUIDED CAPTURE, through the SAME route on Windows and Linux. A job: it opens a real browser,
-  // the person signs in to the vendor ONCE (the profile is persistent), and every part is its own
-  // atomic commit so stopping is safe and resuming is just running it again.
+  // AUTOMATIC ACQUISITION, through the SAME route on Windows and Linux. Direct/keyless sources run
+  // first, then Stockroom drives exact provider results and falls through automatically. Assisted
+  // mode is an explicit last resort for a provider gate that genuinely requires a person.
   //
   // `partIds: [one]` is per-component; omitting it captures every part still missing files. Both
   // are the same backend path deliberately, so verifying one verifies the other.
   //
   // This REPLACED `window.pywebview.api.open_cad_download`, which existed only on Windows - so the
   // whole flow was untestable off Windows and silently degraded to "pick the files yourself".
-  runCapture(input: { partIds?: string[]; vendor?: string; limit?: number } = {}): Promise<{
+  runCapture(
+    input: {
+      partIds?: string[];
+      vendor?: string;
+      limit?: number;
+      mode?: "automatic" | "assisted";
+    } = {},
+  ): Promise<{
     job_id: string;
   }> {
     return request<{ job_id: string }>("POST", "/api/library/capture/run", {
-      body: { part_ids: input.partIds, vendor: input.vendor, limit: input.limit },
+      body: {
+        part_ids: input.partIds,
+        vendor: input.vendor,
+        limit: input.limit,
+        mode: input.mode,
+      },
     });
   },
 
-  // The vendors guided capture can actually drive, read off the adapter registry so a surface can
-  // never offer one with no implementation behind it.
+  // The providers automatic acquisition can actually drive, read off the adapter registry so a
+  // surface can never offer one with no implementation behind it.
   captureVendors(): Promise<{
     vendors: {
       key: string;

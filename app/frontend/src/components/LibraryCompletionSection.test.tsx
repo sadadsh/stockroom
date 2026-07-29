@@ -106,12 +106,35 @@ describe("coverage", () => {
     expect(await screen.findByText(/about 23.8 hours/i)).toBeInTheDocument();
   });
 
-  it("separately names the components no automatic source can reach", async () => {
+  it("separately names the components neither acquisition lane can reach", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
     renderSection();
     expect(
-      await screen.findByText(/no automatic source can supply yet/i),
+      await screen.findByText(/neither an automatic source nor a managed provider/i),
     ).toBeInTheDocument();
+  });
+
+  it("explains managed provider work without calling it automatic", async () => {
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(
+      coverage({
+        needs_assistance: 31,
+        assisted_can_provide: ["altium_symbol", "altium_footprint"],
+      }),
+    );
+    renderSection();
+
+    expect(
+      await screen.findByText(
+        (_text, node) =>
+          node?.tagName === "P" &&
+          !!node.textContent?.match(
+            /31 components have gaps a managed provider window may fill/i,
+          ),
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/remembers the provider session/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Provider")).toHaveLength(2);
+    expect(screen.queryByText("No Source")).not.toBeInTheDocument();
   });
 
   it("disables the action when there is genuinely nothing to do", async () => {
