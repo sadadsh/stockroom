@@ -88,6 +88,7 @@ import {
 import { useToast } from "../lib/toast";
 import { PreviewModal, type PreviewKind } from "./PreviewModal";
 import { CompletePartModal } from "./CompletePartModal";
+import { CadVariantSection } from "./CadVariantSection";
 import {
   CubeArt,
   ExternalIcon,
@@ -1308,23 +1309,34 @@ export function DetailPanel({
           <div className="mx-auto flex h-full min-h-0 w-full max-w-[980px] flex-col gap-3 px-1">
             <RepresentationMatrix detail={detail} />
             <div className="min-h-0 flex-1 overflow-auto rounded-panel">
-              <HandoffBand
-                detail={detail}
-                onEditField={onEditField}
-                onMoveCategory={onMoveCategory}
-                categories={categories}
-                busy={busy}
-                slots={{
-                  // the disagreement follows the value it is about
-                  description: (
-                    <AlternatesDisclosure
-                      entries={detail.alternates?.description ?? []}
-                      current={detail.derived.description}
-                      onUse={onEditField ? (value) => onEditField("description", value) : undefined}
-                    />
-                  ),
-                }}
-              />
+              <div className="flex flex-col gap-3">
+                <CadVariantSection
+                  key={detail.id}
+                  partId={detail.id}
+                  enabled={activeTab === "handoff"}
+                />
+                <HandoffBand
+                  detail={detail}
+                  onEditField={onEditField}
+                  onMoveCategory={onMoveCategory}
+                  categories={categories}
+                  busy={busy}
+                  slots={{
+                    // the disagreement follows the value it is about
+                    description: (
+                      <AlternatesDisclosure
+                        entries={detail.alternates?.description ?? []}
+                        current={detail.derived.description}
+                        onUse={
+                          onEditField
+                            ? (value) => onEditField("description", value)
+                            : undefined
+                        }
+                      />
+                    ),
+                  }}
+                />
+              </div>
             </div>
           </div>
         </WorkbenchPanel>
