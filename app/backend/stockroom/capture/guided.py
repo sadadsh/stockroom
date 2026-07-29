@@ -267,50 +267,91 @@ def drive_formats(
 
     combined = DriveReport()
     for fmt in formats:
-        mark = len(browser.captured)
-        error_mark = len(getattr(browser, "download_errors", ()))
-        try:
-            page.goto(url, wait_until="domcontentloaded")
-            one = _drive_adapter(
-                adapter,
+        attempts = max(1, min(3, int(getattr(adapter, "max_download_attempts", 1))))
+        delivered = False
+        for attempt in range(1, attempts + 1):
+            mark = len(browser.captured)
+            error_mark = len(getattr(browser, "download_errors", ()))
+            try:
+                # This exact navigation is also the recovery action: a failed DigiKey export gets
+                # a fresh product/models render and a fresh pinned selection, never a stale modal.
+                page.goto(url, wait_until="domcontentloaded")
+                one = _drive_adapter(
+                    adapter,
+                    page,
+                    [fmt],
+                    expected_manufacturer=expected_manufacturer,
+                    expected_mpn=expected_mpn,
+                )
+            except Exception as exc:  # noqa: BLE001 - one format is one honest result row
+                combined.missed.append(fmt)
+                combined.message = f"{label}: {exc}"
+                break
+            if not one.submitted:
+                retry_issue = _retryable_download_issue(adapter, page)
+                if retry_issue and attempt < attempts:
+                    combined.message = (
+                        f"{retry_issue}; reopening the exact DigiKey route "
+                        f"(attempt {attempt + 1} of {attempts})."
+                    )
+                    continue
+                combined.missed.extend(one.missed or [fmt])
+                combined.blocked = combined.blocked or one.blocked
+                combined.requires_user_clearance = (
+                    combined.requires_user_clearance or one.requires_user_clearance
+                )
+                combined.route_unavailable = (
+                    combined.route_unavailable or one.route_unavailable
+                )
+                if retry_issue:
+                    combined.message = (
+                        f"{retry_issue}; stopped after {attempts} bounded attempts."
+                    )
+                elif one.message:
+                    combined.message = one.message
+                if one.blocked:
+                    # Auth/challenge/account state is provider-wide. Trying the remaining format
+                    # buttons cannot change it and only repeats the same failure.
+                    return combined, None
+                if one.route_unavailable:
+                    return combined, None
+                break
+            if _wait_for_capture(
+                browser,
                 page,
-                [fmt],
-                expected_manufacturer=expected_manufacturer,
-                expected_mpn=expected_mpn,
-            )
-        except Exception as exc:  # noqa: BLE001 - one format failing is a row, not a dead run
-            combined.missed.append(fmt)
-            combined.message = f"{label}: {exc}"
-            continue
-        if not one.submitted:
-            combined.missed.extend(one.missed or [fmt])
-            combined.blocked = combined.blocked or one.blocked
-            combined.requires_user_clearance = (
-                combined.requires_user_clearance or one.requires_user_clearance
-            )
-            if one.message:
-                combined.message = one.message
-            if one.blocked:
-                # Auth/challenge/account state is provider-wide. Trying the remaining format
-                # buttons cannot change it and only repeats the same failure.
-                return combined, None
-            continue
-        if not _wait_for_capture(
-            browser,
-            page,
-            mark,
-            wait_s,
-            errors_before=error_mark,
-            stop_when=lambda: bool(_user_clearance_issue(adapter, page)),
-        ):
+                mark,
+                wait_s,
+                errors_before=error_mark,
+                stop_when=lambda: bool(
+                    _user_clearance_issue(adapter, page)
+                    or _retryable_download_issue(adapter, page)
+                ),
+            ):
+                combined.selected.extend(one.selected or [fmt])
+                combined.submitted = True
+                delivered = True
+                break
             gate = _download_gate(adapter, page)
             if gate:
                 combined.blocked = True
                 combined.requires_user_clearance = bool(_user_clearance_issue(adapter, page))
                 return combined, gate
+            retry_issue = _retryable_download_issue(adapter, page)
+            if retry_issue and attempt < attempts:
+                combined.message = (
+                    f"{retry_issue}; reopening the exact DigiKey route "
+                    f"(attempt {attempt + 1} of {attempts})."
+                )
+                continue
+            if retry_issue:
+                return (
+                    combined,
+                    f"{label} could not deliver {fmt} after {attempts} bounded attempts: "
+                    f"{retry_issue}",
+                )
             return combined, f"{label} did not deliver {fmt} within {wait_s:.0f}s"
-        combined.selected.extend(one.selected or [fmt])
-        combined.submitted = True
+        if delivered:
+            continue
     if combined.selected:
         combined.message = f"Requested {' and '.join(combined.selected)} from {label}."
     return combined, None
@@ -367,6 +408,44 @@ def _user_clearance_issue(adapter, page) -> str:
         return detector(page) or ""
     except Exception:  # noqa: BLE001 - an unreadable page is not clearance evidence
         return ""
+
+
+def _retryable_download_issue(adapter, page) -> str:
+    """A provider-observed transient export failure, never inferred from elapsed time alone."""
+
+    detector = getattr(adapter, "retryable_download_issue", None)
+    if detector is None:
+        return ""
+    try:
+        return detector(page) or ""
+    except Exception:  # noqa: BLE001 - retry evidence must be positive and provider-observed
+        return ""
+
+
+def _combine_route_outcomes(
+    outcomes: list[tuple[str, SourceOutcome]],
+) -> SourceOutcome:
+    """Merge independently captured author routes without losing partial evidence."""
+
+    satisfied: list[Requirement] = []
+    errors: list[str] = []
+    skipped: list[str] = []
+    blocked = False
+    for label, outcome in outcomes:
+        for requirement in outcome.satisfied:
+            if requirement not in satisfied:
+                satisfied.append(requirement)
+        if outcome.error:
+            errors.append(f"{label}: {outcome.error}")
+        if outcome.skipped:
+            skipped.append(f"{label}: {outcome.skipped}")
+        blocked = blocked or outcome.blocked
+    return SourceOutcome(
+        satisfied=tuple(satisfied),
+        error="; ".join(errors),
+        skipped="; ".join(skipped),
+        blocked=blocked,
+    )
 
 
 def _provider_formats(adapter, needs) -> list[str]:
@@ -772,6 +851,48 @@ class GuidedCaptureSource:
                 formats,
             )
 
+        route_factory = getattr(adapter, "capture_routes", None)
+        routes = tuple(route_factory()) if callable(route_factory) else (adapter,)
+        outcomes: list[tuple[str, SourceOutcome]] = []
+        for route in routes:
+            route_formats = _provider_formats(route, needs)
+            if not route_formats:
+                continue
+            outcome = self._supply_automated_route(
+                record,
+                session,
+                route,
+                manufacturer,
+                mpn,
+                url,
+                route_formats,
+            )
+            outcomes.append((route.capability.label, outcome))
+            if outcome.blocked:
+                break
+        if not outcomes:
+            return SourceOutcome(
+                skipped=f"{adapter.capability.label} exposed no implemented CAD-author route"
+            )
+        return _combine_route_outcomes(outcomes)
+
+    def _supply_automated_route(
+        self,
+        record,
+        session: _Session,
+        adapter,
+        manufacturer: str,
+        mpn: str,
+        url: str,
+        formats: list[str],
+    ) -> SourceOutcome:
+        """Capture one immutable DigiKey author route on its own page/broker binding."""
+
+        evidence_provider_key = getattr(
+            adapter,
+            "evidence_provider_key",
+            self._evidence_provider_key,
+        )
         open_task_page = getattr(session.browser, "task_page", None)
         broker = (
             DownloadBroker(
@@ -780,6 +901,8 @@ class GuidedCaptureSource:
                     manufacturer_key=manufacturer,
                     mpn_canonical=mpn,
                     staging_root=self._download_root,
+                    surface_key=self._vendor_key,
+                    evidence_provider_key=evidence_provider_key,
                 )
             )
             if callable(open_task_page)
@@ -865,6 +988,7 @@ class GuidedCaptureSource:
             landed,
             url,
             detail_url=detail_url,
+            evidence_provider_key=evidence_provider_key,
         )
 
     def _machine_access_issue(self, adapter) -> str:
@@ -1140,7 +1264,28 @@ class GuidedCaptureSource:
             detail_url=result.final_url,
         )
 
-    def _attach(self, record, landed, url: str, *, detail_url: str = "") -> SourceOutcome:
+    def _attach(
+        self,
+        record,
+        landed,
+        url: str,
+        *,
+        detail_url: str = "",
+        evidence_provider_key: str = "",
+    ) -> SourceOutcome:
+        provider_key = evidence_provider_key or self._evidence_provider_key
+        attributed = {
+            value
+            for item in landed
+            if (value := getattr(item, "evidence_provider_key", ""))
+        }
+        if attributed and attributed != {provider_key}:
+            return SourceOutcome(
+                error=(
+                    "capture route attribution mismatch: "
+                    f"expected {provider_key!r}, received {sorted(attributed)!r}"
+                )
+            )
         cleanup_callbacks = []
         try:
             return self._attach_impl(
@@ -1148,6 +1293,7 @@ class GuidedCaptureSource:
                 landed,
                 url,
                 detail_url=detail_url,
+                evidence_provider_key=provider_key,
                 cleanup_callbacks=cleanup_callbacks,
             )
         finally:
@@ -1161,6 +1307,7 @@ class GuidedCaptureSource:
         url: str,
         *,
         detail_url: str = "",
+        evidence_provider_key: str,
         cleanup_callbacks,
     ) -> SourceOutcome:
         """Turn the downloaded file(s) into attached assets, with provenance.
@@ -1192,9 +1339,14 @@ class GuidedCaptureSource:
         if captured_altium is not None:
             cleanup_callbacks.append(captured_altium.cleanup)
         altium_sources = [] if captured_altium is None else list(captured_altium.paths)
-        if not altium_sources and self._convert_altium is not None:
+        route_converter = (
+            self._convert_altium
+            if evidence_provider_key == self._evidence_provider_key
+            else None
+        )
+        if not altium_sources and route_converter is not None:
             try:
-                converted = self._convert_altium(
+                converted = route_converter(
                     tuple(item.path for item in landed),
                     record.manufacturer,
                     record.mpn,
@@ -1243,7 +1395,7 @@ class GuidedCaptureSource:
             selection = select_exact_candidate(
                 record,
                 candidates,
-                vendor_key=self._evidence_provider_key,
+                vendor_key=evidence_provider_key,
                 detail_url=detail_url,
             )
             candidate = selection.candidate
@@ -1262,7 +1414,7 @@ class GuidedCaptureSource:
                             store=self._evidence_store,
                             record=record,
                             candidate=candidate,
-                            provider_key=self._evidence_provider_key,
+                            provider_key=evidence_provider_key,
                             detail_url=detail_url,
                             altium_sources=tuple(altium_sources),
                             cross_eda_verifier=self._cross_eda_verifier,
@@ -1276,7 +1428,7 @@ class GuidedCaptureSource:
                             store=self._evidence_store,
                             record=record,
                             candidate=candidate,
-                            provider_key=self._evidence_provider_key,
+                            provider_key=evidence_provider_key,
                             detail_url=detail_url,
                         )
                     except Exception as exc:  # noqa: BLE001 - fail closed before any library write
@@ -1313,7 +1465,7 @@ class GuidedCaptureSource:
                         store=self._evidence_store,
                         record=record,
                         profile=pipeline.profile,
-                        provider_key=self._evidence_provider_key,
+                        provider_key=evidence_provider_key,
                         detail_url=detail_url,
                         altium_sources=tuple(altium_sources),
                         cross_eda_verifier=self._cross_eda_verifier,
@@ -1380,7 +1532,7 @@ class GuidedCaptureSource:
                         error=f"CAD evidence pointer resolution failed: {exc}"
                     )
             origin = AssetOrigin(
-                vendor=self._evidence_provider_key,
+                vendor=evidence_provider_key,
                 url=url,
                 captured_at=self._now_iso() if self._now_iso else "",
                 extra=(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from stockroom.capture.vendors import (
+    DigiKeySnapMagicRouteAdapter,
     DigiKeyUltraLibrarianAdapter,
     SamacSysAssistedAdapter,
     SnapMagicAdapter,
@@ -60,13 +61,25 @@ def test_requested_mpn_is_recovered_without_losing_identity_punctuation():
     )
 
 
-def test_digikey_ultralibrarian_is_a_distinct_evidence_route() -> None:
+def test_digikey_enumerates_distinct_snapmagic_and_ultralibrarian_routes() -> None:
     adapter = DigiKeyUltraLibrarianAdapter()
+    routes = adapter.capture_routes()
 
     assert adapter.capability.key == "digikey"
     assert adapter.evidence_provider_key == "digikey-ultralibrarian"
+    assert isinstance(routes[0], DigiKeySnapMagicRouteAdapter)
+    assert routes[1] is adapter
+    assert [route.evidence_provider_key for route in routes] == [
+        "digikey-snapmagic",
+        "digikey-ultralibrarian",
+    ]
+    assert [route.capability.label for route in routes] == [
+        "DigiKey · SnapMagic",
+        "DigiKey CAD Models",
+    ]
     assert adapter.capability.browser_access == "machine_allowed"
     assert adapter.capability.supported_formats == {"kicad", "model", "altium"}
+    assert all(route.capability.supported_formats == {"kicad", "model", "altium"} for route in routes)
     assert adapter.resolve_url("MCP4728-E/UN").endswith("keywords=MCP4728-E%2FUN")
 
 

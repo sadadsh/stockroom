@@ -852,6 +852,16 @@ class EvidenceStore:
         """List every verified variant, ranked without selecting or deleting one."""
         directory = self._role_index_directory(identity, role)
         preference = {provider: index for index, provider in enumerate(provider_preference)}
+
+        def provider_rank(provider_key: str) -> tuple[int, int]:
+            exact = preference.get(provider_key)
+            if exact is not None:
+                return exact, 0
+            for family, index in preference.items():
+                if provider_key.endswith(f"-{family}"):
+                    return index, 1
+            return len(preference), 0
+
         variants: list[VerifiedRoleArtifact] = []
         for path in sorted(directory.glob("*.json"), key=lambda item: item.name):
             if not path.is_file() or path.is_symlink():
@@ -882,7 +892,7 @@ class EvidenceStore:
             sorted(
                 variants,
                 key=lambda item: (
-                    preference.get(item.provider_key, len(preference)),
+                    *provider_rank(item.provider_key),
                     item.provider_key,
                     item.manifest_digest,
                 ),

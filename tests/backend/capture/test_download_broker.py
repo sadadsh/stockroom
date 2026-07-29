@@ -122,6 +122,43 @@ def test_direct_http_download_is_task_bound_atomic_and_digest_verified(tmp_path)
     assert not list(receipt.path.parent.glob("*.partial"))
 
 
+def test_digikey_author_routes_are_staged_and_receipted_separately(tmp_path):
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+
+    def task(provider: str) -> DownloadTask:
+        return DownloadTask(
+            task_id="item-01",
+            manufacturer_key="texas-instruments",
+            mpn_canonical="TPD6E05U06RVZR",
+            staging_root=staging,
+            surface_key="digikey",
+            evidence_provider_key=provider,
+        )
+
+    def get(*_args, **_kwargs):
+        return _Response(b"same-name-and-bytes")
+
+    snap = DownloadBroker(task("digikey-snapmagic"), http_get=get).download_http(
+        "https://vendor.example.test/export",
+        suggested_filename="Model.zip",
+    )
+    ultra = DownloadBroker(task("digikey-ultralibrarian"), http_get=get).download_http(
+        "https://vendor.example.test/export",
+        suggested_filename="Model.zip",
+    )
+
+    assert snap.surface_key == ultra.surface_key == "digikey"
+    assert {
+        snap.evidence_provider_key,
+        ultra.evidence_provider_key,
+    } == {"digikey-snapmagic", "digikey-ultralibrarian"}
+    assert snap.path != ultra.path
+    assert snap.path.parent.name == "digikey-snapmagic"
+    assert ultra.path.parent.name == "digikey-ultralibrarian"
+    assert snap.path.read_bytes() == ultra.path.read_bytes() == b"same-name-and-bytes"
+
+
 def test_redirect_and_browser_receipt_urls_discard_embedded_credentials(tmp_path):
     broker = DownloadBroker(
         _task(tmp_path),

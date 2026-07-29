@@ -48,6 +48,8 @@ class DownloadTask:
     manufacturer_key: str
     mpn_canonical: str
     staging_root: Path
+    surface_key: str = ""
+    evidence_provider_key: str = ""
 
     def __post_init__(self) -> None:
         if type(self.task_id) is not str or _TASK_ID.fullmatch(self.task_id) is None:
@@ -64,6 +66,18 @@ class DownloadTask:
             or self.mpn_canonical != self.mpn_canonical.strip()
         ):
             raise ValueError("mpn_canonical must be canonical non-empty text")
+        for name, value in (
+            ("surface_key", self.surface_key),
+            ("evidence_provider_key", self.evidence_provider_key),
+        ):
+            if type(value) is not str or (
+                value and _TASK_ID.fullmatch(value) is None
+            ):
+                raise ValueError(f"{name} must be empty or a portable provider identifier")
+        if bool(self.surface_key) != bool(self.evidence_provider_key):
+            raise ValueError(
+                "surface_key and evidence_provider_key must both be set for attributed capture"
+            )
         root = Path(self.staging_root)
         if not root.is_dir() or root.is_symlink():
             raise ValueError("staging_root must be an existing non-linked directory")
@@ -115,6 +129,8 @@ class DownloadReceipt:
     size_bytes: int
     transport: str
     attempt: int
+    surface_key: str = ""
+    evidence_provider_key: str = ""
 
 
 def _default_http_get(url: str, *, headers: dict[str, str], timeout: float):
@@ -334,6 +350,15 @@ class DownloadBroker:
                 f"download staging path is not a real directory: {destination}"
             )
         destination.mkdir(parents=False, exist_ok=True)
+        if self.task.evidence_provider_key:
+            destination = destination / self.task.evidence_provider_key
+            if destination.exists() and (
+                destination.is_symlink() or not destination.is_dir()
+            ):
+                raise DownloadBrokerError(
+                    f"download route staging path is not a real directory: {destination}"
+                )
+            destination.mkdir(parents=False, exist_ok=True)
         resolved = destination.resolve(strict=True)
         try:
             resolved.relative_to(self.task.staging_root)
@@ -471,6 +496,8 @@ class DownloadBroker:
                 size_bytes=size,
                 transport=transport,
                 attempt=attempt,
+                surface_key=self.task.surface_key,
+                evidence_provider_key=self.task.evidence_provider_key,
             )
             self._receipts.append(receipt)
             if transport == "playwright":
