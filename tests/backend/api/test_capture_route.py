@@ -44,7 +44,10 @@ def fake_vendor(monkeypatch):
     """Point the Ultra Librarian adapter at a local stand-in serving its REAL captured markup, so
     no test ever touches the live vendor."""
     base, shutdown = serve_fixture_vendor()
+    from stockroom.capture import guided as capture_guided
     from stockroom.capture import identity as capture_identity
+    from stockroom.capture import runner as capture_runner
+    from stockroom.capture import vendors as capture_vendors
     from stockroom.capture.vendors import UltraLibrarianAdapter, get_adapter
 
     monkeypatch.setattr(UltraLibrarianAdapter, "resolve_url", lambda self, mpn: base)
@@ -57,17 +60,44 @@ def fake_vendor(monkeypatch):
         "capability",
         replace(adapter.capability, browser_access="machine_allowed"),
     )
+    monkeypatch.setattr(
+        capture_runner,
+        "machine_access_authorized",
+        lambda key: key == "ultralibrarian",
+    )
+    monkeypatch.setattr(capture_guided, "_resolved_provider_url_issue", lambda *_args: "")
     real_page_identity = capture_identity.page_identity
+    real_provider_url_allowed = capture_vendors._provider_url_allowed
     monkeypatch.setattr(
         capture_identity,
         "page_identity",
-        lambda vendor, url: (
+        lambda vendor, url, **options: (
             capture_identity.PageIdentity(
                 mpn="TPD6E05U06RVZR",
                 manufacturer="Texas Instruments",
             )
             if url.startswith(base)
-            else real_page_identity(vendor, url)
+            else real_page_identity(vendor, url, **options)
+        ),
+    )
+    monkeypatch.setattr(
+        capture_vendors,
+        "page_identity",
+        lambda vendor, url, **options: (
+            capture_identity.PageIdentity(
+                mpn="TPD6E05U06RVZR",
+                manufacturer="Texas Instruments",
+            )
+            if url.startswith(base)
+            else real_page_identity(vendor, url, **options)
+        ),
+    )
+    monkeypatch.setattr(
+        capture_vendors,
+        "_provider_url_allowed",
+        lambda vendor, url, **options: (
+            url.startswith(base)
+            or real_provider_url_allowed(vendor, url, **options)
         ),
     )
     try:

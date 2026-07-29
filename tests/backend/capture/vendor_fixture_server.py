@@ -25,9 +25,19 @@ import socketserver
 import threading
 import zipfile
 from pathlib import Path
+from urllib.parse import quote, urlsplit
+from urllib.request import Request, urlopen
 
 FIXTURES = Path(__file__).resolve().parents[1] / "host" / "fixtures"
 READABLE_STEP = Path(__file__).parent / "fixtures" / "readable_geometry.step"
+_NATIVE_DOWNLOADS = {
+    "/downloads/native-kicad.zip": ("native-kicad.zip", b"native-kicad"),
+    "/downloads/native-altium.zip": ("native-altium.zip", b"native-altium"),
+    "/downloads/native-step.step": (
+        "native-step.step",
+        b"ISO-10303-21;\nEND-ISO-10303-21;",
+    ),
+}
 
 # Stands in for the vendor's own submit script (see the module docstring). Enables the disabled
 # submit link once any export is selected, and posts the form when it is clicked.
@@ -123,6 +133,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
     fixture_name = "ul-export-panel.html"
 
     def do_GET(self):  # noqa: N802 - BaseHTTPRequestHandler's interface
+        if self.path in _NATIVE_DOWNLOADS:
+            filename, body = _NATIVE_DOWNLOADS[self.path]
+            self._send(body, "application/octet-stream", attachment=filename)
+            return
         html = (FIXTURES / self.fixture_name).read_text(encoding="utf-8")
         body = (html + _HARNESS_JS).encode("utf-8")
         self._send(body, "text/html; charset=utf-8")
@@ -167,3 +181,46 @@ def serve_fixture_vendor(fixture_name: str = "ul-export-panel.html"):
         server.server_close()
 
     return f"http://127.0.0.1:{server.server_address[1]}", shutdown
+
+
+def route_fixture_vendor(
+    page,
+    fixture_url: str,
+    *,
+    manufacturer: str = "Texas Instruments",
+    mpn: str = "TPD6E05U06RVZR",
+) -> str:
+    """Serve a local fixture at an official-looking UL URL without touching the live service."""
+
+    def proxy(route) -> None:
+        browser_request = route.request
+        parsed = urlsplit(browser_request.url)
+        target = f"{fixture_url}{parsed.path}"
+        if parsed.query:
+            target += f"?{parsed.query}"
+        payload = browser_request.post_data_buffer
+        request = Request(
+            target,
+            data=payload,
+            method=browser_request.method,
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310 - loopback test fixture only
+            body = response.read()
+            headers = dict(response.headers.items())
+            if response.headers.get_content_type() == "text/html":
+                html = body.decode("utf-8")
+                html = html.replace('"/downloads/', f'"{fixture_url}/downloads/')
+                html = html.replace('action="/Export/', f'action="{fixture_url}/Export/')
+                body = html.encode("utf-8")
+                headers.pop("Content-Length", None)
+            route.fulfill(
+                status=response.status,
+                headers=headers,
+                body=body,
+            )
+
+    page.route("https://app.ultralibrarian.com/**", proxy)
+    return (
+        "https://app.ultralibrarian.com/details/fixture/"
+        f"{quote(manufacturer, safe='')}/{quote(mpn, safe='')}?open=exports"
+    )

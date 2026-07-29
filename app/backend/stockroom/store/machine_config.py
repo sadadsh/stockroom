@@ -67,22 +67,22 @@ class MachineConfig:
     # prefers this setting ahead of its own STM32_CUBEMX env-var/candidate-path fallback.
     # Not a secret - a plain filesystem path, echoed raw (never masked) in the settings DTO.
     stm_cubemx_source: str = ""
-    mouser_api_key: str = ""
+    mouser_api_key: str = field(default="", repr=False)
     # DigiKey Product Information API v4 OAuth2 client-credentials (opt-in, OFF by default —
     # spec section 6). Both must be set for enrich/routers/enrich.py:_make_pipeline to build a
     # live DigiKeyAdapter; either blank keeps DigiKey out of the enrichment source registry.
     digikey_client_id: str = ""
-    digikey_client_secret: str = ""
+    digikey_client_secret: str = field(default="", repr=False)
     # DigiKey ACCOUNT web login (distinct from the OAuth API creds above). The capture driver
     # autofills this to sign into DigiKey.com and prepare a logged-in session for everything,
     # so a saved account clears the sign-in wall before the in-DigiKey CAD providers are reached.
     digikey_username: str = ""
-    digikey_password: str = ""
+    digikey_password: str = field(default="", repr=False)
     # A GitHub personal access token (fine-grained, Contents: write on the library repo) used to
     # authenticate library push/pull for the in-repo library, so a part add can auto-push and a
     # collaborator's changes pull. Stored in Windows Credential Manager and held here only in
     # process memory. Blank = no auto-push, sign in later.
-    github_token: str = ""
+    github_token: str = field(default="", repr=False)
     # Saved logins for the in-DigiKey CAD providers the guided capture window drives:
     # Ultra Librarian, SnapEDA, and SamacSys. DigiKey's EDA/CAD Models section aggregates
     # downloads from all three, and the driver prefers Ultra Librarian (it often bundles the
@@ -91,11 +91,16 @@ class MachineConfig:
     # settings. Blank = log in by hand in the capture window (session persistence keeps you
     # signed in thereafter).
     ul_username: str = ""
-    ul_password: str = ""
+    ul_password: str = field(default="", repr=False)
+    # Default-off authorization for the reviewed Ultra Librarian private-evaluation exception.
+    # This is deliberately a non-secret machine setting: it grants no account access by itself,
+    # and passwords remain exclusively in Windows Credential Manager. Public/general installs
+    # stay on assisted capture unless their own authorization is explicitly recorded.
+    ul_private_evaluation_automation: bool = False
     snapeda_username: str = ""
-    snapeda_password: str = ""
+    snapeda_password: str = field(default="", repr=False)
     samacsys_username: str = ""
-    samacsys_password: str = ""
+    samacsys_password: str = field(default="", repr=False)
     kicad_config_override: str = ""
     # An explicit kicad-cli binary path, for a non-standard KiCad install that
     # discovery (PATH + standard locations) does not find. Empty = auto-discover.

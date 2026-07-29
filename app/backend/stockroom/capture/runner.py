@@ -23,8 +23,16 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from stockroom.capture.access_policy import (
+    machine_access_authorized,
+    machine_access_policy,
+)
 from stockroom.capture.complete import complete_library, iter_incomplete
-from stockroom.capture.pacing import CircuitBreaker, PacedSource
+from stockroom.capture.pacing import (
+    CircuitBreaker,
+    DurableSlidingWindowLimiter,
+    PacedSource,
+)
 from stockroom.capture.sources import LcscSource
 from stockroom.enrich.ratelimit import SlidingWindowLimiter
 from stockroom.text import counted
@@ -121,17 +129,18 @@ def coverage(ctx) -> dict:
     browser_source_keys: list[str] = []
     assisted_source_keys: list[str] = []
     assisted_can_provide = set()
+    automatic_browser_keys = set(_automatic_provider_keys(None))
     for key in _vendor_chain(None):
         adapter = get_adapter(key)
         if adapter is None:
             continue
-        if adapter.capability.browser_access == "machine_allowed":
+        if key in automatic_browser_keys:
             browser_source_keys.append(key)
             destination = can_provide
         else:
             assisted_source_keys.append(key)
             destination = assisted_can_provide
-        pins = set(adapter.capability.version_pins)
+        pins = set(adapter.capability.supported_formats)
         if "kicad" in pins:
             destination |= {Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT}
         if "model" in pins:
@@ -260,16 +269,7 @@ def run_guided_capture(
         # Automatic mode may construct only transports with a reviewed machine-access contract.
         # Other browser providers are exposed through the explicit assisted route after permitted
         # automatic sources have exhausted.
-        from stockroom.capture.vendors import get_adapter
-
-        provider_keys = [
-            key
-            for key in _vendor_chain(vendor)
-            if (
-                (adapter := get_adapter(key)) is not None
-                and adapter.capability.browser_access == "machine_allowed"
-            )
-        ]
+        provider_keys = _automatic_provider_keys(vendor)
 
     from stockroom.capture.browser import SharedPlaywrightRuntime
     from stockroom.capture.guided import GuidedCaptureSource
@@ -290,6 +290,20 @@ def run_guided_capture(
         adapter = get_adapter(key)
         if adapter is None:
             raise ValueError(f"no network capture adapter for provider {key!r}")
+        policy = machine_access_policy(key) if not user_driven else None
+        if not user_driven and (policy is None or policy.max_concurrency != 1):
+            raise ValueError(
+                f"{key} automatic capture lacks an enforceable serial machine-access policy"
+            )
+        rate_limiter = (
+            DurableSlidingWindowLimiter(
+                _capture_rate_ledger(ctx, key),
+                policy.starts_per_window,
+                policy.window_seconds,
+            )
+            if policy is not None
+            else None
+        )
         return GuidedCaptureSource(
             make_pipeline,
             vendor=key,
@@ -316,6 +330,14 @@ def run_guided_capture(
             user_driven=user_driven,
             user_cancelled=capture_should_stop,
             cancel_workflow=workflow_cancelled.set,
+            rate_limiter=rate_limiter,
+            # Re-load the non-secret authorization flag and kill switches immediately before
+            # every provider attempt. Revocation therefore stops an already-constructed run.
+            machine_access_check=(
+                (lambda provider_key=key: machine_access_authorized(provider_key))
+                if policy is not None
+                else None
+            ),
         )
 
     guided_sources = [make_guided_source(key) for key in provider_keys]
@@ -435,6 +457,19 @@ def _capture_evidence_root(_ctx) -> Path:
     return root
 
 
+def _capture_rate_ledger(_ctx, provider_key: str) -> Path:
+    """Durable provider-start ledger, separate from credentials and Git state."""
+
+    from stockroom.capture.browser import provider_profile_dir
+
+    root = provider_profile_dir(
+        capture_state_root() / "Rate Limits",
+        provider_key,
+    )
+    root.mkdir(parents=True, exist_ok=True)
+    return root / "Starts.json"
+
+
 def _take(iterable, n: int):
     """islice that keeps the source lazy -- a limited run over a 10,000-part library must not
     walk all 10,000 first."""
@@ -512,3 +547,19 @@ def _vendor_chain(vendor) -> list[str]:
     if not keys:
         raise ValueError("network capture requires at least one implemented provider")
     return keys
+
+
+def _automatic_provider_keys(vendor) -> list[str]:
+    """Reviewed adapters whose per-machine authorization is active right now."""
+
+    from stockroom.capture.vendors import get_adapter
+
+    return [
+        key
+        for key in _vendor_chain(vendor)
+        if (
+            (adapter := get_adapter(key)) is not None
+            and adapter.capability.browser_access == "machine_allowed"
+            and machine_access_authorized(key)
+        )
+    ]

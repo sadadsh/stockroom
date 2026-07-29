@@ -31,6 +31,7 @@ exactly as it was, because a capture that fabricates a partial answer is worse t
 
 from __future__ import annotations
 
+import inspect
 import tempfile
 import time
 from collections.abc import Callable
@@ -38,6 +39,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
+from urllib.parse import parse_qs, urlparse
 
 from stockroom.cad_variants import resolve_cad_variant
 from stockroom.capture.browser import (
@@ -57,9 +59,14 @@ from stockroom.capture.evidence import (
     record_browser_cad_evidence,
     record_composed_browser_altium_evidence,
 )
-from stockroom.capture.identity import select_exact_candidate
+from stockroom.capture.identity import (
+    exact_observation_error,
+    page_identity,
+    provider_url_allowed,
+    select_exact_candidate,
+)
 from stockroom.capture.requirements import Requirement, asset_present, capture_needs
-from stockroom.capture.vendors import formats_for, get_adapter
+from stockroom.capture.vendors import DriveReport, formats_for, get_adapter
 from stockroom.model.asset import AssetOrigin
 
 # How long to wait for the vendor's file after the adapter submits. Generous because a heavy part's
@@ -77,6 +84,7 @@ def _wait_for_capture(
     gap: float = 0.25,
     *,
     errors_before: int | None = None,
+    stop_when: Callable[[], bool] | None = None,
 ) -> bool:
     """True once a NEW file has actually been SAVED. Polls the saved list, not the event.
 
@@ -110,6 +118,8 @@ def _wait_for_capture(
             raise errors[error_mark]
         if len(browser.captured) > before:
             return True
+        if stop_when is not None and stop_when():
+            return False
         page.wait_for_timeout(gap * 1000)
     # One last look: a file that landed inside the final gap still counts.
     errors = getattr(browser, "download_errors", ())
@@ -144,7 +154,48 @@ def sign_in_adapter(adapter, page, credentials) -> str:
     return sign_in(page, creds[0], creds[1]) or ""
 
 
-def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None = None):
+def _drive_adapter(
+    adapter,
+    page,
+    formats: list[str],
+    *,
+    expected_manufacturer: str,
+    expected_mpn: str,
+):
+    """Invoke the exact-identity contract while retaining fixture-adapter compatibility."""
+
+    parameters = inspect.signature(adapter.drive).parameters.values()
+    accepts_identity = {
+        parameter.name for parameter in parameters
+    } >= {"expected_manufacturer", "expected_mpn"} or any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters
+    )
+    if (expected_manufacturer or expected_mpn) and accepts_identity:
+        return adapter.drive(
+            page,
+            formats,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+        )
+    if (
+        (expected_manufacturer or expected_mpn)
+        and adapter.capability.browser_access == "machine_allowed"
+    ):
+        raise TypeError("machine-access adapter does not implement exact manufacturer+MPN gating")
+    return adapter.drive(page, formats)
+
+
+def drive_formats(
+    browser,
+    page,
+    adapter,
+    formats,
+    url,
+    timeout_s: float | None = None,
+    *,
+    expected_manufacturer: str = "",
+    expected_mpn: str = "",
+):
     """Drive a vendor for `formats` and WAIT FOR THE FILES TO LAND. `(DriveReport, error|None)`.
 
     THE one place a vendor is driven for real. `GuidedCaptureSource.supply` runs it as part of
@@ -186,7 +237,13 @@ def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None 
         mark = len(browser.captured)
         error_mark = len(getattr(browser, "download_errors", ()))
         page.goto(url, wait_until="domcontentloaded")
-        report = adapter.drive(page, list(formats))
+        report = _drive_adapter(
+            adapter,
+            page,
+            list(formats),
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+        )
         if not report.submitted:
             return report, None
         if not _wait_for_capture(
@@ -195,10 +252,12 @@ def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None 
             mark,
             wait_s,
             errors_before=error_mark,
+            stop_when=lambda: bool(_user_clearance_issue(adapter, page)),
         ):
             gate = _download_gate(adapter, page)
             if gate:
                 report.blocked = True
+                report.requires_user_clearance = bool(_user_clearance_issue(adapter, page))
                 return report, gate
             return report, f"{label} did not deliver a file within {wait_s:.0f}s"
         return report, None
@@ -209,7 +268,13 @@ def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None 
         error_mark = len(getattr(browser, "download_errors", ()))
         try:
             page.goto(url, wait_until="domcontentloaded")
-            one = adapter.drive(page, [fmt])
+            one = _drive_adapter(
+                adapter,
+                page,
+                [fmt],
+                expected_manufacturer=expected_manufacturer,
+                expected_mpn=expected_mpn,
+            )
         except Exception as exc:  # noqa: BLE001 - one format failing is a row, not a dead run
             combined.missed.append(fmt)
             combined.message = f"{label}: {exc}"
@@ -217,6 +282,9 @@ def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None 
         if not one.submitted:
             combined.missed.extend(one.missed or [fmt])
             combined.blocked = combined.blocked or one.blocked
+            combined.requires_user_clearance = (
+                combined.requires_user_clearance or one.requires_user_clearance
+            )
             if one.message:
                 combined.message = one.message
             if one.blocked:
@@ -230,10 +298,12 @@ def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None 
             mark,
             wait_s,
             errors_before=error_mark,
+            stop_when=lambda: bool(_user_clearance_issue(adapter, page)),
         ):
             gate = _download_gate(adapter, page)
             if gate:
                 combined.blocked = True
+                combined.requires_user_clearance = bool(_user_clearance_issue(adapter, page))
                 return combined, gate
             return combined, f"{label} did not deliver {fmt} within {wait_s:.0f}s"
         combined.selected.extend(one.selected or [fmt])
@@ -241,6 +311,36 @@ def drive_formats(browser, page, adapter, formats, url, timeout_s: float | None 
     if combined.selected:
         combined.message = f"Requested {' and '.join(combined.selected)} from {label}."
     return combined, None
+
+
+def _drive_formats_for_record(
+    browser,
+    page,
+    adapter,
+    formats,
+    url,
+    manufacturer: str,
+    mpn: str,
+):
+    """Call the production identity-aware driver while allowing narrow legacy test doubles."""
+
+    parameters = inspect.signature(drive_formats).parameters.values()
+    accepts_identity = {
+        parameter.name for parameter in parameters
+    } >= {"expected_manufacturer", "expected_mpn"} or any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters
+    )
+    if accepts_identity:
+        return drive_formats(
+            browser,
+            page,
+            adapter,
+            formats,
+            url,
+            expected_manufacturer=manufacturer,
+            expected_mpn=mpn,
+        )
+    return drive_formats(browser, page, adapter, formats, url)
 
 
 def _download_gate(adapter, page) -> str:
@@ -251,6 +351,18 @@ def _download_gate(adapter, page) -> str:
     try:
         return detector(page) or ""
     except Exception:  # noqa: BLE001 - a detector cannot replace the authoritative timeout
+        return ""
+
+
+def _user_clearance_issue(adapter, page) -> str:
+    """Authentication/security gate that only the person may clear."""
+
+    detector = getattr(adapter, "user_clearance_issue", None)
+    if detector is None:
+        return ""
+    try:
+        return detector(page) or ""
+    except Exception:  # noqa: BLE001 - an unreadable page is not clearance evidence
         return ""
 
 
@@ -267,6 +379,36 @@ def _provider_formats(adapter, needs) -> list[str]:
     if requested and set(_COHERENT_CAD_FORMATS) <= selectable:
         return list(_COHERENT_CAD_FORMATS)
     return requested
+
+
+def _resolved_provider_url_issue(adapter, url: str, record) -> str:
+    """Reject a resolver result before the managed browser can navigate to it."""
+
+    provider_key = adapter.capability.key
+    if not provider_url_allowed(provider_key, url):
+        return (
+            f"{adapter.capability.label} resolved outside its official provider origin; "
+            "automatic navigation was refused."
+        )
+    detail = page_identity(provider_key, url)
+    if detail is not None:
+        error = exact_observation_error(record, detail)
+        return f"{adapter.capability.label} {error}." if error else ""
+    query_name = {
+        "ultralibrarian": "queryText",
+        "snapmagic": "q",
+    }.get(provider_key)
+    query = parse_qs(urlparse(url).query)
+    requested_mpn = (getattr(record, "mpn", "") or "").strip().casefold()
+    resolved_values = tuple(
+        value.strip().casefold() for value in query.get(query_name or "", ()) if value.strip()
+    )
+    if requested_mpn and requested_mpn in resolved_values:
+        return ""
+    return (
+        f"{adapter.capability.label} resolver URL did not identify the exact requested MPN; "
+        "automatic navigation was refused."
+    )
 
 
 def _provider_hud_labels(adapter, formats: list[str]) -> tuple[str, ...]:
@@ -388,6 +530,9 @@ class GuidedCaptureSource:
         user_cancelled: Callable[[], bool] | None = None,
         cancel_workflow: Callable[[], None] | None = None,
         user_capture_timeout_s: float = 600.0,
+        rate_limiter=None,
+        user_clearance_timeout_s: float = 600.0,
+        machine_access_check: Callable[[], bool] | None = None,
     ) -> None:
         self._make_pipeline = make_pipeline
         self._vendor_key = vendor
@@ -418,6 +563,10 @@ class GuidedCaptureSource:
         self._user_cancelled = user_cancelled
         self._cancel_workflow = cancel_workflow
         self._user_capture_timeout_s = user_capture_timeout_s
+        self._rate_limiter = rate_limiter
+        self._user_clearance_timeout_s = user_clearance_timeout_s
+        self._machine_access_check = machine_access_check
+        self._sign_in_attempted = False
         self._session: _Session | None = None
 
     # -- lifecycle -------------------------------------------------------------------------
@@ -441,8 +590,6 @@ class GuidedCaptureSource:
         manager = browser.session()
         page = manager.__enter__()
         self._session = _Session(browser=browser, ctx_manager=manager, page=page)
-        if not self._user_driven:
-            self._sign_in_once(page)
         return self._session
 
     def _sign_in_once(self, page) -> None:
@@ -505,7 +652,24 @@ class GuidedCaptureSource:
         url = adapter.resolve_url(mpn)
         if not url:
             return SourceOutcome(skipped=f"no {adapter.capability.label} page for {record.id}")
+        resolved_url_issue = _resolved_provider_url_issue(adapter, url, record)
+        if resolved_url_issue:
+            return SourceOutcome(error=resolved_url_issue, blocked=True)
 
+        machine_access_issue = self._machine_access_issue(adapter)
+        if machine_access_issue:
+            return SourceOutcome(error=machine_access_issue, blocked=True)
+        # The first managed-browser start can perform a saved-credential sign-in before any part
+        # navigation. Count it durably as provider access instead of letting login bypass pacing.
+        if (
+            not self._user_driven
+            and self._session is None
+            and not self._acquire_rate_limit()
+        ):
+            return SourceOutcome(skipped="provider capture was cancelled while waiting for pacing")
+        machine_access_issue = self._machine_access_issue(adapter)
+        if machine_access_issue:
+            return SourceOutcome(error=machine_access_issue, blocked=True)
         session = self._ensure_session()
         if self._user_driven:
             return self._supply_user_driven(
@@ -540,7 +704,32 @@ class GuidedCaptureSource:
             else:
                 page_context = nullcontext(session.page)
             with page_context as task_page:
-                report, failure = drive_formats(session.browser, task_page, adapter, formats, url)
+                if not self._sign_in_attempted:
+                    navigate = getattr(task_page, "goto", None)
+                    if not callable(navigate):
+                        return SourceOutcome(
+                            error=f"{adapter.capability.label} browser page cannot navigate.",
+                            blocked=True,
+                        )
+                    navigate(url, wait_until="domcontentloaded")
+                sign_in_outcome = self._prepare_sign_in(
+                    session,
+                    task_page,
+                    adapter,
+                    manufacturer,
+                    mpn,
+                )
+                if sign_in_outcome is not None:
+                    return sign_in_outcome
+                report, failure = self._drive_automated(
+                    session,
+                    task_page,
+                    adapter,
+                    formats,
+                    url,
+                    manufacturer,
+                    mpn,
+                )
                 # FAILURE IS CHECKED FIRST, and the order is load-bearing. A vendor whose LAST
                 # format was submitted and never arrived comes back with `submitted=False` (the
                 # flag is only set after the file lands) AND an error - so testing `submitted`
@@ -580,6 +769,199 @@ class GuidedCaptureSource:
             url,
             detail_url=detail_url,
         )
+
+    def _machine_access_issue(self, adapter) -> str:
+        """Fail closed when a machine-eligible adapter lacks live authorization."""
+
+        if self._user_driven:
+            return ""
+        if adapter.capability.browser_access != "machine_allowed":
+            return (
+                f"{adapter.capability.label} is not authorized for machine-driven capture; "
+                "use its user-driven workflow."
+            )
+        if self._machine_access_check is None:
+            return (
+                f"{adapter.capability.label} automatic capture requires an explicit live "
+                "machine-authorization check."
+            )
+        try:
+            allowed = self._machine_access_check()
+        except Exception:  # noqa: BLE001 - unreadable authorization is revoked authorization
+            allowed = False
+        if allowed:
+            return ""
+        return (
+            f"{adapter.capability.label} automatic access is disabled or its private-evaluation "
+            "authorization is no longer active."
+        )
+
+    def _acquire_rate_limit(self) -> bool:
+        """Acquire the configured limiter and keep a pending wait cancellable."""
+
+        if self._rate_limiter is None:
+            return True
+        acquire = self._rate_limiter.acquire
+        parameters = inspect.signature(acquire).parameters.values()
+        supports_cancel = "should_cancel" in {
+            parameter.name for parameter in parameters
+        } or any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters)
+        result = (
+            acquire(should_cancel=self._user_cancelled)
+            if supports_cancel
+            else acquire()
+        )
+        return result is not False
+
+    def _prepare_sign_in(
+        self,
+        session: _Session,
+        page,
+        adapter,
+        manufacturer: str,
+        mpn: str,
+    ) -> SourceOutcome | None:
+        """Attempt saved-credential sign-in once and hand any security step to the person."""
+
+        if self._user_driven or self._sign_in_attempted:
+            return None
+        self._sign_in_attempted = True
+        detector = getattr(adapter, "user_clearance_issue", None)
+        if not callable(detector):
+            self._sign_in_once(page)
+            return None
+
+        def current_issue() -> str:
+            return str(detector(page) or "")
+
+        def clear_security_gate() -> SourceOutcome | None:
+            issue = current_issue()
+            if not issue:
+                return None
+            wait_for_clearance = getattr(session.browser, "wait_for_user_clearance", None)
+            if not callable(wait_for_clearance):
+                return SourceOutcome(error=issue, blocked=True)
+            cleared = wait_for_clearance(
+                page,
+                provider_label=adapter.capability.label,
+                manufacturer=manufacturer,
+                mpn=mpn,
+                message=issue,
+                issue_detector=current_issue,
+                should_cancel=self._user_cancelled,
+                timeout_s=self._user_clearance_timeout_s,
+            )
+            if cleared:
+                authorization_issue = self._machine_access_issue(adapter)
+                if authorization_issue:
+                    return SourceOutcome(error=authorization_issue, blocked=True)
+                return None
+            cancelled = self._user_cancelled is not None and self._user_cancelled()
+            return SourceOutcome(
+                error=(
+                    "provider capture was cancelled during the security handoff"
+                    if cancelled
+                    else f"{adapter.capability.label} still needs its sign-in or security check "
+                    "to be cleared; no provider control was bypassed."
+                ),
+                blocked=not cancelled,
+            )
+
+        gate_outcome = clear_security_gate()
+        if gate_outcome is not None:
+            return gate_outcome
+        signed_in = getattr(adapter, "signed_in", None)
+        if callable(signed_in) and signed_in(page):
+            self._sign_in_error = ""
+            return None
+        self._sign_in_once(page)
+        gate_outcome = clear_security_gate()
+        if gate_outcome is not None:
+            return gate_outcome
+        signed_in = getattr(adapter, "signed_in", None)
+        if callable(signed_in) and signed_in(page):
+            self._sign_in_error = ""
+        return None
+
+    def _drive_automated(
+        self,
+        session: _Session,
+        page,
+        adapter,
+        formats: list[str],
+        url: str,
+        manufacturer: str,
+        mpn: str,
+    ):
+        """Drive, hand security controls to the person, then resume without bypassing them."""
+
+        # One handoff can cover a login -> 2FA -> challenge sequence because the browser waits until
+        # the detector sees no security gate. A second handoff covers a distinct post-submit gate.
+        # Anything beyond that is a provider loop and fails closed instead of keeping the user stuck.
+        for handoff_number in range(3):
+            machine_access_issue = self._machine_access_issue(adapter)
+            if machine_access_issue:
+                report = DriveReport(
+                    missed=list(formats),
+                    blocked=True,
+                    message=machine_access_issue,
+                )
+                return report, report.message
+            if not self._acquire_rate_limit():
+                report = DriveReport(
+                    missed=list(formats),
+                    message="provider capture was cancelled while waiting for pacing",
+                )
+                return report, report.message
+            machine_access_issue = self._machine_access_issue(adapter)
+            if machine_access_issue:
+                report = DriveReport(
+                    missed=list(formats),
+                    blocked=True,
+                    message=machine_access_issue,
+                )
+                return report, report.message
+            report, failure = _drive_formats_for_record(
+                session.browser,
+                page,
+                adapter,
+                formats,
+                url,
+                manufacturer,
+                mpn,
+            )
+            if not report.requires_user_clearance:
+                return report, failure
+            if handoff_number >= 2:
+                return (
+                    report,
+                    f"{adapter.capability.label} repeatedly returned to a security or sign-in "
+                    "gate after it was cleared; automatic capture stopped.",
+                )
+            wait_for_clearance = getattr(session.browser, "wait_for_user_clearance", None)
+            if not callable(wait_for_clearance):
+                return report, failure or report.message
+            detector = getattr(adapter, "user_clearance_issue", None)
+            if not callable(detector):
+                return report, failure or report.message
+            cleared = wait_for_clearance(
+                page,
+                provider_label=adapter.capability.label,
+                manufacturer=manufacturer,
+                mpn=mpn,
+                message=failure or report.message,
+                issue_detector=lambda: detector(page) or "",
+                should_cancel=self._user_cancelled,
+                timeout_s=self._user_clearance_timeout_s,
+            )
+            if not cleared:
+                report.blocked = True
+                return (
+                    report,
+                    f"{adapter.capability.label} still needs the sign-in or security check to be "
+                    "cleared; no provider control was bypassed.",
+                )
+        raise AssertionError("unreachable security-handoff loop")
 
     def _supply_user_driven(
         self,

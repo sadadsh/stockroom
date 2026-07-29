@@ -31,10 +31,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Literal, Protocol
 from unicodedata import normalize
 from urllib.parse import parse_qs, unquote, urlparse
 
+from stockroom.capture.identity import (
+    exact_observation_error,
+    page_identity,
+    provider_url_allowed,
+)
 from stockroom.capture.requirements import Requirement
 
 _KICAD_REQS = frozenset(
@@ -81,6 +87,9 @@ class VendorCapability:
     instruction: str
     # Exact provider control id/value for formats a reviewed machine-access adapter may drive.
     version_pins: dict[str, str] = field(default_factory=dict)
+    # Exact visible provider choice for a reviewed machine-access adapter when the control id is
+    # not a stable contract. Matching is exact and unique; a nearby legacy choice is never used.
+    machine_format_labels: dict[str, str] = field(default_factory=dict)
     # Exact visible choices a person selects in a provider-controlled page. These are deliberately
     # separate from DOM ids: a user-driven provider can be a supported acquisition route without
     # granting Stockroom permission to inspect or operate its controls.
@@ -93,7 +102,11 @@ class VendorCapability:
     def supported_formats(self) -> frozenset[str]:
         """Formats the end-to-end capture path can accept, independent of browser-control policy."""
 
-        return frozenset(self.version_pins) | frozenset(self.user_format_labels)
+        return (
+            frozenset(self.version_pins)
+            | frozenset(self.machine_format_labels)
+            | frozenset(self.user_format_labels)
+        )
 
 
 class VendorAdapter(Protocol):
@@ -104,7 +117,14 @@ class VendorAdapter(Protocol):
     def resolve_url(self, mpn: str) -> str:
         """The page this part lives at."""
 
-    def drive(self, page, formats: list[str]) -> "DriveReport":
+    def drive(
+        self,
+        page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> "DriveReport":
         """Select `formats` and trigger the download(s). Returns what it actually achieved."""
 
 
@@ -123,6 +143,10 @@ class DriveReport:
     # A provider-wide challenge/auth/account gate, not a fact about this MPN. The batch engine
     # treats this as deferred and trips its circuit breaker instead of burning every remaining row.
     blocked: bool = False
+    # True only when automation stopped at authentication, CAPTCHA, 2FA, or another security
+    # control that Stockroom must never operate. The browser shows a handoff HUD and resumes only
+    # after the person clears it.
+    requires_user_clearance: bool = False
     message: str = ""
 
     @property
@@ -146,8 +170,10 @@ class UltraLibrarianAdapter:
         # fixture predates that option and remains useful only for the legacy PCAD/script controls.
         # Sources: ultralibrarian.com/native_export_for_altium_designer and
         # app.ultralibrarian.com/content/help/altium_designer_2.htm.
-        # Production is user-driven, so support is keyed to the exact visible native choice below
-        # without inventing a DOM selector or granting machine control of the commercial page.
+        # A private-evaluation authorization from an Ultra Librarian manager permits this user's
+        # installation to exercise the reviewed adapter. Runtime access remains default-off behind
+        # `ul_private_evaluation_automation` and two emergency kill switches; this declaration only
+        # says the adapter is eligible when that separate policy check succeeds.
         tools=("kicad", "altium"),
         formats_exclusive=False,
         aggregator=False,
@@ -162,11 +188,13 @@ class UltraLibrarianAdapter:
         # `MfrThreeDModel`; `_export_selectors` retains that as a compatibility fallback without
         # making the stale id the declared production pin.
         version_pins={"kicad": "KiCADv6", "model": "ThreeDModel"},
+        machine_format_labels={"altium": "Altium Designer (Native)"},
         user_format_labels={
             "kicad": "KiCad 6 or later",
             "model": "STEP",
             "altium": "Altium Designer (Native)",
         },
+        browser_access="machine_allowed",
     )
 
     # The accordion each format hides behind, by its visible text.
@@ -224,12 +252,40 @@ class UltraLibrarianAdapter:
         `#RememberLogin` is TICKED deliberately: it is what makes the persistent browser profile keep
         the session between runs, so the owner signs in once rather than once per run.
         """
+        import time as _time
+
         if not username or not password:
             return "no Ultra Librarian credentials are saved in Settings"
         try:
+            security = _security_verification_issue(page, self.capability.label)
+            if security:
+                return security
+            if self.signed_in(page):
+                return ""
             page.goto("https://app.ultralibrarian.com/Account/Login", wait_until="domcontentloaded")
+            security = _security_verification_issue(page, self.capability.label)
+            if security:
+                return security
+            if self.signed_in(page):
+                return ""
             user_box = page.locator("#Username").first
-            user_box.wait_for(state="visible", timeout=30_000)
+            deadline = _time.monotonic() + 30.0
+            while user_box.count() == 0:
+                security = _security_verification_issue(page, self.capability.label)
+                if security:
+                    return security
+                if self.signed_in(page):
+                    return ""
+                if _time.monotonic() >= deadline:
+                    return (
+                        "Ultra Librarian showed neither its login form nor an authenticated "
+                        "session within 30s."
+                    )
+                page.wait_for_timeout(250)
+                user_box = page.locator("#Username").first
+            security = _security_verification_issue(page, self.capability.label)
+            if security:
+                return security
             user_box.fill(username)
             page.locator("#Password").first.fill(password)
             # Remembered session = the whole point of the persistent profile.
@@ -269,9 +325,12 @@ class UltraLibrarianAdapter:
 
         deadline = _time.monotonic() + timeout_s
         while _time.monotonic() < deadline:
-            # FAILURE IS CHECKED FIRST, on purpose. It is the unambiguous one - the identity server
-            # re-renders the login form and says why - whereas "looks signed in" is inferred from
-            # several absences. Checking success first is what let a wrong password return "".
+            security = _security_verification_issue(page, self.capability.label)
+            if security:
+                return security
+            # Credential rejection remains ahead of the inferred signed-in state, but security
+            # controls are checked first so a CAPTCHA/MFA page retaining the form is never
+            # mislabeled as a bad password.
             try:
                 if page.locator("#Username").count() > 0 and "sso." in (page.url or ""):
                     body = ""
@@ -307,7 +366,13 @@ class UltraLibrarianAdapter:
                 return source.url
         return ""
 
-    def open_panel(self, page) -> str:
+    def open_panel(
+        self,
+        page,
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> str:
         """Navigate from wherever we landed to the export panel, and say what happened.
 
         THE WHOLE JOURNEY, not just the last screen. `resolve_url` returns a SEARCH url, so a
@@ -322,7 +387,12 @@ class UltraLibrarianAdapter:
         Returns "" on success, else a human-readable reason.
         """
         if page.locator("input[name=exports]").count() > 0:
-            return ""  # already there
+            return _detail_identity_issue(
+                "ultralibrarian",
+                page.url or "",
+                expected_manufacturer,
+                expected_mpn,
+            )
         challenge = _challenge_issue(page, "Ultra Librarian")
         if challenge:
             return challenge
@@ -331,18 +401,31 @@ class UltraLibrarianAdapter:
             return missing
 
         if "/search" in (page.url or ""):
-            requested_mpn = _requested_mpn(page.url, ("queryText",))
+            requested_mpn = expected_mpn or _requested_mpn(page.url, ("queryText",))
             results = page.locator('a[href*="/details/"]')
             try:
                 results.first.wait_for(state="visible", timeout=20_000)
             except Exception:  # noqa: BLE001 - no result is an answer, not a crash
                 return "Ultra Librarian has no model for this part."
-            href, selection_error = _exact_result_href(results, requested_mpn)
+            href, selection_error = _exact_result_href(
+                results,
+                requested_mpn,
+                expected_manufacturer=expected_manufacturer,
+                vendor_key="ultralibrarian",
+            )
             if selection_error:
                 return f"Ultra Librarian {selection_error}"
             if not href:
                 return "the result row carried no link"
             page.goto(_absolute(page, href), wait_until="domcontentloaded")
+            identity_issue = _detail_identity_issue(
+                "ultralibrarian",
+                page.url or "",
+                expected_manufacturer,
+                requested_mpn,
+            )
+            if identity_issue:
+                return identity_issue
             challenge = _challenge_issue(page, "Ultra Librarian")
             if challenge:
                 return challenge
@@ -353,8 +436,24 @@ class UltraLibrarianAdapter:
         # The export panel is a real deep link on the part page - fewer clicks than the button,
         # and it survives the button being renamed.
         if "/details/" in (page.url or "") and "open=exports" not in (page.url or ""):
+            identity_issue = _detail_identity_issue(
+                "ultralibrarian",
+                page.url or "",
+                expected_manufacturer,
+                expected_mpn,
+            )
+            if identity_issue:
+                return identity_issue
             joiner = "&" if "?" in page.url else "?"
             page.goto(f"{page.url}{joiner}open=exports", wait_until="domcontentloaded")
+            identity_issue = _detail_identity_issue(
+                "ultralibrarian",
+                page.url or "",
+                expected_manufacturer,
+                expected_mpn,
+            )
+            if identity_issue:
+                return identity_issue
             missing = _ultralibrarian_missing_model_issue(page)
             if missing:
                 return missing
@@ -371,17 +470,53 @@ class UltraLibrarianAdapter:
             if page.locator('a[href*="/Account/Login"]').count() > 0:
                 return "Sign in to Ultra Librarian in the window; the sign-in is remembered."
             return "the CAD format list did not open on this page"
-        return ""
+        return _detail_identity_issue(
+            "ultralibrarian",
+            page.url or "",
+            expected_manufacturer,
+            expected_mpn,
+        )
 
-    def drive(self, page, formats: list[str]) -> DriveReport:
-        blocked = self.open_panel(page)
-        if blocked:
+    def drive(
+        self,
+        page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> DriveReport:
+        if not expected_manufacturer.strip() or not expected_mpn.strip():
             return DriveReport(
                 missed=list(formats),
-                blocked=_is_global_blockage(blocked),
+                blocked=True,
+                message=(
+                    "Ultra Librarian automatic capture requires the exact expected manufacturer "
+                    "and MPN before it may inspect or operate a provider page."
+                ),
+            )
+        blocked = self.open_panel(
+            page,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+        )
+        if blocked:
+            clearance = self.user_clearance_issue(page)
+            return DriveReport(
+                missed=list(formats),
+                blocked=bool(clearance) or _is_global_blockage(blocked),
+                requires_user_clearance=bool(clearance),
                 message=blocked,
             )
+        identity_issue = _detail_identity_issue(
+            "ultralibrarian",
+            page.url or "",
+            expected_manufacturer,
+            expected_mpn,
+        )
+        if identity_issue:
+            return DriveReport(missed=list(formats), message=identity_issue)
         report = DriveReport()
+        missed_reasons: list[str] = []
         # Export choices persist in the page/session. A previous Altium v14 selection was measured
         # still checked on the next live part (2026-07-28). Starting from that ambient state can
         # silently request an obsolete or unsupported format beside the pinned one. Clear every
@@ -397,21 +532,39 @@ class UltraLibrarianAdapter:
             )
         for fmt in formats:
             box_id = self.capability.version_pins.get(fmt)
-            if not box_id:
+            exact_label = self.capability.machine_format_labels.get(fmt)
+            if not box_id and not exact_label:
                 report.missed.append(fmt)
                 continue
             accordion = self._ACCORDION.get(fmt)
             if accordion:
                 _click_accordion(page, accordion)
-            if any(_check_box(page, selector) for selector in _export_selectors(fmt, box_id)):
+            if box_id and any(
+                _check_box(page, selector) for selector in _export_selectors(fmt, box_id)
+            ):
                 report.selected.append(fmt)
+            elif exact_label:
+                selected, reason = _check_exact_export_label(page, exact_label)
+                if selected:
+                    report.selected.append(fmt)
+                else:
+                    report.missed.append(fmt)
+                    missed_reasons.append(reason)
             else:
                 report.missed.append(fmt)
 
         _accept_consents(page)
 
+        identity_issue = _detail_identity_issue(
+            "ultralibrarian",
+            page.url or "",
+            expected_manufacturer,
+            expected_mpn,
+        )
+        if identity_issue:
+            return DriveReport(missed=list(formats), message=identity_issue)
         if not report.selected:
-            report.message = (
+            report.message = " ".join(missed_reasons) or (
                 "Could not select "
                 + " or ".join(report.missed)
                 + " on this page; choose the format and click Download Now."
@@ -421,6 +574,7 @@ class UltraLibrarianAdapter:
         submit = page.locator("#submit-export").first
         if submit.count() == 0:
             report.blocked = True
+            report.requires_user_clearance = bool(self.user_clearance_issue(page))
             report.message = (
                 "Selected " + " and ".join(report.selected) + ", but the Download button is "
                 "not on this page."
@@ -442,11 +596,38 @@ class UltraLibrarianAdapter:
             + " and ".join(report.missed)
             + " on this page."
         )
+        if missed_reasons:
+            report.message += " " + " ".join(missed_reasons)
         return report
 
     def download_gate(self, page) -> str:
         """Provider-wide state explaining why a submitted export produced no browser download."""
-        return _challenge_issue(page, self.capability.label)
+        return self.user_clearance_issue(page)
+
+    def user_clearance_issue(self, page) -> str:
+        """Security or authentication state that requires a person, never automation."""
+
+        security = _security_verification_issue(page, self.capability.label)
+        if security:
+            return security
+        try:
+            url = page.url or ""
+            login_form = page.locator("#Username").count() > 0
+            login_link = page.locator('a[href*="/Account/Login"]').count() > 0
+            if (
+                "sso.ultralibrarian.com" in url.casefold()
+                or "/account/login" in url.casefold()
+                or login_form
+                or login_link
+            ):
+                return (
+                    "Ultra Librarian needs you to finish sign-in or its security verification in "
+                    "this window. Stockroom never operates CAPTCHA, 2FA, or security controls and "
+                    "will resume automatically after you clear them."
+                )
+        except Exception:  # noqa: BLE001 - unreadable state is not evidence of a security gate
+            pass
+        return ""
 
 
 def _click_accordion(page, label: str) -> bool:
@@ -493,6 +674,50 @@ def _check_box(page, selector: str) -> bool:
         except Exception:  # noqa: BLE001 - report the honest miss rather than raising
             pass
     return box.is_checked()
+
+
+def _check_exact_export_label(page, exact_label: str) -> tuple[bool, str]:
+    """Select one uniquely and exactly labelled Ultra Librarian export.
+
+    The native Altium control's DOM id is not a published contract. Its exact visible label is:
+    Ultra Librarian's current help and announcement distinguish ``Altium Designer (Native)`` from
+    the legacy Altium script and P-CAD exports. Matching a substring such as ``Altium Designer``
+    would therefore select the very fallback this path is forbidden to use.
+    """
+
+    wanted = " ".join(normalize("NFKC", exact_label or "").split())
+    labels = page.locator("label[for]")
+    matching_ids: list[str] = []
+    for index in range(labels.count()):
+        label = labels.nth(index)
+        try:
+            visible = " ".join(normalize("NFKC", label.inner_text() or "").split())
+            control_id = (label.get_attribute("for") or "").strip()
+        except Exception:  # noqa: BLE001 - an unreadable label cannot establish an exact choice
+            continue
+        if visible == wanted and control_id and control_id not in matching_ids:
+            matching_ids.append(control_id)
+    if not matching_ids:
+        return (
+            False,
+            "Ultra Librarian does not offer Altium Designer (Native) for this exact part; legacy "
+            "Altium script, .lia, and P-CAD exports were not selected.",
+        )
+    if len(matching_ids) != 1:
+        return (
+            False,
+            "Ultra Librarian exposed multiple Altium Designer (Native) choices; refusing an "
+            "ambiguous export.",
+        )
+    escaped = matching_ids[0].replace("\\", "\\\\").replace('"', '\\"')
+    selector = f'input[name="exports"][id="{escaped}"]'
+    if _check_box(page, selector):
+        return True, ""
+    return (
+        False,
+        "Ultra Librarian exposed Altium Designer (Native), but its exact checkbox did not remain "
+        "selected; legacy exports were not used.",
+    )
 
 
 def _uncheck_box(page, selector: str) -> bool:
@@ -761,26 +986,50 @@ class SnapMagicAdapter:
             page.wait_for_timeout(400)
         return "SnapMagic did not confirm the sign-in"
 
-    def open_panel(self, page) -> str:
+    def open_panel(
+        self,
+        page,
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> str:
         """Search -> part page -> the "Choose Download Format" modal. "" when the formats are up."""
         if page.locator(_SNAPMAGIC_READY_FORMATS).count() > 0:
-            return ""
+            return _detail_identity_issue(
+                "snapmagic",
+                page.url or "",
+                expected_manufacturer,
+                expected_mpn,
+            )
         challenge = _challenge_issue(page, "SnapMagic")
         if challenge:
             return challenge
         if "/search" in (page.url or ""):
-            requested_mpn = _requested_mpn(page.url, ("q",))
+            requested_mpn = expected_mpn or _requested_mpn(page.url, ("q",))
             results = page.locator('a[href*="view-part"]')
             try:
                 results.first.wait_for(state="visible", timeout=20_000)
             except Exception:  # noqa: BLE001 - no result IS an answer, and a normal one
                 return "SnapMagic has no model for this part."
-            href, selection_error = _exact_result_href(results, requested_mpn)
+            href, selection_error = _exact_result_href(
+                results,
+                requested_mpn,
+                expected_manufacturer=expected_manufacturer,
+                vendor_key="snapmagic",
+            )
             if selection_error:
                 return f"SnapMagic {selection_error}"
             if not href:
                 return "the SnapMagic result row carried no link"
             page.goto(_absolute(page, href), wait_until="domcontentloaded")
+            identity_issue = _detail_identity_issue(
+                "snapmagic",
+                page.url or "",
+                expected_manufacturer,
+                requested_mpn,
+            )
+            if identity_issue:
+                return identity_issue
             challenge = _challenge_issue(page, "SnapMagic")
             if challenge:
                 return challenge
@@ -811,7 +1060,14 @@ class SnapMagicAdapter:
             return "the SnapMagic format list did not open"
         return ""
 
-    def drive(self, page, formats: list[str]) -> DriveReport:
+    def drive(
+        self,
+        page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> DriveReport:
         """Select ONE format and trigger its download.
 
         The engine calls this once per format because on SnapMagic each is a separate file; taking
@@ -819,7 +1075,11 @@ class SnapMagicAdapter:
         file and an honest report naming the one it took.
         """
         report = DriveReport()
-        blocked = self.open_panel(page)
+        blocked = self.open_panel(
+            page,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+        )
         if blocked:
             report.missed = list(formats)
             report.blocked = _is_global_blockage(blocked)
@@ -958,11 +1218,57 @@ def _canonical_detail_identity(href: str) -> tuple[str, str, tuple[str, ...]] | 
         return None
 
 
-def _exact_result_href(results, requested_mpn: str) -> tuple[str, str]:
-    """Choose one unique exact-MPN result, or return a fail-closed explanation."""
+def _provider_url_allowed(
+    vendor_key: str,
+    url: str,
+    *,
+    allow_relative: bool = False,
+) -> bool:
+    """Only official provider hosts may establish or receive part identity."""
+
+    return provider_url_allowed(vendor_key, url, allow_relative=allow_relative)
+
+
+def _detail_identity_issue(
+    vendor_key: str,
+    url: str,
+    expected_manufacturer: str,
+    expected_mpn: str,
+) -> str:
+    """Return a fail-closed provider-detail identity error when an expectation was supplied."""
+
+    if not expected_mpn:
+        return ""
+    if not _provider_url_allowed(vendor_key, url):
+        return (
+            f"{vendor_key} left its official provider host; refusing to operate a lookalike "
+            "detail path."
+        )
+    observed = page_identity(vendor_key, url)
+    if observed is None:
+        return (
+            f"{vendor_key} did not expose the exact manufacturer and MPN in its detail URL; "
+            "refusing to operate this page."
+        )
+    error = exact_observation_error(
+        SimpleNamespace(manufacturer=expected_manufacturer, mpn=expected_mpn),
+        observed,
+    )
+    return f"{vendor_key} {error}." if error else ""
+
+
+def _exact_result_href(
+    results,
+    requested_mpn: str,
+    *,
+    expected_manufacturer: str = "",
+    vendor_key: str = "",
+) -> tuple[str, str]:
+    """Choose one unique exact manufacturer+MPN result, or fail closed."""
     if not requested_mpn:
         return "", "could not recover the requested MPN from the search URL."
     matches: dict[tuple[str, str, tuple[str, ...]], str] = {}
+    wrong_manufacturer = False
     for index in range(results.count()):
         node = results.nth(index)
         href = node.get_attribute("href") or ""
@@ -976,10 +1282,38 @@ def _exact_result_href(results, requested_mpn: str) -> tuple[str, str]:
         )
         if _href_demonstrates_mpn(href, requested_mpn) or exact_text:
             absolute = href.strip()
+            if not _provider_url_allowed(vendor_key, absolute, allow_relative=True):
+                continue
+            if expected_manufacturer:
+                observed = page_identity(vendor_key, absolute, allow_relative=True)
+                if observed is None:
+                    continue
+                mismatch = exact_observation_error(
+                    SimpleNamespace(
+                        manufacturer=expected_manufacturer,
+                        mpn=requested_mpn,
+                    ),
+                    observed,
+                )
+                if mismatch:
+                    wrong_manufacturer = True
+                    continue
             identity = _canonical_detail_identity(absolute)
             if identity is not None:
                 matches.setdefault(identity, absolute)
     if not matches:
+        if expected_manufacturer and wrong_manufacturer:
+            return (
+                "",
+                "showed the requested MPN only under a different manufacturer; no near-match was "
+                "selected.",
+            )
+        if expected_manufacturer:
+            return (
+                "",
+                f"showed no exact result for manufacturer {expected_manufacturer!r} and requested "
+                f"MPN {requested_mpn!r}.",
+            )
         return "", f"showed no exact result for requested MPN {requested_mpn!r}."
     if len(matches) > 1:
         return "", f"showed multiple exact links for requested MPN {requested_mpn!r}."
@@ -1032,7 +1366,32 @@ _CHALLENGE_MARKERS = (
     "cf-chl-",
     "challenge-platform",
     "captcha-delivery",
+    "google.com/recaptcha",
+    "recaptcha.net",
+    "g-recaptcha",
+    "hcaptcha.com",
+    "h-captcha",
+    "i'm not a robot",
+    "i am not a robot",
     "turnstile",
+)
+_SECURITY_VERIFICATION_MARKERS = (
+    "two-factor authentication",
+    "two factor authentication",
+    "multi-factor authentication",
+    "multi factor authentication",
+    "verification code",
+    "security code",
+    "one-time code",
+    "one time code",
+    "authenticator app",
+    "approve sign-in",
+    "approve sign in",
+    "verify your identity",
+    "use your passkey",
+    "security key",
+    "enter otp",
+    "enter mfa",
 )
 
 
@@ -1059,6 +1418,22 @@ def _challenge_issue(page, label: str) -> str:
     return (
         f"{label} is asking you to confirm you are human. Clear it once in this window; "
         "the provider-specific browser profile remembers the session."
+    )
+
+
+def _security_verification_issue(page, label: str) -> str:
+    """CAPTCHA, MFA, passkey, or account-verification step that automation must not operate."""
+
+    challenge = _challenge_issue(page, label)
+    if challenge:
+        return challenge
+    body = _visible_body_text(page)
+    if not any(marker in body for marker in _SECURITY_VERIFICATION_MARKERS):
+        return ""
+    return (
+        f"{label} needs you to finish its security verification in this window. Stockroom never "
+        "operates CAPTCHA, 2FA, MFA, passkeys, or security controls and will resume automatically "
+        "after you clear them."
     )
 
 

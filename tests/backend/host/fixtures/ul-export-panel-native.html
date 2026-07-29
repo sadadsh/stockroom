@@ -1,0 +1,53 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Ultra Librarian native export fixture</title>
+<!--
+  Test-shaped fixture for Ultra Librarian's current native export option. The exact visible label
+  and delivered native artifact names come from Ultra Librarian's official 2025-10-16 announcement
+  and current Altium Designer (Native) help page. The nearby script/P-CAD rows are deliberate
+  negative controls and the checked P-CAD row represents persisted selection state.
+-->
+<form id="export-submission-form" data-multi-download="native">
+  <a class="accordion-toggle">KiCAD</a>
+  <input id="KiCADv5" name="exports" type="checkbox" value="legacy-kicad">
+  <label for="KiCADv5">KiCad 5</label>
+  <input id="KiCADv6" name="exports" type="checkbox" value="native-kicad">
+  <label for="KiCADv6">KiCad 6 or later</label>
+
+  <a class="accordion-toggle">3D CAD Model</a>
+  <input id="ThreeDModel" name="exports" type="checkbox" value="step">
+  <label for="ThreeDModel">STEP</label>
+
+  <a class="accordion-toggle">Altium</a>
+  <input id="AltiumDesigner" name="exports" type="checkbox" value="legacy-script">
+  <label for="AltiumDesigner">Altium Designer</label>
+  <input id="AltiumPCADV15" name="exports" type="checkbox" value="legacy-pcad" checked>
+  <label for="AltiumPCADV15">Altium P-CAD V15</label>
+  <input id="AltiumNativeCurrent" name="exports" type="checkbox" value="native-altium">
+  <label for="AltiumNativeCurrent">Altium Designer (Native)</label>
+
+  <input id="consent-Test" type="checkbox">
+  <a id="submit-export" href="#">Download Now</a>
+</form>
+<script>
+document.getElementById("submit-export").addEventListener("click", function(event) {
+  if (!document.getElementById("export-submission-form").dataset.multiDownload) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const targets = [
+    "/downloads/native-kicad.zip",
+    "/downloads/native-altium.zip",
+    "/downloads/native-step.step",
+  ];
+  targets.forEach((target, index) => {
+    setTimeout(() => {
+      const link = document.createElement("a");
+      link.href = target;
+      link.download = "";
+      document.body.append(link);
+      link.click();
+      link.remove();
+    }, index * 200);
+  });
+}, true);
+</script>

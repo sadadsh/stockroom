@@ -29,6 +29,7 @@ import zipfile
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from stockroom.capture.access_policy import machine_access_authorized
 from stockroom.capture.classify import classify_asset
 from stockroom.capture.requirements import Requirement
 from stockroom.host.overlay import build_overlay_js
@@ -1002,9 +1003,22 @@ def _inject_cad_scripts(
     except Exception:  # noqa: BLE001 - a backend without get_current_url falls back to the original
         current = None
     url = current or fallback_url
-    for script in cad_scripts_for_url(
-        url, needs_values, part_name, driver_formats, target_url=fallback_url
-    ):
+    vendor_key, vendor_label = _vendor_from_url(url)
+    if not vendor_key and fallback_url:
+        vendor_key, vendor_label = _vendor_from_url(fallback_url)
+    if machine_access_authorized(vendor_key):
+        scripts = cad_scripts_for_url(
+            url,
+            needs_values,
+            part_name,
+            driver_formats,
+            target_url=fallback_url,
+        )
+    else:
+        # This WebView2 route is retained only as an assisted download catcher. It must never be a
+        # second ungated commercial-site automation path beside the reviewed Playwright adapter.
+        scripts = [build_overlay_js(list(needs_values), vendor_label, part_name)]
+    for script in scripts:
         try:
             win.evaluate_js(script)
         except Exception:  # noqa: BLE001 - injection is best-effort; never crash the app
