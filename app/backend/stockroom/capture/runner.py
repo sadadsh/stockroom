@@ -217,7 +217,7 @@ def run_guided_capture(
     should_stop=None,
     limit=None,
     headless: bool = False,
-    engine: str = "chromium",
+    engine: str = "",
     user_driven: bool = False,
     operator_authorized: bool = False,
 ) -> dict:
@@ -276,6 +276,7 @@ def run_guided_capture(
 
     from stockroom.capture.browser import SharedPlaywrightRuntime
     from stockroom.capture.guided import GuidedCaptureSource
+    from stockroom.capture.vendors import get_adapter
     from stockroom.evidence import EvidenceStore
     from stockroom.ingest.pipeline import IngestPipeline
 
@@ -283,8 +284,21 @@ def run_guided_capture(
         return IngestPipeline(ctx.profile, ctx.repo, ctx.cli)
 
     evidence_store = EvidenceStore(_capture_evidence_root(ctx))
+    provider_engines = {
+        key: (
+            engine
+            or (
+                get_adapter(key).capability.browser_engine
+                if get_adapter(key) is not None
+                else "chromium"
+            )
+        )
+        for key in provider_keys
+    }
     playwright_runtime = (
-        SharedPlaywrightRuntime() if provider_keys and engine != "camoufox" else None
+        SharedPlaywrightRuntime()
+        if any(selected != "camoufox" for selected in provider_engines.values())
+        else None
     )
 
     def make_guided_source(key: str):
@@ -325,7 +339,7 @@ def run_guided_capture(
             # user browser is not part of the product contract and cannot silently change the
             # automation version underneath a provider adapter. Camoufox and branded channels
             # remain explicit provider-specific experiments, never the default.
-            engine=engine,
+            engine=provider_engines[key],
             # The Altium seam, which already existed and was already atomic but which guided capture
             # never called - so a vendor shipping real .SchLib/.PcbLib had them downloaded and
             # dropped. Passed in rather than imported so capture/ stays clear of the mutation layer.

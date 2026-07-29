@@ -99,7 +99,7 @@ def test_each_vendor_states_which_tools_it_can_export_for(client, app_ctx):
         assert isinstance(source["aggregator"], bool)
 
 
-def test_implemented_capture_providers_explain_the_user_driven_finish_contract(client, app_ctx):
+def test_implemented_capture_providers_explain_the_automated_finish_contract(client, app_ctx):
     part_id = _land_bare_part(app_ctx)
     sources = client.get(f"/api/library/parts/{part_id}/cad-source").json()["sources"]
     implemented = [source for source in sources if source["capture_available"]]
@@ -108,10 +108,11 @@ def test_implemented_capture_providers_explain_the_user_driven_finish_contract(c
     for source in implemented:
         instruction = source["instruction"].lower()
         assert "automatic sources first" in instruction
-        assert "select the exact result" in instruction
-        assert "click its download controls" in instruction
+        assert "opens the exact result" in instruction
+        assert "chooses the required formats" in instruction
         assert "validates" in instruction
         assert "attaches" in instruction
+        assert "security check" in instruction
 
     vendors = client.get("/api/library/capture/vendors").json()["vendors"]
     assert vendors
@@ -133,6 +134,9 @@ def test_user_driven_capture_route_requires_one_part_and_one_provider(client, ap
          "does not accept a batch limit"),
         ({"mode": "assisted", "part_ids": [part_id], "vendor": "not-a-provider"},
          "no network capture adapter"),
+        ({"mode": "assisted", "part_ids": [part_id], "vendor": "snapmagic",
+          "background": "yes"},
+         "background must be a boolean"),
     )
 
     for payload, detail in cases:

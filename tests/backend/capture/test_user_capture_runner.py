@@ -134,6 +134,7 @@ def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_expl
     assisted = constructed
     assert len(source_batches[1]) == 1
     assert [options["vendor"] for options in assisted] == ["snapmagic"]
+    assert [options["engine"] for options in assisted] == ["camoufox"]
     assert all(options["user_driven"] is False for options in assisted)
     assert all(options["operator_authorized"] is True for options in assisted)
     cancel_checks = [options["user_cancelled"] for options in assisted]
@@ -142,4 +143,4 @@ def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_expl
     assert cancel_checks[0]() is True
     assert all(options["credentials"] is runner._saved_credentials for options in assisted)
     assert all(source.closed for source in source_batches[1])
-    assert runtimes[0].closed is True
+    assert runtimes == []

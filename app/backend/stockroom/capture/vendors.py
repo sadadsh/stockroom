@@ -48,6 +48,7 @@ _KICAD_REQS = frozenset(
 )
 _ALTIUM_REQS = frozenset({Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT})
 BrowserAccessPolicy = Literal["user_driven", "machine_allowed"]
+BrowserEngine = Literal["chromium", "camoufox"]
 
 
 def formats_for(needs) -> list[str]:
@@ -97,6 +98,9 @@ class VendorCapability:
     # Provider-side DOM automation is opt-in, never inferred from having an adapter. Commercial
     # sites remain user-driven until a separately reviewed machine-access contract permits it.
     browser_access: BrowserAccessPolicy = "user_driven"
+    # The measured browser runtime for this provider. This is capability data because a single
+    # acquisition chain can span providers with different browser requirements.
+    browser_engine: BrowserEngine = "chromium"
 
     @property
     def supported_formats(self) -> frozenset[str]:
@@ -179,8 +183,8 @@ class UltraLibrarianAdapter:
         aggregator=False,
         needs_login=True,
         instruction=(
-            "Confirm the exact part, select KiCad, STEP, and Altium Designer (Native), then choose "
-            "Download Now. Stockroom captures every delivered file."
+            "Stockroom confirms the exact part and selects KiCad, STEP, and Altium Designer "
+            "(Native). Clear a provider security check only if one appears."
         ),
         # Measured element ids on the export panel. `model` is separate from `kicad`: the STEP
         # sits behind its own "3D CAD Model" accordion and is missed entirely if not ticked.
@@ -872,6 +876,7 @@ class SnapMagicAdapter:
             "model": "STEP model",
             "altium": "Altium native",
         },
+        browser_engine="camoufox",
     )
 
     def resolve_url(self, mpn: str) -> str:
