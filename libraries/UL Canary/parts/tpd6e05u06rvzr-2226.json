@@ -1,5 +1,76 @@
 {
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "origin": {
+          "captured_at": "2026-07-29T02:54:42Z",
+          "evidence_adapter_version": "browser-guided-cad-v1",
+          "evidence_manifest_digest": "sha256:7d4d8a724456883ca8af3a81485eea8ed5e8760362461749da4795ab2838d8dd",
+          "evidence_operation": "cad:kicad",
+          "url": "https://app.ultralibrarian.com/search?queryText=TPD6E05U06RVZR",
+          "vendor": "ultralibrarian"
+        },
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "TPD6E05U06RVZR"
+        }
+      },
+      "model": {
+        "origin": {
+          "captured_at": "2026-07-29T02:54:42Z",
+          "evidence_adapter_version": "browser-guided-cad-v1",
+          "evidence_manifest_digest": "sha256:7d4d8a724456883ca8af3a81485eea8ed5e8760362461749da4795ab2838d8dd",
+          "evidence_operation": "cad:kicad",
+          "url": "https://app.ultralibrarian.com/search?queryText=TPD6E05U06RVZR",
+          "vendor": "ultralibrarian"
+        },
+        "ref": {
+          "file": "models/TPD6E05U06RVZR.stp",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "origin": {
+          "captured_at": "2026-07-29T02:54:42Z",
+          "evidence_adapter_version": "browser-guided-cad-v1",
+          "evidence_manifest_digest": "sha256:7d4d8a724456883ca8af3a81485eea8ed5e8760362461749da4795ab2838d8dd",
+          "evidence_operation": "cad:kicad",
+          "url": "https://app.ultralibrarian.com/search?queryText=TPD6E05U06RVZR",
+          "vendor": "ultralibrarian"
+        },
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "TPD6E05U06RVZR"
+        }
+      }
+    }
+  },
+  "cad_variants": {
+    "active": {
+      "kicad": {
+        "artifacts": {
+          "footprint": {
+            "artifact_digest": "sha256:06444bcb64cc763ce0f1d6c3a5d23dd1b3dc6c6864213f3d4c55e9a235ae1550",
+            "evidence_role": "footprint"
+          },
+          "model": {
+            "artifact_digest": "sha256:ab6cbb46fabc1e57c294a76d69beb9e37ddec30dfcaa8de7b349e9c5626e3528",
+            "evidence_role": "model"
+          },
+          "symbol": {
+            "artifact_digest": "sha256:8b743a97b9d59d68ac4692403eea8cd9a294bffa97255fdc12e6a0c316d87c62",
+            "evidence_role": "symbol"
+          }
+        },
+        "manifest_digest": "sha256:7d4d8a724456883ca8af3a81485eea8ed5e8760362461749da4795ab2838d8dd",
+        "provider": "ultralibrarian",
+        "source_manifests": []
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "",
