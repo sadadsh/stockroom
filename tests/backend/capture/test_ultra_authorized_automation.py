@@ -571,6 +571,61 @@ def test_guided_drive_hands_security_to_the_user_then_resumes_with_exact_identit
     assert calls == [("Acme", "ABC-1"), ("Acme", "ABC-1")]
 
 
+def test_saved_credentials_run_before_an_ordinary_signed_out_handoff(monkeypatch, tmp_path):
+    state = {"signed_in": False, "sign_ins": 0}
+
+    class Adapter:
+        capability = SimpleNamespace(
+            key="ultralibrarian",
+            label="Ultra Librarian",
+            needs_login=True,
+        )
+
+        def signed_in(self, _page):
+            return state["signed_in"]
+
+        def sign_in(self, _page, _username, _password):
+            state["sign_ins"] += 1
+            state["signed_in"] = True
+            return ""
+
+        def user_clearance_issue(self, _page):
+            return "" if state["signed_in"] else "Sign in to Ultra Librarian."
+
+    class Page:
+        url = "https://app.ultralibrarian.com/search?queryText=ABC-1"
+
+        def title(self):
+            return "Search | Ultra Librarian"
+
+        def inner_text(self, selector):
+            assert selector == "body"
+            return "Texas Instruments ABC-1 Models Available"
+
+        def locator(self, _selector):
+            return _NoNodes()
+
+    class Browser:
+        def wait_for_user_clearance(self, *_args, **_kwargs):
+            raise AssertionError("ordinary sign-in must use saved credentials before handoff")
+
+    adapter = Adapter()
+    monkeypatch.setattr(guided, "get_adapter", lambda _key: adapter)
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="ultralibrarian",
+        download_root=tmp_path,
+        credentials=lambda _key: ("owner@example.test", "saved-secret"),
+        machine_access_check=lambda: True,
+    )
+    session = guided._Session(browser=Browser(), ctx_manager=None, page=Page())
+
+    outcome = source._prepare_sign_in(session, session.page, adapter, "Acme", "ABC-1")
+
+    assert outcome is None
+    assert state == {"signed_in": True, "sign_ins": 1}
+
+
 def test_authorization_revocation_stops_before_the_post_handoff_retry(monkeypatch, tmp_path):
     calls = 0
 
