@@ -4,8 +4,9 @@ One file per part is git-merge friendly by construction: concurrent adds on two 
 in different files and cannot conflict (spec section 3). JSON is emitted canonically (sorted
 keys, 2-space indent, trailing newline) so a one-field edit produces a minimal, stable diff.
 
-**The v3 shape** is drawn in `docs/specs/2026-07-27-owner-spec-complete-trusted-library.md`
-section 9 and is not re-litigated here:
+The v3 identity / derived / sources / assets shape is drawn in
+`docs/specs/2026-07-27-owner-spec-complete-trusted-library.md` section 9.  Version 4 adds only
+the active CAD-variant pointers; the existing ``assets`` map remains the materialized projection:
 
     parts/<id>.json          identity + part_class + DERIVED + asset refs + a sources INDEX
     sourced/<id>/<src>.json  the raw pull, byte for byte, append-only evidence
@@ -37,6 +38,7 @@ from pathlib import Path
 
 from stockroom.eda.registry import all_tools, get_tool
 from stockroom.model.asset import ASSET_KINDS, Asset, AssetOrigin, AssetRef, EdaAssets
+from stockroom.model.cad_variant import CadVariantSelections
 from stockroom.model.category import slugify
 from stockroom.model.derived import DERIVED_BY, DERIVED_FIELDS, Derived
 from stockroom.model.part_class import (
@@ -58,13 +60,15 @@ from stockroom.model.trust import AssetCheck
 #   2 = the per-tool `eda` map (one symmetric EdaAssets bundle per EDA registry key)
 #   3 = identity / `derived` / `sources` / `assets` (asset = ref + origin + checks), and
 #       `part_class` in place of the two-valued `passive` flag
+#   4 = `cad_variants`: one active digest-bound evidence bundle per tool, kept separate from
+#       the materialized `assets` projection
 #
 # This exists because peers share these records through git and BOTH write them. Kubernetes'
 # API conventions state the rule: patching a resource at schema version N-1 must not erase
 # fields defined at version N. Before this, an older build editing one field on a newer peer's
 # part silently deleted every field it did not recognise, and git recorded the deletion as an
 # intentional change. `extra` (below) is the other half of that guarantee.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # KiCad-visible fields mirrored INTO symbol properties so KiCad shows a complete
 # part even without Stockroom (spec section 3). Maps record-derived value ->
@@ -324,9 +328,22 @@ def _v2_to_v3(d: dict) -> dict:
     return out
 
 
+def _v3_to_v4(d: dict) -> dict:
+    """Adopt separate active CAD-variant pointers.
+
+    A v3 asset has no durable link to an immutable evidence object, so migration must leave the
+    selection empty rather than infer one from a filename or provenance label.  ``cad_variants``
+    is optional on disk; the only required persisted change is the honest schema capability
+    stamp.
+    """
+    out = dict(d)
+    out["schema_version"] = 4
+    return out
+
+
 # version present -> the step that upgrades it to the next one. A version with no entry is
 # REFUSED rather than restamped.
-_MIGRATIONS = {1: _v1_to_v2, 2: _v2_to_v3}
+_MIGRATIONS = {1: _v1_to_v2, 2: _v2_to_v3, 3: _v3_to_v4}
 
 
 def migrate_record(d: dict) -> dict:
@@ -360,7 +377,7 @@ def migrate_record(d: dict) -> dict:
     return out
 
 
-# Every top-level key the v3 shape defines. Anything outside this set is a field from a newer
+# Every top-level key the v4 shape defines. Anything outside this set is a field from a newer
 # build and is preserved verbatim in `PartRecord.extra`. Legacy keys are absent on purpose:
 # `migrate_record` CONSUMES them before this set is consulted, so a migrated record can never
 # carry two contradictory copies of its assets.
@@ -375,6 +392,7 @@ _KNOWN_KEYS: frozenset[str] = frozenset(
         "derived",
         "sources",
         "assets",
+        "cad_variants",
         "tags",
         "datasheet",
         "purchase",
@@ -429,6 +447,10 @@ class PartRecord:
     # entry (see __post_init__), so `record.assets_for(tool).symbol = ref` is always a live
     # write; empty bundles are dropped on serialization so the JSON stays minimal.
     assets: dict[str, EdaAssets] = field(default_factory=dict)
+    # Active bundle selection is deliberately separate from `assets`: evidence variants are
+    # immutable, while the EDA files are a replaceable projection. Empty selections are omitted
+    # on disk so migrating a v3 record does not fabricate a link to bytes never digest-bound.
+    cad_variants: CadVariantSelections = field(default_factory=CadVariantSelections)
     # ---- curated / vendor data that is neither identity nor recomputed from `sourced/`
     tags: list[str] = field(default_factory=list)
     datasheet: Datasheet | None = None
@@ -554,6 +576,11 @@ class PartRecord:
             # Empty bundles are omitted: a part with only KiCad assets should not carry a
             # wall of nulls for every other tool, and a one-field edit stays a one-line diff.
             "assets": {k: a.to_dict() for k, a in self.assets.items() if not a.is_empty()},
+            **(
+                {"cad_variants": self.cad_variants.to_dict()}
+                if not self.cad_variants.is_empty()
+                else {}
+            ),
             "tags": list(self.tags),
             "datasheet": asdict(self.datasheet) if self.datasheet else None,
             "purchase": [asdict(p) for p in self.purchase],
@@ -593,6 +620,7 @@ class PartRecord:
             assets={
                 tool: EdaAssets.from_dict(a or {}) for tool, a in (d.get("assets") or {}).items()
             },
+            cad_variants=CadVariantSelections.from_dict(d.get("cad_variants") or {}),
             tags=list(d.get("tags", [])),
             datasheet=Datasheet(**d["datasheet"]) if d.get("datasheet") else None,
             purchase=[Purchase(**p) for p in d.get("purchase", [])],
@@ -716,6 +744,7 @@ __all__ = [
     "AssetCheck",
     "AssetOrigin",
     "AssetRef",
+    "CadVariantSelections",
     "Datasheet",
     "Derived",
     "EdaAssets",
