@@ -6,7 +6,7 @@
   "note": "Owner outcomes are the product source of truth. The historical engineering checklist is retained below as unweighted implementation history and must never be presented as product readiness.",
   "product_scope": "Windows-only component-library management for both KiCad and Altium. A capability ships only when both EDA workflows are supported. KiCad-only project management is deferred and removed from the current frontend; its backend and Git history are preserved.",
   "active_work": {
-    "last_updated": "2026-07-29T04:24:04Z",
+    "last_updated": "2026-07-29T05:57:14Z",
     "objective": "Finish exact-MPN-to-assets acquisition with the smallest possible user workload: use verified direct sources and reviewed provider automation, retain every usable file, convert supported provider packages into native outputs, and require exact identity plus semantic and cross-EDA verification before attachment.",
     "refresh_policy": "Manually refreshed at meaningful checkpoints; this is not real-time telemetry.",
     "workstreams": [
@@ -15,27 +15,27 @@
         "name": "Automatic MPN-To-Assets Acquisition",
         "status": "active",
         "owner": "Codex · acquisition planning and provider adapters",
-        "evidence": "The isolated UL Canary profile now contains one complete Texas Instruments TPD6E05U06RVZR component captured from real SnapMagic downloads. Active KiCad and Altium variants share manifest sha256:5b0cb30d1b83ab28b392032602469fef0c20aa0725861d03b60e747c24e2092a; independent readback proved eight pins, fourteen pads, the same mechanical-pad allowance, and terminal, pad, and package equivalence. DigiKey and SamacSys now expose distinct implemented routes rather than discovery-only links.",
+        "evidence": "The isolated UL Canary profile now proves two coherent provider paths for Texas Instruments TPD6E05U06RVZR. The retained SnapMagic pair remains available. A real saved 79,884-byte DigiKey Ultra Librarian script ZIP then ran through installed AD26 in 12.8 seconds and activated all five required KiCad/Altium assets in exactly one Git transaction. Active KiCad provider ultralibrarian manifest sha256:f84d8d3530caba1a0a011b0a51dda42630fb7dbba5e3d376b4121229db1d8b47 is the exact source of active Altium provider digikey-ultralibrarian manifest sha256:5886053375092ddbdeb3b74b7dcdbbbb0b02b61fde0f0dbc1929617690bc174a. Reopen, immutable evidence resolution, native SchLib/PcbLib entry readback, and installed cross-EDA verification all passed for 8 connected terminals, 6 no-connect package pads, and 14 physical pads.",
         "blocker": "One successful provider canary does not prove arbitrary-MPN completion. The production Stockroom profile still contains only incomplete IC51-0484-806, and provider availability, verified-cache reuse, deterministic generation, and fallback performance remain unqualified at scale.",
-        "next_action": "Use the TPD6E05U06RVZR canary as the fixed regression, finish the DigiKey script-package conversion proof, then exercise several unrelated MPN and package classes through the same acquisition and fallback engine."
+        "next_action": "Use both retained TPD6E05U06RVZR provider paths as fixed regressions, then exercise several unrelated MPN and package classes through browser acquisition, conversion, fallback, attachment, reopen, and evidence verification."
       },
       {
         "id": "cad-evidence-composition",
         "name": "CAD Evidence Composition And Variants",
         "status": "verified",
         "owner": "Codex · immutable evidence and cross-EDA validation",
-        "evidence": "Committed role manifests and active CAD pointers preserve exact identity, provider, content digest, validation, and compatible source-manifest links. The real SnapMagic canary retained three Ultra Librarian KiCad manifests and the coherent SnapMagic pair, then atomically projected the compatible KiCad and Altium variants without deleting alternatives.",
-        "blocker": "The current per-tool activation endpoint still cannot switch an already-complete pair through an incompatible intermediate state. Pair switching must be one coherent transaction, not weaker compatibility guards.",
-        "next_action": "Add one atomic compatible-pair activation action and expose the retained provider variants in the component UI."
+        "evidence": "Committed role manifests and active CAD pointers preserve exact identity, provider, content digest, validation, and compatible source-manifest links. The live DigiKey/UL canary searched retained KiCad variants, rejected the incompatible active SnapMagic geometry, promoted the compatible UL bundle without deleting alternatives, bound the derived Altium manifest to that exact source, and projected both tools through one transaction and one commit. Mutation tests prove rollback after a post-KiCad Altium failure and preserve dirty exact targets.",
+        "blocker": "The component UI does not yet expose retained variants or a deliberate coherent pair switch. Per-tool activation remains unsuitable for switching an already-complete incompatible pair.",
+        "next_action": "Expose retained variants and add a user-facing coherent pair selector that invokes the same one-transaction compatibility boundary."
       },
       {
         "id": "digikey-ultralibrarian-conversion",
         "name": "DigiKey Ultra Librarian Conversion",
-        "status": "verification",
+        "status": "verified",
         "owner": "Codex · DigiKey browser adapter and guarded Altium bridge",
-        "evidence": "A real isolated headless Camoufox run reused saved DigiKey credentials, selected the exact product/model page, and downloaded TPD6E05U06RVZR.zip. The measured Altium choice is script based and contains STEP, one ASCII component payload, and the Ultra Librarian importer, not native libraries. Before extraction Stockroom requires the reviewed six-file archive shape, exact static and importer hashes, safe paths, bounded size/compression, and exact payload manufacturer/MPN/component/footprint identity. In a temporary sandbox it ignores the one reviewed AD26 informational dialog, captures every other provider dialog as a failure, generates a minimal one-document project, routes execution through the existing watchdog, requires exact native-library entry readback, and deletes the sandbox after guided attachment or any failure. The real ZIP passed recognition and all 26 dialog-site transformations; 154 focused provider tests plus Ruff pass without launching Altium. Two broader backend invocations timed out without terminal output and are not counted as passing evidence.",
-        "blocker": "The patched importer has not yet run through installed AD26, because that live application run was intentionally deferred while the owner was using the desktop. Native output and cross-EDA equivalence are therefore not yet live proof.",
-        "next_action": "When the desktop is free, execute the already-recognized package through AD26, verify the native SchLib/PcbLib against coherent KiCad assets, retain original and derived evidence, and reject the route if any dialog, timeout, or semantic mismatch remains."
+        "evidence": "A real isolated Camoufox run reused saved DigiKey credentials, selected the exact product/model page, and downloaded TPD6E05U06RVZR.zip. The 79,884-byte Altium choice is script based and contains STEP, one ASCII component payload, and the reviewed Ultra Librarian importer. The saved archive ran through installed AD26 in the normal guarded converter, produced one exact TPD6E05U06RVZR SchLib entry and one RVZ0014A PcbLib entry, selected a geometrically compatible retained UL KiCad set, preserved original and derived immutable evidence, and attached all five assets in one 12.8-second transaction. Independent installed readback proved 8 connected terminals, 6 no-connect mappings, and 14 matching pads. No X2 process or task-owned conversion/materialization directory remained. The capture directory passes 313 tests; two unrelated legacy-contract assertions remain red: a stale global-Chromium-default expectation and the guard detecting the dead WebView2 DigiKey driver beside the Python adapter.",
+        "blocker": "One part and package class do not prove arbitrary-MPN availability, account behavior, or throughput. The current acquisition timing starts from an already-downloaded archive, so browser navigation/download time is not included.",
+        "next_action": "Qualify unrelated MPNs and package classes through the full browser-to-archive path, measure provider gates and total wall time separately, and delete the dead WebView2 DigiKey implementation so the one-provider-one-adapter guard is green."
       },
       {
         "id": "deploy-and-durable-state",
@@ -43,8 +43,8 @@
         "status": "verified",
         "owner": "Codex · Windows deployment and Obsidian state",
         "evidence": "Implementation commit 29fd20a5 is on canonical main and origin/main. The installed checkout was fast-forwarded to that revision with an explicit ul_import.py content marker while preserving all five modified KiCad fixtures plus drive-shots/ and paste_list.js. Stockroom was not restarted or launched, and no visible browser, mouse, keyboard, or desktop control was used. The permanent Current State records the exact proven boundary and the QMD project collection was refreshed.",
-        "blocker": "No deployment blocker remains for the headless provider route. Live AD26 conversion remains a separate desktop-free verification, and the two broad backend gate attempts timed out without a result.",
-        "next_action": "When the owner is no longer using the desktop, run only the live AD26 conversion canary and then continue unrelated-MPN/provider scale qualification."
+        "blocker": "The live AD26 and coherent-attach proof is complete. Final source/installed convergence for the accepted revision remains the deployment step for this checkpoint; automatic hot adoption is still a separate unfinished product outcome.",
+        "next_action": "Deploy the accepted coherent-attach revision without restarting the visible app, verify the installed commit/content marker, then continue unrelated-MPN/provider scale qualification."
       }
     ]
   },
@@ -562,7 +562,7 @@
                 {
                   "t": "Both formats per part where the vendor offers them",
                   "done": false,
-                  "evidence": "DOING. Ultra Librarian's official 2025-10-16 native export provides schematic library, PCB library, LibPkg, and integrated STEP output, so the old PCAD-only assumption is false. The working-tree capability contract exposes KiCad, STEP, and Altium Designer (Native) to the user-driven HUD, and archive discovery recognizes .LibPkg containing .SchLib/.PcbLib; focused tests pass. No live arbitrary-MPN capture has yet proved all files through attach and reopen: https://www.ultralibrarian.com/native_export_for_altium_designer.",
+                  "evidence": "ONE REAL PART PROVED, ARBITRARY MPN STILL OPEN. The saved DigiKey/UL TPD6E05U06RVZR package ran through installed AD26 and activated KiCad symbol, footprint, STEP plus native Altium SchLib/PcbLib in one transaction. Reopen and installed cross-EDA readback passed. Direct Ultra Librarian's current native-export route and unrelated MPN/package availability remain unqualified: https://www.ultralibrarian.com/native_export_for_altium_designer.",
                   "status": "doing"
                 },
                 {
@@ -608,9 +608,8 @@
                 },
                 {
                   "t": "Exact validated artifacts can compose across providers without weakening verification",
-                  "done": false,
-                  "evidence": "WORKING-TREE VERIFIED. Partial role manifests bind exact identity, provider, adapter, role, bytes, validation report, and source manifests. An Altium-only delivery can compose with the currently attached KiCad files only after those active files are read back, installed and reverified from CAS, and terminal/pad/package equivalence passes. Attachment uses CAS-rematerialized Altium bytes. Twenty focused tests plus Ruff and Ty pass; no live canary or commit exists.",
-                  "status": "doing"
+                  "done": true,
+                  "evidence": "LIVE AND MUTATION VERIFIED. Partial role manifests bind exact identity, provider, adapter, role, bytes, validation report, and source manifests. The real DigiKey/UL Altium delivery rejected incompatible active SnapMagic geometry, selected and promoted one compatible retained UL KiCad bundle, and bound both active pointers in one transaction. The five installed assets reopened and passed native and cross-EDA readback. Failure injection proves zero-trace rollback."
                 },
                 {
                   "t": "Every exact validated variant is preserved and active selection is explicit",
@@ -621,7 +620,7 @@
                 {
                   "t": "Installed end-to-end arbitrary-MPN proof attaches validated KiCad, native Altium, and STEP outputs",
                   "done": false,
-                  "evidence": "OPEN. The installed app is still at 3a296a1e and has none of the working-tree HUD, composition, variant-index, or production runner changes. No live Ultra Librarian or IC51 capture has passed saved bytes, exact identity, semantic readback, cross-EDA equivalence, attachment, reopen, and evidence-digest verification."
+                  "evidence": "ONE ISOLATED CANARY PASSED, ARBITRARY MPN AND INSTALLED-UI PROOF REMAIN OPEN. TPD6E05U06RVZR passed saved archive, installed AD26 conversion, exact identity, semantic readback, cross-EDA equivalence, one-transaction attachment, reopen, active source binding, and evidence-digest resolution. Browser acquisition time and unrelated MPN/package classes are not yet qualified."
                 }
               ]
             }
