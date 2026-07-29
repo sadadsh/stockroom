@@ -26,6 +26,7 @@ const mockCadVariantApi = vi.mocked(cadVariantApi);
 function document(activeVariantId: string | null = "snap-kicad"): CadVariantDocument {
   return {
     partId: "lm358",
+    supplementary: [],
     inventories: [
       {
         tool: "kicad",

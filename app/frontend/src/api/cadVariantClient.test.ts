@@ -8,6 +8,7 @@ import {
 const DOCUMENT: CadVariantDocument = {
   partId: "part/1",
   inventories: [],
+  supplementary: [],
 };
 
 afterEach(() => {

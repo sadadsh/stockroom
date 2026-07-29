@@ -58,9 +58,46 @@ function inventories(): CadVariantInventory[] {
   ];
 }
 
+const supplementary = [
+  {
+    id: "sha256:trace-manifest",
+    provider: "DigiKey · TraceParts",
+    surface: "DigiKey",
+    adapterVersion: "digikey-models/1",
+    evidenceDigest: "sha256:trace-manifest",
+    canActivate: false as const,
+    artifacts: [
+      {
+        id: "sha256:step",
+        fileName: "TPS62130.step",
+        sizeBytes: 4096,
+        mediaType: "application/octet-stream",
+        evidenceDigest: "sha256:step",
+        canActivate: false as const,
+        downloadUrl: "/api/supplementary/step",
+      },
+      {
+        id: "sha256:drawing",
+        fileName: "TPS62130.dxf",
+        sizeBytes: 512,
+        mediaType: "application/octet-stream",
+        evidenceDigest: "sha256:drawing",
+        canActivate: false as const,
+        downloadUrl: "/api/supplementary/drawing",
+      },
+    ],
+  },
+];
+
 describe("CadVariantSelector", () => {
   it("shows every retained KiCad and Altium variant with the active pointer separate", () => {
-    render(<CadVariantSelector inventories={inventories()} onActivate={vi.fn()} />);
+    render(
+      <CadVariantSelector
+        inventories={inventories()}
+        supplementary={[]}
+        onActivate={vi.fn()}
+      />,
+    );
 
     const kicad = screen.getByRole("region", { name: "KiCad CAD Variants" });
     expect(within(kicad).getAllByRole("article")).toHaveLength(2);
@@ -87,7 +124,13 @@ describe("CadVariantSelector", () => {
   });
 
   it("orders by supplied trust policy, making Ultra Librarian preferred without hard-coding it", () => {
-    render(<CadVariantSelector inventories={inventories()} onActivate={vi.fn()} />);
+    render(
+      <CadVariantSelector
+        inventories={inventories()}
+        supplementary={[]}
+        onActivate={vi.fn()}
+      />,
+    );
 
     const kicad = screen.getByRole("region", { name: "KiCad CAD Variants" });
     const rows = within(kicad).getAllByRole("article");
@@ -99,7 +142,13 @@ describe("CadVariantSelector", () => {
 
   it("requests a compare-and-switch activation without mutating or removing variants", async () => {
     const onActivate = vi.fn();
-    render(<CadVariantSelector inventories={inventories()} onActivate={onActivate} />);
+    render(
+      <CadVariantSelector
+        inventories={inventories()}
+        supplementary={[]}
+        onActivate={onActivate}
+      />,
+    );
 
     await userEvent.click(
       screen.getByRole("button", { name: "Use Ultra Librarian variant for KiCad" }),
@@ -130,6 +179,7 @@ describe("CadVariantSelector", () => {
     render(
       <CadVariantSelector
         inventories={data}
+        supplementary={[]}
         onActivate={vi.fn()}
         activating={{ tool: "kicad", variantId: "ul-kicad" }}
       />,
@@ -152,6 +202,7 @@ describe("CadVariantSelector", () => {
         inventories={[
           { tool: "kicad", activeVariantId: "missing", variants: [variant()] },
         ]}
+        supplementary={[]}
         onActivate={vi.fn()}
         activationError="The library changed before this switch completed."
       />,
@@ -166,5 +217,27 @@ describe("CadVariantSelector", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "The library changed before this switch completed.",
     );
+  });
+
+  it("lists supplementary originals separately without any activation control", () => {
+    render(
+      <CadVariantSelector
+        inventories={inventories()}
+        supplementary={supplementary}
+        onActivate={vi.fn()}
+      />,
+    );
+
+    const retained = screen.getByRole("region", {
+      name: "Supplementary Retained Artifacts",
+    });
+    const traceParts = within(retained).getByRole("article", {
+      name: "DigiKey · TraceParts retained originals",
+    });
+    expect(within(traceParts).getByText("TPS62130.step")).toBeInTheDocument();
+    expect(within(traceParts).getByText("TPS62130.dxf")).toBeInTheDocument();
+    expect(within(traceParts).getByText("Not Activatable")).toBeInTheDocument();
+    expect(screen.getByText("2 Originals")).toBeInTheDocument();
+    expect(within(traceParts).queryByRole("button")).not.toBeInTheDocument();
   });
 });

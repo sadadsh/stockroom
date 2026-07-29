@@ -54,6 +54,10 @@ class SourceOutcome:
     """
 
     satisfied: tuple[Requirement, ...] = ()
+    # Files preserved as exact supplementary evidence but intentionally not projected into either
+    # EDA library. This is separate from `satisfied`: a model-only source must never make a part
+    # look complete merely because useful bytes were retained.
+    retained: int = 0
     error: str = ""
     skipped: str = ""
     # The catalogue refused to talk to us, so this part was never really attempted. A
@@ -64,7 +68,11 @@ class SourceOutcome:
 
     def as_blocked(self) -> "SourceOutcome":
         return SourceOutcome(
-            satisfied=self.satisfied, error=self.error, skipped=self.skipped, blocked=True
+            satisfied=self.satisfied,
+            retained=self.retained,
+            error=self.error,
+            skipped=self.skipped,
+            blocked=True,
         )
 
 
@@ -103,6 +111,7 @@ class CompletionItem:
     #                                                    improved | deferred | unchanged | error
     needed: list[str] = field(default_factory=list)
     satisfied: list[str] = field(default_factory=list)
+    retained: int = 0
     remaining: list[str] = field(default_factory=list)
     sources: list[str] = field(default_factory=list)  # which sources actually delivered
     # Honest non-error explanations from sources that declined this exact part. Kept separate
@@ -125,6 +134,7 @@ class CompletionItem:
             "status": self.status,
             "needed": list(self.needed),
             "satisfied": list(self.satisfied),
+            "retained": self.retained,
             "remaining": list(self.remaining),
             "sources": list(self.sources),
             "notes": list(self.notes),
@@ -227,6 +237,7 @@ def complete_part(part_id: str, *, load_record, sources) -> CompletionItem:
             # provider, so prefer their public report label when naming a decline.
             source_label = getattr(source, "report_label", "") or source.key
             item.notes.append(f"{source_label}: {outcome.skipped}")
+        item.retained += outcome.retained
         if outcome.blocked:
             blocked = True
         # Re-read the record's OWN state rather than trusting the claim. A source that
@@ -298,7 +309,7 @@ def complete_library(
         if breaker is not None:
             if item.provider_blocked:
                 breaker.record_blocked(item.error)
-            elif item.status in ("completed", "improved", "already-complete"):
+            elif item.status in ("completed", "improved", "already-complete") or item.retained:
                 breaker.record_ok()
             else:
                 breaker.record_failure()
@@ -314,6 +325,7 @@ def complete_library(
                     "display_name": item.display_name,
                     "status": item.status,
                     "satisfied": list(item.satisfied),
+                    "retained": item.retained,
                     "remaining": list(item.remaining),
                     "message": (
                         f"{item.mpn or item.part_id}"

@@ -40,6 +40,7 @@ class FakeSource:
         fills=None,
         error="",
         skipped="",
+        retained=0,
         calls=None,
         report_label="",
     ):
@@ -48,6 +49,7 @@ class FakeSource:
         self._fills = frozenset(fills if fills is not None else provides)
         self._error = error
         self._skipped = skipped
+        self._retained = retained
         self.calls = calls if calls is not None else []
         self.report_label = report_label
 
@@ -59,7 +61,7 @@ class FakeSource:
         if self._error:
             return SourceOutcome(error=self._error)
         if self._skipped:
-            return SourceOutcome(skipped=self._skipped)
+            return SourceOutcome(skipped=self._skipped, retained=self._retained)
         for req in self._fills:
             tool, _, kind = req.value.partition("_")
             record.assets_for(tool).set(kind, AssetRef(lib="L", name="N"))
@@ -181,6 +183,25 @@ def test_sources_that_decline_retain_provider_named_notes_without_becoming_error
         "Ultra Librarian: the exact part has no downloadable symbol",
     ]
     assert item.to_dict()["notes"] == item.notes
+
+
+def test_supplementary_retention_is_reported_without_claiming_a_requirement():
+    rec = _rec()
+    traceparts = FakeSource(
+        "guided",
+        [Requirement.KICAD_MODEL],
+        skipped="retained exact supplementary STEP",
+        retained=1,
+        report_label="DigiKey · TraceParts",
+    )
+
+    item = complete_part("p1", load_record=_loader({"p1": rec}), sources=[traceparts])
+
+    assert item.status == "unchanged"
+    assert item.retained == 1
+    assert item.satisfied == []
+    assert item.remaining == [requirement.value for requirement in ALL_REQUIREMENTS]
+    assert item.to_dict()["retained"] == 1
 
 
 def test_a_source_that_raises_is_caught_and_the_next_source_still_runs():

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from stockroom.api.errors import ApiError
 from stockroom.api.routers.cad_variants import ActivateCadVariantBody, _activate
+from stockroom.capture.download_broker import DownloadReceipt
 from stockroom.capture.evidence import exact_identity
 from stockroom.evidence import EvidenceArtifact, EvidenceStore
 from stockroom.planning import ALTIUM_CAD_OPERATION, KICAD_CAD_OPERATION
@@ -153,6 +155,41 @@ def _record_altium(
     )
 
 
+def _record_supplementary(
+    store: EvidenceStore,
+    identity,
+    staging: Path,
+) -> tuple[str, bytes]:
+    data = b"ISO-10303-21;\nTRACEPARTS ORIGINAL\nEND-ISO-10303-21;\n"
+    path = staging / "TPS62130-traceparts.step"
+    path.write_bytes(data)
+    artifact_digest = f"sha256:{hashlib.sha256(data).hexdigest()}"
+    manifest_digest = store.record_supplementary_artifacts(
+        identity=identity,
+        surface_key="digikey",
+        provider_key="digikey-traceparts",
+        adapter_version="digikey-models/1",
+        receipts=(
+            DownloadReceipt(
+                task_id="capture-traceparts",
+                manufacturer_key=identity.authoritative_manufacturer_key,
+                mpn_canonical=identity.mpn_canonical,
+                path=path,
+                suggested_name=path.name,
+                source_url="https://www.digikey.com/en/models/123?token=removed",
+                final_url="https://cdn.example.invalid/TPS62130.step?key=removed",
+                sha256=artifact_digest,
+                size_bytes=len(data),
+                transport="playwright",
+                attempt=1,
+                surface_key="digikey",
+                evidence_provider_key="digikey-traceparts",
+            ),
+        ),
+    )
+    return manifest_digest, data
+
+
 def _evidence(app_ctx, tmp_path: Path, monkeypatch) -> tuple[EvidenceStore, object]:
     capture_root = tmp_path / "Capture"
     monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(capture_root))
@@ -220,6 +257,59 @@ def test_inventory_is_authenticated_ul_first_and_activation_materializes_all_kic
     assert '"VariantMarker" "ul"' in symbol
     assert '"VariantMarker" "ul"' in footprint
     assert b"/* ul */" in model
+
+
+def test_inventory_lists_supplementary_originals_separately_and_downloads_exact_bytes(
+    client,
+    anon_client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    store, identity = _evidence(app_ctx, tmp_path, monkeypatch)
+    manifest_digest, data = _record_supplementary(
+        store,
+        identity,
+        tmp_path,
+    )
+
+    response = client.get("/api/library/parts/tps62130/cad-variants")
+
+    assert response.status_code == 200
+    document = response.json()
+    assert all(not inventory["variants"] for inventory in document["inventories"])
+    assert len(document["supplementary"]) == 1
+    supplementary = document["supplementary"][0]
+    assert supplementary == {
+        "id": manifest_digest,
+        "provider": "DigiKey · TraceParts",
+        "surface": "DigiKey",
+        "adapterVersion": "digikey-models/1",
+        "evidenceDigest": manifest_digest,
+        "canActivate": False,
+        "artifacts": [
+            {
+                "id": supplementary["artifacts"][0]["id"],
+                "fileName": "TPS62130-traceparts.step",
+                "sizeBytes": len(data),
+                "mediaType": "application/octet-stream",
+                "evidenceDigest": supplementary["artifacts"][0]["id"],
+                "canActivate": False,
+                "downloadUrl": supplementary["artifacts"][0]["downloadUrl"],
+            }
+        ],
+    }
+    download_url = supplementary["artifacts"][0]["downloadUrl"]
+    assert anon_client.get(download_url).status_code == 401
+    downloaded = client.get(download_url)
+    assert downloaded.status_code == 200
+    assert downloaded.content == data
+    assert "TPS62130-traceparts.step" in downloaded.headers["content-disposition"]
+
+    head = app_ctx.repo.head()
+    not_projectable = _activate_api(client, "kicad", manifest_digest, None)
+    assert not_projectable.status_code == 404
+    assert app_ctx.repo.head() == head
 
 
 def test_activation_stale_compare_and_failed_materialization_leave_zero_trace(

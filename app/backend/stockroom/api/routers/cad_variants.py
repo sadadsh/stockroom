@@ -13,8 +13,10 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from stockroom.api.errors import ApiError
@@ -47,6 +49,16 @@ _PROVIDER_PRESENTATION = {
         "Validated Fallback",
         "Retained fallback; exact identity and bundle validation passed.",
     ),
+}
+_SUPPLEMENTARY_PROVIDER_LABELS = {
+    "traceparts": "TraceParts",
+    "cadenas": "CADENAS",
+    "manufacturer": "Manufacturer",
+    "snapmagic": "SnapMagic",
+    "ultralibrarian": "Ultra Librarian",
+}
+_SUPPLEMENTARY_SURFACE_LABELS = {
+    "digikey": "DigiKey",
 }
 
 
@@ -126,6 +138,55 @@ def _descriptor_document(descriptor: CadVariantDescriptor) -> dict:
     }
 
 
+def _supplementary_provider_label(surface: str, provider: str) -> str:
+    author = provider.removeprefix(f"{surface}-")
+    author_label = _SUPPLEMENTARY_PROVIDER_LABELS.get(
+        author,
+        re.sub(r"[._-]+", " ", author).title(),
+    )
+    surface_label = _SUPPLEMENTARY_SURFACE_LABELS.get(
+        surface,
+        re.sub(r"[._-]+", " ", surface).title(),
+    )
+    return f"{surface_label} · {author_label}"
+
+
+def _supplementary_document(part_id: str, evidence) -> dict:
+    encoded_part = quote(part_id, safe="")
+    encoded_manifest = quote(evidence.manifest_digest, safe="")
+    artifacts = [
+        {
+            "id": artifact.artifact_digest,
+            "fileName": artifact.suggested_name,
+            "sizeBytes": artifact.size_bytes,
+            "mediaType": "application/octet-stream",
+            "evidenceDigest": artifact.artifact_digest,
+            "canActivate": False,
+            "downloadUrl": (
+                f"/api/library/parts/{encoded_part}/cad-variants/supplementary/"
+                f"{encoded_manifest}/{quote(artifact.artifact_digest, safe='')}/"
+                f"{quote(artifact.suggested_name, safe='')}"
+            ),
+        }
+        for artifact in evidence.artifacts
+    ]
+    return {
+        "id": evidence.manifest_digest,
+        "provider": _supplementary_provider_label(
+            evidence.surface_key,
+            evidence.provider_key,
+        ),
+        "surface": _SUPPLEMENTARY_SURFACE_LABELS.get(
+            evidence.surface_key,
+            re.sub(r"[._-]+", " ", evidence.surface_key).title(),
+        ),
+        "adapterVersion": evidence.adapter_version,
+        "evidenceDigest": evidence.manifest_digest,
+        "canActivate": False,
+        "artifacts": artifacts,
+    }
+
+
 def _active_variant_id(record: PartRecord, tool: str) -> str | None:
     pointer = record.cad_variants.selection_for(tool)
     return pointer.variant_key if pointer is not None else None
@@ -165,7 +226,61 @@ def _inventory_document(ctx, part_id: str, store: EvidenceStore | None = None) -
                 "variants": [_descriptor_document(item) for item in descriptors],
             }
         )
-    return {"partId": part_id, "inventories": inventories}
+    supplementary = (
+        evidence.list_supplementary_artifacts(identity=identity)
+        if identity is not None
+        else ()
+    )
+    return {
+        "partId": part_id,
+        "inventories": inventories,
+        "supplementary": [
+            _supplementary_document(part_id, item) for item in supplementary
+        ],
+    }
+
+
+def _supplementary_download(
+    ctx,
+    part_id: str,
+    manifest_digest: str,
+    artifact_digest: str,
+    file_name: str,
+    store: EvidenceStore | None = None,
+) -> FileResponse:
+    record = ctx.ops.load_record(part_id)
+    if not record.manufacturer or not record.mpn:
+        raise ApiError(404, "the requested supplementary artifact is not retained")
+    identity = exact_identity(record)
+    evidence = store or _store()
+    manifest = next(
+        (
+            item
+            for item in evidence.list_supplementary_artifacts(identity=identity)
+            if item.manifest_digest == manifest_digest
+        ),
+        None,
+    )
+    artifact = (
+        next(
+            (
+                item
+                for item in manifest.artifacts
+                if item.artifact_digest == artifact_digest
+                and item.suggested_name == file_name
+            ),
+            None,
+        )
+        if manifest is not None
+        else None
+    )
+    if artifact is None:
+        raise ApiError(404, "the requested supplementary artifact is not retained")
+    return FileResponse(
+        artifact.path,
+        media_type="application/octet-stream",
+        filename=artifact.suggested_name,
+    )
 
 
 def _origin(descriptor: CadVariantDescriptor) -> AssetOrigin:
@@ -325,6 +440,25 @@ def cad_variants_router(require_token) -> APIRouter:
     @router.get("/{part_id}/cad-variants")
     def inventory(request: Request, part_id: str) -> dict:
         return _inventory_document(request.app.state.ctx, part_id)
+
+    @router.get(
+        "/{part_id}/cad-variants/supplementary/"
+        "{manifest_digest}/{artifact_digest}/{file_name}"
+    )
+    def supplementary_download(
+        request: Request,
+        part_id: str,
+        manifest_digest: str,
+        artifact_digest: str,
+        file_name: str,
+    ) -> FileResponse:
+        return _supplementary_download(
+            request.app.state.ctx,
+            part_id,
+            manifest_digest,
+            artifact_digest,
+            file_name,
+        )
 
     @router.post("/{part_id}/cad-variants/activate")
     def activate(request: Request, part_id: str, body: ActivateCadVariantBody) -> dict:

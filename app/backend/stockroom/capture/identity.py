@@ -39,6 +39,12 @@ _PROVIDER_HOSTS = {
             "www.digikey.com",
         }
     ),
+    "digikey-traceparts": frozenset(
+        {
+            "digikey.com",
+            "www.digikey.com",
+        }
+    ),
     "samacsys": frozenset(
         {
             "componentsearchengine.com",
@@ -180,7 +186,12 @@ def page_identity(
             index = segments.index("parts")
             # /parts/<mpn>/<manufacturer>/view-part/
             return PageIdentity(mpn=segments[index + 1], manufacturer=segments[index + 2])
-        if vendor_key in {"digikey", "digikey-snapmagic", "digikey-ultralibrarian"}:
+        if vendor_key in {
+            "digikey",
+            "digikey-snapmagic",
+            "digikey-traceparts",
+            "digikey-ultralibrarian",
+        }:
             index = segments.index("detail")
             # /en/products/detail/<manufacturer>/<mpn>/<opaque-product-id>
             return PageIdentity(mpn=segments[index + 2], manufacturer=segments[index + 1])
