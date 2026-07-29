@@ -526,6 +526,7 @@ class GuidedCaptureSource:
         cross_eda_verifier=None,
         playwright_runtime: SharedPlaywrightRuntime | None = None,
         user_driven: bool = False,
+        operator_authorized: bool = False,
         user_finished: Callable[[], bool] | None = None,
         user_cancelled: Callable[[], bool] | None = None,
         cancel_workflow: Callable[[], None] | None = None,
@@ -559,6 +560,7 @@ class GuidedCaptureSource:
         self._cross_eda_verifier = cross_eda_verifier or verify_cross_eda_component
         self._playwright_runtime = playwright_runtime
         self._user_driven = user_driven
+        self._operator_authorized = operator_authorized
         self._user_finished = user_finished
         self._user_cancelled = user_cancelled
         self._cancel_workflow = cancel_workflow
@@ -773,7 +775,7 @@ class GuidedCaptureSource:
     def _machine_access_issue(self, adapter) -> str:
         """Fail closed when a machine-eligible adapter lacks live authorization."""
 
-        if self._user_driven:
+        if self._user_driven or self._operator_authorized:
             return ""
         if adapter.capability.browser_access != "machine_allowed":
             return (

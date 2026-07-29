@@ -10,8 +10,10 @@ from stockroom.capture import runner
 
 def test_automatic_capture_is_the_runner_default():
     parameter = inspect.signature(runner.run_guided_capture).parameters["user_driven"]
+    authorized = inspect.signature(runner.run_guided_capture).parameters["operator_authorized"]
 
     assert parameter.default is False
+    assert authorized.default is False
 
 
 @pytest.mark.parametrize(
@@ -125,22 +127,19 @@ def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_expl
         ctx,
         part_ids=["part-a"],
         vendor="snapmagic",
-        user_driven=True,
+        operator_authorized=True,
         should_stop=stop,
     )
 
     assisted = constructed
-    assert len(source_batches[1]) == 2
-    assert [options["vendor"] for options in assisted] == [
-        "snapmagic",
-        "ultralibrarian",
-    ]
-    assert all(options["user_driven"] is True for options in assisted)
+    assert len(source_batches[1]) == 1
+    assert [options["vendor"] for options in assisted] == ["snapmagic"]
+    assert all(options["user_driven"] is False for options in assisted)
+    assert all(options["operator_authorized"] is True for options in assisted)
     cancel_checks = [options["user_cancelled"] for options in assisted]
-    assert cancel_checks[0] is cancel_checks[1]
     assert cancel_checks[0]() is False
     assisted[0]["cancel_workflow"]()
-    assert cancel_checks[1]() is True
-    assert all(options["credentials"] is None for options in assisted)
+    assert cancel_checks[0]() is True
+    assert all(options["credentials"] is runner._saved_credentials for options in assisted)
     assert all(source.closed for source in source_batches[1])
     assert runtimes[0].closed is True

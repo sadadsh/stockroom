@@ -219,6 +219,7 @@ def run_guided_capture(
     headless: bool = False,
     engine: str = "chromium",
     user_driven: bool = False,
+    operator_authorized: bool = False,
 ) -> dict:
     """Complete CAD automatically, with person-controlled capture only as an explicit fallback.
 
@@ -229,13 +230,16 @@ def run_guided_capture(
     download, validates it, and attaches it. A preferred ``vendor`` changes provider order where
     policy permits machine access.
 
-    ``user_driven=True`` is the last-resort lane for a provider gate Stockroom cannot cross. It is
-    deliberately scoped to one part and one preferred provider: the person handles each provider
-    page while Stockroom still owns download interception, validation, attachment, and advancing
-    to another provider when the preferred one cannot close every remaining gap.
+    ``operator_authorized=True`` is the normal explicit-provider lane. One selected part and one
+    selected provider authorize Stockroom to use saved login state and operate ordinary export
+    controls for that job only. CAPTCHA, MFA, passkeys, and security checks still stop for the
+    person. ``user_driven=True`` retains the raw browser fallback for a provider whose ordinary
+    controls have no implemented adapter.
     """
-    if type(user_driven) is not bool:
-        raise TypeError("user_driven must be a boolean")
+    if type(user_driven) is not bool or type(operator_authorized) is not bool:
+        raise TypeError("capture authorization flags must be booleans")
+    if user_driven and operator_authorized:
+        raise ValueError("capture cannot be both user-driven and operator-authorized automation")
     from threading import Event
 
     workflow_cancelled = Event()
@@ -243,9 +247,9 @@ def run_guided_capture(
     def capture_should_stop() -> bool:
         return workflow_cancelled.is_set() or bool(should_stop and should_stop())
 
-    if user_driven:
+    if user_driven or operator_authorized:
         if part_ids is None or isinstance(part_ids, (str, bytes)):
-            raise ValueError("user-driven capture requires exactly one selected part")
+            raise ValueError("explicit provider capture requires exactly one selected part")
         selected_parts = list(part_ids)
         if (
             len(selected_parts) != 1
@@ -253,18 +257,17 @@ def run_guided_capture(
             or not selected_parts[0].strip()
             or selected_parts[0] != selected_parts[0].strip()
         ):
-            raise ValueError("user-driven capture requires exactly one selected part")
+            raise ValueError("explicit provider capture requires exactly one selected part")
         if not isinstance(vendor, str) or not vendor.strip():
-            raise ValueError("user-driven capture requires one selected provider")
+            raise ValueError("explicit provider capture requires one selected provider")
         if limit is not None:
             raise ValueError(
-                "user-driven capture does not accept a batch limit; select exactly one part"
+                "explicit provider capture does not accept a batch limit; select exactly one part"
             )
         part_ids = selected_parts
-        # The selected provider is first, not exclusive. "Try Another Provider" in Stockroom's
-        # browser HUD can therefore end the current page and advance within this same resumable
-        # job instead of making the person return to the app and start another capture.
-        provider_keys = _vendor_chain(vendor.strip().lower())
+        # One click authorizes ordinary controls on exactly the provider the person selected.
+        # It is not standing permission to operate a different commercial account or a batch.
+        provider_keys = [vendor.strip().lower()]
     else:
         # Automatic mode may construct only transports with a reviewed machine-access contract.
         # Other browser providers are exposed through the explicit assisted route after permitted
@@ -290,8 +293,16 @@ def run_guided_capture(
         adapter = get_adapter(key)
         if adapter is None:
             raise ValueError(f"no network capture adapter for provider {key!r}")
-        policy = machine_access_policy(key) if not user_driven else None
-        if not user_driven and (policy is None or policy.max_concurrency != 1):
+        policy = (
+            machine_access_policy(key)
+            if not user_driven and not operator_authorized
+            else None
+        )
+        if (
+            not user_driven
+            and not operator_authorized
+            and (policy is None or policy.max_concurrency != 1)
+        ):
             raise ValueError(
                 f"{key} automatic capture lacks an enforceable serial machine-access policy"
             )
@@ -328,6 +339,7 @@ def run_guided_capture(
             evidence_store=evidence_store,
             playwright_runtime=playwright_runtime,
             user_driven=user_driven,
+            operator_authorized=operator_authorized,
             user_cancelled=capture_should_stop,
             cancel_workflow=workflow_cancelled.set,
             rate_limiter=rate_limiter,
@@ -345,7 +357,7 @@ def run_guided_capture(
     # KiCad requirements, GuidedCaptureSource is never asked and no browser window opens.
     sources = (
         guided_sources
-        if user_driven
+        if user_driven or operator_authorized
         else [
             *build_sources(ctx, run_write=ctx.jobs.run_write, paced=False),
             *guided_sources,
