@@ -7,7 +7,11 @@ import pytest
 
 from stockroom.capture.cross_eda import (
     CrossEdaVerificationError,
+    _PadGeometry,
+    _Pin,
     _SymbolReadback,
+    _terminal_map,
+    _verify_geometry,
     _verify_identity,
     read_altium_footprint,
     read_altium_symbol,
@@ -114,6 +118,106 @@ def test_metadata_light_altium_identity_requires_exact_external_attestation() ->
     )
     with pytest.raises(CrossEdaVerificationError, match="does not equal"):
         _verify_identity(conflicting, expected, "Altium", expected)
+
+
+def test_symbol_may_omit_explicit_no_connect_pins_when_both_footprints_keep_them() -> None:
+    kicad = _SymbolReadback(
+        entry="PART",
+        manufacturer="Acme",
+        mpn="PART",
+        pins=(_Pin("1", "NC"), _Pin("2", "IO"), _Pin("3", "GND")),
+    )
+    altium = _SymbolReadback(
+        entry="PART",
+        manufacturer="Acme",
+        mpn="PART",
+        pins=(_Pin("2", "IO"), _Pin("3", "GND")),
+    )
+    pads = (
+        _PadGeometry("1", 0.0, 0.0, 1.0, 1.0),
+        _PadGeometry("2", 1.0, 0.0, 1.0, 1.0),
+        _PadGeometry("3", 2.0, 0.0, 1.0, 1.0),
+    )
+
+    mapping, kicad_nc, altium_nc = _terminal_map(kicad, altium)
+    physical = _verify_geometry(
+        pads,
+        pads,
+        mapping,
+        kicad_no_connects=kicad_nc,
+        altium_no_connects=altium_nc,
+    )
+
+    assert mapping == {"2": "2", "3": "3"}
+    assert physical == {"1": "1", "2": "2", "3": "3"}
+
+
+def test_both_symbols_may_omit_the_same_package_only_pads() -> None:
+    kicad = _SymbolReadback(
+        entry="PART",
+        manufacturer="Acme",
+        mpn="PART",
+        pins=(_Pin("2", "IO"), _Pin("3", "GND")),
+    )
+    altium = _SymbolReadback(
+        entry="PART",
+        manufacturer="Acme",
+        mpn="PART",
+        pins=(_Pin("2", "IO"), _Pin("3", "GND")),
+    )
+    pads = (
+        _PadGeometry("1", 0.0, 0.0, 1.0, 1.0),
+        _PadGeometry("2", 1.0, 0.0, 1.0, 1.0),
+        _PadGeometry("3", 2.0, 0.0, 1.0, 1.0),
+    )
+
+    mapping, kicad_nc, altium_nc = _terminal_map(kicad, altium)
+    physical = _verify_geometry(
+        pads,
+        pads,
+        mapping,
+        kicad_no_connects=kicad_nc,
+        altium_no_connects=altium_nc,
+    )
+
+    assert mapping == {"2": "2", "3": "3"}
+    assert physical == {"1": "1", "2": "2", "3": "3"}
+
+
+def test_standalone_kicad_rejects_unrepresented_pads_without_cross_eda_proof(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    symbol, footprint = _write_kicad_pair(tmp_path)
+    footprint.write_text(
+        footprint.read_text(encoding="utf-8").replace(
+            '  (pad "2" smd rect',
+            '  (pad "3" smd rect (at 0 0) (size 1 1) (layers "F.Cu"))\n'
+            '  (pad "2" smd rect',
+        ),
+        encoding="utf-8",
+    )
+    step = tmp_path / "D_SMA.step"
+    step.write_bytes(b"ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n")
+    monkeypatch.setattr(
+        "stockroom.capture.cross_eda.model_to_glb",
+        lambda _path: b"glTF-test-geometry",
+    )
+    kwargs = {
+        "identity": ExactPartIdentity("ON Semiconductor", "S1M"),
+        "kicad_symbol": symbol,
+        "kicad_footprint": footprint,
+        "step_model": step,
+    }
+
+    with pytest.raises(CrossEdaVerificationError, match="pad numbers"):
+        verify_kicad_component(**kwargs)
+
+    report = verify_kicad_component(
+        **kwargs,
+        allowed_unrepresented_pads=frozenset({"3"}),
+    )
+    assert report["unrepresented_pad_numbers"] == ["3"]
 
 
 def test_cross_eda_readback_proves_real_s1m_artifacts(tmp_path: Path) -> None:

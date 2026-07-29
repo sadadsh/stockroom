@@ -21,6 +21,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Protocol
 
+from stockroom.altium.extract import extract_intlib
 from stockroom.capture.cross_eda import (
     CrossEdaVerificationError,
     read_kicad_symbol,
@@ -90,11 +91,7 @@ def _altium_artifacts(paths: Iterable[Path]) -> tuple[EvidenceArtifact, ...]:
         ".pcblib": ("altium_footprint", "application/vnd.altium.pcblib"),
         ".intlib": ("altium_integrated_library", "application/vnd.altium.intlib"),
     }
-    for path in sorted((Path(item) for item in paths), key=lambda item: str(item).casefold()):
-        mapping = role_by_suffix.get(path.suffix.casefold())
-        if mapping is None:
-            continue
-        base_role, media_type = mapping
+    def append(path: Path, base_role: str, media_type: str) -> None:
         counts[base_role] = counts.get(base_role, 0) + 1
         index = counts[base_role]
         role = base_role if index == 1 else f"{base_role}_{index}"
@@ -102,6 +99,26 @@ def _altium_artifacts(paths: Iterable[Path]) -> tuple[EvidenceArtifact, ...]:
         if not artifact.data.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
             raise ValueError(f"captured {role} is not a native Altium compound file")
         artifacts.append(artifact)
+
+    for path in sorted((Path(item) for item in paths), key=lambda item: str(item).casefold()):
+        mapping = role_by_suffix.get(path.suffix.casefold())
+        if mapping is None:
+            continue
+        base_role, media_type = mapping
+        if path.suffix.casefold() == ".intlib":
+            # Keep the exact provider download for audit/replay AND index its native children as
+            # selectable Altium roles. An IntLib is a compiled container, not a substitute role:
+            # the active library projection and variant registry operate on SchLib/PcbLib bytes.
+            append(path, base_role, media_type)
+            with tempfile.TemporaryDirectory(prefix="sr-evidence-intlib-") as temporary:
+                try:
+                    schlib, pcblib = extract_intlib(path, Path(temporary))
+                except ValueError as exc:
+                    raise ValueError(f"captured Altium IntLib cannot be extracted: {exc}") from exc
+                append(schlib, "altium_symbol", "application/vnd.altium.schlib")
+                append(pcblib, "altium_footprint", "application/vnd.altium.pcblib")
+            continue
+        append(path, base_role, media_type)
     return tuple(artifacts)
 
 
@@ -626,25 +643,9 @@ def record_browser_cad_evidence(
         provider_key=provider_key,
         detail_url=detail_url,
     )
-    kicad_report = verify_kicad_component(
-        identity=identity,
-        kicad_symbol=Path(symbol),
-        kicad_footprint=Path(footprint),
-        step_model=model_path,
-    )
-    if not isinstance(kicad_report, dict) or kicad_report.get("valid") is not True:
-        raise ValueError("KiCad artifact readback did not prove a complete component")
-    if bound_identity_fields:
-        kicad_report = {
-            **kicad_report,
-            "identity_binding": {
-                "fields_added": list(bound_identity_fields),
-                "source": "exact-provider-detail-page",
-            },
-        }
-
     native_altium = tuple(Path(path) for path in altium_sources)
     cross_eda_report = None
+    allowed_unrepresented_pads: frozenset[str] = frozenset()
     if native_altium and cross_eda_verifier is not None:
         cross_eda_report = _verify_cross_eda_with_provider_identity(
             cross_eda_verifier,
@@ -660,6 +661,31 @@ def record_browser_cad_evidence(
             raise ValueError(
                 "cross-EDA verifier did not prove terminal, pad, and package equivalence"
             )
+        kicad_section = cross_eda_report.get("kicad")
+        if isinstance(kicad_section, dict):
+            reported_unrepresented = kicad_section.get("unrepresented_pad_numbers", ())
+            if isinstance(reported_unrepresented, list) and all(
+                isinstance(number, str) and number for number in reported_unrepresented
+            ):
+                allowed_unrepresented_pads = frozenset(reported_unrepresented)
+
+    kicad_report = verify_kicad_component(
+        identity=identity,
+        kicad_symbol=Path(symbol),
+        kicad_footprint=Path(footprint),
+        step_model=model_path,
+        allowed_unrepresented_pads=allowed_unrepresented_pads,
+    )
+    if not isinstance(kicad_report, dict) or kicad_report.get("valid") is not True:
+        raise ValueError("KiCad artifact readback did not prove a complete component")
+    if bound_identity_fields:
+        kicad_report = {
+            **kicad_report,
+            "identity_binding": {
+                "fields_added": list(bound_identity_fields),
+                "source": "exact-provider-detail-page",
+            },
+        }
 
     validation = _canonical_report(
         identity=identity,

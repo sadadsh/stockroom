@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,6 +21,7 @@ from stockroom.planning import KICAD_CAD_OPERATION, ExactPartIdentity
 
 _CFB_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 _DETAIL_URL = "https://www.snapeda.com/parts/S1M/ON%20Semiconductor/view-part/"
+_ALTIUM_FIXTURES = Path(__file__).parents[1] / "altium" / "fixtures"
 
 
 @pytest.fixture(autouse=True)
@@ -386,6 +388,100 @@ def test_guided_attach_persists_digest_and_refuses_unverified_altium(
     assert len(active_variants) == 1
     assert active_variants[0].manifest_digest == digest
     active_variants[0].validate_for_tool("kicad")
+
+
+def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_variant(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    candidate = _candidate(tmp_path)
+    record = _InstalledRecord()
+    kicad_zip = tmp_path / "S1M.zip"
+    with zipfile.ZipFile(kicad_zip, "w") as archive:
+        archive.writestr("S1M.kicad_sym", candidate.symbol_lib_path.read_bytes())
+    intlib = tmp_path / "S1M.IntLib"
+    shutil.copyfile(_ALTIUM_FIXTURES / "sample.IntLib", intlib)
+    attach_calls = []
+    altium_calls = []
+
+    class _Pipeline:
+        def inspect(self, inputs):
+            if inputs == [kicad_zip]:
+                return [candidate]
+            if inputs == [intlib]:
+                raise ValueError("native Altium library is not a KiCad ingest package")
+            raise AssertionError(inputs)
+
+        def attach_assets(
+            self,
+            part_id,
+            selected,
+            *,
+            origin=None,
+            active_variant=None,
+            replace_existing=False,
+        ):
+            attach_calls.append((part_id, selected, origin, active_variant, replace_existing))
+
+        def cleanup(self):
+            return None
+
+    def _attach_altium(part_id, *sources, **kwargs):
+        altium_calls.append((part_id, sources, kwargs))
+        record.assets["altium"] = EdaAssets(
+            symbol=AssetRef(lib="S1M.SchLib", name="S1M"),
+            footprint=AssetRef(lib="S1M.PcbLib", name="S1M"),
+        )
+        return record
+
+    monkeypatch.setattr(
+        "stockroom.capture.guided.get_adapter",
+        lambda _key: type(
+            "_Adapter",
+            (),
+            {"capability": type("_Capability", (), {"label": "SnapMagic"})()},
+        )(),
+    )
+    source = GuidedCaptureSource(
+        lambda: _Pipeline(),
+        vendor="snapmagic",
+        download_root=tmp_path / "Downloads",
+        attach_altium=_attach_altium,
+        evidence_store=EvidenceStore(tmp_path / "Evidence"),
+        cross_eda_verifier=lambda **_kwargs: {
+            "valid": True,
+            "terminal_equivalence": True,
+            "pad_equivalence": True,
+            "package_equivalence": True,
+        },
+    )
+
+    outcome = source._attach(
+        record,
+        [
+            type("_Captured", (), {"path": kicad_zip})(),
+            type("_Captured", (), {"path": intlib})(),
+        ],
+        _DETAIL_URL,
+        detail_url=_DETAIL_URL,
+    )
+
+    assert set(outcome.satisfied) == {
+        Requirement.KICAD_SYMBOL,
+        Requirement.KICAD_FOOTPRINT,
+        Requirement.KICAD_MODEL,
+        Requirement.ALTIUM_SYMBOL,
+        Requirement.ALTIUM_FOOTPRINT,
+    }, outcome.error
+    assert outcome.error == ""
+    assert len(attach_calls) == 1
+    _, _, _, kicad_variant, replace_existing = attach_calls[0]
+    assert replace_existing is True
+    assert len(altium_calls) == 1
+    altium_variant = altium_calls[0][2]["active_variant"]
+    assert kicad_variant.manifest_digest == altium_variant.manifest_digest
+    kicad_variant.validate_for_tool("kicad")
+    altium_variant.validate_for_tool("altium")
 
 
 def _installed_kicad(

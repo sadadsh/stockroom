@@ -99,6 +99,11 @@ def _pin_name_key(value: str) -> str:
     return unicodedata.normalize("NFKC", value).strip().casefold()
 
 
+def _is_no_connect_name(value: str) -> bool:
+    key = "".join(character for character in _pin_name_key(value) if character.isalnum())
+    return key in {"nc", "noconnect", "donotconnect", "dnc"}
+
+
 def _field(properties: dict[str, str], aliases: tuple[str, ...]) -> str:
     normalized = {
         unicodedata.normalize("NFKC", key).strip().casefold(): value.strip()
@@ -413,21 +418,34 @@ def _validate_pads(pads: tuple[_PadGeometry, ...], tool: str) -> None:
 def _terminal_map(
     kicad: _SymbolReadback,
     altium: _SymbolReadback,
-) -> dict[str, str]:
-    kicad_by_number = {pin.number: pin for pin in kicad.pins}
-    altium_by_number = {pin.number: pin for pin in altium.pins}
+) -> tuple[dict[str, str], set[str], set[str]]:
+    """Map represented electrical terminals while retaining explicit NC package pads."""
+
+    kicad_nc = {pin.number for pin in kicad.pins if _is_no_connect_name(pin.name)}
+    altium_nc = {pin.number for pin in altium.pins if _is_no_connect_name(pin.name)}
+    kicad_by_number = {
+        pin.number: pin for pin in kicad.pins if pin.number not in kicad_nc
+    }
+    altium_by_number = {
+        pin.number: pin for pin in altium.pins if pin.number not in altium_nc
+    }
     if len(kicad_by_number) != len(altium_by_number):
         raise CrossEdaVerificationError(
-            f"KiCad exposes {len(kicad_by_number)} pins but Altium exposes {len(altium_by_number)}"
+            f"KiCad exposes {len(kicad_by_number)} connected pins but Altium exposes "
+            f"{len(altium_by_number)}"
         )
     if set(kicad_by_number) == set(altium_by_number):
-        return {number: number for number in sorted(kicad_by_number)}
+        return (
+            {number: number for number in sorted(kicad_by_number)},
+            kicad_nc,
+            altium_nc,
+        )
 
     kicad_by_name: dict[str, list[str]] = defaultdict(list)
     altium_by_name: dict[str, list[str]] = defaultdict(list)
-    for pin in kicad.pins:
+    for pin in kicad_by_number.values():
         kicad_by_name[_pin_name_key(pin.name)].append(pin.number)
-    for pin in altium.pins:
+    for pin in altium_by_number.values():
         altium_by_name[_pin_name_key(pin.name)].append(pin.number)
     if "" in kicad_by_name or "" in altium_by_name or set(kicad_by_name) != set(altium_by_name):
         raise CrossEdaVerificationError(
@@ -442,7 +460,7 @@ def _terminal_map(
                 f"pin name {name!r} is not unique across both EDA symbols"
             )
         mapping[kicad_numbers[0]] = altium_numbers[0]
-    return mapping
+    return mapping, kicad_nc, altium_nc
 
 
 def _close(left: float, right: float) -> bool:
@@ -487,27 +505,50 @@ def _verify_geometry(
     kicad_pads: tuple[_PadGeometry, ...],
     altium_pads: tuple[_PadGeometry, ...],
     terminal_map: dict[str, str],
-) -> None:
+    *,
+    kicad_no_connects: set[str],
+    altium_no_connects: set[str],
+) -> dict[str, str]:
     kicad_counts = Counter(pad.number for pad in kicad_pads)
     altium_counts = Counter(pad.number for pad in altium_pads)
-    if set(kicad_counts) != set(terminal_map):
+    physical_map = dict(terminal_map)
+    # One symbol may omit package NC pins while both footprints retain their physical pads. The
+    # other symbol's explicit NC number plus an equal-number pad on both sides is the only safe
+    # additional mapping.
+    for number in sorted(kicad_no_connects | altium_no_connects):
+        if (
+            number in kicad_counts
+            and number in altium_counts
+            and number not in physical_map
+            and number not in physical_map.values()
+        ):
+            physical_map[number] = number
+    # Some native libraries omit package-only pads from both symbols (typically NC terminals)
+    # while retaining them in both footprints. Accept only the exact same unused pad numbers on
+    # both sides; this proves package equivalence without inventing an electrical terminal.
+    unmatched_kicad = set(kicad_counts) - set(physical_map)
+    unmatched_altium = set(altium_counts) - set(physical_map.values())
+    if unmatched_kicad == unmatched_altium:
+        for number in sorted(unmatched_kicad):
+            physical_map[number] = number
+    if set(kicad_counts) != set(physical_map):
         raise CrossEdaVerificationError(
             "KiCad footprint pad numbers do not equal its symbol pin numbers"
         )
-    if set(altium_counts) != set(terminal_map.values()):
+    if set(altium_counts) != set(physical_map.values()):
         raise CrossEdaVerificationError(
             "Altium footprint pad numbers do not equal its symbol pin numbers"
         )
-    for kicad_number, altium_number in terminal_map.items():
+    for kicad_number, altium_number in physical_map.items():
         if kicad_counts[kicad_number] != altium_counts[altium_number]:
             raise CrossEdaVerificationError(
                 f"physical pad multiplicity differs for mapped terminals "
                 f"{kicad_number!r}/{altium_number!r}"
             )
 
-    canonical = {number: number for number in terminal_map}
+    canonical = {number: number for number in physical_map}
     altium_canonical = {
-        native: canonical_number for canonical_number, native in terminal_map.items()
+        native: canonical_number for canonical_number, native in physical_map.items()
     }
     left_distances = _distance_signature(kicad_pads, canonical)
     right_distances = _distance_signature(altium_pads, altium_canonical)
@@ -539,6 +580,7 @@ def _verify_geometry(
                 raise CrossEdaVerificationError(
                     f"KiCad and Altium pad dimensions differ for terminal {key!r}"
                 )
+    return physical_map
 
 
 def _verify_step(path: Path) -> dict[str, object]:
@@ -593,6 +635,7 @@ def verify_kicad_component(
     kicad_symbol: Path,
     kicad_footprint: Path,
     step_model: Path,
+    allowed_unrepresented_pads: frozenset[str] = frozenset(),
 ) -> dict[str, object]:
     """Prove the minimum complete KiCad artifact set through native readback."""
 
@@ -607,7 +650,11 @@ def verify_kicad_component(
     footprint = read_kicad_footprint(kicad_footprint, step_model)
     pin_numbers = {pin.number for pin in symbol.pins}
     pad_numbers = {pad.number for pad in footprint.pads}
-    if pin_numbers != pad_numbers:
+    if pin_numbers & allowed_unrepresented_pads:
+        raise CrossEdaVerificationError(
+            "KiCad represented pins cannot also be declared unrepresented package pads"
+        )
+    if pin_numbers | allowed_unrepresented_pads != pad_numbers:
         raise CrossEdaVerificationError(
             "KiCad footprint pad numbers do not equal its symbol pin numbers"
         )
@@ -621,6 +668,7 @@ def verify_kicad_component(
         "schema": "stockroom.kicad-artifact-verification/1",
         "step": step,
         "symbol_entry": symbol.entry,
+        "unrepresented_pad_numbers": sorted(allowed_unrepresented_pads),
         "valid": True,
     }
 
@@ -647,12 +695,6 @@ def verify_cross_eda_component(
     try:
         with tempfile.TemporaryDirectory(prefix="stockroom-cross-eda-") as temporary:
             schlib, pcblib = _resolve_altium_sources(sources, Path(temporary))
-            kicad_report = verify_kicad_component(
-                identity=identity,
-                kicad_symbol=kicad_symbol,
-                kicad_footprint=kicad_footprint,
-                step_model=step_model,
-            )
             kicad = read_kicad_symbol(kicad_symbol, identity.mpn_canonical)
             altium = read_altium_symbol(schlib, identity.mpn_canonical)
             bound_altium_fields = _verify_identity(
@@ -663,8 +705,23 @@ def verify_cross_eda_component(
             )
             kicad_fp = read_kicad_footprint(kicad_footprint, step_model)
             altium_fp = read_altium_footprint(pcblib, identity.mpn_canonical)
-            mapping = _terminal_map(kicad, altium)
-            _verify_geometry(kicad_fp.pads, altium_fp.pads, mapping)
+            mapping, kicad_no_connects, altium_no_connects = _terminal_map(kicad, altium)
+            physical_mapping = _verify_geometry(
+                kicad_fp.pads,
+                altium_fp.pads,
+                mapping,
+                kicad_no_connects=kicad_no_connects,
+                altium_no_connects=altium_no_connects,
+            )
+            represented_kicad = {pin.number for pin in kicad.pins}
+            unrepresented_kicad = frozenset(physical_mapping) - represented_kicad
+            kicad_report = verify_kicad_component(
+                identity=identity,
+                kicad_symbol=kicad_symbol,
+                kicad_footprint=kicad_footprint,
+                step_model=step_model,
+                allowed_unrepresented_pads=unrepresented_kicad,
+            )
 
             embedded = read_embedded_model_payloads(pcblib)
             if embedded and step_model.read_bytes() not in embedded:
@@ -706,12 +763,18 @@ def verify_cross_eda_component(
             "pad_count": len(kicad_fp.pads),
             "pin_count": len(kicad.pins),
             "symbol_entry": kicad.entry,
+            "unrepresented_pad_numbers": sorted(unrepresented_kicad),
         },
         "schema": "stockroom.cross-eda-verification/1",
         "step": kicad_report["step"],
         "terminal_map": [
             {"altium": altium_number, "kicad": kicad_number}
             for kicad_number, altium_number in sorted(mapping.items())
+        ],
+        "no_connect_pad_map": [
+            {"altium": altium_number, "kicad": kicad_number}
+            for kicad_number, altium_number in sorted(physical_mapping.items())
+            if kicad_number not in mapping
         ],
         "valid": True,
     }
