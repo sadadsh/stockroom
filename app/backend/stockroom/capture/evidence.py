@@ -13,6 +13,7 @@ guided source may attach them.
 
 from __future__ import annotations
 
+import inspect
 import json
 import tempfile
 from collections.abc import Iterable
@@ -55,6 +56,7 @@ class CrossEdaVerifier(Protocol):
         kicad_footprint: Path,
         step_model: Path,
         altium_sources: tuple[Path, ...],
+        altium_identity_attestation: ExactPartIdentity | None = None,
     ) -> object: ...
 
 
@@ -101,6 +103,46 @@ def _altium_artifacts(paths: Iterable[Path]) -> tuple[EvidenceArtifact, ...]:
             raise ValueError(f"captured {role} is not a native Altium compound file")
         artifacts.append(artifact)
     return tuple(artifacts)
+
+
+def _verify_cross_eda_with_provider_identity(
+    verifier: CrossEdaVerifier,
+    *,
+    identity: ExactPartIdentity,
+    provider_key: str,
+    detail_url: str,
+    kicad_symbol: Path,
+    kicad_footprint: Path,
+    step_model: Path,
+    altium_sources: tuple[Path, ...],
+) -> object:
+    """Call a verifier with exact provider-page identity when it supports that contract."""
+
+    kwargs = {
+        "identity": identity,
+        "kicad_symbol": kicad_symbol,
+        "kicad_footprint": kicad_footprint,
+        "step_model": step_model,
+        "altium_sources": altium_sources,
+    }
+    parameters = inspect.signature(verifier).parameters.values()
+    supports_attestation = (
+        "altium_identity_attestation" in {parameter.name for parameter in parameters}
+        or any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters)
+    )
+    if supports_attestation:
+        detail = page_identity(provider_key, detail_url)
+        if detail is not None:
+            expected_record = SimpleNamespace(
+                manufacturer=identity.authoritative_manufacturer_key,
+                mpn=identity.mpn_canonical,
+            )
+            if not exact_observation_error(expected_record, detail):
+                kwargs["altium_identity_attestation"] = ExactPartIdentity(
+                    detail.manufacturer,
+                    detail.mpn,
+                )
+    return verifier(**kwargs)
 
 
 def _bind_kicad_symbol_identity(
@@ -476,8 +518,11 @@ def record_composed_browser_altium_evidence(
             path.write_bytes(data)
             if path.read_bytes() != data:
                 raise ValueError(f"could not re-materialize verified KiCad {role} bytes")
-        cross_eda_report = cross_eda_verifier(
+        cross_eda_report = _verify_cross_eda_with_provider_identity(
+            cross_eda_verifier,
             identity=identity,
+            provider_key=provider_key,
+            detail_url=detail_url,
             kicad_symbol=materialized["symbol"],
             kicad_footprint=materialized["footprint"],
             step_model=materialized["model"],
@@ -601,8 +646,11 @@ def record_browser_cad_evidence(
     native_altium = tuple(Path(path) for path in altium_sources)
     cross_eda_report = None
     if native_altium and cross_eda_verifier is not None:
-        cross_eda_report = cross_eda_verifier(
+        cross_eda_report = _verify_cross_eda_with_provider_identity(
+            cross_eda_verifier,
             identity=identity,
+            provider_key=provider_key,
+            detail_url=detail_url,
             kicad_symbol=Path(symbol),
             kicad_footprint=Path(footprint),
             step_model=model_path,
