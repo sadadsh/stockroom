@@ -133,9 +133,9 @@ def test_malformed_profile_preferences_fail_closed(tmp_path):
         _allow_automatic_downloads(tmp_path / "snapmagic")
 
 
-def test_the_production_runner_defaults_to_stockroom_managed_chromium():
+def test_the_production_runner_defers_to_each_stockroom_managed_provider_engine():
     parameter = inspect.signature(run_guided_capture).parameters["engine"]
-    assert parameter.default == "chromium"
+    assert parameter.default == ""
 
 
 @pytest.mark.parametrize("persistent", [False, True])

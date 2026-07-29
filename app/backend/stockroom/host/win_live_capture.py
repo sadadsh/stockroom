@@ -577,56 +577,12 @@ def _drive_signin(webview, base: str, captured: list, result: dict) -> None:
 
 
 def _drive_production(webview, base: str, captured: list, result: dict) -> None:
-    """Drive the REAL production guided-capture driver (build_driver_js) end-to-end against a live
-    DigiKey part: open the product page, inject the overlay + driver on EACH `loaded` (mirroring the
-    host's re-injection so the driver runs again after it navigates product -> models), and let the
-    two-phase state machine navigate + download the requested formats. The persistent profile keeps
-    the signed-in session; the downloads are proven by the external Downloads-folder check."""
-    import os
-    import time as _t
-
-    from stockroom.host.overlay import build_overlay_js
-    from stockroom.host.vendor_drivers.drivers import build_driver_js
-
-    mpn = os.environ.get("STOCKROOM_LIVE_MPN", "RC0603FR-0710KL")
-    url = os.environ.get("STOCKROOM_LIVE_URL", "") or _resolve_digikey_url(mpn) or (
-        "https://www.digikey.com/en/products/result?keywords=" + mpn
+    """Fail honestly because the injected-driver diagnostic was retired with that implementation."""
+    result["ok"] = False
+    result["error"] = (
+        "The WebView2 injected DigiKey driver was retired. Exercise the production "
+        "stockroom.capture.vendors adapter through the capture API instead."
     )
-    result["url"] = url
-    formats = [f for f in os.environ.get("STOCKROOM_DRIVER_FORMATS", "kicad,altium").split(",") if f]
-    needs_map = {
-        "kicad": ["kicad_symbol", "kicad_footprint", "kicad_model"],
-        "altium": ["altium_symbol", "altium_footprint"],
-    }
-    needs = [n for f in formats for n in needs_map.get(f, [])]
-    cad = webview.create_window("stockroom-driver", url=url, width=1340, height=980)
-
-    def on_loaded() -> None:
-        try:
-            cad.evaluate_js(build_overlay_js(needs, "DigiKey", mpn))
-            cad.evaluate_js(build_driver_js("digikey", formats))
-            print("DRIVER: injected overlay + production driver on load.", flush=True)
-        except Exception as e:  # noqa: BLE001
-            print("DRIVER: inject failed " + repr(e), flush=True)
-
-    try:
-        cad.events.loaded += on_loaded
-    except Exception as e:  # noqa: BLE001
-        result["error"] = "loaded-bind: " + repr(e)
-        on_loaded()  # at least inject once on the initial page
-
-    wait_s = float(os.environ.get("STOCKROOM_DRIVER_WAIT", "85"))
-    print(f"DRIVER: letting the production driver run for {wait_s:.0f}s...", flush=True)
-    _t.sleep(wait_s)
-    try:
-        result["final_url"] = cad.evaluate_js("location.href.slice(0,110)") or ""
-        result["hud_state"] = cad.evaluate_js(
-            "(function(){var o=document.getElementById('__stockroom_overlay__');"
-            "return o?(o.innerText||'').replace(/\\n+/g,' | ').slice(0,400):'NO_HUD';})()"
-        ) or ""
-    except Exception as e:  # noqa: BLE001
-        result["error"] = repr(e)
-    result["ok"] = True
 
 
 # A single compact DOM-state probe run over CDP every few seconds: exactly the questions that
@@ -736,11 +692,10 @@ def _drive_cdpcapture(webview, base: str, captured: list, result: dict) -> None:
     # exercised live even when a better source is offered. Never set in production.
     prov_pin = [p.strip().lower() for p in os.environ.get("STOCKROOM_LIVE_PROVIDERS", "").split(",") if p.strip()]
     if prov_pin:
-        from stockroom.host.vendor_drivers import drivers as D
-
-        by_key = {p[0]: p for p in D._DIGIKEY_PROVIDER_KEYS}
-        D._DIGIKEY_PROVIDER_KEYS[:] = [by_key[k] for k in prov_pin if k in by_key]
-        w(f"# provider pin: {[p[0] for p in D._DIGIKEY_PROVIDER_KEYS]}")
+        raise RuntimeError(
+            "STOCKROOM_LIVE_PROVIDERS targeted the retired injected DigiKey driver; "
+            "select providers through the production capture API"
+        )
     formats = [f for f in os.environ.get("STOCKROOM_DRIVER_FORMATS", "kicad,altium").split(",") if f]
     needs_map = {
         "kicad": ["kicad_symbol", "kicad_footprint", "kicad_model"],
