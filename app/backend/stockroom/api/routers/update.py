@@ -25,6 +25,7 @@ def update_router(require_token) -> APIRouter:
                 "state": UpdateState.NO_REMOTE,
                 "detail": "this installation is not managed by an application checkout",
                 "current_revision": "",
+                "target_revision": "",
                 "channel": "unmanaged",
                 "automatic_on_launch": False,
                 "check_interval_seconds": 120,

@@ -46,6 +46,11 @@ import { Badge, Button, Card, Dot, Eyebrow, PanelTitle } from "../components/pri
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "../components/Icon";
+import {
+  deriveUpdateStanding,
+  shortRevision,
+  updateTargetRevision,
+} from "../lib/updateStanding";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -152,6 +157,11 @@ export function SettingsPage() {
   const lfsQ = useLibraryLfs();
   const rescanQ = useRescanState();
   const { theme } = useTheme();
+  const updateStanding = deriveUpdateStanding({
+    data: updateQ.data,
+    checking: updateQ.isPending || updateQ.isFetching,
+    failed: updateQ.isError,
+  });
 
   const [group, setGroup] = useState<GroupId>("general");
 
@@ -401,11 +411,17 @@ export function SettingsPage() {
                   title="Automatic Updates" titleId="settings.update.title"
                   hint="Stockroom updates from its configured application branch when it opens and checks again every two minutes while running. Installing a waiting update restarts the app."
                   hintId="settings.update.hint"
-                  summary={updateQ.data
-                    ? updateQ.data.update_available
-                      ? <Badge tone="warn"><Text id="settings.summary.update-available">Update Ready</Text></Badge>
-                      : <Text id="settings.summary.up-to-date-app">Current</Text>
-                    : null}
+                  summary={
+                    updateStanding.standing === "available" ? (
+                      <Badge tone="warn"><Text id="settings.summary.update-available">Update Ready</Text></Badge>
+                    ) : updateStanding.standing === "current" ? (
+                      <Text id="settings.summary.up-to-date-app">Current</Text>
+                    ) : updateStanding.standing === "checking" ? (
+                      <Text id="settings.summary.update-checking">Checking...</Text>
+                    ) : (
+                      <Text id="settings.summary.update-unknown">Update Unknown</Text>
+                    )
+                  }
                   className="@3xl:col-span-2"
                   data-dev-id="settings.update"
                 >
@@ -1579,7 +1595,13 @@ function UpdateSection() {
     });
   }
 
-  const available = check.data?.update_available ?? false;
+  const standing = deriveUpdateStanding({
+    data: check.data,
+    checking: check.isPending || check.isFetching,
+    failed: check.isError,
+  });
+  const available = standing.standing === "available";
+  const targetRevision = updateTargetRevision(check.data);
 
   return (
     <>
@@ -1605,25 +1627,48 @@ function UpdateSection() {
               </span>
             }
           />
+          {targetRevision ? (
+            <StatusRow
+              label="Latest Remote Revision"
+              value={<span className="font-mono">{targetRevision}</span>}
+            />
+          ) : null}
           <StatusRow
             label="Update Status"
             labelId="settings.update.status"
             value={
-              check.data?.state === "offline" ? (
-                <span className="text-warn">Offline, using the last verified checkout</span>
-              ) : check.data?.state === "no_remote" ? (
-                <span className="text-warn">Application remote is not configured</span>
-              ) : available ? (
+              standing.standing === "checking" ? (
+                <span className="text-t3">Checking the application remote...</span>
+              ) : standing.standing === "current" ? (
+                <span className="text-ok">Current</span>
+              ) : standing.standing === "available" ? (
                 <span className="text-warn">
                   {check.data?.behind
-                    ? `${check.data.behind} commits ready to install`
-                    : "Update ready to install"}
+                    ? `${check.data.behind} commits ready to install at ${shortRevision(targetRevision)}`
+                    : targetRevision
+                      ? `Revision ${shortRevision(targetRevision)} is ready to install`
+                      : "Update ready to install"}
                 </span>
               ) : (
-                <span className="text-ok">Current</span>
+                <span className="text-warn">
+                  {check.data?.state === "offline"
+                    ? "Latest revision unknown while offline"
+                    : check.data?.state === "no_remote"
+                      ? "Application remote is not configured"
+                      : check.data?.state === "diverged"
+                        ? "Local and remote histories diverged"
+                        : check.data?.state === "up_to_date" &&
+                            check.data?.current_revision &&
+                            targetRevision
+                          ? "Installed and latest remote revisions do not match"
+                        : "Latest remote revision could not be verified"}
+                </span>
               )
             }
           />
+          {standing.standing === "unknown" && standing.detail ? (
+            <StatusRow label="Check Detail" value={standing.detail} />
+          ) : null}
         </>
       )}
       <p className="mt-3 text-xs leading-relaxed text-t3">

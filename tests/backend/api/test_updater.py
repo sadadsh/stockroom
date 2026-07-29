@@ -122,9 +122,23 @@ def test_check_fetches_so_a_fresh_remote_commit_is_seen(tmp_path):
     assert info["behind"] == 1
     assert info["state"] == "update_available"
     assert info["current_revision"] == c.head()[:12]
+    assert info["target_revision"] == o.head()[:12]
     assert info["channel"] == c.current_branch()
     assert info["automatic_on_launch"] is True
     assert info["check_interval_seconds"] == 120
+
+
+def test_check_proves_current_against_the_exact_upstream_revision(tmp_path):
+    o, origin, c, clone = _origin_and_clone(tmp_path)
+
+    info = AppUpdater(c, uv_runner=lambda: None, restart=lambda: None).check()
+
+    expected = o.head()[:12]
+    assert info["state"] == UpdateState.UP_TO_DATE
+    assert info["update_available"] is False
+    assert info["behind"] == 0
+    assert info["current_revision"] == expected
+    assert info["target_revision"] == expected
 
 
 def test_check_reports_an_unreachable_remote_honestly(tmp_path):
@@ -135,6 +149,7 @@ def test_check_reports_an_unreachable_remote_honestly(tmp_path):
     assert info["state"] == UpdateState.OFFLINE
     assert info["detail"]  # the reason is carried, never a silent Up To Date
     assert info["current_revision"] == c.head()[:12]
+    assert info["target_revision"] == ""
     assert info["channel"] == c.current_branch()
 
 
@@ -153,4 +168,31 @@ def test_check_reports_an_unmanaged_checkout_instead_of_calling_it_current(tmp_p
     assert info["state"] == UpdateState.NO_REMOTE
     assert info["detail"] == "no application remote is configured"
     assert info["current_revision"] == repo.head()[:12]
+    assert info["target_revision"] == ""
     assert info["automatic_on_launch"] is True
+
+
+def test_check_never_calls_a_remote_without_an_upstream_current(tmp_path):
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    remote = GitRepo(origin)
+    remote.init()
+    tracked = origin / "app.py"
+    tracked.write_text("v1\n", encoding="utf-8")
+    remote.commit("v1", [tracked])
+
+    local_path = tmp_path / "local"
+    local_path.mkdir()
+    local = GitRepo(local_path)
+    local.init()
+    local_file = local_path / "app.py"
+    local_file.write_text("v1\n", encoding="utf-8")
+    local.commit("v1", [local_file])
+    local.add_remote("origin", str(origin))
+
+    info = AppUpdater(local).check()
+
+    assert info["state"] == UpdateState.UNVERIFIED
+    assert info["update_available"] is False
+    assert info["target_revision"] == ""
+    assert "no verifiable upstream" in info["detail"]

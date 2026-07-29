@@ -155,7 +155,13 @@ beforeEach(() => {
     ahead: 0,
     behind: 2,
   });
-  mockApi.checkUpdate.mockResolvedValue({ update_available: false, behind: 0 });
+  mockApi.checkUpdate.mockResolvedValue({
+    update_available: false,
+    state: "up_to_date",
+    behind: 0,
+    current_revision: "123456789abc",
+    target_revision: "123456789abc",
+  } as never);
   mockApi.altiumOdbcStatus.mockResolvedValue({ installed: true, driver: "SQLite3 ODBC Driver", download_url: "" });
   mockApi.altiumStatus.mockResolvedValue({
     profile: "Main",
@@ -469,7 +475,13 @@ describe("SettingsPage — sync + kicad + update", () => {
   });
 
   it("applies an available update", async () => {
-    mockApi.checkUpdate.mockResolvedValue({ update_available: true, behind: 3 });
+    mockApi.checkUpdate.mockResolvedValue({
+      update_available: true,
+      state: "update_available",
+      behind: 3,
+      current_revision: "111111111111",
+      target_revision: "222222222222",
+    } as never);
     renderPage();
     await openSettings("settings.update");
     const apply = await screen.findByRole("button", { name: /install and restart/i });
@@ -484,6 +496,21 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(
       screen.queryByRole("button", { name: /install and restart/i }),
     ).toBeNull();
+  });
+
+  it("never presents an unverified offline result as Current", async () => {
+    mockApi.checkUpdate.mockResolvedValue({
+      update_available: false,
+      state: "offline",
+      current_revision: "123456789abc",
+      target_revision: "",
+      detail: "network unavailable",
+    } as never);
+    renderPage();
+    await openSettings("settings.update");
+    expect(await screen.findByText(/latest revision unknown while offline/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^current$/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /install and restart/i })).toBeNull();
   });
 });
 
