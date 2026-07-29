@@ -1,5 +1,38 @@
 {
   "assets": {
+    "altium": {
+      "footprint": {
+        "origin": {
+          "captured_at": "2026-07-29T03:44:01Z",
+          "evidence_adapter_version": "browser-guided-cad-v1",
+          "evidence_manifest_digest": "sha256:5b0cb30d1b83ab28b392032602469fef0c20aa0725861d03b60e747c24e2092a",
+          "evidence_operation": "cad:kicad",
+          "url": "https://www.snapeda.com/parts/TPD6E05U06RVZR/Texas%20Instruments/view-part/",
+          "vendor": "snapmagic"
+        },
+        "ref": {
+          "file": "",
+          "lib": "tpd6e05u06rvzr-2226.PcbLib",
+          "name": "SON50P135X350X55-14N"
+        }
+      },
+      "model": null,
+      "symbol": {
+        "origin": {
+          "captured_at": "2026-07-29T03:44:01Z",
+          "evidence_adapter_version": "browser-guided-cad-v1",
+          "evidence_manifest_digest": "sha256:5b0cb30d1b83ab28b392032602469fef0c20aa0725861d03b60e747c24e2092a",
+          "evidence_operation": "cad:kicad",
+          "url": "https://www.snapeda.com/parts/TPD6E05U06RVZR/Texas%20Instruments/view-part/",
+          "vendor": "snapmagic"
+        },
+        "ref": {
+          "file": "",
+          "lib": "tpd6e05u06rvzr-2226.SchLib",
+          "name": "TPD6E05U06RVZR"
+        }
+      }
+    },
     "kicad": {
       "footprint": {
         "origin": {
@@ -50,6 +83,21 @@
   },
   "cad_variants": {
     "active": {
+      "altium": {
+        "artifacts": {
+          "footprint": {
+            "artifact_digest": "sha256:e1871d7447aba51f2277840e712b23844cead400fee4ec99dd1417b117281ca8",
+            "evidence_role": "altium_footprint"
+          },
+          "symbol": {
+            "artifact_digest": "sha256:b6436c28e91839378839e5309de072b447b7fa8c54e88779edf2d918ebb0daee",
+            "evidence_role": "altium_symbol"
+          }
+        },
+        "manifest_digest": "sha256:5b0cb30d1b83ab28b392032602469fef0c20aa0725861d03b60e747c24e2092a",
+        "provider": "snapmagic",
+        "source_manifests": []
+      },
       "kicad": {
         "artifacts": {
           "footprint": {
