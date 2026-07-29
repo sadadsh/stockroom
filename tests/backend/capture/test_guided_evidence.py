@@ -267,6 +267,7 @@ def test_guided_attach_persists_digest_and_refuses_unverified_altium(
         archive.writestr("S1M.PcbLib", _CFB_MAGIC + b"footprint")
 
     origins = []
+    active_variants = []
     altium_calls = []
 
     class _Pipeline:
@@ -274,10 +275,11 @@ def test_guided_attach_persists_digest_and_refuses_unverified_altium(
             assert inputs == [bundle]
             return [candidate]
 
-        def attach_assets(self, part_id, selected, origin=None):
+        def attach_assets(self, part_id, selected, origin=None, active_variant=None):
             assert part_id == "s1m"
             assert selected is candidate
             origins.append(origin)
+            active_variants.append(active_variant)
 
         def cleanup(self):
             return None
@@ -318,6 +320,9 @@ def test_guided_attach_persists_digest_and_refuses_unverified_altium(
     digest = origins[0].extra["evidence_manifest_digest"]
     assert digest.startswith("sha256:")
     assert origins[0].extra["evidence_operation"] == "cad:kicad"
+    assert len(active_variants) == 1
+    assert active_variants[0].manifest_digest == digest
+    active_variants[0].validate_for_tool("kicad")
 
 
 def _installed_kicad(
@@ -369,6 +374,7 @@ def test_altium_only_download_composes_with_reverified_active_kicad_without_repl
         archive.writestr("S1M.PcbLib", _CFB_MAGIC + b"footprint")
     store = EvidenceStore(tmp_path / "Evidence")
     attach_origins = []
+    attached_variants = []
     original_kicad = record.assets_for("kicad")
 
     class _Pipeline:
@@ -382,11 +388,18 @@ def test_altium_only_download_composes_with_reverified_active_kicad_without_repl
         def cleanup(self):
             return None
 
-    def _attach_altium(part_id, *sources, origin=None):
+    def _attach_altium(
+        part_id,
+        *sources,
+        origin=None,
+        active_variant=None,
+        compatible_kicad_variant=None,
+    ):
         assert part_id == "s1m"
         assert {path.suffix.casefold() for path in sources} == {".schlib", ".pcblib"}
         assert all(path.read_bytes().startswith(_CFB_MAGIC) for path in sources)
         attach_origins.append(origin)
+        attached_variants.append((active_variant, compatible_kicad_variant))
         record.assets["altium"] = EdaAssets(
             symbol=AssetRef(lib="S1M", name="S1M"),
             footprint=AssetRef(lib="S1M", name="S1M"),
@@ -439,6 +452,12 @@ def test_altium_only_download_composes_with_reverified_active_kicad_without_repl
     )
     assert manifest["provider"] == "ultralibrarian"
     assert len(manifest["source_manifests"]) == 1
+    assert len(attached_variants) == 1
+    active_altium, compatible_kicad = attached_variants[0]
+    assert active_altium.manifest_digest == origin.extra["evidence_manifest_digest"]
+    assert active_altium.source_manifests == (compatible_kicad.manifest_digest,)
+    active_altium.validate_for_tool("altium")
+    compatible_kicad.validate_for_tool("kicad")
     assert [
         item.provider_key
         for item in store.list_role_variants(

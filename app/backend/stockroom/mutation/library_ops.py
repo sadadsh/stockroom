@@ -7,6 +7,7 @@ sections 3, 5, 9).
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import re
 import shutil
@@ -88,6 +89,57 @@ def _altium_log_suffix(log: str) -> str:
 def _altium(record: PartRecord):
     """The record's LIVE Altium asset bundle (see `_kicad`)."""
     return record.assets_for("altium")
+
+
+def _verify_kicad_projection_pointer(
+    library,
+    record: PartRecord,
+    pointer: CadVariantPointer,
+) -> None:
+    """Prove current installed KiCad bytes are exactly the pointer being adopted.
+
+    This is used only when an Altium-only capture cross-verifies against an already installed
+    KiCad component.  The source manifest stores the whole category symbol library plus this
+    part's footprint and model, so all three exact digests can be checked without guessing a
+    selection or rewriting the KiCad projection.
+    """
+    pointer.validate_for_tool("kicad")
+    kicad = _kicad(record)
+    if kicad.symbol is None or kicad.footprint is None or kicad.model is None:
+        raise ValueError("the compatible KiCad bundle is not fully materialized")
+    paths = {
+        "symbol": library.symbol_lib_path(record.category),
+        "footprint": (
+            library.footprint_lib_path(record.category)
+            / f"{kicad.footprint.name}.kicad_mod"
+        ),
+        "model": library.root / kicad.model.file,
+    }
+    root = Path(library.root).resolve()
+    for role, path in paths.items():
+        resolved = Path(path)
+        try:
+            inside = resolved.resolve().is_relative_to(root)
+        except OSError:
+            inside = False
+        if not inside or not resolved.is_file() or resolved.is_symlink():
+            raise ValueError(f"the installed KiCad {role} cannot prove its evidence pointer")
+        expected = pointer.artifact_for(role)
+        observed = f"sha256:{hashlib.sha256(resolved.read_bytes()).hexdigest()}"
+        if expected is None or observed != expected.artifact_digest:
+            raise ValueError(
+                f"the installed KiCad {role} differs from the cross-EDA source manifest"
+            )
+
+
+def _altium_pointer_accepts_kicad(
+    altium_pointer: CadVariantPointer,
+    kicad_pointer: CadVariantPointer,
+) -> bool:
+    return (
+        altium_pointer.manifest_digest == kicad_pointer.manifest_digest
+        or kicad_pointer.manifest_digest in altium_pointer.source_manifests
+    )
 
 
 @dataclass
@@ -762,6 +814,7 @@ class LibraryOps:
         self, part_id: str, *sources,
         origin: AssetOrigin | None = None, now_iso: str = "",
         active_variant: CadVariantPointer | None = None,
+        compatible_kicad_variant: CadVariantPointer | None = None,
     ) -> PartRecord:
         """Store a part's Altium assets verbatim under <profile>/altium/ and set
         altium_symbol/altium_footprint. `*sources` is EITHER a loose .SchLib + .PcbLib pair OR
@@ -780,12 +833,26 @@ class LibraryOps:
 
         ``active_variant`` binds a complete native Altium symbol/footprint pair to its retained
         evidence manifest. It is persisted only after both files land, inside this same
-        Transaction, so a caller can never publish a selection-only success."""
+        Transaction, so a caller can never publish a selection-only success.
+
+        ``compatible_kicad_variant`` is only for a composed Altium-only capture. Its complete
+        installed KiCad projection is digest-checked under the Transaction lock, then that exact
+        source pointer and the Altium pointer are adopted together. It is never inferred from
+        provenance or filenames."""
         from stockroom.altium.extract import normalize_altium_source
         from stockroom.altium.oleread import pick_entry, read_footprint_names, read_symbol_names
 
         if active_variant is not None:
             active_variant.validate_for_tool("altium")
+        if compatible_kicad_variant is not None:
+            compatible_kicad_variant.validate_for_tool("kicad")
+            if active_variant is None or not _altium_pointer_accepts_kicad(
+                active_variant,
+                compatible_kicad_variant,
+            ):
+                raise ValueError(
+                    "the Altium bundle is not bound to the supplied KiCad source manifest"
+                )
         record = self.load_record(part_id)
         altium_dir = self.lib.parts_dir.parent / "altium"
         json_path = self.lib.parts_dir / f"{part_id}.json"
@@ -815,6 +882,27 @@ class LibraryOps:
             fresh = [] if altium_dir.exists() else [altium_dir]
             altium_dir.mkdir(parents=True, exist_ok=True)
             with Transaction(self.repo) as txn:
+                locked_record = self.load_record(part_id)
+                if locked_record.dumps() != record.dumps():
+                    raise ValueError("the part changed while its Altium bundle was being verified")
+                record = locked_record
+                bound_kicad = compatible_kicad_variant or record.cad_variants.selection_for(
+                    "kicad"
+                )
+                if active_variant is not None:
+                    if bound_kicad is None or not _altium_pointer_accepts_kicad(
+                        active_variant,
+                        bound_kicad,
+                    ):
+                        raise ValueError(
+                            "activate the exact compatible KiCad bundle before this Altium bundle"
+                        )
+                if compatible_kicad_variant is not None:
+                    _verify_kicad_projection_pointer(
+                        self.lib,
+                        record,
+                        compatible_kicad_variant,
+                    )
                 txn.track_dir(*fresh)
                 landed: list[str] = []
                 # Track EACH deterministic destination before copying so a partial write, or a
@@ -856,6 +944,8 @@ class LibraryOps:
                 if active_variant is not None:
                     # Whole-bundle pointer last, immediately before the canonical record write.
                     # Transaction rollback restores both native binaries and this pointer.
+                    if compatible_kicad_variant is not None:
+                        record.cad_variants.select("kicad", compatible_kicad_variant)
                     record.cad_variants.select("altium", active_variant)
                 json_path.write_text(record.dumps(), encoding="utf-8")
                 txn.track(json_path)

@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from stockroom.cad_variants import resolve_cad_variant
 from stockroom.capture.browser import (
     PlaywrightCaptureBrowser,
     ProviderHudSpec,
@@ -52,6 +53,7 @@ from stockroom.capture.cross_eda import (
 from stockroom.capture.download_broker import DownloadBroker, DownloadTask
 from stockroom.capture.evidence import (
     BROWSER_CAPTURE_ADAPTER_VERSION,
+    exact_identity,
     record_browser_cad_evidence,
     record_composed_browser_altium_evidence,
 )
@@ -671,6 +673,9 @@ class GuidedCaptureSource:
         evidence_digest = ""
         evidence_operation = "cad:kicad"
         cross_eda_verified = False
+        kicad_active_variant = None
+        altium_active_variant = None
+        compatible_kicad_variant = None
         altium_sources = _altium_libraries(landed)
         pipeline = self._make_pipeline()
         try:
@@ -721,6 +726,25 @@ class GuidedCaptureSource:
                         )
                     except Exception as exc:  # noqa: BLE001 - fail closed before any library write
                         return SourceOutcome(error=f"CAD evidence verification failed: {exc}")
+                    try:
+                        identity = exact_identity(record)
+                        kicad_active_variant = resolve_cad_variant(
+                            self._evidence_store,
+                            identity=identity,
+                            tool="kicad",
+                            manifest_digest=evidence_digest,
+                        ).pointer
+                        if cross_eda_verified:
+                            altium_active_variant = resolve_cad_variant(
+                                self._evidence_store,
+                                identity=identity,
+                                tool="altium",
+                                manifest_digest=evidence_digest,
+                            ).pointer
+                    except Exception as exc:  # noqa: BLE001 - never attach an unbound projection
+                        return SourceOutcome(
+                            error=f"CAD evidence pointer resolution failed: {exc}"
+                        )
             elif self._evidence_store is not None and not identity_error:
                 if not altium_sources:
                     return SourceOutcome(
@@ -744,6 +768,28 @@ class GuidedCaptureSource:
                 altium_sources = list(verified_sources)
                 cross_eda_verified = True
                 evidence_operation = "cad:altium"
+                try:
+                    identity = exact_identity(record)
+                    altium_active_variant = resolve_cad_variant(
+                        self._evidence_store,
+                        identity=identity,
+                        tool="altium",
+                        manifest_digest=evidence_digest,
+                    ).pointer
+                    if len(altium_active_variant.source_manifests) != 1:
+                        raise ValueError(
+                            "composed Altium evidence must name one exact KiCad source manifest"
+                        )
+                    compatible_kicad_variant = resolve_cad_variant(
+                        self._evidence_store,
+                        identity=identity,
+                        tool="kicad",
+                        manifest_digest=altium_active_variant.source_manifests[0],
+                    ).pointer
+                except Exception as exc:  # noqa: BLE001 - no guessed source binding
+                    return SourceOutcome(
+                        error=f"CAD evidence pointer resolution failed: {exc}"
+                    )
             origin = AssetOrigin(
                 vendor=self._vendor_key,
                 url=url,
@@ -760,8 +806,15 @@ class GuidedCaptureSource:
             )
             if kicad_offered:
                 try:
+                    attach_kwargs = {"origin": origin}
+                    if kicad_active_variant is not None:
+                        attach_kwargs["active_variant"] = kicad_active_variant
                     self._run_write(
-                        lambda: pipeline.attach_assets(record.id, candidate, origin=origin)
+                        lambda: pipeline.attach_assets(
+                            record.id,
+                            candidate,
+                            **attach_kwargs,
+                        )
                     )
                     offered.extend(kicad_offered)
                 except Exception as exc:  # noqa: BLE001 - each attach is atomic; a failure is a row
@@ -781,15 +834,23 @@ class GuidedCaptureSource:
                 "cross-EDA terminal, pad, and package equivalence is not verified"
             )
         else:
-            offered.extend(
-                self._attach_altium_assets(
-                    record,
-                    landed,
-                    failures,
-                    origin,
-                    sources=altium_sources,
+            if kicad_offered and not all(item in offered for item in kicad_offered):
+                failures.append(
+                    "native Altium files were left unattached because the compatible "
+                    "KiCad bundle did not materialize"
                 )
-            )
+            else:
+                offered.extend(
+                    self._attach_altium_assets(
+                        record,
+                        landed,
+                        failures,
+                        origin,
+                        sources=altium_sources,
+                        active_variant=altium_active_variant,
+                        compatible_kicad_variant=compatible_kicad_variant,
+                    )
+                )
 
         if offered:
             return SourceOutcome(
@@ -812,6 +873,8 @@ class GuidedCaptureSource:
         origin=None,
         *,
         sources: list[Path] | None = None,
+        active_variant=None,
+        compatible_kicad_variant=None,
     ) -> list[Requirement]:
         """Attach any Altium libraries in the download, and report what the RECORD then holds.
 
@@ -833,7 +896,12 @@ class GuidedCaptureSource:
             # The SAME origin the KiCad half files. Without it a guided capture recorded where its
             # symbol came from and left the Altium library beside it unattributed, which is the
             # provenance story holding for one tool and quietly not the other.
-            updated = self._run_write(lambda: attach_altium(record.id, *sources, origin=origin))
+            kwargs = {"origin": origin}
+            if active_variant is not None:
+                kwargs["active_variant"] = active_variant
+            if compatible_kicad_variant is not None:
+                kwargs["compatible_kicad_variant"] = compatible_kicad_variant
+            updated = self._run_write(lambda: attach_altium(record.id, *sources, **kwargs))
         except Exception as exc:  # noqa: BLE001 - atomic: a failure leaves the part untouched
             failures.append(f"could not attach the Altium libraries: {exc}")
             return []
