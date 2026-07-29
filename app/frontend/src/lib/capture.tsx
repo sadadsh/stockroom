@@ -22,7 +22,6 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../api/client";
 import type {
-  CadSourceResponse,
   CompletionResult,
   Requirement,
   StagingCandidate,
@@ -106,9 +105,16 @@ export function subsetComplete(needs: Requirement[], received: Received, subset:
 
 export interface CaptureApi {
   active: CaptureState;
-  // `sourceKey` picks WHICH vendor page to open ("ultralibrarian", "samacsys", ...). Omitted
-  // means the first source the backend returns, which is its trust order's head.
-  start: (partId: string, partName: string, needs: Requirement[], sourceKey?: string) => Promise<void>;
+  // `sourceKey` is only a preferred browser provider. Direct/keyless sources run in automatic
+  // mode; once the explicit assisted fallback starts, the backend can advance through the
+  // remaining provider chain without another trip back through this UI.
+  start: (
+    partId: string,
+    partName: string,
+    needs: Requirement[],
+    sourceKey?: string,
+    mode?: "automatic" | "assisted",
+  ) => Promise<void>;
   submitPaths: (partId: string, partName: string, needs: Requirement[], paths: string[]) => Promise<void>;
   reset: () => void;
   keepWorking: () => void;
@@ -348,7 +354,13 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
   }, [onCapture]);
 
   const start = useCallback(
-    async (partId: string, partName: string, needs: Requirement[], sourceKey?: string) => {
+    async (
+      partId: string,
+      partName: string,
+      needs: Requirement[],
+      sourceKey?: string,
+      mode: "automatic" | "assisted" = "automatic",
+    ) => {
       clearWatchdog();
       clearHandler();
       partIdRef.current = partId;
@@ -361,40 +373,35 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         partName,
         needs,
         status: "resolving",
-        message: "Looking up the download page...",
+        message: "Checking direct sources and provider libraries...",
       });
-      let source: CadSourceResponse;
-      try {
-        source = await api.partCadSource(partId);
-      } catch (err) {
-        setState((s) => ({ ...s, status: "error", message: errMsg(err, "Could not resolve a CAD source.") }));
-        return;
-      }
-      // The CHOSEN vendor, or the head of the backend's trust order. A key that resolves to
-      // nothing falls back to the head rather than opening nowhere -- the list the caller picked
-      // from came from this same endpoint, so a miss means the part changed under them.
-      const picked =
-        (sourceKey ? source.sources.find((v) => v.key === sourceKey) : undefined) ??
-        source.sources[0];
-      if (!picked?.url) {
-        setState((s) => ({ ...s, status: "unavailable", message: "No CAD source page for this part." }));
-        return;
-      }
-      originRef.current = { vendor: picked.key, url: picked.url };
-      setState((s) => ({ ...s, url: picked.url, vendor: picked.label, received: {} }));
-      // THE capture path, identical on Windows and Linux. The backend opens a real browser, drives
-      // the vendor page, catches the download, classifies it and attaches it with provenance - one
-      // job, and testable off Windows.
+      originRef.current = null;
+      setState((s) => ({
+        ...s,
+        vendor: sourceKey ?? "Automatic",
+        received: {},
+      }));
+      // THE acquisition path, identical on Windows and Linux. The backend checks permitted
+      // keyless/direct sources first. Commercial provider pages stay user-driven unless a reviewed
+      // machine-access contract allows more; Stockroom still captures every resulting download,
+      // validates it, attaches it, and continues the fallback chain.
       //
       // This replaced `window.pywebview.api.open_cad_download`, which existed ONLY on Windows: off
       // it the flow silently degraded to "pick the files yourself", so nothing below the URL layer
       // could be verified and every claim about capture came from an adjacent layer.
       try {
-        const { job_id } = await api.runCapture({ partIds: [partId], vendor: picked.key });
+        const { job_id } = await api.runCapture({
+          partIds: [partId],
+          vendor: sourceKey || undefined,
+          mode,
+        });
         setState((s) => ({
           ...s,
           status: "receiving",
-          message: "Working through the vendor page. Sign in there if it asks; it is remembered.",
+          message:
+            mode === "automatic"
+              ? "Checking permitted automatic sources and validating anything they return."
+              : "Select the exact provider result and formats, click its downloads, then close the page. Stockroom handles everything after that.",
         }));
         const body = await api.openJobStream(job_id);
         let failure: string | null = null;

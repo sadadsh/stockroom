@@ -1534,20 +1534,23 @@ export interface BulkImportResult {
 // GET /api/library/completion -- "is my library complete, and what is missing?"
 //
 // The owner's central question, which until now only a script outside the app could answer.
-// Two totals are deliberately separate: `needs_files` is work a run can actually do right now,
-// `unsourced` is a real gap that NOTHING registered can currently fill (every Altium asset,
-// today). Collapsing them would either hide the stuck parts or promise a run that cannot
-// deliver on them.
+// The action totals are deliberately separate. `needs_files` is work the automatic lane can
+// improve, `needs_assistance` is work a managed user-driven provider can improve, and `unsourced`
+// is a real gap neither lane can currently fill. Automatic and assisted counts may overlap when
+// one part needs both kinds of source.
 export interface LibraryCoverage {
   total: number;
   complete: number;
   needs_files: number;
+  needs_assistance?: number;
   unsourced: number;
   // Requirement value ("kicad_symbol", "altium_footprint", ...) -> how many parts lack it.
   by_requirement: Record<string, number>;
   // The registered source keys, and every Requirement they can between them supply.
   sources: string[];
   can_provide: string[];
+  assisted_sources?: string[];
+  assisted_can_provide?: string[];
 }
 
 // What CAD this library holds, and what a clear would remove.

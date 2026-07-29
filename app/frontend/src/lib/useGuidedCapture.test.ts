@@ -108,12 +108,16 @@ describe("useGuidedCapture", () => {
     });
 
     expect(capture.run).toHaveBeenCalledWith(
-      expect.objectContaining({ partIds: ["part1"] }),
+      expect.objectContaining({
+        partIds: ["part1"],
+        vendor: undefined,
+        mode: "automatic",
+      }),
     );
     expect(result.current.status).toBe("done");
   });
 
-  it("passes the vendor the user picked", async () => {
+  it("passes the preferred provider while keeping the first attempt automatic", async () => {
     mockCadSourceUrl();
     const capture = mockCapture();
     const { result } = render(["kicad_symbol", "kicad_footprint"]);
@@ -123,11 +127,14 @@ describe("useGuidedCapture", () => {
     });
 
     expect(capture.run).toHaveBeenCalledWith(
-      expect.objectContaining({ vendor: "ultralibrarian" }),
+      expect.objectContaining({
+        vendor: "ultralibrarian",
+        mode: "automatic",
+      }),
     );
   });
 
-  it("reports unavailable when no source resolves, and starts nothing", async () => {
+  it("still runs direct automatic acquisition when no provider URL resolves", async () => {
     mockCadSourceUrl(null);
     const capture = mockCapture();
     const { result } = render(["kicad_symbol", "kicad_footprint"]);
@@ -136,8 +143,32 @@ describe("useGuidedCapture", () => {
       await result.current.start();
     });
 
-    expect(result.current.status).toBe("unavailable");
-    expect(capture.run).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("done");
+    expect(capture.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partIds: ["part1"],
+        vendor: undefined,
+        mode: "automatic",
+      }),
+    );
+  });
+
+  it("forwards an explicit assisted retry for the selected provider", async () => {
+    mockCadSourceUrl();
+    const capture = mockCapture();
+    const { result } = render(["kicad_symbol", "kicad_footprint"]);
+
+    await act(async () => {
+      await result.current.start("snapmagic", "assisted");
+    });
+
+    expect(capture.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partIds: ["part1"],
+        vendor: "snapmagic",
+        mode: "assisted",
+      }),
+    );
   });
 
   it("surfaces a failed run as an error rather than a quiet done", async () => {
