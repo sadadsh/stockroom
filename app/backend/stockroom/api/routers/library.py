@@ -33,9 +33,9 @@ from stockroom.verify.record_diff import extract_symbol_node, field_diff
 # is reachable.
 _HISTORY_MAX = 100
 _AUTOMATIC_CAPTURE_INSTRUCTION = (
-    "Stockroom tries permitted automatic sources first. If this provider window opens, select the "
-    "exact result and formats and click its download controls; Stockroom captures, validates, "
-    "attaches, and continues automatically."
+    "Stockroom tries permitted automatic sources first. When you select this provider, Stockroom "
+    "opens the exact result, chooses the required formats, captures, validates, and attaches every "
+    "delivered file automatically. It stops only for a provider security check."
 )
 
 
@@ -693,6 +693,9 @@ def library_router(require_token) -> APIRouter:
         mode = payload.get("mode", "automatic")
         if mode not in {"automatic", "assisted"}:
             raise ValueError("capture mode must be 'automatic' or 'assisted'")
+        background = payload.get("background", False)
+        if type(background) is not bool:
+            raise ValueError("background must be a boolean")
         raw_part_ids = payload.get("part_ids")
         if raw_part_ids is None:
             part_ids = None
@@ -736,6 +739,7 @@ def library_router(require_token) -> APIRouter:
                 progress=progress,
                 should_stop=should_stop,
                 limit=(int(limit) if limit else None),
+                headless=background,
                 operator_authorized=mode == "assisted",
             )
 
