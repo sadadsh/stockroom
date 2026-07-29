@@ -110,7 +110,7 @@ def test_active_kicad_mechanical_pad_allowance_is_bound_to_the_active_manifest()
         sort_keys=True,
     ).encode()
     store = SimpleNamespace(
-        verified_role_validation_report=lambda *_args, **_kwargs: json.loads(validation)
+        verified_cad_validation_report=lambda *_args, **_kwargs: json.loads(validation)
     )
     record = SimpleNamespace(
         cad_variants=SimpleNamespace(
@@ -898,7 +898,7 @@ def test_altium_only_download_switches_to_a_compatible_retained_kicad_pair(
         identity=ExactPartIdentity("ON Semiconductor", "S1M"),
         required_roles=("symbol", "footprint", "model"),
     )
-    report = store.verified_role_validation_report(
+    report = store.verified_cad_validation_report(
         compatible_manifest,
         identity=ExactPartIdentity("ON Semiconductor", "S1M"),
     )

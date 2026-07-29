@@ -438,7 +438,7 @@ def _active_kicad_pad_allowance(
     if not isinstance(manifest_digest, str) or not manifest_digest:
         return frozenset()
     try:
-        validation = store.verified_role_validation_report(
+        validation = store.verified_cad_validation_report(
             manifest_digest,
             identity=identity,
         )
