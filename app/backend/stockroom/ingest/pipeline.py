@@ -20,6 +20,7 @@ from stockroom.kicad.cli import KiCadCli
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.asset import AssetOrigin
+from stockroom.model.cad_variant import CadVariantPointer
 from stockroom.model.category import category_nickname
 from stockroom.model.part import AssetRef, PartRecord, Provenance
 from stockroom.mutation.library_ops import LibraryOps
@@ -150,6 +151,8 @@ class IngestPipeline:
     def attach_assets(
         self, part_id: str, candidate: StagingCandidate,
         *, origin: AssetOrigin | None = None, now_iso: str = "",
+        active_variant: CadVariantPointer | None = None,
+        replace_existing: bool = False,
     ) -> PartRecord:
         """Attach a downloaded CAD ZIP's symbol/footprint/3D onto an EXISTING part (the
         owner's DigiKey-CAD-download flow for a part that already landed identity-only,
@@ -168,10 +171,22 @@ class IngestPipeline:
         `attach_footprint`, because this is the path guided capture actually uses: a downloaded
         archive whose symbol, footprint and 3D all came from the same page in one click.
         `captured_at` is stamped by the caller's clock (the API passes the server's), never by the
-        client. Omitted means the assets stay honestly UNATTRIBUTED."""
+        client. Omitted means the assets stay honestly UNATTRIBUTED.
+
+        ``active_variant`` is the digest-bound evidence bundle that produced this projection.
+        When supplied, all three KiCad roles are required and the pointer is written only after
+        every role has materialized, in this same Transaction. ``replace_existing`` permits the
+        activation flow to replace this part's stable symbol entry; ordinary ingestion keeps the
+        add-only symbol guard."""
         fp = candidate.chosen_footprint  # None if no variants; IngestError if index invalid
         if candidate.symbol_lib_path is None and fp is None and candidate.model_path is None:
             raise IngestError("candidate carries no symbol, footprint, or 3D model to attach")
+        if active_variant is not None:
+            active_variant.validate_for_tool("kicad")
+            if candidate.symbol_lib_path is None or fp is None or candidate.model_path is None:
+                raise IngestError(
+                    "an active KiCad CAD variant must materialize symbol, footprint, and model"
+                )
         record = self.ops.load_record(part_id)
         lib = self.profile.library
         nickname = category_nickname(record.category)
@@ -203,6 +218,15 @@ class IngestPipeline:
                         )
                     create_empty_symbol_lib(self.cli, sym_lib_path)
                     txn.track(sym_lib_path)
+                elif replace_existing:
+                    # Track before the first write so a source-parse/merge failure after removal
+                    # restores the prior symbol library. Replacement is intentionally local to
+                    # this stable entry; every other category symbol remains byte-preserved.
+                    txn.track(sym_lib_path)
+                    existing = SymbolLib.load(sym_lib_path)
+                    if entry_name in existing.symbol_names:
+                        existing.remove_symbol(entry_name)
+                        existing.save(sym_lib_path)
                 merge_symbol_into_lib(
                     sym_lib_path, candidate.symbol_lib_path, candidate.symbol_name, entry_name
                 )
@@ -213,6 +237,9 @@ class IngestPipeline:
                 if not entry_name:
                     raise IngestError(f"part {part_id} has no entry name to place a footprint under")
                 ensure_footprint_lib(pretty_dir)
+                # Register the deterministic destination before copy/parse: even a short write or
+                # malformed source must restore the prior footprint rather than leak a partial one.
+                txn.track(pretty_dir / f"{entry_name}.kicad_mod")
                 fp_path = place_footprint(pretty_dir, fp, entry_name)
                 txn.track(fp_path)
                 kicad.footprint = _with_origin(
@@ -228,8 +255,8 @@ class IngestPipeline:
                 lib.models_dir.mkdir(parents=True, exist_ok=True)
                 model_name = f"{kicad.footprint.name}{Path(candidate.model_path).suffix}"
                 model_dst = lib.models_dir / model_name
-                shutil.copyfile(candidate.model_path, model_dst)
                 txn.track(model_dst)
+                shutil.copyfile(candidate.model_path, model_dst)
                 fp_obj = Footprint.load(fp_file)
                 fp_obj.set_model_path(f"${{SR_LIB}}/models/{model_name}")
                 fp_file.write_text(fp_obj.serialize(), encoding="utf-8", newline="")
@@ -250,6 +277,12 @@ class IngestPipeline:
                 mirror_fields_to_symbol(sym, record)
                 sym_lib.save(sym_lib_path)
                 txn.track(sym_lib_path)
+
+            if active_variant is not None:
+                # The pointer is the final in-memory mutation before the canonical record write.
+                # A failure above leaves the old pointer untouched; a commit failure rolls the
+                # projection and pointer back together.
+                record.cad_variants.select("kicad", active_variant)
 
             json_path.write_text(record.dumps(), encoding="utf-8")
             txn.track(json_path)
