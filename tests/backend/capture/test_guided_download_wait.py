@@ -614,8 +614,15 @@ def test_current_ul_native_archive_shape_exposes_both_altium_libraries(tmp_path)
 
     found = guided._altium_libraries([_CapturedFile(bundle)])
 
-    assert sorted(path.suffix.casefold() for path in found) == [".pcblib", ".schlib"]
-    assert all(path.read_bytes().startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1") for path in found)
+    assert found is not None
+    assert sorted(path.suffix.casefold() for path in found.paths) == [".pcblib", ".schlib"]
+    assert all(
+        path.read_bytes().startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
+        for path in found.paths
+    )
+    root = found.root
+    found.cleanup()
+    assert not root.exists()
 
 
 def test_only_the_side_the_record_actually_holds_is_reported(monkeypatch, tmp_path):

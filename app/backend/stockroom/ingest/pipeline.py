@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+from contextlib import nullcontext
 from pathlib import Path
 
 from stockroom.ingest.errors import IngestError
@@ -153,6 +154,8 @@ class IngestPipeline:
         *, origin: AssetOrigin | None = None, now_iso: str = "",
         active_variant: CadVariantPointer | None = None,
         replace_existing: bool = False,
+        _transaction: Transaction | None = None,
+        _record: PartRecord | None = None,
     ) -> PartRecord:
         """Attach a downloaded CAD ZIP's symbol/footprint/3D onto an EXISTING part (the
         owner's DigiKey-CAD-download flow for a part that already landed identity-only,
@@ -187,7 +190,7 @@ class IngestPipeline:
                 raise IngestError(
                     "an active KiCad CAD variant must materialize symbol, footprint, and model"
                 )
-        record = self.ops.load_record(part_id)
+        record = _record or self.ops.load_record(part_id)
         lib = self.profile.library
         nickname = category_nickname(record.category)
         sym_lib_path = lib.symbol_lib_path(record.category)
@@ -204,7 +207,10 @@ class IngestPipeline:
         fresh_dirs = [d for d in (lib.models_dir, pretty_dir) if not d.exists()]
         json_path = lib.parts_dir / f"{part_id}.json"
 
-        with Transaction(self.repo) as txn:
+        transaction_scope = (
+            Transaction(self.repo) if _transaction is None else nullcontext(_transaction)
+        )
+        with transaction_scope as txn:
             txn.track_dir(*fresh_dirs)
 
             if candidate.symbol_lib_path is not None:
@@ -286,7 +292,73 @@ class IngestPipeline:
 
             json_path.write_text(record.dumps(), encoding="utf-8")
             txn.track(json_path)
-            txn.commit(f"Attach CAD assets to {part_id}")
+            if _transaction is None:
+                txn.commit(f"Attach CAD assets to {part_id}")
+        return record
+
+    def attach_coherent_cad_assets(
+        self,
+        part_id: str,
+        candidate: StagingCandidate,
+        *altium_sources: Path,
+        kicad_origin: AssetOrigin | None,
+        altium_origin: AssetOrigin | None,
+        now_iso: str,
+        kicad_active_variant: CadVariantPointer,
+        altium_active_variant: CadVariantPointer,
+    ) -> PartRecord:
+        """Materialize one cross-EDA-proved KiCad/Altium pair in one Git transaction."""
+
+        kicad_active_variant.validate_for_tool("kicad")
+        altium_active_variant.validate_for_tool("altium")
+        if not (
+            altium_active_variant.manifest_digest == kicad_active_variant.manifest_digest
+            or kicad_active_variant.manifest_digest
+            in altium_active_variant.source_manifests
+        ):
+            raise IngestError("the Altium bundle is not bound to the supplied KiCad bundle")
+        with Transaction(self.repo) as txn:
+            record = self.ops.load_record(part_id)
+            current_symbol = record.assets_for("kicad").symbol
+            entry_name = candidate.entry_name or (
+                current_symbol.name if current_symbol is not None else ""
+            )
+            if not entry_name:
+                raise IngestError(f"part {part_id} has no entry name for coherent CAD attachment")
+            library = self.profile.library
+            exact_targets = [
+                library.parts_dir / f"{part_id}.json",
+                library.symbol_lib_path(record.category),
+                library.footprint_lib_path(record.category) / f"{entry_name}.kicad_mod",
+                library.models_dir / f"{entry_name}{Path(candidate.model_path or '').suffix}",
+                library.parts_dir.parent / "altium" / f"{part_id}.SchLib",
+                library.parts_dir.parent / "altium" / f"{part_id}.PcbLib",
+            ]
+            if not self.repo.is_clean(exact_targets):
+                raise IngestError(
+                    "coherent CAD attachment refused because one exact target has "
+                    "uncommitted changes"
+                )
+            record = self.attach_assets(
+                part_id,
+                candidate,
+                origin=kicad_origin,
+                now_iso=now_iso,
+                active_variant=kicad_active_variant,
+                replace_existing=True,
+                _transaction=txn,
+                _record=record,
+            )
+            record = self.ops.attach_altium_assets(
+                part_id,
+                *altium_sources,
+                origin=altium_origin,
+                now_iso=now_iso,
+                active_variant=altium_active_variant,
+                _transaction=txn,
+                _record=record,
+            )
+            txn.commit(f"Attach coherent KiCad and Altium assets to {part_id}")
         return record
 
     def cleanup(self) -> None:

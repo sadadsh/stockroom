@@ -474,6 +474,55 @@ End;
     return patched.replace(first_function, sink + first_function, 1)
 
 
+def _patch_ad26_default_symbol(importer_text: str) -> str:
+    """Remove the blank symbol AD26 creates when opening a new SchLib.
+
+    The reviewed provider importer asks Altium to create a new schematic library and then adds
+    the payload component. AD26 initializes that document with ``Component_1``; unless it is
+    removed before parsing, the resulting library contains both identities and must fail exact
+    readback. Patch only the pinned InitLibDocs body in the sandbox copy.
+    """
+
+    function_start = "Function InitLibDocs(BasePath: String,"
+    function_end = "\nEnd;\n\nProcedure ImportAscIIData(InFileName : String);"
+    if importer_text.count(function_start) != 1 or importer_text.count(function_end) != 1:
+        raise UltraLibrarianImportError(
+            "the reviewed Ultra Librarian library-initialization anchors changed"
+        )
+    before, remainder = importer_text.split(function_start, 1)
+    body, after = remainder.split(function_end, 1)
+    declaration_anchor = "    WorkSpace : IWorkSpace;\nBegin"
+    removal_anchor = """\
+    If sLib = Nil Then Begin
+        ShowMessage('Nil sLib');
+        Exit;
+    End;
+    // Done"""
+    if body.count(declaration_anchor) != 1 or body.count(removal_anchor) != 1:
+        raise UltraLibrarianImportError(
+            "the reviewed Ultra Librarian default-symbol anchors changed"
+        )
+    body = body.replace(
+        declaration_anchor,
+        "    WorkSpace : IWorkSpace;\n    StockroomDefaultComponent : ISch_Component;\nBegin",
+        1,
+    )
+    body = body.replace(
+        removal_anchor,
+        """\
+    If sLib = Nil Then Begin
+        ShowMessage('Nil sLib');
+        Exit;
+    End;
+    StockroomDefaultComponent := sLib.GetState_SchComponentByLibRef('Component_1');
+    If StockroomDefaultComponent <> Nil Then
+        sLib.RemoveSchComponent(StockroomDefaultComponent);
+    // Done""",
+        1,
+    )
+    return before + function_start + body + function_end + after
+
+
 def render_stockroom_wrapper(
     *,
     payload_win: str,
@@ -595,8 +644,9 @@ def convert_ul_altium_package(
         drv = driver or AltiumDriver()
         original = package.importer.read_text(encoding="utf-8-sig")
         importer_digest = hashlib.sha256(package.importer.read_bytes()).hexdigest()
+        patched = _patch_ad26_default_symbol(original)
         patched = _patch_reviewed_dialogs(
-            original,
+            patched,
             expected_calls=_APPROVED_IMPORTER_REVISIONS[importer_digest],
         )
         wrapper = render_stockroom_wrapper(

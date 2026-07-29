@@ -805,6 +805,22 @@ class EvidenceStore:
             )
         return result
 
+    def verified_role_validation_report(
+        self,
+        digest: str,
+        *,
+        identity: ExactIdentity,
+    ) -> dict[str, JsonValue]:
+        """Return the canonical validation document after full dependency revalidation."""
+
+        manifest = self.verify_role_artifact_success(digest, identity=identity)
+        reference = manifest.get("validation_report")
+        assert isinstance(reference, dict)
+        data = self.object_bytes(str(reference["digest"]))
+        validation = json.loads(data)
+        assert isinstance(validation, dict)
+        return validation
+
     def list_role_variants(
         self,
         *,
