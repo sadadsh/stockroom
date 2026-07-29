@@ -103,6 +103,27 @@ def test_exact_result_collapses_repeated_actions_for_one_provider_identity():
     assert error == ""
 
 
+def test_exact_result_collapses_equivalent_snapmagic_manufacturer_slugs():
+    href, error = _exact_result_href(
+        _Results(
+            _ResultNode(
+                "/parts/TPD6E05U06RVZR/Texas-Instruments/view-part/",
+                "TPD6E05U06RVZR",
+            ),
+            _ResultNode(
+                "/parts/TPD6E05U06RVZR/Texas%20Instruments/view-part/",
+                "Download",
+            ),
+        ),
+        "TPD6E05U06RVZR",
+        expected_manufacturer="Texas Instruments",
+        vendor_key="snapmagic",
+    )
+
+    assert href.endswith("/Texas-Instruments/view-part/")
+    assert error == ""
+
+
 def test_exact_result_rejects_sponsored_tracking_echoes_and_collapses_duplicate_links():
     sponsored = (
         "/parts/WP10-S002VA10-R15000/JAE/view-part/"

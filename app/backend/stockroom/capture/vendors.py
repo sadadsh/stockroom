@@ -1195,7 +1195,10 @@ def _href_demonstrates_mpn(href: str, requested_mpn: str) -> bool:
     return any(_mpn_key(value) == expected for value in path_segments)
 
 
-def _canonical_detail_identity(href: str) -> tuple[str, str, tuple[str, ...]] | None:
+def _canonical_detail_identity(
+    href: str,
+    vendor_key: str = "",
+) -> tuple[str, str, tuple[str, ...]] | None:
     """The stable destination behind one result link.
 
     Provider search pages repeat one part through image/title/action links and add presentation
@@ -1205,6 +1208,21 @@ def _canonical_detail_identity(href: str) -> tuple[str, str, tuple[str, ...]] | 
     """
     try:
         parsed = urlparse(href)
+        observed = page_identity(vendor_key, href, allow_relative=True)
+        if observed is not None:
+            manufacturer = "".join(
+                character
+                for character in normalize("NFKC", observed.manufacturer).casefold()
+                if character.isalnum()
+            )
+            mpn = _mpn_key(observed.mpn)
+            if manufacturer and mpn:
+                uid = tuple(
+                    _mpn_key(value)
+                    for value in parse_qs(parsed.query, keep_blank_values=False).get("uid", ())
+                    if value.strip()
+                )
+                return (manufacturer, mpn, uid)
         path = _mpn_key(unquote(parsed.path)).rstrip("/")
         if not path:
             return None
@@ -1298,7 +1316,7 @@ def _exact_result_href(
                 if mismatch:
                     wrong_manufacturer = True
                     continue
-            identity = _canonical_detail_identity(absolute)
+            identity = _canonical_detail_identity(absolute, vendor_key)
             if identity is not None:
                 matches.setdefault(identity, absolute)
     if not matches:

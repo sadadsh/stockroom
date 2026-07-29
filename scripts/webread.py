@@ -50,6 +50,11 @@ _CONTROLS_JS = r"""
                         catch (e) { return false; } };
   const txt = (el) => { try { return (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 90); }
                         catch (e) { return ''; } };
+  const labelled = (el) => {
+    try {
+      return Array.from(el.labels || []).map(txt).filter(Boolean).join(' | ').slice(0, 120);
+    } catch (e) { return ''; }
+  };
   const sel = (el) => {
     if (el.id) return '#' + el.id;
     const bits = [el.tagName.toLowerCase()];
@@ -82,7 +87,7 @@ _CONTROLS_JS = r"""
       }
     } catch (e) {}
     out.push({why, tag: el.tagName.toLowerCase(), selector: sel(el), visible: vis(el),
-              text: txt(el), attrs});
+              text: txt(el) || labelled(el), attrs});
   };
   // EVERY field, unconditionally. Filtering inputs through the keyword regex made this tool blind
   // to exactly the controls a sign-in needs: a bare `input[type=email]` carries no matching text,
@@ -242,7 +247,15 @@ def _drive(browser, args) -> int:
     with browser.session() as page:
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
         _sign_in_if_saved(adapter, page)
-        report, failure = drive_formats(browser, page, adapter, formats, url)
+        report, failure = drive_formats(
+            browser,
+            page,
+            adapter,
+            formats,
+            url,
+            expected_manufacturer=args.manufacturer,
+            expected_mpn=args.mpn,
+        )
 
     print(f"\nSELECTED   {report.selected or 'none'}")
     print(f"MISSED     {report.missed or 'none'}")
@@ -259,6 +272,11 @@ def main() -> int:
     ap.add_argument("url", nargs="?", default="")
     ap.add_argument("--vendor", default="", help="resolve the URL from the CAD-source registry")
     ap.add_argument("--mpn", default="", help="part number, with --vendor")
+    ap.add_argument(
+        "--manufacturer",
+        default="",
+        help="exact manufacturer identity required by machine-access vendor diagnostics",
+    )
     ap.add_argument("--grep", action="append", default=[], metavar="TERM")
     ap.add_argument("--context", type=int, default=240)
     ap.add_argument("--dump", action="store_true")
@@ -328,7 +346,16 @@ def main() -> int:
                 print(f"WARNING: {args.expect!r} never appeared within {args.timeout:.0f}s; "
                       "what follows may be a partial page")
         else:
-            page.wait_for_load_state("networkidle", timeout=int(args.timeout * 1000))
+            # Ad-supported provider pages can keep analytics and ad requests alive forever.
+            # `domcontentloaded` above already established a real document; network-idle is a
+            # useful extra signal, not a reason to discard the inspectable page after 45 seconds.
+            try:
+                page.wait_for_load_state("networkidle", timeout=int(args.timeout * 1000))
+            except Exception:  # noqa: BLE001 - continue with the loaded document and say so
+                print(
+                    f"WARNING: network did not become idle within {args.timeout:.0f}s; "
+                    "continuing with the loaded document"
+                )
 
         if args.panel:
             # Through the ADAPTER'S OWN open_panel, never a hand-written click here. A vendor's
