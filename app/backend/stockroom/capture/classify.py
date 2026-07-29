@@ -30,9 +30,9 @@ _INTLIB_REQS = frozenset({Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRIN
 # one `symbolDef` (schematic symbol), one `patternDef` (PCB footprint) and one `compDef`, with 69
 # pads and 212 pin references. It is delivered nested under `AltiumV15/`, never loose.
 #
-# This is how Ultra Librarian supplies Altium at all. Its other Altium row, "Altium Designer
-# (script based)", ships a Delphi script and NO libraries - and measuring only that row had
-# produced the over-general conclusion that UL could not serve Altium.
+# This remains a supported legacy fallback. Ultra Librarian's current primary Altium export is
+# native .SchLib/.PcbLib; its older "Altium Designer (script based)" row ships a Delphi script and
+# no libraries, while PCAD v15 supplies this importable .LIA shape.
 _LIA_REQS = _INTLIB_REQS
 
 _TOOL_FOR_REQ = {

@@ -29,6 +29,32 @@ class CandidateSelection:
     error: str = ""
 
 
+def exact_observation_error(record: object, observed: PageIdentity) -> str:
+    """Return why a provider identity is not the requested part, or an empty string."""
+
+    requested_mpn = getattr(record, "mpn", "") or ""
+    requested_manufacturer = getattr(record, "manufacturer", "") or ""
+    if not requested_mpn.strip():
+        return "cannot verify provider identity without a requested MPN"
+    if _mpn_key(observed.mpn) != _mpn_key(requested_mpn):
+        return (
+            "the provider exposed no exact candidate: "
+            f"MPN {observed.mpn!r} is not requested MPN {requested_mpn!r}"
+        )
+    if requested_manufacturer:
+        if not observed.manufacturer.strip():
+            return (
+                "the provider exposed no exact candidate with manufacturer "
+                f"{requested_manufacturer!r}"
+            )
+        if _manufacturer_key(observed.manufacturer) != _manufacturer_key(requested_manufacturer):
+            return (
+                "the provider exact-MPN candidate identifies manufacturer "
+                f"{observed.manufacturer!r}, not {requested_manufacturer!r}"
+            )
+    return ""
+
+
 def _decode_segment(value: str) -> str:
     """Decode vendor paths that may have been percent-encoded more than once."""
     decoded = value

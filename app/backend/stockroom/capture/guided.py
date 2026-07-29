@@ -39,7 +39,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from stockroom.capture.browser import PlaywrightCaptureBrowser, SharedPlaywrightRuntime
+from stockroom.capture.browser import (
+    PlaywrightCaptureBrowser,
+    ProviderHudSpec,
+    SharedPlaywrightRuntime,
+)
 from stockroom.capture.complete import SourceOutcome
 from stockroom.capture.cross_eda import (
     CrossEdaVerificationError,
@@ -49,6 +53,7 @@ from stockroom.capture.download_broker import DownloadBroker, DownloadTask
 from stockroom.capture.evidence import (
     BROWSER_CAPTURE_ADAPTER_VERSION,
     record_browser_cad_evidence,
+    record_composed_browser_altium_evidence,
 )
 from stockroom.capture.identity import select_exact_candidate
 from stockroom.capture.requirements import Requirement, asset_present, capture_needs
@@ -255,11 +260,23 @@ def _provider_formats(adapter, needs) -> list[str]:
     complete-bundle provider downloads KiCad symbol/footprint, STEP, and native Altium from that
     SAME provider. Verification runs before any existing asset can be replaced.
     """
-    selectable = set(adapter.capability.version_pins)
+    selectable = set(adapter.capability.supported_formats)
     requested = [fmt for fmt in formats_for(needs) if fmt in selectable]
     if requested and set(_COHERENT_CAD_FORMATS) <= selectable:
         return list(_COHERENT_CAD_FORMATS)
     return requested
+
+
+def _provider_hud_labels(adapter, formats: list[str]) -> tuple[str, ...]:
+    """Exact provider choices the person should select for one coherent capture."""
+
+    labels = adapter.capability.user_format_labels
+    fallbacks = {
+        "kicad": "KiCad symbol and footprint",
+        "model": "STEP model",
+        "altium": "Native Altium symbol and footprint",
+    }
+    return tuple(labels.get(fmt) or fallbacks[fmt] for fmt in formats)
 
 
 # What `altium/extract.py::normalize_altium_source` can actually take TODAY. `.lia` is not here
@@ -329,24 +346,22 @@ class GuidedCaptureSource:
     name = "guided"
 
     def provides(self) -> frozenset:
-        """What this source can actually deliver, derived from the ADAPTER's measured pins.
+        """What this source can deliver through its declared browser-access contract.
 
-        Never a hardcoded set, and never keyed on a tool NAME: the honest answer to "what can you
-        really fetch" is which export controls the adapter has measured AND this app can then
-        STORE - which is what `version_pins` records. A vendor that pins none of a part's needs is
-        never scheduled for it, so a pin that cannot be attached would make the engine chase a
-        requirement forever (see UltraLibrarianAdapter on why altium is not pinned yet).
+        Human-visible format labels and machine selectors are separate declarations. A user-driven
+        provider can be a supported path without granting Stockroom permission to inspect or
+        operate its DOM; both declarations still require an implemented validation/attach seam.
         """
         adapter = get_adapter(self._vendor_key)
         if adapter is None:
             return frozenset()
-        pins = set(adapter.capability.version_pins)
+        formats = set(adapter.capability.supported_formats)
         out: set[Requirement] = set()
-        if "kicad" in pins:
+        if "kicad" in formats:
             out |= {Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT}
-        if "model" in pins:
+        if "model" in formats:
             out.add(Requirement.KICAD_MODEL)
-        if "altium" in pins:
+        if "altium" in formats:
             out |= {Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT}
         return frozenset(out)
 
@@ -369,6 +384,7 @@ class GuidedCaptureSource:
         user_driven: bool = False,
         user_finished: Callable[[], bool] | None = None,
         user_cancelled: Callable[[], bool] | None = None,
+        cancel_workflow: Callable[[], None] | None = None,
         user_capture_timeout_s: float = 600.0,
     ) -> None:
         self._make_pipeline = make_pipeline
@@ -398,6 +414,7 @@ class GuidedCaptureSource:
         self._user_driven = user_driven
         self._user_finished = user_finished
         self._user_cancelled = user_cancelled
+        self._cancel_workflow = cancel_workflow
         self._user_capture_timeout_s = user_capture_timeout_s
         self._session: _Session | None = None
 
@@ -457,6 +474,9 @@ class GuidedCaptureSource:
     # -- the source contract ---------------------------------------------------------------
 
     def supply(self, record) -> SourceOutcome:
+        if self._user_driven and self._user_cancelled and self._user_cancelled():
+            return SourceOutcome(skipped="provider capture workflow was cancelled")
+
         adapter = get_adapter(self._vendor_key)
         if adapter is None:
             return SourceOutcome(error=f"no capture adapter for vendor {self._vendor_key!r}")
@@ -469,10 +489,8 @@ class GuidedCaptureSource:
         needs = list(capture_needs(record))
         if not needs:
             return SourceOutcome(skipped=f"{record.mpn or record.id} needs no captured files")
-        # Filter on what the adapter can ACTUALLY select (its measured pins), not on a tool
-        # name. Ultra Librarian nominally "does Altium", but its Altium export is a script that
-        # produces no library files - so asking for it produced a confident success that attached
-        # nothing. `version_pins` is the honest answer to "what can you really fetch".
+        # Filter on the formats accepted by this provider's declared access contract and by
+        # Stockroom's implemented attach seams. User-driven formats do not require DOM selectors.
         formats = _provider_formats(adapter, needs)
         if not formats:
             return SourceOutcome(
@@ -495,6 +513,7 @@ class GuidedCaptureSource:
                 manufacturer,
                 mpn,
                 url,
+                formats,
             )
 
         open_task_page = getattr(session.browser, "task_page", None)
@@ -568,9 +587,13 @@ class GuidedCaptureSource:
         manufacturer: str,
         mpn: str,
         url: str,
+        formats: list[str],
     ) -> SourceOutcome:
         """Open the provider page without invoking any provider automation."""
 
+        adapter = get_adapter(self._vendor_key)
+        if adapter is None:
+            return SourceOutcome(error=f"no capture adapter for vendor {self._vendor_key!r}")
         broker = DownloadBroker(
             DownloadTask(
                 task_id=record.id,
@@ -583,6 +606,12 @@ class GuidedCaptureSource:
             result = session.browser.capture_user_downloads(
                 url,
                 broker,
+                hud=ProviderHudSpec(
+                    provider_label=provider_label,
+                    manufacturer=manufacturer,
+                    mpn=mpn,
+                    required_file_labels=_provider_hud_labels(adapter, formats),
+                ),
                 should_finish=self._user_finished,
                 should_cancel=self._user_cancelled,
                 timeout_s=self._user_capture_timeout_s,
@@ -592,9 +621,18 @@ class GuidedCaptureSource:
 
         received = len(result.files)
         if result.status == "cancelled":
+            if self._cancel_workflow is not None:
+                self._cancel_workflow()
             suffix = f" after receiving {received} file(s)" if received else ""
             return SourceOutcome(
                 skipped=f"{provider_label} capture was cancelled{suffix}; nothing was attached"
+            )
+        if result.status == "try_another":
+            suffix = f" after receiving {received} file(s)" if received else ""
+            return SourceOutcome(
+                skipped=(
+                    f"{provider_label} was left for another provider{suffix}; nothing was attached"
+                )
             )
         if result.status == "timed_out":
             suffix = f" after receiving {received} file(s)" if received else ""
@@ -631,6 +669,7 @@ class GuidedCaptureSource:
         failures: list[str] = []
         identity_error = ""
         evidence_digest = ""
+        evidence_operation = "cad:kicad"
         cross_eda_verified = False
         altium_sources = _altium_libraries(landed)
         pipeline = self._make_pipeline()
@@ -683,12 +722,28 @@ class GuidedCaptureSource:
                     except Exception as exc:  # noqa: BLE001 - fail closed before any library write
                         return SourceOutcome(error=f"CAD evidence verification failed: {exc}")
             elif self._evidence_store is not None and not identity_error:
-                return SourceOutcome(
-                    error=(
-                        "CAD evidence verification failed: the provider download has no exact "
-                        "KiCad symbol, footprint, and STEP set"
+                if not altium_sources:
+                    return SourceOutcome(
+                        error=(
+                            "CAD evidence verification failed: the provider download has no exact "
+                            "KiCad symbol, footprint, STEP, or native Altium set"
+                        )
                     )
-                )
+                try:
+                    evidence_digest, verified_sources = record_composed_browser_altium_evidence(
+                        store=self._evidence_store,
+                        record=record,
+                        profile=pipeline.profile,
+                        provider_key=self._vendor_key,
+                        detail_url=detail_url,
+                        altium_sources=tuple(altium_sources),
+                        cross_eda_verifier=self._cross_eda_verifier,
+                    )
+                except Exception as exc:  # noqa: BLE001 - fail closed before any library write
+                    return SourceOutcome(error=f"CAD evidence verification failed: {exc}")
+                altium_sources = list(verified_sources)
+                cross_eda_verified = True
+                evidence_operation = "cad:altium"
             origin = AssetOrigin(
                 vendor=self._vendor_key,
                 url=url,
@@ -699,7 +754,7 @@ class GuidedCaptureSource:
                     else {
                         "evidence_adapter_version": BROWSER_CAPTURE_ADAPTER_VERSION,
                         "evidence_manifest_digest": evidence_digest,
-                        "evidence_operation": "cad:kicad",
+                        "evidence_operation": evidence_operation,
                     }
                 ),
             )

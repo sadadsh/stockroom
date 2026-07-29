@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
@@ -15,6 +15,7 @@ from stockroom.capture.guided import GuidedCaptureSource
 from stockroom.capture.requirements import Requirement
 from stockroom.evidence import EvidenceStore
 from stockroom.ingest.staging import StagingCandidate
+from stockroom.model.asset import Asset, AssetOrigin, AssetRef, EdaAssets
 from stockroom.planning import KICAD_CAD_OPERATION, ExactPartIdentity
 
 _CFB_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
@@ -39,6 +40,20 @@ class _Record:
     id: str = "s1m"
     manufacturer: str = "ON Semiconductor"
     mpn: str = "S1M"
+
+
+@dataclass
+class _InstalledRecord(_Record):
+    category: str = "Diodes"
+    assets: dict[str, EdaAssets] = field(
+        default_factory=lambda: {
+            "kicad": EdaAssets(),
+            "altium": EdaAssets(),
+        }
+    )
+
+    def assets_for(self, tool: str) -> EdaAssets:
+        return self.assets[tool]
 
 
 def _candidate(tmp_path: Path, *, model: bool = True) -> StagingCandidate:
@@ -303,3 +318,183 @@ def test_guided_attach_persists_digest_and_refuses_unverified_altium(
     digest = origins[0].extra["evidence_manifest_digest"]
     assert digest.startswith("sha256:")
     assert origins[0].extra["evidence_operation"] == "cad:kicad"
+
+
+def _installed_kicad(
+    tmp_path: Path,
+    candidate: StagingCandidate,
+) -> tuple[_InstalledRecord, object]:
+    root = tmp_path / "Library"
+
+    class _Library:
+        def __init__(self) -> None:
+            self.root = root
+
+        def symbol_lib_path(self, _category: str) -> Path:
+            return root / "symbols" / "Diodes.kicad_sym"
+
+        def footprint_lib_path(self, _category: str) -> Path:
+            return root / "footprints" / "Diodes.pretty"
+
+    library = _Library()
+    symbol = library.symbol_lib_path("Diodes")
+    footprint = library.footprint_lib_path("Diodes") / "D_SMA.kicad_mod"
+    model = root / "models" / "S1M.step"
+    for path in (symbol, footprint, model):
+        path.parent.mkdir(parents=True, exist_ok=True)
+    symbol.write_bytes(candidate.symbol_lib_path.read_bytes())
+    footprint.write_bytes(candidate.chosen_footprint.read_bytes())
+    model.write_bytes(candidate.model_path.read_bytes())
+
+    origin = AssetOrigin(vendor="lcsc")
+    record = _InstalledRecord()
+    record.assets["kicad"] = EdaAssets(
+        symbol=Asset(ref=AssetRef(lib="Diodes", name="S1M"), origin=origin),
+        footprint=Asset(ref=AssetRef(lib="Diodes", name="D_SMA"), origin=origin),
+        model=Asset(ref=AssetRef(file="models/S1M.step"), origin=origin),
+    )
+    profile = type("_Profile", (), {"library": library})()
+    return record, profile
+
+
+def test_altium_only_download_composes_with_reverified_active_kicad_without_replacing_it(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    candidate = _candidate(tmp_path)
+    record, profile = _installed_kicad(tmp_path, candidate)
+    bundle = tmp_path / "altium-only.zip"
+    with zipfile.ZipFile(bundle, "w") as archive:
+        archive.writestr("S1M.SchLib", _CFB_MAGIC + b"symbol")
+        archive.writestr("S1M.PcbLib", _CFB_MAGIC + b"footprint")
+    store = EvidenceStore(tmp_path / "Evidence")
+    attach_origins = []
+    original_kicad = record.assets_for("kicad")
+
+    class _Pipeline:
+        def __init__(self) -> None:
+            self.profile = profile
+
+        def inspect(self, inputs):
+            assert inputs == [bundle]
+            return []
+
+        def cleanup(self):
+            return None
+
+    def _attach_altium(part_id, *sources, origin=None):
+        assert part_id == "s1m"
+        assert {path.suffix.casefold() for path in sources} == {".schlib", ".pcblib"}
+        assert all(path.read_bytes().startswith(_CFB_MAGIC) for path in sources)
+        attach_origins.append(origin)
+        record.assets["altium"] = EdaAssets(
+            symbol=AssetRef(lib="S1M", name="S1M"),
+            footprint=AssetRef(lib="S1M", name="S1M"),
+        )
+        return record
+
+    monkeypatch.setattr(
+        "stockroom.capture.guided.get_adapter",
+        lambda _key: type(
+            "_Adapter",
+            (),
+            {"capability": type("_Capability", (), {"label": "Ultra Librarian"})()},
+        )(),
+    )
+    source = GuidedCaptureSource(
+        lambda: _Pipeline(),
+        vendor="ultralibrarian",
+        download_root=tmp_path / "Downloads",
+        attach_altium=_attach_altium,
+        evidence_store=store,
+        cross_eda_verifier=lambda **_kwargs: {
+            "valid": True,
+            "terminal_equivalence": True,
+            "pad_equivalence": True,
+            "package_equivalence": True,
+        },
+        now_iso=lambda: "2026-07-28T00:00:00Z",
+    )
+
+    outcome = source._attach(
+        record,
+        [type("_Captured", (), {"path": bundle})()],
+        _DETAIL_URL.replace("snapeda.com", "ultralibrarian.com"),
+        detail_url=("https://app.ultralibrarian.com/details/example/ON%20Semiconductor/S1M"),
+    )
+
+    assert set(outcome.satisfied) == {
+        Requirement.ALTIUM_SYMBOL,
+        Requirement.ALTIUM_FOOTPRINT,
+    }
+    assert outcome.error == ""
+    assert record.assets_for("kicad") is original_kicad
+    assert len(attach_origins) == 1
+    origin = attach_origins[0]
+    assert origin.extra["evidence_operation"] == "cad:altium"
+    manifest = store.verify_role_artifact_success(
+        origin.extra["evidence_manifest_digest"],
+        identity=ExactPartIdentity("ON Semiconductor", "S1M"),
+        required_roles=("altium_symbol", "altium_footprint"),
+    )
+    assert manifest["provider"] == "ultralibrarian"
+    assert len(manifest["source_manifests"]) == 1
+    assert [
+        item.provider_key
+        for item in store.list_role_variants(
+            identity=ExactPartIdentity("ON Semiconductor", "S1M"),
+            role="altium_symbol",
+        )
+    ] == ["ultralibrarian"]
+
+
+def test_altium_only_download_stays_unattached_without_complete_equivalence_proof(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    candidate = _candidate(tmp_path)
+    record, profile = _installed_kicad(tmp_path, candidate)
+    bundle = tmp_path / "altium-only.zip"
+    with zipfile.ZipFile(bundle, "w") as archive:
+        archive.writestr("S1M.SchLib", _CFB_MAGIC + b"symbol")
+        archive.writestr("S1M.PcbLib", _CFB_MAGIC + b"footprint")
+    attached = []
+
+    class _Pipeline:
+        def __init__(self) -> None:
+            self.profile = profile
+
+        def inspect(self, inputs):
+            assert inputs == [bundle]
+            return []
+
+        def cleanup(self):
+            return None
+
+    monkeypatch.setattr(
+        "stockroom.capture.guided.get_adapter",
+        lambda _key: type(
+            "_Adapter",
+            (),
+            {"capability": type("_Capability", (), {"label": "Ultra Librarian"})()},
+        )(),
+    )
+    source = GuidedCaptureSource(
+        lambda: _Pipeline(),
+        vendor="ultralibrarian",
+        download_root=tmp_path / "Downloads",
+        attach_altium=lambda *_args, **_kwargs: attached.append(True),
+        evidence_store=EvidenceStore(tmp_path / "Evidence"),
+        cross_eda_verifier=lambda **_kwargs: {"valid": True},
+    )
+
+    outcome = source._attach(
+        record,
+        [type("_Captured", (), {"path": bundle})()],
+        "https://app.ultralibrarian.com/details/example/ON%20Semiconductor/S1M",
+        detail_url="https://app.ultralibrarian.com/details/example/ON%20Semiconductor/S1M",
+    )
+
+    assert not attached
+    assert outcome.satisfied == ()
+    assert "terminal, pad, and package equivalence" in outcome.error

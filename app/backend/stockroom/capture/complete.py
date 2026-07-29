@@ -195,7 +195,10 @@ def complete_part(part_id: str, *, load_record, sources) -> CompletionItem:
     item.display_name = getattr(record, "display_name", "") or ""
     item.category = getattr(record, "category", "") or ""
 
-    needs = sourceable_needs(record, sources)
+    # Report every real CAD gap, not only the subset today's sources claim they can fill.
+    # Otherwise a source can satisfy the sourceable subset and make the item read "completed"
+    # while an unsupported Altium/model requirement remains on the record.
+    needs = list(capture_needs(record))
     item.needed = [n.value for n in needs]
     if not needs:
         item.status = "already-complete"
@@ -231,7 +234,8 @@ def complete_part(part_id: str, *, load_record, sources) -> CompletionItem:
         # files behind it, which is the "success reported by the code that started the work"
         # failure this project has paid for more than once.
         try:
-            still = set(sourceable_needs(load_record(part_id), sources))
+            record = load_record(part_id)
+            still = set(capture_needs(record))
         except Exception as exc:  # noqa: BLE001
             errors.append(f"reload after {source.key}: {exc}")
             continue

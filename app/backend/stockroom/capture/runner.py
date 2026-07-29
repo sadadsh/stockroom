@@ -23,7 +23,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from stockroom.capture.complete import complete_library, iter_incomplete, sourceable_needs
+from stockroom.capture.complete import complete_library, iter_incomplete
 from stockroom.capture.pacing import CircuitBreaker, PacedSource
 from stockroom.capture.sources import LcscSource
 from stockroom.enrich.ratelimit import SlidingWindowLimiter
@@ -53,16 +53,38 @@ def build_sources(ctx, *, run_write=None, paced: bool = True):
         # holds one tree at a time rather than one per part.
         return IngestPipeline(ctx.profile, ctx.repo, ctx.cli)
 
+    from stockroom.enrich.fetch import HttpFetcher
+
+    fetcher = HttpFetcher()
+
     def resolve_online(mpn: str) -> str:
         """The free, keyless jlcsearch catalogue: MPN -> LCSC part number. Only reached when
         the record itself carries no id, which is 20 of the owner's 66 file-less parts."""
-        from stockroom.enrich.fetch import HttpFetcher
         from stockroom.enrich.jlcsearch import JlcSearchClient
 
-        hit = JlcSearchClient(HttpFetcher()).search(mpn)
+        hit = JlcSearchClient(fetcher).search(mpn)
         return (getattr(hit, "lcsc", "") or "") if hit is not None else ""
 
-    lcsc = LcscSource(make_pipeline, resolve_online=resolve_online, run_write=run_write)
+    def resolve_identity(lcsc_id: str):
+        """LCSC C-number -> independent manufacturer + MPN evidence from its product page."""
+        from stockroom.enrich.sites.lcsc import parse_lcsc_product
+
+        url = f"https://www.lcsc.com/product-detail/{lcsc_id.upper()}.html"
+        page = fetcher.get(url)
+        if not 200 <= page.status < 300:
+            raise RuntimeError(f"product page returned HTTP {page.status}")
+        product = parse_lcsc_product(page.text)
+        if product is None:
+            raise RuntimeError("product page exposed no structured identity")
+        return product
+
+    lcsc = LcscSource(
+        make_pipeline,
+        resolve_online=resolve_online,
+        resolve_identity=resolve_identity,
+        run_write=run_write,
+        now_iso=_utc_now_iso,
+    )
     if not paced:
         return [lcsc]
     return [
@@ -84,19 +106,43 @@ def coverage(ctx) -> dict:
     in the background, and a coverage number that disagrees with the files is a number that
     lies.
 
-    Two different totals are reported on purpose. `needs_files` counts what some registered
-    source could act on right now; `unsourced` counts parts with a real gap that NOTHING
-    registered can fill. Collapsing them would either hide 16 genuinely stuck parts or report
-    them as pending work forever.
+    The action totals are reported separately. `needs_files` counts parts an automatic source can
+    improve, `needs_assistance` counts parts whose gaps overlap a managed user-driven provider,
+    and `unsourced` counts parts with a real gap that neither lane can fill. The first two may
+    overlap: a part can gain KiCad automatically and still need an assisted native-Altium export.
     """
-    sources = build_sources(ctx, paced=False)
+    from stockroom.capture.requirements import Requirement
+    from stockroom.capture.vendors import get_adapter
+
+    direct_sources = build_sources(ctx, paced=False)
     can_provide = set()
-    for source in sources:
+    for source in direct_sources:
         can_provide |= set(source.provides())
+    browser_source_keys: list[str] = []
+    assisted_source_keys: list[str] = []
+    assisted_can_provide = set()
+    for key in _vendor_chain(None):
+        adapter = get_adapter(key)
+        if adapter is None:
+            continue
+        if adapter.capability.browser_access == "machine_allowed":
+            browser_source_keys.append(key)
+            destination = can_provide
+        else:
+            assisted_source_keys.append(key)
+            destination = assisted_can_provide
+        pins = set(adapter.capability.version_pins)
+        if "kicad" in pins:
+            destination |= {Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT}
+        if "model" in pins:
+            destination.add(Requirement.KICAD_MODEL)
+        if "altium" in pins:
+            destination |= {Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT}
 
     total = 0
     complete = 0
     needs_files = 0
+    needs_assistance = 0
     unsourced = 0
     by_requirement: dict[str, int] = {}
     for path in sorted(ctx.profile.library.parts_dir.glob("*.json")):
@@ -113,65 +159,44 @@ def coverage(ctx) -> dict:
             continue
         for need in needs:
             by_requirement[need.value] = by_requirement.get(need.value, 0) + 1
-        if sourceable_needs(record, sources):
+        automatic_overlap = set(needs) & can_provide
+        assisted_overlap = set(needs) & assisted_can_provide
+        if automatic_overlap:
             needs_files += 1
-        else:
+        if assisted_overlap:
+            needs_assistance += 1
+        if not automatic_overlap and not assisted_overlap:
             unsourced += 1
     return {
         "total": total,
         "complete": complete,
         "needs_files": needs_files,
+        "needs_assistance": needs_assistance,
         "unsourced": unsourced,
         "by_requirement": dict(sorted(by_requirement.items())),
-        "sources": [s.key for s in sources],
+        "sources": [s.key for s in direct_sources] + browser_source_keys,
         "can_provide": sorted(r.value for r in can_provide),
+        "assisted_sources": assisted_source_keys,
+        "assisted_can_provide": sorted(r.value for r in assisted_can_provide),
     }
 
 
 def run_completion(ctx, *, progress=None, should_stop=None, part_ids=None, limit=None) -> dict:
-    """Complete every part that a registered source can help, streaming.
+    """Run the same automatic acquisition ladder for one part or the whole library.
 
     `part_ids` narrows the run to a chosen set (one part, or a filtered list); omitted, the
     worklist is DERIVED from the library, which is what makes a stopped run resumable by
-    simply running it again.
+    simply running it again. Direct/keyless sources run before managed-browser providers, so the
+    bulk surface and Complete Part cannot disagree about which gaps are fillable.
     """
-
-    def run_write(fn):
-        # Each git commit goes onto the serialized write lane while the slow network work
-        # stays on the read lane -- the same split bulk_import uses, so commits can never
-        # interleave with another writer.
-        return ctx.jobs.run_write(fn)
-
-    sources = build_sources(ctx, run_write=run_write)
-    load_record = ctx.ops.load_record
-
-    if part_ids is None:
-        work = iter_incomplete(
-            ctx.profile.library.parts_dir, load_record=load_record, sources=sources
-        )
-        total = None
-    else:
-        work = list(part_ids)
-        total = len(work)
-    if limit is not None:
-        work = _take(work, limit)
-        total = min(total, limit) if total is not None else None
-
-    report = complete_library(
-        work,
-        load_record=load_record,
-        sources=sources,
-        on_progress=progress,
+    return run_guided_capture(
+        ctx,
+        part_ids=part_ids,
+        progress=progress,
         should_stop=should_stop,
-        total=total,
-        breaker=CircuitBreaker(threshold=_BREAKER_THRESHOLD),
+        limit=limit,
+        user_driven=False,
     )
-    if report.of("completed", "improved"):
-        # Only rebuild and push when something actually changed. A no-op run over a complete
-        # 10,000-part library must cost nothing.
-        ctx.jobs.run_write(ctx.rebuild_index)
-        ctx.jobs.run_write(ctx.auto_push)
-    return report.to_dict()
 
 
 def run_guided_capture(
@@ -184,29 +209,68 @@ def run_guided_capture(
     limit=None,
     headless: bool = False,
     engine: str = "chromium",
+    user_driven: bool = False,
 ) -> dict:
-    """Capture from a trusted vendor through a real browser: ONE component, or the whole library.
+    """Complete CAD automatically, with person-controlled capture only as an explicit fallback.
 
-    Owner, 2026-07-27: *"i also need guided capture per component"*. `part_ids=[one]` is the
-    per-component run and `part_ids=None` is the whole library - the SAME path, so whichever one is
-    verified verifies the other. That is also why this shares `complete_library` with the offline
-    sources rather than being its own flow.
+    The default path performs the least-expensive work first: keyless direct catalogue retrieval,
+    deterministic generators, and any provider transport with a reviewed machine-access contract.
+    Commercial browser providers remain available only through the explicit assisted fallback when
+    their policy requires user control; Stockroom still opens the exact page, intercepts every
+    download, validates it, and attaches it. A preferred ``vendor`` changes provider order where
+    policy permits machine access.
 
-    BOTH VENDORS, IN ORDER. Owner, 2026-07-27: *"i wanted both"* / *"check both to see which one
-    has it, and if one download fails use the other."* `vendor` accepts a single key or a list; the
-    default is the whole chain. Nothing clever implements the fallback - `complete_library` already
-    walks its sources in order and skips any whose `provides()` no longer overlaps what the part
-    still needs. A part that gets everything from the first vendor never opens the second.
-
-    Order is the policy: SnapMagic first because it is the only implemented browser provider that
-    can deliver one coherent KiCad + STEP + native-Altium evidence bundle. Its community/AI sourcing
-    is lower-trust than Ultra Librarian, but exact identity, native readback, cross-EDA equivalence,
-    and immutable evidence gate every attachment. Ultra Librarian remains the manufacturer-authored
-    fallback when SnapMagic is unavailable, but currently closes only the KiCad side.
-
-    The browser is opened lazily by each source (a run with nothing to do never flashes a window)
-    and ALL of them are closed here, so a stopped, failed or completed run leaves no window behind.
+    ``user_driven=True`` is the last-resort lane for a provider gate Stockroom cannot cross. It is
+    deliberately scoped to one part and one preferred provider: the person handles each provider
+    page while Stockroom still owns download interception, validation, attachment, and advancing
+    to another provider when the preferred one cannot close every remaining gap.
     """
+    if type(user_driven) is not bool:
+        raise TypeError("user_driven must be a boolean")
+    from threading import Event
+
+    workflow_cancelled = Event()
+
+    def capture_should_stop() -> bool:
+        return workflow_cancelled.is_set() or bool(should_stop and should_stop())
+
+    if user_driven:
+        if part_ids is None or isinstance(part_ids, (str, bytes)):
+            raise ValueError("user-driven capture requires exactly one selected part")
+        selected_parts = list(part_ids)
+        if (
+            len(selected_parts) != 1
+            or not isinstance(selected_parts[0], str)
+            or not selected_parts[0].strip()
+            or selected_parts[0] != selected_parts[0].strip()
+        ):
+            raise ValueError("user-driven capture requires exactly one selected part")
+        if not isinstance(vendor, str) or not vendor.strip():
+            raise ValueError("user-driven capture requires one selected provider")
+        if limit is not None:
+            raise ValueError(
+                "user-driven capture does not accept a batch limit; select exactly one part"
+            )
+        part_ids = selected_parts
+        # The selected provider is first, not exclusive. "Try Another Provider" in Stockroom's
+        # browser HUD can therefore end the current page and advance within this same resumable
+        # job instead of making the person return to the app and start another capture.
+        provider_keys = _vendor_chain(vendor.strip().lower())
+    else:
+        # Automatic mode may construct only transports with a reviewed machine-access contract.
+        # Other browser providers are exposed through the explicit assisted route after permitted
+        # automatic sources have exhausted.
+        from stockroom.capture.vendors import get_adapter
+
+        provider_keys = [
+            key
+            for key in _vendor_chain(vendor)
+            if (
+                (adapter := get_adapter(key)) is not None
+                and adapter.capability.browser_access == "machine_allowed"
+            )
+        ]
+
     from stockroom.capture.browser import SharedPlaywrightRuntime
     from stockroom.capture.guided import GuidedCaptureSource
     from stockroom.evidence import EvidenceStore
@@ -216,9 +280,17 @@ def run_guided_capture(
         return IngestPipeline(ctx.profile, ctx.repo, ctx.cli)
 
     evidence_store = EvidenceStore(_capture_evidence_root(ctx))
-    playwright_runtime = SharedPlaywrightRuntime() if engine != "camoufox" else None
-    sources = [
-        GuidedCaptureSource(
+    playwright_runtime = (
+        SharedPlaywrightRuntime() if provider_keys and engine != "camoufox" else None
+    )
+
+    def make_guided_source(key: str):
+        from stockroom.capture.vendors import get_adapter
+
+        adapter = get_adapter(key)
+        if adapter is None:
+            raise ValueError(f"no network capture adapter for provider {key!r}")
+        return GuidedCaptureSource(
             make_pipeline,
             vendor=key,
             download_root=_capture_downloads(ctx, key),
@@ -233,16 +305,30 @@ def run_guided_capture(
             # never called - so a vendor shipping real .SchLib/.PcbLib had them downloaded and
             # dropped. Passed in rather than imported so capture/ stays clear of the mutation layer.
             attach_altium=ctx.ops.attach_altium_assets,
-            # Saved vendor sign-ins, so a 90-part sitting runs unattended instead of stopping on
-            # every part at a Download button the vendor renders only for a signed-in user.
-            credentials=_saved_credentials,
+            # Credentials are supplied only to providers whose reviewed policy explicitly permits
+            # machine access. User-driven providers retain their session in the isolated profile
+            # without Stockroom impersonating provider-side choices.
+            credentials=None if user_driven else _saved_credentials,
             run_write=ctx.jobs.run_write,
             now_iso=_utc_now_iso,
             evidence_store=evidence_store,
             playwright_runtime=playwright_runtime,
+            user_driven=user_driven,
+            user_cancelled=capture_should_stop,
+            cancel_workflow=workflow_cancelled.set,
         )
-        for key in _vendor_chain(vendor)
-    ]
+
+    guided_sources = [make_guided_source(key) for key in provider_keys]
+    # Direct/keyless acquisition is the zero-interaction first lane. If it fills the remaining
+    # KiCad requirements, GuidedCaptureSource is never asked and no browser window opens.
+    sources = (
+        guided_sources
+        if user_driven
+        else [
+            *build_sources(ctx, run_write=ctx.jobs.run_write, paced=False),
+            *guided_sources,
+        ]
+    )
     load_record = ctx.ops.load_record
 
     if part_ids is None:
@@ -263,12 +349,12 @@ def run_guided_capture(
             load_record=load_record,
             sources=sources,
             on_progress=progress,
-            should_stop=should_stop,
+            should_stop=capture_should_stop,
             total=total,
             breaker=CircuitBreaker(threshold=_BREAKER_THRESHOLD),
         )
     finally:
-        for source in sources:
+        for source in guided_sources:
             source.close()
         if playwright_runtime is not None:
             playwright_runtime.close()
@@ -391,12 +477,11 @@ def _saved_credentials(vendor_key: str):
     return user, secret
 
 
-# The vendor chain, in the order a run tries them. ORDER IS THE POLICY: SnapMagic first because it
-# alone supplies a same-provider KiCad + STEP + native-Altium bundle for the evidence join. Its
-# source quality is lower than Ultra Librarian's manufacturer-authored assets, so attachment remains
-# contingent on exact identity, native readback, cross-EDA equivalence, and immutable evidence.
-# Ultra Librarian is the availability/trust fallback, but currently cannot close native Altium.
-_VENDOR_CHAIN = ("snapmagic", "ultralibrarian")
+# The vendor chain, in trust order. Ultra Librarian's manufacturer-verified/source-built assets and
+# current native Altium export are preferred; SnapMagic is the availability fallback. Exact identity, native
+# readback, cross-EDA equivalence, and immutable evidence still gate every attachment regardless of
+# source. A caller can explicitly prefer another provider for one run without changing this default.
+_VENDOR_CHAIN = ("ultralibrarian", "snapmagic")
 
 
 def _vendor_chain(vendor) -> list[str]:

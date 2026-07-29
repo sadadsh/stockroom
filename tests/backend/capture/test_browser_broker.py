@@ -18,6 +18,7 @@ import pytest
 from stockroom.capture.browser import (
     CaptureBrowserError,
     PlaywrightCaptureBrowser,
+    ProviderHudSpec,
     ProviderProfileLock,
     SharedPlaywrightRuntime,
     _allow_automatic_downloads,
@@ -390,6 +391,231 @@ class _PageContext:
         page = _EventPage()
         self.pages.append(page)
         return page
+
+
+class _HudPage(_EventPage):
+    """Deterministic Page double exposing only Stockroom's injection/update seams."""
+
+    url = "about:blank"
+
+    def __init__(self):
+        super().__init__()
+        self.events: list[str] = []
+        self.init_scripts: list[str] = []
+        self.bindings: dict[str, object] = {}
+        self.evaluations: list[tuple[str, object]] = []
+        self.waits = 0
+        self.on_goto = None
+        self.on_wait = None
+
+    def on(self, event: str, handler) -> None:
+        self.events.append(f"on:{event}")
+        super().on(event, handler)
+
+    def expose_binding(self, name: str, callback) -> None:
+        self.events.append("expose-binding")
+        self.bindings[name] = callback
+
+    def add_init_script(self, script: str) -> None:
+        self.events.append("add-init-script")
+        self.init_scripts.append(script)
+
+    def evaluate(self, expression: str, arg=None) -> None:
+        self.events.append("evaluate-stockroom")
+        self.evaluations.append((expression, arg))
+
+    def goto(self, url: str, **_options) -> None:
+        self.events.append(f"goto:{url}")
+        assert self.handlers, "download interception must be wired before navigation"
+        assert self.bindings, "HUD actions must be bound before navigation"
+        assert self.init_scripts, "HUD must survive provider navigation"
+        self.url = url
+        if self.on_goto is not None:
+            self.on_goto()
+
+    def wait_for_timeout(self, _milliseconds: int) -> None:
+        self.events.append("wait")
+        self.waits += 1
+        if self.on_wait is not None:
+            self.on_wait(self.waits)
+
+    def is_closed(self) -> bool:
+        return self.closed
+
+    def invoke_hud_action(self, action: str, *, token: str | None = None) -> bool:
+        assert len(self.bindings) == 1
+        assert self.evaluations
+        callback = next(iter(self.bindings.values()))
+        return callback(
+            SimpleNamespace(page=self),
+            action,
+            token if token is not None else self.evaluations[0][1]["actionToken"],
+        )
+
+
+def _provider_hud_spec() -> ProviderHudSpec:
+    return ProviderHudSpec(
+        provider_label="Exact Provider",
+        manufacturer="Exact Manufacturer",
+        mpn="MPN-A/7",
+        required_file_labels=(
+            "KiCad symbol (.kicad_sym)",
+            "KiCad footprint (.kicad_mod)",
+            "3D model (.step)",
+        ),
+    )
+
+
+def _hud_capture(tmp_path, page: _HudPage, *, action: str | None = None):
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+    spec = _provider_hud_spec()
+    broker = DownloadBroker(DownloadTask("part-a", spec.manufacturer, spec.mpn, staging))
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    browser._context = SimpleNamespace(new_page=lambda: page)
+    if action is not None:
+        page.on_goto = lambda: page.invoke_hud_action(action)
+    result = browser.capture_user_downloads(
+        "https://vendor.example.test/search?query=MPN-A%2F7",
+        broker,
+        hud=spec,
+        timeout_s=1,
+        poll_interval_s=0.01,
+        settle_seconds=0,
+    )
+    return result, broker
+
+
+def test_user_capture_hud_is_injected_before_navigation_and_survives_without_dom_inspection(
+    tmp_path,
+):
+    page = _HudPage()
+
+    result, _broker = _hud_capture(tmp_path, page, action="finish")
+
+    assert result.status == "completed"
+    goto_index = page.events.index("goto:https://vendor.example.test/search?query=MPN-A%2F7")
+    assert page.events.index("on:download") < goto_index
+    assert page.events.index("expose-binding") < goto_index
+    assert page.events.index("add-init-script") < goto_index
+    assert page.events.index("evaluate-stockroom") < goto_index
+    assert len(page.init_scripts) == 1
+
+    bootstrap, payload = page.evaluations[0]
+    assert payload["providerLabel"] == "Exact Provider"
+    assert payload["manufacturer"] == "Exact Manufacturer"
+    assert payload["mpn"] == "MPN-A/7"
+    assert payload["requiredFileLabels"] == [
+        "KiCad symbol (.kicad_sym)",
+        "KiCad footprint (.kicad_mod)",
+        "3D model (.step)",
+    ]
+    assert payload["downloadCount"] == 0
+    assert 'attachShadow({ mode: "closed" })' in bootstrap
+    assert 'host.setAttribute("popover", "manual")' in bootstrap
+    assert "Sign in if asked—this session is remembered on this PC." in bootstrap
+    assert "prefers-reduced-motion" in bootstrap
+    assert 'live.setAttribute("aria-live", "polite")' in bootstrap
+    assert 'header.addEventListener("pointerdown"' in bootstrap
+    assert 'move.addEventListener("keydown"' in bootstrap
+    assert '"Finish"' in bootstrap
+    assert '"Try Another Provider"' in bootstrap
+    assert '"Cancel"' in bootstrap
+
+    # The only page code Stockroom installs creates and updates its own closed-shadow surface.
+    # The fake deliberately has no locator/query APIs, and the script carries no provider-content,
+    # credential, or storage inspection primitive.
+    provider_inspection_primitives = (
+        "querySelector",
+        "getElementsBy",
+        "document.body",
+        "innerHTML",
+        "innerText",
+        "document.cookie",
+        "localStorage",
+        "sessionStorage",
+        "credential",
+        "password",
+    )
+    assert all(value not in bootstrap for value in provider_inspection_primitives)
+
+
+def test_user_capture_hud_receives_live_stockroom_download_count(tmp_path):
+    class Download:
+        suggested_filename = "symbol.kicad_sym"
+        url = "https://vendor.example.test/files/symbol.kicad_sym"
+
+        def save_as(self, destination: str) -> None:
+            Path(destination).write_bytes(b"captured-symbol")
+
+    page = _HudPage()
+
+    def during_wait(wait_number: int) -> None:
+        if wait_number == 1:
+            page.handlers[0](Download())
+        elif wait_number == 2:
+            assert page.invoke_hud_action("finish") is True
+
+    page.on_wait = during_wait
+    result, broker = _hud_capture(tmp_path, page)
+
+    assert result.status == "completed"
+    assert len(broker.receipts) == 1
+    assert broker.receipts[0].path.read_bytes() == b"captured-symbol"
+    count_updates = [
+        argument["downloadCount"]
+        for _expression, argument in page.evaluations[1:]
+        if isinstance(argument, dict) and "downloadCount" in argument
+    ]
+    assert 1 in count_updates
+
+
+@pytest.mark.parametrize(
+    ("action", "expected_status"),
+    [
+        ("finish", "completed"),
+        ("try_another", "try_another"),
+        ("cancel", "cancelled"),
+    ],
+)
+def test_user_capture_hud_actions_drive_distinct_result_statuses(
+    tmp_path,
+    action,
+    expected_status,
+):
+    page = _HudPage()
+
+    def act_once() -> None:
+        assert page.invoke_hud_action(action, token="not-the-hud-token") is False
+        assert page.invoke_hud_action(action) is True
+        assert page.invoke_hud_action(action) is False
+
+    page.on_goto = act_once
+    result, _broker = _hud_capture(tmp_path, page)
+
+    assert result.status == expected_status
+
+
+def test_user_capture_hud_rejects_identity_that_is_not_its_bound_task(tmp_path):
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    browser._context = SimpleNamespace(new_page=lambda: _HudPage())
+    mismatched = ProviderHudSpec(
+        provider_label="Provider",
+        manufacturer="Different Manufacturer",
+        mpn="MPN-A",
+        required_file_labels=("KiCad symbol",),
+    )
+
+    with pytest.raises(CaptureBrowserError, match="exactly match"):
+        browser.capture_user_downloads(
+            "https://vendor.example.test/search?query=MPN-A",
+            broker,
+            hud=mismatched,
+            timeout_s=1,
+        )
 
 
 def test_download_is_saved_before_it_is_reported_and_uses_a_windows_safe_name(tmp_path):

@@ -117,15 +117,17 @@ def test_ultra_librarian_lives_only_in_the_python_adapter():
     assert "ultralibrarian" in {adapter.capability.key for adapter in all_adapters()}
 
 
-def test_every_adapter_pins_a_version_for_every_tool_it_claims():
+def test_every_adapter_names_an_exact_export_for_every_tool_it_claims():
     """The cross-vendor hazard, made structural. Ultra Librarian offers KiCAD v5 one row above v6+,
     and SnapEDA offers 'V3 & Prior' / 'V4 & Later' / 'V6 & Later'. KiCad 5 emits `(module ...)`
     footprints that `Footprint.load` REFUSES, so an unpinned version silently poisons the library
-    far from the cause. A tool a vendor claims to serve must name WHICH export to take."""
+    far from the cause. A tool a vendor claims to serve must name WHICH export to take, either as
+    a machine selector under an approved automation contract or as exact visible text in the
+    person-controlled provider window."""
     for adapter in all_adapters():
         capability = adapter.capability
         for tool in capability.tools:
-            assert capability.version_pins.get(tool), (
-                f"{capability.key} claims to serve {tool} but pins no specific export for it; "
+            assert capability.version_pins.get(tool) or capability.user_format_labels.get(tool), (
+                f"{capability.key} claims to serve {tool} but names no specific export for it; "
                 "an unpinned version is how a KiCad-5 footprint reaches the library"
             )
