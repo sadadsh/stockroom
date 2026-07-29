@@ -7,6 +7,8 @@ import pytest
 
 from stockroom.capture.cross_eda import (
     CrossEdaVerificationError,
+    _SymbolReadback,
+    _verify_identity,
     read_altium_footprint,
     read_altium_symbol,
     read_kicad_symbol,
@@ -88,6 +90,30 @@ def test_native_altium_readback_observes_identity_pins_and_pad_geometry() -> Non
     ]
     assert all(round(pad.width_mm, 2) == 2.33 for pad in footprint.pads)
     assert all(round(pad.height_mm, 2) == 1.56 for pad in footprint.pads)
+
+
+def test_metadata_light_altium_identity_requires_exact_external_attestation() -> None:
+    expected = ExactPartIdentity("Texas Instruments", "TPD6E05U06RVZR")
+    metadata_light = _SymbolReadback(
+        entry="TPD6E05U06RVZR",
+        manufacturer="",
+        mpn="TPD6E05U06RVZR",
+        pins=(),
+    )
+
+    with pytest.raises(CrossEdaVerificationError, match="does not carry both"):
+        _verify_identity(metadata_light, expected, "Altium")
+
+    assert _verify_identity(metadata_light, expected, "Altium", expected) == ("manufacturer",)
+
+    conflicting = _SymbolReadback(
+        entry=metadata_light.entry,
+        manufacturer="Other Manufacturer",
+        mpn=metadata_light.mpn,
+        pins=(),
+    )
+    with pytest.raises(CrossEdaVerificationError, match="does not equal"):
+        _verify_identity(conflicting, expected, "Altium", expected)
 
 
 def test_cross_eda_readback_proves_real_s1m_artifacts(tmp_path: Path) -> None:

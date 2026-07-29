@@ -119,22 +119,37 @@ def _verify_identity(
     observed: _SymbolReadback,
     expected: ExactPartIdentity,
     tool: str,
-) -> None:
-    if not observed.manufacturer or not observed.mpn:
-        raise CrossEdaVerificationError(
-            f"{tool} symbol does not carry both manufacturer and MPN identity"
-        )
-    if _manufacturer_key(observed.manufacturer) != _manufacturer_key(
-        expected.authoritative_manufacturer_key
-    ):
+    attested: ExactPartIdentity | None = None,
+) -> tuple[str, ...]:
+    missing: list[str] = []
+    if observed.manufacturer and _manufacturer_key(
+        observed.manufacturer
+    ) != _manufacturer_key(expected.authoritative_manufacturer_key):
         raise CrossEdaVerificationError(
             f"{tool} symbol manufacturer {observed.manufacturer!r} does not equal "
             f"{expected.authoritative_manufacturer_key!r}"
         )
-    if _mpn_key(observed.mpn) != _mpn_key(expected.mpn_canonical):
+    if observed.mpn and _mpn_key(observed.mpn) != _mpn_key(expected.mpn_canonical):
         raise CrossEdaVerificationError(
             f"{tool} symbol MPN {observed.mpn!r} does not equal {expected.mpn_canonical!r}"
         )
+    if not observed.manufacturer:
+        missing.append("manufacturer")
+    if not observed.mpn:
+        missing.append("mpn")
+    if not missing:
+        return ()
+    if attested is None:
+        raise CrossEdaVerificationError(
+            f"{tool} symbol does not carry both manufacturer and MPN identity"
+        )
+    if _manufacturer_key(attested.authoritative_manufacturer_key) != _manufacturer_key(
+        expected.authoritative_manufacturer_key
+    ) or _mpn_key(attested.mpn_canonical) != _mpn_key(expected.mpn_canonical):
+        raise CrossEdaVerificationError(
+            f"{tool} symbol's missing identity is not covered by an exact provider attestation"
+        )
+    return tuple(missing)
 
 
 def _unique_pins(pins: list[_Pin], tool: str) -> tuple[_Pin, ...]:
@@ -617,6 +632,7 @@ def verify_cross_eda_component(
     kicad_footprint: Path,
     step_model: Path,
     altium_sources: tuple[Path, ...],
+    altium_identity_attestation: ExactPartIdentity | None = None,
 ) -> dict[str, object]:
     """Return strict-JSON evidence only after independent native readback agrees."""
 
@@ -639,7 +655,12 @@ def verify_cross_eda_component(
             )
             kicad = read_kicad_symbol(kicad_symbol, identity.mpn_canonical)
             altium = read_altium_symbol(schlib, identity.mpn_canonical)
-            _verify_identity(altium, identity, "Altium")
+            bound_altium_fields = _verify_identity(
+                altium,
+                identity,
+                "Altium",
+                altium_identity_attestation,
+            )
             kicad_fp = read_kicad_footprint(kicad_footprint, step_model)
             altium_fp = read_altium_footprint(pcblib, identity.mpn_canonical)
             mapping = _terminal_map(kicad, altium)
@@ -669,6 +690,16 @@ def verify_cross_eda_component(
         "identity": {
             "authoritative_manufacturer_key": identity.authoritative_manufacturer_key,
             "mpn_canonical": identity.mpn_canonical,
+            **(
+                {
+                    "altium_binding": {
+                        "fields": list(bound_altium_fields),
+                        "source": "exact-provider-detail-page",
+                    }
+                }
+                if bound_altium_fields
+                else {}
+            ),
         },
         "kicad": {
             "footprint_entry": kicad_fp.entry,
