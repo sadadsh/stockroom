@@ -17,12 +17,23 @@ import json
 import tempfile
 from collections.abc import Iterable
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Protocol
 
-from stockroom.capture.cross_eda import verify_kicad_component
-from stockroom.capture.identity import page_identity, select_exact_candidate
+from stockroom.capture.cross_eda import (
+    CrossEdaVerificationError,
+    read_kicad_symbol,
+    verify_kicad_component,
+)
+from stockroom.capture.identity import (
+    PageIdentity,
+    exact_observation_error,
+    page_identity,
+    select_exact_candidate,
+)
 from stockroom.evidence import EvidenceArtifact, EvidenceStore
 from stockroom.ingest.staging import StagingCandidate
+from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.planning import (
     ALTIUM_CAD_OPERATION,
     KICAD_CAD_OPERATION,
@@ -90,6 +101,81 @@ def _altium_artifacts(paths: Iterable[Path]) -> tuple[EvidenceArtifact, ...]:
             raise ValueError(f"captured {role} is not a native Altium compound file")
         artifacts.append(artifact)
     return tuple(artifacts)
+
+
+def _bind_kicad_symbol_identity(
+    *,
+    candidate: StagingCandidate,
+    identity: ExactPartIdentity,
+    provider_key: str,
+    detail_url: str,
+) -> tuple[str, ...]:
+    """Bind a metadata-light provider symbol to its independently verified detail page.
+
+    Ultra Librarian's standard KiCad export names the exact symbol but does not include
+    manufacturer/MPN properties. The raw archive remains immutable in the download store;
+    this normalized staging copy gains hidden identity fields only after both the candidate
+    and the provider detail URL have passed the exact-result gate. Existing conflicting
+    metadata is evidence of a mismatch and is never overwritten.
+    """
+
+    symbol_path = Path(candidate.symbol_lib_path or "")
+    observed = read_kicad_symbol(symbol_path, candidate.symbol_name)
+    expected_record = SimpleNamespace(
+        manufacturer=identity.authoritative_manufacturer_key,
+        mpn=identity.mpn_canonical,
+    )
+    if observed.manufacturer:
+        issue = exact_observation_error(
+            expected_record,
+            PageIdentity(
+                manufacturer=observed.manufacturer,
+                mpn=identity.mpn_canonical,
+            ),
+        )
+        if issue:
+            raise CrossEdaVerificationError(f"KiCad symbol {issue}")
+    if observed.mpn:
+        issue = exact_observation_error(
+            expected_record,
+            PageIdentity(
+                manufacturer=identity.authoritative_manufacturer_key,
+                mpn=observed.mpn,
+            ),
+        )
+        if issue:
+            raise CrossEdaVerificationError(f"KiCad symbol {issue}")
+
+    missing: list[str] = []
+    if not observed.manufacturer:
+        missing.append("Manufacturer")
+    if not observed.mpn:
+        missing.append("Manufacturer Part Number")
+    if not missing:
+        return ()
+
+    detail = page_identity(provider_key, detail_url)
+    if detail is None or exact_observation_error(expected_record, detail):
+        raise CrossEdaVerificationError(
+            "KiCad symbol lacks embedded identity and no exact provider detail page can bind it"
+        )
+
+    library = SymbolLib.load(symbol_path)
+    symbol = library.get_symbol(observed.entry)
+    if "Manufacturer" in missing:
+        symbol.set_property(
+            "Manufacturer",
+            identity.authoritative_manufacturer_key,
+            hide=True,
+        )
+    if "Manufacturer Part Number" in missing:
+        symbol.set_property(
+            "Manufacturer Part Number",
+            identity.mpn_canonical,
+            hide=True,
+        )
+    library.save(symbol_path)
+    return tuple(missing)
 
 
 def _canonical_report(
@@ -481,6 +567,12 @@ def record_browser_cad_evidence(
     if not model_path.read_bytes().lstrip().startswith(b"ISO-10303-21;"):
         raise ValueError("browser CAD evidence STEP model has no ISO-10303-21 header")
 
+    bound_identity_fields = _bind_kicad_symbol_identity(
+        candidate=candidate,
+        identity=identity,
+        provider_key=provider_key,
+        detail_url=detail_url,
+    )
     kicad_report = verify_kicad_component(
         identity=identity,
         kicad_symbol=Path(symbol),
@@ -489,6 +581,14 @@ def record_browser_cad_evidence(
     )
     if not isinstance(kicad_report, dict) or kicad_report.get("valid") is not True:
         raise ValueError("KiCad artifact readback did not prove a complete component")
+    if bound_identity_fields:
+        kicad_report = {
+            **kicad_report,
+            "identity_binding": {
+                "fields_added": list(bound_identity_fields),
+                "source": "exact-provider-detail-page",
+            },
+        }
 
     native_altium = tuple(Path(path) for path in altium_sources)
     cross_eda_report = None

@@ -145,6 +145,69 @@ def test_browser_cad_installs_exact_actual_files_with_provider_per_artifact(
     assert cross_eda_verified is False
 
 
+def test_exact_provider_page_binds_metadata_light_kicad_symbol(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path / "Evidence")
+    candidate = _candidate(tmp_path)
+    candidate.symbol_lib_path.write_text(
+        """(kicad_symbol_lib
+  (version 20240101)
+  (symbol "S1M"
+    (symbol "S1M_0_1"
+      (pin passive line (at -5 0 0) (length 2.54)
+        (name "K" (effects (font (size 1 1))))
+        (number "1" (effects (font (size 1 1))))))))
+""",
+        encoding="utf-8",
+    )
+
+    digest, verified = record_browser_cad_evidence(
+        store=store,
+        record=_Record(),
+        candidate=candidate,
+        provider_key="snapmagic",
+        detail_url=_DETAIL_URL,
+    )
+
+    manifest = store.verify_provider_success(
+        digest,
+        identity=ExactPartIdentity("ON Semiconductor", "S1M"),
+        operation=KICAD_CAD_OPERATION,
+        provider_key="snapmagic",
+        adapter_version=BROWSER_CAPTURE_ADAPTER_VERSION,
+    )
+    objects = {item["role"]: item for item in manifest["objects"]}
+    symbol_text = store.object_bytes(objects["symbol"]["digest"]).decode("utf-8")
+    report = json.loads(store.object_bytes(objects["validation_report"]["digest"]))
+    assert '(property "Manufacturer" "ON Semiconductor"' in symbol_text
+    assert report["kicad_readback"]["identity_binding"] == {
+        "fields_added": ["Manufacturer"],
+        "source": "exact-provider-detail-page",
+    }
+    assert verified is False
+
+
+def test_provider_identity_binding_never_overwrites_conflicting_symbol_metadata(
+    tmp_path: Path,
+) -> None:
+    candidate = _candidate(tmp_path)
+    original = candidate.symbol_lib_path.read_text(encoding="utf-8").replace(
+        '"ON Semiconductor"',
+        '"Other Manufacturer"',
+    )
+    candidate.symbol_lib_path.write_text(original, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="not 'ON Semiconductor'"):
+        record_browser_cad_evidence(
+            store=EvidenceStore(tmp_path / "Evidence"),
+            record=_Record(),
+            candidate=candidate,
+            provider_key="snapmagic",
+            detail_url=_DETAIL_URL,
+        )
+
+    assert "Other Manufacturer" in candidate.symbol_lib_path.read_text(encoding="utf-8")
+
+
 def test_browser_cad_cannot_record_a_partial_or_near_match(tmp_path: Path) -> None:
     store = EvidenceStore(tmp_path / "Evidence")
     incomplete = _candidate(tmp_path, model=False)
