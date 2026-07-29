@@ -38,6 +38,7 @@ provider's cookies or browser state.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -138,6 +139,7 @@ _WINDOWS_RESERVED_NAMES = {
 }
 _PROCESS_LOCK_GUARD = threading.Lock()
 _PROCESS_LOCKS: set[str] = set()
+_CLOAK_BROWSER_VERSION = "146.0.7680.177.5"
 _CHROMIUM_PREFERENCES = Path("Default") / "Preferences"
 _BROWSER_LAUNCH_TIMEOUT_MS = 20_000
 _DISABLE_WEBRTC_INIT_SCRIPT = """
@@ -974,9 +976,10 @@ class PlaywrightCaptureBrowser:
     ENGINE IS A PARAMETER, NEVER A SECOND CLASS. Production uses Stockroom's version-pinned
     Playwright Chromium so the browser version is part of the tested application contract rather
     than whichever branded browser happens to be installed. ``windows`` remains an explicit
-    Chrome-then-Chromium compatibility policy, and ``camoufox`` remains an explicit provider mode
-    for a measured anti-bot need. A vendor that resists is therefore a MODE on this class, never a
-    `CamoufoxCaptureBrowser` beside it - that is the one-tool-per-job rule, and
+    Chrome-then-Chromium compatibility policy. ``camoufox`` is the Firefox stealth mode and
+    ``cloak`` is the Chromium stealth mode, each selected only for a measured provider need. A
+    vendor that resists is therefore a MODE on this class, never a second capture-browser class
+    beside it - that is the one-tool-per-job rule, and
     tests/backend/capture/test_one_tool_per_job.py enforces it by listing the modules allowed to
     launch a browser at all.
 
@@ -1379,6 +1382,11 @@ class PlaywrightCaptureBrowser:
                 with self._camoufox_session() as page:
                     yield page
                 return
+            if self.engine == "cloak":
+                self.launched_browser = f"CloakBrowser Chromium {_CLOAK_BROWSER_VERSION}"
+                with self._cloak_session() as page:
+                    yield page
+                return
 
             if self._playwright_runtime is not None:
                 with self._playwright_session(self._playwright_runtime.get()) as page:
@@ -1560,6 +1568,86 @@ class PlaywrightCaptureBrowser:
                     self._page_brokers.clear()
                     self._page_huds.clear()
                     self._wired_pages.clear()
+
+    @contextmanager
+    def _cloak_session(self):
+        """Launch the pinned free stealth-Chromium build through the one browser owner.
+
+        DigiKey's CAD-provider application currently renders in Chromium but not Camoufox's
+        Firefox engine, while stock Playwright Chromium reaches DigiKey's automation
+        interstitial. CloakBrowser supplies a source-patched Chromium binary and the same
+        synchronous Playwright objects this class already owns. Its public v146 build is pinned
+        deliberately: it requires no account or API key, is downloaded independently on each
+        installation, and its wrapper verifies the published signature/checksum.
+        """
+
+        try:
+            from cloakbrowser import launch, launch_persistent_context
+        except ImportError as exc:  # pragma: no cover - dependency is declared
+            raise CaptureBrowserError(
+                "cloakbrowser is not installed; it is a declared dependency, run `uv sync`"
+            ) from exc
+
+        fingerprint_source = (
+            str(self.profile_dir.resolve()).casefold()
+            if self.profile_dir is not None
+            else f"stockroom:{self.provider_key or 'ephemeral'}"
+        )
+        fingerprint = (
+            int.from_bytes(
+                hashlib.sha256(fingerprint_source.encode("utf-8")).digest()[:4],
+                "big",
+            )
+            % 90_000
+            + 10_000
+        )
+        fingerprint_args = [f"--fingerprint={fingerprint}"]
+        context = None
+        browser = None
+        try:
+            if self.profile_dir is not None:
+                self.profile_dir.mkdir(parents=True, exist_ok=True)
+                context = launch_persistent_context(
+                    str(self.profile_dir),
+                    headless=self.headless,
+                    browser_version=_CLOAK_BROWSER_VERSION,
+                    humanize=True,
+                    args=fingerprint_args,
+                    accept_downloads=True,
+                )
+            else:
+                browser = launch(
+                    headless=self.headless,
+                    browser_version=_CLOAK_BROWSER_VERSION,
+                    humanize=True,
+                    args=fingerprint_args,
+                )
+                context = browser.new_context(accept_downloads=True)
+            _disable_webrtc(context)
+            with self._download_lock:
+                self._context = context
+            context.on("page", self._wire_downloads)
+            page = context.pages[0] if context.pages else context.new_page()
+            self._wire_downloads(page)
+            yield page
+        except Exception as exc:
+            if isinstance(exc, CaptureBrowserError):
+                raise
+            raise CaptureBrowserError(
+                f"could not launch pinned CloakBrowser Chromium: {exc}"
+            ) from exc
+        finally:
+            for closable in (context, browser):
+                if closable is not None:
+                    try:
+                        closable.close()
+                    except Exception:  # noqa: BLE001 - teardown is best effort
+                        pass
+            with self._download_lock:
+                self._context = None
+                self._page_brokers.clear()
+                self._page_huds.clear()
+                self._wired_pages.clear()
 
     def _bind_provider_hud(self, page, state: _ProviderHudState) -> None:
         """Install one Stockroom-owned HUD without reading provider-controlled page content."""

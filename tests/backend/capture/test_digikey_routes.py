@@ -70,6 +70,32 @@ _EXTERNAL_SNAP_HTML = """
 </html>
 """
 
+_HYDRATING_TRACE_HTML = """
+<!doctype html>
+<html>
+  <body>
+    <section id="snap-media-active" hidden></section>
+    <section id="ultra-media-active" hidden></section>
+    <section id="traceparts-media-active" hidden>
+      <button onclick="document.getElementById('traceparts-export-options').hidden=false">
+        Select Download Format
+      </button>
+    </section>
+    <div id="traceparts-export-options" hidden>
+      <input id="trace-step" type="radio" name="traceparts-format-selection">
+      <label for="trace-step" data-original="STEP AP214">STEP AP214</label>
+      <button id="btn-clear-selection-traceParts">Clear</button>
+      <button id="btn-download-traceParts">Download</button>
+    </div>
+    <script>
+      setTimeout(() => {
+        document.getElementById("traceparts-media-active").hidden = false;
+      }, 75);
+    </script>
+  </body>
+</html>
+"""
+
 
 @pytest.mark.skipif(
     chromium_unavailable_reason() is not None,
@@ -163,3 +189,37 @@ def test_digikey_current_external_snapmagic_row_is_not_reported_as_a_download(tm
     assert report.route_unavailable is True
     assert report.selected == []
     assert "external provider link" in report.message
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_waits_for_provider_hydration_before_declaring_a_hidden_row_absent(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    surface._exact_product_url = (
+        "https://www.digikey.com/en/products/detail/te-connectivity-amp-connectors/"
+        "5212034-1/2038204"
+    )
+    traceparts = surface.capture_routes()[1]
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+
+    with browser.session() as page:
+        page.route(
+            "https://www.digikey.com/en/models/2038204",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="text/html",
+                body=_HYDRATING_TRACE_HTML,
+            ),
+        )
+        page.goto("https://www.digikey.com/en/models/2038204")
+        report = traceparts.drive(
+            page,
+            ["model"],
+            expected_manufacturer="TE Connectivity AMP Connectors",
+            expected_mpn="5212034-1",
+        )
+
+    assert report.selected == ["model"], report
+    assert report.submitted is True

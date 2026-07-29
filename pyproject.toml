@@ -41,6 +41,7 @@ dependencies = [
     # sources (stockroom.altium.oleread / .extract). olefile is BSD, read-only, pure-Python;
     # combined with zlib it replicates KiCad's DecodeIntLibStream. We never write Altium binary.
     "olefile>=0.47",
+    "cloakbrowser==0.5.2",
 ]
 
 [dependency-groups]

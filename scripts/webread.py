@@ -302,9 +302,9 @@ def main() -> int:
     ap.add_argument(
         "--engine",
         default="chromium",
-        choices=("chromium", "camoufox"),
-        help="camoufox is the stealth engine: slower to launch, but the only one measured to get "
-        "past a Cloudflare Turnstile (SnapEDA serves one to plain Chromium)",
+        choices=("chromium", "camoufox", "cloak"),
+        help="camoufox is stealth Firefox; cloak is pinned stealth Chromium for provider "
+        "applications that require Chromium but block stock Playwright",
     )
     args = ap.parse_args()
 
@@ -368,6 +368,9 @@ def main() -> int:
             adapter = get_adapter(args.vendor)
             if adapter is None:
                 raise SystemExit(f"no capture adapter for vendor {args.vendor!r}")
+            open_panel = getattr(adapter, "open_panel", None)
+            if not callable(open_panel):
+                raise SystemExit(f"{adapter.capability.label} exposes no inspectable format panel")
             _sign_in_if_saved(adapter, page)
             # BACK TO THE PART. Signing in navigates to the vendor's own landing page, so opening
             # the panel straight afterwards surveys the home page and reports "no download control
@@ -375,7 +378,7 @@ def main() -> int:
             # Production does not hit this because it signs in once when the session opens and
             # `drive_formats` navigates per format; the tool has to do the same by hand.
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            blocked = adapter.open_panel(page)
+            blocked = open_panel(page)
             print(f"PANEL  {blocked or 'open'}")
 
         text = re.sub(r"\n{2,}", "\n", page.inner_text("body"))

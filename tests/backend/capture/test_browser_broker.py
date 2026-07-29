@@ -209,6 +209,84 @@ def test_each_camoufox_context_disables_webrtc_before_opening_a_page(
     assert "webkitRTCPeerConnection" in script
 
 
+@pytest.mark.parametrize("persistent", [False, True])
+def test_each_cloak_context_is_pinned_and_disables_webrtc_before_opening_a_page(
+    monkeypatch,
+    tmp_path,
+    persistent,
+):
+    context_events: list[tuple[str, object]] = []
+    launch_options: list[tuple[str, dict]] = []
+
+    class Context:
+        def __init__(self):
+            self.pages = []
+
+        def add_init_script(self, script: str) -> None:
+            context_events.append(("init_script", script))
+
+        def on(self, event: str, _handler) -> None:
+            context_events.append(("on", event))
+
+        def new_page(self):
+            context_events.append(("new_page", None))
+            return _EventPage()
+
+        def close(self) -> None:
+            context_events.append(("context_close", None))
+
+    context = Context()
+
+    class Browser:
+        def new_context(self, **options):
+            context_events.append(("new_context", options))
+            return context
+
+        def close(self) -> None:
+            context_events.append(("browser_close", None))
+
+    def launch(**options):
+        launch_options.append(("ephemeral", options))
+        return Browser()
+
+    def launch_persistent_context(profile, **options):
+        launch_options.append(("persistent", {"profile": profile, **options}))
+        return context
+
+    cloak_module = ModuleType("cloakbrowser")
+    cloak_module.launch = launch
+    cloak_module.launch_persistent_context = launch_persistent_context
+    monkeypatch.setitem(sys.modules, "cloakbrowser", cloak_module)
+
+    browser = PlaywrightCaptureBrowser(
+        download_dir=tmp_path / "Downloads",
+        profile_dir=tmp_path / "Profile" if persistent else None,
+        provider_key="cloak-probe" if persistent else None,
+        engine="cloak",
+        headless=True,
+    )
+
+    with browser._cloak_session():
+        pass
+
+    kind, options = launch_options[0]
+    assert kind == ("persistent" if persistent else "ephemeral")
+    assert options["browser_version"] == "146.0.7680.177.5"
+    assert options["headless"] is True
+    assert options["humanize"] is True
+    assert len(options["args"]) == 1
+    assert options["args"][0].startswith("--fingerprint=")
+    init_index = next(
+        index for index, event in enumerate(context_events) if event[0] == "init_script"
+    )
+    page_index = next(index for index, event in enumerate(context_events) if event[0] == "new_page")
+    script = context_events[init_index][1]
+    assert init_index < page_index
+    assert isinstance(script, str)
+    assert "RTCPeerConnection" in script
+    assert "webkitRTCPeerConnection" in script
+
+
 @pytest.mark.timeout(30)
 def test_two_provider_contexts_share_one_real_playwright_runtime(tmp_path):
     from stockroom.capture.browser import chromium_unavailable_reason
