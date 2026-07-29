@@ -143,7 +143,7 @@ def _discriminating_specs(specs) -> dict[str, str]:
     return out
 
 
-def library_match_records(parts: Iterable) -> list[dict]:
+def library_match_records(parts: Iterable, tool: str = "kicad") -> list[dict]:
     """Build the fill match index from the shared library's `PartRecord`s.
 
     Each record is flattened to what matching + filling need: the symbol name a placed instance's
@@ -166,7 +166,7 @@ def library_match_records(parts: Iterable) -> list[dict]:
     out: list[dict] = []
     for p in parts:
         try:
-            nickname = category_nickname(p.category)
+            nickname = category_nickname(p.category) if tool == "kicad" else ""
         except ValueError:
             # A category outside the fixed taxonomy has no Stockroom library, so this part cannot own
             # its symbol and forfeits the symbol tier (it still matches by MPN and still fills every
@@ -174,13 +174,19 @@ def library_match_records(parts: Iterable) -> list[dict]:
             # not depend on the category). A corrupt category is a library-side problem the doctor
             # surfaces; it must not silently discard the part nor crash the Prepare.
             nickname = ""
-        # The KiCad bundle explicitly: a project fill writes KiCad lib_ids into a
-        # `.kicad_sch`, so it must read the KiCad assets, not whatever the record happens
-        # to carry first. (This was `getattr(p, "symbol", None)`, which after the per-EDA
-        # cutover would return None forever and silently match NOTHING.)
-        kicad = p.assets_for("kicad")
-        symbol = kicad.symbol
-        footprint = kicad.footprint
+        assets = p.assets_for(tool)
+        symbol = assets.symbol
+        footprint = assets.footprint
+        if tool == "altium":
+            # Altium placements expose a Library Ref name, not a portable library path.
+            # The adapter prefixes that name with ``altium:`` so it cannot collide with
+            # KiCad's ``<nickname>:<name>`` identity. Footprint models likewise expose
+            # their model name only.
+            symbol_lib_id = f"altium:{symbol.name}" if symbol and symbol.name else ""
+            footprint_lib_id = (footprint.name if footprint else "") or ""
+        else:
+            symbol_lib_id = _lib_id(symbol)
+            footprint_lib_id = _lib_id(footprint)
         datasheet = getattr(p, "datasheet", None)
         # The schematic Datasheet property holds a URL or a local file path; prefer the source URL,
         # falling back to the on-disk file name (what the complete-to-add gate actually requires) so
@@ -195,8 +201,8 @@ def library_match_records(parts: Iterable) -> list[dict]:
             "manufacturer": (p.manufacturer or "").strip(),
             "datasheet": ds,
             "description": (p.description or "").strip(),
-            "symbol_lib_id": _lib_id(symbol),
-            "footprint_lib_id": _lib_id(footprint),
+            "symbol_lib_id": symbol_lib_id,
+            "footprint_lib_id": footprint_lib_id,
             # A record has no dedicated value field: a passive's value is a display spec row that
             # `PassiveSpec.to_specs` writes ("Resistance": "10 kOhm"), so the candidate tier reads it
             # from there. "Value" is accepted last for a record whose specs came from a vendor pull.
@@ -204,7 +210,16 @@ def library_match_records(parts: Iterable) -> list[dict]:
             "package": _eia_case((getattr(p, "specs", None) or {}).get("Package", "")),
             "specs": _discriminating_specs(getattr(p, "specs", None)),
             # Ownership on its own; uniqueness is folded in below, once the whole index is known.
-            "symbol_is_identity": bool(nickname and symbol and (symbol.lib or "").strip() == nickname),
+            # KiCad's Stockroom category library establishes ownership. Altium's
+            # Library Ref alone does not: generic RES/CAP symbols can be shared by
+            # thousands of parts, so Altium identification comes from MPN, a placed
+            # Stockroom ID, or an explicit assignment, never symbol-name coincidence.
+            "symbol_is_identity": bool(
+                tool == "kicad"
+                and nickname
+                and symbol
+                and (symbol.lib or "").strip() == nickname
+            ),
             "nickname": nickname,
             "category": p.category,
             "passive": bool(getattr(p, "passive", False)),
@@ -382,10 +397,17 @@ def group_placements(components: list[dict]) -> list[dict]:
         if group is None:
             group = groups[key] = {"key": "␟".join(key), "lib_id": lib_id, "value": value,
                                    "footprint": footprint, "refs": [], "count": 0}
-        group["refs"].append(comp.get("ref", ""))
-        group["count"] += 1
+        refs = group["refs"]
+        count = group["count"]
+        if not isinstance(refs, list) or not isinstance(count, int):
+            raise TypeError("placement group state is malformed")
+        refs.append(comp.get("ref", ""))
+        group["count"] = count + 1
     for group in groups.values():
-        group["refs"].sort(key=ref_sort_key)
+        refs = group["refs"]
+        if not isinstance(refs, list):
+            raise TypeError("placement group refs are malformed")
+        refs.sort(key=ref_sort_key)
     return sorted(groups.values(), key=lambda g: (g["lib_id"], g["value"], g["footprint"]))
 
 

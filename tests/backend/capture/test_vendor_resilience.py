@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from stockroom.capture.vendors import (
+    DigiKeyCadenasRouteAdapter,
+    DigiKeyManufacturerProvidedRouteAdapter,
     DigiKeySnapMagicRouteAdapter,
     DigiKeyTracePartsRouteAdapter,
     DigiKeyUltraLibrarianAdapter,
@@ -68,25 +70,38 @@ def test_digikey_enumerates_distinct_measured_author_routes() -> None:
 
     assert adapter.capability.key == "digikey"
     assert adapter.evidence_provider_key == "digikey-ultralibrarian"
-    assert isinstance(routes[0], DigiKeySnapMagicRouteAdapter)
-    assert isinstance(routes[1], DigiKeyTracePartsRouteAdapter)
-    assert routes[2] is adapter
+    assert routes[0] is adapter
+    assert isinstance(routes[1], DigiKeySnapMagicRouteAdapter)
+    assert isinstance(routes[2], DigiKeyTracePartsRouteAdapter)
+    assert isinstance(routes[3], DigiKeyManufacturerProvidedRouteAdapter)
+    assert isinstance(routes[4], DigiKeyCadenasRouteAdapter)
     assert [route.evidence_provider_key for route in routes] == [
+        "digikey-ultralibrarian",
         "digikey-snapmagic",
         "digikey-traceparts",
-        "digikey-ultralibrarian",
+        "digikey-manufacturer",
+        "digikey-cadenas",
     ]
     assert [route.capability.label for route in routes] == [
+        "DigiKey CAD Models",
         "DigiKey · SnapMagic",
         "DigiKey · TraceParts",
-        "DigiKey CAD Models",
+        "DigiKey · Manufacturer Provided",
+        "DigiKey · CADENAS",
     ]
-    assert adapter.capability.browser_access == "machine_allowed"
+    assert adapter.capability.browser_access == "user_driven"
+    assert adapter.capability.operator_automation is False
     assert adapter.capability.supported_formats == {"kicad", "model", "altium"}
     assert routes[0].capability.supported_formats == {"kicad", "model", "altium"}
-    assert routes[1].capability.supported_formats == {"model"}
-    assert routes[2].capability.supported_formats == {"kicad", "model", "altium"}
-    assert routes[1].supplementary_only is True
+    assert routes[1].capability.supported_formats == {"kicad", "model", "altium"}
+    assert routes[2].capability.supported_formats == {"model"}
+    assert routes[3].capability.supported_formats == {"model"}
+    assert routes[4].capability.supported_formats == {"model"}
+    assert routes[2].supplementary_only is True
+    assert routes[3].supplementary_only is True
+    assert routes[4].supplementary_only is True
+    assert routes[3].capability.operator_automation is False
+    assert routes[4].capability.operator_automation is False
     assert adapter.resolve_url("MCP4728-E/UN").endswith("keywords=MCP4728-E%2FUN")
 
 

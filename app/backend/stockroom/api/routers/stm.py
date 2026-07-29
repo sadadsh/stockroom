@@ -20,6 +20,7 @@ from stockroom.api.schemas import (
     FamilyDTO,
     McuSpecRow,
     PinoutDTO,
+    SocketSolutionDTO,
     StmStatusDTO,
     SuggestionGroupDTO,
     TargetDefinitionDTO,
@@ -27,6 +28,7 @@ from stockroom.api.schemas import (
 )
 from stockroom.stm import authority as stm_authority
 from stockroom.stm import geometry as stm_geometry
+from stockroom.stm import socket_solution as stm_socket_solution
 from stockroom.stm import source as stm_source
 from stockroom.stm import target_definition as stm_target_definition
 
@@ -522,8 +524,9 @@ def stm_router(require_token) -> APIRouter:
         """Compile an explicit device set and caller-owned hardware policy.
 
         Unlike the similarity verdict, this response keeps silicon variation,
-        requested routes, safety rules, and channel allocation as separate
-        auditable layers and binds them to the current source revisions.
+        requested routes, safety rules, and implementation-neutral independent
+        path requirements as separate auditable layers and binds them to the
+        current source revisions.
         """
         ctx = request.app.state.ctx
         if ctx.stm_index is None:
@@ -541,6 +544,32 @@ def stm_router(require_token) -> APIRouter:
         except ValueError as exc:
             raise ApiError(400, str(exc)) from exc
         return TargetDefinitionDTO.from_dict(result).model_dump()
+
+    @r.post("/socket-solution")
+    def socket_solution(request: Request, body: dict) -> dict:
+        """Compile a scalable, implementation-neutral socket hardware solution.
+
+        The detailed target definition remains the evidence layer. This endpoint
+        compacts it into unique position modes, reusable support cells, target
+        cohorts, and safe control states suitable for selections from two targets
+        through the complete indexed package population.
+        """
+        ctx = request.app.state.ctx
+        if ctx.stm_index is None:
+            raise ApiError(409, "STM index not built")
+        parts = list(body.get("parts") or [])
+        policy = dict(body.get("policy") or {})
+        try:
+            with _stm_read_lock:
+                result = stm_socket_solution.compile_socket_solution(
+                    ctx.stm_index.conn,
+                    refs=parts,
+                    policy=policy,
+                    source_meta=ctx.stm_index.meta(),
+                )
+        except ValueError as exc:
+            raise ApiError(400, str(exc)) from exc
+        return SocketSolutionDTO.from_dict(result).model_dump()
 
     @r.get("/compat/suggestions")
     def compat_suggestions(
@@ -566,6 +595,10 @@ def stm_router(require_token) -> APIRouter:
             raise ApiError(409, "STM index not built")
         part = body.get("part")
         assignment = body.get("assignment") or {}
+        if not isinstance(part, str) or not part.strip():
+            raise ApiError(400, "part must be a non-empty string")
+        if not isinstance(assignment, dict):
+            raise ApiError(400, "assignment must be an object")
         with _stm_read_lock:
             conflicts = stm_authority.af_conflicts(ctx.stm_index.conn, part, assignment)
         return {"conflicts": conflicts}

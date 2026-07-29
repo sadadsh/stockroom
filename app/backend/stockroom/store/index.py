@@ -21,6 +21,8 @@ from pathlib import Path
 from stockroom.eda.registry import all_tools
 from stockroom.model.asset import ASSET_KINDS
 from stockroom.model.part import PartRecord
+from stockroom.model.part_class import CLASS_NEEDS, PartClass
+from stockroom.model.trust import AssetCheck, Verdict, combine, verdict_for
 
 # NO `DROP TABLE`, and every object is `IF NOT EXISTS`, because `sync()` updates an index in
 # place. Dropping meant every library write - and `rebuild_index` runs after all of them - re-read
@@ -88,6 +90,26 @@ CREATE INDEX IF NOT EXISTS idx_assets_tool    ON part_assets(tool, kind, present
 CREATE INDEX IF NOT EXISTS idx_assets_name    ON part_assets(tool, kind, name);
 CREATE INDEX IF NOT EXISTS idx_assets_vendor  ON part_assets(origin_vendor);
 
+-- The requirement set for every (part, tool), including an EMPTY set.  It is derived from the
+-- part class, its per-part override, and the EDA registry when the source record is indexed.
+-- Presence remains in `part_assets`; trust remains raw `checks_json` facts there.  In particular,
+-- this table stores NO ready/trusted verdict.  Readiness is derived on every query so tightening
+-- a trust check re-judges the index without rewriting or re-auditing source records.
+CREATE TABLE IF NOT EXISTS part_requirements (
+    part_id       TEXT NOT NULL,
+    tool          TEXT NOT NULL,
+    required_json TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (part_id, tool)
+);
+CREATE INDEX IF NOT EXISTS idx_requirements_tool ON part_requirements(tool, part_id);
+
+-- Fingerprints of derived-index rules.  The source record hash cannot notice a registry or
+-- part-class rule change, so a persisted index needs this independent invalidation boundary.
+CREATE TABLE IF NOT EXISTS index_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 -- One row per purchase link, not one `purchase_url` column. A part is genuinely orderable from
 -- several distributors and the old shape kept only `purchase[0]`, so every other vendor's link,
 -- order number and price ladder was invisible to every query.
@@ -114,6 +136,23 @@ class IndexRow:
     manufacturer: str
     is_complete: bool
     missing: list[str] = field(default_factory=list)
+    eda_readiness: dict[str, "ToolReadiness"] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ToolReadiness:
+    """One tool's independently derived coverage and trust summary.
+
+    `coverage_complete` measures presence only.  `trust` judges the check facts for the required
+    assets that are present.  `ready` requires both, except that a class with no required assets
+    is ready by definition while its asset-trust verdict remains honestly UNKNOWN.
+    """
+
+    required: tuple[str, ...] = ()
+    missing: tuple[str, ...] = ()
+    coverage_complete: bool = False
+    trust: Verdict = Verdict.UNKNOWN
+    ready: bool = False
 
 
 @dataclass
@@ -214,10 +253,28 @@ class LibraryIndex:
         parts_dir = Path(parts_dir)
         stats = SyncStats()
         with self._lock:
+            requirements_revision = _requirements_revision()
+            saved_revision = self._conn.execute(
+                "SELECT value FROM index_meta WHERE key = 'requirements_revision'"
+            ).fetchone()
+            requirements_rules_changed = (
+                saved_revision is None or saved_revision["value"] != requirements_revision
+            )
             known = {
                 r["id"]: r["source_hash"]
                 for r in self._conn.execute("SELECT id, source_hash FROM parts")
             }
+            # A persistent index created by an older build can already know a record's source
+            # hash while lacking this build's per-tool requirement rows.  Treat that as stale
+            # derived state and reparse only those records; otherwise a schema upgrade would
+            # silently emit an empty readiness contract until the source file happened to change.
+            requirement_rows = {
+                r["part_id"]: r["n"]
+                for r in self._conn.execute(
+                    "SELECT part_id, COUNT(*) n FROM part_requirements GROUP BY part_id"
+                )
+            }
+            required_tool_rows = len(all_tools())
             seen: set[str] = set()
             if parts_dir.exists():
                 for json_path in sorted(parts_dir.glob("*.json")):
@@ -225,7 +282,11 @@ class LibraryIndex:
                     digest = hashlib.sha256(raw).hexdigest()
                     part_id = json_path.stem
                     seen.add(part_id)
-                    if known.get(part_id) == digest:
+                    if (
+                        known.get(part_id) == digest
+                        and requirement_rows.get(part_id) == required_tool_rows
+                        and not requirements_rules_changed
+                    ):
                         stats.unchanged += 1
                         continue
                     record = PartRecord.loads(raw.decode("utf-8"))
@@ -241,11 +302,15 @@ class LibraryIndex:
             for gone in set(known) - seen:
                 self._delete(gone)
                 stats.removed += 1
+            self._conn.execute(
+                "INSERT OR REPLACE INTO index_meta (key, value) VALUES (?, ?)",
+                ("requirements_revision", requirements_revision),
+            )
             self._conn.commit()
         return stats
 
     def _delete(self, part_id: str) -> None:
-        for table in ("part_assets", "part_purchase", "parts"):
+        for table in ("part_assets", "part_requirements", "part_purchase", "parts"):
             self._conn.execute(f"DELETE FROM {table} WHERE part_id = ?"
                                if table != "parts" else "DELETE FROM parts WHERE id = ?",
                                (part_id,))
@@ -266,6 +331,11 @@ class LibraryIndex:
             "origin_vendor, origin_url, origin_captured_at, checks_json) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             _asset_rows(rec),
+        )
+        self._conn.execute("DELETE FROM part_requirements WHERE part_id = ?", (rec.id,))
+        self._conn.executemany(
+            "INSERT INTO part_requirements (part_id, tool, required_json) VALUES (?,?,?)",
+            _requirement_rows(rec),
         )
         self._conn.execute("DELETE FROM part_purchase WHERE part_id = ?", (rec.id,))
         self._conn.executemany(
@@ -349,12 +419,13 @@ class LibraryIndex:
         # releasing after execute would leave another thread free to reset the statement mid-iteration.
         # Every reader below follows the same rule for the same reason.
         with self._lock:
-            return [_to_row(r) for r in self._conn.execute(sql, args)]
+            rows = list(self._conn.execute(sql, args))
+            return self._to_rows(rows)
 
     def get(self, part_id: str) -> IndexRow | None:
         with self._lock:
             r = self._conn.execute("SELECT * FROM parts WHERE id = ?", (part_id,)).fetchone()
-            return _to_row(r) if r else None
+            return self._to_rows([r])[0] if r else None
 
     def find_by_mpn(self, mpn: str) -> list[IndexRow]:
         """Exact-part match for a BOM line: case and separator insensitive
@@ -364,13 +435,14 @@ class LibraryIndex:
         if not key:
             return []
         with self._lock:
-            return [
-                _to_row(r)
+            rows = [
+                r
                 for r in self._conn.execute(
                     "SELECT * FROM parts WHERE mpn <> '' ORDER BY display_name COLLATE NOCASE"
                 )
                 if _mpn_key(r["mpn"]) == key
             ]
+            return self._to_rows(rows)
 
     def facets(self) -> Facets:
         with self._lock:
@@ -506,12 +578,84 @@ class LibraryIndex:
 
     def incomplete(self) -> list[IndexRow]:
         with self._lock:
-            return [
-                _to_row(r)
-                for r in self._conn.execute(
+            rows = list(
+                self._conn.execute(
                     "SELECT * FROM parts WHERE is_complete = 0 ORDER BY display_name COLLATE NOCASE"
                 )
-            ]
+            )
+            return self._to_rows(rows)
+
+    def _to_rows(self, rows: list[sqlite3.Row]) -> list[IndexRow]:
+        """Hydrate base rows with the per-tool readiness contract in bounded SQL batches.
+
+        Callers already hold `_lock`; keeping both the base rows and their asset facts inside the
+        same critical section prevents a sync from producing a mixed-generation summary.
+        """
+        if not rows:
+            return []
+
+        part_ids = [str(row["id"]) for row in rows]
+        required: dict[tuple[str, str], tuple[str, ...]] = {}
+        assets: dict[tuple[str, str, str], tuple[bool, list[AssetCheck]]] = {}
+
+        # SQLite deployments commonly cap bound parameters at 999.  Four hundred leaves room for
+        # future fixed predicates while keeping a 10,000-part library to 25 bounded reads, not an
+        # N+1 query per row.
+        for offset in range(0, len(part_ids), 400):
+            batch = part_ids[offset : offset + 400]
+            marks = ",".join("?" for _ in batch)
+            for row in self._conn.execute(
+                "SELECT part_id, tool, required_json FROM part_requirements "
+                f"WHERE part_id IN ({marks})",
+                batch,
+            ):
+                raw = json.loads(row["required_json"])
+                required[(row["part_id"], row["tool"])] = tuple(
+                    str(kind) for kind in raw if isinstance(kind, str)
+                )
+            for row in self._conn.execute(
+                "SELECT part_id, tool, kind, present, checks_json FROM part_assets "
+                f"WHERE part_id IN ({marks})",
+                batch,
+            ):
+                raw_checks = json.loads(row["checks_json"]) if row["checks_json"] else []
+                checks = [
+                    AssetCheck.from_dict(check)
+                    for check in raw_checks
+                    if isinstance(check, dict)
+                ]
+                assets[(row["part_id"], row["tool"], row["kind"])] = (
+                    bool(row["present"]),
+                    checks,
+                )
+
+        summaries: dict[str, dict[str, ToolReadiness]] = {}
+        for part_id in part_ids:
+            by_tool: dict[str, ToolReadiness] = {}
+            for tool in all_tools():
+                needs = required.get((part_id, tool.key), ())
+                missing = tuple(
+                    kind
+                    for kind in needs
+                    if not assets.get((part_id, tool.key, kind), (False, []))[0]
+                )
+                present_verdicts = [
+                    verdict_for(assets[(part_id, tool.key, kind)][1])
+                    for kind in needs
+                    if assets.get((part_id, tool.key, kind), (False, []))[0]
+                ]
+                trust = combine(present_verdicts)
+                coverage_complete = not missing
+                by_tool[tool.key] = ToolReadiness(
+                    required=needs,
+                    missing=missing,
+                    coverage_complete=coverage_complete,
+                    trust=trust,
+                    ready=coverage_complete and (not needs or trust is Verdict.PASS),
+                )
+            summaries[part_id] = by_tool
+
+        return [_to_row(row, summaries.get(str(row["id"]), {})) for row in rows]
 
     def close(self) -> None:
         # Closing while another thread is mid-read is the same misuse as reading concurrently, so it
@@ -523,6 +667,27 @@ class LibraryIndex:
 def _mpn_key(text: str) -> str:
     """Case/separator-insensitive MPN token: alphanumerics only, lowercased."""
     return "".join(ch for ch in text.lower() if ch.isalnum())
+
+
+def _requirements_revision() -> str:
+    """Content fingerprint of every registry fact that decides required asset kinds.
+
+    This is computed from the tables themselves, not a hand-maintained version number.  Adding a
+    class or tool, or changing what either can require, therefore invalidates a persistent derived
+    index automatically instead of relying on somebody to remember a parallel schema bump.
+    """
+    contract = {
+        "classes": [
+            {"key": part_class.value, "assets": list(CLASS_NEEDS[part_class].assets)}
+            for part_class in PartClass
+        ],
+        "tools": [
+            {"key": tool.key, "closable_assets": list(tool.closable_assets())}
+            for tool in all_tools()
+        ],
+    }
+    encoded = json.dumps(contract, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _asset_rows(rec: PartRecord) -> list[tuple]:
@@ -560,6 +725,20 @@ def _asset_rows(rec: PartRecord) -> list[tuple]:
                 json.dumps([c.to_dict() for c in asset.checks]) if asset.checks else "",
             ))
     return rows
+
+
+def _requirement_rows(rec: PartRecord) -> list[tuple[str, str, str]]:
+    """The exact required asset-kind set for every registered tool.
+
+    There is deliberately one row even when the set is empty.  An empty requirement set is a
+    positive class/registry decision (passive or virtual), while no row means an older or torn
+    derived index that must be rebuilt.  Both the part-class and tool decisions stay in their
+    registries; this projection has no `if tool == ...` or `if passive` branch.
+    """
+    return [
+        (rec.id, tool.key, json.dumps(list(rec.needs(tool.key))))
+        for tool in all_tools()
+    ]
 
 
 def _purchase_rows(rec: PartRecord) -> list[tuple]:
@@ -610,7 +789,10 @@ def _row_values(rec: PartRecord, source_hash: str = "") -> tuple:
     )
 
 
-def _to_row(r: sqlite3.Row) -> IndexRow:
+def _to_row(
+    r: sqlite3.Row,
+    eda_readiness: dict[str, ToolReadiness] | None = None,
+) -> IndexRow:
     return IndexRow(
         id=r["id"],
         display_name=r["display_name"],
@@ -619,4 +801,5 @@ def _to_row(r: sqlite3.Row) -> IndexRow:
         manufacturer=r["manufacturer"],
         is_complete=bool(r["is_complete"]),
         missing=[m for m in r["missing"].split(",") if m],
+        eda_readiness=dict(eda_readiness or {}),
     )

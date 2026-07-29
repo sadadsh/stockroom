@@ -142,7 +142,9 @@ def test_it_keeps_reconciling_while_the_app_runs(app_ctx):
     while len(calls) < 2 and time.time() < deadline:
         time.sleep(0.02)
     stop.set()
+    stop.join(2.0)
     assert len(calls) >= 2, f"the background loop did not keep running (calls={len(calls)})"
+    assert not stop.is_alive()
 
 
 def test_the_loop_stops_when_asked(app_ctx):
@@ -153,6 +155,16 @@ def test_the_loop_stops_when_asked(app_ctx):
     stop = app_ctx.start_background_sync(interval_seconds=0.05)
     time.sleep(0.2)
     stop.set()
+    stop.join(2.0)
     settled = len(calls)
     time.sleep(0.3)
     assert len(calls) == settled, "the loop kept going after stop"
+    assert not stop.is_alive()
+
+
+def test_background_sync_rejects_an_unbounded_interval(app_ctx):
+    import pytest
+
+    for value in (0, -1, float("inf"), float("nan"), True):
+        with pytest.raises((TypeError, ValueError)):
+            app_ctx.start_background_sync(interval_seconds=value)

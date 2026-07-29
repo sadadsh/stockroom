@@ -192,7 +192,7 @@ export function CompactPinoutCard({
       aria-labelledby="detail-pinout-heading"
       className="flex h-[184px] flex-none flex-col overflow-hidden rounded-card border border-line bg-s1"
     >
-      <div className="flex-none border-b border-line px-2.5 py-2">
+      <div className="flex-none border-b border-line px-3 py-2">
         <div className="flex min-w-0 items-baseline gap-2">
           <h3
             id="detail-pinout-heading"

@@ -21,6 +21,7 @@ class SyncState:
     DIVERGED = "diverged"
     DENIED = "denied"
     NO_REMOTE = "no_remote"
+    CONVERGED = "converged"
 
 
 @dataclass
@@ -29,6 +30,7 @@ class SyncResult:
     pulled: bool = False
     pushed: bool = False
     detail: str = ""
+    converged: bool = False
 
 
 def _looks_denied(reason: str) -> bool:
@@ -81,11 +83,19 @@ class SyncEngine:
         has_upstream = self.repo.has_upstream()
 
         pulled = False
+        converged = False
         if has_upstream:
             pull = self.repo.pull_ff()
             if not pull.ok:
-                return SyncResult(state=_classify_failure(pull.reason), detail=pull.reason)
-            pulled = pull.updated
+                failure = _classify_failure(pull.reason)
+                if failure != SyncState.DIVERGED:
+                    return SyncResult(state=failure, detail=pull.reason)
+                rebased = self.repo.pull_rebase()
+                if not rebased.ok:
+                    return SyncResult(state=SyncState.DIVERGED, detail=rebased.reason)
+                pulled, converged = True, True
+            else:
+                pulled = pull.updated
 
         # decide whether we have local commits to push
         if has_upstream:
@@ -100,9 +110,16 @@ class SyncEngine:
             push = self.repo.push()
             if not push.ok:
                 return SyncResult(state=_classify_failure(push.reason), pulled=pulled,
-                                  detail=push.reason)
+                                  converged=converged, detail=push.reason)
             pushed = True
 
+        if converged:
+            return SyncResult(
+                state=SyncState.CONVERGED,
+                pulled=True,
+                pushed=pushed,
+                converged=True,
+            )
         if pushed:
             return SyncResult(state=SyncState.PUSHED, pulled=pulled, pushed=True)
         if pulled:

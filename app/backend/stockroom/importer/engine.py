@@ -46,7 +46,7 @@ from pathlib import Path
 from stockroom.derive.engine import rederive
 from stockroom.derive.naming import DEFAULT_SCHEME
 from stockroom.importer.classify import reclassify
-from stockroom.importer.sources import build_sources
+from stockroom.importer.sources import PayloadFetcher, build_sources
 from stockroom.model.part_id import is_valid_part_id
 from stockroom.model.sourced import SOURCED_DIRNAME, source_rel_path, sourced_file, write_payload
 
@@ -116,7 +116,7 @@ def import_part(
     record,
     *,
     library_root: Path,
-    sources: list[tuple[str, object]],
+    sources: list[tuple[str, PayloadFetcher]],
     derived_at: str,
     scheme: str = DEFAULT_SCHEME,
     refetch: bool = False,
@@ -312,7 +312,7 @@ def run_import(
     pace: Callable[[str], None] | None = None,
     on_result: Callable[[PartResult], None] | None = None,
     save: Callable[[object], None] | None = None,
-    sources: list[tuple[str, object]] | None = None,
+    sources: list[tuple[str, PayloadFetcher]] | None = None,
 ) -> ImportReport:
     """Import a whole worklist. Stoppable at any point; re-running resumes from library state.
 

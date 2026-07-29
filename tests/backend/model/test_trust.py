@@ -59,6 +59,20 @@ def test_a_numeric_check_honours_its_declared_tolerance():
     # mm), not a verdict, so it is stored with the evidence.
     assert check_verdict(_check(measured=4.02, expected=4.0, tolerance=0.05)) is Verdict.PASS
     assert check_verdict(_check(measured=4.2, expected=4.0, tolerance=0.05)) is Verdict.FAIL
+
+
+def test_malformed_or_non_finite_numeric_evidence_fails_closed():
+    malformed = AssetCheck.from_dict(
+        {
+            "check": "courtyard_vs_body",
+            "measured": 4.0,
+            "expected": 4.0,
+            "tolerance": "not-a-number",
+        }
+    )
+    assert check_verdict(malformed) is Verdict.UNKNOWN
+    assert check_verdict(_check(measured=float("nan"), expected=4.0)) is Verdict.UNKNOWN
+    assert check_verdict(_check(measured=4.0, expected=float("inf"))) is Verdict.UNKNOWN
     assert check_verdict(_check(measured=4.02, expected=4.0)) is Verdict.FAIL
 
 

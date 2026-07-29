@@ -93,6 +93,22 @@ def _declared_fields() -> dict[str, bool]:
     }
 
 
+def _interface_fields(name: str) -> set[str]:
+    """Top-level fields of one TypeScript interface, with comments removed."""
+    src = TYPES_TS.read_text(encoding="utf-8")
+    match = re.search(
+        rf"export\s+interface\s+{re.escape(name)}\s*\{{(.*?)\n\}}",
+        src,
+        re.S,
+    )
+    assert match, f"could not find `export interface {name} {{ ... }}` in types.ts"
+    body = re.sub(r"/\*.*?\*/", "", match.group(1), flags=re.S)
+    body = re.sub(r"//[^\n]*", "", body)
+    return set(
+        re.findall(r"^\s{2}([A-Za-z_][A-Za-z0-9_]*)(?:\??)\s*:", body, re.M)
+    )
+
+
 def test_the_harness_can_actually_see_both_sides():
     """Anti-vacuous guard: a comparison that silently matches nothing always passes.
 
@@ -154,6 +170,56 @@ def test_a_key_the_backend_can_omit_is_declared_OPTIONAL_in_the_typescript():
         f"declares them required. A consumer dereferences `undefined` with the compiler's "
         f"blessing. Spell them `name?:` in {TYPES_TS.relative_to(ROOT).as_posix()}."
     )
+
+
+def test_part_summary_and_nested_eda_readiness_match_the_typescript_contract():
+    """The lean list DTO is independently hand-declared in TypeScript too.
+
+    This pins the exact seam that formerly reused passport `is_complete` as default-tool CAD
+    readiness: a backend rename/addition cannot silently leave `summaryReadiness` reading an
+    invented shape.
+    """
+    from stockroom.api.schemas import EdaReadinessSummary, PartSummary
+
+    assert set(PartSummary.model_fields) == _interface_fields("PartSummary")
+    assert set(EdaReadinessSummary.model_fields) == _interface_fields(
+        "EdaReadinessSummary"
+    )
+
+
+def test_part_summary_serializes_presence_and_trust_as_distinct_fields():
+    from stockroom.api.schemas import PartSummary
+    from stockroom.model.trust import Verdict
+    from stockroom.store.index import IndexRow, ToolReadiness
+
+    row = IndexRow(
+        id="x",
+        display_name="X",
+        category="ICs",
+        mpn="X",
+        manufacturer="Acme",
+        is_complete=True,
+        missing=[],
+        eda_readiness={
+            "kicad": ToolReadiness(
+                required=("symbol",),
+                missing=(),
+                coverage_complete=True,
+                trust=Verdict.UNKNOWN,
+                ready=False,
+            )
+        },
+    )
+
+    payload = PartSummary.from_row(row).model_dump(mode="json")
+    assert payload["is_complete"] is True
+    assert payload["eda_readiness"]["kicad"] == {
+        "required": ["symbol"],
+        "missing": [],
+        "coverage_complete": True,
+        "trust": "unknown",
+        "ready": False,
+    }
 
 
 @pytest.mark.parametrize("tool", ["kicad", "altium"])

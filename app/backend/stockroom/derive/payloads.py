@@ -18,9 +18,10 @@ asserts every source that can WRITE under `sourced/` has a parser here. Adding a
 one entry in this table plus one `parse_*_payload` function; there is no `if source == "mouser"`
 anywhere in the engine.
 
-ORDER IS THE CONTRACT. `merge_missing` gives the slot to whoever fills it FIRST, so the order of
-this table decides which vendor's description and specs win. It is an explicit tuple rather than
-dict insertion order or a set, because the derivation must be deterministic to be idempotent -
+ORDER IS THE DEFAULT CONTRACT. `merge_missing` gives the slot to whoever fills it FIRST, so the
+order of this table decides which vendor wins unless a canonical field has a measured,
+field-specific order in `FIELD_SOURCE_PRIORITY`. Both are explicit tuples rather than dict
+insertion order or a set, because the derivation must be deterministic to be idempotent -
 "derive twice, get byte-identical records" is a spec acceptance test, and an unordered merge fails
 it intermittently, which is the worst way to fail it.
 """
@@ -39,12 +40,12 @@ from stockroom.enrich.schema import EnrichmentResult
 # corrupt file must not make a part unrebuildable.
 PayloadParser = Callable[[dict | None, str], EnrichmentResult]
 
-# Source key -> parser, in PRIORITY ORDER (first to fill a field keeps it).
+# Source key -> parser, in DEFAULT PRIORITY ORDER (first to fill a field keeps it).
 #
 # Mouser leads DigiKey only because that is the order the live registry already walks, so a
 # re-derive reproduces the values the import produced rather than quietly re-picking winners the
-# first time it runs. Changing this order is a legitimate derivation-rules change and must bump
-# `RULESET_VERSION` in model/derived.py, which is exactly what that stamp is for.
+# first time it runs. A field whose evidence supports a different choice is declared separately
+# below instead of moving every other field with it.
 PAYLOAD_PARSERS: tuple[tuple[str, PayloadParser], ...] = (
     ("mouser", parse_mouser_payload),
     ("digikey", parse_digikey_payload),
@@ -52,10 +53,32 @@ PAYLOAD_PARSERS: tuple[tuple[str, PayloadParser], ...] = (
 
 _BY_NAME: dict[str, PayloadParser] = dict(PAYLOAD_PARSERS)
 
+# Canonical field -> source keys, best first. This is DATA, not a source-name branch in the derive
+# engine. The owner-library sample found Mouser's short catalogue description both truncated and
+# polluted while DigiKey's DetailedDescription was readable prose; that evidence says nothing
+# about lifecycle, lead time, tariff, or every other field, so only `description` moves.
+#
+# Changing this table changes output from unchanged evidence and therefore requires a
+# `RULESET_VERSION` bump in model/derived.py.
+FIELD_SOURCE_PRIORITY: dict[str, tuple[str, ...]] = {
+    "description": ("digikey", "mouser"),
+}
+
 
 def known_sources() -> tuple[str, ...]:
-    """Source keys that can be re-derived from, in priority order."""
+    """Source keys that can be re-derived from, in default priority order."""
     return tuple(name for name, _ in PAYLOAD_PARSERS)
+
+
+def sources_for_field(field: str) -> tuple[str, ...]:
+    """Every registered source in deterministic priority order for one canonical field.
+
+    A field override may name only a subset; the remaining registered sources retain their
+    default order afterward. That makes adding a third parser an honest fallback instead of
+    silently making it ineligible for every existing field rule.
+    """
+    preferred = FIELD_SOURCE_PRIORITY.get(field, ())
+    return preferred + tuple(source for source in known_sources() if source not in preferred)
 
 
 def parser_for(source: str) -> PayloadParser | None:

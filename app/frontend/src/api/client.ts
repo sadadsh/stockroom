@@ -8,10 +8,15 @@
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
+  AssemblyRun,
   AltiumEmbedCapability,
   AltiumEmbedResult,
   AltiumModelsPending,
   LibraryCoverage,
+  CompletionRunRef,
+  WorkflowBatchSnapshot,
+  WorkflowControlResult,
+  WorkflowEventsPage,
   LibraryDerivation,
   CadInventory,
   AltiumRegenerateResult,
@@ -38,6 +43,19 @@ import type {
   LibraryLfsStatus,
   OnboardingStatus,
   ProfilesResponse,
+  ProjectSummary,
+  ProjectBom,
+  ProjectAssignments,
+  ProjectCollaboration,
+  ProjectReviewCandidate,
+  ProjectReviewEvidence,
+  ProjectNativeValidation,
+  ProjectReviews,
+  ApproveProjectReviewResult,
+  RequestProjectChangesResult,
+  FinishWorkSessionResult,
+  ProjectWorkspace,
+  DiscoveredProject,
   SetLibraryBody,
   RepairResult,
   RescanStartResponse,
@@ -58,6 +76,7 @@ import type {
   UnionDTO,
   TargetDefinitionBody,
   TargetDefinitionDTO,
+  SocketSolutionDTO,
   PinAfResponse,
   SignalCandidatesResponse,
   SuggestionsResponse,
@@ -85,11 +104,7 @@ interface RequestOptions {
   body?: unknown;
 }
 
-async function request<T>(
-  method: string,
-  path: string,
-  opts: RequestOptions = {},
-): Promise<T> {
+async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
   const url = new URL(apiBase() + path);
   if (opts.params) {
     for (const [k, v] of Object.entries(opts.params)) {
@@ -168,6 +183,46 @@ async function fetchPreviewBlob(path: string, accept: string): Promise<Blob> {
   return res.blob();
 }
 
+export interface DownloadedFile {
+  blob: Blob;
+  filename: string;
+}
+
+async function fetchDownload(
+  path: string,
+  params: Record<string, string>,
+): Promise<DownloadedFile> {
+  const url = new URL(apiBase() + path);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  const token = apiToken();
+  const headers: Record<string, string> = { Accept: "text/csv" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), { headers });
+  } catch (err) {
+    throw new ApiError(0, err instanceof Error ? err.message : "Network error");
+  }
+  if (!res.ok) {
+    let msg = `Request failed (${res.status})`;
+    try {
+      const body = await res.json();
+      msg = body.detail || body.error || body.message || msg;
+    } catch {
+      /* non-JSON error body, keep the status message */
+    }
+    throw new ApiError(res.status, msg);
+  }
+  const disposition = res.headers.get("content-disposition") || "";
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  return {
+    blob: await res.blob(),
+    filename: match?.[1] || "stockroom-bom.csv",
+  };
+}
+
 export interface LandPad {
   number: string;
   /** millimetres from the footprint origin, KiCad's frame (+Y down) */
@@ -228,6 +283,189 @@ export interface StmMcusArgs {
 }
 
 export const api = {
+  listProjects(): Promise<ProjectSummary[]> {
+    return apiGet<ProjectSummary[]>("/api/projects");
+  },
+
+  discoverProjects(candidate: string): Promise<{ projects: DiscoveredProject[] }> {
+    return request<{ projects: DiscoveredProject[] }>("POST", "/api/projects/discover", {
+      body: { candidate },
+    });
+  },
+
+  registerProject(root: string, eda: "kicad" | "altium"): Promise<unknown> {
+    return request("POST", "/api/projects", { body: { root, eda } });
+  },
+
+  projectWorkspace(projectId: string): Promise<ProjectWorkspace> {
+    return apiGet<ProjectWorkspace>(`/api/projects/${encodeURIComponent(projectId)}/workspace`);
+  },
+
+  liveProjectBom(projectId: string, boards = 1): Promise<ProjectBom> {
+    return apiGet<ProjectBom>(`/api/projects/${encodeURIComponent(projectId)}/bom/live`, {
+      boards: String(boards),
+    });
+  },
+
+  liveProjectBomExport(projectId: string, boards = 1): Promise<DownloadedFile> {
+    return fetchDownload(`/api/projects/${encodeURIComponent(projectId)}/bom/live/export`, {
+      boards: String(boards),
+      kind: "csv",
+    });
+  },
+
+  projectAssignments(projectId: string): Promise<ProjectAssignments> {
+    return apiGet<ProjectAssignments>(`/api/projects/${encodeURIComponent(projectId)}/assign`);
+  },
+
+  assignProjectGroup(
+    projectId: string,
+    refs: string[],
+    partId: string,
+  ): Promise<{
+    project: string;
+    refs: string[];
+    part_id: string;
+    bound: number;
+    committed: string | null;
+  }> {
+    return request("POST", `/api/projects/${encodeURIComponent(projectId)}/assign`, {
+      body: { refs, part_id: partId },
+    });
+  },
+
+  projectCollaboration(projectId: string): Promise<ProjectCollaboration> {
+    return apiGet<ProjectCollaboration>(
+      `/api/projects/${encodeURIComponent(projectId)}/collaboration`,
+    );
+  },
+
+  startWorkSession(
+    projectId: string,
+    body: { owner: string; branch: string; documents: string[] },
+  ): Promise<ProjectCollaboration> {
+    return request<ProjectCollaboration>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/work-sessions`,
+      { body },
+    );
+  },
+
+  shareWorkSession(
+    projectId: string,
+    sessionId: string,
+    message: string,
+  ): Promise<ProjectCollaboration> {
+    return request<ProjectCollaboration>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/work-sessions/${encodeURIComponent(sessionId)}/share`,
+      { body: { message } },
+    );
+  },
+
+  resumeWorkSession(projectId: string, sessionId: string): Promise<ProjectCollaboration> {
+    return request<ProjectCollaboration>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/work-sessions/${encodeURIComponent(sessionId)}/resume`,
+    );
+  },
+
+  finishWorkSession(projectId: string, sessionId: string): Promise<FinishWorkSessionResult> {
+    return request<FinishWorkSessionResult>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/work-sessions/${encodeURIComponent(sessionId)}/finish`,
+    );
+  },
+
+  projectReviews(projectId: string): Promise<ProjectReviews> {
+    return apiGet<ProjectReviews>(`/api/projects/${encodeURIComponent(projectId)}/reviews`);
+  },
+
+  projectReviewEvidence(
+    projectId: string,
+    candidate: Pick<ProjectReviewCandidate, "branch" | "commit" | "base_branch" | "base_commit">,
+  ): Promise<ProjectReviewEvidence> {
+    return request<ProjectReviewEvidence>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/reviews/evidence`,
+      { body: candidate },
+    );
+  },
+
+  validateProjectReview(
+    projectId: string,
+    candidate: Pick<ProjectReviewCandidate, "branch" | "commit" | "base_branch" | "base_commit">,
+  ): Promise<ProjectNativeValidation> {
+    return request<ProjectNativeValidation>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/reviews/validate`,
+      { body: candidate },
+    );
+  },
+
+  approveProjectReview(
+    projectId: string,
+    candidate: Pick<ProjectReviewCandidate, "branch" | "commit" | "base_branch" | "base_commit">,
+  ): Promise<ApproveProjectReviewResult> {
+    return request<ApproveProjectReviewResult>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/reviews/approve`,
+      { body: candidate },
+    );
+  },
+
+  requestProjectChanges(
+    projectId: string,
+    decision: Pick<ProjectReviewCandidate, "branch" | "commit" | "base_branch" | "base_commit"> & {
+      reviewer: string;
+      message: string;
+    },
+  ): Promise<RequestProjectChangesResult> {
+    return request<RequestProjectChangesResult>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/reviews/request-changes`,
+      { body: decision },
+    );
+  },
+
+  activeAssembly(projectId: string): Promise<AssemblyRun | null> {
+    return apiGet<AssemblyRun | null>(
+      `/api/projects/${encodeURIComponent(projectId)}/assemblies/active`,
+    );
+  },
+
+  startAssembly(projectId: string, operator: string, boards: number): Promise<AssemblyRun> {
+    return request<AssemblyRun>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/assemblies`,
+      { body: { operator, boards } },
+    );
+  },
+
+  recordAssemblyEvent(
+    projectId: string,
+    runId: string,
+    body: {
+      placement_id: string;
+      state: "done" | "skipped" | "reworked" | "issue";
+      scanned_mpn?: string;
+      note?: string;
+    },
+  ): Promise<AssemblyRun> {
+    return request<AssemblyRun>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/assemblies/${encodeURIComponent(runId)}/events`,
+      { body },
+    );
+  },
+
+  completeAssembly(projectId: string, runId: string): Promise<AssemblyRun> {
+    return request<AssemblyRun>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/assemblies/${encodeURIComponent(runId)}/complete`,
+    );
+  },
+
   listParts({ q, category, completeOnly }: ListPartsArgs): Promise<PartsResponse> {
     const params: Record<string, string> = {};
     if (q) params.q = q;
@@ -309,9 +547,7 @@ export const api = {
   // The part's git timeline (M6k): commits that touched its canonical JSON, newest
   // first. An uncommitted part honestly reports an empty list.
   partHistory(id: string): Promise<HistoryResponse> {
-    return apiGet<HistoryResponse>(
-      `/api/library/parts/${encodeURIComponent(id)}/history`,
-    );
+    return apiGet<HistoryResponse>(`/api/library/parts/${encodeURIComponent(id)}/history`);
   },
 
   // A structured field-diff of the part JSON between two revs (M6k). `a` may be ""
@@ -319,10 +555,7 @@ export const api = {
   // param serializer, so the backend applies its "" default and every field reads as
   // added. Both revs must lie in this part's own history or the backend returns 400.
   partDiff(id: string, a: string, b: string): Promise<DiffResponse> {
-    return apiGet<DiffResponse>(
-      `/api/library/parts/${encodeURIComponent(id)}/diff`,
-      { a, b },
-    );
+    return apiGet<DiffResponse>(`/api/library/parts/${encodeURIComponent(id)}/diff`, { a, b });
   },
 
   // Previews (M6d). The symbol/footprint SVG is requested in the monochrome (?bw)
@@ -380,10 +613,7 @@ export const api = {
   // it comes back as a Blob (object-URL'd by the viewer). 400 = refused URL, 404 = the
   // fetch yielded no real image; both surface as ApiError and the photo simply hides.
   productImage(url: string): Promise<Blob> {
-    return fetchPreviewBlob(
-      `/api/enrich/image?url=${encodeURIComponent(url)}`,
-      "image/*",
-    );
+    return fetchPreviewBlob(`/api/enrich/image?url=${encodeURIComponent(url)}`, "image/*");
   },
 
   // Edit one field (mirrored to the KiCad symbol where the field maps to a symbol
@@ -392,26 +622,6 @@ export const api = {
     return request<PartDetail>("PATCH", `/api/library/parts/${encodeURIComponent(id)}`, {
       body: { field, value },
     });
-  },
-
-  // Attach (or repoint) a symbol / footprint REFERENCE on an existing part AFTER it
-  // was added (assets no longer gate entry; they are attachable after). The reference
-  // is a lib_id (no file copied), tagged with the EDA tool it targets ("kicad" default).
-  // `name` is required; an empty name is a 422 from the gate. Returns the updated record.
-  attachSymbol(id: string, lib: string, name: string, tool = "kicad"): Promise<PartDetail> {
-    return request<PartDetail>(
-      "POST",
-      `/api/library/parts/${encodeURIComponent(id)}/symbol`,
-      { body: { lib, name, tool } },
-    );
-  },
-
-  attachFootprint(id: string, lib: string, name: string, tool = "kicad"): Promise<PartDetail> {
-    return request<PartDetail>(
-      "POST",
-      `/api/library/parts/${encodeURIComponent(id)}/footprint`,
-      { body: { lib, name, tool } },
-    );
   },
 
   // Persist canonical spec data (e.g. an enriched pinout) onto the record so a
@@ -423,23 +633,23 @@ export const api = {
     specs: Record<string, { value: unknown; source?: string; confidence?: string }>,
     overwrite = false,
   ): Promise<PartDetail> {
-    return request<PartDetail>(
-      "POST",
-      `/api/library/parts/${encodeURIComponent(id)}/specs`,
-      { body: { specs, overwrite } },
-    );
+    return request<PartDetail>("POST", `/api/library/parts/${encodeURIComponent(id)}/specs`, {
+      body: { specs, overwrite },
+    });
   },
 
   moveCategory(id: string, category: string): Promise<PartDetail> {
-    return request<PartDetail>(
-      "POST",
-      `/api/library/parts/${encodeURIComponent(id)}/move`,
-      { body: { category } },
-    );
+    return request<PartDetail>("POST", `/api/library/parts/${encodeURIComponent(id)}/move`, {
+      body: { category },
+    });
   },
 
   deletePart(id: string): Promise<void> {
     return request<void>("DELETE", `/api/library/parts/${encodeURIComponent(id)}`);
+  },
+
+  restoreDeletedPart(id: string): Promise<PartDetail> {
+    return request<PartDetail>("POST", `/api/library/parts/${encodeURIComponent(id)}/undo-delete`);
   },
 
   // Remove ONE element from a part: "datasheet", or a `<tool>_<asset kind>` pair from the
@@ -456,21 +666,14 @@ export const api = {
   // from the distributor APIs. A write-lane job: the record commits server-side and the
   // job's terminal SSE result carries the updated record.
   refreshSourcing(id: string): Promise<JobRef> {
-    return request<JobRef>(
-      "POST",
-      `/api/library/parts/${encodeURIComponent(id)}/refresh`,
-    );
+    return request<JobRef>("POST", `/api/library/parts/${encodeURIComponent(id)}/refresh`);
   },
 
   // Look up a part by its MPN through the enrichment pipeline (scrape-first, spec
   // section 6.1). Returns the sourced candidate fields; the caller applies the ones
   // it wants through editField. A scrape miss returns null fields, never an error,
   // so completeness is never blocked by a dead source.
-  enrichPart(
-    mpn: string,
-    category?: string,
-    want?: string[],
-  ): Promise<JobRef> {
+  enrichPart(mpn: string, category?: string, want?: string[]): Promise<JobRef> {
     const body: Record<string, unknown> = { mpn };
     if (category) body.category = category;
     if (want && want.length > 0) body.want = want;
@@ -488,14 +691,6 @@ export const api = {
     return request<JobRef>("POST", "/api/enrich/from-url", { body: { url } });
   },
 
-  // Inspect dropped file paths / LCSC ids into staging candidates. Returns a job
-  // id; the candidates arrive on the job's SSE result event (openJobStream).
-  ingestInspect(paths: string[], lcsc_ids: string[]): Promise<JobRef> {
-    return request<JobRef>("POST", "/api/ingest/inspect", {
-      body: { paths, lcsc_ids },
-    });
-  },
-
   // Add a staging candidate to the library. On success returns the new record; on
   // the complete-to-add gate failure it throws ApiError (422) with `missing` set.
   ingestCommit(candidate: StagingCandidate): Promise<PartDetail> {
@@ -506,38 +701,7 @@ export const api = {
   // download, spec section 5). A resolvable 200 either way; `url` is null when the part
   // has no MPN, DigiKey is disabled, or nothing resolved - never an error.
   partCadSource(id: string): Promise<CadSourceResponse> {
-    return apiGet<CadSourceResponse>(
-      `/api/library/parts/${encodeURIComponent(id)}/cad-source`,
-    );
-  },
-
-  // Unpack a downloaded CAD ZIP for an EXISTING part into staging candidates. Same
-  // read-lane job + candidate DTO shape as ingestInspect; the result arrives on the
-  // job's SSE result event (openJobStream).
-  assetsInspect(partId: string, paths: string[]): Promise<JobRef> {
-    return request<JobRef>(
-      "POST",
-      `/api/parts/${encodeURIComponent(partId)}/assets/inspect`,
-      { body: { paths } },
-    );
-  },
-
-  // Attach a reviewed candidate's symbol/footprint/3D onto the existing part,
-  // synchronously (one atomic Transaction). Only the assets the candidate actually
-  // carries are touched; an already-present asset is left alone.
-  // `origin` records WHICH vendor page the files were downloaded from. The backend stamps the
-  // time; only the guided flow knows the vendor, so only it can send this. Omitted means the
-  // assets land honestly unattributed rather than claiming a blank source.
-  assetsCommit(
-    partId: string,
-    candidate: StagingCandidate,
-    origin?: { vendor: string; url: string },
-  ): Promise<PartDetail> {
-    return request<PartDetail>(
-      "POST",
-      `/api/parts/${encodeURIComponent(partId)}/assets/commit`,
-      { body: origin ? { ...candidate, origin } : candidate },
-    );
+    return apiGet<CadSourceResponse>(`/api/library/parts/${encodeURIComponent(id)}/cad-source`);
   },
 
   // Open a job's Server-Sent Events stream. Native EventSource cannot send the
@@ -547,10 +711,9 @@ export const api = {
     const token = apiToken();
     const headers: Record<string, string> = { Accept: "text/event-stream" };
     if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(
-      apiBase() + `/api/jobs/${encodeURIComponent(jobId)}/events`,
-      { headers },
-    );
+    const res = await fetch(apiBase() + `/api/jobs/${encodeURIComponent(jobId)}/events`, {
+      headers,
+    });
     if (!res.ok || !res.body) {
       throw new ApiError(res.status || 0, `Job stream failed (${res.status})`);
     }
@@ -591,10 +754,7 @@ export const api = {
   },
 
   activateProfile(name: string): Promise<ActivateResponse> {
-    return request<ActivateResponse>(
-      "POST",
-      `/api/profiles/${encodeURIComponent(name)}/activate`,
-    );
+    return request<ActivateResponse>("POST", `/api/profiles/${encodeURIComponent(name)}/activate`);
   },
 
   deleteProfile(name: string): Promise<void> {
@@ -742,10 +902,55 @@ export const api = {
   // Give every part the files it still needs. A JOB, and a long one: at the measured catalogue
   // pace a 10,000-part library is around 21 hours, which is exactly why it is stoppable and why
   // resuming is free (the worklist is derived from the library, never bookkept).
-  runCompletion(input: { partIds?: string[]; limit?: number } = {}): Promise<{ job_id: string }> {
-    return request<{ job_id: string }>("POST", "/api/library/completion/run", {
+  runCompletion(input: { partIds?: string[]; limit?: number } = {}): Promise<CompletionRunRef> {
+    return request<CompletionRunRef>("POST", "/api/library/completion/run", {
       body: { part_ids: input.partIds, limit: input.limit },
     });
+  },
+
+  workflowBatch(batchId: string, afterOrdinal = -1, limit = 100): Promise<WorkflowBatchSnapshot> {
+    return apiGet<WorkflowBatchSnapshot>(`/api/workflows/batches/${encodeURIComponent(batchId)}`, {
+      after_ordinal: String(afterOrdinal),
+      limit: String(limit),
+    });
+  },
+
+  workflowEvents(batchId: string, afterSequence: number, limit = 200): Promise<WorkflowEventsPage> {
+    return apiGet<WorkflowEventsPage>(
+      `/api/workflows/batches/${encodeURIComponent(batchId)}/events`,
+      {
+        after_sequence: String(afterSequence),
+        limit: String(limit),
+      },
+    );
+  },
+
+  workflowPause(batchId: string): Promise<WorkflowControlResult> {
+    return request<WorkflowControlResult>(
+      "POST",
+      `/api/workflows/batches/${encodeURIComponent(batchId)}/pause`,
+    );
+  },
+
+  workflowResume(batchId: string): Promise<WorkflowControlResult> {
+    return request<WorkflowControlResult>(
+      "POST",
+      `/api/workflows/batches/${encodeURIComponent(batchId)}/resume`,
+    );
+  },
+
+  workflowRetry(batchId: string): Promise<WorkflowControlResult> {
+    return request<WorkflowControlResult>(
+      "POST",
+      `/api/workflows/batches/${encodeURIComponent(batchId)}/retry`,
+    );
+  },
+
+  workflowCancel(batchId: string): Promise<WorkflowControlResult> {
+    return request<WorkflowControlResult>(
+      "POST",
+      `/api/workflows/batches/${encodeURIComponent(batchId)}/cancel`,
+    );
   },
 
   // AUTOMATIC ACQUISITION, through the SAME route on Windows and Linux. Direct/keyless sources run
@@ -755,14 +960,14 @@ export const api = {
   // `partIds: [one]` is per-component; omitting it captures every part still missing files. Both
   // are the same backend path deliberately, so verifying one verifies the other.
   //
-  // This REPLACED `window.pywebview.api.open_cad_download`, which existed only on Windows - so the
-  // whole flow was untestable off Windows and silently degraded to "pick the files yourself".
+  // The native shell and browser development build share this API-owned route. Provider sessions
+  // and task-bound downloads remain backend-owned.
   runCapture(
     input: {
       partIds?: string[];
       vendor?: string;
       limit?: number;
-      mode?: "automatic" | "assisted";
+      mode?: "automatic" | "assisted" | "collect-all";
     } = {},
   ): Promise<{
     job_id: string;
@@ -842,16 +1047,6 @@ export const api = {
     return request<AltiumRegenerateResult>("POST", "/api/altium/regenerate");
   },
 
-  // Attach a part's Altium assets (a .SchLib + .PcbLib pair or a single .IntLib) by their native
-  // filesystem paths (host-captured, same as ingest). Synchronous, one atomic commit.
-  altiumAttach(partId: string, paths: string[]): Promise<unknown> {
-    return request<unknown>(
-      "POST",
-      `/api/altium/parts/${encodeURIComponent(partId)}/attach`,
-      { body: { paths } },
-    );
-  },
-
   // --- STM Viewer (Phase 3 contract, section 4). Every read raises ApiError(409, "STM index
   // not built") when the index is absent; the caller branches on .status === 409 to show the
   // Build the index call to action instead of a raw error. ---
@@ -903,6 +1098,12 @@ export const api = {
   // content-addressed artifact consumed by build documentation and firmware.
   postStmTargetDefinition(body: TargetDefinitionBody): Promise<TargetDefinitionDTO> {
     return request<TargetDefinitionDTO>("POST", "/api/stm/target-definition", { body });
+  },
+
+  // Compile the same explicit target set into compact hardware modes, reusable
+  // support cells, target cohorts, and safe software-control states.
+  postStmSocketSolution(body: TargetDefinitionBody): Promise<SocketSolutionDTO> {
+    return request<SocketSolutionDTO>("POST", "/api/stm/socket-solution", { body });
   },
 
   // One pin's complete AF0-15 set (SWAP-01). `part` is a ref_name OR an MPN, passed as a query

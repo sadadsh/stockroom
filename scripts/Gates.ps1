@@ -128,8 +128,18 @@ try {
         Write-Warning $failures[-1]
     }
 
+    Invoke-Checked 'GitHub Actions Workflows' {
+        $actionlint = Get-Command actionlint -CommandType Application -ErrorAction SilentlyContinue
+        if (-not $actionlint) {
+            throw 'actionlint is required; install rhysd.actionlint with winget'
+        }
+        & $actionlint.Source .github\workflows\ci.yml .github\workflows\release.yml
+    }
     Invoke-Checked 'Ruff' {
         & uv run ruff check app\backend scripts tests
+    }
+    Invoke-Checked 'Backend Type Check' {
+        & uv run ty check app\backend\stockroom
     }
     Invoke-Checked 'Backend Tests' {
         & uv run pytest tests\backend -q -p no:randomly `

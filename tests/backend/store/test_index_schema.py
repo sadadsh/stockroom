@@ -11,7 +11,7 @@ from pathlib import Path
 
 from stockroom.model.asset import Asset, AssetOrigin, AssetRef, EdaAssets
 from stockroom.model.part import PartRecord
-from stockroom.model.part_class import PartClass
+from stockroom.model.part_class import CLASS_NEEDS, ClassNeeds, PartClass, RequirementOverride
 from stockroom.model.trust import AssetCheck, Verdict
 from stockroom.store.index import LibraryIndex
 
@@ -233,6 +233,181 @@ def test_a_failing_measurement_derives_FAIL_from_the_stored_facts(tmp_path):
     ]))
     assert idx.asset_trust("a-aaaa", "kicad", "symbol") is Verdict.FAIL
     idx.close()
+
+
+def _checked_asset(*, lib: str = "", name: str = "", file: str = "", good: bool = True) -> Asset:
+    return Asset(
+        ref=AssetRef(lib=lib, name=name, file=file),
+        checks=[
+            AssetCheck(
+                check="known-bad-negative-control",
+                measured=8 if good else 7,
+                expected=8,
+                against="fixture authority",
+            )
+        ],
+    )
+
+
+def test_per_tool_readiness_rejects_a_present_known_bad_asset(tmp_path):
+    """The adversarial input is deliberately PRESENT but measurably wrong.
+
+    This is the concrete negative control for the former summary bug: a presence-only
+    implementation would mark both tools ready and this test would fail.
+    """
+    record = _rec(
+        "bad-aaaa",
+        "BAD",
+        assets={
+            "kicad": EdaAssets(
+                symbol=_checked_asset(lib="k.SchLib", name="S", good=False),
+                footprint=_checked_asset(lib="k.PcbLib", name="F"),
+                model=_checked_asset(file="k.step"),
+            ),
+            "altium": EdaAssets(
+                symbol=_checked_asset(lib="a.SchLib", name="S"),
+                footprint=_checked_asset(lib="a.PcbLib", name="F"),
+                model=_checked_asset(file="a.step"),
+            ),
+        },
+    )
+    row = LibraryIndex.build(_lib(tmp_path, [record])).get(record.id)
+    assert row is not None
+
+    kicad = row.eda_readiness["kicad"]
+    assert kicad.required == ("symbol", "footprint", "model")
+    assert kicad.missing == ()
+    assert kicad.coverage_complete is True
+    assert kicad.trust is Verdict.FAIL
+    assert kicad.ready is False
+
+    # The non-default tool is judged by the identical data-driven path and independently passes.
+    altium = row.eda_readiness["altium"]
+    assert altium.required == ("symbol", "footprint", "model")
+    assert altium.missing == ()
+    assert altium.coverage_complete is True
+    assert altium.trust is Verdict.PASS
+    assert altium.ready is True
+
+
+def test_per_tool_readiness_keeps_presence_and_unknown_trust_separate(tmp_path):
+    record = _rec(
+        "unchecked-aaaa",
+        "UNCHECKED",
+        assets={
+            "kicad": EdaAssets(
+                symbol=AssetRef(lib="K", name="S"),
+                footprint=AssetRef(lib="K", name="F"),
+                model=AssetRef(file="m.step"),
+            )
+        },
+    )
+    row = LibraryIndex.build(_lib(tmp_path, [record])).get(record.id)
+    assert row is not None
+    state = row.eda_readiness["kicad"]
+    assert state.coverage_complete is True
+    assert state.missing == ()
+    assert state.trust is Verdict.UNKNOWN
+    assert state.ready is False
+
+
+def test_per_tool_readiness_keeps_missing_presence_separate_from_passing_checks(tmp_path):
+    record = _rec(
+        "missing-aaaa",
+        "MISSING",
+        assets={
+            "kicad": EdaAssets(
+                symbol=_checked_asset(lib="K", name="S"),
+                footprint=_checked_asset(lib="K", name="F"),
+            )
+        },
+    )
+    row = LibraryIndex.build(_lib(tmp_path, [record])).get(record.id)
+    assert row is not None
+    state = row.eda_readiness["kicad"]
+    assert state.coverage_complete is False
+    assert state.missing == ("model",)
+    assert state.trust is Verdict.PASS
+    assert state.ready is False
+
+
+def test_per_tool_requirements_are_class_and_override_data_not_tool_branches(tmp_path):
+    passive = _rec("passive-aaaa", "PASSIVE")
+    passive.part_class = PartClass.PASSIVE
+    mechanical = _rec(
+        "mechanical-aaaa",
+        "MECHANICAL",
+        assets={
+            tool: EdaAssets(footprint=_checked_asset(lib=f"{tool}.lib", name="F"))
+            for tool in ("kicad", "altium")
+        },
+    )
+    mechanical.part_class = PartClass.MECHANICAL
+    override = _rec(
+        "override-aaaa",
+        "OVERRIDE",
+        assets={
+            "altium": EdaAssets(footprint=_checked_asset(lib="a.PcbLib", name="F"))
+        },
+    )
+    override.requires_override = RequirementOverride(
+        needs=("footprint",),
+        tools=("altium",),
+        reason="fixture has no Altium schematic representation",
+    )
+    index = LibraryIndex.build(_lib(tmp_path, [passive, mechanical, override]))
+
+    passive_row = index.get(passive.id)
+    assert passive_row is not None
+    for tool in ("kicad", "altium"):
+        state = passive_row.eda_readiness[tool]
+        assert state.required == ()
+        assert state.trust is Verdict.UNKNOWN
+        assert state.ready is True
+
+    mechanical_row = index.get(mechanical.id)
+    assert mechanical_row is not None
+    assert {
+        tool: mechanical_row.eda_readiness[tool].required
+        for tool in ("kicad", "altium")
+    } == {"kicad": ("footprint",), "altium": ("footprint",)}
+    assert all(
+        mechanical_row.eda_readiness[tool].ready
+        for tool in ("kicad", "altium")
+    )
+
+    override_row = index.get(override.id)
+    assert override_row is not None
+    assert override_row.eda_readiness["kicad"].required == (
+        "symbol",
+        "footprint",
+        "model",
+    )
+    assert override_row.eda_readiness["altium"].required == ("footprint",)
+    assert override_row.eda_readiness["altium"].ready is True
+
+
+def test_a_requirement_rule_change_invalidates_unchanged_persistent_records(
+    tmp_path, monkeypatch
+):
+    parts = _lib(tmp_path, [_rec("a-aaaa", "A")])
+    database = tmp_path / "index.sqlite3"
+    index = LibraryIndex.build(parts, db_path=database)
+    assert index.get("a-aaaa").eda_readiness["kicad"].required == (
+        "symbol",
+        "footprint",
+        "model",
+    )
+
+    monkeypatch.setitem(
+        CLASS_NEEDS,
+        PartClass.COMPONENT,
+        ClassNeeds(assets=("footprint",), label="Component", description="test rule"),
+    )
+    stats = index.sync(parts)
+    assert stats.parsed == 1, "a rule change must not leave source-hash-equal readiness stale"
+    assert index.get("a-aaaa").eda_readiness["kicad"].required == ("footprint",)
+    index.close()
 
 
 def test_asset_provenance_is_queryable_including_the_UNATTRIBUTED_ones(tmp_path):

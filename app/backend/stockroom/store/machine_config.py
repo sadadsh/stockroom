@@ -136,6 +136,12 @@ class MachineConfig:
         repr=False,
         compare=False,
     )
+    _legacy_credentials_pending: bool = field(
+        default=False,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     @classmethod
     def _path(cls, path: Path | None) -> Path:
@@ -147,6 +153,7 @@ class MachineConfig:
         path: Path | None = None,
         *,
         credential_store: "CredentialStore | None" = None,
+        migrate_credentials: bool = True,
     ) -> "MachineConfig":
         p = cls._path(path)
         data = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
@@ -170,13 +177,63 @@ class MachineConfig:
         config = cls(**public, **secret_values)
         config._credential_store = store
         config._credential_path = p.resolve(strict=False)
+        config._legacy_credentials_pending = legacy_fields_present
 
-        if legacy_fields_present:
-            # The plaintext file remains untouched until every credential has
-            # been stored and read back. A failure therefore loses no data.
-            _sync_credentials(store, secret_values)
-            _write_public_config(p, config)
+        if legacy_fields_present and migrate_credentials:
+            config.migrate_legacy_credentials()
         return config
+
+    @property
+    def source_path(self) -> Path | None:
+        """The exact persisted document this instance was loaded from, if any.
+
+        Directly constructed configurations are intentionally detached. Tests and
+        embedded callers use those as explicit in-memory authority, so a managed
+        lifecycle must not silently replace them with the user's default config.
+        """
+
+        return self._credential_path
+
+    def reload(self, *, migrate_credentials: bool = True) -> "MachineConfig":
+        """Read the latest persisted settings through this instance's exact store.
+
+        Managed release candidates are built before the previous coordinator
+        drains. Reloading after the next generation fence is acquired prevents a
+        candidate from resurrecting the profile, library, or settings snapshot it
+        observed during preflight. Credential migration remains caller-controlled
+        so that a cold shadow cannot write machine state.
+        """
+
+        path = self._credential_path
+        if path is None:
+            return self
+        return type(self).load(
+            path,
+            credential_store=self._credential_store,
+            migrate_credentials=migrate_credentials,
+        )
+
+    def migrate_legacy_credentials(self) -> bool:
+        """Move a loaded legacy plaintext secret batch under caller-owned authority.
+
+        Managed shadow workers load configuration with ``migrate_credentials=False`` so
+        constructing a candidate cannot alter machine configuration before promotion.
+        The coordinator lifecycle calls this method after acquiring its generation
+        fence.  The plaintext file remains untouched until every credential has been
+        stored and read back, so a failure loses no data.
+        """
+
+        if not self._legacy_credentials_pending:
+            return False
+        path = self._credential_path or self._path(None).resolve(strict=False)
+        store = self._credential_store or default_credential_store(path)
+        values = {name: str(getattr(self, name, "") or "") for name in SECRET_FIELDS}
+        _sync_credentials(store, values)
+        _write_public_config(path, self)
+        self._credential_store = store
+        self._credential_path = path
+        self._legacy_credentials_pending = False
+        return True
 
     def save(
         self,
@@ -200,6 +257,7 @@ class MachineConfig:
         _write_public_config(p, self)
         self._credential_store = store
         self._credential_path = resolved
+        self._legacy_credentials_pending = False
 
 
 def _public_payload(config: MachineConfig) -> dict[str, object]:

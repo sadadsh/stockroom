@@ -254,6 +254,7 @@ class ResolvedQuery:
 # good MPN would be sent on a pointless lookup and reported unresolved.
 _MOUSER_SKU_RE = re.compile(r"^\d{2,4}-[A-Za-z0-9][A-Za-z0-9./+_-]*$")
 _DIGIKEY_PN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9./+_-]*-(?:ND|CT-ND|TR-ND|DKR-ND)$")
+_LCSC_ID_RE = re.compile(r"^C\d+$", re.IGNORECASE)
 
 
 def _looks_like_stock_number(query: str, vendor: str) -> bool:
@@ -271,9 +272,8 @@ def _default_url_for(mpn: str, category: str) -> str:
     a pasted LCSC C-id goes straight to its product-detail page (which carries the
     __NEXT_DATA__ the extractor reads); anything else falls back to the LCSC search."""
     ident = (mpn or "").strip()
-    from stockroom.ingest.lcsc import is_lcsc_id
 
-    if is_lcsc_id(ident):
+    if _LCSC_ID_RE.fullmatch(ident):
         return f"https://www.lcsc.com/product-detail/{ident.upper()}.html"
     return f"https://www.lcsc.com/search?q={quote(ident)}"
 

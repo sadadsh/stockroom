@@ -145,6 +145,36 @@ def test_match_none_for_unknown():
     assert fill.match_component(comp, index)["part"] is None
 
 
+def test_altium_index_uses_native_names_without_treating_a_generic_symbol_as_identity():
+    resistor = PartRecord(
+        id="r10k",
+        display_name="10k 0402",
+        category="Resistors",
+        description="10k 1% 0402",
+        mpn="RC0402FR-0710KL",
+        manufacturer="Yageo",
+        part_class=PartClass.PASSIVE,
+        assets={
+            "altium": EdaAssets(
+                symbol=AssetRef(lib="Stockroom.SchLib", name="RES"),
+                footprint=AssetRef(lib="Stockroom.PcbLib", name="R_0402"),
+            )
+        },
+        specs={"Resistance": "10 kOhm", "Package": "0402"},
+    )
+    index = fill.library_match_records([resistor], tool="altium")
+    placement = {
+        "ref": "R1",
+        "lib_id": "altium:RES",
+        "props": {"Reference": "R1", "Value": "10k", "Footprint": "R_0402"},
+    }
+
+    assert fill.match_component(placement, index)["part"] is None
+    candidates = fill.candidate_matches(placement, index)
+    assert [candidate["part_id"] for candidate in candidates] == ["r10k"]
+    assert candidates[0]["confidence"] == "value+footprint"
+
+
 # -- proposed_changes / plan ---------------------------------------------------
 
 

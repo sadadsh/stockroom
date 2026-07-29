@@ -88,9 +88,9 @@ def distributor_part_number_from_url(url: str) -> str:
     """The distributor's own part number embedded in a product url, or "".
 
     Extends `distributor_mpn_from_url` (Mouser/DigiKey only, by design -- those are the two
-    Akamai-guarded sites with an official API) to LCSC, whose C-number is the key the
-    easyeda2kicad conversion needs. Returns "" for anything unrecognised, including a search
-    page: an empty part number is honest, and a guessed one is a wrong part.
+    Akamai-guarded sites with an official API) to LCSC, whose C-number is useful as a
+    catalogue identity only. Returns "" for anything unrecognised, including a search page:
+    an empty part number is honest, and a guessed one is a wrong part.
     """
     u = (url or "").strip()
     if not u:

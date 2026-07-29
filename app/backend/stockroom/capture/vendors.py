@@ -101,6 +101,10 @@ class VendorCapability:
     # The measured browser runtime for this provider. This is capability data because a single
     # acquisition chain can span providers with different browser requirements.
     browser_engine: BrowserEngine = "chromium"
+    # Some exclusive-format providers keep their model application and format fragment alive
+    # after a download. Reusing that exact page avoids unnecessary catalogue requests and security
+    # challenges; adapters that navigate away retain the conservative default.
+    reuse_page_between_formats: bool = False
     # Whether one explicit part+provider selection authorizes Stockroom to operate ordinary export
     # controls. False keeps those controls person-driven even in the explicit-provider lane.
     operator_automation: bool = True
@@ -1211,6 +1215,26 @@ _DIGIKEY_TRACEPARTS_ROUTE = DigiKeyProviderRoute(
     supported_formats=("model",),
     model_only=True,
 )
+_DIGIKEY_MANUFACTURER_ROUTE = DigiKeyProviderRoute(
+    evidence_provider_key="digikey-manufacturer",
+    label="Manufacturer Provided",
+    row_ids=("mfr-media-active",),
+    modal_id="mfr-export-options",
+    altium_label="",
+    model_label="",
+    supported_formats=("model",),
+    model_only=True,
+)
+_DIGIKEY_CADENAS_ROUTE = DigiKeyProviderRoute(
+    evidence_provider_key="digikey-cadenas",
+    label="CADENAS",
+    row_ids=("cadenas-media-active",),
+    modal_id="cadenas-export-options",
+    altium_label="",
+    model_label="",
+    supported_formats=("model",),
+    model_only=True,
+)
 
 
 def _digikey_format_label_matches(
@@ -1233,10 +1257,11 @@ def _digikey_format_label_matches(
 class DigiKeyUltraLibrarianAdapter:
     """DigiKey's exact product/model pages with independently attributed CAD-author routes.
 
-    DigiKey is the browser surface, not the CAD author. One persistent session enumerates the
-    measured SnapMagic, TraceParts, and Ultra Librarian rows separately. Every captured artifact
-    retains its author route; TraceParts stays supplementary, and Ultra Librarian's script-based
-    Altium package alone enters the guarded converter.
+    DigiKey is the browser surface, not the CAD author. Its current Terms of Use prohibit robots
+    and other automated access, so production keeps provider controls person-driven. Stockroom
+    still opens the exact page, overlays the task, captures each delivered file, retains its author
+    route, and runs the complete evidence/validation/attachment pipeline afterward. The measured
+    control driver remains a regression harness, not production authorization.
     """
 
     evidence_provider_key = "digikey-ultralibrarian"
@@ -1249,10 +1274,11 @@ class DigiKeyUltraLibrarianAdapter:
         aggregator=True,
         needs_login=True,
         instruction=(
-            "Stockroom opens the exact DigiKey product once, captures every supported SnapMagic "
-            "and Ultra Librarian variant, retains exact TraceParts supplementary models without "
-            "activating them, converts only the recognized Ultra Librarian Altium script package, "
-            "and activates a strictly compatible cross-EDA set."
+            "Stockroom opens the exact DigiKey models page and shows the required author routes. "
+            "Start each offered download there; Stockroom captures every delivered variant, "
+            "retains incomplete TraceParts, manufacturer-provided, and CADENAS model sets as "
+            "supplementary evidence, converts only the recognized Ultra Librarian Altium script "
+            "package, and activates a strictly compatible cross-EDA set."
         ),
         machine_format_labels={
             "kicad": "KiCad v6+",
@@ -1264,20 +1290,30 @@ class DigiKeyUltraLibrarianAdapter:
             "model": "STEP",
             "altium": "Altium Designer",
         },
-        browser_access="machine_allowed",
+        browser_access="user_driven",
+        operator_automation=False,
         browser_engine="cloak",
+        reuse_page_between_formats=True,
     )
 
     def __init__(self) -> None:
         self._exact_product_url = ""
+        # DigiKey's author fragments hydrate independently on each models-page render. A route
+        # positively observed for one exact product cannot become a terminal catalogue miss when
+        # a later task tab temporarily renders its placeholder hidden. Keep only positive,
+        # run-local observations; absence is never promoted to durable knowledge.
+        self._observed_available_routes: dict[str, set[str]] = {}
+        self._hidden_route_observations: dict[tuple[str, str], int] = {}
 
     def capture_routes(self) -> tuple[object, ...]:
-        """Collect measured author routes and leave preferred Ultra Librarian last."""
+        """Collect the preferred coherent author first, then supplementary alternatives."""
 
         return (
+            self,
             DigiKeySnapMagicRouteAdapter(self),
             DigiKeyTracePartsRouteAdapter(self),
-            self,
+            DigiKeyManufacturerProvidedRouteAdapter(self),
+            DigiKeyCadenasRouteAdapter(self),
         )
 
     def resolve_url(self, mpn: str) -> str:
@@ -1381,32 +1417,81 @@ class DigiKeyUltraLibrarianAdapter:
         )
         return "" if issue else self._exact_product_url
 
-    @staticmethod
-    def _wait_for_provider_surface(page) -> None:
-        """Wait for DigiKey's client-rendered provider catalogue, not a hidden template.
+    def _product_observation_key(self) -> str:
+        """Stable exact-product key for run-local provider availability observations."""
 
-        The model page attaches every provider placeholder in its first HTML document and then
-        hydrates the available rows asynchronously. Treating an attached-but-hidden row as an
-        immediate catalogue miss races that hydration in stealth Chromium. Once any known
-        provider row is visible, the surface is authoritative and every other hidden row can
-        still decline immediately.
+        return (self._exact_product_url or "").partition("?")[0].rstrip("/")
+
+    def _remember_visible_routes(self, page) -> None:
+        """Remember only positively visible author rows for this exact product and run."""
+
+        product_key = self._product_observation_key()
+        if not product_key:
+            return
+        visible = self._observed_available_routes.setdefault(product_key, set())
+        for route in (
+            _DIGIKEY_SNAPMAGIC_ROUTE,
+            _DIGIKEY_TRACEPARTS_ROUTE,
+            _DIGIKEY_ULTRALIBRARIAN_ROUTE,
+            _DIGIKEY_MANUFACTURER_ROUTE,
+            _DIGIKEY_CADENAS_ROUTE,
+        ):
+            for candidate_id in route.row_ids:
+                candidate = page.locator(f"#{candidate_id}").first
+                try:
+                    if candidate.count() > 0 and candidate.is_visible():
+                        visible.add(route.evidence_provider_key)
+                        self._hidden_route_observations.pop(
+                            (product_key, route.evidence_provider_key),
+                            None,
+                        )
+                        break
+                except Exception:  # noqa: BLE001 - unreadable state proves no availability
+                    continue
+
+    def _route_was_observed_available(self, route: DigiKeyProviderRoute) -> bool:
+        product_key = self._product_observation_key()
+        return bool(
+            product_key
+            and route.evidence_provider_key
+            in self._observed_available_routes.get(product_key, set())
+        )
+
+    def _record_hidden_route(self, route: DigiKeyProviderRoute) -> int:
+        product_key = self._product_observation_key()
+        if not product_key:
+            return 0
+        key = (product_key, route.evidence_provider_key)
+        count = self._hidden_route_observations.get(key, 0) + 1
+        self._hidden_route_observations[key] = count
+        return count
+
+    def _hidden_route_count(self, route: DigiKeyProviderRoute) -> int:
+        product_key = self._product_observation_key()
+        if not product_key:
+            return 0
+        return self._hidden_route_observations.get(
+            (product_key, route.evidence_provider_key),
+            0,
+        )
+
+    @staticmethod
+    def _wait_for_provider_surface(page, route: DigiKeyProviderRoute) -> None:
+        """Wait for the requested provider's hydrated row, not a sibling provider.
+
+        Live DigiKey hydrates rows independently. SnapMagic can become visible several seconds
+        before Ultra Librarian even when both are offered, so using the first visible provider as
+        a catalogue-ready signal produces a false Ultra Librarian miss. A route-specific wait
+        preserves a bounded absent-provider answer without racing a slower sibling.
         """
 
-        selectors = tuple(
-            dict.fromkeys(
-                (
-                    *_DIGIKEY_SNAPMAGIC_ROUTE.row_ids,
-                    *_DIGIKEY_TRACEPARTS_ROUTE.row_ids,
-                    *_DIGIKEY_ULTRALIBRARIAN_ROUTE.row_ids,
-                )
-            )
-        )
+        selectors = tuple(dict.fromkeys(route.row_ids))
         try:
             page.locator(
                 ", ".join(f"#{value}:visible" for value in selectors)
             ).first.wait_for(
                 state="visible",
-                timeout=35_000,
+                timeout=12_000,
             )
         except Exception:  # noqa: BLE001 - caller still reports the exact unavailable route
             pass
@@ -1418,10 +1503,12 @@ class DigiKeyUltraLibrarianAdapter:
         expected_manufacturer: str = "",
         expected_mpn: str = "",
         _route: DigiKeyProviderRoute = _DIGIKEY_ULTRALIBRARIAN_ROUTE,
+        _inspect_only: bool = False,
     ) -> str:
         challenge = _challenge_issue(page, self.capability.label)
         if challenge:
             return challenge
+        self._remember_visible_routes(page)
         url = page.url or ""
         if "/products/result" in url:
             self._exact_product_url = ""
@@ -1473,10 +1560,11 @@ class DigiKeyUltraLibrarianAdapter:
                 "refusing to download."
             )
 
-        self._wait_for_provider_surface(page)
+        self._wait_for_provider_surface(page, _route)
         challenge = _challenge_issue(page, self.capability.label)
         if challenge:
             return challenge
+        self._remember_visible_routes(page)
 
         row = None
         row_id = ""
@@ -1494,8 +1582,23 @@ class DigiKeyUltraLibrarianAdapter:
             except Exception:  # noqa: BLE001 - unreadable is unavailable
                 continue
         # DigiKey renders unavailable provider rows as hidden placeholders. That is a catalogue
-        # fact, not a slow-loading state, so do not spend another format timeout on it.
+        # fact only when no tab in this exact run has already seen the same route. A contradictory
+        # hidden placeholder is a transient fragment failure and the bounded route retry owns it.
         if row is None and row_present:
+            if self._route_was_observed_available(_route):
+                return (
+                    f"DigiKey's {_route.label} route did not rehydrate even though this exact "
+                    "product exposed it in the same run."
+                )
+            hidden_count = self._record_hidden_route(_route)
+            if (
+                _route.evidence_provider_key == "digikey-ultralibrarian"
+                and hidden_count == 1
+            ):
+                return (
+                    "DigiKey's primary Ultra Librarian route rendered one cold hidden "
+                    "placeholder; one fresh render is required before treating it as absent."
+                )
             return f"DigiKey does not offer {_route.label} for this exact product."
         if row is None:
             selector = ", ".join(f"#{candidate_id}" for candidate_id in _route.row_ids)
@@ -1514,6 +1617,8 @@ class DigiKeyUltraLibrarianAdapter:
                     continue
         if row is None:
             return f"DigiKey does not offer {_route.label} for this exact product."
+        if _inspect_only:
+            return ""
         modal = page.locator(f"#{_route.modal_id}").first
         labels = modal.locator("label[data-original]")
         if labels.count() > 0:
@@ -1584,6 +1689,156 @@ class DigiKeyUltraLibrarianAdapter:
         except Exception:  # noqa: BLE001 - no labels means no supported export choice
             return f"DigiKey's {_route.label} format list did not open."
         return ""
+
+    @staticmethod
+    def _manufacturer_step_controls(page) -> tuple[str, ...]:
+        """Return only measured, exact DigiKey-hosted manufacturer STEP originals.
+
+        Live DigiKey manufacturer rows are polymorphic. Some contain a modal whose labels are
+        original filenames and whose radio values are ``https://mm.digikey.com`` file URLs;
+        others contain an external manufacturer link or an empty format surface. Treating every
+        visible row as the modal variant would invent a contract and lose files.
+        """
+
+        labels = page.locator('#mfr-export-options label[data-original]')
+        download = page.locator("#mfr-export-options #btn-download-mfr")
+        if download.count() == 0:
+            return ()
+        files: set[str] = set()
+        for index in range(labels.count()):
+            label = labels.nth(index)
+            raw = " ".join(
+                normalize(
+                    "NFKC",
+                    label.get_attribute("data-original") or label.inner_text() or "",
+                ).split()
+            )
+            if not raw.casefold().endswith((".step", ".stp")):
+                continue
+            control_id = (label.get_attribute("for") or "").strip()
+            if not control_id:
+                continue
+            escaped = control_id.replace("\\", "\\\\").replace('"', '\\"')
+            controls = page.locator(f'#mfr-export-options [id="{escaped}"]')
+            for control_index in range(controls.count()):
+                control = controls.nth(control_index)
+                if (
+                    (control.get_attribute("name") or "")
+                    != "mfr-format-selection-3d"
+                ):
+                    continue
+                value = (control.get_attribute("value") or "").strip()
+                parsed = urlparse(value)
+                if (
+                    parsed.scheme.casefold() == "https"
+                    and (parsed.hostname or "").casefold() == "mm.digikey.com"
+                    and unquote(parsed.path).casefold().endswith((".step", ".stp"))
+                ):
+                    files.add(raw)
+                    break
+        return tuple(sorted(files, key=str.casefold))
+
+    @staticmethod
+    def _manufacturer_external_step_link(page) -> tuple[str, str]:
+        """Return one visible external STEP link presented by the exact DigiKey row."""
+
+        links = page.locator("#mfr-model a[href]")
+        for index in range(links.count()):
+            link = links.nth(index)
+            try:
+                if not link.is_visible():
+                    continue
+            except Exception:  # noqa: BLE001 - unreadable is not positive link evidence
+                continue
+            href = (link.get_attribute("href") or "").strip()
+            label = " ".join(normalize("NFKC", link.inner_text() or "").split())
+            parsed = urlparse(href)
+            path = unquote(parsed.path).casefold()
+            if (
+                parsed.scheme.casefold() == "https"
+                and parsed.username is None
+                and parsed.password is None
+                and (
+                    label.casefold().endswith((".step", ".stp"))
+                    or path.endswith((".step", ".stp"))
+                    or "/step/" in path
+                )
+            ):
+                return label or "STEP model", (parsed.hostname or "").casefold()
+        return "", ""
+
+    def observe_supplementary_route(
+        self,
+        page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+        _route: DigiKeyProviderRoute,
+    ) -> DriveReport:
+        """Classify an incomplete author route without operating an unmeasured control."""
+
+        issue = self.open_panel(
+            page,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+            _route=_route,
+            _inspect_only=True,
+        )
+        if issue:
+            clearance = self.user_clearance_issue(page)
+            unavailable = issue == (
+                f"DigiKey does not offer {_route.label} for this exact product."
+            )
+            return DriveReport(
+                missed=list(formats),
+                blocked=bool(clearance) or _is_global_blockage(issue),
+                requires_user_clearance=bool(clearance),
+                route_unavailable=unavailable,
+                message=issue,
+            )
+
+        if _route.evidence_provider_key == "digikey-manufacturer":
+            embedded = self._manufacturer_step_controls(page)
+            external_label, external_host = self._manufacturer_external_step_link(
+                page
+            )
+            details: list[str] = []
+            if embedded:
+                noun = "original" if len(embedded) == 1 else "originals"
+                details.append(f"{len(embedded)} exact DigiKey-hosted STEP {noun}")
+            if external_label:
+                details.append(
+                    "an external manufacturer STEP link"
+                    + (f" on {external_host}" if external_host else "")
+                )
+            if details:
+                return DriveReport(
+                    missed=list(formats),
+                    message=(
+                        "DigiKey exposes Manufacturer Provided as "
+                        + " and ".join(details)
+                        + "; its person-driven route retains every delivered original as "
+                        "supplementary evidence."
+                    ),
+                )
+            return DriveReport(
+                missed=list(formats),
+                message=(
+                    "DigiKey exposes Manufacturer Provided for this exact product, but the row "
+                    "contains neither a measured DigiKey-hosted STEP control nor a visible "
+                    "external STEP link; the supplementary route remains explicitly unresolved."
+                ),
+            )
+
+        return DriveReport(
+            missed=list(formats),
+            message=(
+                "DigiKey exposes CADENAS for this exact product, but no positive live CADENAS "
+                "format/download contract has been measured; the supplementary route remains "
+                "explicitly unresolved and no selector was guessed."
+            ),
+        )
 
     @staticmethod
     def _label_text(label) -> str:
@@ -1767,7 +2022,11 @@ class DigiKeyUltraLibrarianAdapter:
         return self.user_clearance_issue(page)
 
 
-    def retryable_download_issue(self, page) -> str:
+    def retryable_download_issue(
+        self,
+        page,
+        _route: DigiKeyProviderRoute = _DIGIKEY_ULTRALIBRARIAN_ROUTE,
+    ) -> str:
         """Return a visible DigiKey export failure that merits one bounded fresh retry."""
 
         try:
@@ -1794,6 +2053,40 @@ class DigiKeyUltraLibrarianAdapter:
                 if retryable:
                     return f"DigiKey reported a retryable download failure: {text[:180]}"
         except Exception:  # noqa: BLE001 - unreadable UI is not retry evidence
+            pass
+
+        # Measured live on 2026-07-29: rapid task tabs can receive a models page whose provider
+        # row is visible but whose independently fetched format fragment is empty, or whose row is
+        # temporarily hidden after an earlier tab positively exposed it. Both are positive
+        # transient evidence. A genuinely unavailable route stays a terminal skip.
+        try:
+            if _route.evidence_provider_key == "digikey-snapmagic":
+                external = page.locator(
+                    'a[href*="snapeda.com/parts/"], a[href*="snapmagic.com/parts/"]'
+                ).first
+                if external.count() > 0 and external.is_visible():
+                    return ""
+            row_visible = any(
+                page.locator(f"#{candidate_id}").first.count() > 0
+                and page.locator(f"#{candidate_id}").first.is_visible()
+                for candidate_id in _route.row_ids
+            )
+            modal = page.locator(f"#{_route.modal_id}").first
+            labels_ready = (
+                modal.count() > 0
+                and modal.locator("label[data-original]:visible").count() > 0
+            )
+            if row_visible and not labels_ready:
+                return f"DigiKey loaded the {_route.label} row without its format fragment"
+            if not row_visible and self._route_was_observed_available(_route):
+                return f"DigiKey temporarily hid the previously observed {_route.label} route"
+            if (
+                not row_visible
+                and _route.evidence_provider_key == "digikey-ultralibrarian"
+                and self._hidden_route_count(_route) == 1
+            ):
+                return "DigiKey returned the first cold hidden Ultra Librarian placeholder"
+        except Exception:  # noqa: BLE001 - retry requires positive readable evidence
             pass
         return ""
 
@@ -1869,7 +2162,7 @@ class _DigiKeyProviderRouteAdapter:
         return self._surface.download_gate(page)
 
     def retryable_download_issue(self, page) -> str:
-        return self._surface.retryable_download_issue(page)
+        return self._surface.retryable_download_issue(page, self._route)
 
 
 class DigiKeySnapMagicRouteAdapter(_DigiKeyProviderRouteAdapter):
@@ -1900,6 +2193,7 @@ class DigiKeySnapMagicRouteAdapter(_DigiKeyProviderRouteAdapter):
         },
         browser_access="machine_allowed",
         browser_engine="cloak",
+        reuse_page_between_formats=True,
     )
 
 
@@ -1923,6 +2217,85 @@ class DigiKeyTracePartsRouteAdapter(_DigiKeyProviderRouteAdapter):
         user_format_labels={"model": "STEP AP214"},
         browser_access="machine_allowed",
         browser_engine="cloak",
+        reuse_page_between_formats=True,
+    )
+
+
+class _DigiKeyObservedSupplementaryRouteAdapter(_DigiKeyProviderRouteAdapter):
+    """A declared model-only route whose ordinary provider controls stay person-driven."""
+
+    supplementary_only = True
+
+    def drive(
+        self,
+        page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> DriveReport:
+        return self._surface.observe_supplementary_route(
+            page,
+            formats,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+            _route=self._route,
+        )
+
+    def retryable_download_issue(self, page) -> str:
+        # A visible but unmeasured/person-driven route is a terminal ledger fact, not a failed
+        # fragment load. Retrying it would only turn one honest observation into a loop.
+        del page
+        return ""
+
+
+class DigiKeyManufacturerProvidedRouteAdapter(
+    _DigiKeyObservedSupplementaryRouteAdapter
+):
+    """Direct-manufacturer STEP originals, retained without forming an active CAD set."""
+
+    _route = _DIGIKEY_MANUFACTURER_ROUTE
+    capability = VendorCapability(
+        key="digikey",
+        label="DigiKey · Manufacturer Provided",
+        tools=("kicad",),
+        formats_exclusive=True,
+        aggregator=True,
+        needs_login=True,
+        instruction=(
+            "Use the Manufacturer Provided row when it appears. Start every offered STEP "
+            "original, including a visible external manufacturer link; Stockroom retains the "
+            "delivered exact files as supplementary evidence without activating them."
+        ),
+        user_format_labels={"model": "3D Model"},
+        browser_access="user_driven",
+        operator_automation=False,
+        browser_engine="cloak",
+        reuse_page_between_formats=True,
+    )
+
+
+class DigiKeyCadenasRouteAdapter(_DigiKeyObservedSupplementaryRouteAdapter):
+    """CADENAS' declared row, observed without inventing an unmeasured format selector."""
+
+    _route = _DIGIKEY_CADENAS_ROUTE
+    capability = VendorCapability(
+        key="digikey",
+        label="DigiKey · CADENAS",
+        tools=("kicad",),
+        formats_exclusive=True,
+        aggregator=True,
+        needs_login=True,
+        instruction=(
+            "Use the CADENAS row only when DigiKey visibly offers it for the exact part. "
+            "Stockroom captures and retains the delivered 3D original as supplementary evidence; "
+            "its machine selector remains disabled until a positive live format contract exists."
+        ),
+        user_format_labels={"model": "3D Model"},
+        browser_access="user_driven",
+        operator_automation=False,
+        browser_engine="cloak",
+        reuse_page_between_formats=True,
     )
 
 

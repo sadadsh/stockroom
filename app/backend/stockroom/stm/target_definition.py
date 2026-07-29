@@ -2,7 +2,7 @@
 
 The compatibility workbench answers whether device descriptions look alike. A
 hardware build needs a different contract: silicon variation, requested service
-routes, safety handling, and controllable-channel allocation must remain separate
+routes, safety handling, and independent conductive-path requirements must remain separate
 and auditable. This module performs that pure computation over the derived STM
 SQLite index. It owns no filesystem writes and names no board-specific component.
 """
@@ -18,8 +18,8 @@ from collections.abc import Iterable
 from stockroom.stm.authority import _position_sort_key, _resolve_mcu_row, five_v
 from stockroom.text import counted
 
-FORMAT = "stm-target-definition/1"
-COMPILER_REV = 4
+FORMAT = "stm-target-definition/2"
+COMPILER_REV = 8
 
 _GPIO_NAME = re.compile(r"^(P[A-Z]\d+)")
 _CLAIM_SCOPES = {
@@ -52,7 +52,7 @@ _FOUNDATION_GROUPS: tuple[dict, ...] = (
     {
         "id": "voltage-reference",
         "label": "Analog Reference",
-        "identities": ("power:vref",),
+        "identity_patterns": (r"power:vref.*",),
         "obligation": "Provide the documented VREF bias and decoupling for each exposed reference pin.",
         "applicability": "when-present",
     },
@@ -68,6 +68,20 @@ _FOUNDATION_GROUPS: tuple[dict, ...] = (
         "label": "Core Regulator",
         "identities": ("vcap",),
         "obligation": "Implement the exact datasheet VCAP/regulator network without external loading.",
+        "applicability": "when-present",
+    },
+    {
+        "id": "power-regulator-control",
+        "label": "Power and Regulator Control",
+        "identity_patterns": (
+            r"power:(?!vdd$|vdda$|vbat$|vref.*$).+",
+            r"power-control:.+",
+            r"regulator-control:.+",
+        ),
+        "obligation": (
+            "Implement each special supply, regulator, and power-supervisor pin from exact "
+            "target documentation; do not treat it as ordinary GPIO, reset, or VDD."
+        ),
         "applicability": "when-present",
     },
     {
@@ -156,6 +170,20 @@ def _critical_identity(pin: dict) -> str | None:
     electrical = str(pin["electrical_class"] or "").lower()
     canonical = str(pin["canonical_pin_name"] or "").upper()
     roles = [str(role).lower() for role in pin["roles"]]
+
+    # CubeMX pin types are not a sufficient electrical authority for these names. Across STM32F
+    # device XML, NC has appeared as Power and Reset, RFU as I/O, PDR_ON as I/O, and BYPASS_REG as
+    # Reset. Letting those raw labels through makes a reserved position look break-outable and
+    # hides power/regulator obligations. Keep the source value in per_target.electrical_class for
+    # provenance, but compile the target-definition identity from the unambiguous pin name.
+    if canonical in {"NC", "RFU"} or canonical.startswith("RESERVED"):
+        return "no-connect"
+    if canonical == "NPOR":
+        return "power-control:npor"
+    if canonical == "PDRON":
+        return "power-control:pdr-on"
+    if canonical == "BYPASSREG":
+        return "regulator-control:bypass"
 
     if electrical == "io":
         return None
@@ -287,7 +315,10 @@ def _read_targets(conn: sqlite3.Connection, refs: list[str]) -> list[dict]:
                 "family": row["family"],
                 "line": row["line"],
                 "package": row["package_name"],
-                "pins": sorted(pins, key=lambda item: _position_sort_key(item["position"])),
+                "pins": sorted(
+                    pins,
+                    key=lambda item: _position_sort_key(str(item["position"])),
+                ),
             }
         )
     return targets
@@ -339,7 +370,7 @@ def _position_class(per_target: list[dict], target_count: int) -> tuple[str, str
             if critical[0] == "no-connect":
                 return "fixed_critical", "isolate"
             return "fixed_critical", "hardwire"
-        return "safety_collision", "isolate"
+        return "safety_collision", "selectable"
 
     gpio_names = {_base_gpio(pin["canonical_pin_name"]) for pin in per_target}
     gpio_names.discard(None)
@@ -850,6 +881,10 @@ def _compile_functional_foundation(
 
     for definition in _FOUNDATION_GROUPS:
         identities = set(definition.get("identities", ()))
+        identity_patterns = [
+            re.compile(pattern, re.I)
+            for pattern in definition.get("identity_patterns", ())
+        ]
         access_tags = set(definition.get("access_tags", ()))
         allowed_actions = set(
             definition.get(
@@ -864,7 +899,14 @@ def _compile_functional_foundation(
             pins = []
             for pin in target["pins"]:
                 identity = _pin_identity(pin)
-                if identities and identity not in identities:
+                if (
+                    (identities or identity_patterns)
+                    and identity not in identities
+                    and not any(
+                        pattern.fullmatch(identity)
+                        for pattern in identity_patterns
+                    )
+                ):
                     continue
                 if access_tags and not access_tags.intersection(pin["access_tags"]):
                     continue
@@ -906,7 +948,7 @@ def _compile_functional_foundation(
             )
 
         applicable = [target for target in per_target if target["present"]]
-        resolved_count = sum(target["resolved"] for target in applicable)
+        resolved_count = sum(1 for target in applicable if bool(target["resolved"]))
         status = (
             "unavailable"
             if not applicable
@@ -972,7 +1014,7 @@ def _apply_safety_rules(
         if rule_position in rules_by_position:
             raise ValueError(f"duplicate safety rule for position {rule_position}")
         rules_by_position[rule_position] = dict(raw_rule)
-    channel_requests: list[dict] = []
+    path_requests: list[dict] = []
     compiled_rules: list[dict] = []
     blockers: list[str] = []
     warnings: list[str] = []
@@ -1072,9 +1114,9 @@ def _apply_safety_rules(
                 for pin in position["per_target"]
                 if _pin_identity(pin) in matched_identities
             )
-            uses_channel = bool(
+            requires_independent_path = bool(
                 branch.get(
-                    "uses_channel",
+                    "requires_independent_path",
                     branch_action in {"switched", "selectable"},
                 )
             )
@@ -1085,21 +1127,21 @@ def _apply_safety_rules(
                 "matched_targets": matched_targets,
                 "action": branch_action,
                 "net": str(branch.get("net", "")).strip(),
-                "uses_channel": uses_channel,
+                "requires_independent_path": requires_independent_path,
                 "safe_default": str(branch.get("safe_default", safe_default)).lower(),
                 "evidence": branch_evidence,
             }
             compiled_branches.append(compiled_branch)
-            if uses_channel:
-                channel_requests.append(
+            if requires_independent_path:
+                path_requests.append(
                     {
                         "kind": "safety",
                         "position": position["position"],
-                        "net": compiled_branch["net"]
+                        "requested_net": compiled_branch["net"]
                         or f"SAFETY_{position['position']}_{branch_id}",
-                        "route_id": None,
+                        "requirement_id": None,
                         "branch_id": branch_id,
-                        "onehot_group": branch.get(
+                        "exclusivity_group": branch.get(
                             "onehot_group",
                             rule.get("onehot_group", f"position-{position['position']}"),
                         ),
@@ -1131,15 +1173,20 @@ def _apply_safety_rules(
         }
         compiled_rules.append(compiled)
         if not raw_branches and bool(
-            rule.get("uses_channel", action in {"switched", "selectable"})
+            rule.get(
+                "requires_independent_path",
+                action in {"switched", "selectable"},
+            )
         ):
-            channel_requests.append(
+            path_requests.append(
                 {
                     "kind": "safety",
                     "position": position["position"],
-                    "net": rule.get("net", f"SAFETY_{position['position']}"),
-                    "route_id": None,
-                    "onehot_group": rule.get("onehot_group"),
+                    "requested_net": rule.get(
+                        "net", f"SAFETY_{position['position']}"
+                    ),
+                    "requirement_id": None,
+                    "exclusivity_group": rule.get("onehot_group"),
                     "safe_default": safe_default,
                 }
             )
@@ -1154,10 +1201,10 @@ def _apply_safety_rules(
             warnings.append(
                 f"safety rule position {rule_position} does not resolve a critical collision"
             )
-    return compiled_rules, channel_requests, blockers, warnings
+    return compiled_rules, path_requests, blockers, warnings
 
 
-def _route_channel_requests(requirements: list[dict]) -> list[dict]:
+def _route_path_requests(requirements: list[dict]) -> list[dict]:
     requests: list[dict] = []
     for requirement in requirements:
         if (
@@ -1175,9 +1222,9 @@ def _route_channel_requests(requirements: list[dict]) -> list[dict]:
                 {
                     "kind": "route",
                     "position": position,
-                    "net": requirement["net"],
-                    "route_id": requirement["id"],
-                    "onehot_group": requirement["id"],
+                    "requested_net": requirement["net"],
+                    "requirement_id": requirement["id"],
+                    "exclusivity_group": requirement["id"],
                     "safe_default": "open",
                     "targets": sorted(by_position[position]),
                 }
@@ -1185,66 +1232,455 @@ def _route_channel_requests(requirements: list[dict]) -> list[dict]:
     return requests
 
 
-def _allocate_channels(
-    channel_requests: list[dict], fabric: dict
+def _compile_routing_requirements(
+    path_requests: list[dict], constraints: dict
 ) -> tuple[dict, list[str]]:
+    """Compile implementation-neutral independent-path requirements.
+
+    Stockroom owns the electrical behavior a universal supporter needs, not the
+    circuit technology that implements it. The artifact therefore identifies
+    paths, target applicability, exclusivity, and safe state without assigning a
+    part, reference designator, device index, channel number, or register bit.
+    """
     blockers: list[str] = []
-    part_mpn = str(fabric.get("part_mpn", "")).strip()
-    channels_per_device = int(fabric.get("channels_per_device", 0) or 0)
-    max_devices = int(fabric.get("max_devices", 0) or 0)
-    reference_prefix = str(fabric.get("reference_prefix", "U_ROUTE")).strip() or "U_ROUTE"
-    default_state = str(fabric.get("default_state", "")).lower()
+    unknown = sorted(
+        set(constraints) - {"safe_default", "maximum_independent_paths"}
+    )
+    if unknown:
+        raise ValueError(
+            "routing_constraints contains implementation-specific or unknown fields: "
+            + ", ".join(unknown)
+        )
+    default_state = str(constraints.get("safe_default", "open")).lower() or "open"
 
-    if channel_requests and not part_mpn:
-        blockers.append("channel fabric has no exact component MPN")
-    if channel_requests and channels_per_device <= 0:
-        blockers.append("channel fabric channels_per_device must be positive")
-    if channel_requests and max_devices <= 0:
-        blockers.append("channel fabric max_devices must be positive")
-    if channel_requests and default_state != "open":
-        blockers.append("channel fabric must default open")
+    if path_requests and default_state != "open":
+        blockers.append("independent routing paths must default open")
 
-    capacity = max(0, channels_per_device * max_devices)
-    if len(channel_requests) > capacity:
+    maximum = constraints.get("maximum_independent_paths")
+    if maximum is not None:
+        try:
+            maximum = int(maximum)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "maximum_independent_paths must be a positive integer"
+            ) from exc
+        if maximum <= 0:
+            raise ValueError("maximum_independent_paths must be a positive integer")
+    if maximum is not None and len(path_requests) > maximum:
         blockers.append(
-            f"channel fabric capacity {capacity} is below required {len(channel_requests)}"
+            f"declared independent-path limit {maximum} is below required "
+            f"{len(path_requests)}"
         )
 
-    allocations = []
-    if channels_per_device > 0:
-        for index, request in enumerate(channel_requests):
-            device = index // channels_per_device + 1
-            channel = index % channels_per_device + 1
-            allocations.append(
-                {
-                    **request,
-                    "reference": f"{reference_prefix}_{device}",
-                    "device_index": device,
-                    "channel": channel,
-                    "register_bit": channel - 1,
-                    "register_label": f"DB{channel - 1}",
-                }
-            )
+    paths = []
+    for index, request in enumerate(path_requests):
+        paths.append(
+            {
+                **request,
+                "path_id": f"path-{index + 1:03d}",
+            }
+        )
 
-    used_devices = (
-        (len(channel_requests) + channels_per_device - 1) // channels_per_device
-        if channels_per_device > 0
-        else 0
-    )
     return (
         {
-            "part_mpn": part_mpn,
-            "channels_per_device": channels_per_device,
-            "max_devices": max_devices,
-            "default_state": default_state,
-            "reference_prefix": reference_prefix,
-            "required_channels": len(channel_requests),
-            "capacity": capacity,
-            "used_devices": used_devices,
-            "allocations": allocations,
+            "strategy": "implementation-neutral-independent-paths",
+            "safe_default": default_state,
+            "required_independent_paths": len(path_requests),
+            "maximum_independent_paths": maximum,
+            "limit_status": (
+                "unbounded"
+                if maximum is None
+                else "within-limit"
+                if len(path_requests) <= maximum
+                else "over-limit"
+            ),
+            "paths": paths,
         },
         blockers,
     )
+
+
+def _compile_universalization(
+    positions: list[dict],
+    safety_rules: list[dict],
+    routing_requirements: dict,
+) -> dict:
+    """Describe how every physical position can participate in one supporter.
+
+    The plan is intentionally technology-neutral. It states connection
+    semantics and safety invariants; the consuming hardware project selects and
+    validates the implementation technology.
+    """
+    safety_by_position = {
+        str(rule["position"]): rule for rule in safety_rules
+    }
+    strategies = []
+    required_paths = 0
+    passive_paths = 0
+
+    for position in positions:
+        silicon_class = position["silicon_class"]
+        identities = list(position["identities"])
+        rule = safety_by_position.get(position["position"])
+        branches = []
+        constraints: list[str] = []
+        validation_checks: list[str] = []
+        safe_default = None
+        selection = "none"
+        validation_status = "not-required"
+        validation_failure_action = "none"
+
+        if silicon_class == "fixed_critical":
+            if identities == ["no-connect"]:
+                primitive = "leave-open"
+                explanation = (
+                    "The role is reserved or no-connect on every selected MCU, "
+                    "so the universal design keeps it isolated."
+                )
+            else:
+                primitive = "fixed-network"
+                explanation = (
+                    "The same fixed electrical identity occupies this position "
+                    "on every selected MCU."
+                )
+        elif silicon_class == "stable_io":
+            primitive = "universal-breakout"
+            explanation = (
+                "The same GPIO identity is present on every selected MCU and can "
+                "feed one common assignable board net."
+            )
+        elif silicon_class == "variant_io":
+            primitive = "firmware-mapped-breakout"
+            explanation = (
+                "The physical position is universal, while firmware and the "
+                "exported target map preserve the MCU-specific GPIO identity."
+            )
+        elif silicon_class == "partial":
+            primitive = "exclude-from-common-interface"
+            explanation = (
+                "The common design must not depend on this position; it may be "
+                "offered only as an optional target-specific branch."
+            )
+            constraints.append(
+                "The universal interface must remain functional when this position is absent."
+            )
+        else:
+            safe_default = "open"
+            if rule and rule["branches"]:
+                primitive = "declared-identity-branches"
+                selection = "policy-defined"
+                explanation = (
+                    "The declared safety policy defines which identity branches "
+                    "are selectable, passive, direct, or isolated."
+                )
+                for branch in rule["branches"]:
+                    connection_mode = (
+                        "selectable"
+                        if branch["requires_independent_path"]
+                        else "isolated"
+                        if branch["action"] in {"isolate", "unsupported"}
+                        else "passive-or-direct"
+                    )
+                    branches.append(
+                        {
+                            "id": branch["id"],
+                            "identity_patterns": branch["identity_patterns"],
+                            "matched_identities": branch["matched_identities"],
+                            "matched_targets": branch["matched_targets"],
+                            "action": branch["action"],
+                            "net": branch["net"],
+                            "safe_default": branch["safe_default"],
+                            "evidence_status": "declared",
+                            "connection_mode": connection_mode,
+                            "uses_independent_path": branch[
+                                "requires_independent_path"
+                            ],
+                        }
+                    )
+                    if branch["requires_independent_path"]:
+                        required_paths += 1
+                    elif connection_mode == "passive-or-direct":
+                        passive_paths += 1
+                evidence_status = "declared"
+                fallback = None
+                validation_status = "policy-evidence-required"
+                validation_failure_action = "keep-independent-paths-open"
+            else:
+                gpio_identities = [
+                    identity for identity in identities if _base_gpio(identity)
+                ]
+                critical_identities = [
+                    identity for identity in identities if identity not in gpio_identities
+                ]
+                compact_hybrid = bool(gpio_identities) and bool(
+                    [
+                        identity
+                        for identity in critical_identities
+                        if identity != "no-connect"
+                    ]
+                ) and "no-connect" not in critical_identities
+
+                if compact_hybrid:
+                    primitive = "conditioned-signal-with-selected-critical-role"
+                    selection = "critical-role-only"
+                    explanation = (
+                        "Keep one common GPIO path through validated passive "
+                        "conditioning and select only the conflicting critical "
+                        "electrical role. This reduces active routing, but the "
+                        "passive path must be proven harmless for every target."
+                    )
+                    gpio_targets = sorted(
+                        pin["ref"]
+                        for pin in position["per_target"]
+                        if _pin_identity(pin) in gpio_identities
+                    )
+                    branches.append(
+                        {
+                            "id": "conditioned-signal",
+                            "identity_patterns": [
+                                re.escape(identity) for identity in gpio_identities
+                            ],
+                            "matched_identities": gpio_identities,
+                            "matched_targets": gpio_targets,
+                            "action": "breakout",
+                            "net": "",
+                            "safe_default": "passive",
+                            "evidence_status": "suggested",
+                            "connection_mode": "passive-conditioned",
+                            "uses_independent_path": False,
+                        }
+                    )
+                    passive_paths += 1
+                    for index, identity in enumerate(
+                        critical_identities, start=1
+                    ):
+                        matched_targets = sorted(
+                            pin["ref"]
+                            for pin in position["per_target"]
+                            if _pin_identity(pin) == identity
+                        )
+                        branches.append(
+                            {
+                                "id": f"critical-role-{index}",
+                                "identity_patterns": [re.escape(identity)],
+                                "matched_identities": [identity],
+                                "matched_targets": matched_targets,
+                                "action": "selectable",
+                                "net": "",
+                                "safe_default": "open",
+                                "evidence_status": "suggested",
+                                "connection_mode": "selectable",
+                                "uses_independent_path": True,
+                            }
+                        )
+                        required_paths += 1
+                    fallback = {
+                        "primitive": "exclusive-identity-branches",
+                        "independent_paths": 1 + len(critical_identities),
+                        "reason": (
+                            "Use full branch isolation when the passive signal "
+                            "path cannot be proven safe across every critical role."
+                        ),
+                    }
+                    constraints.extend(
+                        [
+                            (
+                                "The passive signal path must not source, sink, "
+                                "clamp, or back-power the critical pin beyond the "
+                                "installed target limits."
+                            ),
+                            (
+                                "Calculate passive impedance against worst-case "
+                                "voltage, current, leakage, injection current, "
+                                "edge rate, and bandwidth."
+                            ),
+                            (
+                                "External circuitry on the passive path must be "
+                                "high-impedance or otherwise electrically safe "
+                                "whenever the installed target uses the critical role."
+                            ),
+                            (
+                                "If any passive-path proof fails, use the fully "
+                                "exclusive fallback topology."
+                            ),
+                        ]
+                    )
+                    validation_checks.extend(
+                        [
+                            "voltage-range",
+                            "source-current",
+                            "sink-current",
+                            "leakage",
+                            "injection-current",
+                            "back-power",
+                            "bias-loading",
+                            "edge-rate",
+                            "bandwidth",
+                            "power-off-behavior",
+                        ]
+                    )
+                    validation_status = "required"
+                    validation_failure_action = "use-fully-exclusive-fallback"
+                else:
+                    primitive = "exclusive-identity-branches"
+                    selection = "one-of"
+                    explanation = (
+                        "These identities cannot be compacted into a generally "
+                        "safe passive topology, so each conductive role gets an "
+                        "independent target-selected branch."
+                    )
+                    fallback = None
+                    gpio_group_added = False
+                    for index, identity in enumerate(identities, start=1):
+                        if _base_gpio(identity):
+                            if gpio_group_added:
+                                continue
+                            branch_identities = gpio_identities
+                            gpio_group_added = True
+                        else:
+                            branch_identities = [identity]
+                        matched_targets = sorted(
+                            pin["ref"]
+                            for pin in position["per_target"]
+                            if _pin_identity(pin) in branch_identities
+                        )
+                        action = (
+                            "isolate"
+                            if branch_identities == ["no-connect"]
+                            else "selectable"
+                        )
+                        uses_path = action == "selectable"
+                        branches.append(
+                            {
+                                "id": f"identity-{index}",
+                                "identity_patterns": [
+                                    re.escape(value) for value in branch_identities
+                                ],
+                                "matched_identities": branch_identities,
+                                "matched_targets": matched_targets,
+                                "action": action,
+                                "net": "",
+                                "safe_default": "open",
+                                "evidence_status": "suggested",
+                                "connection_mode": (
+                                    "selectable" if uses_path else "isolated"
+                                ),
+                                "uses_independent_path": uses_path,
+                            }
+                        )
+                        if uses_path:
+                            required_paths += 1
+                    validation_status = "required"
+                    validation_failure_action = "keep-independent-paths-open"
+                evidence_status = "suggested"
+            constraints.extend(
+                [
+                    "Only paths permitted for the installed target may conduct.",
+                    "Every selectable path must default open during reset, power loss, and controller startup.",
+                    (
+                        "The consuming design must validate voltage, current, leakage, "
+                        "bandwidth, injection, and power-off behavior."
+                    ),
+                ]
+            )
+            if any(
+                identity == "ground"
+                or identity == "vcap"
+                or identity.startswith("power:")
+                or identity.startswith("power-control:")
+                or identity.startswith("regulator-control:")
+                for identity in identities
+            ):
+                constraints.append(
+                    "Power, ground, regulator, and VCAP branches require exact target-document review."
+                )
+
+        strategies.append(
+            {
+                "position": position["position"],
+                "silicon_class": silicon_class,
+                "primitive": primitive,
+                "explanation": explanation,
+                "selection": selection,
+                "safe_default": safe_default,
+                "identities": identities,
+                "branches": branches,
+                "constraints": constraints,
+                "validation": {
+                    "status": validation_status,
+                    "required_checks": validation_checks,
+                    "failure_action": validation_failure_action,
+                },
+                "active_path_count": sum(
+                    bool(branch.get("uses_independent_path")) for branch in branches
+                ),
+                "passive_path_count": sum(
+                    branch.get("connection_mode") in {
+                        "passive-conditioned",
+                        "passive-or-direct",
+                    }
+                    for branch in branches
+                ),
+                "fallback": fallback if silicon_class == "safety_collision" else None,
+                "evidence_status": (
+                    evidence_status
+                    if silicon_class == "safety_collision"
+                    else "compiler-derived"
+                ),
+                "implementation_owner": "consuming-design",
+            }
+        )
+
+    return {
+        "strategy": "one-package-universal-support",
+        "implementation_owner": "consuming-design",
+        "implementation_technology": "unspecified",
+        "required_independent_paths": max(
+            required_paths,
+            int(routing_requirements.get("required_independent_paths", 0) or 0),
+        ),
+        "passive_conditioned_paths": passive_paths,
+        "safe_default": "open",
+        "state_contract": {
+            "unknown_target": "all-independent-paths-open",
+            "controller_startup": "all-independent-paths-open",
+            "controller_reset": "all-independent-paths-open",
+            "power_loss": "all-independent-paths-open",
+            "target_change": "open-before-reconfigure",
+            "identity_mismatch": "refuse-activation",
+            "configured": "only-target-permitted-paths-may-conduct",
+        },
+        "summary": {
+            "direct_or_fixed": sum(
+                strategy["primitive"]
+                in {
+                    "fixed-network",
+                    "leave-open",
+                    "universal-breakout",
+                    "firmware-mapped-breakout",
+                }
+                for strategy in strategies
+            ),
+            "selectable": sum(
+                strategy["silicon_class"] == "safety_collision"
+                for strategy in strategies
+            ),
+            "compact_hybrid": sum(
+                strategy["primitive"]
+                == "conditioned-signal-with-selected-critical-role"
+                for strategy in strategies
+            ),
+            "fully_exclusive": sum(
+                strategy["primitive"] == "exclusive-identity-branches"
+                for strategy in strategies
+            ),
+            "excluded_from_common_interface": sum(
+                strategy["primitive"] == "exclude-from-common-interface"
+                for strategy in strategies
+            ),
+        },
+        "strategies": strategies,
+    }
 
 
 def _validate_target_mpns(
@@ -1279,6 +1715,21 @@ def compile_target_definition(
     """Return a deterministic, content-addressed target-definition artifact."""
     source_meta = dict(source_meta or {})
     policy = dict(policy or {})
+    if "channel_fabric" in policy:
+        raise ValueError(
+            "channel_fabric is not part of the generic target-definition policy; "
+            "use routing_constraints and keep component, channel, and register "
+            "assignments in the consuming design"
+        )
+    for rule in list(policy.get("safety_rules", []) or []):
+        if "uses_channel" in rule or any(
+            "uses_channel" in branch
+            for branch in list(rule.get("branches", []) or [])
+        ):
+            raise ValueError(
+                "uses_channel is implementation-specific; use "
+                "requires_independent_path"
+            )
     profile_id = str(policy.get("id", "")).strip()
     if not profile_id:
         raise ValueError("target-definition policy needs a non-empty id")
@@ -1292,7 +1743,7 @@ def compile_target_definition(
     targets = _read_targets(conn, refs)
     positions = _compile_positions(targets)
 
-    safety_rules, safety_channels, safety_blockers, safety_warnings = _apply_safety_rules(
+    safety_rules, safety_paths, safety_blockers, safety_warnings = _apply_safety_rules(
         positions, list(policy.get("safety_rules", []) or [])
     )
     requirements, route_blockers, route_warnings = _compile_requirements(
@@ -1309,10 +1760,22 @@ def compile_target_definition(
     functional_foundation = _compile_functional_foundation(
         targets, positions, safety_rules
     )
-    channel_requests = safety_channels + _route_channel_requests(requirements)
-    channel_fabric, channel_blockers = _allocate_channels(
-        channel_requests, dict(policy.get("channel_fabric", {}) or {})
+    path_requests = safety_paths + _route_path_requests(requirements)
+    routing_requirements, routing_blockers = _compile_routing_requirements(
+        path_requests, dict(policy.get("routing_constraints", {}) or {})
     )
+    universalization = _compile_universalization(
+        positions, safety_rules, routing_requirements
+    )
+    strategy_by_position = {
+        strategy["position"]: strategy
+        for strategy in universalization["strategies"]
+    }
+    for position in positions:
+        strategy = strategy_by_position[position["position"]]
+        position["universal_primitive"] = strategy["primitive"]
+        position["active_path_count"] = strategy["active_path_count"]
+        position["passive_path_count"] = strategy["passive_path_count"]
     target_scope, mpn_warnings = _validate_target_mpns(
         targets, dict(policy.get("target_mpns", {}) or {})
     )
@@ -1338,7 +1801,7 @@ def compile_target_definition(
             *route_claim_blockers,
             *group_blockers,
             *safety_blockers,
-            *channel_blockers,
+            *routing_blockers,
             *provenance_blockers,
             *(str(item) for item in policy.get("declared_blockers", []) or []),
         ]
@@ -1406,7 +1869,8 @@ def compile_target_definition(
         "service_groups": service_groups,
         "functional_foundation": functional_foundation,
         "safety_rules": safety_rules,
-        "channel_fabric": channel_fabric,
+        "routing_requirements": routing_requirements,
+        "universalization": universalization,
         "positions": positions,
     }
     artifact["artifact_digest"] = _sha256(artifact)

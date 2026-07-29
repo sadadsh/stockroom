@@ -2,7 +2,7 @@ import type { UpdateCheck } from "../api/types";
 import {
   deriveUpdateStanding,
   runningVersion,
-  shortRevision,
+  updateIdentity,
 } from "../lib/updateStanding";
 import { Dot } from "./primitives";
 
@@ -10,6 +10,7 @@ const STANDING_LABEL = {
   checking: "Checking…",
   current: "Current",
   available: "Update Available",
+  updating: "Updating…",
   unknown: "Unknown",
 } as const;
 
@@ -17,6 +18,7 @@ const STANDING_TONE = {
   checking: "text-t3",
   current: "text-ok",
   available: "text-warn",
+  updating: "text-acc",
   unknown: "text-t3",
 } as const;
 
@@ -33,14 +35,17 @@ export function RunningVersionIndicator({
 }) {
   const view = deriveUpdateStanding({ data, checking, failed });
   const running = runningVersion(view.currentRevision, buildVersion);
-  const target = shortRevision(view.targetRevision);
+  const target = view.targetRevision ? updateIdentity(view.targetRevision) : null;
   const label = STANDING_LABEL[view.standing];
-  const accessibleVersion =
-    running.kind === "revision"
-      ? `running revision ${running.value}`
-      : `running version ${running.value}`;
+  const accessibleVersion = `running ${running.kind} ${running.value}`;
   const accessibleTarget =
-    view.standing === "available" && target ? `, target revision ${target}` : "";
+    view.standing === "available" && target
+      ? `, target ${target.kind} ${target.value}`
+      : "";
+  const identityPrefix =
+    running.kind === "revision" ? "r" : running.kind === "version" ? "v" : "";
+  const targetPrefix =
+    target?.kind === "revision" ? "" : target?.kind === "version" ? "v" : "";
 
   return (
     <span
@@ -55,17 +60,22 @@ export function RunningVersionIndicator({
             ? "ok"
             : view.standing === "available"
               ? "warn"
+              : view.standing === "updating"
+                ? "neutral"
               : "neutral"
         }
       />
-      <span className="text-t3">{running.kind === "revision" ? "r" : "v"}</span>
+      {identityPrefix ? <span className="text-t3">{identityPrefix}</span> : null}
       <span className="font-mono tabular-nums text-t2">{running.value}</span>
       {view.standing === "available" && target ? (
         <>
           <span aria-hidden className="text-line2">
             →
           </span>
-          <span className="font-mono tabular-nums text-t2">{target}</span>
+          <span className="font-mono tabular-nums text-t2">
+            {targetPrefix}
+            {target.value}
+          </span>
         </>
       ) : null}
       <span className={STANDING_TONE[view.standing]}>{label}</span>

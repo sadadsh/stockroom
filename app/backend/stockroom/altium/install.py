@@ -12,30 +12,18 @@ This is the Altium half of what `kicad/wiring.py` already does for KiCad, which 
 `sym-lib-table`, `fp-lib-table` and the `SR_LIB` path variable. Until now the tool-agnostic registry
 promised parity it did not have: one tool got wired, the other got a file on disk.
 
-NOT YET WIRED INTO THE APP, and here is the measured reason
------------------------------------------------------------
-**A scripted Altium session does not see the same installed-library list as the windowed one.**
-Measured 2026-07-26 on the owner's machine, immediately after a GUI install that had survived a
-full restart: a scripted run reported ONE installed library, the stock
-`Simulation Generic Components.IntLib`, with no trace of `Stockroom.DbLib`. So `InstallLibrary`
-called from a script writes into a scope the user's real Altium never reads, and wiring this to a
-button would produce a feature that reports success and changes nothing. That is the exact shape of
-failure this codebase keeps getting caught by, so it stays unwired until the scope question is
-settled.
+How the app proves persistence
+------------------------------
+`stockroom.altium.convergence` wires this installer into the native host. It does not trust the
+list observed in this process: after the driver's clean shutdown, it launches a second Altium
+process whose script contains no `InstallLibrary` call. Only when that fresh process still lists
+the DbLib and resolves a real database key, symbol, footprint, and placement parameters does the
+host record a machine-local receipt. This preserves the original caution about session scope while
+removing the manual setup step.
 
-The leading hypothesis, untested: the list is tied to the Altium 365 WORKSPACE session. A scripted
-run is not signed in, and a GUI launch that came up "Not Connected" is the case to check. Testing it
-needs the Components panel driven in a windowed Altium, which needs real pointer input.
-
-Why not write the preference file directly: it could not be found, and guessing at one is how you
-corrupt somebody's install. Searched after an install that demonstrably persisted: the whole of
-`%APPDATA%\\Altium` and `%LOCALAPPDATA%\\Altium` for the path in ASCII and in UTF-16LE, the
-`IntegratedLibrary` registry keys, the `LastWorkspace` group file, and `DXP.RCS` / `DXP.RAF` (both
-untouched, timestamps older than the install). The registry holds only Components-panel view state.
-
-What IS proven here: the module drives the API correctly, confirms the outcome from the resulting
-library list rather than from the absence of an error, and is idempotent. What is NOT proven is that
-the scope it writes to is the one the user sees.
+Why not write the preference file directly: guessing at an undocumented preference store can
+corrupt somebody's install. Altium's supported Integrated Library API plus independent
+fresh-session verification is both safer and stronger evidence.
 
 The one detail that makes it stick
 ----------------------------------

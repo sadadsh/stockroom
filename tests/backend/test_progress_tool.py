@@ -21,6 +21,8 @@ def _plan() -> dict:
         "title": "Stockroom",
         "progress_schema": 2,
         "product_scope": "Windows-only dual-EDA library.",
+        "now": "Run the exact current acceptance slice.",
+        "now_updated": "2026-07-29 16:10:25 -04:00",
         "active_work": {
             "last_updated": progress._utc_now().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "objective": "Land the fail-closed workflow foundation.",
@@ -140,6 +142,9 @@ def test_render_refuses_to_present_the_raw_counter_as_product_readiness(monkeypa
     assert ">Pending<" in rendered
     assert "Current evidence" in rendered
     assert "Next action" in rendered
+    assert "Working on now" in rendered
+    assert "Run the exact current acceptance slice." in rendered
+    assert "2026-07-29 16:10:25 -04:00" in rendered
     assert "Owner Outcome Gates" in rendered
     assert "Independent gates; never averaged" in rendered
     assert "Engineering Checklist History" in rendered

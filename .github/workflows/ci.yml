@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     strategy:
@@ -20,11 +23,20 @@ jobs:
       GIT_TERMINAL_PROMPT: "0"
       GCM_INTERACTIVE: "never"
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          version: "0.11.16"
+          python-version: "3.12.13"
+          enable-cache: false
       - name: Sync
-        run: uv sync
+        run: uv sync --frozen
+      - name: Type check backend
+        run: uv run ty check app/backend/stockroom
       - name: Provision render browsers (Playwright Chromium + Camoufox)
         # Linux only. The scrape engine renders through Playwright Chromium (BrowserFetcher) and
         # the genuine-fingerprint Camoufox Firefox (CamoufoxFetcher, which defeats Akamai +

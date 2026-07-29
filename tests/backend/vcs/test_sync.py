@@ -113,13 +113,13 @@ def test_divergence_is_surfaced_not_clobbered(tmp_path):
     (a.root / "f").write_text("remote")
     a.commit("remote", [a.root / "f"])
     SyncEngine(a).sync()
-    (b.root / "g").write_text("local")
-    b.commit("local", [b.root / "g"])
+    (b.root / "f").write_text("local")
+    b.commit("local", [b.root / "f"])
 
     res = SyncEngine(b).sync()
     assert res.state == SyncState.DIVERGED
     # local work intact, remote not merged over it
-    assert (b.root / "g").read_text() == "local"
+    assert (b.root / "f").read_text() == "local"
 
 
 def test_already_in_sync_is_idempotent(tmp_path):

@@ -1,120 +1,812 @@
-name: release
-
-# Build the portable Stockroom.exe on Windows (M9f). PyInstaller does not cross-compile and
-# pywebview/WebView2 are Windows-only, so the release binary is produced here, on windows-latest,
-# never on the Linux dev box. On a version tag it is attached to the GitHub Release; on a manual
-# dispatch it is uploaded as a downloadable build artifact.
+name: Stockroom Windows Release
 
 on:
   push:
-    tags: ["v*"]
+    tags:
+      - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: Three- or four-part Windows package version, for example 1.2.3.4
+        required: true
+        type: string
 
-permissions:
-  contents: write # create / upload release assets
+concurrency:
+  group: stockroom-windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Every job declares only the GitHub token access it needs.
+permissions: {}
 
 jobs:
-  windows-exe:
-    runs-on: windows-latest
+  build-windows-package:
+    name: Build And Verify Signed Windows Package
+    runs-on: windows-2025
+    timeout-minutes: 45
+    environment: Windows Release
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.release-metadata.outputs.version }}
+    env:
+      GIT_TERMINAL_PROMPT: "0"
+      GCM_INTERACTIVE: "never"
+      UV_PYTHON: "3.12.13"
     steps:
-      - uses: actions/checkout@v4
+      - name: Check Out The Exact Release Revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      - name: Install Pinned uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          version: "0.11.16"
+          python-version: "3.12.13"
+          enable-cache: false
 
-      - name: Sync (provision the importable stockroom package the launcher freezes)
-        run: uv sync
+      - name: Resolve And Validate Release Metadata
+        id: release-metadata
+        shell: pwsh
+        env:
+          MANUAL_VERSION: ${{ inputs.version }}
+          STOCKROOM_WINDOWS_PUBLISHER: ${{ vars.STOCKROOM_WINDOWS_PUBLISHER }}
+          STOCKROOM_WINDOWS_FEED_BASE_URI: ${{ vars.STOCKROOM_WINDOWS_FEED_BASE_URI }}
+          STOCKROOM_MINGIT_URL: ${{ vars.STOCKROOM_MINGIT_URL }}
+          STOCKROOM_MINGIT_SHA256: ${{ vars.STOCKROOM_MINGIT_SHA256 }}
+          STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL: ${{ vars.STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL }}
+          STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256: ${{ vars.STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256 }}
+          STOCKROOM_TUF_ROOT_BASE64: ${{ vars.STOCKROOM_TUF_ROOT_BASE64 }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
 
-      - name: Fetch portable git (MinGit) to bundle into the exe
+          $required = [ordered]@{
+            STOCKROOM_WINDOWS_PUBLISHER = $env:STOCKROOM_WINDOWS_PUBLISHER
+            STOCKROOM_WINDOWS_FEED_BASE_URI = $env:STOCKROOM_WINDOWS_FEED_BASE_URI
+            STOCKROOM_MINGIT_URL = $env:STOCKROOM_MINGIT_URL
+            STOCKROOM_MINGIT_SHA256 = $env:STOCKROOM_MINGIT_SHA256
+            STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL = $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL
+            STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256 = $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256
+            STOCKROOM_TUF_ROOT_BASE64 = $env:STOCKROOM_TUF_ROOT_BASE64
+          }
+          foreach ($entry in $required.GetEnumerator()) {
+            if ([string]::IsNullOrWhiteSpace([string]$entry.Value)) {
+              throw "Required repository variable $($entry.Key) is missing."
+            }
+          }
+
+          foreach ($name in @(
+            "STOCKROOM_MINGIT_SHA256",
+            "STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256"
+          )) {
+            if ([string]$required[$name] -notmatch "^[0-9a-fA-F]{64}$") {
+              throw "$name must be an exact SHA-256 digest."
+            }
+          }
+
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+            if (-not $env:GITHUB_REF_NAME.StartsWith("v", [StringComparison]::Ordinal)) {
+              throw "Release tags must begin with v."
+            }
+            $version = $env:GITHUB_REF_NAME.Substring(1)
+          }
+          else {
+            $version = $env:MANUAL_VERSION
+          }
+          if ($version -match "^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$") {
+            $version += ".0"
+          }
+          if ($version -notmatch "^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$") {
+            throw "The release version must contain three or four canonical numeric components."
+          }
+          $parts = @($version.Split(".") | ForEach-Object { [uint32]$_ })
+          if ($parts -contains 65536 -or ($parts | Where-Object { $_ -gt 65535 })) {
+            throw "Every Windows package version component must be at most 65535."
+          }
+          if (($parts | Measure-Object -Sum).Sum -eq 0) {
+            throw "Version 0.0.0.0 is not deployable."
+          }
+
+          $currentVersion = [version]$version
+          $tagVersions = @(
+            & git tag --list "v*" |
+              ForEach-Object {
+                $candidate = $_.Substring(1)
+                if ($candidate -match "^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$") {
+                  $candidate += ".0"
+                }
+                if ($candidate -match "^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$") {
+                  $parsed = [version]$candidate
+                  [pscustomobject]@{
+                    Canonical = $candidate
+                    Parsed = $parsed
+                  }
+                }
+              }
+          )
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not derive prior deployed release tags."
+          }
+          $newerVersions = @(
+            $tagVersions |
+              Where-Object { $_.Parsed -gt $currentVersion }
+          )
+          if ($newerVersions.Count -gt 0) {
+            throw "Release version is older than an existing canonical release tag."
+          }
+          $priorVersions = @(
+            $tagVersions |
+              Where-Object { $_.Parsed -lt $currentVersion } |
+              Sort-Object Parsed -Descending |
+              Group-Object Canonical |
+              ForEach-Object { $_.Group[0] }
+          )
+          $tufMetadataVersion = $priorVersions.Count + 1
+          $rollbackReleaseId = if ($priorVersions.Count -gt 0) {
+            "release-$($priorVersions[0].Canonical)"
+          }
+          else {
+            "release-bootstrap"
+          }
+          $compatibleReleaseIds = @("release-bootstrap")
+          $compatibleReleaseIds += @(
+            $priorVersions |
+              ForEach-Object { "release-$($_.Canonical)" }
+          )
+          $compatibleReleaseIds = @(
+            $compatibleReleaseIds |
+              Select-Object -Unique
+          )
+          if ($compatibleReleaseIds -notcontains $rollbackReleaseId) {
+            throw "Derived compatibility set excludes the rollback release."
+          }
+
+          $utf8 = [Text.UTF8Encoding]::new($false)
+          [IO.File]::AppendAllText(
+            $env:GITHUB_ENV,
+            (
+              "STOCKROOM_PACKAGE_VERSION=$version`n" +
+              "STOCKROOM_TUF_METADATA_VERSION=$tufMetadataVersion`n" +
+              "STOCKROOM_ROLLBACK_RELEASE_ID=$rollbackReleaseId`n" +
+              "STOCKROOM_COMPATIBLE_FROM_RELEASE_IDS=" +
+              (($compatibleReleaseIds -join ";") + "`n")
+            ),
+            $utf8
+          )
+          [IO.File]::AppendAllText(
+            $env:GITHUB_OUTPUT,
+            "version=$version`n",
+            $utf8
+          )
+
+      - name: Synchronize Locked Build Environment
+        shell: pwsh
+        run: uv sync --frozen
+
+      - name: Fetch And Verify Pinned Launcher Inputs
+        shell: pwsh
+        env:
+          STOCKROOM_MINGIT_URL: ${{ vars.STOCKROOM_MINGIT_URL }}
+          STOCKROOM_MINGIT_SHA256: ${{ vars.STOCKROOM_MINGIT_SHA256 }}
+          STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL: ${{ vars.STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL }}
+          STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256: ${{ vars.STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256 }}
+          STOCKROOM_TUF_ROOT_BASE64: ${{ vars.STOCKROOM_TUF_ROOT_BASE64 }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+
+          function Receive-VerifiedReleaseInput {
+            param(
+              [Parameter(Mandatory)][string]$Uri,
+              [Parameter(Mandatory)][string]$ExpectedSha256,
+              [Parameter(Mandatory)][string]$Destination,
+              [Parameter(Mandatory)][string[]]$AllowedHosts
+            )
+
+            $parsed = [Uri]::new($Uri)
+            if ($parsed.Scheme -cne "https") {
+              throw "Release input URLs must use HTTPS."
+            }
+            if (-not [string]::IsNullOrEmpty($parsed.UserInfo)) {
+              throw "Release input URLs cannot embed credentials."
+            }
+            if ($AllowedHosts -notcontains $parsed.DnsSafeHost.ToLowerInvariant()) {
+              throw "Release input URL is not hosted by the expected upstream."
+            }
+            Invoke-WebRequest -Uri $Uri -OutFile $Destination -MaximumRedirection 10
+            $actual = (Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash
+            if ($actual -cne $ExpectedSha256.ToUpperInvariant()) {
+              Remove-Item -LiteralPath $Destination -Force
+              throw "Release input SHA-256 verification failed."
+            }
+          }
+
+          $inputRoot = Join-Path $env:RUNNER_TEMP "Stockroom.Release.Inputs"
+          if (Test-Path -LiteralPath $inputRoot) {
+            throw "The release input directory unexpectedly already exists."
+          }
+          New-Item -ItemType Directory -Path $inputRoot | Out-Null
+
+          $minGitArchive = Join-Path $inputRoot "MinGit.zip"
+          Receive-VerifiedReleaseInput `
+            -Uri $env:STOCKROOM_MINGIT_URL `
+            -ExpectedSha256 $env:STOCKROOM_MINGIT_SHA256 `
+            -Destination $minGitArchive `
+            -AllowedHosts @("github.com")
+          $minGitRoot = Join-Path $inputRoot "MinGit"
+          Expand-Archive -LiteralPath $minGitArchive -DestinationPath $minGitRoot
+          if (-not (Test-Path -LiteralPath (Join-Path $minGitRoot "cmd\git.exe") -PathType Leaf)) {
+            throw "The verified MinGit archive does not contain cmd\git.exe."
+          }
+
+          $webView2 = Join-Path $inputRoot "MicrosoftEdgeWebview2Setup.exe"
+          Receive-VerifiedReleaseInput `
+            -Uri $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL `
+            -ExpectedSha256 $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256 `
+            -Destination $webView2 `
+            -AllowedHosts @(
+              "go.microsoft.com",
+              "msedge.sf.dl.delivery.mp.microsoft.com"
+            )
+
+          $tufRoot = Join-Path $inputRoot "Root.json"
+          try {
+            $tufRootBytes = [Convert]::FromBase64String($env:STOCKROOM_TUF_ROOT_BASE64)
+          }
+          catch {
+            throw "STOCKROOM_TUF_ROOT_BASE64 is not valid base64."
+          }
+          if ($tufRootBytes.Length -eq 0) {
+            throw "STOCKROOM_TUF_ROOT_BASE64 decoded to an empty trust root."
+          }
+          [IO.File]::WriteAllBytes($tufRoot, $tufRootBytes)
+          [Array]::Clear($tufRootBytes, 0, $tufRootBytes.Length)
+
+          $utf8 = [Text.UTF8Encoding]::new($false)
+          [IO.File]::AppendAllText(
+            $env:GITHUB_ENV,
+            "STOCKROOM_MINGIT_ROOT=$minGitRoot`nSTOCKROOM_WEBVIEW2_BOOTSTRAPPER=$webView2`nSTOCKROOM_TUF_ROOT_PATH=$tufRoot`n",
+            $utf8
+          )
+
+      - name: Materialize Ephemeral Signing Material
+        shell: pwsh
+        env:
+          WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          STOCKROOM_TUF_TARGETS_KEY_BASE64: ${{ secrets.STOCKROOM_TUF_TARGETS_KEY_BASE64 }}
+          STOCKROOM_TUF_SNAPSHOT_KEY_BASE64: ${{ secrets.STOCKROOM_TUF_SNAPSHOT_KEY_BASE64 }}
+          STOCKROOM_TUF_TIMESTAMP_KEY_BASE64: ${{ secrets.STOCKROOM_TUF_TIMESTAMP_KEY_BASE64 }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+
+          function Write-EphemeralSecretFile {
+            param(
+              [Parameter(Mandatory)][string]$Name,
+              [Parameter(Mandatory)][string]$Encoded,
+              [Parameter(Mandatory)][string]$Path
+            )
+            if ([string]::IsNullOrWhiteSpace($Encoded)) {
+              throw "$Name is required; unsigned release metadata is forbidden."
+            }
+            if (Test-Path -LiteralPath $Path) {
+              throw "The ephemeral signing path unexpectedly already exists."
+            }
+            try {
+              $bytes = [Convert]::FromBase64String($Encoded)
+            }
+            catch {
+              throw "$Name is not valid base64."
+            }
+            try {
+              if ($bytes.Length -eq 0) {
+                throw "$Name decoded to an empty file."
+              }
+              [IO.File]::WriteAllBytes($Path, $bytes)
+            }
+            finally {
+              if ($null -ne $bytes) {
+                [Array]::Clear($bytes, 0, $bytes.Length)
+              }
+            }
+          }
+
+          $pfxPath = Join-Path $env:RUNNER_TEMP "Stockroom.Release.pfx"
+          $targetsKeyPath = Join-Path $env:RUNNER_TEMP "Stockroom.TUF.Targets.pem"
+          $snapshotKeyPath = Join-Path $env:RUNNER_TEMP "Stockroom.TUF.Snapshot.pem"
+          $timestampKeyPath = Join-Path $env:RUNNER_TEMP "Stockroom.TUF.Timestamp.pem"
+          Write-EphemeralSecretFile `
+            -Name "WINDOWS_CERT_BASE64" `
+            -Encoded $env:WINDOWS_CERT_BASE64 `
+            -Path $pfxPath
+          Write-EphemeralSecretFile `
+            -Name "STOCKROOM_TUF_TARGETS_KEY_BASE64" `
+            -Encoded $env:STOCKROOM_TUF_TARGETS_KEY_BASE64 `
+            -Path $targetsKeyPath
+          Write-EphemeralSecretFile `
+            -Name "STOCKROOM_TUF_SNAPSHOT_KEY_BASE64" `
+            -Encoded $env:STOCKROOM_TUF_SNAPSHOT_KEY_BASE64 `
+            -Path $snapshotKeyPath
+          Write-EphemeralSecretFile `
+            -Name "STOCKROOM_TUF_TIMESTAMP_KEY_BASE64" `
+            -Encoded $env:STOCKROOM_TUF_TIMESTAMP_KEY_BASE64 `
+            -Path $timestampKeyPath
+
+          $utf8 = [Text.UTF8Encoding]::new($false)
+          [IO.File]::AppendAllText(
+            $env:GITHUB_ENV,
+            (
+              "STOCKROOM_TUF_TARGETS_KEY_PATH=$targetsKeyPath`n" +
+              "STOCKROOM_TUF_SNAPSHOT_KEY_PATH=$snapshotKeyPath`n" +
+              "STOCKROOM_TUF_TIMESTAMP_KEY_PATH=$timestampKeyPath`n"
+            ),
+            $utf8
+          )
+
+      - name: Build Canonical Production Package
+        shell: pwsh
+        env:
+          STOCKROOM_WINDOWS_PUBLISHER: ${{ vars.STOCKROOM_WINDOWS_PUBLISHER }}
+          STOCKROOM_WINDOWS_FEED_BASE_URI: ${{ vars.STOCKROOM_WINDOWS_FEED_BASE_URI }}
+          STOCKROOM_SIGNING_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+          if ([string]::IsNullOrEmpty($env:STOCKROOM_SIGNING_CERT_PASSWORD)) {
+            throw "WINDOWS_CERT_PASSWORD is required; unsigned releases are forbidden."
+          }
+          $pfxPath = Join-Path $env:RUNNER_TEMP "Stockroom.Release.pfx"
+          $outputRoot = Join-Path $env:RUNNER_TEMP "Stockroom.Release.Output"
+          $compatibleReleaseIds = @(
+            $env:STOCKROOM_COMPATIBLE_FROM_RELEASE_IDS.Split(
+              [char]";",
+              [StringSplitOptions]::RemoveEmptyEntries
+            )
+          )
+          if (
+            $compatibleReleaseIds.Count -eq 0 -or
+            $compatibleReleaseIds -notcontains $env:STOCKROOM_ROLLBACK_RELEASE_ID
+          ) {
+            throw "Release compatibility metadata is incomplete."
+          }
+          & .\packaging\Build-Windows-Package.ps1 `
+            -Mode Production `
+            -Version $env:STOCKROOM_PACKAGE_VERSION `
+            -Publisher $env:STOCKROOM_WINDOWS_PUBLISHER `
+            -FeedBaseUri $env:STOCKROOM_WINDOWS_FEED_BASE_URI `
+            -SigningCertificatePath $pfxPath `
+            -MinGitRoot $env:STOCKROOM_MINGIT_ROOT `
+            -WebView2BootstrapperPath $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER `
+            -TufRootPath $env:STOCKROOM_TUF_ROOT_PATH `
+            -TufMetadataVersion ([int]$env:STOCKROOM_TUF_METADATA_VERSION) `
+            -TufTargetsKeyPaths $env:STOCKROOM_TUF_TARGETS_KEY_PATH `
+            -TufSnapshotKeyPaths $env:STOCKROOM_TUF_SNAPSHOT_KEY_PATH `
+            -TufTimestampKeyPaths $env:STOCKROOM_TUF_TIMESTAMP_KEY_PATH `
+            -RollbackReleaseId $env:STOCKROOM_ROLLBACK_RELEASE_ID `
+            -CompatibleFromReleaseIds $compatibleReleaseIds `
+            -OutputRoot $outputRoot
+
+      - name: Destroy Ephemeral Signing Material
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+
+          $paths = @(
+            (Join-Path $env:RUNNER_TEMP "Stockroom.Release.pfx"),
+            (Join-Path $env:RUNNER_TEMP "Stockroom.TUF.Targets.pem"),
+            (Join-Path $env:RUNNER_TEMP "Stockroom.TUF.Snapshot.pem"),
+            (Join-Path $env:RUNNER_TEMP "Stockroom.TUF.Timestamp.pem")
+          )
+          foreach ($path in $paths) {
+            if (Test-Path -LiteralPath $path -PathType Leaf) {
+              $stream = $null
+              try {
+                $length = (Get-Item -LiteralPath $path).Length
+                $stream = [IO.File]::Open(
+                  $path,
+                  [IO.FileMode]::Open,
+                  [IO.FileAccess]::Write,
+                  [IO.FileShare]::None
+                )
+                $buffer = [byte[]]::new([Math]::Min([Math]::Max($length, 1), 1MB))
+                $remaining = $length
+                while ($remaining -gt 0) {
+                  $count = [int][Math]::Min($remaining, $buffer.Length)
+                  $stream.Write($buffer, 0, $count)
+                  $remaining -= $count
+                }
+                $stream.Flush($true)
+              }
+              finally {
+                if ($null -ne $stream) {
+                  $stream.Dispose()
+                }
+                Remove-Item -LiteralPath $path -Force
+              }
+            }
+            if (Test-Path -LiteralPath $path) {
+              throw "Ephemeral signing material was not removed."
+            }
+          }
+
+      - name: Verify And Stage Exact Release Assets
+        shell: pwsh
+        env:
+          STOCKROOM_WINDOWS_PUBLISHER: ${{ vars.STOCKROOM_WINDOWS_PUBLISHER }}
+          STOCKROOM_WINDOWS_FEED_BASE_URI: ${{ vars.STOCKROOM_WINDOWS_FEED_BASE_URI }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+
+          $artifactRoot = Join-Path $env:RUNNER_TEMP "Stockroom.Release.Output\Artifacts"
+          $packageName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_x64.msix"
+          $packagePath = Join-Path $artifactRoot $packageName
+          $appInstallerPath = Join-Path $artifactRoot "Stockroom.appinstaller"
+          $evidencePath = Join-Path $artifactRoot "Build Evidence.json"
+          $feedName = "Stockroom_TUF_Feed_$($env:STOCKROOM_PACKAGE_VERSION).zip"
+          $feedPath = Join-Path $artifactRoot $feedName
+          $feedEvidencePath = Join-Path $artifactRoot "Release Feed Evidence.json"
+          foreach ($path in @(
+            $packagePath,
+            $appInstallerPath,
+            $evidencePath,
+            $feedPath,
+            $feedEvidencePath
+          )) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Canonical production output is missing."
+            }
+          }
+
+          $evidence = Get-Content -Raw -LiteralPath $evidencePath | ConvertFrom-Json
+          if ($evidence.mode -cne "production") {
+            throw "Build evidence is not production-mode evidence."
+          }
+          if (
+            $evidence.schema -cne "stockroom-windows-package-build/3" -or
+            $evidence.runtime_status -cne "stable-managed-release-runtime"
+          ) {
+            throw "Build evidence omitted the stable managed runtime boundary."
+          }
+          if ($evidence.source.git_revision -cne $env:GITHUB_SHA -or $evidence.source.git_dirty) {
+            throw "Build evidence does not identify the exact clean release revision."
+          }
+          if (
+            $evidence.contract.version -cne $env:STOCKROOM_PACKAGE_VERSION -or
+            [int]$evidence.contract.protocol_version -ne 1 -or
+            [int]$evidence.contract.tuf_metadata_version -ne
+              [int]$env:STOCKROOM_TUF_METADATA_VERSION -or
+            $evidence.contract.publisher -cne $env:STOCKROOM_WINDOWS_PUBLISHER -or
+            $evidence.contract.feed_base_uri -cne
+              $env:STOCKROOM_WINDOWS_FEED_BASE_URI.TrimEnd([char]"/") -or
+            $evidence.contract.rollback_release_id -cne
+              $env:STOCKROOM_ROLLBACK_RELEASE_ID -or
+            (@($evidence.contract.compatible_from_release_ids) -join ";") -cne
+              $env:STOCKROOM_COMPATIBLE_FROM_RELEASE_IDS
+          ) {
+            throw "Build evidence does not match the requested release contract."
+          }
+          if (
+            $evidence.signing.state -cne "authenticode-signed" -or
+            $evidence.signing.executable_signature_status -cne "Valid" -or
+            $evidence.signing.msix_signature_status -cne "Valid" -or
+            $null -ne $evidence.signing.production_blocker -or
+            $evidence.signing.certificate_was_installed_or_trusted
+          ) {
+            throw "Production signing evidence is incomplete or invalid."
+          }
+          if (
+            -not $evidence.validation.python_contract_validator -or
+            -not $evidence.validation.makeappx_semantic_validation -or
+            -not $evidence.validation.makeappx_round_trip -or
+            -not $evidence.validation.unpacked_manifest_matches -or
+            -not $evidence.validation.unpacked_executable_matches -or
+            -not $evidence.validation.immutable_release_bundle_round_trip -or
+            -not $evidence.validation.managed_host_launch -or
+            -not $evidence.validation.managed_service_authority -or
+            -not $evidence.validation.workflow_coordinator_running -or
+            -not $evidence.validation.packaged_frontend_served -or
+            -not $evidence.validation.packaged_worker_handoff -or
+            -not $evidence.validation.signed_tuf_release_feed -or
+            -not $evidence.reproducibility.checked -or
+            -not $evidence.reproducibility.pyinstaller_payloads_match
+          ) {
+            throw "Canonical package validation or reproducibility evidence is incomplete."
+          }
+          if (
+            $evidence.managed_runtime.release_id -cne
+              "release-$($env:STOCKROOM_PACKAGE_VERSION)" -or
+            $evidence.managed_runtime.host_package_version -cne
+              $env:STOCKROOM_PACKAGE_VERSION -or
+            [int]$evidence.managed_runtime.host_protocol_version -ne
+              [int]$evidence.contract.protocol_version -or
+            $evidence.managed_runtime.rollback_release_id -cne
+              $env:STOCKROOM_ROLLBACK_RELEASE_ID -or
+            (@($evidence.managed_runtime.compatible_from_release_ids) -join ";") -cne
+              $env:STOCKROOM_COMPATIBLE_FROM_RELEASE_IDS -or
+            $evidence.managed_runtime.service_mode -cne "coordinator" -or
+            $evidence.managed_runtime.coordinator_state -cne "running" -or
+            $evidence.managed_runtime.update_channel -cne "production" -or
+            -not $evidence.managed_runtime.frontend_injected -or
+            [int]$evidence.managed_runtime.service_generation -le 0 -or
+            [string]$evidence.managed_runtime.release_manifest_sha256 -notmatch
+              "^[0-9a-f]{64}$" -or
+            [string]$evidence.managed_runtime.pinned_tuf_root_sha256 -notmatch
+              "^[0-9a-f]{64}$" -or
+            [string]$evidence.managed_runtime.immutable_backend_sha256 -notmatch
+              "^[0-9a-f]{64}$" -or
+            $evidence.managed_runtime.worker_handoff_receipt_schema -cne
+              "stockroom-packaged-worker-handoff/1" -or
+            [int]$evidence.managed_runtime.worker_candidate_generation -le 0 -or
+            [int]$evidence.managed_runtime.worker_restored_generation -ne
+              ([int]$evidence.managed_runtime.worker_candidate_generation + 1) -or
+            $evidence.managed_runtime.worker_exact_executable_sha256 -cne
+              $evidence.managed_runtime.immutable_backend_sha256
+          ) {
+            throw "Stable managed runtime evidence is incomplete or invalid."
+          }
+          if (
+            $evidence.release_feed.schema -cne "stockroom-release-feed/1" -or
+            [int]$evidence.release_feed.metadata_version -ne
+              [int]$env:STOCKROOM_TUF_METADATA_VERSION -or
+            $evidence.release_feed.release_id -cne
+              $evidence.managed_runtime.release_id -or
+            $evidence.release_feed.manifest_sha256 -cne
+              $evidence.managed_runtime.release_manifest_sha256 -or
+            $evidence.release_feed.root_sha256 -cne
+              $evidence.managed_runtime.pinned_tuf_root_sha256 -or
+            $evidence.release_feed.feed_base_uri -cne
+              $env:STOCKROOM_WINDOWS_FEED_BASE_URI.TrimEnd([char]"/") -or
+            -not $evidence.release_feed.trusted_updater_round_trip -or
+            $evidence.release_feed.deployment_state -cne "staged-not-deployed" -or
+            -not $evidence.release_feed.external_action_required -or
+            [string]::IsNullOrWhiteSpace(
+              [string]$evidence.release_feed.production_deployment_blocker
+            )
+          ) {
+            throw "Signed TUF release-feed evidence is incomplete or invalid."
+          }
+          if (
+            [string]$evidence.tools.bundled_mingit.git_executable_sha256 -notmatch
+              "^[0-9a-f]{64}$" -or
+            [string]$evidence.tools.webview2_bootstrapper.sha256 -notmatch
+              "^[0-9a-f]{64}$"
+          ) {
+            throw "Bundled Windows runtime dependency evidence is incomplete."
+          }
+
+          $packageHash = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $appInstallerHash = (
+            Get-FileHash -LiteralPath $appInstallerPath -Algorithm SHA256
+          ).Hash.ToLowerInvariant()
+          $feedHash = (
+            Get-FileHash -LiteralPath $feedPath -Algorithm SHA256
+          ).Hash.ToLowerInvariant()
+          $feedEvidenceHash = (
+            Get-FileHash -LiteralPath $feedEvidencePath -Algorithm SHA256
+          ).Hash.ToLowerInvariant()
+          if (
+            $packageHash -cne $evidence.outputs.msix.sha256 -or
+            $appInstallerHash -cne $evidence.outputs.appinstaller.sha256 -or
+            $feedHash -cne $evidence.outputs.release_feed.sha256 -or
+            $feedEvidenceHash -cne $evidence.outputs.release_feed_evidence.sha256
+          ) {
+            throw "Release output digest does not match Build Evidence.json."
+          }
+          $feedEvidence = Get-Content -Raw -LiteralPath $feedEvidencePath |
+            ConvertFrom-Json
+          if (
+            $feedEvidence.schema -cne "stockroom-release-feed/1" -or
+            $feedEvidence.release_id -cne $evidence.managed_runtime.release_id -or
+            [int]$feedEvidence.metadata_version -ne
+              [int]$env:STOCKROOM_TUF_METADATA_VERSION -or
+            $feedEvidence.archive.sha256 -cne $feedHash -or
+            $feedEvidence.deployment.feed_base_uri -cne
+              $env:STOCKROOM_WINDOWS_FEED_BASE_URI.TrimEnd([char]"/") -or
+            -not $feedEvidence.validation.trusted_updater_round_trip
+          ) {
+            throw "Release feed artifact differs from its signed authoring evidence."
+          }
+          if (
+            (Get-AuthenticodeSignature -LiteralPath $packagePath).Status.ToString() -cne "Valid"
+          ) {
+            throw "The release MSIX does not have a valid trusted Authenticode signature."
+          }
+          if (Get-ChildItem -LiteralPath $artifactRoot -Recurse -File -Filter "*.pfx") {
+            throw "Signing key material reached the canonical artifact directory."
+          }
+
+          $publishRoot = Join-Path $env:RUNNER_TEMP "Stockroom.Release.Publish"
+          if (Test-Path -LiteralPath $publishRoot) {
+            throw "The release staging directory unexpectedly already exists."
+          }
+          New-Item -ItemType Directory -Path $publishRoot | Out-Null
+          Copy-Item -LiteralPath $packagePath -Destination $publishRoot
+          Copy-Item -LiteralPath $appInstallerPath -Destination $publishRoot
+          Copy-Item -LiteralPath $evidencePath -Destination $publishRoot
+          Copy-Item -LiteralPath $feedPath -Destination $publishRoot
+          Copy-Item -LiteralPath $feedEvidencePath -Destination $publishRoot
+
+          $evidenceHash = (Get-FileHash -LiteralPath $evidencePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checksumLines = @(
+            "$packageHash  $packageName"
+            "$appInstallerHash  Stockroom.appinstaller"
+            "$evidenceHash  Build Evidence.json"
+            "$feedHash  $feedName"
+            "$feedEvidenceHash  Release Feed Evidence.json"
+          )
+          [IO.File]::WriteAllText(
+            (Join-Path $publishRoot "SHA256SUMS.txt"),
+            ($checksumLines -join "`n") + "`n",
+            [Text.Encoding]::ASCII
+          )
+          $allowed = @(
+            "Build Evidence.json",
+            "Release Feed Evidence.json",
+            "SHA256SUMS.txt",
+            "Stockroom.appinstaller",
+            $feedName,
+            $packageName
+          )
+          $actual = @(
+            Get-ChildItem -LiteralPath $publishRoot -File |
+              Sort-Object Name |
+              ForEach-Object Name
+          )
+          if (Compare-Object -ReferenceObject ($allowed | Sort-Object) -DifferenceObject $actual) {
+            throw "Release staging contains a file outside the exact publication allowlist."
+          }
+
+      - name: Upload Verified Release Assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Stockroom-Windows-Release
+          path: ${{ runner.temp }}\Stockroom.Release.Publish
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          include-hidden-files: false
+
+  publish-github-release:
+    name: Publish GitHub Prerelease
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    needs: build-windows-package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read # Download the verified artifact produced by this workflow run.
+      contents: write # Create the tagged prerelease and upload its exact asset allowlist.
+    steps:
+      - name: Download Verified Release Assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: Stockroom-Windows-Release
+          path: release-assets
+
+      - name: Reverify Release Asset Allowlist And Digests
+        shell: pwsh
+        env:
+          STOCKROOM_PACKAGE_VERSION: ${{ needs.build-windows-package.outputs.version }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+          $packageName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_x64.msix"
+          $feedName = "Stockroom_TUF_Feed_$($env:STOCKROOM_PACKAGE_VERSION).zip"
+          $allowed = @(
+            "Build Evidence.json",
+            "Release Feed Evidence.json",
+            "SHA256SUMS.txt",
+            "Stockroom.appinstaller",
+            $feedName,
+            $packageName
+          )
+          $files = @(Get-ChildItem -LiteralPath "release-assets" -File)
+          if (Compare-Object -ReferenceObject ($allowed | Sort-Object) -DifferenceObject ($files.Name | Sort-Object)) {
+            throw "Downloaded release artifact differs from the exact publication allowlist."
+          }
+          $checksumLines = Get-Content -LiteralPath "release-assets/SHA256SUMS.txt"
+          foreach ($line in $checksumLines) {
+            if ($line -notmatch "^([0-9a-f]{64})  (.+)$") {
+              throw "SHA256SUMS.txt contains a malformed line."
+            }
+            $path = Join-Path "release-assets" $Matches[2]
+            $actual = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -cne $Matches[1]) {
+              throw "Downloaded release asset failed SHA-256 verification."
+            }
+          }
+          if ($checksumLines.Count -ne 5) {
+            throw "SHA256SUMS.txt must cover exactly the package, App Installer, build evidence, and both release-feed artifacts."
+          }
+
+      - name: Publish Signed Windows Prerelease
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          STOCKROOM_PACKAGE_VERSION: ${{ needs.build-windows-package.outputs.version }}
         run: |
-          # Authenticate the API call so it uses the 1000/hr limit, not the 60/hr anonymous one.
-          $headers = @{ 'User-Agent' = 'stockroom-ci'; 'Authorization' = "Bearer $env:GH_TOKEN" }
-          $rel = Invoke-RestMethod -Headers $headers https://api.github.com/repos/git-for-windows/git/releases/latest
-          $asset = $rel.assets | Where-Object { $_.name -match '^MinGit-.*-64-bit\.zip$' -and $_.name -notmatch 'busybox' } | Select-Object -First 1
-          if (-not $asset) { throw "MinGit 64-bit asset not found in the latest git-for-windows release" }
-          Write-Host "Downloading $($asset.name)"
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile mingit.zip
-          Expand-Archive -Path mingit.zip -DestinationPath packaging/mingit -Force
-          if (-not (Test-Path packaging/mingit/cmd/git.exe)) { throw "MinGit git.exe missing after extract" }
-          Write-Host "MinGit ready at packaging/mingit"
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
 
-      - name: Fetch the WebView2 Evergreen Bootstrapper to bundle
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path packaging/webview2 | Out-Null
-          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile packaging/webview2/MicrosoftEdgeWebview2Setup.exe
-          if (-not (Test-Path packaging/webview2/MicrosoftEdgeWebview2Setup.exe)) { throw "WebView2 bootstrapper download failed" }
-          Write-Host "WebView2 bootstrapper ready at packaging/webview2"
+          $notesPath = Join-Path $env:RUNNER_TEMP "Stockroom.Release.Notes.md"
+          @"
+          Signed, verified Windows package and App Installer update policy for Stockroom.
 
-      - name: Build the launcher exe
-        run: uv run --with pyinstaller pyinstaller packaging/stockroom.spec --noconfirm --clean
+          This prerelease contains Stockroom's stable signed-release broker, immutable
+          built-in release, generation-fenced workflow coordinator, full backend, and
+          committed frontend. The canonical build launches the unpacked executable and
+          proves the managed host, coordinator, production update channel, and frontend
+          before publication.
 
-      - name: Verify the exe was produced
-        shell: pwsh
-        run: if (-not (Test-Path dist/Stockroom.exe)) { throw "Stockroom.exe was not built" }
+          Verify every downloaded file against ``SHA256SUMS.txt``. ``Build Evidence.json``
+          records the package contract, exact source revision, SDK validation, signature
+          status, deterministic unsigned-payload comparison, and updater round trip.
+          ``Stockroom_TUF_Feed_$($env:STOCKROOM_PACKAGE_VERSION).zip`` contains the exact
+          signed ``metadata/`` and consistent-snapshot ``targets/`` trees. Publication as
+          a release asset stages this feed but does not deploy it to the configured HTTPS
+          origin; that external upload remains explicitly required.
+          "@ | Set-Content -LiteralPath $notesPath -Encoding utf8NoBOM
 
-      - name: Code-sign the exe (only if a signing cert is configured)
-        shell: pwsh
-        env:
-          CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
-          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-        run: |
-          # To kill the SmartScreen "Windows protected your PC" warning, add two repo secrets:
-          #   WINDOWS_CERT_BASE64   = base64 of a code-signing .pfx (an Authenticode / OV/EV cert)
-          #   WINDOWS_CERT_PASSWORD = its password
-          # Until then this is a clean no-op (the exe ships unsigned and SmartScreen warns once).
-          if (-not $env:CERT_BASE64) { Write-Host "No signing cert configured; shipping unsigned (SmartScreen will warn once)."; exit 0 }
-          $pfx = "$env:RUNNER_TEMP\stockroom-cert.pfx"
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_BASE64))
-          $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue | Select-Object -Last 1).FullName
-          if (-not $signtool) { throw "signtool.exe not found on the runner" }
-          & $signtool sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 dist\Stockroom.exe
-          if ($LASTEXITCODE -ne 0) { throw "signing failed" }
-          Remove-Item $pfx -Force
-          Write-Host "Signed dist\Stockroom.exe"
+          $packageName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_x64.msix"
+          $feedName = "Stockroom_TUF_Feed_$($env:STOCKROOM_PACKAGE_VERSION).zip"
+          $allowed = @(
+            "Build Evidence.json",
+            "Release Feed Evidence.json",
+            "SHA256SUMS.txt",
+            "Stockroom.appinstaller",
+            $feedName,
+            $packageName
+          )
+          $existing = @(
+            & gh release view $env:GITHUB_REF_NAME --json assets --jq ".assets[].name"
+          )
+          $releaseExists = $LASTEXITCODE -eq 0
+          if ($releaseExists) {
+            $disallowed = @($existing | Where-Object { $_ -notin $allowed })
+            if ($disallowed.Count -gt 0) {
+              throw "The GitHub prerelease already contains an asset outside the release allowlist."
+            }
+            if ($existing.Count -gt 0) {
+              throw "Published release assets are immutable; use a new package and TUF metadata version."
+            }
+            & gh release edit $env:GITHUB_REF_NAME `
+              --prerelease `
+              --title "Stockroom $($env:GITHUB_REF_NAME)" `
+              --notes-file $notesPath
+          }
+          else {
+            & gh release create $env:GITHUB_REF_NAME `
+              --verify-tag `
+              --prerelease `
+              --title "Stockroom $($env:GITHUB_REF_NAME)" `
+              --notes-file $notesPath
+          }
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub prerelease creation or update failed."
+          }
 
-      - name: Write the release checksum
-        shell: pwsh
-        run: |
-          $hash = (Get-FileHash dist\Stockroom.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  Stockroom.exe" | Set-Content -Encoding ascii dist\Stockroom.exe.sha256
-
-      - name: Upload as a build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Stockroom-exe
-          path: |
-            dist/Stockroom.exe
-            dist/Stockroom.exe.sha256
-
-      - name: Publish the GitHub Release (on a version tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/Stockroom.exe
-            dist/Stockroom.exe.sha256
-          name: Stockroom ${{ github.ref_name }}
-          prerelease: true
-          body: |
-            Portable frozen-once launcher for Stockroom, the KiCad component-library and PCB-project manager.
-
-            Download `Stockroom.exe` and keep it anywhere convenient. The launcher bundles portable
-            Git, uv, and the WebView2 bootstrapper. On first launch it creates a managed checkout at
-            `%LOCALAPPDATA%\Stockroom\app`, provisions the environment, and opens the bundled library.
-            Later launches reconcile that checkout with its configured application branch. A running
-            session checks every two minutes and offers `Install And Restart` when new code is ready.
-
-            Requirements on the target machine: internet on first run and 64-bit Windows. KiCad 10 is
-            optional and enables ERC/DRC, fab export, and native preview features.
-
-            `Stockroom.exe.sha256` contains the release asset's SHA-256 checksum. Authenticode signing
-            is applied when the repository's Windows signing certificate secrets are configured.
-
-            Marked pre-release: the full fresh-device flow (clone, uv sync, every backend feature, ERC/DRC
-            and fab export via the real Windows kicad-cli) is verified on real Windows; the remaining
-            manual check is the WebView2 window's on-screen rendering. Promote to a full release once
-            that visual pass is done.
+          $assets = @(
+            "release-assets/$packageName",
+            "release-assets/Stockroom.appinstaller",
+            "release-assets/Build Evidence.json",
+            "release-assets/Release Feed Evidence.json",
+            "release-assets/$feedName",
+            "release-assets/SHA256SUMS.txt"
+          )
+          & gh release upload $env:GITHUB_REF_NAME @assets
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub prerelease asset upload failed."
+          }
+          $published = @(
+            & gh release view $env:GITHUB_REF_NAME --json assets --jq ".assets[].name"
+          )
+          if (
+            $LASTEXITCODE -ne 0 -or
+            (Compare-Object -ReferenceObject ($allowed | Sort-Object) -DifferenceObject ($published | Sort-Object))
+          ) {
+            throw "Published GitHub prerelease assets differ from the exact release allowlist."
+          }

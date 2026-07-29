@@ -1,7 +1,7 @@
 /**
  * The Add A Part window's open/close state, lifted to one place so every entry
  * point opens the SAME modal: the Components toolbar button, the Ctrl+K palette,
- * and a vendor ZIP dropped anywhere in the window. It is a plain in-window modal
+ * from the Components toolbar and command palette. It is a plain in-window modal
  * (no route, no OS window), so opening it never navigates away from wherever the
  * user is. AppShell renders <AddPartModal/> off this; consumers call open()/close().
  */

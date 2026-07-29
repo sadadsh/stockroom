@@ -1,8 +1,12 @@
 import type { UpdateCheck } from "../api/types";
 
-type UpdateCheckWithTarget = UpdateCheck & { target_revision?: string };
+export type UpdateStanding = "checking" | "current" | "available" | "updating" | "unknown";
+export type UpdateIdentityKind = "revision" | "version" | "release";
 
-export type UpdateStanding = "checking" | "current" | "available" | "unknown";
+export interface UpdateIdentityView {
+  value: string;
+  kind: UpdateIdentityKind;
+}
 
 export interface UpdateStandingView {
   standing: UpdateStanding;
@@ -12,7 +16,11 @@ export interface UpdateStandingView {
 }
 
 export function updateTargetRevision(data: UpdateCheck | undefined): string {
-  return ((data as UpdateCheckWithTarget | undefined)?.target_revision ?? "").trim();
+  return (data?.target_release_id || data?.target_revision || "").trim();
+}
+
+export function updateCurrentRevision(data: UpdateCheck | undefined): string {
+  return (data?.current_release_id || data?.current_revision || "").trim();
 }
 
 export function deriveUpdateStanding({
@@ -24,7 +32,7 @@ export function deriveUpdateStanding({
   checking: boolean;
   failed: boolean;
 }): UpdateStandingView {
-  const currentRevision = (data?.current_revision ?? "").trim();
+  const currentRevision = updateCurrentRevision(data);
   const targetRevision = updateTargetRevision(data);
   if (checking) {
     return {
@@ -40,6 +48,19 @@ export function deriveUpdateStanding({
       currentRevision,
       targetRevision: "",
       detail: "The latest application revision could not be verified.",
+    };
+  }
+  if (
+    ["applying", "reloading_frontend", "handing_off", "restarting"].includes(
+      data.convergence_phase ?? "",
+    ) ||
+    data.state === "updating"
+  ) {
+    return {
+      standing: "updating",
+      currentRevision,
+      targetRevision,
+      detail: data.detail || "A verified application release is being adopted automatically.",
     };
   }
   if (data.update_available && targetRevision) {
@@ -96,15 +117,49 @@ export function deriveUpdateStanding({
 
 export function shortRevision(value: string): string {
   const revision = value.trim();
-  return revision.length > 7 ? revision.slice(0, 7) : revision;
+  return /^[0-9a-f]{8,}$/i.test(revision) ? revision.slice(0, 7) : revision;
+}
+
+/**
+ * Render the identity the backend actually supplied.
+ *
+ * Production uses immutable signed release IDs (`release-1.2.3.4`); development uses Git
+ * revisions. Treating every non-empty identity as a SHA turned the production ID into the
+ * meaningless `r release-`. Unknown release-ID schemes remain intact and are never truncated.
+ */
+export function updateIdentity(value: string): UpdateIdentityView {
+  const identity = value.trim();
+  const version = /^(?:release-|v)?(\d+(?:\.\d+)+)$/i.exec(identity)?.[1];
+  if (version) {
+    return { value: version, kind: "version" };
+  }
+  if (/^[0-9a-f]{7,}$/i.test(identity)) {
+    return { value: shortRevision(identity), kind: "revision" };
+  }
+  return { value: identity || "Unknown", kind: "release" };
+}
+
+export function aboutVersion(
+  data: UpdateCheck | undefined,
+  buildVersion: string,
+): string {
+  const explicitRelease = (data?.current_release_id ?? "").trim();
+  const revision = (data?.current_revision ?? "").trim();
+  const productionRelease =
+    data?.channel === "production" || /^release-/i.test(revision) ? revision : "";
+  const authoritativeRelease = explicitRelease || productionRelease;
+  if (authoritativeRelease) {
+    return updateIdentity(authoritativeRelease).value;
+  }
+  return buildVersion.trim() || "Unknown";
 }
 
 export function runningVersion(
   currentRevision: string,
   buildVersion: string,
-): { value: string; kind: "revision" | "version" } {
+): UpdateIdentityView {
   if (currentRevision.trim()) {
-    return { value: shortRevision(currentRevision), kind: "revision" };
+    return updateIdentity(currentRevision);
   }
   const buildRevision = /\+([0-9a-f]{7,})$/i.exec(buildVersion.trim())?.[1];
   if (buildRevision) {

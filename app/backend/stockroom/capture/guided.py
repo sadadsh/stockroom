@@ -38,27 +38,28 @@ from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 from urllib.parse import parse_qs, urlparse
 
-from stockroom.cad_variants import resolve_cad_variant
+from stockroom.cad_variants import resolve_cad_variant, same_cad_evidence_set
 from stockroom.capture.browser import (
     PlaywrightCaptureBrowser,
     ProviderHudSpec,
     SharedPlaywrightRuntime,
 )
 from stockroom.capture.cad_composition import OwnedMaterialization
-from stockroom.capture.complete import SourceOutcome
-from stockroom.capture.cross_eda import (
-    CrossEdaVerificationError,
-    verify_cross_eda_component,
+from stockroom.capture.complete import (
+    ProviderOutcome,
+    ProviderOutcomeStatus,
+    SourceOutcome,
+    provider_outcome_from_source,
 )
+from stockroom.capture.cross_eda import verify_cross_eda_component
 from stockroom.capture.download_broker import DownloadBroker, DownloadTask
 from stockroom.capture.evidence import (
     BROWSER_CAPTURE_ADAPTER_VERSION,
     exact_identity,
     record_browser_cad_evidence,
-    record_composed_browser_altium_evidence,
 )
 from stockroom.capture.identity import (
     exact_observation_error,
@@ -67,7 +68,13 @@ from stockroom.capture.identity import (
     select_exact_candidate,
 )
 from stockroom.capture.requirements import Requirement, asset_present, capture_needs
-from stockroom.capture.vendors import DriveReport, formats_for, get_adapter
+from stockroom.capture.vendors import (
+    DriveReport,
+    VendorCapability,
+    formats_for,
+    get_adapter,
+)
+from stockroom.capture.verified_cache import active_pair_is_verified
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.asset import AssetOrigin
@@ -77,6 +84,12 @@ from stockroom.model.asset import AssetOrigin
 # and this is a BACKSTOP: the wait ends the instant the file appears in the saved list.
 _DOWNLOAD_TIMEOUT_MS = 120_000
 _COHERENT_CAD_FORMATS = ("kicad", "model", "altium")
+_CAD_AUTHOR_LABELS = {
+    "ultralibrarian": "Ultra Librarian",
+    "snapmagic": "SnapMagic",
+    "traceparts": "TraceParts",
+    "samacsys": "SamacSys",
+}
 
 
 def _wait_for_capture(
@@ -218,10 +231,10 @@ def drive_formats(
     A format that WAS submitted and never arrived is the returned error instead: calling that a miss
     would let a vanished file read as "the vendor had nothing".
 
-    Re-navigates before each exclusive format, because taking a download generally leaves the
-    vendor's modal closed or the page changed; `open_panel` is cheap and idempotent, and assuming
-    the panel survived a download is the kind of guess that works on a fixture and fails on the
-    real site.
+    Re-navigates before each exclusive format unless the adapter declares a measured reusable-page
+    contract. Taking a download generally closes a modal or changes the page, but DigiKey's models
+    app does the opposite: the fragment survives while redundant renders trigger empty fragments
+    and security challenges. Either behavior is capability data, never a vendor-name branch.
 
     THE WAIT IS ON THE SAVED FILE, NEVER ON THE DOWNLOAD EVENT. `wait_for_event("download")` RACES
     the `on("download")` handler the browser session registers up front; whichever listener is
@@ -266,16 +279,29 @@ def drive_formats(
         return report, None
 
     combined = DriveReport()
-    for fmt in formats:
+    reuse_page = bool(getattr(adapter.capability, "reuse_page_between_formats", False))
+    for format_index, fmt in enumerate(formats):
         attempts = max(1, min(3, int(getattr(adapter, "max_download_attempts", 1))))
         delivered = False
         for attempt in range(1, attempts + 1):
             mark = len(browser.captured)
             error_mark = len(getattr(browser, "download_errors", ()))
             try:
-                # This exact navigation is also the recovery action: a failed DigiKey export gets
-                # a fresh product/models render and a fresh pinned selection, never a stale modal.
-                page.goto(url, wait_until="domcontentloaded")
+                # Most exclusive-format providers need a fresh render after every download.
+                # DigiKey's measured models app is the opposite: its fragment remains valid, while
+                # repeated renders trigger empty fragments and then a Cloudflare challenge. The
+                # caller already initialized the task page, so a declared reusable route navigates
+                # only for a bounded retry or when a standalone caller supplied a blank page.
+                current_url = str(getattr(page, "url", "") or "")
+                if (
+                    not reuse_page
+                    or attempt > 1
+                    or (
+                        format_index == 0
+                        and current_url in {"", "about:blank"}
+                    )
+                ):
+                    page.goto(url, wait_until="domcontentloaded")
                 one = _drive_adapter(
                     adapter,
                     page,
@@ -432,6 +458,7 @@ def _combine_route_outcomes(
     skipped: list[str] = []
     blocked = False
     retained = 0
+    provider_outcomes: list[ProviderOutcome] = []
     for label, outcome in outcomes:
         for requirement in outcome.satisfied:
             if requirement not in satisfied:
@@ -442,13 +469,166 @@ def _combine_route_outcomes(
             skipped.append(f"{label}: {outcome.skipped}")
         retained += outcome.retained
         blocked = blocked or outcome.blocked
+        provider_outcomes.extend(outcome.provider_outcomes)
     return SourceOutcome(
         satisfied=tuple(satisfied),
         retained=retained,
         error="; ".join(errors),
         skipped="; ".join(skipped),
         blocked=blocked,
+        provider_outcomes=tuple(provider_outcomes),
     )
+
+
+def _with_route_outcome(
+    outcome: SourceOutcome,
+    *,
+    provider_key: str,
+    author_key: str,
+    label: str,
+    attempted: bool = True,
+    status: ProviderOutcomeStatus | None = None,
+    reason: str | None = None,
+) -> SourceOutcome:
+    """Attach exactly one terminal ledger row to one independently bound author route."""
+
+    if outcome.provider_outcomes:
+        return outcome
+    if status is None and outcome.blocked:
+        detail = f"{outcome.error} {outcome.skipped}".casefold()
+        if "cancel" in detail or "left for another provider" in detail:
+            status = "cancelled"
+        elif any(
+            marker in detail
+            for marker in (
+                "sign-in",
+                "sign in",
+                "security",
+                "captcha",
+                "mfa",
+                "passkey",
+                "person",
+                "user input",
+            )
+        ):
+            status = "requires-human"
+        else:
+            status = "blocked"
+    return SourceOutcome(
+        satisfied=outcome.satisfied,
+        retained=outcome.retained,
+        error=outcome.error,
+        skipped=outcome.skipped,
+        blocked=outcome.blocked,
+        provider_outcomes=(
+            provider_outcome_from_source(
+                outcome,
+                provider_key=provider_key,
+                author_key=author_key,
+                label=label,
+                attempted=attempted,
+                status=status,
+                reason=reason,
+            ),
+        ),
+    )
+
+
+def _unattempted_route_outcome(
+    *,
+    provider_key: str,
+    author_key: str,
+    label: str,
+    reason: str,
+) -> SourceOutcome:
+    base = SourceOutcome(skipped=reason)
+    return _with_route_outcome(
+        base,
+        provider_key=provider_key,
+        author_key=author_key,
+        label=label,
+        attempted=False,
+        status="not-attempted",
+        reason=reason,
+    )
+
+
+class _CaptureRoute(Protocol):
+    capability: VendorCapability
+    evidence_provider_key: str
+
+
+def _capture_routes(adapter) -> tuple[_CaptureRoute, ...]:
+    factory = getattr(adapter, "capture_routes", None)
+    routes = tuple(factory()) if callable(factory) else (adapter,)
+    return tuple(cast(_CaptureRoute, route) for route in routes)
+
+
+def _author_key(provider_key: str, route) -> str:
+    return (
+        str(getattr(route, "evidence_provider_key", "") or provider_key)
+        .strip()
+        .casefold()
+    )
+
+
+def _provider_wide_outcome(
+    adapter,
+    outcome: SourceOutcome,
+    *,
+    attempted: bool,
+    status: ProviderOutcomeStatus | None = None,
+) -> SourceOutcome:
+    """Ledger a pre-route provider result once for every route it prevented."""
+
+    provider_key = adapter.capability.key
+    return SourceOutcome(
+        satisfied=outcome.satisfied,
+        retained=outcome.retained,
+        error=outcome.error,
+        skipped=outcome.skipped,
+        blocked=outcome.blocked,
+        provider_outcomes=tuple(
+            provider_outcome_from_source(
+                outcome,
+                provider_key=provider_key,
+                author_key=_author_key(provider_key, route),
+                label=route.capability.label,
+                attempted=attempted,
+                status=status,
+            )
+            for route in _capture_routes(adapter)
+        ),
+    )
+
+
+def _receipt_binding_issue(
+    landed,
+    *,
+    record,
+    surface_key: str,
+    evidence_provider_key: str,
+) -> str:
+    """Require every captured byte to carry the exact nonblank task and author binding."""
+
+    expected = {
+        "task_id": getattr(record, "id", ""),
+        "manufacturer_key": (getattr(record, "manufacturer", "") or "").strip(),
+        "mpn_canonical": (getattr(record, "mpn", "") or "").strip(),
+        "surface_key": surface_key,
+        "evidence_provider_key": evidence_provider_key,
+    }
+    if not landed:
+        return "capture produced no task-bound receipt"
+    for item in landed:
+        for field_name, expected_value in expected.items():
+            observed = getattr(item, field_name, "")
+            if not expected_value or observed != expected_value:
+                return (
+                    "capture receipt binding mismatch for "
+                    f"{field_name.replace('_', ' ')}; no file was retained or activated"
+                )
+    return ""
 
 
 def _provider_formats(adapter, needs) -> list[str]:
@@ -508,6 +688,21 @@ def _provider_hud_labels(adapter, formats: list[str]) -> tuple[str, ...]:
         "altium": "Native Altium symbol and footprint",
     }
     return tuple(labels.get(fmt) or fallbacks[fmt] for fmt in formats)
+
+
+def _provider_hud_author_route(adapter) -> str:
+    """Human label for the CAD author behind the visible provider surface."""
+
+    route = getattr(adapter, "_route", None)
+    route_label = getattr(route, "label", "")
+    if type(route_label) is str and route_label.strip():
+        return route_label.strip()
+
+    evidence_key = str(getattr(adapter, "evidence_provider_key", "") or "").strip().casefold()
+    for family, label in _CAD_AUTHOR_LABELS.items():
+        if evidence_key == family or evidence_key.endswith(f"-{family}"):
+            return label
+    return adapter.capability.label
 
 
 # What `altium/extract.py::normalize_altium_source` can actually take TODAY. `.lia` is not here
@@ -671,6 +866,17 @@ class GuidedCaptureSource:
             out |= {Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT}
         return frozenset(out)
 
+    def provider_route_ids(self) -> tuple[str, ...]:
+        """The stable surface/author routes one exhaustive run must ledger."""
+
+        adapter = get_adapter(self._vendor_key)
+        if adapter is None:
+            raise ValueError(f"no capture adapter for vendor {self._vendor_key!r}")
+        return tuple(
+            f"{self._vendor_key}:{_author_key(self._vendor_key, route)}"
+            for route in _capture_routes(adapter)
+        )
+
     def __init__(
         self,
         make_pipeline,
@@ -680,8 +886,10 @@ class GuidedCaptureSource:
         profile_dir: Path | None = None,
         headless: bool = False,
         engine: str = "chromium",
-        attach_altium=None,
         convert_altium=None,
+        collect_variants: bool = False,
+        preserve_active_pair: bool = False,
+        close_after_supply: bool = False,
         credentials=None,
         run_write=None,
         now_iso=None,
@@ -704,6 +912,8 @@ class GuidedCaptureSource:
         self._evidence_provider_key = (
             getattr(adapter, "evidence_provider_key", vendor) if adapter is not None else vendor
         )
+        self.provider_key = vendor
+        self.author_key = self._evidence_provider_key
         # Public, human-facing identity for completion reports. `key` must remain "guided"
         # because it names the source implementation, while two instances in one fallback chain
         # need distinct provider names so their honest decline reasons remain distinguishable.
@@ -713,13 +923,16 @@ class GuidedCaptureSource:
         self._profile_dir = profile_dir
         self._headless = headless
         self._engine = engine
-        # `library_ops.attach_altium_assets`, injected rather than imported, so this module stays
-        # free of the mutation layer and a test can drive the Altium path without a real library.
-        self._attach_altium = attach_altium
         # Optional provider-package conversion seam. DigiKey's embedded Ultra Librarian route
         # delivers an official Altium scripting project, not native libraries. The runner injects
         # the narrowly recognized converter only for that route.
         self._convert_altium = convert_altium
+        # Explicit provider capture may be used after a part is already complete to retain another
+        # exact provider's full dual-EDA set. It must never silently replace the active pair; the
+        # pair selector owns that decision.
+        self._collect_variants = collect_variants
+        self._preserve_active_pair = preserve_active_pair
+        self._close_after_supply = close_after_supply
         # `(vendor_key) -> (username, password) | None`. Injected, so capture/ never reads the
         # machine config itself and a test can drive sign-in without one.
         self._credentials = credentials
@@ -795,42 +1008,109 @@ class GuidedCaptureSource:
     # -- the source contract ---------------------------------------------------------------
 
     def supply(self, record) -> SourceOutcome:
-        if self._user_driven and self._user_cancelled and self._user_cancelled():
-            return SourceOutcome(skipped="provider capture workflow was cancelled")
+        """Run one part and optionally release the provider session before the next source."""
 
+        try:
+            try:
+                return self._supply_once(record)
+            except Exception as exc:  # noqa: BLE001 - preserve a complete provider ledger
+                adapter = get_adapter(self._vendor_key)
+                if adapter is None:
+                    return SourceOutcome(
+                        error=f"{self._vendor_key}: {exc}",
+                    )
+                return _provider_wide_outcome(
+                    adapter,
+                    SourceOutcome(error=f"{adapter.capability.label}: {exc}"),
+                    attempted=True,
+                    status="failed",
+                )
+        finally:
+            if self._close_after_supply:
+                self.close()
+
+    def _supply_once(self, record) -> SourceOutcome:
         adapter = get_adapter(self._vendor_key)
         if adapter is None:
             return SourceOutcome(error=f"no capture adapter for vendor {self._vendor_key!r}")
+        routes = _capture_routes(adapter)
+        if self._user_cancelled and self._user_cancelled():
+            return _provider_wide_outcome(
+                adapter,
+                SourceOutcome(skipped="provider capture workflow was cancelled"),
+                attempted=False,
+                status="cancelled",
+            )
 
         manufacturer = (getattr(record, "manufacturer", "") or "").strip()
         mpn = (getattr(record, "mpn", "") or "").strip()
         if not manufacturer or not mpn:
-            return SourceOutcome(error="browser acquisition requires an exact manufacturer and MPN")
+            return _provider_wide_outcome(
+                adapter,
+                SourceOutcome(
+                    error="browser acquisition requires an exact manufacturer and MPN"
+                ),
+                attempted=False,
+                status="failed",
+            )
 
         needs = list(capture_needs(record))
         if not needs:
-            return SourceOutcome(skipped=f"{record.mpn or record.id} needs no captured files")
+            if not self._collect_variants or getattr(record, "passive", False):
+                return _provider_wide_outcome(
+                    adapter,
+                    SourceOutcome(
+                        skipped=f"{record.mpn or record.id} needs no captured files"
+                    ),
+                    attempted=True,
+                    status="unavailable",
+                )
+            # A selected provider is being harvested as an alternative. Ask it for its complete
+            # declared set even though the active library itself has no missing requirements.
+            needs = sorted(self.provides(), key=lambda requirement: requirement.value)
         # Filter on the formats accepted by this provider's declared access contract and by
         # Stockroom's implemented attach seams. User-driven formats do not require DOM selectors.
         formats = _provider_formats(adapter, needs)
         if not formats:
-            return SourceOutcome(
-                skipped=(
-                    f"{adapter.capability.label} cannot supply "
-                    f"{', '.join(sorted({r.value.split('_')[0] for r in needs}))} for this part"
-                )
+            return _provider_wide_outcome(
+                adapter,
+                SourceOutcome(
+                    skipped=(
+                        f"{adapter.capability.label} cannot supply "
+                        f"{', '.join(sorted({r.value.split('_')[0] for r in needs}))} for this part"
+                    )
+                ),
+                attempted=True,
+                status="unavailable",
             )
 
         url = adapter.resolve_url(mpn)
         if not url:
-            return SourceOutcome(skipped=f"no {adapter.capability.label} page for {record.id}")
+            return _provider_wide_outcome(
+                adapter,
+                SourceOutcome(
+                    skipped=f"no {adapter.capability.label} page for {record.id}"
+                ),
+                attempted=True,
+                status="unavailable",
+            )
         resolved_url_issue = _resolved_provider_url_issue(adapter, url, record)
         if resolved_url_issue:
-            return SourceOutcome(error=resolved_url_issue, blocked=True)
+            return _provider_wide_outcome(
+                adapter,
+                SourceOutcome(error=resolved_url_issue, blocked=True),
+                attempted=True,
+                status="failed",
+            )
 
         machine_access_issue = self._machine_access_issue(adapter)
         if machine_access_issue:
-            return SourceOutcome(error=machine_access_issue, blocked=True)
+            return _provider_wide_outcome(
+                adapter,
+                SourceOutcome(error=machine_access_issue, blocked=True),
+                attempted=False,
+                status="requires-human",
+            )
         # The first managed-browser start can perform a saved-credential sign-in before any part
         # navigation. Count it durably as provider access instead of letting login bypass pacing.
         if (
@@ -838,40 +1118,126 @@ class GuidedCaptureSource:
             and self._session is None
             and not self._acquire_rate_limit()
         ):
-            return SourceOutcome(skipped="provider capture was cancelled while waiting for pacing")
+            return _provider_wide_outcome(
+                adapter,
+                SourceOutcome(
+                    skipped="provider capture was cancelled while waiting for pacing"
+                ),
+                attempted=False,
+                status="cancelled",
+            )
         machine_access_issue = self._machine_access_issue(adapter)
         if machine_access_issue:
-            return SourceOutcome(error=machine_access_issue, blocked=True)
+            return _provider_wide_outcome(
+                adapter,
+                SourceOutcome(error=machine_access_issue, blocked=True),
+                attempted=False,
+                status="requires-human",
+            )
         session = self._ensure_session()
         if self._user_driven:
-            return self._supply_user_driven(
-                record,
-                session,
-                adapter.capability.label,
-                manufacturer,
-                mpn,
-                url,
-                formats,
-            )
+            outcomes: list[tuple[str, SourceOutcome]] = []
+            for route_index, route in enumerate(routes):
+                route_formats = _provider_formats(route, needs)
+                if not route_formats:
+                    outcome = _with_route_outcome(
+                        SourceOutcome(
+                            skipped=(
+                                f"{route.capability.label} has no accepted format for this task"
+                            )
+                        ),
+                        provider_key=self._vendor_key,
+                        author_key=_author_key(self._vendor_key, route),
+                        label=route.capability.label,
+                        attempted=True,
+                        status="unavailable",
+                    )
+                else:
+                    raw_outcome = self._supply_user_driven_route(
+                        record,
+                        session,
+                        route,
+                        manufacturer,
+                        mpn,
+                        url,
+                        route_formats,
+                    )
+                    outcome = _with_route_outcome(
+                        raw_outcome,
+                        provider_key=self._vendor_key,
+                        author_key=_author_key(self._vendor_key, route),
+                        label=route.capability.label,
+                    )
+                outcomes.append((route.capability.label, outcome))
+                if outcome.blocked:
+                    reason = (
+                        f"not attempted after {route.capability.label} blocked the provider session"
+                    )
+                    for later_route in routes[route_index + 1 :]:
+                        outcomes.append(
+                            (
+                                later_route.capability.label,
+                                _unattempted_route_outcome(
+                                    provider_key=self._vendor_key,
+                                    author_key=_author_key(
+                                        self._vendor_key,
+                                        later_route,
+                                    ),
+                                    label=later_route.capability.label,
+                                    reason=reason,
+                                ),
+                            )
+                        )
+                    break
+            return _combine_route_outcomes(outcomes)
 
-        route_factory = getattr(adapter, "capture_routes", None)
-        routes = tuple(route_factory()) if callable(route_factory) else (adapter,)
         outcomes: list[tuple[str, SourceOutcome]] = []
-        for route in routes:
+        for route_index, route in enumerate(routes):
             route_formats = _provider_formats(route, needs)
             if not route_formats:
-                continue
-            outcome = self._supply_automated_route(
-                record,
-                session,
-                route,
-                manufacturer,
-                mpn,
-                url,
-                route_formats,
-            )
+                outcome = _with_route_outcome(
+                    SourceOutcome(
+                        skipped=f"{route.capability.label} has no accepted format for this task"
+                    ),
+                    provider_key=self._vendor_key,
+                    author_key=_author_key(self._vendor_key, route),
+                    label=route.capability.label,
+                    attempted=True,
+                    status="unavailable",
+                )
+            else:
+                raw_outcome = self._supply_automated_route(
+                    record,
+                    session,
+                    route,
+                    manufacturer,
+                    mpn,
+                    url,
+                    route_formats,
+                )
+                outcome = _with_route_outcome(
+                    raw_outcome,
+                    provider_key=self._vendor_key,
+                    author_key=_author_key(self._vendor_key, route),
+                    label=route.capability.label,
+                )
             outcomes.append((route.capability.label, outcome))
             if outcome.blocked:
+                reason = (
+                    f"not attempted after {route.capability.label} blocked the provider session"
+                )
+                for later_route in routes[route_index + 1 :]:
+                    outcomes.append(
+                        (
+                            later_route.capability.label,
+                            _unattempted_route_outcome(
+                                provider_key=self._vendor_key,
+                                author_key=_author_key(self._vendor_key, later_route),
+                                label=later_route.capability.label,
+                                reason=reason,
+                            ),
+                        )
+                    )
                 break
         if not outcomes:
             return SourceOutcome(
@@ -920,13 +1286,19 @@ class GuidedCaptureSource:
             else:
                 page_context = nullcontext(session.page)
             with page_context as task_page:
-                if not self._sign_in_attempted:
-                    navigate = getattr(task_page, "goto", None)
-                    if not callable(navigate):
-                        return SourceOutcome(
-                            error=f"{adapter.capability.label} browser page cannot navigate.",
-                            blocked=True,
-                        )
+                navigate = getattr(task_page, "goto", None)
+                if not callable(navigate):
+                    return SourceOutcome(
+                        error=f"{adapter.capability.label} browser page cannot navigate.",
+                        blocked=True,
+                    )
+                # Each attributed route owns a fresh broker-bound tab. Sign-in is run-scoped, but
+                # tab initialization is not: the second and third tabs still start at about:blank.
+                # DigiKey's provider catalogue is client-rendered and a cold tab that receives
+                # only the later format navigation can race hydration, falsely reporting Ultra
+                # Librarian absent after SnapMagic initialized the first tab.
+                task_url = str(getattr(task_page, "url", "") or "")
+                if not self._sign_in_attempted or task_url in {"", "about:blank"}:
                     navigate(url, wait_until="domcontentloaded")
                 sign_in_outcome = self._prepare_sign_in(
                     session,
@@ -1011,6 +1383,7 @@ class GuidedCaptureSource:
         detail_url: str,
         surface_key: str,
         evidence_provider_key: str,
+        require_step_model: bool = True,
     ) -> SourceOutcome:
         """Preserve exact route downloads without projecting an incomplete CAD bundle."""
 
@@ -1021,6 +1394,14 @@ class GuidedCaptureSource:
                     "evidence storage is unavailable"
                 )
             )
+        binding_issue = _receipt_binding_issue(
+            landed,
+            record=record,
+            surface_key=surface_key,
+            evidence_provider_key=evidence_provider_key,
+        )
+        if binding_issue:
+            return SourceOutcome(error=binding_issue)
         attributed = {
             value
             for item in landed
@@ -1044,9 +1425,10 @@ class GuidedCaptureSource:
         identity_error = exact_observation_error(record, observed)
         if identity_error:
             return SourceOutcome(error=identity_error)
-        model_issue = self._supplementary_model_issue(landed)
-        if model_issue:
-            return SourceOutcome(error=model_issue)
+        if require_step_model:
+            model_issue = self._supplementary_model_issue(landed)
+            if model_issue:
+                return SourceOutcome(error=model_issue)
         try:
             self._evidence_store.record_supplementary_artifacts(
                 identity=exact_identity(record),
@@ -1065,6 +1447,38 @@ class GuidedCaptureSource:
                 f"retained {count} exact supplementary {noun}; no incomplete CAD bundle was "
                 "activated"
             ),
+        )
+
+    def _retain_incomplete_cad_set(
+        self,
+        record,
+        landed,
+        *,
+        detail_url: str,
+        evidence_provider_key: str,
+        reason: str,
+    ) -> SourceOutcome:
+        """Preserve raw bytes while refusing a mixed or one-tool active projection."""
+
+        retained = self._retain_supplementary(
+            record,
+            landed,
+            detail_url=detail_url,
+            surface_key=self._vendor_key,
+            evidence_provider_key=evidence_provider_key,
+            require_step_model=False,
+        )
+        if retained.retained:
+            return SourceOutcome(
+                retained=retained.retained,
+                skipped=f"{reason}; {retained.skipped}",
+            )
+        return SourceOutcome(
+            error=(
+                f"{reason}; {retained.error}"
+                if retained.error
+                else reason
+            )
         )
 
     def _supplementary_model_issue(self, landed) -> str:
@@ -1191,6 +1605,7 @@ class GuidedCaptureSource:
             cleared = wait_for_clearance(
                 page,
                 provider_label=adapter.capability.label,
+                author_route=_provider_hud_author_route(adapter),
                 manufacturer=manufacturer,
                 mpn=mpn,
                 message=issue,
@@ -1294,6 +1709,7 @@ class GuidedCaptureSource:
             cleared = wait_for_clearance(
                 page,
                 provider_label=adapter.capability.label,
+                author_route=_provider_hud_author_route(adapter),
                 manufacturer=manufacturer,
                 mpn=mpn,
                 message=failure or report.message,
@@ -1310,27 +1726,28 @@ class GuidedCaptureSource:
                 )
         raise AssertionError("unreachable security-handoff loop")
 
-    def _supply_user_driven(
+    def _supply_user_driven_route(
         self,
         record,
         session: _Session,
-        provider_label: str,
+        adapter,
         manufacturer: str,
         mpn: str,
         url: str,
         formats: list[str],
     ) -> SourceOutcome:
-        """Open the provider page without invoking any provider automation."""
+        """Open one author-bound provider page without invoking provider controls."""
 
-        adapter = get_adapter(self._vendor_key)
-        if adapter is None:
-            return SourceOutcome(error=f"no capture adapter for vendor {self._vendor_key!r}")
+        provider_label = adapter.capability.label
+        evidence_provider_key = _author_key(self._vendor_key, adapter)
         broker = DownloadBroker(
             DownloadTask(
                 task_id=record.id,
                 manufacturer_key=manufacturer,
                 mpn_canonical=mpn,
                 staging_root=self._download_root,
+                surface_key=self._vendor_key,
+                evidence_provider_key=evidence_provider_key,
             )
         )
         try:
@@ -1339,6 +1756,7 @@ class GuidedCaptureSource:
                 broker,
                 hud=ProviderHudSpec(
                     provider_label=provider_label,
+                    author_route=_provider_hud_author_route(adapter),
                     manufacturer=manufacturer,
                     mpn=mpn,
                     required_file_labels=_provider_hud_labels(adapter, formats),
@@ -1356,14 +1774,16 @@ class GuidedCaptureSource:
                 self._cancel_workflow()
             suffix = f" after receiving {received} file(s)" if received else ""
             return SourceOutcome(
-                skipped=f"{provider_label} capture was cancelled{suffix}; nothing was attached"
+                skipped=f"{provider_label} capture was cancelled{suffix}; nothing was attached",
+                blocked=True,
             )
         if result.status == "try_another":
             suffix = f" after receiving {received} file(s)" if received else ""
             return SourceOutcome(
                 skipped=(
                     f"{provider_label} was left for another provider{suffix}; nothing was attached"
-                )
+                ),
+                blocked=True,
             )
         if result.status == "timed_out":
             suffix = f" after receiving {received} file(s)" if received else ""
@@ -1373,11 +1793,20 @@ class GuidedCaptureSource:
         if not result.files:
             return SourceOutcome(error="the vendor download did not produce a file")
 
+        if getattr(adapter, "supplementary_only", False):
+            return self._retain_supplementary(
+                record,
+                list(result.files),
+                detail_url=result.final_url,
+                surface_key=self._vendor_key,
+                evidence_provider_key=evidence_provider_key,
+            )
         return self._attach(
             record,
             list(result.files),
             url,
             detail_url=result.final_url,
+            evidence_provider_key=evidence_provider_key,
         )
 
     def _attach(
@@ -1390,12 +1819,21 @@ class GuidedCaptureSource:
         evidence_provider_key: str = "",
     ) -> SourceOutcome:
         provider_key = evidence_provider_key or self._evidence_provider_key
+        if evidence_provider_key:
+            binding_issue = _receipt_binding_issue(
+                landed,
+                record=record,
+                surface_key=self._vendor_key,
+                evidence_provider_key=provider_key,
+            )
+            if binding_issue:
+                return SourceOutcome(error=binding_issue)
         attributed = {
             value
             for item in landed
             if (value := getattr(item, "evidence_provider_key", ""))
         }
-        if attributed and attributed != {provider_key}:
+        if evidence_provider_key and attributed != {provider_key}:
             return SourceOutcome(
                 error=(
                     "capture route attribution mismatch: "
@@ -1428,28 +1866,19 @@ class GuidedCaptureSource:
     ) -> SourceOutcome:
         """Turn the downloaded file(s) into attached assets, with provenance.
 
-        Reuses the ingest pipeline the rest of the app already attaches through, so a guided
-        capture and a hand-dropped zip land identically - there is no second attach path to drift.
+        Reuses the ingest pipeline's atomic materializer, so network capture has one validation and
+        attachment path rather than separate per-tool seams that can drift.
 
-        BOTH TOOLS, through their existing seams. KiCad assets go through `IngestPipeline`;
-        Altium libraries go through `library_ops.attach_altium_assets`. When strict cross-EDA
-        evidence selects both, the pipeline borrows one shared Transaction so every native file
-        and both active pointers commit or roll back together.
+        BOTH TOOLS OR NEITHER.  KiCad, STEP, and native Altium must be present in this exact
+        provider download set and pass native cross-readback.  Only then does the pipeline borrow
+        one shared transaction so every file and both active pointers commit or roll back
+        together.  One-tool or independently sourced output is retained as non-projectable
+        evidence and cannot replace an active library projection.
         """
         adapter = get_adapter(self._vendor_key)
         if adapter is None:
             return SourceOutcome(error=f"no capture adapter for vendor {self._vendor_key!r}")
-        offered: list[Requirement] = []
-        failures: list[str] = []
-        identity_error = ""
-        evidence_digest = ""
-        evidence_operation = "cad:kicad"
-        cross_eda_verified = False
-        kicad_active_variant = None
-        altium_active_variant = None
-        compatible_kicad_variant = None
-        kicad_origin = None
-        cad_pair_handled = False
+        conversion_failure = ""
         converted_altium = False
         captured_altium = _altium_libraries(landed)
         if captured_altium is not None:
@@ -1474,12 +1903,17 @@ class GuidedCaptureSource:
                         cleanup_callbacks.append(cleanup)
                     altium_sources = list(converted.libraries)
             except Exception as exc:  # noqa: BLE001 - keep usable KiCad and report this gap
-                failures.append(f"could not convert the provider's Altium package: {exc}")
+                conversion_failure = f"could not convert the provider's Altium package: {exc}"
         pipeline = self._make_pipeline()
         try:
             load_current = getattr(getattr(pipeline, "ops", None), "load_record", None)
             if callable(load_current):
                 record = load_current(record.id)
+            preserve_active_pair = (
+                (self._preserve_active_pair or self._collect_variants)
+                and self._evidence_store is not None
+                and active_pair_is_verified(self._evidence_store, record)
+            )
             candidates = []
             inspect_errors: list[Exception] = []
             # Exclusive-format providers deliver KiCad and Altium as sibling files. Inspecting
@@ -1500,8 +1934,8 @@ class GuidedCaptureSource:
                 # DigiKey's UL script ZIP carries a root STEP named for the package, not the MPN.
                 # The ingest fingerprint correctly exposes it as a model-only candidate, but it
                 # is supplemental package data rather than a second KiCad definition. Keep any
-                # symbol/footprint-bearing candidate; drop model-only fragments so the verified
-                # native Altium pair composes with active KiCad rather than competing with it.
+                # symbol/footprint-bearing candidate; drop model-only fragments so one complete
+                # same-download dual-EDA set is evaluated rather than competing fragments.
                 candidates = [
                     candidate
                     for candidate in candidates
@@ -1510,7 +1944,6 @@ class GuidedCaptureSource:
             if not candidates and not altium_sources and inspect_errors:
                 return SourceOutcome(error=f"could not read the download: {inspect_errors[0]}")
 
-            kicad_offered: list[Requirement] = []
             selection = select_exact_candidate(
                 record,
                 candidates,
@@ -1518,292 +1951,173 @@ class GuidedCaptureSource:
                 detail_url=detail_url,
             )
             candidate = selection.candidate
-            identity_error = selection.error
-            if candidate is not None:
-                candidate.entry_name = record.mpn or candidate.entry_name or candidate.mpn
-                if candidate.symbol_lib_path is not None:
-                    kicad_offered.append(Requirement.KICAD_SYMBOL)
-                if candidate.footprint_variants:
-                    kicad_offered.append(Requirement.KICAD_FOOTPRINT)
-                if candidate.model_path is not None:
-                    kicad_offered.append(Requirement.KICAD_MODEL)
-                if self._evidence_store is not None:
-                    try:
-                        evidence_digest, cross_eda_verified = record_browser_cad_evidence(
-                            store=self._evidence_store,
-                            record=record,
-                            candidate=candidate,
-                            provider_key=evidence_provider_key,
-                            detail_url=detail_url,
-                            altium_sources=tuple(altium_sources),
-                            cross_eda_verifier=self._cross_eda_verifier,
-                        )
-                    except CrossEdaVerificationError as exc:
-                        # A bad/unsupported Altium binary must not poison an independently valid
-                        # KiCad set. Record only the proved KiCad artifacts, retain Altium as
-                        # unsatisfied, and surface the exact cross-EDA reason below.
-                        failures.append(f"cross-EDA verification failed: {exc}")
-                        evidence_digest, cross_eda_verified = record_browser_cad_evidence(
-                            store=self._evidence_store,
-                            record=record,
-                            candidate=candidate,
-                            provider_key=evidence_provider_key,
-                            detail_url=detail_url,
-                        )
-                    except Exception as exc:  # noqa: BLE001 - fail closed before any library write
-                        return SourceOutcome(error=f"CAD evidence verification failed: {exc}")
-                    try:
-                        identity = exact_identity(record)
-                        kicad_active_variant = resolve_cad_variant(
-                            self._evidence_store,
-                            identity=identity,
-                            tool="kicad",
-                            manifest_digest=evidence_digest,
-                        ).pointer
-                        if cross_eda_verified:
-                            altium_active_variant = resolve_cad_variant(
-                                self._evidence_store,
-                                identity=identity,
-                                tool="altium",
-                                manifest_digest=evidence_digest,
-                            ).pointer
-                    except Exception as exc:  # noqa: BLE001 - never attach an unbound projection
-                        return SourceOutcome(
-                            error=f"CAD evidence pointer resolution failed: {exc}"
-                        )
-            elif self._evidence_store is not None and not identity_error:
-                if not altium_sources:
-                    return SourceOutcome(
-                        error=(
-                            "CAD evidence verification failed: the provider download has no exact "
-                            "KiCad symbol, footprint, STEP, or native Altium set"
-                        )
+            if selection.error:
+                return SourceOutcome(error=selection.error)
+            if candidate is None:
+                return self._retain_incomplete_cad_set(
+                    record,
+                    landed,
+                    detail_url=detail_url,
+                    evidence_provider_key=evidence_provider_key,
+                    reason=(
+                        "provider download contains no exact KiCad symbol, footprint, and STEP "
+                        "beside its native Altium files"
+                    ),
+                )
+
+            candidate.entry_name = record.mpn or candidate.entry_name or candidate.mpn
+            missing_kicad: list[str] = []
+            if candidate.symbol_lib_path is None:
+                missing_kicad.append("KiCad symbol")
+            if not candidate.footprint_variants:
+                missing_kicad.append("KiCad footprint")
+            if candidate.model_path is None:
+                missing_kicad.append("STEP model")
+            if missing_kicad or not altium_sources:
+                absent = [
+                    *missing_kicad,
+                    *(["native Altium symbol/footprint"] if not altium_sources else []),
+                ]
+                return self._retain_incomplete_cad_set(
+                    record,
+                    landed,
+                    detail_url=detail_url,
+                    evidence_provider_key=evidence_provider_key,
+                    reason=(
+                        "provider download is not one complete dual-EDA source set; missing "
+                        + ", ".join(absent)
+                        + (f"; {conversion_failure}" if conversion_failure else "")
+                    ),
+                )
+            if self._evidence_store is None:
+                return SourceOutcome(
+                    error=(
+                        "a complete provider CAD set landed, but immutable evidence storage is "
+                        "unavailable; nothing was activated"
                     )
-                try:
-                    composed = record_composed_browser_altium_evidence(
-                        store=self._evidence_store,
-                        record=record,
-                        profile=pipeline.profile,
-                        provider_key=evidence_provider_key,
-                        detail_url=detail_url,
-                        altium_sources=tuple(altium_sources),
-                        cross_eda_verifier=self._cross_eda_verifier,
+                )
+            if self._cross_eda_verifier is None:
+                return self._retain_incomplete_cad_set(
+                    record,
+                    landed,
+                    detail_url=detail_url,
+                    evidence_provider_key=evidence_provider_key,
+                    reason=(
+                        "the complete provider CAD set cannot be activated without native "
+                        "cross-EDA verification"
+                    ),
+                )
+            try:
+                evidence_digest, cross_eda_verified = record_browser_cad_evidence(
+                    store=self._evidence_store,
+                    record=record,
+                    candidate=candidate,
+                    provider_key=evidence_provider_key,
+                    detail_url=detail_url,
+                    altium_sources=tuple(altium_sources),
+                    cross_eda_verifier=self._cross_eda_verifier,
+                )
+            except Exception as exc:  # noqa: BLE001 - no partial projection on any failure
+                return self._retain_incomplete_cad_set(
+                    record,
+                    landed,
+                    detail_url=detail_url,
+                    evidence_provider_key=evidence_provider_key,
+                    reason=f"same-set cross-EDA verification failed: {exc}",
+                )
+            if not cross_eda_verified:
+                return self._retain_incomplete_cad_set(
+                    record,
+                    landed,
+                    detail_url=detail_url,
+                    evidence_provider_key=evidence_provider_key,
+                    reason="same-set cross-EDA verification did not prove the provider bundle",
+                )
+            try:
+                identity = exact_identity(record)
+                kicad_resolved = resolve_cad_variant(
+                    self._evidence_store,
+                    identity=identity,
+                    tool="kicad",
+                    manifest_digest=evidence_digest,
+                )
+                altium_resolved = resolve_cad_variant(
+                    self._evidence_store,
+                    identity=identity,
+                    tool="altium",
+                    manifest_digest=evidence_digest,
+                )
+                if not same_cad_evidence_set(
+                    kicad_resolved.descriptor,
+                    altium_resolved.descriptor,
+                ):
+                    raise ValueError(
+                        "resolved KiCad and Altium projections do not share one evidence set"
                     )
-                    altium_owner = OwnedMaterialization.from_bytes(
-                        _resolved_variant_files(composed.altium_variant),
-                        prefix="sr-verified-altium-",
-                    )
-                    cleanup_callbacks.append(altium_owner.cleanup)
-                except Exception as exc:  # noqa: BLE001 - fail closed before any library write
-                    return SourceOutcome(error=f"CAD evidence verification failed: {exc}")
-                altium_sources = list(altium_owner.paths)
-                cross_eda_verified = True
-                evidence_operation = "cad:altium"
-                try:
-                    altium_active_variant = composed.altium_variant.pointer
-                    evidence_digest = composed.altium_variant.descriptor.manifest_digest
-                    if len(altium_active_variant.source_manifests) != 1:
-                        raise ValueError(
-                            "composed Altium evidence must name one exact KiCad source manifest"
-                        )
-                    compatible_kicad_variant = composed.kicad_variant.pointer
-                    if (
-                        compatible_kicad_variant.manifest_digest
-                        != altium_active_variant.source_manifests[0]
-                    ):
-                        raise ValueError(
-                            "composed Altium evidence resolved a different KiCad source manifest"
-                        )
-                    if not composed.uses_installed_kicad:
-                        kicad_owner = OwnedMaterialization.from_bytes(
-                            _resolved_variant_files(composed.kicad_variant),
-                            prefix="sr-verified-kicad-",
-                        )
-                        cleanup_callbacks.append(kicad_owner.cleanup)
-                        candidate = _resolved_kicad_candidate(
-                            record,
-                            composed.kicad_variant,
-                            kicad_owner,
-                        )
-                        kicad_active_variant = compatible_kicad_variant
-                        kicad_offered = [
-                            Requirement.KICAD_SYMBOL,
-                            Requirement.KICAD_FOOTPRINT,
-                            Requirement.KICAD_MODEL,
-                        ]
-                        kicad_origin = AssetOrigin(
-                            vendor=composed.kicad_variant.descriptor.provider,
-                            captured_at=self._now_iso() if self._now_iso else "",
-                            extra={
-                                "evidence_adapter_version": (
-                                    composed.kicad_variant.descriptor.adapter_version
-                                ),
-                                "evidence_manifest_digest": (
-                                    composed.kicad_variant.descriptor.manifest_digest
-                                ),
-                                "evidence_operation": (
-                                    composed.kicad_variant.descriptor.operation
-                                ),
-                            },
-                        )
-                except Exception as exc:  # noqa: BLE001 - no guessed source binding
-                    return SourceOutcome(
-                        error=f"CAD evidence pointer resolution failed: {exc}"
-                    )
+            except Exception as exc:  # noqa: BLE001 - never attach an unbound projection
+                return SourceOutcome(error=f"CAD evidence pointer resolution failed: {exc}")
+
+            if preserve_active_pair:
+                return SourceOutcome(
+                    retained=5,
+                    skipped=(
+                        f"retained a complete {evidence_provider_key} dual-EDA variant; "
+                        "the active KiCad/Altium pair is unchanged"
+                    ),
+                )
+
             origin = AssetOrigin(
                 vendor=evidence_provider_key,
                 url=url,
                 captured_at=self._now_iso() if self._now_iso else "",
-                extra=(
-                    {}
-                    if not evidence_digest
-                    else {
-                        "evidence_adapter_version": BROWSER_CAPTURE_ADAPTER_VERSION,
-                        "evidence_manifest_digest": evidence_digest,
-                        "evidence_operation": evidence_operation,
-                    }
-                ),
+                extra={
+                    "evidence_adapter_version": BROWSER_CAPTURE_ADAPTER_VERSION,
+                    "evidence_manifest_digest": evidence_digest,
+                    "evidence_operation": kicad_resolved.descriptor.operation,
+                    "evidence_set": evidence_digest,
+                },
             )
-            if kicad_offered:
-                try:
-                    if (
-                        cross_eda_verified
-                        and kicad_active_variant is not None
-                        and altium_active_variant is not None
-                        and altium_sources
-                    ):
-                        cad_pair_handled = True
-                        updated = self._run_write(
-                            lambda: pipeline.attach_coherent_cad_assets(
-                                record.id,
-                                candidate,
-                                *altium_sources,
-                                kicad_origin=kicad_origin or origin,
-                                altium_origin=origin,
-                                now_iso=self._now_iso() if self._now_iso else "",
-                                kicad_active_variant=kicad_active_variant,
-                                altium_active_variant=altium_active_variant,
-                            )
-                        )
-                        offered.extend(kicad_offered)
-                        altium_bundle = updated.assets_for("altium")
-                        if asset_present(altium_bundle.symbol):
-                            offered.append(Requirement.ALTIUM_SYMBOL)
-                        if asset_present(altium_bundle.footprint):
-                            offered.append(Requirement.ALTIUM_FOOTPRINT)
-                    else:
-                        attach_kwargs = {"origin": kicad_origin or origin}
-                        if kicad_active_variant is not None:
-                            attach_kwargs["active_variant"] = kicad_active_variant
-                        self._run_write(
-                            lambda: pipeline.attach_assets(
-                                record.id,
-                                candidate,
-                                **attach_kwargs,
-                            )
-                        )
-                        offered.extend(kicad_offered)
-                except Exception as exc:  # noqa: BLE001 - the whole pair rolls back as one row
-                    failures.append(str(exc))
-        finally:
-            pipeline.cleanup()
-
-        # A mismatched or ambiguous KiCad candidate poisons the whole browser download. Do not
-        # attach native Altium files beside it and then hide the identity failure behind a partial
-        # success: both came from the same untrusted selection.
-        if identity_error:
-            return SourceOutcome(error=identity_error)
-
-        if cad_pair_handled:
-            pass
-        elif altium_sources and self._evidence_store is not None and not cross_eda_verified:
-            failures.append(
-                "native Altium files were left unattached: "
-                "cross-EDA terminal, pad, and package equivalence is not verified"
-            )
-        else:
-            if kicad_offered and not all(item in offered for item in kicad_offered):
-                failures.append(
-                    "native Altium files were left unattached because the compatible "
-                    "KiCad bundle did not materialize"
-                )
-            else:
-                offered.extend(
-                    self._attach_altium_assets(
-                        record,
-                        landed,
-                        failures,
-                        origin,
-                        sources=altium_sources,
-                        active_variant=altium_active_variant,
-                        compatible_kicad_variant=compatible_kicad_variant,
+            try:
+                updated = self._run_write(
+                    lambda: pipeline.attach_coherent_cad_assets(
+                        record.id,
+                        candidate,
+                        *altium_sources,
+                        kicad_origin=origin,
+                        altium_origin=origin,
+                        now_iso=self._now_iso() if self._now_iso else "",
+                        kicad_active_variant=kicad_resolved.pointer,
+                        altium_active_variant=altium_resolved.pointer,
                     )
                 )
+            except Exception as exc:  # noqa: BLE001 - the whole set rolls back as one row
+                return SourceOutcome(error=f"could not activate the coherent CAD set: {exc}")
 
-        if offered:
+            kicad_bundle = updated.assets_for("kicad")
+            altium_bundle = updated.assets_for("altium")
+            if not all(
+                (
+                    asset_present(kicad_bundle.symbol),
+                    asset_present(kicad_bundle.footprint),
+                    asset_present(kicad_bundle.model),
+                    asset_present(altium_bundle.symbol),
+                    asset_present(altium_bundle.footprint),
+                )
+            ):
+                return SourceOutcome(
+                    error=(
+                        "the atomic CAD transaction returned without all five same-set "
+                        "projections present"
+                    )
+                )
             return SourceOutcome(
-                satisfied=tuple(offered),
-                error="; ".join(failures),
+                satisfied=(
+                    Requirement.KICAD_SYMBOL,
+                    Requirement.KICAD_FOOTPRINT,
+                    Requirement.KICAD_MODEL,
+                    Requirement.ALTIUM_SYMBOL,
+                    Requirement.ALTIUM_FOOTPRINT,
+                )
             )
-        if failures:
-            return SourceOutcome(error="; ".join(failures))
-        return SourceOutcome(
-            error=(
-                f"{adapter.capability.label} delivered a file with nothing this part can use in it"
-            )
-        )
-
-    def _attach_altium_assets(
-        self,
-        record,
-        landed,
-        failures: list[str],
-        origin=None,
-        *,
-        sources: list[Path] | None = None,
-        active_variant=None,
-        compatible_kicad_variant=None,
-    ) -> list[Requirement]:
-        """Attach any Altium libraries in the download, and report what the RECORD then holds.
-
-        Reports from the record rather than from what was requested, because
-        `attach_altium_assets` decides per side which of symbol/footprint it could actually bind -
-        a vendor may ship only one. Reading it back is the difference between "we sent the files"
-        and "the part has them", and only the second is a success worth reporting.
-
-        Silent no-op when the runner supplied no attach callable or the download carries no Altium
-        library, so a KiCad-only vendor is completely unaffected.
-        """
-        if self._attach_altium is None:
-            return []
-        attach_altium = self._attach_altium
-        owned_sources = _altium_libraries(landed) if sources is None else None
-        if sources is None:
-            sources = [] if owned_sources is None else list(owned_sources.paths)
-        if not sources:
-            return []
-        try:
-            # The SAME origin the KiCad half files. Without it a guided capture recorded where its
-            # symbol came from and left the Altium library beside it unattributed, which is the
-            # provenance story holding for one tool and quietly not the other.
-            kwargs = {"origin": origin}
-            if active_variant is not None:
-                kwargs["active_variant"] = active_variant
-            if compatible_kicad_variant is not None:
-                kwargs["compatible_kicad_variant"] = compatible_kicad_variant
-            updated = self._run_write(lambda: attach_altium(record.id, *sources, **kwargs))
-        except Exception as exc:  # noqa: BLE001 - atomic: a failure leaves the part untouched
-            failures.append(f"could not attach the Altium libraries: {exc}")
-            return []
         finally:
-            if owned_sources is not None:
-                owned_sources.cleanup()
-        if updated is None:
-            return []
-        bundle = updated.assets_for("altium") or {}
-        got: list[Requirement] = []
-        if asset_present(bundle.get("symbol")):
-            got.append(Requirement.ALTIUM_SYMBOL)
-        if asset_present(bundle.get("footprint")):
-            got.append(Requirement.ALTIUM_FOOTPRINT)
-        return got
+            pipeline.cleanup()

@@ -6,6 +6,7 @@ MPN to the canonical EnrichmentResult. Extracted Qt-free from the owner's legacy
 LibraryManager.py (_parse_digikey_part / _digikey_token / _digikey_request); nothing is imported
 from that repo. Never raises: any auth/network/parse failure yields an empty result so the
 registry falls through cleanly."""
+
 from __future__ import annotations
 
 import json
@@ -33,10 +34,14 @@ def _fetch_token(client_id: str, client_secret: str, timeout: float) -> str | No
     search gives - rather than degrading to a generic, breaker-invisible failure."""
     if not (client_id and client_secret):
         return None
-    body = urllib.parse.urlencode({"client_id": client_id, "client_secret": client_secret,
-                                   "grant_type": "client_credentials"}).encode()
-    req = urllib.request.Request("https://api.digikey.com/v1/oauth2/token", data=body,
-                                 headers={"Content-Type": "application/x-www-form-urlencoded"})
+    body = urllib.parse.urlencode(
+        {"client_id": client_id, "client_secret": client_secret, "grant_type": "client_credentials"}
+    ).encode()
+    req = urllib.request.Request(
+        "https://api.digikey.com/v1/oauth2/token",
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             parsed = json.loads(r.read().decode())
@@ -51,16 +56,18 @@ def _default_requester(client_id: str, client_secret: str, timeout: float = 8):
     """A requester(mpn) -> v4 body dict. One OAuth2 bearer token is cached across every call on
     this closure (DigiKey tokens live ~30 min; a 25-min TTL leaves margin), so a bulk rescan does
     not re-auth per part. Raises EnrichError on any auth/transport failure."""
-    tok = {"token": None, "exp": 0.0}
+    token: str | None = None
+    expires_at = 0.0
     TTL = 1500.0
 
     def _cached_token() -> str | None:
+        nonlocal expires_at, token
         now = _time.monotonic()
-        if tok["token"] and now < tok["exp"]:
-            return tok["token"]
+        if token and now < expires_at:
+            return token
         t = _fetch_token(client_id, client_secret, timeout)
         if t:  # cache successes only, so a refused token is retried next call
-            tok["token"], tok["exp"] = t, now + TTL
+            token, expires_at = t, now + TTL
         return t
 
     def request(mpn: str) -> dict:
@@ -70,9 +77,12 @@ def _default_requester(client_id: str, client_secret: str, timeout: float = 8):
         req = urllib.request.Request(
             "https://api.digikey.com/products/v4/search/keyword",
             data=json.dumps({"Keywords": str(mpn).strip(), "Limit": 10, "Offset": 0}).encode(),
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {token}",
-                     "X-DIGIKEY-Client-Id": client_id})
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+                "X-DIGIKEY-Client-Id": client_id,
+            },
+        )
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.loads(r.read().decode())
@@ -86,9 +96,11 @@ def _default_requester(client_id: str, client_secret: str, timeout: float = 8):
 
 
 _CLASSIFICATION_LABELS = {
-    "RohsStatus": "RoHS", "ReachStatus": "REACH",
+    "RohsStatus": "RoHS",
+    "ReachStatus": "REACH",
     "MoistureSensitivityLevel": "Moisture Sensitivity Level",
-    "ExportControlClassNumber": "ECCN", "HtsusCode": "HTS Code (US)",
+    "ExportControlClassNumber": "ECCN",
+    "HtsusCode": "HTS Code (US)",
 }
 
 
@@ -233,9 +245,12 @@ def parse_digikey_payload(body: dict | None, mpn: str) -> EnrichmentResult:
         return EnrichmentResult()
     target = normalize_mpn(mpn)
     exact = next(
-        (p for p in products
-         if isinstance(p, dict)
-         and normalize_mpn(_obj_str(p.get("ManufacturerProductNumber")) or "") == target),
+        (
+            p
+            for p in products
+            if isinstance(p, dict)
+            and normalize_mpn(_obj_str(p.get("ManufacturerProductNumber")) or "") == target
+        ),
         None,
     )
     chosen = exact if exact is not None else products[0]

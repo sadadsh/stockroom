@@ -121,6 +121,9 @@ def build_candidates(
             )
         ]
 
+    if cli is None:
+        raise IngestError("KiCad CLI is required to normalize symbol and footprint assets")
+
     sym_workdir = workdir / "symbol"
     normalized_sym = normalize_symbol(cli, detected.symbol_path, detected.dcm_path, sym_workdir)
     sym_lib = SymbolLib.load(normalized_sym)

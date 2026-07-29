@@ -10,6 +10,18 @@ function Trigger() {
   );
 }
 
+function ActionTrigger({ action }: { action: () => void }) {
+  const { toast } = useToast();
+  return (
+    <button
+      type="button"
+      onClick={() => toast("Part deleted", "ok", { label: "Undo Delete", onClick: action })}
+    >
+      delete
+    </button>
+  );
+}
+
 describe("toasts", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
@@ -34,8 +46,23 @@ describe("toasts", () => {
       </ToastProvider>,
     );
     fireEvent.click(screen.getByText("fire"));
-    fireEvent.click(screen.getByText("Saved"));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss Saved" }));
     expect(screen.queryByText("Saved")).not.toBeInTheDocument();
+  });
+
+  it("runs an explicit recovery action once and dismisses the toast", () => {
+    const action = vi.fn();
+    render(
+      <ToastProvider>
+        <ActionTrigger action={action} />
+      </ToastProvider>,
+    );
+    fireEvent.click(screen.getByText("delete"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo Delete" }));
+
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Part deleted")).not.toBeInTheDocument();
   });
 
   it("throws when used outside a provider", () => {

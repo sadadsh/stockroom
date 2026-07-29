@@ -1,26 +1,25 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Rail } from "./Rail";
 import { DevModeProvider } from "../lib/devMode";
 import { DEV_ID_BY_ID } from "../lib/devIds";
 
-// A controllable router stand-in so the rail can be tested in isolation. The update-availability,
-// apply mutation, and its pending flag are hoisted too, so a test can drive the Update control
-// through both its available/click and busy states.
-const { state, navigate, applyMutate, updateState, applyState } = vi.hoisted(() => ({
+// A controllable router stand-in so the rail can be tested in isolation.
+const { state, navigate, updateState } = vi.hoisted(() => ({
   state: { route: "components" },
   navigate: vi.fn(),
-  applyMutate: vi.fn(),
   updateState: {
     update_available: false,
     state: "up_to_date",
+    channel: "main",
+    current_release_id: "",
+    target_release_id: "",
     current_revision: "123456789abc",
     target_revision: "123456789abc",
     isPending: false,
     isFetching: false,
     isError: false,
   },
-  applyState: { isPending: false },
 }));
 vi.mock("../lib/router", () => ({
   useRouter: () => ({ route: state.route, navigate }),
@@ -37,6 +36,9 @@ vi.mock("../api/queries", () => ({
     data: {
       update_available: updateState.update_available,
       state: updateState.state,
+      channel: updateState.channel,
+      current_release_id: updateState.current_release_id,
+      target_release_id: updateState.target_release_id,
       current_revision: updateState.current_revision,
       target_revision: updateState.target_revision,
     },
@@ -44,10 +46,6 @@ vi.mock("../api/queries", () => ({
     isFetching: updateState.isFetching,
     isError: updateState.isError,
   }),
-  useApplyUpdate: () => ({ mutate: applyMutate, isPending: applyState.isPending }),
-}));
-vi.mock("../lib/toast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
 }));
 
 // The rail now starts collapsed on a window too narrow for the detail sheet's three-column
@@ -64,13 +62,14 @@ describe("Rail", () => {
     state.route = "components";
     updateState.update_available = false;
     updateState.state = "up_to_date";
+    updateState.channel = "main";
+    updateState.current_release_id = "";
+    updateState.target_release_id = "";
     updateState.current_revision = "123456789abc";
     updateState.target_revision = "123456789abc";
     updateState.isPending = false;
     updateState.isFetching = false;
     updateState.isError = false;
-    applyState.isPending = false;
-    applyMutate.mockReset();
   });
 
   it("shows exactly the top-level destinations", () => {
@@ -92,26 +91,12 @@ describe("Rail", () => {
     expect(navigate).toHaveBeenCalledWith("components");
   });
 
-  it("applies the update when the rail's Update button is clicked", async () => {
+  it("reports a waiting automatic update without leaving a manual action", () => {
     updateState.update_available = true;
+    updateState.state = "update_available";
     render(<Rail />);
-    const button = screen.getByRole("button", { name: /Update/ });
-    expect(button).toBeEnabled();
-    await userEvent.click(button);
-    // Same flow as Settings' Apply Update: the useApplyUpdate mutation with result-shaped
-    // toasts (asserted here at the mutation seam; the toast branching lives in onApply).
-    expect(applyMutate).toHaveBeenCalledTimes(1);
-  });
-
-  it("shows a busy label and disables the Update button while the apply is in flight", () => {
-    updateState.update_available = true;
-    applyState.isPending = true;
-    render(<Rail />);
-    const button = screen.getByRole("button", { name: /Updating/ });
-    expect(button).toBeDisabled();
-    // clicking a disabled busy button must not fire a second apply
-    fireEvent.click(button);
-    expect(applyMutate).not.toHaveBeenCalled();
+    expect(screen.getByText("Update Ready")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Update/ })).toBeNull();
   });
 
   it("calls the installed version Current only with an exact upstream match", () => {
@@ -158,6 +143,11 @@ describe("Rail", () => {
 describe("Rail AboutModal - copy + brand icon adoption", () => {
   beforeEach(() => {
     state.route = "components";
+    updateState.channel = "main";
+    updateState.current_release_id = "";
+    updateState.target_release_id = "";
+    updateState.current_revision = "123456789abc";
+    updateState.target_revision = "123456789abc";
   });
 
   function toggleDevMode() {
@@ -230,6 +220,21 @@ describe("Rail AboutModal - copy + brand icon adoption", () => {
     expect(screen.getByRole("dialog").textContent).not.toContain("—");
   });
 
+  it("shows the installed production release instead of the source build version", async () => {
+    updateState.channel = "production";
+    updateState.current_revision = "release-1.2.3.4";
+    updateState.target_revision = "release-1.2.3.4";
+
+    render(<Rail />);
+    await userEvent.click(screen.getByRole("button", { name: /About/ }));
+
+    expect(screen.getByText("1.2.3.4")).toBeInTheDocument();
+    expect(screen.queryByText("release-1.2.3.4")).toBeNull();
+    if (__APP_VERSION__ !== "1.2.3.4") {
+      expect(screen.queryByText(__APP_VERSION__)).toBeNull();
+    }
+  });
+
 });
 
 describe("the rail fits itself to the window when you have never chosen", () => {
@@ -285,9 +290,7 @@ describe("the rail's three reported defects", () => {
   const setWidth = (w: number) =>
     Object.defineProperty(window, "innerWidth", { value: w, configurable: true, writable: true });
 
-  it("does not drop a shadow when the peek opens", () => {
-    // Owner: "i dont like its shadow on hover". The peek is already an opaque panel with a border,
-    // so the shadow only added weight to a hover state.
+  it("does not add visual weight to the compact rail", () => {
     setWidth(1000);
     window.__STOCKROOM_UI__ = {};
     render(<DevModeProvider><Rail /></DevModeProvider>);
@@ -295,30 +298,30 @@ describe("the rail's three reported defects", () => {
     expect(rail.className).not.toContain("shadow-pop");
   });
 
-  it("does not keep the overlay open after pointer navigation", () => {
-    // MEASURED in the real WebView2 host at 1384px: clicking Components, STM Viewer, or Settings
-    // left that button focused. `focus-within:w-[190px]` therefore kept the collapsed rail's
-    // 190px overlay open over a 52px layout slot and hid the first 138px of the destination until
-    // the user clicked somewhere else. Keyboard focus must still reveal the labels, but only when
-    // the browser reports focus-visible (keyboard modality), not for every focused descendant.
+  it("never grows the compact rail over destination controls", () => {
+    // Live browser reproduction: after clicking STM Viewer, moving to the Bench tab kept the
+    // hover-expanded rail under the pointer and sent the click to Components instead. The compact
+    // rail now has one width; only the explicit Expand Rail control changes workspace geometry.
     setWidth(1000);
     window.__STOCKROOM_UI__ = {};
     render(<DevModeProvider><Rail /></DevModeProvider>);
     const rail = document.querySelector('[data-dev-id="rail.root"]')!;
     expect(rail.className).not.toContain("focus-within:w-[190px]");
-    expect(rail.className).toContain("has-[:focus-visible]:w-[190px]");
+    expect(rail.className).not.toContain("has-[:focus-visible]:w-[190px]");
+    expect(rail.className).not.toContain("hover:w-[190px]");
     const components = document.querySelector('[data-dev-id="rail.nav-components"]')!;
     const label = components.querySelector("span:not([aria-hidden])")!;
     expect(label.className).not.toContain("group-focus-within/rail");
-    expect(label.className).toContain("group-has-[:focus-visible]/rail");
+    expect(label.className).not.toContain("group-has-[:focus-visible]/rail");
+    expect(label.className).toContain("w-0");
   });
 
-  it("keeps the glyph column still while the peek opens", () => {
+  it("keeps the glyph column still between compact and pinned states", () => {
     // Owner: "hovering it shifts the icons to the right spot but not hovering on it misaligns
     // everything". MEASURED before: glyph centre 20.5 collapsed, 30.5 hovered - a 10px jump, and
     // neither was the rail's centre. AFTER: 25.5 in both states (jsdom has no layout, so what is
     // asserted here is the STRUCTURE that produces it).
-    //   * every row owns a fixed icon grid track, so the peek cannot re-justify it;
+    //   * every row owns a fixed icon grid track, so pinning cannot re-justify it;
     //   * the panel's padding does not change on hover, so the row's x cannot move;
     //   * the glyph sits in a fixed-width box, so the zero-width label's flex GAP - which is what
     //     dragged it 5px off centre - lands to its right instead of being centred with it.

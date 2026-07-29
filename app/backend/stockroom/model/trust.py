@@ -38,6 +38,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TypeGuard
 
 
 class Verdict(str, Enum):
@@ -113,7 +114,7 @@ class AssetCheck:
         )
 
 
-def _is_number(v) -> bool:
+def _is_number(v: object) -> TypeGuard[int | float]:
     # bool is a subclass of int; treating True as 1 would make a boolean check compare
     # numerically with a tolerance, which is nonsense.
     return isinstance(v, (int, float)) and not isinstance(v, bool)
@@ -131,8 +132,19 @@ def check_verdict(check: AssetCheck) -> Verdict:
     if measured is None or expected is None:
         return Verdict.UNKNOWN
     if _is_number(measured) and _is_number(expected):
-        tol = 0.0 if check.tolerance is None else abs(float(check.tolerance))
-        ok = math.isclose(float(measured), float(expected), rel_tol=0.0, abs_tol=tol)
+        measured_number = float(measured)
+        expected_number = float(expected)
+        if not math.isfinite(measured_number) or not math.isfinite(expected_number):
+            return Verdict.UNKNOWN
+        if check.tolerance is None:
+            tol = 0.0
+        elif _is_number(check.tolerance) and math.isfinite(float(check.tolerance)):
+            tol = abs(float(check.tolerance))
+        else:
+            # JSON is an external evidence boundary. A malformed tolerance is not proof of a
+            # mismatch, and it must not crash every list-row readiness calculation either.
+            return Verdict.UNKNOWN
+        ok = math.isclose(measured_number, expected_number, rel_tol=0.0, abs_tol=tol)
         return Verdict.PASS if ok else Verdict.FAIL
     return Verdict.PASS if measured == expected else Verdict.FAIL
 

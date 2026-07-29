@@ -126,7 +126,7 @@ def test_traceparts_retention_rejects_invalid_step_and_wrong_route(tmp_path):
 
     assert invalid_outcome.retained == 0
     assert "no structurally valid STEP" in invalid_outcome.error
-    assert "route attribution mismatch" in wrong_route.error
+    assert "binding mismatch for evidence provider key" in wrong_route.error
 
 
 def test_route_outcomes_report_retention_separately_from_satisfaction():

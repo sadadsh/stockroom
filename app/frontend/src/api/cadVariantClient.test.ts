@@ -8,6 +8,7 @@ import {
 const DOCUMENT: CadVariantDocument = {
   partId: "part/1",
   inventories: [],
+  pairs: [],
   supplementary: [],
 };
 
@@ -38,7 +39,7 @@ describe("cadVariantApi", () => {
     );
   });
 
-  it("posts the exact compare-and-switch body without a download or delete request", async () => {
+  it("posts both expected pointers when atomically switching a validated pair", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(DOCUMENT), {
         status: 200,
@@ -47,14 +48,15 @@ describe("cadVariantApi", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await cadVariantApi.activate("part/1", {
-      tool: "kicad",
-      variantId: "sha256:new",
-      expectedActiveVariantId: "sha256:old",
+    await cadVariantApi.activatePair("part/1", {
+      kicadVariantId: "sha256:kicad-new",
+      altiumVariantId: "sha256:altium-new",
+      expectedActiveKicadVariantId: "sha256:kicad-old",
+      expectedActiveAltiumVariantId: "sha256:altium-old",
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8765/api/library/parts/part%2F1/cad-variants/activate",
+      "http://127.0.0.1:8765/api/library/parts/part%2F1/cad-variants/activate-pair",
       {
         method: "POST",
         headers: {
@@ -63,12 +65,14 @@ describe("cadVariantApi", () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          tool: "kicad",
-          variantId: "sha256:new",
-          expectedActiveVariantId: "sha256:old",
+          kicadVariantId: "sha256:kicad-new",
+          altiumVariantId: "sha256:altium-new",
+          expectedActiveKicadVariantId: "sha256:kicad-old",
+          expectedActiveAltiumVariantId: "sha256:altium-old",
         }),
       },
     );
+    expect("activate" in cadVariantApi).toBe(false);
   });
 
   it("preserves a stale-selection conflict as a typed 409", async () => {
@@ -82,10 +86,11 @@ describe("cadVariantApi", () => {
       ),
     );
 
-    const result = cadVariantApi.activate("p1", {
-      tool: "altium",
-      variantId: "sha256:new",
-      expectedActiveVariantId: null,
+    const result = cadVariantApi.activatePair("p1", {
+      kicadVariantId: "sha256:new",
+      altiumVariantId: "sha256:new",
+      expectedActiveKicadVariantId: null,
+      expectedActiveAltiumVariantId: null,
     });
 
     await expect(result).rejects.toMatchObject({

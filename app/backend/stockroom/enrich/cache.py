@@ -16,6 +16,19 @@ from typing import Callable
 from stockroom.enrich.schema import normalize_mpn
 
 _SEP = "___"
+_SELF_IGNORE = "# Stockroom per-device enrich cache: derived, re-fetchable, never synced.\n*\n"
+
+
+def ensure_cache_dir(path: Path) -> None:
+    """Create a per-device cache that remains invisible to any enclosing Git repo."""
+    root = Path(path)
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        marker = root / ".gitignore"
+        if not marker.exists():
+            marker.write_text(_SELF_IGNORE, encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _retry_transient(op: Callable[[], object], attempts: int = 8, base_delay: float = 0.002):
@@ -56,7 +69,7 @@ class TtlCache:
         self.ttl = ttl
         self.prefix = prefix
         self._clock = clock
-        self.root.mkdir(parents=True, exist_ok=True)
+        ensure_cache_dir(self.root)
 
     def _glob(self, key: str) -> list[Path]:
         return sorted(self.root.glob(f"{self.prefix}{_SEP}{key}{_SEP}*.json"))

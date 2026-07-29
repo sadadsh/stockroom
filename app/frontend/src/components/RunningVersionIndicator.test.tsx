@@ -49,6 +49,29 @@ describe("RunningVersionIndicator", () => {
     ).toHaveTextContent("r1111111→2222222Update Available");
   });
 
+  it("shows a packaged release as its full version and Current", () => {
+    render(
+      <RunningVersionIndicator
+        data={{
+          update_available: false,
+          state: "up_to_date",
+          current_release_id: "release-1.2.3.4",
+          target_release_id: "release-1.2.3.4",
+          current_revision: "release-1.2.3.4",
+          target_revision: "release-1.2.3.4",
+        }}
+        checking={false}
+        failed={false}
+      />,
+    );
+
+    const status = screen.getByRole("status", {
+      name: "running version 1.2.3.4, Current",
+    });
+    expect(status).toHaveTextContent("v1.2.3.4Current");
+    expect(status).not.toHaveTextContent("release-");
+  });
+
   it("uses the compiled version while checking and never guesses Current", () => {
     const { rerender } = render(
       <RunningVersionIndicator

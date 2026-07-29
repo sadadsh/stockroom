@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -52,6 +53,37 @@ class ReviewCandidate:
     base_branch: str
     base_commit: str
     changed_paths: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ReviewEvent:
+    """An immutable repository-backed decision bound to one exact review commit."""
+
+    id: str
+    kind: str
+    branch: str
+    commit: str
+    base_branch: str
+    base_commit: str
+    reviewer: str
+    message: str
+    created_at: str
+
+
+@dataclass(frozen=True)
+class ReviewListing:
+    """One pushed work branch as observed from the current remote base."""
+
+    branch: str
+    commit: str
+    base_branch: str
+    base_commit: str
+    fork_commit: str
+    changed_paths: tuple[str, ...]
+    commit_count: int
+    ready: bool
+    blocked_reason: str = ""
+    events: tuple[ReviewEvent, ...] = ()
 
 
 class WorkSessionManager:
@@ -182,6 +214,232 @@ class WorkSessionManager:
             )
         return replace(session, shared_commit=commit)
 
+    def recovery_status(
+        self,
+        session: WorkSession,
+        *,
+        verify_claims: bool = True,
+        trust_claims: bool = False,
+    ) -> dict:
+        """Diagnose a persisted session without changing source, refs, or claims."""
+
+        current_branch = self.repo.current_branch()
+        branch_exists = (
+            self.repo._run(
+                "show-ref",
+                "--verify",
+                "--quiet",
+                f"refs/heads/{session.branch}",
+                check=False,
+            ).returncode
+            == 0
+        )
+        dirty = tuple(self.repo._rel(path) for path in self.repo.dirty_paths())
+        claimed_set = set(session.documents)
+        dirty_claimed = tuple(path for path in dirty if path in claimed_set)
+        dirty_unclaimed = tuple(path for path in dirty if path not in claimed_set)
+        missing = tuple(
+            path for path in session.documents if not (self.repo.root / path).is_file()
+        )
+        issues: list[dict] = []
+        held: list[str] = []
+        lost: list[str] = []
+        unknown: list[str] = []
+
+        if not branch_exists:
+            issues.append(
+                {
+                    "code": "work_branch_missing",
+                    "severity": "error",
+                    "detail": f"The local work branch {session.branch} is missing.",
+                    "paths": [],
+                }
+            )
+        elif current_branch != session.branch:
+            issues.append(
+                {
+                    "code": (
+                        "resume_branch_available"
+                        if not dirty
+                        else "wrong_branch_with_changes"
+                    ),
+                    "severity": "action" if not dirty else "error",
+                    "detail": (
+                        f"Resume the clean checkout on {session.branch}."
+                        if not dirty
+                        else "The checkout is on another branch and has local changes; "
+                        "Stockroom will not switch it automatically."
+                    ),
+                    "paths": list(dirty),
+                }
+            )
+        if missing:
+            issues.append(
+                {
+                    "code": "claimed_documents_missing",
+                    "severity": "error",
+                    "detail": "One or more claimed native documents are missing.",
+                    "paths": list(missing),
+                }
+            )
+        if dirty_unclaimed:
+            issues.append(
+                {
+                    "code": "unclaimed_changes",
+                    "severity": "error",
+                    "detail": "Local changes outside this session must remain separate.",
+                    "paths": list(dirty_unclaimed),
+                }
+            )
+
+        available, reason = self.locks.available() if verify_claims else (True, "")
+        if trust_claims:
+            held.extend(lock.path for lock in session.locks)
+        elif not verify_claims:
+            unknown.extend(lock.path for lock in session.locks)
+            issues.append(
+                {
+                    "code": "claims_need_recovery",
+                    "severity": "action",
+                    "detail": (
+                        "This session survived an application restart. Reverify its "
+                        "remote claims before sharing."
+                    ),
+                    "paths": list(unknown),
+                }
+            )
+        elif not available:
+            unknown.extend(lock.path for lock in session.locks)
+            issues.append(
+                {
+                    "code": "claim_service_offline",
+                    "severity": "offline",
+                    "detail": reason or "Remote document claims cannot be verified.",
+                    "paths": list(unknown),
+                }
+            )
+        else:
+            for lock in session.locks:
+                try:
+                    owned = self.locks.owns(lock)
+                except LockError as exc:
+                    unknown.append(lock.path)
+                    issues.append(
+                        {
+                            "code": "claim_status_unknown",
+                            "severity": "offline",
+                            "detail": f"The claim for {lock.path} could not be verified: {exc}",
+                            "paths": [lock.path],
+                        }
+                    )
+                    continue
+                if owned:
+                    held.append(lock.path)
+                else:
+                    lost.append(lock.path)
+            if lost:
+                issues.append(
+                    {
+                        "code": "claims_lost",
+                        "severity": "action",
+                        "detail": (
+                            "The saved session is intact, but one or more remote claims "
+                            "must be reacquired before sharing."
+                        ),
+                        "paths": list(lost),
+                    }
+                )
+
+        hard_error = any(issue["severity"] == "error" for issue in issues)
+        offline = any(issue["severity"] == "offline" for issue in issues)
+        action = any(issue["severity"] == "action" for issue in issues)
+        safe_to_resume = (
+            branch_exists
+            and not missing
+            and not dirty_unclaimed
+            and not offline
+            and not hard_error
+            and (current_branch == session.branch or not dirty)
+        )
+        state = (
+            "attention"
+            if hard_error
+            else "offline"
+            if offline
+            else "resume_available"
+            if action
+            else "healthy"
+        )
+        return {
+            "state": state,
+            "detail": (
+                "Protected work is active and every remote claim is held."
+                if state == "healthy"
+                else "Protected work can be resumed without replacing local files."
+                if state == "resume_available"
+                else "Protected work is preserved, but remote claims cannot be verified."
+                if state == "offline"
+                else "Protected work is preserved; resolve the listed repository state first."
+            ),
+            "safe_to_resume": safe_to_resume,
+            "ready_to_share": (
+                state == "healthy"
+                and current_branch == session.branch
+                and bool(dirty_claimed)
+                and not session.shared_commit
+            ),
+            "source_preserved": not missing,
+            "current_branch": current_branch,
+            "dirty_claimed": list(dirty_claimed),
+            "dirty_unclaimed": list(dirty_unclaimed),
+            "claims": {
+                "held": held,
+                "lost": lost,
+                "unknown": unknown,
+            },
+            "issues": issues,
+        }
+
+    def resume(self, session: WorkSession) -> WorkSession:
+        """Safely return to a persisted branch and reacquire only absent claims."""
+
+        status = self.recovery_status(session)
+        if not status["safe_to_resume"]:
+            first = status["issues"][0] if status["issues"] else None
+            raise CollaborationError(
+                first["code"] if first else "resume_blocked",
+                first["detail"] if first else "this protected work session cannot be resumed safely",
+            )
+        if self.repo.current_branch() != session.branch:
+            switched = self.repo._run("switch", session.branch, check=False)
+            if switched.returncode != 0:
+                raise CollaborationError(
+                    "branch_failed",
+                    (switched.stderr or switched.stdout).strip()
+                    or f"could not switch to {session.branch}",
+                )
+
+        lost = set(status["claims"]["lost"])
+        if not lost:
+            return session
+        recovered: list[DocumentLock] = []
+        locks: list[DocumentLock] = []
+        try:
+            for lock in session.locks:
+                if lock.path not in lost:
+                    locks.append(lock)
+                    continue
+                reacquired = self.locks.acquire(lock.path)
+                recovered.append(reacquired)
+                locks.append(reacquired)
+        except LockError as exc:
+            cleanup = self._release_best_effort(recovered)
+            detail = f"remote claims could not be recovered: {exc}"
+            if cleanup:
+                detail += f"; recovered-claim cleanup also failed: {'; '.join(cleanup)}"
+            raise CollaborationError("claim_recovery_failed", detail) from exc
+        return replace(session, locks=tuple(locks))
+
     def release_after_integration(self, session: WorkSession, *, integrated_commit: str) -> None:
         if not session.shared_commit:
             raise CollaborationError(
@@ -198,6 +456,57 @@ class WorkSessionManager:
         failures = self._release_best_effort(session.locks)
         if failures:
             raise CollaborationError("unlock_failed", "; ".join(failures))
+
+    def finish_after_remote_integration(self, session: WorkSession) -> str:
+        """Fetch the base branch, prove the shared commit landed, then release claims."""
+
+        if not session.shared_commit:
+            raise CollaborationError(
+                "not_shared", "share this work session before finishing it"
+            )
+        ok, reason = self.repo.fetch()
+        if not ok:
+            raise CollaborationError("fetch_failed", reason or "the remote could not be fetched")
+        remote_base = self.repo._run(
+            "rev-parse",
+            "--verify",
+            f"refs/remotes/origin/{session.base_branch}^{{commit}}",
+            check=False,
+        )
+        if remote_base.returncode != 0:
+            raise CollaborationError(
+                "base_missing",
+                f"remote ref is unavailable: refs/remotes/origin/{session.base_branch}",
+            )
+        integrated_commit = remote_base.stdout.strip()
+        if not self.repo.is_clean():
+            raise CollaborationError(
+                "dirty_tree",
+                "preserve or commit local changes before finishing this work session",
+            )
+        current_branch = self.repo.current_branch()
+        if current_branch == session.branch:
+            switched = self.repo._run("switch", session.base_branch, check=False)
+            if switched.returncode != 0:
+                raise CollaborationError(
+                    "branch_failed",
+                    (switched.stderr or switched.stdout).strip()
+                    or f"could not switch to {session.base_branch}",
+                )
+        elif current_branch != session.base_branch:
+            raise CollaborationError(
+                "wrong_branch",
+                f"switch to {session.branch} or {session.base_branch} before finishing",
+            )
+        advanced = self.repo._run("merge", "--ff-only", integrated_commit, check=False)
+        if advanced.returncode != 0:
+            raise CollaborationError(
+                "base_changed",
+                (advanced.stderr or advanced.stdout).strip()
+                or f"{session.base_branch} could not advance to the integrated commit",
+            )
+        self.release_after_integration(session, integrated_commit=integrated_commit)
+        return integrated_commit
 
     def _preflight_synced_base(self) -> None:
         if not self.repo.is_git_repo():
@@ -273,11 +582,38 @@ class WorkSessionManager:
         return failures
 
 
+def work_session_recovery(
+    repo: GitRepo,
+    locks: DocumentLockService,
+    session: WorkSession,
+    *,
+    verify_claims: bool = True,
+    trust_claims: bool = False,
+) -> dict:
+    """Public read-only recovery seam used by collaboration status."""
+
+    return WorkSessionManager(repo, locks).recovery_status(
+        session,
+        verify_claims=verify_claims,
+        trust_claims=trust_claims,
+    )
+
+
 class ReviewManager:
     """Review and integrate one immutable remote commit without replacing local work."""
 
-    def __init__(self, repo: GitRepo):
+    _EVENT_TAG_PREFIX = "refs/tags/stockroom/review"
+
+    def __init__(
+        self,
+        repo: GitRepo,
+        *,
+        now: Callable[[], datetime] | None = None,
+        new_id: Callable[[], str] | None = None,
+    ):
         self.repo = repo
+        self._now = now or (lambda: datetime.now(UTC))
+        self._new_id = new_id or (lambda: uuid4().hex)
 
     def discover(self, *, branch: str, base_branch: str = "main") -> ReviewCandidate:
         self._validate_remote_branch(branch)
@@ -313,6 +649,190 @@ class ReviewManager:
             base_commit=base_commit,
             changed_paths=paths,
         )
+
+    def list_candidates(self, *, base_branch: str = "main") -> tuple[ReviewListing, ...]:
+        """List pushed ``work/*`` branches without changing the working copy."""
+
+        self._validate_remote_branch(base_branch)
+        ok, reason = self.repo.fetch()
+        if not ok:
+            raise CollaborationError("fetch_failed", reason or "the remote could not be fetched")
+        remote_base = f"refs/remotes/origin/{base_branch}"
+        base_commit = self._resolve_commit(remote_base, code="base_missing")
+        self._fetch_review_event_tags()
+        refs = self.repo._run(
+            "for-each-ref",
+            "--format=%(refname)",
+            "refs/remotes/origin/work/",
+        ).stdout.splitlines()
+        listings: list[ReviewListing] = []
+        prefix = "refs/remotes/origin/"
+        for ref in sorted(value.strip() for value in refs if value.strip()):
+            branch = ref.removeprefix(prefix)
+            commit = self._resolve_commit(ref, code="review_missing")
+            fork = self.repo._run("merge-base", base_commit, commit, check=False)
+            fork_commit = fork.stdout.strip() if fork.returncode == 0 else ""
+            if not fork_commit:
+                listings.append(
+                    ReviewListing(
+                        branch=branch,
+                        commit=commit,
+                        base_branch=base_branch,
+                        base_commit=base_commit,
+                        fork_commit="",
+                        changed_paths=(),
+                        commit_count=0,
+                        ready=False,
+                        blocked_reason=f"{branch} does not share history with {base_branch}",
+                    )
+                )
+                continue
+            changed = self.repo._run(
+                "-c",
+                "core.quotepath=false",
+                "diff",
+                "--name-only",
+                "-z",
+                fork_commit,
+                commit,
+            ).stdout
+            paths = tuple(path for path in changed.split("\0") if path)
+            if not paths:
+                continue
+            ready = fork_commit == base_commit
+            listings.append(
+                ReviewListing(
+                    branch=branch,
+                    commit=commit,
+                    base_branch=base_branch,
+                    base_commit=base_commit,
+                    fork_commit=fork_commit,
+                    changed_paths=paths,
+                    commit_count=self.repo.count_commits(fork_commit, commit),
+                    ready=ready,
+                    blocked_reason=(
+                        ""
+                        if ready
+                        else f"{base_branch} advanced after this work branch started"
+                    ),
+                    events=self._events_for_commit(
+                        commit,
+                        branch=branch,
+                        base_branch=base_branch,
+                        fork_commit=fork_commit,
+                    ),
+                )
+            )
+        return tuple(listings)
+
+    def request_changes(
+        self,
+        candidate: ReviewCandidate,
+        *,
+        reviewer: str,
+        message: str,
+    ) -> ReviewEvent:
+        """Append one immutable change request without touching the working copy."""
+
+        reviewer = reviewer.strip()
+        message = message.strip()
+        if not reviewer:
+            raise CollaborationError("reviewer_required", "name the reviewer requesting changes")
+        if len(reviewer) > 120:
+            raise CollaborationError(
+                "reviewer_too_long", "the reviewer name must be 120 characters or fewer"
+            )
+        if not message:
+            raise CollaborationError(
+                "review_message_required", "describe the changes that are required"
+            )
+        if len(message) > 2_000:
+            raise CollaborationError(
+                "review_message_too_long",
+                "the change request must be 2,000 characters or fewer",
+            )
+
+        ok, reason = self.repo.fetch()
+        if not ok:
+            raise CollaborationError("fetch_failed", reason or "the remote could not be fetched")
+        current_commit = self._resolve_commit(
+            f"refs/remotes/origin/{candidate.branch}",
+            code="review_missing",
+        )
+        current_base = self._resolve_commit(
+            f"refs/remotes/origin/{candidate.base_branch}",
+            code="base_missing",
+        )
+        if current_commit != candidate.commit:
+            raise CollaborationError(
+                "review_changed", "the work branch changed after it was reviewed"
+            )
+        if current_base != candidate.base_commit:
+            raise CollaborationError(
+                "base_changed", "the shared branch changed after this review began"
+            )
+
+        event_id = self._new_id().strip().lower()
+        if not event_id or any(
+            char not in "abcdefghijklmnopqrstuvwxyz0123456789-" for char in event_id
+        ):
+            raise CollaborationError(
+                "review_event_id_invalid", "the review event identity is invalid"
+            )
+        created = self._now()
+        event = ReviewEvent(
+            id=event_id,
+            kind="changes_requested",
+            branch=candidate.branch,
+            commit=candidate.commit,
+            base_branch=candidate.base_branch,
+            base_commit=candidate.base_commit,
+            reviewer=reviewer,
+            message=message,
+            created_at=created.isoformat().replace("+00:00", "Z"),
+        )
+        tag_name = f"stockroom/review/{candidate.commit}/{event.id}"
+        tag_ref = f"refs/tags/{tag_name}"
+        payload = json.dumps(asdict(event), sort_keys=True, separators=(",", ":"))
+        self.repo._set_test_identity_if_missing()
+        tagged = self.repo._run(
+            "tag",
+            "-a",
+            tag_name,
+            candidate.commit,
+            "-F",
+            "-",
+            input_text=f"{payload}\n",
+            check=False,
+        )
+        if tagged.returncode != 0:
+            raise CollaborationError(
+                "review_event_write_failed",
+                (tagged.stderr or tagged.stdout).strip()
+                or "the repository review event could not be created",
+            )
+        pushed = self.repo._run(
+            "push",
+            "origin",
+            f"{tag_ref}:{tag_ref}",
+            check=False,
+        )
+        if pushed.returncode != 0:
+            cleanup = self.repo._run("tag", "-d", tag_name, check=False)
+            cleanup_detail = (
+                ""
+                if cleanup.returncode == 0
+                else "; the unshared local event tag also could not be removed"
+            )
+            detail = (
+                (pushed.stderr or pushed.stdout).strip()
+                or "the repository review event could not be shared"
+            )
+            raise CollaborationError(
+                "review_event_push_failed",
+                detail + cleanup_detail,
+            )
+        return event
 
     def inspect(self, candidate: ReviewCandidate, inspect: Callable[[Path], None]) -> None:
         """Run a readonly inspector against a detached disposable worktree."""
@@ -389,6 +909,90 @@ class ReviewManager:
         if resolved.returncode != 0:
             raise CollaborationError(code, f"remote ref is unavailable: {ref}")
         return resolved.stdout.strip()
+
+    def _fetch_review_event_tags(self) -> None:
+        pattern = f"{self._EVENT_TAG_PREFIX}/*"
+        remote = self.repo._run(
+            "ls-remote",
+            "--tags",
+            "--refs",
+            "origin",
+            pattern,
+            check=False,
+        )
+        if remote.returncode != 0:
+            raise CollaborationError(
+                "review_event_fetch_failed",
+                (remote.stderr or remote.stdout).strip()
+                or "repository review events could not be discovered",
+            )
+        if not remote.stdout.strip():
+            return
+        fetched = self.repo._run(
+            "fetch",
+            "origin",
+            f"{pattern}:{pattern}",
+            check=False,
+        )
+        if fetched.returncode != 0:
+            raise CollaborationError(
+                "review_event_fetch_failed",
+                (fetched.stderr or fetched.stdout).strip()
+                or "repository review events could not be fetched",
+            )
+
+    def _events_for_commit(
+        self,
+        commit: str,
+        *,
+        branch: str,
+        base_branch: str,
+        fork_commit: str,
+    ) -> tuple[ReviewEvent, ...]:
+        prefix = f"{self._EVENT_TAG_PREFIX}/{commit}/"
+        refs = self.repo._run(
+            "for-each-ref",
+            "--format=%(refname)",
+            prefix,
+        ).stdout.splitlines()
+        events: list[ReviewEvent] = []
+        for ref in sorted(value.strip() for value in refs if value.strip()):
+            target = self._resolve_commit(ref, code="review_event_invalid")
+            contents = self.repo._run(
+                "for-each-ref",
+                "--format=%(contents)",
+                ref,
+                check=False,
+            )
+            try:
+                payload = json.loads(contents.stdout.strip())
+                event = ReviewEvent(**payload)
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise CollaborationError(
+                    "review_event_invalid",
+                    f"repository review event is malformed: {ref}",
+                ) from exc
+            event_id = ref.rsplit("/", 1)[-1]
+            string_values = tuple(asdict(event).values())
+            if (
+                contents.returncode != 0
+                or not all(isinstance(value, str) for value in string_values)
+                or event.id != event_id
+                or event.kind != "changes_requested"
+                or target != commit
+                or event.commit != commit
+                or event.branch != branch
+                or event.base_branch != base_branch
+                or event.base_commit != fork_commit
+                or not event.reviewer.strip()
+                or not event.message.strip()
+            ):
+                raise CollaborationError(
+                    "review_event_invalid",
+                    f"repository review event does not match its review commit: {ref}",
+                )
+            events.append(event)
+        return tuple(sorted(events, key=lambda event: (event.created_at, event.id)))
 
     def _validate_remote_branch(self, branch: str) -> None:
         checked = self.repo._run("check-ref-format", "--branch", branch, check=False)

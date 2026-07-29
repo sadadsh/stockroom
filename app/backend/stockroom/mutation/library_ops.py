@@ -478,11 +478,13 @@ class LibraryOps:
                 datasheet=datasheet,
                 assets={
                     "kicad": EdaAssets(
-                        symbol=AssetRef(lib=nickname, name=staged.entry_name)
-                        if staged.symbol_source is not None else None,
-                        footprint=AssetRef(lib=nickname, name=staged.entry_name)
-                        if staged.footprint_source is not None else None,
-                        model=model_ref,
+                        symbol=Asset.of(AssetRef(lib=nickname, name=staged.entry_name))
+                        if staged.symbol_source is not None
+                        else None,
+                        footprint=Asset.of(AssetRef(lib=nickname, name=staged.entry_name))
+                        if staged.footprint_source is not None
+                        else None,
+                        model=Asset.of(model_ref),
                     )
                 },
                 provenance=staged.provenance,
@@ -815,6 +817,8 @@ class LibraryOps:
         origin: AssetOrigin | None = None, now_iso: str = "",
         active_variant: CadVariantPointer | None = None,
         compatible_kicad_variant: CadVariantPointer | None = None,
+        auto_embed_model: bool = False,
+        altium_driver=None,
         _transaction: Transaction | None = None,
         _record: PartRecord | None = None,
     ) -> PartRecord:
@@ -840,7 +844,11 @@ class LibraryOps:
         ``compatible_kicad_variant`` is only for a composed Altium-only capture. Its complete
         installed KiCad projection is digest-checked under the Transaction lock, then that exact
         source pointer and the Altium pointer are adopted together. It is never inferred from
-        provenance or filenames."""
+        provenance or filenames.
+
+        ``auto_embed_model`` is the guided-production path for a part that already has a validated
+        STEP projection. When a PcbLib lands without that body, the exact selected footprint is
+        embedded and independently read back inside this same transaction."""
         from stockroom.altium.extract import normalize_altium_source
         from stockroom.altium.oleread import pick_entry, read_footprint_names, read_symbol_names
 
@@ -948,6 +956,20 @@ class LibraryOps:
                         AssetRef(lib=pcb_dst.name, name=fp_name or "")
                     )
                     landed.append(fp_name or pcb_dst.name)
+                model_source = self._model_source(record)
+                if (
+                    auto_embed_model
+                    and pcb_src is not None
+                    and model_source is not None
+                    and Path(model_source.file).suffix.casefold() in {".step", ".stp"}
+                ):
+                    self.embed_altium_model(
+                        part_id,
+                        driver=altium_driver,
+                        _transaction=txn,
+                        _record=record,
+                        _require_native_readback=True,
+                    )
                 if active_variant is not None:
                     # Whole-bundle pointer last, immediately before the canonical record write.
                     # Transaction rollback restores both native binaries and this pointer.
@@ -974,7 +996,16 @@ class LibraryOps:
                 return ref
         return None
 
-    def embed_altium_model(self, part_id: str, *, replace: bool = False, driver=None) -> dict:
+    def embed_altium_model(
+        self,
+        part_id: str,
+        *,
+        replace: bool = False,
+        driver=None,
+        _transaction: Transaction | None = None,
+        _record: PartRecord | None = None,
+        _require_native_readback: bool = False,
+    ) -> dict:
         """Embed the part's 3D model into its Altium footprint's `.PcbLib`, atomically.
 
         Altium stores a 3D body INSIDE the `.PcbLib` binary, so this is the one mutation Stockroom
@@ -986,9 +1017,10 @@ class LibraryOps:
         original bytes and leaves zero trace. That matters more here than usual, because a
         half-written OLE container is not something a peer could repair by hand.
         """
-        from stockroom.altium.embed3d import embed_model
+        from stockroom.altium.embed3d import embed_model, model_name_present, read_model_index
+        from stockroom.altium.oleread import read_footprint_names
 
-        record = self.load_record(part_id)
+        record = _record or self.load_record(part_id)
         altium = _altium(record)
         footprint = altium.footprint
         if footprint is None or not footprint.lib:
@@ -1009,9 +1041,27 @@ class LibraryOps:
         step = self.lib.root / source.file
         if not step.exists():
             raise ValueError(f"the 3D model file is missing: {source.file}")
+        if _require_native_readback:
+            if step.suffix.casefold() not in {".step", ".stp"}:
+                raise ValueError(f"the Altium embed source is not a STEP file: {source.file}")
+            with step.open("rb") as handle:
+                step_header = handle.read(256)
+            if b"ISO-10303-21;" not in step_header:
+                raise ValueError("the Altium embed source is not a valid ISO-10303-21 STEP file")
+            footprint_names = read_footprint_names(pcblib)
+            if not footprint.name or footprint.name not in footprint_names:
+                raise ValueError(
+                    f"the Altium footprint binding {footprint.name!r} is not present exactly in "
+                    f"{footprint.lib}; found {footprint_names!r}"
+                )
 
         json_path = self.lib.parts_dir / f"{part_id}.json"
-        with Transaction(self.repo) as txn:
+        transaction_scope = (
+            Transaction(self.repo)
+            if _transaction is None
+            else contextlib.nullcontext(_transaction)
+        )
+        with transaction_scope as txn:
             # Tracked BEFORE Altium touches it, unlike an attach which tracks after its copy: this
             # modifies a file that already exists, so the pre-edit bytes are what rollback restores.
             txn.track(pcblib)
@@ -1027,12 +1077,38 @@ class LibraryOps:
                 # words are carried through, because "it did not work" without the reason is what
                 # made this feature take ten boots to diagnose.
                 raise ValueError(f"{result.detail}{_altium_log_suffix(result.altium_log)}")
+            if _require_native_readback:
+                # Do not equate an Altium success marker with a persisted body. The model index
+                # proves the exact STEP name, while the independently decoded numbered OLE stream
+                # proves the body carries the exact validated provider bytes.
+                from stockroom.altium.native_authoring import read_embedded_model_payloads
+
+                model_index = read_model_index(pcblib)
+                if not model_name_present(model_index, step.name):
+                    raise ValueError(
+                        f"the saved PcbLib model index does not name the exact STEP {step.name}"
+                    )
+                payloads = read_embedded_model_payloads(pcblib)
+                if step.read_bytes() not in payloads:
+                    raise ValueError(
+                        "the saved PcbLib has no embedded body whose native payload exactly "
+                        "matches the validated STEP input"
+                    )
+                persisted_names = read_footprint_names(pcblib)
+                if footprint.name not in persisted_names:
+                    raise ValueError(
+                        f"the saved PcbLib lost the exact footprint binding {footprint.name!r}"
+                    )
             # The Altium model asset is a FILE-shaped ref that also names its container, because
             # unlike KiCad's the payload lives inside the footprint library rather than beside it.
             altium.model = AssetRef(lib=footprint.lib, name=footprint.name, file=source.file)
             json_path.write_text(record.dumps(), encoding="utf-8")
             txn.track(json_path)
-            sha = txn.commit(f"Embed 3D model into {part_id} Altium footprint")
+            sha = (
+                txn.commit(f"Embed 3D model into {part_id} Altium footprint")
+                if _transaction is None
+                else ""
+            )
         return {
             "part_id": part_id,
             "status": result.status,
@@ -1371,7 +1447,9 @@ class LibraryOps:
         # how six Altium libraries survived a clear that claimed to have deleted them.
         return missing
 
-    def _remove_kicad_asset(self, record: PartRecord, asset_kind: str, ref, txn) -> None:
+    def _remove_kicad_asset(
+        self, record: PartRecord, asset_kind: str, ref, txn
+    ) -> Path | None:
         """KiCad file removal: a symbol is an entry inside the category `.kicad_sym`, a
         footprint is one `.kicad_mod`, a model is a file under `models/` whose `(model ...)`
         link must also be stripped from the footprint so nothing dangles."""
@@ -1415,7 +1493,9 @@ class LibraryOps:
                         txn.track(fp_path)
         return None
 
-    def _remove_altium_asset(self, record: PartRecord, asset_kind: str, ref, txn) -> None:
+    def _remove_altium_asset(
+        self, record: PartRecord, asset_kind: str, ref, txn
+    ) -> Path | None:
         """Altium file removal: each asset is its own OLE2 compound file in the profile's
         `altium/` directory, named for the part."""
         altium_dir = self.lib.parts_dir.parent / "altium"
@@ -1465,6 +1545,7 @@ class LibraryOps:
                 if field == "tags":
                     sym.set_property("ki_keywords", " ".join(record.tags))
                 else:
+                    assert prop is not None
                     sym.set_property(prop, str(value))
                 sym_lib.save(sym_lib_path)
                 txn.track(sym_lib_path)
@@ -1512,7 +1593,13 @@ class LibraryOps:
         return report
 
     def rederive_library(
-        self, *, now_iso: str, scheme: str = "", dry_run: bool = False, progress=None
+        self,
+        *,
+        now_iso: str,
+        scheme: str = "",
+        dry_run: bool = False,
+        progress=None,
+        only_outdated: bool = False,
     ) -> dict:
         """Recompute every record's DERIVED block from its stored evidence, in one atomic commit.
 
@@ -1533,6 +1620,11 @@ class LibraryOps:
         * **Atomic.** "The library is on ruleset N" is one fact, so it is one commit and one
           rollback. A part that cannot be read is reported by id and does not abandon the rest.
 
+        `only_outdated` is the automatic application-update mode: current records are skipped
+        before their evidence is parsed, and records stamped by a newer ruleset are left intact
+        rather than silently downgraded. The explicit rebuild route retains its full recomputation
+        behavior.
+
         Streams: one record is held in memory at a time, so a 10,000-part library costs the same
         as a 10-part one. `derived_at` is only re-stamped when the block actually changed, so a
         second pass over an already-current library is a true no-op rather than a full rewrite.
@@ -1549,8 +1641,12 @@ class LibraryOps:
             "rewritten": 0,
             "unchanged": 0,
             "no_evidence": 0,
+            "skipped_current": 0,
+            "skipped_newer": 0,
+            "skipped_unrecognized": 0,
             "failed": [],
         }
+        current_generation = int(DERIVED_BY.removeprefix("rules@"))
         paths = sorted(self.lib.parts_dir.glob("*.json"))
         # The transaction is opened BEFORE the walk, so a rewritten record is written and tracked
         # immediately and nothing accumulates. Holding the new text of every changed record until
@@ -1565,6 +1661,19 @@ class LibraryOps:
                     progress(i + 1, len(paths), path.stem)
                 try:
                     record = PartRecord.loads(path.read_text(encoding="utf-8"))
+                    if only_outdated:
+                        stamp = (record.derived_by or "").strip()
+                        match = re.fullmatch(r"rules@(\d+)", stamp) if stamp else None
+                        if stamp and match is None:
+                            report["skipped_unrecognized"] += 1
+                            continue
+                        generation = int(match.group(1)) if match is not None else 0
+                        if generation == current_generation:
+                            report["skipped_current"] += 1
+                            continue
+                        if generation > current_generation:
+                            report["skipped_newer"] += 1
+                            continue
                     # Evidence is checked on DISK, not from the record's `sources` index: an
                     # index entry pointing at a payload that is not there would blank the part.
                     if not list_sources(library_root, record.id):
@@ -1810,7 +1919,7 @@ class LibraryOps:
             txn.commit(f"Move {part_id}: {old_cat} -> {new_category}")
         return record
 
-    def delete_part(self, part_id: str) -> None:
+    def delete_part(self, part_id: str) -> str:
         record = self.load_record(part_id)
         json_path = self.lib.parts_dir / f"{part_id}.json"
         with Transaction(self.repo) as txn:
@@ -1854,7 +1963,48 @@ class LibraryOps:
                 if ap.exists():
                     ap.unlink()
                     txn.track(ap)
-            txn.commit(f"Delete {part_id}")
+            return txn.commit(f"Delete {part_id}")
+
+    def restore_deleted_part(self, part_id: str) -> PartRecord:
+        """Undo the exact latest Stockroom deletion as a new Git commit.
+
+        The JSON path is the recovery identity. Its latest touching commit must be the exact
+        `Delete <id>` commit, that commit's parent must contain a valid record for this same id,
+        and the delete commit itself must not contain the JSON. Only then is the whole atomic
+        deletion reverted, restoring the shared symbol entry and every per-part asset together.
+        A later conflicting edit makes Git's revert fail and leaves zero conflicted state.
+        """
+        if not part_id or any(ch in part_id for ch in ("/", "\\")) or part_id in {".", ".."}:
+            raise ValueError("invalid part id")
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        if json_path.exists():
+            raise ValueError(f"{part_id} already exists; there is no deletion to undo")
+
+        history = self.repo.log_paths([json_path], max_count=1)
+        if not history:
+            raise ValueError(f"no deletion history exists for {part_id}")
+        deletion = history[0]
+        expected_subject = f"Delete {part_id}"
+        if deletion.subject != expected_subject:
+            raise ValueError(
+                f"the latest change to {part_id} is {deletion.subject!r}, not an undoable deletion"
+            )
+        if self.repo.show_file(deletion.sha, json_path) is not None:
+            raise ValueError(f"{deletion.sha} did not delete {part_id}")
+        prior = self.repo.show_file(f"{deletion.sha}^", json_path)
+        if prior is None:
+            raise ValueError(f"{deletion.sha} has no prior {part_id} record to restore")
+        record = PartRecord.loads(prior)
+        if record.id != part_id:
+            raise ValueError(
+                f"the deleted record identity {record.id!r} does not match {part_id!r}"
+            )
+
+        self.repo.revert(deletion.sha)
+        restored = self.load_record(part_id)
+        if restored.id != part_id:
+            raise ValueError(f"restored record identity {restored.id!r} does not match {part_id!r}")
+        return restored
 
     def detect_drift(self) -> DriftReport:
         """Compare each part's JSON (the source of truth) against its symbol's

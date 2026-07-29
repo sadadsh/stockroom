@@ -206,23 +206,6 @@ def enrich_router(require_token) -> APIRouter:
 
         def work(progress):
             pipeline = _make_pipeline(ctx)
-            # The CAD lane for non-passives: an LCSC part number converts to a real symbol,
-            # footprint AND 3D model through easyeda2kicad, which `ingest/lcsc.py` already
-            # wraps. One workdir for the whole run, cleaned up after it, so a 166-part import
-            # does not leave 166 sandbox trees behind.
-            import shutil
-            import tempfile
-
-            from stockroom.ingest.pipeline import IngestPipeline
-
-            workdir = Path(tempfile.mkdtemp(prefix="sr-bulk-cad-"))
-            ingest = IngestPipeline(ctx.profile, ctx.repo, ctx.cli)
-
-            def cad_source(lcsc_id: str):
-                """The converted candidate for an LCSC id, or None. Raising is fine: the caller
-                treats a failure as "no files", never as a lost part."""
-                found = ingest.inspect(lcsc_ids=[lcsc_id], workdir=workdir / lcsc_id)
-                return found[0] if found else None
 
             def on_progress(done: int, total: int, query: str) -> None:
                 if progress is None:
@@ -234,20 +217,18 @@ def enrich_router(require_token) -> APIRouter:
                     "message": f"importing {query} ({done + 1} of {total})",
                 })
 
-            try:
-                report = bulk_import(
-                    # A CALLABLE, not the index object: a 166-part run lasts ~28 minutes and the
-                    # background sync rebuilds the index during it, closing the handle. Passing
-                    # `ctx.index` by value failed 37 of 166 parts on the owner's real library.
-                    queries, pipeline, _WriteLaneOps(), index=lambda: ctx.index,
-                    category=category, dry_run=dry_run, on_progress=on_progress,
-                    cad_source=cad_source,
-                )
-            finally:
-                # The staged asset files are COPIED into the library by add_part, so the sandbox
-                # is disposable once the run ends - and leaving 166 of them in the system temp
-                # dir is the kind of leak nobody notices until a disk fills.
-                shutil.rmtree(workdir, ignore_errors=True)
+            report = bulk_import(
+                # A CALLABLE, not the index object: a 166-part run lasts ~28 minutes and the
+                # background sync rebuilds the index during it, closing the handle. Passing
+                # `ctx.index` by value failed 37 of 166 parts on the owner's real library.
+                queries,
+                pipeline,
+                _WriteLaneOps(),
+                index=lambda: ctx.index,
+                category=category,
+                dry_run=dry_run,
+                on_progress=on_progress,
+            )
             if not dry_run and report.of("added"):
                 ctx.jobs.run_write(ctx.rebuild_index)
                 ctx.jobs.run_write(ctx.auto_push)

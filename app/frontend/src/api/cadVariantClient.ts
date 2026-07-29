@@ -35,6 +35,15 @@ export interface CadVariantInventory {
   variants: readonly CadVariant[];
 }
 
+export interface CadVariantPair {
+  kicadVariantId: string;
+  altiumVariantId: string;
+  provider: string;
+  trustRank: number;
+  trustLabel: string;
+  trustReason?: string;
+}
+
 export interface SupplementaryCadArtifact {
   id: string;
   fileName: string;
@@ -58,13 +67,15 @@ export interface SupplementaryCadEvidence {
 export interface CadVariantDocument {
   partId: string;
   inventories: readonly CadVariantInventory[];
+  pairs: readonly CadVariantPair[];
   supplementary: readonly SupplementaryCadEvidence[];
 }
 
-export interface CadVariantActivation {
-  tool: CadVariantTool;
-  variantId: string;
-  expectedActiveVariantId: string | null;
+export interface CadVariantPairActivation {
+  kicadVariantId: string;
+  altiumVariantId: string;
+  expectedActiveKicadVariantId: string | null;
+  expectedActiveAltiumVariantId: string | null;
 }
 
 export class CadVariantApiError extends Error {
@@ -80,7 +91,7 @@ export class CadVariantApiError extends Error {
 async function requestCadVariants(
   method: "GET" | "POST",
   path: string,
-  body?: CadVariantActivation,
+  body?: CadVariantPairActivation,
 ): Promise<CadVariantDocument> {
   const headers: Record<string, string> = { Accept: "application/json" };
   const token = apiToken();
@@ -127,13 +138,13 @@ export const cadVariantApi = {
     return requestCadVariants("GET", variantsPath(partId));
   },
 
-  activate(
+  activatePair(
     partId: string,
-    activation: CadVariantActivation,
+    activation: CadVariantPairActivation,
   ): Promise<CadVariantDocument> {
     return requestCadVariants(
       "POST",
-      `${variantsPath(partId)}/activate`,
+      `${variantsPath(partId)}/activate-pair`,
       activation,
     );
   },

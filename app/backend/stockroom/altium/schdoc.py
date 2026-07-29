@@ -162,7 +162,7 @@ def _components_from_stream(raw: bytes) -> list[dict]:
     # symbol) is two physical parts and never merges; a blank designator never
     # merges either.
     out: list[dict] = []
-    seen: dict[tuple[str, str], dict] = {}
+    seen: dict[tuple[str, str], tuple[dict, set[str]]] = {}
     for i in sorted(by_index):
         c = by_index[i]
         part_id = c.pop("_part_id")

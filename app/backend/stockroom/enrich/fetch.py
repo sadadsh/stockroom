@@ -11,9 +11,12 @@ seam is real and the pipeline is wired end-to-end today (documented deferral).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from stockroom.enrich.errors import EnrichError
+
+if TYPE_CHECKING:
+    from curl_cffi import BrowserTypeLiteral
 
 # Default headers a real browser sends. Referer is added per-request when the
 # datasheet or product link came from a known landing page.
@@ -33,7 +36,7 @@ class FetchResult:
     final_url: str
 
 
-def _make_session(impersonate: str) -> Any:
+def _make_session(impersonate: BrowserTypeLiteral) -> Any:
     # Imported lazily so the module (and its Protocol) import even where curl_cffi
     # is not installed (e.g. a schema-only unit run); construction is what needs it.
     from curl_cffi import requests as curl_requests
@@ -42,7 +45,7 @@ def _make_session(impersonate: str) -> Any:
 
 
 class HttpFetcher:
-    def __init__(self, impersonate: str = "chrome", session: Any = None):
+    def __init__(self, impersonate: BrowserTypeLiteral = "chrome", session: Any = None):
         self._impersonate = impersonate
         self._session = session
 

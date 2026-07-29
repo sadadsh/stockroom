@@ -5,16 +5,21 @@ derived index is kept warm and rebuilt on load, on profile switch, and after a p
 
 from __future__ import annotations
 
+import hashlib
+import math
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from stockroom.api.jobs import JobRunner
+from stockroom.enrich.cache import ensure_cache_dir
 from stockroom.kicad.cli import KiCadCli
 from stockroom.kicad.config import kicad_config_dir
 from stockroom.mutation.library_ops import LibraryOps
 from stockroom.mutation.project_ops import ProjectOps
+from stockroom.projects.assembly import AssemblyRunStore
+from stockroom.projects.collaboration_store import WorkSessionStore
 from stockroom.store.index import LibraryIndex
 from stockroom.store.machine_config import MachineConfig
 from stockroom.store.profile import Profile, ProfileStore
@@ -26,6 +31,36 @@ from stockroom.vcs.sync import SyncEngine
 if TYPE_CHECKING:
     from stockroom.service import WorkflowCoordinator
     from stockroom.stm.db import StmIndex
+
+
+class BackgroundSyncHandle(threading.Event):
+    """Cancellation plus thread-completion ownership for periodic reconciliation.
+
+    ``set``/``is_set``/``wait`` retain the former Event-shaped API for standalone
+    hosts, while managed service handoff can now prove the worker actually left
+    its generation instead of merely setting a flag and releasing authority.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._thread: threading.Thread | None = None
+
+    def bind(self, thread: threading.Thread) -> None:
+        if self._thread is not None:
+            raise RuntimeError("background sync handle is already bound")
+        self._thread = thread
+
+    def cancel(self) -> None:
+        self.set()
+
+    def join(self, timeout: float | None = None) -> None:
+        thread = self._thread
+        if thread is not None:
+            thread.join(timeout)
+
+    def is_alive(self) -> bool:
+        thread = self._thread
+        return thread is not None and thread.is_alive()
 
 
 @dataclass
@@ -49,6 +84,8 @@ class AppContext:
     project_store: ProjectStore
     project_index: ProjectIndex
     project_ops: ProjectOps
+    assembly_store: AssemblyRunStore
+    work_session_store: WorkSessionStore
     # The STM32 pinout/spec index (stm-viewer workstream, Phase 3). LAZY, unlike `index`
     # above: no CubeMX source is synced at launch, so build_context only ATTEMPTS a load of
     # whatever is already on disk (default_index_path()) and accepts None (first run, a
@@ -60,6 +97,18 @@ class AppContext:
     # context does not acquire generation authority or start/stop this resource;
     # the future persistent service process owns that lifecycle.
     workflow_coordinator: "WorkflowCoordinator | None" = None
+    # The production host/worker binds these live authority fields. Source
+    # development remains standalone unless the guard is explicitly enabled.
+    service_authority_required: bool = False
+    service_control: object | None = None
+    service_fence: object | None = None
+    service_generation: int = 0
+    service_mode: str = "standalone"
+    release_id: str = ""
+    # Sanitized fail-closed state for a packaged host whose signed built-in
+    # release is intact but whose coordinator/update bootstrap could not start.
+    # Never store the raw exception here: health is intentionally unauthenticated.
+    service_degraded_reason: str = ""
     # The last ERC/DRC run per project id (M7b), cached in-memory (never committed to
     # the library repo: an external project's check results are not library records, and
     # a git commit per check run is churn). Read by the checks GET, Overview, and the
@@ -69,6 +118,13 @@ class AppContext:
     # committed: a BOM is derived, and pricing is network-bound, so the cache lets a
     # re-open render instantly). Read by the BOM GET; cleared on delete.
     bom_cache: dict = field(default_factory=dict)
+    # Native review checks are expensive and exact-commit immutable. Cache the
+    # digest-bound result per candidate; a restart simply requires a new run.
+    review_validation_cache: dict = field(default_factory=dict)
+    # Process-local proof that a persisted session's remote claims were acquired
+    # or reverified in this run. An app restart deliberately empties this set and
+    # surfaces one explicit Resume step without polling the LFS server every 15s.
+    work_session_verified: set[str] = field(default_factory=set)
     jobs: JobRunner = field(default_factory=JobRunner)
     rendered_dom_fetcher: object | None = None  # RenderedDomFetcher; set by the host on Windows
     # App-repo self-update (updater.py): the CODE/UI/DATA repo (distinct from the
@@ -82,6 +138,12 @@ class AppContext:
     # or library switch, or a KiCad settings change), so Doctor/Settings can surface
     # honestly what happened without re-running it. None until the first attempt.
     last_wiring: object | None = None
+    # Most recent automatic library convergence outcome. None means no attempt
+    # has completed yet; failures remain observable instead of being swallowed.
+    last_sync: object | None = None
+    # Most recent automatic sourced -> derived refresh. Application/ruleset updates run this
+    # without credentials, and the report stays observable even when one record cannot rebuild.
+    last_derivation: dict | None = None
     # The explicitly injected kicad_dir (tests, embeddings), when one was given: a
     # settings change must never silently repoint it at the real machine config
     # (the review-confirmed footgun that let the test suite write into ~/.config).
@@ -123,6 +185,41 @@ class AppContext:
         """
         self.index.sync(self.profile.library.parts_dir)
 
+    def refresh_stale_derivations(self) -> dict:
+        """Bring older sourced records onto this build's ruleset and refresh the live index.
+
+        This is the automatic half of the derivation stamp: an application update that changes
+        description or normalization rules must not leave the old presentation in place until a
+        person finds a Maintenance button. It is credential-free and fail-soft; unreadable or
+        evidence-free records remain explicitly reported, and a newer peer's stamp is never
+        downgraded.
+        """
+        from datetime import datetime, timezone
+
+        from stockroom.model.derived import DERIVED_BY
+
+        try:
+            report = self.ops.rederive_library(
+                now_iso=datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
+                    "+00:00", "Z"
+                ),
+                only_outdated=True,
+            )
+        except Exception as exc:  # noqa: BLE001 - a derivation issue must not kill the desktop
+            report = {
+                "ruleset": DERIVED_BY,
+                "checked": 0,
+                "rewritten": 0,
+                "failed": [{"id": "", "error": str(exc)}],
+            }
+        self.last_derivation = report
+        if report.get("rewritten", 0):
+            self.rebuild_index()
+            # A derivation commit is a normal library write. Push when this machine is configured
+            # to do so; otherwise the commit remains local and the next Sync carries it.
+            self.auto_push()
+        return report
+
     def rebuild_stm_index(self, source: Path | None = None, progress=None) -> None:
         """Build the STM index from `source` (falling back to the configured
         stm_cubemx_source, then stm.source's own env-var/candidate-path discovery)
@@ -134,9 +231,11 @@ class AppContext:
         from stockroom.stm.db import StmIndex
         from stockroom.stm.source import default_cubemx_source, default_index_path
 
-        resolved_source = source or (
-            Path(self.config.stm_cubemx_source) if self.config.stm_cubemx_source else None
-        ) or default_cubemx_source()
+        resolved_source = (
+            source
+            or (Path(self.config.stm_cubemx_source) if self.config.stm_cubemx_source else None)
+            or default_cubemx_source()
+        )
         if resolved_source is None:
             raise ValueError(
                 "no STM32 CubeMX source configured or discoverable - set "
@@ -180,15 +279,25 @@ class AppContext:
             return False
         try:
             result = self.sync.sync()
-        except Exception:  # noqa: BLE001 - reconciling must never break a launch or a running app
+        except Exception as exc:  # noqa: BLE001 - never break launch or the running app
+            from stockroom.vcs.sync import SyncResult, SyncState
+
+            self.last_sync = SyncResult(state=SyncState.DIVERGED, detail=str(exc))
             return False
+        self.last_sync = result
         if getattr(result, "pulled", False):
+            # A peer may have contributed records from the previous application ruleset. Refresh
+            # those before exposing the pulled tree through the derived index.
+            self.refresh_stale_derivations()
             self.rebuild_index()
             self.rebuild_project_index()
             return True
         return False
 
-    def start_background_sync(self, interval_seconds: float = 120.0) -> "threading.Event":
+    def start_background_sync(
+        self,
+        interval_seconds: float = 120.0,
+    ) -> BackgroundSyncHandle:
         """Keep reconciling for as long as the app runs, not only at launch.
 
         Owner, 2026-07-26: "it shouldnt need to relaunch". A launch-only pull still leaves a window
@@ -196,18 +305,31 @@ class AppContext:
         staleness in slower motion. Mirrors the update check the rail already runs on an interval
         for exactly this reason.
 
-        A daemon thread on a stoppable Event, so nothing has to be torn down on exit and a test can
-        stop it deterministically. The per-repo write lock added earlier makes a background pull
-        safe against a concurrent local write: they queue rather than collide on `.git/index.lock`.
+        The returned handle owns both cancellation and completion. The per-repo
+        write lock makes a background pull safe against a concurrent local write;
+        generation handoff additionally joins this worker before releasing its
+        durable fence.
         """
-        stop = threading.Event()
+        if (
+            type(interval_seconds) not in {int, float}
+            or not math.isfinite(float(interval_seconds))
+            or float(interval_seconds) <= 0
+        ):
+            raise ValueError("interval_seconds must be positive and finite")
+        handle = BackgroundSyncHandle()
 
         def loop() -> None:
-            while not stop.wait(interval_seconds):
+            while not handle.wait(interval_seconds):
                 self.reconcile()
 
-        threading.Thread(target=loop, name="stockroom-sync-loop", daemon=True).start()
-        return stop
+        thread = threading.Thread(
+            target=loop,
+            name="stockroom-sync-loop",
+            daemon=False,
+        )
+        handle.bind(thread)
+        thread.start()
+        return handle
 
     def sync_on_launch(self) -> None:
         """Reconcile this machine's library with the remote once, at startup.
@@ -262,6 +384,127 @@ class AppContext:
         except Exception:  # noqa: BLE001 - best-effort; the surface reports the gap instead
             pass
 
+    def configure_repository_auth(self) -> None:
+        """Apply the configured GitHub credential to this library repository.
+
+        This can update ``.git/config``. Managed hosts therefore call it only from
+        the coordinator lifecycle after acquiring the exact service generation.
+        """
+
+        try:
+            from stockroom.vcs import github_auth
+
+            github_auth.configure(
+                self.repo,
+                getattr(self.config, "github_token", ""),
+            )
+        except Exception:  # noqa: BLE001 - auth config is best-effort at boot
+            pass
+
+    def load_stm_index(self, *, restore_baked: bool) -> None:
+        """Load the machine STM index, optionally restoring the packaged seed.
+
+        Opening an existing index is read-only in intent, while restoring the seed
+        writes machine state. Managed cold construction does neither; the promoted
+        coordinator performs this bounded initialization instead.
+        """
+
+        if self.stm_index is not None:
+            return
+        try:
+            from stockroom.stm.db import StmIndex
+            from stockroom.stm.source import default_index_path
+
+            path = default_index_path()
+            self.stm_index = StmIndex.load(path)
+            if self.stm_index is None and restore_baked:
+                from stockroom.stm.seed import restore_baked_index
+
+                if restore_baked_index(path):
+                    self.stm_index = StmIndex.load(path)
+        except Exception:  # noqa: BLE001 - missing/stale/corrupt STM data is non-fatal
+            pass
+
+    def reconcile_managed_boot(self) -> None:
+        """Rehydrate current machine/library truth and reconcile it under authority.
+
+        A release candidate is intentionally constructed cold before the previous
+        owner drains. Settings, profiles, parts, and projects can all change in
+        that interval. The acquired generation fence is therefore the boundary at
+        which persisted configuration is reloaded and every root-derived engine
+        is rebound in place before background work becomes reachable.
+        """
+
+        latest_config = self.config.reload(migrate_credentials=False)
+        configured_root = latest_config.libraries_root.strip()
+        latest_root = (
+            Path(configured_root).expanduser()
+            if configured_root
+            else self.libraries_root
+        )
+        latest_repo = GitRepo(latest_root)
+        latest_profiles = ProfileStore(latest_root, latest_repo)
+        profile_names = latest_profiles.list()
+        if not profile_names:
+            raise RuntimeError("managed library has no usable profiles")
+        repaired_profile = latest_config.active_profile not in profile_names
+        if repaired_profile:
+            latest_config.active_profile = profile_names[0]
+
+        fresh = build_context(
+            latest_root,
+            kicad_dir=self.kicad_dir_pinned,
+            config=latest_config,
+            token=self.token,
+            perform_boot_reconciliation=False,
+        )
+        old_index = self.index
+        old_project_index = self.project_index
+        self.__dict__.update(
+            {
+                name: getattr(fresh, name)
+                for name in (
+                    "libraries_root",
+                    "repo",
+                    "config",
+                    "profile_store",
+                    "profile",
+                    "ops",
+                    "index",
+                    "sync",
+                    "kicad_dir",
+                    "cli",
+                    "enrich_cache_dir",
+                    "project_store",
+                    "project_index",
+                    "project_ops",
+                    "assembly_store",
+                    "work_session_store",
+                )
+            }
+        )
+        old_index.close()
+        old_project_index.close()
+        self.checks_cache.clear()
+        self.bom_cache.clear()
+        self.review_validation_cache.clear()
+        self.work_session_verified.clear()
+
+        self.config.migrate_legacy_credentials()
+        config_source = self.config.source_path
+        if repaired_profile and config_source is not None:
+            self.config.save(config_source)
+        ensure_cache_dir(self.enrich_cache_dir)
+        self.configure_repository_auth()
+        self.refresh_stale_derivations()
+        # These scans are intentionally unconditional. The cold preflight indexes
+        # may predate writes completed by the previous generation during drain.
+        self.index.sync(self.profile.library.parts_dir)
+        self.rebuild_project_index()
+        self.ensure_derived_artifacts()
+        self.load_stm_index(restore_baked=True)
+        self.rewire_kicad()
+
     def rewire_kicad(self) -> None:
         """Repoint KiCad at the active profile (SR_LIB + table rows + category libs),
         never raising: auto_wire skips when KiCad is absent and captures failures
@@ -270,9 +513,7 @@ class AppContext:
         from stockroom.kicad.wiring import auto_wire
 
         explicit = self.kicad_dir_pinned is not None or bool(self.config.kicad_config_override)
-        self.last_wiring = auto_wire(
-            self.kicad_dir, self.profile, cli=self.cli, explicit=explicit
-        )
+        self.last_wiring = auto_wire(self.kicad_dir, self.profile, cli=self.cli, explicit=explicit)
 
     def apply_kicad_settings(self) -> None:
         """Rebuild every engine piece derived from the KiCad overrides LIVE (no
@@ -296,6 +537,7 @@ class AppContext:
         self.ops = LibraryOps(self.profile, self.repo, self.cli)
         self.config.active_profile = name
         self.config.save()
+        self.refresh_stale_derivations()
         self.rebuild_index()
         self.rewire_kicad()
         # Each profile has its own parts and therefore its own derived data source; without this
@@ -319,8 +561,20 @@ class AppContext:
         )
         old_index, old_project_index = self.index, self.project_index
         for name in (
-            "libraries_root", "repo", "profile_store", "profile", "ops", "index", "sync",
-            "enrich_cache_dir", "project_store", "project_index", "project_ops",
+            "libraries_root",
+            "repo",
+            "profile_store",
+            "profile",
+            "ops",
+            "index",
+            "sync",
+            "enrich_cache_dir",
+            "project_store",
+            "project_index",
+            "project_ops",
+            "assembly_store",
+            "work_session_store",
+            "last_derivation",
         ):
             setattr(self, name, getattr(fresh, name))
         old_index.close()
@@ -338,6 +592,8 @@ def build_context(
     kicad_dir: Path | None = None,
     config: MachineConfig | None = None,
     token: str | None = None,
+    *,
+    perform_boot_reconciliation: bool = True,
 ) -> AppContext:
     from stockroom.api.security import mint_token
 
@@ -355,10 +611,26 @@ def build_context(
     project_store = ProjectStore(projects_root, repo)
     project_index = ProjectIndex.build(projects_root)
     project_ops = ProjectOps(project_store, cli)
-    kdir = Path(kicad_dir) if kicad_dir is not None else kicad_config_dir(
-        override=config.kicad_config_override
+    library_workflow_key = hashlib.sha256(
+        str(libraries_root.resolve()).casefold().encode("utf-8")
+    ).hexdigest()[:16]
+    assembly_store = AssemblyRunStore(
+        libraries_root.parent / ".stockroom-project-workflows" / "assemblies" / library_workflow_key
+    )
+    work_session_store = WorkSessionStore(
+        libraries_root.parent
+        / ".stockroom-project-workflows"
+        / "work-sessions"
+        / library_workflow_key
+    )
+    kdir = (
+        Path(kicad_dir)
+        if kicad_dir is not None
+        else kicad_config_dir(override=config.kicad_config_override)
     )
     enrich_cache = libraries_root.parent / ".stockroom-enrich-cache"
+    if perform_boot_reconciliation:
+        ensure_cache_dir(enrich_cache)
     # The app repo is the git repo containing THIS package (the CODE/UI/DATA repo),
     # used only by the self-update route (updater.py). GitRepo needs git on PATH; if
     # it is absent we leave app_repo None so the update route surfaces the state
@@ -387,36 +659,16 @@ def build_context(
         project_store=project_store,
         project_index=project_index,
         project_ops=project_ops,
+        assembly_store=assembly_store,
+        work_session_store=work_session_store,
         app_repo=app_repo,
         kicad_dir_pinned=Path(kicad_dir) if kicad_dir is not None else None,
     )
-    # Apply the configured GitHub credential to the library repo so push/pull authenticate
-    # non-interactively (a recovery re-clone resets .git/config, so re-applying on every boot
-    # keeps it live). Non-fatal: a non-git library or a git error never blocks the boot.
-    try:
-        from stockroom.vcs import github_auth
-
-        github_auth.configure(repo, getattr(config, "github_token", ""))
-    except Exception:  # noqa: BLE001 - auth config is best-effort; never crash the context build
-        pass
-    # Build any DERIVED per-tool artifact this library needs on disk but does not share through
-    # git (today: Altium's SQLite data source). Doing it at boot is what keeps a fresh clone
-    # placeable now that the file is no longer committed.
-    ctx.ensure_derived_artifacts()
-    # Lazy STM index load: unlike `index`, no source is synced at launch, so this only picks
-    # up whatever derived index already sits on disk (default_index_path()). When nothing
-    # valid is on disk, the committed baked seed (stm/seed.py) is restored once and the load
-    # retried - the rev-stamp gate still decides; a stale seed is refused like any stale
-    # file. None remains a legitimate result (first run with no seed, a stamp mismatch on
-    # both paths, or corruption) - never treated as an error, and never blocks the boot.
-    try:
-        from stockroom.stm.db import StmIndex
-        from stockroom.stm.seed import restore_baked_index
-        from stockroom.stm.source import default_index_path
-
-        ctx.stm_index = StmIndex.load(default_index_path())
-        if ctx.stm_index is None and restore_baked_index(default_index_path()):
-            ctx.stm_index = StmIndex.load(default_index_path())
-    except Exception:  # noqa: BLE001 - a missing/stale/corrupt STM index must never break the boot
-        pass
+    if perform_boot_reconciliation:
+        # Mutable boot work is retained for standalone development callers. Managed
+        # hosts pass False and invoke reconcile_managed_boot only after fencing.
+        ctx.configure_repository_auth()
+        ctx.refresh_stale_derivations()
+        ctx.ensure_derived_artifacts()
+        ctx.load_stm_index(restore_baked=True)
     return ctx

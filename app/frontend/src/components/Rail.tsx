@@ -1,30 +1,27 @@
 /**
  * The left navigation rail (north-star .nav): a wordmark card at the top, the primary
  * destinations, and a footer pinned to the bottom that carries Settings and a single
- * utility controls. Every row shares one icon column and one label column, so pinning,
- * peeking, and auto-collapsing never move a glyph.
+ * utility controls. Every row shares one icon column and one label column, so pinning
+ * and auto-collapsing never move a glyph.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { railNav, railRouteFor, type NavEntry } from "../lib/nav";
 import { useRouter, type Route } from "../lib/router";
 import { useTheme } from "../lib/theme";
-import { useApplyUpdate, useUpdateCheck } from "../api/queries";
-import { ApiError } from "../api/client";
-import { useToast } from "../lib/toast";
+import { useUpdateCheck } from "../api/queries";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "./Icon";
 import { readPref, writePref } from "../lib/uiPrefs";
 import { useModalDismiss } from "../lib/useModalDismiss";
-import { deriveUpdateStanding } from "../lib/updateStanding";
+import { aboutVersion, deriveUpdateStanding } from "../lib/updateStanding";
 
-// The peek's label reveal, in ONE place. Every label in the rail uses it, because the first cut wired
-// only the primary nav and Settings - so hovering produced a panel where three of the bottom controls
-// were still bare icons, which reads as broken rather than as compact.
-const PEEK_LABEL =
-  "w-0 overflow-hidden opacity-0 transition-opacity duration-150 motion-reduce:transition-none " +
-  "[@media(hover:hover)]:group-hover/rail:w-auto [@media(hover:hover)]:group-hover/rail:opacity-100 " +
-  "[@media(hover:hover)]:group-hover/rail:delay-150 " +
-  "group-has-[:focus-visible]/rail:w-auto group-has-[:focus-visible]/rail:opacity-100";
+// Collapsed labels stay in the accessibility tree but never grow an overlay over the workspace.
+// The old hover peek expanded from 52px to 190px and then sustained its own :hover state. After a
+// user chose a destination, the pointer had to cross that overlay to reach controls near the left
+// edge, so it could intercept the next click (the STM Explorer / Bench tabs exposed this exactly).
+// Native title tooltips identify the icons at rest; the explicit header control pins the rail open
+// when persistent labels are wanted.
+const COLLAPSED_LABEL = "w-0 overflow-hidden opacity-0";
 
 /** One geometry for every rail control in every state.
  *
@@ -37,10 +34,6 @@ const RAIL_ROW =
   "grid h-[34px] w-full grid-cols-[35px_minmax(0,1fr)] items-center gap-2.5 " +
   "rounded-control px-0 text-left";
 const RAIL_GLYPH = "flex h-[17px] w-[35px] items-center justify-center";
-
-function errMsg(err: unknown): string {
-  return err instanceof ApiError ? err.message : "Something went wrong.";
-}
 
 // The primary nav destinations. Each glyph was a sizeless `.ico` svg taking its 17px box from the
 // parent span; <Icon>'s primary branch would inject its default h-3.5 box, so we pass h-full w-full
@@ -131,35 +124,12 @@ export function Rail() {
     checking: !!(update.isPending || update.isFetching),
     failed: !!update.isError,
   });
-  const hasUpdate = updateView.standing === "available";
   const [aboutOpen, setAboutOpen] = useState(false);
 
-  // The Update pill applies the update right here - the same flow (and the same toasts) as
-  // Settings' Apply Update, so the two entry points can never behave differently.
-  const apply = useApplyUpdate();
-  const { toast } = useToast();
-  const toastRestart = useText("settings.update.toast-restart", "Update applied. Restart to finish.");
-  const toastApplied = useText("settings.update.toast-applied", "Update applied.");
-
-  function onApplyUpdate() {
-    apply.mutate(undefined, {
-      onSuccess: (r) => {
-        if (r.restart_requested) {
-          toast(toastRestart, "neutral");
-        } else if (r.updated) {
-          toast(toastApplied, "ok");
-        } else {
-          toast(r.detail || r.state, "neutral");
-        }
-      },
-      onError: (e) => toast(errMsg(e), "err"),
-    });
-  }
-
   return (
-    // COLLAPSED, the outer shell holds a FIXED 52px of layout and the rail itself overlays on top of
-    // it, so hovering reveals the labels WITHOUT reflowing the page (the owner's choice from previews,
-    // 2026-07-26). Pinned open, there is no overlay at all and the content reflows exactly once.
+    // COLLAPSED, the outer shell holds a fixed 52px of layout. Pinned open, the content reflows
+    // exactly once. The collapsed rail never grows over the workspace, so left-edge controls remain
+    // reachable immediately after navigation.
     <div className={collapsed ? "relative z-[60] w-[52px] flex-none" : "flex-none"}>
     <nav
       aria-label="Primary"
@@ -171,24 +141,13 @@ export function Rail() {
         "group/rail flex flex-col border-r border-line py-4 " +
         "transition-[width,padding] duration-150 motion-reduce:transition-none " +
         (collapsed
-          // The peek. `@media (hover:hover)` so a touch device never gets a state it cannot leave -
-          // there the toggle is the only way, which is why the toggle stays. `:has(:focus-visible)`
-          // gives the same expansion to the keyboard without treating pointer focus as keyboard
-          // intent. `focus-within` left the overlay open after every mouse navigation because the
-          // clicked button retained focus, covering 138px of the destination until the next click.
-          // The 150ms hover-intent delay stops a pointer merely crossing the rail from opening it;
-          // leaving is instant, because a panel that lingers over content reads as stuck.
+          // A compact, opaque icon rail. Labels are available through the accessible name and
+          // native title; the header toggle is the only operation that changes rail width.
           ? "absolute inset-y-0 left-0 h-full w-[52px] overflow-hidden px-2 " +
-            // --c-rail is a translucent TINT (rgba .032 dark / .5 light). That was fine while the rail
-            // sat IN the flex flow over the canvas; overlaying content it let the parts list read
-            // straight through the panel. Composite the tint over an opaque canvas base in one
-            // element, so the peek is opaque and still exactly the rail's colour.
-            "bg-canvas [background-image:linear-gradient(var(--c-rail),var(--c-rail))] " +
-            // WIDTH ONLY. The padding stayed px-2 (it used to go px-3, which moved every row 4px)
-            // and the drop shadow is gone at the owner's request - the peek is already an
-            // opaque panel with a border, so the shadow only added weight to a hover state.
-            "[@media(hover:hover)]:hover:w-[190px] [@media(hover:hover)]:hover:delay-150 " +
-            "has-[:focus-visible]:w-[190px]"
+            // --c-rail is a translucent tint. Composite it over an opaque canvas base so content
+            // never reads through the compact rail. Padding stays identical to the pinned rail,
+            // keeping every glyph on one centerline.
+            "bg-canvas [background-image:linear-gradient(var(--c-rail),var(--c-rail))]"
           : "bg-rail h-full w-[190px] px-2")
       }
     >
@@ -249,7 +208,7 @@ export function Rail() {
         {collapsed ? (
           <span
             className={
-              PEEK_LABEL +
+            COLLAPSED_LABEL +
               " whitespace-nowrap text-base font-semibold tracking-[-0.01em] text-t1"
             }
           >
@@ -298,7 +257,7 @@ export function Rail() {
           <span aria-hidden className={RAIL_GLYPH}>
             <Icon id="nav.about" className="h-full w-full" />
           </span>
-          <span className={collapsed ? PEEK_LABEL + " whitespace-nowrap" : ""}>
+          <span className={collapsed ? COLLAPSED_LABEL + " whitespace-nowrap" : ""}>
             <Text id="nav.about">About</Text>
           </span>
         </button>
@@ -306,68 +265,43 @@ export function Rail() {
           data-dev-id="rail.utility"
           className="flex flex-col items-stretch gap-0.5"
         >
-          {hasUpdate ? (
-            <button
-              type="button"
-              data-dev-id="rail.update"
-              title="A new version is available"
-              aria-label={collapsed ? "Update" : undefined}
-              onClick={onApplyUpdate}
-              disabled={apply.isPending}
-              className={
-                RAIL_ROW +
-                " text-xs font-semibold text-t1 transition hover:bg-[var(--c-hover)] " +
-                "disabled:cursor-not-allowed disabled:opacity-50"
+          <div
+            data-dev-id="rail.update"
+            className={RAIL_ROW + " text-xs font-medium text-t2"}
+            title={updateView.detail}
+          >
+            <span
+              aria-hidden
+              className={RAIL_GLYPH}
+              style={
+                updateView.standing === "current"
+                  ? { color: "var(--c-ok)" }
+                  : undefined
               }
             >
-              <span aria-hidden className={RAIL_GLYPH}>
-                <Icon id="nav.update" className="h-4 w-4 flex-none" />
-              </span>
-              <span className={collapsed ? PEEK_LABEL + " whitespace-nowrap" : ""}>
-                {apply.isPending ? (
-                  <Text id="nav.update-busy">Updating...</Text>
-                ) : (
-                  <Text id="nav.update">Update</Text>
-                )}
-              </span>
-            </button>
-          ) : (
-            <div
-              data-dev-id="rail.update"
-              className={
-                RAIL_ROW + " text-xs font-medium text-t2"
-              }
-              title={updateView.detail}
-            >
-              <span
-                aria-hidden
-                className={RAIL_GLYPH}
-                style={
+              <Icon
+                id={
                   updateView.standing === "current"
-                    ? { color: "var(--c-ok)" }
-                    : undefined
+                    ? "nav.up-to-date"
+                    : "nav.update"
                 }
-              >
-                <Icon
-                  id={
-                    updateView.standing === "current"
-                      ? "nav.up-to-date"
-                      : "nav.update"
-                  }
-                  className="h-4 w-4 flex-none"
-                />
-              </span>
-              <span className={collapsed ? PEEK_LABEL + " whitespace-nowrap" : ""}>
-                {updateView.standing === "current" ? (
-                  <Text id="nav.update-current">Current</Text>
-                ) : updateView.standing === "checking" ? (
-                  <Text id="nav.update-checking">Checking...</Text>
-                ) : (
-                  <Text id="nav.update-unknown">Update Unknown</Text>
-                )}
-              </span>
-            </div>
-          )}
+                className="h-4 w-4 flex-none"
+              />
+            </span>
+            <span className={collapsed ? COLLAPSED_LABEL + " whitespace-nowrap" : ""}>
+              {updateView.standing === "available" ? (
+                <Text id="nav.update-ready">Update Ready</Text>
+              ) : updateView.standing === "current" ? (
+                <Text id="nav.update-current">Current</Text>
+              ) : updateView.standing === "updating" ? (
+                <span>Updating...</span>
+              ) : updateView.standing === "checking" ? (
+                <Text id="nav.update-checking">Checking...</Text>
+              ) : (
+                <Text id="nav.update-unknown">Update Unknown</Text>
+              )}
+            </span>
+          </div>
           <button
             type="button"
             data-dev-id="rail.theme-toggle"
@@ -388,13 +322,18 @@ export function Rail() {
                 zero-width label. Measured with `uishot --measure`, which now reports glyphCx.
                 It also earns its place - the rail peek names every other control and named this
                 one nothing. */}
-            <span className={collapsed ? PEEK_LABEL + " whitespace-nowrap" : ""}>
+            <span className={collapsed ? COLLAPSED_LABEL + " whitespace-nowrap" : ""}>
               <Text id="nav.theme">Theme</Text>
             </span>
           </button>
         </div>
       </div>
-      {aboutOpen ? <AboutModal onClose={() => setAboutOpen(false)} /> : null}
+      {aboutOpen ? (
+        <AboutModal
+          onClose={() => setAboutOpen(false)}
+          version={aboutVersion(update.data, __APP_VERSION__)}
+        />
+      ) : null}
     </nav>
     </div>
   );
@@ -411,7 +350,7 @@ export function Rail() {
 // nothing. Seven other modals already adopted `useModalDismiss`; this one never did, while still
 // declaring `role="dialog" aria-modal`. A modal that traps you is worse than a panel that does not
 // claim to be one.
-function AboutModal({ onClose }: { onClose: () => void }) {
+function AboutModal({ onClose, version }: { onClose: () => void; version: string }) {
   const aboutLabel = useText("modal.about.aria", "About Stockroom");
   // Always mounted only while open, so `open` is true whenever this renders. The hook owns Escape,
   // the focus move into the dialog and the focus restore on the way out.
@@ -465,7 +404,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
         </p>
         <p className="mt-2 text-xs text-t3">
           <span className="font-medium">Version</span>{" "}
-          <span className="tnum font-mono">{__APP_VERSION__}</span>
+          <span className="tnum font-mono">{version}</span>
         </p>
         <div data-dev-id="about.links" className="mt-4 flex justify-center gap-2.5">
           <a
@@ -525,12 +464,11 @@ function RailItem({
       <span aria-hidden className={RAIL_GLYPH}>
         {NAV_ICONS[item.route] ?? null}
       </span>
-      {/* ALWAYS rendered, so the peek has something to reveal and the accessible name is real text
-          rather than an aria-label. Collapsed it is clipped to zero width by the panel's
-          `overflow-hidden` and faded out; the peek gives it both back. */}
+      {/* Always rendered so the accessible name is real text rather than a duplicate aria-label.
+          Collapsed, it is clipped to zero width by the panel and faded out. */}
       <span
         className={
-          "truncate whitespace-nowrap " + (collapsed ? PEEK_LABEL : "")
+          "truncate whitespace-nowrap " + (collapsed ? COLLAPSED_LABEL : "")
         }
       >
         <Text id={`nav.${item.route}`}>{item.title}</Text>

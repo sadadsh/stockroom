@@ -1,10 +1,7 @@
 /**
- * One staged part in the Add A Part flow: a candidate produced by inspecting a vendor
- * ZIP (its symbol/footprint/3D), edited until the complete-to-add gate passes, then
- * committed. When it was seeded from a pulled purchase link (the non-passive branch),
- * the pulled identity/specs/purchase already ride on the candidate and the datasheet
- * link is pre-filled, so the only thing the user still supplies is the asset files.
- * A known datasheet link counts as the datasheet, so nothing more is needed for it.
+ * One metadata-only candidate in Add A Part. It is edited, committed as an exact
+ * identity/spec record, then handed to the coherent network capture flow. Local CAD
+ * paths never enter this component. A known datasheet link counts as the datasheet.
  */
 import { useState } from "react";
 import { ApiError } from "../api/client";
@@ -17,7 +14,7 @@ import { distributorLabel } from "../lib/sourced";
 import { Badge, Button, Card, Dot } from "./primitives";
 import { PhotoTrigger, productPhotoUrl } from "./ProductPhoto";
 
-// where a shown conflict value came from: a distributor, or the dropped files' side.
+// Where a shown conflict value came from.
 // `files` is in the shared label table now, so this no longer carries its own copy of that
 // one answer - a second place deciding the same thing is a second place to drift.
 const conflictSourceLabel = (source: string) => distributorLabel(source);
@@ -52,7 +49,7 @@ export function CandidateCard({
   toast,
 }: {
   candidate: StagingCandidate;
-  // spec disagreements kept for display (API-vs-API + ZIP-vs-pull): the first value won
+  // Source disagreements kept for display: the first value won
   // the slot, the rest are shown so nothing pulled is silently discarded
   conflicts?: SpecConflict[];
   initialDatasheetUrl?: string;
@@ -134,6 +131,7 @@ export function CandidateCard({
         />
         <Button
           variant="accent"
+          data-dev-id="ingest.candidate-add"
           onClick={handleCommit}
           disabled={commit.isPending}
           className="flex-none"

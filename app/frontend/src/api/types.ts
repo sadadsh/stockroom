@@ -4,6 +4,21 @@
  * (stockroom.api.schemas, stockroom.model.part). Kept in lockstep with those.
  */
 
+export type TrustVerdict = "pass" | "fail" | "unknown";
+
+/**
+ * One tool's independently measured CAD state. `coverage_complete` says only whether every
+ * required representation is present; `trust` says what the recorded checks prove. `ready`
+ * requires both, except that a part class with no required assets is ready by definition.
+ */
+export interface EdaReadinessSummary {
+  required: string[];
+  missing: string[];
+  coverage_complete: boolean;
+  trust: TrustVerdict;
+  ready: boolean;
+}
+
 // GET /api/library/parts -> { parts: PartSummary[], count }
 export interface PartSummary {
   id: string;
@@ -11,8 +26,13 @@ export interface PartSummary {
   category: string;
   mpn: string;
   manufacturer: string;
+  // Passport/data completeness. This is not a CAD-presence or trust verdict.
   is_complete: boolean;
   missing: string[];
+  // Registry-keyed, per-tool CAD presence + evidence. Never inferred from the default EDA.
+  // Optional only across a rolling frontend/backend handoff from the preceding additive API;
+  // its absence fails closed and never falls back to passport completeness.
+  eda_readiness?: Record<string, EdaReadinessSummary>;
 }
 
 export interface PartsResponse {
@@ -497,11 +517,7 @@ export interface JobRef {
 // The KiCad + Altium asset types a part can still need. Mirrors the backend
 // stockroom.capture.requirements.Requirement enum values exactly (the wire contract).
 export type Requirement =
-  | "kicad_symbol"
-  | "kicad_footprint"
-  | "kicad_model"
-  | "altium_symbol"
-  | "altium_footprint";
+  "kicad_symbol" | "kicad_footprint" | "kicad_model" | "altium_symbol" | "altium_footprint";
 
 // ONE vendor's page for one part, and what the person has to do when they get there.
 export interface CadSource {
@@ -633,6 +649,446 @@ export interface OnboardingStatus {
   default_dir: string;
 }
 
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  root: string;
+  eda: "kicad" | "altium";
+  board_count: number;
+  sheet_count: number;
+  has_git: boolean;
+  registered_at: string;
+}
+
+export interface DiscoveredProject {
+  eda: "kicad" | "altium";
+  eda_label: string;
+  name: string;
+  root: string;
+  descriptor: string;
+  boards: string[];
+  schematics: string[];
+}
+
+export interface ProjectDocument {
+  document_id: string;
+  path: string;
+  label: string;
+  kind: "project" | "schematic" | "pcb";
+  exists: boolean;
+  lock_required: boolean;
+}
+
+export interface ProjectWorkspace {
+  project: {
+    id: string;
+    name: string;
+    root: string;
+    pro_path: string;
+    board_paths: string[];
+    sheet_paths: string[];
+    eda: "kicad" | "altium";
+    git_root: string | null;
+  };
+  eda_label: string;
+  tools: Array<"design" | "bom" | "assemble" | "changes" | "releases">;
+  parity: {
+    schema: "stockroom-project-parity/1";
+    edas: ["kicad", "altium"];
+    strict: true;
+    adapter_boundary: "native_io_only";
+    tools: Array<{
+      key: "design" | "bom" | "assemble" | "changes" | "releases";
+      label: string;
+      status: "active" | "planned";
+      behavior: "identical";
+      actions: string[];
+      inputs: string[];
+      states: string[];
+      results: string[];
+      recovery: string[];
+      acceptance: string[];
+    }>;
+  };
+  runtime: {
+    adapter_key: "kicad" | "altium";
+    available: boolean;
+    status: string;
+    version: string;
+    detail: string;
+  };
+  documents: ProjectDocument[];
+}
+
+export interface ProjectBomLine {
+  refs: string[];
+  qty: number;
+  value: string;
+  mpn: string;
+  manufacturer: string;
+  footprint: string;
+  description: string;
+  package: string;
+  basic: boolean;
+  in_library: boolean;
+  library_part_id: string;
+  final_qty: number;
+  final_unit_price: number | null;
+  line_total: number | null;
+}
+
+export interface ProjectBom {
+  project: string;
+  ran_at: string;
+  boards: number;
+  priced: boolean;
+  line_count: number;
+  component_count: number;
+  lines: ProjectBomLine[];
+  summary: {
+    state: "empty" | "built" | "unpriced" | "partial" | "costed";
+    total_cost: number;
+    priced_lines: number;
+    unpriced_lines: number;
+    line_count: number;
+    currency: string;
+  };
+  evidence: {
+    eda: "kicad" | "altium";
+    variant: string;
+    source_commit: string;
+    source_documents: string[];
+    bom_digest: string;
+    repository_pinned: boolean;
+  };
+}
+
+export interface ProjectAssignmentCandidate {
+  part_id: string;
+  display_name: string;
+  mpn: string;
+  description: string;
+  confidence: "value+footprint" | "value+package" | "value";
+  distinguish: string[];
+}
+
+export interface ProjectAssignmentGroup {
+  key: string;
+  lib_id: string;
+  value: string;
+  footprint: string;
+  refs: string[];
+  count: number;
+  sheets: string[];
+  candidates: ProjectAssignmentCandidate[];
+}
+
+export interface ProjectAssignments {
+  project: string;
+  eda: "kicad" | "altium";
+  under_git: boolean;
+  binding: {
+    field: string;
+    writable: boolean;
+    reason: string;
+  };
+  components: number;
+  unassigned: number;
+  bound: Array<{
+    ref: string;
+    sheet: string;
+    key: string;
+    weak_key: boolean;
+    part_id: string;
+    display_name: string;
+    mpn: string;
+    missing: boolean;
+    drift: Array<{ prop: string; old: string; new: string; kind: string }>;
+  }>;
+  groups: ProjectAssignmentGroup[];
+}
+
+export interface ProjectDocumentLock {
+  id: string;
+  path: string;
+  owner: string;
+  locked_at: string;
+}
+
+export interface ProjectWorkSession {
+  id: string;
+  owner: string;
+  branch: string;
+  base_branch: string;
+  base_commit: string;
+  documents: string[];
+  locks: ProjectDocumentLock[];
+  started_at: string;
+  shared_commit: string;
+}
+
+export interface ProjectSessionRecovery {
+  state: "healthy" | "resume_available" | "offline" | "attention";
+  detail: string;
+  safe_to_resume: boolean;
+  ready_to_share: boolean;
+  source_preserved: boolean;
+  current_branch: string;
+  dirty_claimed: string[];
+  dirty_unclaimed: string[];
+  claims: {
+    held: string[];
+    lost: string[];
+    unknown: string[];
+  };
+  issues: Array<{
+    code: string;
+    severity: "action" | "offline" | "error";
+    detail: string;
+    paths: string[];
+  }>;
+}
+
+export interface ProjectCollaboration {
+  repository: {
+    root: string;
+    remote: string;
+    branch: string;
+    commit: string;
+    clean: boolean;
+    dirty_paths: string[];
+    has_remote: boolean;
+    has_upstream: boolean;
+    ahead: number;
+    behind: number;
+  } | null;
+  session: ProjectWorkSession | null;
+  recovery: ProjectSessionRecovery | null;
+  blocked_reason?: string;
+}
+
+export interface ProjectReviewCandidate {
+  branch: string;
+  commit: string;
+  base_branch: string;
+  base_commit: string;
+  fork_commit: string;
+  changed_paths: string[];
+  commit_count: number;
+  ready: boolean;
+  blocked_reason: string;
+  events: ProjectReviewEvent[];
+}
+
+export interface ProjectReviewEvent {
+  id: string;
+  kind: "changes_requested";
+  branch: string;
+  commit: string;
+  base_branch: string;
+  base_commit: string;
+  reviewer: string;
+  message: string;
+  created_at: string;
+}
+
+export interface ProjectReviews {
+  base_branch: string;
+  candidates: ProjectReviewCandidate[];
+}
+
+export interface ProjectReviewEvidenceFinding {
+  kind: string;
+  path: string;
+  detail: string;
+}
+
+export interface ProjectNativeValidationCheck {
+  kind: "schematic" | "pcb";
+  path: string;
+  status: "passed" | "failed" | "blocked";
+  errors: number;
+  warnings: number;
+  detail: string;
+  findings?: Array<{
+    severity?: string;
+    rule?: string;
+    message?: string;
+  }>;
+  artifact?: {
+    name: string;
+    bytes: number;
+    sha256: string;
+  };
+}
+
+export interface ProjectNativeValidation {
+  schema_version?: number;
+  adapter?: "kicad" | "altium";
+  status: "pending" | "passed" | "failed" | "blocked";
+  runtime?: {
+    name: string;
+    version: string;
+  };
+  checks?: ProjectNativeValidationCheck[];
+  summary?: {
+    checked: number;
+    errors: number;
+    warnings: number;
+  };
+  detail: string;
+  project_id?: string;
+  branch?: string;
+  commit?: string;
+  base_branch?: string;
+  base_commit?: string;
+  source_digest?: string;
+  digest?: string;
+}
+
+export interface ProjectReviewEvidence {
+  schema_version: number;
+  project_id: string;
+  project_name: string;
+  eda: "kicad" | "altium";
+  branch: string;
+  commit: string;
+  base_branch: string;
+  base_commit: string;
+  source_digest: string;
+  documents: Array<{
+    path: string;
+    kind: "project" | "schematic" | "pcb";
+    bytes: number;
+    sha256: string;
+  }>;
+  bom: {
+    variant: string;
+    line_count: number;
+    component_count: number;
+    digest: string;
+    lines: Array<{
+      refs: string[];
+      qty: number;
+      value: string;
+      mpn: string;
+      manufacturer: string;
+      footprint: string;
+      package: string;
+      description: string;
+      datasheet: string;
+      basic: boolean;
+      identity_ready: boolean;
+    }>;
+  };
+  semantic_audit: {
+    components: number;
+    sheets: number;
+    counts: {
+      by_severity: Record<"error" | "warning" | "info", number>;
+      by_kind: Record<string, number>;
+    };
+    findings: Array<{
+      ref: string;
+      severity: "error" | "warning" | "info";
+      kind: string;
+      detail: string;
+    }>;
+    digest: string;
+  };
+  blockers: ProjectReviewEvidenceFinding[];
+  warnings: ProjectReviewEvidenceFinding[];
+  reviewable: boolean;
+  native_validation: ProjectNativeValidation;
+  visual_diff: {
+    status: "pending" | "passed" | "failed" | "blocked";
+    detail: string;
+  };
+  digest: string;
+}
+
+export interface ApproveProjectReviewResult {
+  integrated_commit: string;
+  evidence_digest: string;
+  candidate: Omit<
+    ProjectReviewCandidate,
+    "fork_commit" | "commit_count" | "ready" | "blocked_reason"
+  >;
+}
+
+export interface RequestProjectChangesResult {
+  event: ProjectReviewEvent;
+  candidate: Omit<
+    ProjectReviewCandidate,
+    "fork_commit" | "commit_count" | "ready" | "blocked_reason" | "events"
+  >;
+}
+
+export interface FinishWorkSessionResult {
+  integrated_commit: string;
+  collaboration: ProjectCollaboration;
+}
+
+export type AssemblyPlacementState = "pending" | "done" | "skipped" | "reworked" | "issue";
+
+export interface AssemblyPlacement {
+  placement_id: string;
+  board_index: number;
+  native_id: string;
+  reference: string;
+  sheet: string;
+  value: string;
+  footprint: string;
+  part_id: string;
+  mpn: string;
+  manufacturer: string;
+  state: AssemblyPlacementState;
+  last_event: AssemblyEvent | null;
+}
+
+export interface AssemblyEvent {
+  id: string;
+  sequence: number;
+  run_id: string;
+  placement_id: string;
+  state: Exclude<AssemblyPlacementState, "pending">;
+  scanned_mpn: string;
+  note: string;
+  recorded_at: string;
+}
+
+export interface AssemblyRun {
+  schema_version: number;
+  id: string;
+  project_id: string;
+  project_name: string;
+  eda: "kicad" | "altium";
+  operator: string;
+  boards: number;
+  source_commit: string;
+  project_digest: string;
+  started_at: string;
+  completed_at: string;
+  status: "active" | "completed";
+  receipt?: {
+    run_id: string;
+    source_commit: string;
+    project_digest: string;
+    event_digest: string;
+    completed_at: string;
+    digest: string;
+  };
+  placements: AssemblyPlacement[];
+  events: AssemblyEvent[];
+  progress: {
+    total: number;
+    complete: number;
+    resolved: number;
+    percent: number;
+    counts: Record<AssemblyPlacementState, number>;
+  };
+}
+
 // POST /api/onboarding/library
 export interface SetLibraryBody {
   mode: "open" | "create" | "clone";
@@ -647,6 +1103,32 @@ export interface SyncStatus {
   current_branch: string;
   ahead: number;
   behind: number;
+  working_copy?: {
+    mode: "embedded" | "rival_application_checkout" | "separate";
+    detail: string;
+  };
+  checkout_inventory?: {
+    state: "scanning" | "complete" | "truncated" | "failed" | "unavailable";
+    scanned_directories?: number;
+    max_directories?: number;
+    rival_count: number;
+    detail?: string;
+    checkouts: Array<{
+      path: string;
+      classification: "canonical" | "rival" | "active_rival" | "staged_release";
+      revision: string;
+      current: boolean;
+      tracked_dirty: boolean;
+      active_library: boolean;
+    }>;
+  };
+  last_sync?: {
+    state: string;
+    pulled: boolean;
+    pushed: boolean;
+    converged: boolean;
+    detail: string;
+  } | null;
 }
 
 // POST /api/sync
@@ -654,6 +1136,7 @@ export interface SyncResult {
   state: string;
   pulled: boolean;
   pushed: boolean;
+  converged?: boolean;
   detail: string;
 }
 
@@ -662,10 +1145,17 @@ export interface UpdateCheck {
   update_available: boolean;
   state?: string;
   behind?: number;
+  // Production installs identify immutable signed releases. Development installs use Git
+  // revisions instead; both remain explicit so the UI never guesses an identity's kind.
+  current_release_id?: string;
+  target_release_id?: string;
   current_revision?: string;
+  target_revision?: string;
   channel?: string;
   automatic_on_launch?: boolean;
   check_interval_seconds?: number;
+  convergence_phase?: string;
+  automatic_apply?: boolean;
   // set when the check could not reach the remote (state "offline"), so the UI
   // never shows a silent Up To Date it did not verify
   detail?: string;
@@ -677,6 +1167,10 @@ export interface UpdateApply {
   updated: boolean;
   detail: string;
   restart_requested: boolean;
+  frontend_reload_requested?: boolean;
+  seamless_handoff_requested?: boolean;
+  activated_revision?: string;
+  rolled_back?: boolean;
 }
 
 // GET /api/doctor/scan -> the library-health pass (stockroom.mutation.library_ops).
@@ -1139,20 +1633,10 @@ export interface CompatUnionBody {
 }
 
 export type TargetSiliconClass =
-  | "fixed_critical"
-  | "stable_io"
-  | "variant_io"
-  | "safety_collision"
-  | "partial";
+  "fixed_critical" | "stable_io" | "variant_io" | "safety_collision" | "partial";
 
 export type TargetBoardAction =
-  | "hardwire"
-  | "breakout"
-  | "direct"
-  | "switched"
-  | "selectable"
-  | "isolate"
-  | "unsupported";
+  "hardwire" | "breakout" | "direct" | "switched" | "selectable" | "isolate" | "unsupported";
 
 export interface TargetDefinitionPolicy {
   id: string;
@@ -1208,7 +1692,7 @@ export interface TargetDefinitionPolicy {
     position: string;
     action: TargetBoardAction;
     safe_default: "open" | "off" | "high-z";
-    uses_channel?: boolean;
+    requires_independent_path?: boolean;
     onehot_group?: string | null;
     net?: string;
     hazard?: string;
@@ -1218,18 +1702,15 @@ export interface TargetDefinitionPolicy {
       identity_patterns: string[];
       action: TargetBoardAction;
       net?: string;
-      uses_channel?: boolean;
+      requires_independent_path?: boolean;
       safe_default?: "open" | "off" | "high-z";
       onehot_group?: string | null;
       evidence?: string[];
     }[];
   }[];
-  channel_fabric: {
-    part_mpn: string;
-    channels_per_device: number;
-    max_devices: number;
-    default_state: "open";
-    reference_prefix?: string;
+  routing_constraints?: {
+    safe_default: "open";
+    maximum_independent_paths?: number;
   };
   target_mpns?: Record<string, string[]>;
   declared_blockers?: string[];
@@ -1248,6 +1729,9 @@ export interface TargetDefinitionPosition {
   bga_col: number | null;
   silicon_class: TargetSiliconClass;
   board_action: TargetBoardAction;
+  universal_primitive?: string;
+  active_path_count?: number;
+  passive_path_count?: number;
   identities: string[];
   access_tags: string[];
   access_tags_union: string[];
@@ -1269,7 +1753,7 @@ export interface TargetDefinitionPosition {
 }
 
 export interface TargetDefinitionDTO {
-  format: "stm-target-definition/1";
+  format: "stm-target-definition/2";
   compiler_rev: number;
   artifact_digest: string;
   profile: {
@@ -1431,38 +1915,365 @@ export interface TargetDefinitionDTO {
       matched_targets: string[];
       action: string;
       net: string;
-      uses_channel: boolean;
+      requires_independent_path: boolean;
       safe_default: string;
       evidence: string[];
     }[];
   }[];
-  channel_fabric: {
-    part_mpn: string;
-    channels_per_device: number;
-    max_devices: number;
-    default_state: string;
-    reference_prefix: string;
-    required_channels: number;
-    capacity: number;
-    used_devices: number;
-    allocations: {
+  routing_requirements: {
+    strategy: "implementation-neutral-independent-paths";
+    safe_default: "open";
+    required_independent_paths: number;
+    maximum_independent_paths: number | null;
+    limit_status: "unbounded" | "within-limit" | "over-limit";
+    paths: {
       kind: "route" | "safety";
       position: string;
-      net: string;
-      route_id: string | null;
+      requested_net: string;
+      requirement_id: string | null;
       branch_id?: string;
-      onehot_group: string | null;
+      exclusivity_group: string | null;
       safe_default: string;
       targets?: string[];
       identities?: string[];
-      reference: string;
-      device_index: number;
-      channel: number;
-      register_bit: number;
-      register_label: string;
+      path_id: string;
+    }[];
+  };
+  universalization: {
+    strategy: "one-package-universal-support";
+    implementation_owner: "consuming-design";
+    implementation_technology: "unspecified";
+    required_independent_paths: number;
+    passive_conditioned_paths?: number;
+    safe_default: "open";
+    state_contract: {
+      unknown_target: "all-independent-paths-open";
+      controller_startup: "all-independent-paths-open";
+      controller_reset: "all-independent-paths-open";
+      power_loss: "all-independent-paths-open";
+      target_change: "open-before-reconfigure";
+      identity_mismatch: "refuse-activation";
+      configured: "only-target-permitted-paths-may-conduct";
+    };
+    summary: {
+      direct_or_fixed: number;
+      selectable: number;
+      excluded_from_common_interface: number;
+      compact_hybrid?: number;
+      fully_exclusive?: number;
+    };
+    strategies: {
+      position: string;
+      silicon_class: TargetSiliconClass;
+      primitive:
+        | "fixed-network"
+        | "leave-open"
+        | "universal-breakout"
+        | "firmware-mapped-breakout"
+        | "exclude-from-common-interface"
+        | "exclusive-identity-branches"
+        | "conditioned-signal-with-selected-critical-role"
+        | "declared-identity-branches";
+      explanation: string;
+      selection: "none" | "one-of" | "critical-role-only" | "policy-defined";
+      safe_default: "open" | null;
+      identities: string[];
+      branches: {
+        id: string;
+        identity_patterns: string[];
+        matched_identities: string[];
+        matched_targets: string[];
+        action: TargetBoardAction;
+        net: string;
+        safe_default: string;
+        evidence_status: "declared" | "suggested";
+        connection_mode?: "selectable" | "isolated" | "passive-conditioned" | "passive-or-direct";
+        uses_independent_path?: boolean;
+      }[];
+      constraints: string[];
+      validation: {
+        status: "not-required" | "required" | "policy-evidence-required";
+        required_checks: string[];
+        failure_action: "none" | "use-fully-exclusive-fallback" | "keep-independent-paths-open";
+      };
+      active_path_count?: number;
+      passive_path_count?: number;
+      fallback?: {
+        primitive: "exclusive-identity-branches";
+        independent_paths: number;
+        reason: string;
+      } | null;
+      evidence_status: "compiler-derived" | "declared" | "suggested";
+      implementation_owner: "consuming-design";
     }[];
   };
   positions: TargetDefinitionPosition[];
+}
+
+export interface SocketSolutionElectricalEnvelope {
+  authority: string;
+  families: string[];
+  operating_v: [number, number] | null;
+  per_pin_current_ma: number | null;
+  injection_current_ma: number | null;
+  five_v_tolerant: boolean | null;
+  five_v_by_family?: Record<string, boolean>;
+  citations: string[];
+}
+
+export interface SocketSolutionMode {
+  id: string;
+  label: string;
+  kind: "signal" | "critical" | "reserved" | "absent";
+  conductive: boolean;
+  endpoint: string;
+  target_mask: string;
+  target_count: number;
+  percentage: number;
+  target_examples: string[];
+  functions: string[];
+  access_tags: string[];
+  electrical_envelope: SocketSolutionElectricalEnvelope;
+}
+
+export interface SocketSolutionBranch {
+  id: string;
+  mode_id: string;
+  label: string;
+  endpoint: string;
+  target_mask: string;
+  controlled: boolean;
+  default_state: "open" | "connected";
+  direction: string;
+  break_before_make: boolean;
+  plane:
+    | "open"
+    | "ground-return"
+    | "power-source"
+    | "regulator-network"
+    | "open-drain-control"
+    | "signal"
+    | "dedicated-network";
+  electrical_envelope: SocketSolutionElectricalEnvelope;
+}
+
+export interface SocketHazardContract {
+  level: "none" | "medium" | "high" | "critical";
+  rank: number;
+  category: string;
+  label: string;
+  reason: string;
+}
+
+export interface SocketCellContract {
+  architecture:
+    | "fail-closed-universal-position-cell"
+    | "passive-common-network"
+    | "fixed-or-signal-network";
+  selection_authority: "declared-target-profile" | "not-required";
+  default_state: "all-branches-open" | "connected";
+  planes: {
+    id: string;
+    requirements: string[];
+  }[];
+  mandatory_features: string[];
+  power_sequence: string[];
+  failure_response: "force-all-branches-open";
+  hazard: SocketHazardContract;
+}
+
+export interface SocketSolutionPosition {
+  position: string;
+  position_kind: "numeric" | "alnum";
+  lqfp_side: "left" | "bottom" | "right" | "top" | null;
+  bga_row: string | null;
+  bga_col: number | null;
+  cell_type:
+    | "fixed-direct"
+    | "fixed-network"
+    | "universal-io"
+    | "selected-roles"
+    | "critical-role-island"
+    | "passive-compatible-lane"
+    | "shared-analog-network"
+    | "high-integrity-path"
+    | "dedicated-analog-path"
+    | "reserved-open"
+    | "optional-absent";
+  cell_label: string;
+  solution_reason: string;
+  network_requirements: string[];
+  validation_checks: string[];
+  cell_contract: SocketCellContract;
+  hazard_contract: SocketHazardContract;
+  controlled: boolean;
+  safe_default: "open" | "connected";
+  observation_node: boolean;
+  universal_lane: boolean;
+  modes: SocketSolutionMode[];
+  branches: SocketSolutionBranch[];
+  mode_count: number;
+  agreement_count: number;
+  agreement_percentage: number;
+  support_cell_id: string;
+  hazard: string;
+}
+
+export interface SocketSupportCell {
+  id: string;
+  signature: string;
+  type: SocketSolutionPosition["cell_type"];
+  label: string;
+  positions: string[];
+  position_count: number;
+  mode_count: number;
+  controlled: boolean;
+  safe_default: "open" | "connected";
+  hazard_contract: SocketHazardContract;
+  cell_contract: SocketCellContract;
+  branch_pattern: {
+    mode_id: string;
+    label: string;
+    endpoint: string;
+    controlled: boolean;
+    plane: SocketSolutionBranch["plane"];
+  }[];
+  implementation_capabilities: {
+    default_open: boolean;
+    hardware_reset: boolean;
+    readback: boolean;
+    break_before_make: boolean;
+    bidirectional: boolean;
+    passive_conditioning?: boolean;
+    shared_supply?: boolean;
+    proof_required?: boolean;
+  };
+}
+
+export interface SocketTargetCohort {
+  id: string;
+  target_mask: string;
+  target_count: number;
+  percentage: number;
+  families: string[];
+  target_examples: string[];
+  configuration: Record<string, string>;
+}
+
+export interface SocketSolutionDTO {
+  format: "stm-socket-solution/1";
+  compiler_rev: number;
+  artifact_digest: string;
+  source_definition_digest: string;
+  scope: {
+    package: string;
+    families: string[];
+    target_count: number;
+    targets: {
+      ref: string;
+      family: string;
+      line: string;
+      verified_mpns: string[];
+    }[];
+    target_index: {
+      index: number;
+      ref: string;
+      family: string;
+      line: string;
+    }[];
+  };
+  provenance: Record<string, unknown>;
+  status: {
+    solution: "solved" | "conditional" | "impossible";
+    evidence: "complete" | "needs-source";
+    bootstrap: "automatic" | "requires-declared-target" | "unavailable";
+    blockers: string[];
+    warnings: string[];
+  };
+  closure: {
+    verdict: "architecture-complete" | "unsupported";
+    release: "ready" | "verification-open";
+    zero_omission: boolean;
+    supported_target_count: number;
+    unsupported_target_count: number;
+    target_coverage_percentage: number;
+    gates: {
+      id:
+        | "target-coverage"
+        | "configuration-integrity"
+        | "safe-before-power"
+        | "required-access"
+        | "electrical-verification";
+      label: string;
+      status: "pass" | "open" | "fail";
+      value: string;
+      detail: string;
+    }[];
+    required_requirement_coverage: {
+      id: string;
+      label: string;
+      covered_targets: number;
+      available_target_count: number;
+      target_count: number;
+      coverage_percentage: number;
+      silicon_available_percentage: number;
+      missing_targets: string[];
+      architecture_missing_targets: string[];
+      status: "pass" | "fail";
+    }[];
+    configuration_errors: {
+      target: string;
+      position: string;
+      reason: string;
+    }[];
+  };
+  summary: {
+    target_count: number;
+    target_cohort_count: number;
+    position_count: number;
+    support_cell_count: number;
+    direct_positions: number;
+    configurable_positions: number;
+    critical_positions: number;
+    universal_lanes: number;
+    observation_nodes: number;
+    controlled_branches: number;
+    critical_hazard_positions: number;
+    high_hazard_positions: number;
+    proof_open_positions: number;
+    supported_targets: number;
+    direct_percentage: number;
+    configurable_percentage: number;
+    shared_route_savings_percentage: number;
+  };
+  safe_state_contract: Record<string, string>;
+  bootstrap: {
+    status: "automatic" | "requires-declared-target";
+    debug_positions: string[];
+    rule: string;
+  };
+  fabric: {
+    strategy: string;
+    universal_lanes: number;
+    observation_nodes: number;
+    controlled_branches: number;
+    control_bits_required: number;
+    cohort_configurations: number;
+    capacity_limit: number | null;
+    configuration_authority:
+      | "declared-target-before-power"
+      | "common-bootstrap-then-target-profile";
+    mandatory_interlocks: string[];
+  };
+  target_cohorts: SocketTargetCohort[];
+  support_cells: SocketSupportCell[];
+  positions: SocketSolutionPosition[];
+  proofs: {
+    position: string;
+    status: "needed";
+    checks: string[];
+    failure_action: string;
+  }[];
 }
 
 // GET /api/stm/pin/af?part=&position= -> one pin's complete AF0-15 set (SWAP-01). Reuses Phase 4's
@@ -1553,6 +2364,91 @@ export interface LibraryCoverage {
   assisted_can_provide?: string[];
 }
 
+export type WorkflowBatchStatus =
+  "queued" | "running" | "blocked" | "paused" | "completed" | "failed" | "cancelled";
+
+export interface WorkflowBatchActions {
+  can_pause: boolean;
+  can_resume: boolean;
+  can_retry: boolean;
+  can_cancel: boolean;
+}
+
+export interface WorkflowBatchSummary {
+  id: string;
+  status: WorkflowBatchStatus;
+  created_at: number;
+  updated_at: number;
+  total_items: number;
+  item_counts: Record<string, number>;
+  cancellation: {
+    state: "requested" | "completed";
+    requested_at: number;
+    completed_at: number | null;
+  } | null;
+  actions: WorkflowBatchActions;
+}
+
+export interface WorkflowEvent {
+  sequence: number;
+  item_id: string | null;
+  stage_id: string | null;
+  kind: string;
+  details: Record<string, string | number>;
+  created_at: number;
+}
+
+export interface WorkflowEventsPage {
+  schema_version: 1;
+  batch: WorkflowBatchSummary;
+  events: WorkflowEvent[];
+  cursor: {
+    after_sequence: number;
+    next_sequence: number;
+    limit: number;
+    has_more: boolean;
+  };
+}
+
+export interface WorkflowBatchSnapshot {
+  schema_version: 1;
+  batch: WorkflowBatchSummary;
+  event_cursor: number;
+  items: Array<{
+    id: string;
+    ordinal: number;
+    status: string;
+    stages: Array<{
+      id: string;
+      name: string;
+      status: string;
+      attempt_count: number;
+      next_attempt_at: number | null;
+    }>;
+  }>;
+  page: {
+    after_ordinal: number;
+    next_ordinal: number;
+    limit: number;
+    has_more: boolean;
+  };
+}
+
+export interface WorkflowControlResult {
+  schema_version: 1;
+  operation: "pause" | "resume" | "retry" | "cancel";
+  changed: boolean;
+  batch: WorkflowBatchSummary;
+}
+
+export interface CompletionRunRef {
+  /** Durable vNext authority. Preferred whenever the persistent owner supplies it. */
+  workflow_batch_id?: string;
+  event_cursor?: number;
+  /** Explicitly bounded compatibility transport during cutover. */
+  job_id?: string;
+}
+
 // What CAD this library holds, and what a clear would remove.
 //
 // `cleared` counts STOCKROOM-AUTHORED assets: an entry in an SR- library, a `.kicad_mod`, a
@@ -1598,6 +2494,28 @@ export interface DerivationReport {
 }
 
 // One part's outcome from a completion run.
+export type ProviderOutcomeStatus =
+  | "succeeded-retained"
+  | "activated"
+  | "unavailable"
+  | "requires-human"
+  | "blocked"
+  | "failed"
+  | "cancelled"
+  | "not-attempted";
+
+export interface ProviderOutcome {
+  route_id: string;
+  provider_key: string;
+  author_key: string;
+  label: string;
+  status: ProviderOutcomeStatus;
+  attempted: boolean;
+  retained: number;
+  activated: boolean;
+  reason: string;
+}
+
 export interface CompletionItem {
   part_id: string;
   mpn: string;
@@ -1620,11 +2538,19 @@ export interface CompletionItem {
   // failures; `error` remains reserved for an operation that broke.
   notes: string[];
   error: string;
+  // One terminal result for every planned surface/author route. DigiKey's Ultra Librarian,
+  // SnapMagic, and TraceParts rows remain independent.
+  provider_outcomes?: ProviderOutcome[];
+  // Null for ordinary missing-only completion. In collect-all mode this is false whenever any
+  // planned route is blocked, errors, or lacks a terminal availability verdict.
+  collection_complete?: boolean | null;
 }
 
 export interface CompletionResult {
   items: CompletionItem[];
   counts: Record<string, number>;
+  retained?: number;
+  collection_complete?: boolean | null;
   stopped: boolean;
   // Why it stopped when the user did not ask it to -- empty otherwise. A stop with no reason
   // is indistinguishable from a crash.

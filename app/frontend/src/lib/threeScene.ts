@@ -264,6 +264,11 @@ function roundedPadGeometry(
   return geo;
 }
 
+/** The canvas stays transparent because its parent owns the theme-aware `bg-stage` surface. */
+export const MODEL_RENDERER_PARAMETERS: Readonly<THREE.WebGLRendererParameters> = Object.freeze({
+  antialias: true,
+  alpha: true,
+});
 
 export function mountModelScene(
   container: HTMLElement,
@@ -278,7 +283,7 @@ export function mountModelScene(
   // colour of its own. This was briefly switched to alpha:false while hunting the black-model bug;
   // that turned out to be missing vertex normals, so the opaque backdrop bought nothing and only
   // painted a colour over the app's own.
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  const renderer = new THREE.WebGLRenderer({ ...MODEL_RENDERER_PARAMETERS });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(width, height);
   // Filmic tone mapping so the bright metal highlights + deep shadow sides don't clip: this is
@@ -1001,6 +1006,11 @@ export function mountModelScene(
    */
   function applyPlacement(source: LandPatternInput["model_placement"]) {
     if (!modelRoot) return;
+    // A placement may contain a zero or reflected scale. Decomposing that matrix
+    // is either undefined (zero) or can move the reflection between axes. Keep
+    // KiCad's complete matrix intact instead of round-tripping it through
+    // position/quaternion/scale components.
+    root.matrixAutoUpdate = true;
     if (!source) {
       root.position.set(0, 0, 0);
       root.rotation.set(0, 0, 0);
@@ -1010,11 +1020,9 @@ export function mountModelScene(
     // Convert the WHOLE placement matrix. Field-by-field Euler swaps fail when more than one
     // rotation axis is non-zero because they change multiplication order, and scale needs the
     // same Y/Z basis conversion as position.
-    kicadModelPlacementMatrix(source).decompose(
-      root.position,
-      root.quaternion,
-      root.scale,
-    );
+    root.matrix.copy(kicadModelPlacementMatrix(source));
+    root.matrixAutoUpdate = false;
+    root.matrixWorldNeedsUpdate = true;
   }
 
   /**

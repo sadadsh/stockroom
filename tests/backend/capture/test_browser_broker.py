@@ -363,6 +363,72 @@ def test_webrtc_is_disabled_before_scripts_in_each_new_document_and_frame(tmp_pa
             assert child.evaluate("window.observedWebRtcTypes") == expected
 
 
+@pytest.mark.timeout(30)
+def test_digikey_session_state_survives_relaunch_only_in_its_provider_profile(tmp_path):
+    from stockroom.capture.browser import chromium_unavailable_reason
+
+    reason = chromium_unavailable_reason()
+    if reason is not None:
+        pytest.skip(reason)
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
+            body = b"<title>Provider session probe</title>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, _format: str, *_args) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    url = f"http://127.0.0.1:{server.server_port}/"
+    profile = tmp_path / "Profiles" / "digikey"
+
+    def make_browser(provider_key: str, profile_dir: Path) -> PlaywrightCaptureBrowser:
+        return PlaywrightCaptureBrowser(
+            download_dir=tmp_path / "Downloads" / provider_key,
+            profile_dir=profile_dir,
+            provider_key=provider_key,
+            headless=True,
+            engine="chromium",
+        )
+
+    try:
+        first = make_browser("digikey", profile)
+        with first.session() as page:
+            page.goto(url)
+            page.evaluate(
+                "localStorage.setItem('stockroom-session-probe', 'remembered-by-provider-profile')"
+            )
+
+        relaunched = make_browser("digikey", profile)
+        with relaunched.session() as page:
+            page.goto(url)
+            remembered = page.evaluate(
+                "localStorage.getItem('stockroom-session-probe')"
+            )
+
+        isolated = make_browser("ultralibrarian", tmp_path / "Profiles" / "ultralibrarian")
+        with isolated.session() as page:
+            page.goto(url)
+            leaked = page.evaluate("localStorage.getItem('stockroom-session-probe')")
+    finally:
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=5)
+
+    assert first.persistent_digikey_session is True
+    assert relaunched.persistent_digikey_session is True
+    assert remembered == "remembered-by-provider-profile"
+    assert isolated.persistent_digikey_session is False
+    assert leaked is None
+
+
 def test_provider_profiles_and_downloads_are_isolated(monkeypatch, tmp_path):
     machine_root = tmp_path / "Machine Capture"
     monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(machine_root))
@@ -534,6 +600,7 @@ class _HudPage(_EventPage):
 def _provider_hud_spec() -> ProviderHudSpec:
     return ProviderHudSpec(
         provider_label="Exact Provider",
+        author_route="Exact CAD Author",
         manufacturer="Exact Manufacturer",
         mpn="MPN-A/7",
         required_file_labels=(
@@ -544,12 +611,23 @@ def _provider_hud_spec() -> ProviderHudSpec:
     )
 
 
-def _hud_capture(tmp_path, page: _HudPage, *, action: str | None = None):
+def _hud_capture(
+    tmp_path,
+    page: _HudPage,
+    *,
+    action: str | None = None,
+    profile_dir: Path | None = None,
+    provider_key: str | None = None,
+):
     staging = tmp_path / "Staging"
     staging.mkdir()
     spec = _provider_hud_spec()
     broker = DownloadBroker(DownloadTask("part-a", spec.manufacturer, spec.mpn, staging))
-    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    browser = PlaywrightCaptureBrowser(
+        download_dir=tmp_path / "Legacy",
+        profile_dir=profile_dir,
+        provider_key=provider_key,
+    )
     browser._context = SimpleNamespace(new_page=lambda: page)
     if action is not None:
         page.on_goto = lambda: page.invoke_hud_action(action)
@@ -581,24 +659,40 @@ def test_user_capture_hud_is_injected_before_navigation_and_survives_without_dom
 
     bootstrap, payload = page.evaluations[0]
     assert payload["providerLabel"] == "Exact Provider"
+    assert payload["authorRoute"] == "Exact CAD Author"
     assert payload["manufacturer"] == "Exact Manufacturer"
     assert payload["mpn"] == "MPN-A/7"
+    assert payload["automatedStep"] == "Listening for provider downloads."
+    assert (
+        payload["humanAction"]
+        == "Start this part's download with every required format shown here."
+    )
     assert payload["requiredFileLabels"] == [
         "KiCad symbol (.kicad_sym)",
         "KiCad footprint (.kicad_mod)",
         "3D model (.step)",
     ]
     assert payload["downloadCount"] == 0
+    assert payload["sessionPersistent"] is False
     assert 'attachShadow({ mode: "closed" })' in bootstrap
     assert 'host.setAttribute("popover", "manual")' in bootstrap
-    assert "Sign in if asked—this session is remembered on this PC." in bootstrap
+    assert '"Author Route"' in bootstrap
+    assert '"Automated Step"' in bootstrap
+    assert '"Human Action"' in bootstrap
+    assert "This assisted window never reads or submits " in bootstrap
+    assert "credentials, CAPTCHA, 2FA, or passkeys." in bootstrap
+    assert "color-scheme: light dark" in bootstrap
+    assert "@media (prefers-color-scheme: dark)" in bootstrap
+    assert "var(--sr-surface)" in bootstrap
+    assert 'Consolas, "Cascadia Mono"' in bootstrap
+    assert "border-radius: 3px" in bootstrap
     assert "prefers-reduced-motion" in bootstrap
     assert 'live.setAttribute("aria-live", "polite")' in bootstrap
     assert 'header.addEventListener("pointerdown"' in bootstrap
     assert 'move.addEventListener("keydown"' in bootstrap
-    assert '"Finish"' in bootstrap
-    assert '"Try Another Provider"' in bootstrap
-    assert '"Cancel"' in bootstrap
+    assert '"Resume Stockroom"' in bootstrap
+    assert '"Use Another Provider"' in bootstrap
+    assert '"Close Capture"' in bootstrap
 
     # The only page code Stockroom installs creates and updates its own closed-shadow surface.
     # The fake deliberately has no locator/query APIs, and the script carries no provider-content,
@@ -612,10 +706,39 @@ def test_user_capture_hud_is_injected_before_navigation_and_survives_without_dom
         "document.cookie",
         "localStorage",
         "sessionStorage",
-        "credential",
-        "password",
+        "navigator.credentials",
+        'input[type="password"]',
     )
     assert all(value not in bootstrap for value in provider_inspection_primitives)
+
+
+def test_digikey_hud_names_provider_isolated_session_memory_only_with_its_profile(tmp_path):
+    page = _HudPage()
+
+    result, _broker = _hud_capture(
+        tmp_path,
+        page,
+        action="finish",
+        profile_dir=tmp_path / "DigiKey Profile",
+        provider_key="digikey",
+    )
+
+    assert result.status == "completed"
+    bootstrap, payload = page.evaluations[0]
+    assert payload["sessionPersistent"] is True
+    assert '"Session Memory On"' in bootstrap
+    assert "Provider-only browser profile keeps this session on this PC." in bootstrap
+    assert "This assisted " in bootstrap
+    assert "window never reads or stores passwords from the page." in bootstrap
+    assert "DigiKey sign-in or " in bootstrap
+    assert "consent returns only after session expiry or a new gate." in bootstrap
+
+    other_browser = PlaywrightCaptureBrowser(
+        download_dir=tmp_path / "Other Downloads",
+        profile_dir=tmp_path / "Other Profile",
+        provider_key="ultralibrarian",
+    )
+    assert other_browser.persistent_digikey_session is False
 
 
 def test_user_capture_hud_receives_live_stockroom_download_count(tmp_path):
@@ -682,6 +805,7 @@ def test_user_capture_hud_rejects_identity_that_is_not_its_bound_task(tmp_path):
     browser._context = SimpleNamespace(new_page=lambda: _HudPage())
     mismatched = ProviderHudSpec(
         provider_label="Provider",
+        author_route="CAD Author",
         manufacturer="Different Manufacturer",
         mpn="MPN-A",
         required_file_labels=("KiCad symbol",),

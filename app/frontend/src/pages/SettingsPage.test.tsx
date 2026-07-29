@@ -32,7 +32,6 @@ vi.mock("../api/client", async (importActual) => {
       altiumOdbcStatus: vi.fn(),
       loadDevCreds: vi.fn(),
       altiumRegenerate: vi.fn(),
-      altiumAttach: vi.fn(),
       altiumModelsPending: vi.fn(),
       altiumEmbedCapability: vi.fn(),
       altiumEmbedModels: vi.fn(),
@@ -140,7 +139,6 @@ async function openSettings(devId: string) {
   await screen.findByTestId(`${devId}.header`);
 }
 
-
 beforeEach(() => {
   localStorage.clear();
   delete document.documentElement.dataset.theme;
@@ -162,7 +160,11 @@ beforeEach(() => {
     current_revision: "123456789abc",
     target_revision: "123456789abc",
   } as never);
-  mockApi.altiumOdbcStatus.mockResolvedValue({ installed: true, driver: "SQLite3 ODBC Driver", download_url: "" });
+  mockApi.altiumOdbcStatus.mockResolvedValue({
+    installed: true,
+    driver: "SQLite3 ODBC Driver",
+    download_url: "",
+  });
   mockApi.altiumStatus.mockResolvedValue({
     profile: "Main",
     dblib: "C:/Stockroom/libraries/Main/altium/Stockroom.DbLib",
@@ -216,19 +218,37 @@ beforeEach(() => {
     restart_requested: true,
   });
   mockApi.libraryCoverage.mockResolvedValue({
-    total: 158, complete: 92, needs_files: 50, unsourced: 16,
-    by_requirement: {}, sources: ["ultralibrarian"], can_provide: ["kicad_symbol"],
+    total: 158,
+    complete: 92,
+    needs_files: 50,
+    unsourced: 16,
+    by_requirement: {},
+    sources: ["ultralibrarian"],
+    can_provide: ["kicad_symbol"],
   });
   mockApi.libraryDerivation.mockResolvedValue({
-    ruleset: "rules@2", counts: { "rules@2": 158 }, current: 158, stale: 0,
+    ruleset: "rules@2",
+    counts: { "rules@2": 158 },
+    current: 158,
+    stale: 0,
   });
   mockApi.cadInventory.mockResolvedValue({
-    cleared: 184, kept_stock: 0, items: [], failed: [], missing_files: [],
+    cleared: 184,
+    kept_stock: 0,
+    items: [],
+    failed: [],
+    missing_files: [],
   });
   mockApi.getLibraryLfs.mockResolvedValue({
-    installed: true, version: "3.4.1", enabled: true,
-    tracked_patterns: ["*.step"], objects: 62, legacy_blobs: 0,
-    covers: [], adopted: true, reason: "",
+    installed: true,
+    version: "3.4.1",
+    enabled: true,
+    tracked_patterns: ["*.step"],
+    objects: 62,
+    legacy_blobs: 0,
+    covers: [],
+    adopted: true,
+    reason: "",
   });
   mockApi.getRescanState.mockResolvedValue({
     parts: { "SR-0001": { checked_at: "2026-07-20T10:00:00Z", outcome: "updated" } },
@@ -276,10 +296,7 @@ describe("SettingsPage — profiles", () => {
     renderPage();
     await openSettings("settings.profiles");
     await screen.findByText("Archive");
-    await userEvent.type(
-      screen.getByPlaceholderText(/new profile/i),
-      "Scratch",
-    );
+    await userEvent.type(screen.getByPlaceholderText(/new profile/i), "Scratch");
     await userEvent.click(screen.getByLabelText(/archive profile/i));
     await userEvent.click(screen.getByRole("button", { name: /^create profile$/i }));
     expect(mockApi.createProfile).toHaveBeenCalledWith("Scratch", true);
@@ -308,9 +325,7 @@ describe("SettingsPage — profiles", () => {
     renderPage();
     await openSettings("settings.profiles");
     await screen.findByText("Archive");
-    await userEvent.click(
-      within(profileRow("Archive")).getByRole("button", { name: /^delete$/i }),
-    );
+    await userEvent.click(within(profileRow("Archive")).getByRole("button", { name: /^delete$/i }));
     // nothing deleted until the confirm dialog is accepted
     expect(mockApi.deleteProfile).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
@@ -382,6 +397,47 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(mockApi.doSync).toHaveBeenCalled();
   });
 
+  it("shows the automatic device outcome and detects an active rival app checkout", async () => {
+    mockApi.getSyncStatus.mockResolvedValue({
+      has_remote: true,
+      current_branch: "main",
+      ahead: 0,
+      behind: 0,
+      working_copy: {
+        mode: "rival_application_checkout",
+        detail: "The active library is inside a second checkout.",
+      },
+      checkout_inventory: {
+        state: "complete",
+        rival_count: 1,
+        checkouts: [
+          {
+            path: "D:\\Other\\Stockroom",
+            classification: "active_rival",
+            revision: "abc123",
+            current: false,
+            tracked_dirty: false,
+            active_library: true,
+          },
+        ],
+      },
+      last_sync: {
+        state: "converged",
+        pulled: true,
+        pushed: true,
+        converged: true,
+        detail: "",
+      },
+    });
+
+    renderPage();
+    await openSettings("settings.sync");
+
+    expect(await screen.findByText("Rival App Checkout Detected")).toBeInTheDocument();
+    expect(screen.getByText("1 Rival Checkout Detected")).toBeInTheDocument();
+    expect(screen.getByText("Devices Converged")).toBeInTheDocument();
+  });
+
   it("surfaces a diverged sync as a failure, never a green up-to-date success", async () => {
     mockApi.doSync.mockResolvedValue({
       state: "diverged",
@@ -437,9 +493,7 @@ describe("SettingsPage — sync + kicad + update", () => {
   it("shows the wiring status when SR_LIB points at the active library", async () => {
     renderPage();
     await openSettings("settings.kicad");
-    expect(
-      await screen.findByText(/wired to the active profile/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/wired to the active profile/i)).toBeInTheDocument();
   });
 
   it("shows an honest not-wired status", async () => {
@@ -474,28 +528,29 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(screen.getByRole("button", { name: /save paths and rewire/i })).toBeDisabled();
   });
 
-  it("applies an available update", async () => {
+  it("makes an available update automatic instead of leaving a restart action to the user", async () => {
     mockApi.checkUpdate.mockResolvedValue({
       update_available: true,
       state: "update_available",
       behind: 3,
       current_revision: "111111111111",
       target_revision: "222222222222",
+      automatic_on_launch: true,
+      automatic_apply: true,
     } as never);
     renderPage();
     await openSettings("settings.update");
-    const apply = await screen.findByRole("button", { name: /install and restart/i });
-    await userEvent.click(apply);
-    expect(mockApi.applyUpdate).toHaveBeenCalled();
+    expect(await screen.findByText(/automatic while stockroom is open/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /install and restart/i })).toBeNull();
+    expect(screen.getByText(/health-checked/i)).toBeInTheDocument();
+    expect(mockApi.applyUpdate).not.toHaveBeenCalled();
   });
 
   it("does not offer to apply when up to date", async () => {
     renderPage();
     await openSettings("settings.update");
     expect((await screen.findAllByText(/^current$/i)).length).toBeGreaterThan(0);
-    expect(
-      screen.queryByRole("button", { name: /install and restart/i }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /install and restart/i })).toBeNull();
   });
 
   it("never presents an unverified offline result as Current", async () => {
@@ -514,16 +569,16 @@ describe("SettingsPage — sync + kicad + update", () => {
   });
 });
 
-  it("connects a GitHub token so part changes auto-push, and never asks for it raw", async () => {
-    mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS });
-    renderPage();
-    await openSettings("settings.github");
-    const input = screen.getByLabelText("GitHub Personal Access Token");
-    expect((input as HTMLInputElement).type).toBe("password"); // the token is never shown
-    await userEvent.type(input, "ghp_TESTTOKEN");
-    await userEvent.click(screen.getByRole("button", { name: /save github access/i }));
-    expect(mockApi.updateSettings).toHaveBeenCalledWith({ github_token: "ghp_TESTTOKEN" });
-  });
+it("connects a GitHub token so part changes auto-push, and never asks for it raw", async () => {
+  mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS });
+  renderPage();
+  await openSettings("settings.github");
+  const input = screen.getByLabelText("GitHub Personal Access Token");
+  expect((input as HTMLInputElement).type).toBe("password"); // the token is never shown
+  await userEvent.type(input, "ghp_TESTTOKEN");
+  await userEvent.click(screen.getByRole("button", { name: /save github access/i }));
+  expect(mockApi.updateSettings).toHaveBeenCalledWith({ github_token: "ghp_TESTTOKEN" });
+});
 
 // KiCad wiring moved here from the Doctor page (D3): the manual re-wire button
 // now lives in the Settings KiCad section.
@@ -570,6 +625,15 @@ describe("SettingsPage — KiCad wiring", () => {
 });
 
 describe("SettingsPage - capture credentials", () => {
+  it("makes saved sign-ins optional and names persistent sessions plus security pauses", async () => {
+    renderPage();
+    await openSettings("settings.vendor-logins");
+
+    expect(screen.getByText("Provider Sessions And Optional Sign-Ins")).toBeInTheDocument();
+    expect(screen.getByText(/reuses provider-only browser sessions first/i)).toBeInTheDocument();
+    expect(screen.getByText(/CAPTCHA or MFA always pauses for you/i)).toBeInTheDocument();
+  });
+
   it("saves the Ultra Librarian username and password", async () => {
     const user = userEvent.setup();
     mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
@@ -577,9 +641,7 @@ describe("SettingsPage - capture credentials", () => {
     await openSettings("settings.vendor-logins");
     await user.type(screen.getByLabelText("Ultra Librarian Username"), "me@x.com");
     await user.type(screen.getByLabelText("Ultra Librarian Password"), "secret");
-    await user.click(
-      screen.getByRole("button", { name: "Save Ultra Librarian Login" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Save Ultra Librarian Login" }));
     expect(mockApi.updateSettings).toHaveBeenCalledWith(
       expect.objectContaining({ ul_username: "me@x.com", ul_password: "secret" }),
     );
@@ -588,10 +650,7 @@ describe("SettingsPage - capture credentials", () => {
   it("renders the password input as type password", async () => {
     renderPage();
     await openSettings("settings.vendor-logins");
-    expect(screen.getByLabelText("Ultra Librarian Password")).toHaveAttribute(
-      "type",
-      "password",
-    );
+    expect(screen.getByLabelText("Ultra Librarian Password")).toHaveAttribute("type", "password");
   });
 
   it("saves the SnapEDA username and password", async () => {
@@ -629,9 +688,7 @@ describe("SettingsPage - capture credentials", () => {
     expect(pass).toHaveAttribute("type", "password");
     await user.type(screen.getByLabelText("DigiKey Account Username"), "dk@x.com");
     await user.type(pass, "acctpw");
-    await user.click(
-      screen.getByRole("button", { name: "Save DigiKey Account Login" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Save DigiKey Account Login" }));
     expect(mockApi.updateSettings).toHaveBeenCalledWith(
       expect.objectContaining({ digikey_username: "dk@x.com", digikey_password: "acctpw" }),
     );
@@ -646,9 +703,7 @@ describe("SettingsPage - capture credentials", () => {
     expect(secret).toHaveAttribute("type", "password");
     await user.type(screen.getByLabelText("DigiKey API Client ID"), "CLIENTID");
     await user.type(secret, "APISECRET");
-    await user.click(
-      screen.getByRole("button", { name: "Save DigiKey API Creds" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Save DigiKey API Creds" }));
     expect(mockApi.updateSettings).toHaveBeenCalledWith(
       expect.objectContaining({
         digikey_client_id: "CLIENTID",
@@ -698,16 +753,12 @@ describe("SettingsPage - copy adoption", () => {
     renderPage();
     await openSettings("settings.profiles");
     await screen.findByText("Archive");
-    await userEvent.click(
-      within(profileRow("Archive")).getByRole("button", { name: /^delete$/i }),
-    );
+    await userEvent.click(within(profileRow("Archive")).getByRole("button", { name: /^delete$/i }));
     const dialog = screen.getByRole("dialog");
     // The call-site-wrapped props resolve to their defaults: the title and the
     // danger confirm label both read through useText.
     expect(within(dialog).getByText("Delete Profile")).toBeInTheDocument();
-    expect(
-      within(dialog).getByRole("button", { name: /^delete$/i }),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
   });
 });
 
@@ -718,6 +769,41 @@ describe("SettingsPage - grouped IA + Machine Setup band", () => {
     expect(screen.getByRole("button", { name: /^light$/i })).toBeInTheDocument();
     expect(screen.getByTestId("settings.update.header")).toBeInTheDocument();
     expect(screen.queryByTestId("settings.profiles.header")).toBeNull();
+  });
+
+  it("changes both selected state and visible capability DOM when a section control is pressed", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await screen.findByTestId("settings.appearance.header");
+    const nav = screen.getByRole("navigation", { name: /settings sections/i });
+    const general = within(nav).getByRole("button", { name: /^general$/i });
+    const eda = within(nav).getByRole("button", { name: /^eda tools$/i });
+    expect(general).toHaveAttribute("aria-current", "true");
+
+    await user.click(eda);
+
+    expect(eda).toHaveAttribute("aria-current", "true");
+    expect(general).not.toHaveAttribute("aria-current");
+    expect(screen.queryByTestId("settings.appearance.header")).toBeNull();
+    expect(await screen.findByTestId("settings.kicad.header")).toBeInTheDocument();
+    expect(screen.getByTestId("settings.altium.header")).toBeInTheDocument();
+  });
+
+  it("keeps the machine band, section navigation, and active workspace on one left edge", async () => {
+    renderPage();
+    await screen.findByTestId("settings.appearance.header");
+    const machine = document.querySelector('[data-dev-id="settings.machine-band"]') as HTMLElement;
+    const nav = document.querySelector('[data-dev-id="settings.nav"]') as HTMLElement;
+    const frame = nav.parentElement;
+    const workspace = nav.nextElementSibling;
+
+    expect(frame).not.toBeNull();
+    expect(machine.parentElement).toBe(frame);
+    expect(workspace?.parentElement).toBe(frame);
+    expect(frame).toHaveClass("px-5");
+    expect(machine.className).not.toMatch(/\bml-/);
+    expect(nav.className).not.toMatch(/\bml-/);
+    expect(workspace?.className).not.toMatch(/\bml-/);
   });
 
   it("states the machine verdict from the live settings (all met reads Ready)", async () => {
@@ -752,7 +838,11 @@ describe("SettingsPage - grouped IA + Machine Setup band", () => {
   });
 
   it("shows the ODBC driver step only when the probe answers (never off-Windows null)", async () => {
-    mockApi.altiumOdbcStatus.mockResolvedValue({ installed: null, driver: "SQLite3 ODBC Driver", download_url: "" });
+    mockApi.altiumOdbcStatus.mockResolvedValue({
+      installed: null,
+      driver: "SQLite3 ODBC Driver",
+      download_url: "",
+    });
     mockApi.getSettings.mockResolvedValue({
       ...BASE_SETTINGS,
       mouser_api_key_set: true,
@@ -820,9 +910,15 @@ describe("SettingsPage - capability cards state their own status", () => {
     // "0 In LFS" beside siblings reading "None" and "Healthy". A zero dressed as a count is
     // the data-vomit the complaint register already names.
     mockApi.getLibraryLfs.mockResolvedValue({
-      installed: true, version: "3.4.1", enabled: true,
-      tracked_patterns: ["*.step"], objects: 0, legacy_blobs: 0,
-      covers: [], adopted: true, reason: "",
+      installed: true,
+      version: "3.4.1",
+      enabled: true,
+      tracked_patterns: ["*.step"],
+      objects: 0,
+      legacy_blobs: 0,
+      covers: [],
+      adopted: true,
+      reason: "",
     });
     renderPage();
     const user = userEvent.setup();
@@ -843,15 +939,13 @@ describe("SettingsPage - capability cards state their own status", () => {
     const seen: string[] = [];
     const silent: string[] = [];
     for (const groupName of ["General", "Library", "EDA Tools", "Data Sources", "Maintenance"]) {
-      await user.click(within(nav).getByRole("button", { name: new RegExp(`^${groupName}$`, "i") }));
-      await waitFor(() =>
-        expect(
-          document.querySelectorAll('[data-testid$=".header"]').length,
-        ).toBeGreaterThan(0),
+      await user.click(
+        within(nav).getByRole("button", { name: new RegExp(`^${groupName}$`, "i") }),
       );
-      for (const header of document.querySelectorAll<HTMLElement>(
-        '[data-testid$=".header"]',
-      )) {
+      await waitFor(() =>
+        expect(document.querySelectorAll('[data-testid$=".header"]').length).toBeGreaterThan(0),
+      );
+      for (const header of document.querySelectorAll<HTMLElement>('[data-testid$=".header"]')) {
         const id = header.getAttribute("data-testid") || "";
         if (!id.startsWith("settings.") || seen.includes(id)) continue;
         seen.push(id);
@@ -872,14 +966,26 @@ describe("SettingsPage - capability cards state their own status", () => {
     // "0 of 158 Complete" and "0 Files" are technically true and useless. The calm states are
     // their own words, matching how Component Sync says "Up To Date" rather than "0 Behind".
     mockApi.libraryCoverage.mockResolvedValue({
-      total: 158, complete: 158, needs_files: 0, unsourced: 0,
-      by_requirement: {}, sources: [], can_provide: [],
+      total: 158,
+      complete: 158,
+      needs_files: 0,
+      unsourced: 0,
+      by_requirement: {},
+      sources: [],
+      can_provide: [],
     });
     mockApi.cadInventory.mockResolvedValue({
-      cleared: 0, kept_stock: 0, items: [], failed: [], missing_files: [],
+      cleared: 0,
+      kept_stock: 0,
+      items: [],
+      failed: [],
+      missing_files: [],
     });
     mockApi.libraryDerivation.mockResolvedValue({
-      ruleset: "rules@2", counts: {}, current: 100, stale: 58,
+      ruleset: "rules@2",
+      counts: {},
+      current: 100,
+      stale: 58,
     });
     renderPage();
     const user = userEvent.setup();
@@ -898,7 +1004,11 @@ describe("SettingsPage - capability cards state their own status", () => {
 
 describe("SettingsPage - dev-creds hotkey", () => {
   it("Ctrl+Alt+K loads the dev creds from ANYWHERE on Settings", async () => {
-    mockApi.loadDevCreds.mockResolvedValue({ ...BASE_SETTINGS, loaded: ["mouser_api_key"], config_path: "C:/Users/x/AppData/Roaming/Stockroom/dev-creds.json" });
+    mockApi.loadDevCreds.mockResolvedValue({
+      ...BASE_SETTINGS,
+      loaded: ["mouser_api_key"],
+      config_path: "C:/Users/x/AppData/Roaming/Stockroom/dev-creds.json",
+    });
     renderPage();
     await screen.findByTestId("settings.appearance.header");
     fireEvent.keyDown(window, { key: "k", ctrlKey: true, altKey: true });

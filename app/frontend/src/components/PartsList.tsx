@@ -3,7 +3,18 @@
  * the part number, with an incomplete warning triangle on the right. Parts are
  * grouped by category with sticky group headers, matching library-v2.html.
  */
-import { useMemo } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
+import {
+  defaultRangeExtractor,
+  observeElementRect,
+  type Range,
+  useVirtualizer,
+} from "@tanstack/react-virtual";
 import type { PartSummary } from "../api/types";
 import { WarnIcon } from "./icons";
 import { Icon } from "./Icon";
@@ -47,12 +58,28 @@ interface Props {
   parts: PartSummary[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** The picker viewport. Large libraries virtualize against this exact scroll owner. */
+  scrollElement: HTMLDivElement | null;
   // Part ids that share an MPN with another part (a real accidental duplicate);
   // each gets a Duplicate badge. Shared footprints are normal and never badged.
   duplicateIds?: Set<string>;
 }
 
-function groupByCategory(parts: PartSummary[]): Array<[string, PartSummary[]]> {
+type GroupedParts = Array<[string, PartSummary[]]>;
+type ListItem =
+  | { kind: "category"; key: string; category: string; count: number }
+  | { kind: "part"; key: string; part: PartSummary };
+
+// Below this boundary a normal DOM is cheaper and more accessible than a virtual one. Above it,
+// DOM cost must follow viewport size rather than library size. The value is a count boundary, not
+// a timing claim; the 1,000-row contract is locked by a rendered-node budget in PartsList.test.
+export const PARTS_LIST_VIRTUALIZATION_THRESHOLD = 100;
+const PART_ROW_HEIGHT = 48;
+const CATEGORY_ROW_HEIGHT = 38;
+const VIRTUAL_OVERSCAN = 8;
+const INITIAL_VIEWPORT = { width: 320, height: 640 };
+
+function groupByCategory(parts: PartSummary[]): GroupedParts {
   const groups = new Map<string, PartSummary[]>();
   for (const p of parts) {
     const key = p.category || "Uncategorized";
@@ -63,8 +90,106 @@ function groupByCategory(parts: PartSummary[]): Array<[string, PartSummary[]]> {
   return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
-export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) {
+function flattenGroups(grouped: GroupedParts): ListItem[] {
+  return grouped.flatMap(([category, parts]) => [
+    {
+      kind: "category" as const,
+      key: `category:${category}`,
+      category,
+      count: parts.length,
+    },
+    ...parts.map((part) => ({
+      kind: "part" as const,
+      key: `part:${part.id}`,
+      part,
+    })),
+  ]);
+}
+
+export function PartsList({
+  parts,
+  selectedId,
+  onSelect,
+  scrollElement,
+  duplicateIds,
+}: Props) {
   const grouped = useMemo(() => groupByCategory(parts), [parts]);
+  const items = useMemo(() => flattenGroups(grouped), [grouped]);
+  const virtualized = parts.length > PARTS_LIST_VIRTUALIZATION_THRESHOLD;
+  const stickyIndexes = useMemo(
+    () =>
+      items.flatMap((item, index) =>
+        item.kind === "category" ? [index] : [],
+      ),
+    [items],
+  );
+  const activeStickyIndex = useRef(stickyIndexes[0] ?? 0);
+  const rangeExtractor = useCallback(
+    (range: Range) => {
+      activeStickyIndex.current =
+        [...stickyIndexes]
+          .reverse()
+          .find((index) => range.startIndex >= index) ??
+        stickyIndexes[0] ??
+        0;
+      return [
+        ...new Set([
+          activeStickyIndex.current,
+          ...defaultRangeExtractor(range),
+        ]),
+      ].sort((a, b) => a - b);
+    },
+    [stickyIndexes],
+  );
+  const estimateSize = useCallback(
+    (index: number) =>
+      items[index]?.kind === "category"
+        ? CATEGORY_ROW_HEIGHT
+        : PART_ROW_HEIGHT,
+    [items],
+  );
+  const getItemKey = useCallback(
+    (index: number) => items[index]?.key ?? index,
+    [items],
+  );
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    enabled: virtualized,
+    getScrollElement: () => scrollElement,
+    getItemKey,
+    estimateSize,
+    overscan: VIRTUAL_OVERSCAN,
+    rangeExtractor,
+    initialRect: INITIAL_VIEWPORT,
+    // jsdom and a temporarily collapsed picker report a zero rect. Keeping the conservative
+    // initial viewport avoids both a blank first paint and the old "render all as fallback"
+    // failure mode. A real non-zero browser measurement takes over immediately.
+    observeElementRect: (instance, callback) =>
+      observeElementRect(instance, (rect) =>
+        callback(rect.height > 0 ? rect : INITIAL_VIEWPORT),
+      ),
+  });
+  const selectedIndex = useMemo(
+    () =>
+      selectedId
+        ? items.findIndex(
+            (item) => item.kind === "part" && item.part.id === selectedId,
+          )
+        : -1,
+    [items, selectedId],
+  );
+
+  // Search-overlay selection can name a row outside the mounted window. Bring that selected row
+  // into the viewport when the browser supports programmatic scrolling; ordinary row clicks are
+  // already visible and therefore do not move the list.
+  useEffect(() => {
+    if (!virtualized || selectedIndex < 0) return;
+    if (!scrollElement || typeof scrollElement.scrollTo !== "function") return;
+    const mounted = virtualizer
+      .getVirtualItems()
+      .some((item) => item.index === selectedIndex);
+    if (!mounted) virtualizer.scrollToIndex(selectedIndex, { align: "auto" });
+  }, [scrollElement, selectedIndex, virtualized, virtualizer]);
 
   if (parts.length === 0) {
     return (
@@ -72,79 +197,183 @@ export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) 
     );
   }
 
-  return (
-    <div data-dev-id="components.list" className="flex flex-col gap-0.5">
-      {grouped.map(([category, items]) => (
-        <div key={category} className="flex flex-col gap-0.5">
-          <div
-            data-dev-id="components.category-header"
-            className="sticky top-0 z-[1] mb-0.5 flex items-baseline gap-2 bg-[var(--c-sticky)] px-2.5 pb-1.5 pt-3.5 backdrop-blur"
-          >
-            <span className="text-xs font-semibold text-t2">{category}</span>
-            <span className="tnum font-mono text-2xs text-t3">{items.length}</span>
+  // Preserve the simple one-item/small-library path. Besides avoiding unnecessary observers,
+  // this keeps native document flow and sticky category headers for the overwhelmingly common
+  // case while the production large-library path below bounds mounted rows.
+  if (!virtualized) {
+    return (
+      <div
+        data-dev-id="components.list"
+        data-virtualized="false"
+        className="flex flex-col gap-0.5"
+      >
+        {grouped.map(([category, groupParts]) => (
+          <div key={category} className="flex flex-col gap-0.5">
+            <CategoryHeader category={category} count={groupParts.length} sticky />
+            {groupParts.map((part) => (
+              <PartRow
+                key={part.id}
+                part={part}
+                selected={part.id === selectedId}
+                duplicate={duplicateIds?.has(part.id) ?? false}
+                onSelect={onSelect}
+              />
+            ))}
           </div>
-          {items.map((p) => {
-            const selected = p.id === selectedId;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                data-dev-id="components.row"
-                onClick={() => onSelect(p.id)}
-                aria-current={selected ? "true" : undefined}
-                className={
-                  // Rows separate by whitespace + a rounded selection/hover pill, not a
-                  // hairline on every row (the border-on-everything tell). The selected
-                  // row is the one lift; the MPN reads in the mono index face.
-                  "flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left transition-colors " +
-                  (selected
-                    ? "bg-acc-soft shadow-[inset_2px_0_0_var(--c-acc)]"
-                    : "hover:bg-[var(--c-hover)]")
-                }
-              >
-                <RowThumbnail category={p.category} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={
-                        "truncate text-sm " +
-                        (selected ? "font-semibold text-t1" : "font-medium text-t1")
-                      }
-                    >
-                      {p.display_name}
-                    </span>
-                    {duplicateIds?.has(p.id) ? (
-                      <span
-                        data-dev-id="components.row-duplicate"
-                        className="flex-none"
-                        title="Another part shares this MPN"
-                      >
-                        <Badge tone="warn" size="sm">
-                          Duplicate
-                        </Badge>
-                      </span>
-                    ) : null}
-                  </div>
-                  {p.mpn ? (
-                    <div className="tnum mt-0.5 truncate font-mono text-2xs text-t3">
-                      {p.mpn}
-                    </div>
-                  ) : null}
-                </div>
-                {!p.is_complete ? (
-                  <span
-                    data-dev-id="components.row-warn"
-                    className="mt-0.5 flex flex-none items-center text-warn"
-                    title={`Incomplete: missing ${p.missing.join(", ")}`}
-                  >
-                    <WarnIcon className="h-3.5 w-3.5" />
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      ))}
+        ))}
+      </div>
+    );
+  }
+
+  const virtualItems = virtualizer.getVirtualItems();
+  return (
+    <div
+      data-dev-id="components.list"
+      data-virtualized="true"
+      className="relative"
+      style={{ height: virtualizer.getTotalSize() }}
+    >
+      {virtualItems.map((virtualItem) => {
+        const item = items[virtualItem.index];
+        if (!item) return null;
+        const isSticky =
+          item.kind === "category" &&
+          virtualItem.index === activeStickyIndex.current;
+        return (
+          <div
+            key={item.key}
+            data-index={virtualItem.index}
+            style={
+              isSticky
+                ? {
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 2,
+                    height: virtualItem.size,
+                  }
+                : {
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: virtualItem.size,
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }
+            }
+          >
+            {item.kind === "category" ? (
+              <CategoryHeader
+                category={item.category}
+                count={item.count}
+                sticky={false}
+              />
+            ) : (
+              <PartRow
+                part={item.part}
+                selected={item.part.id === selectedId}
+                duplicate={duplicateIds?.has(item.part.id) ?? false}
+                onSelect={onSelect}
+                virtual
+              />
+            )}
+          </div>
+        );
+      })}
     </div>
+  );
+}
+
+function CategoryHeader({
+  category,
+  count,
+  sticky,
+}: {
+  category: string;
+  count: number;
+  sticky: boolean;
+}) {
+  return (
+    <div
+      data-dev-id="components.category-header"
+      className={
+        (sticky ? "sticky top-0 z-[1] " : "") +
+        "mb-0.5 flex h-9 items-baseline gap-2 bg-[var(--c-sticky)] px-2.5 pb-1.5 pt-3.5 backdrop-blur"
+      }
+    >
+      <span className="text-xs font-semibold text-t2">{category}</span>
+      <span className="tnum font-mono text-2xs text-t3">{count}</span>
+    </div>
+  );
+}
+
+function PartRow({
+  part,
+  selected,
+  duplicate,
+  onSelect,
+  virtual = false,
+}: {
+  part: PartSummary;
+  selected: boolean;
+  duplicate: boolean;
+  onSelect: (id: string) => void;
+  virtual?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      data-dev-id="components.row"
+      onClick={() => onSelect(part.id)}
+      aria-current={selected ? "true" : undefined}
+      className={
+        // Rows separate by whitespace + a rounded selection/hover pill, not a
+        // hairline on every row (the border-on-everything tell). The selected
+        // row is the one lift; the MPN reads in the mono index face.
+        "flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left transition-colors " +
+        (virtual ? "mb-0.5 h-[46px] " : "") +
+        (selected
+          ? "bg-acc-soft shadow-[inset_2px_0_0_var(--c-acc)]"
+          : "hover:bg-[var(--c-hover)]")
+      }
+    >
+      <RowThumbnail category={part.category} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span
+            className={
+              "truncate text-sm " +
+              (selected ? "font-semibold text-t1" : "font-medium text-t1")
+            }
+          >
+            {part.display_name}
+          </span>
+          {duplicate ? (
+            <span
+              data-dev-id="components.row-duplicate"
+              className="flex-none"
+              title="Another part shares this MPN"
+            >
+              <Badge tone="warn" size="sm">
+                Duplicate
+              </Badge>
+            </span>
+          ) : null}
+        </div>
+        {part.mpn ? (
+          <div className="tnum mt-0.5 truncate font-mono text-2xs text-t3">
+            {part.mpn}
+          </div>
+        ) : null}
+      </div>
+      {!part.is_complete ? (
+        <span
+          data-dev-id="components.row-warn"
+          className="mt-0.5 flex flex-none items-center text-warn"
+          title={`Incomplete: missing ${part.missing.join(", ")}`}
+        >
+          <WarnIcon className="h-3.5 w-3.5" />
+        </span>
+      ) : null}
+    </button>
   );
 }

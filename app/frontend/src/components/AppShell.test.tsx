@@ -1,9 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { api } from "../api/client";
 import { AppShell } from "./AppShell";
-import { onQueuedPaths } from "../lib/ingestQueue";
 import { RouterProvider } from "../lib/router";
 import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { CaptureProvider } from "../lib/capture";
@@ -48,7 +47,7 @@ function AddPartProbe() {
   return <div data-testid="addpart-open">{String(isOpen)}</div>;
 }
 
-function renderShell() {
+function renderShell(initial: "components" | "stm" | "settings" = "components") {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -56,7 +55,7 @@ function renderShell() {
     <QueryClientProvider client={qc}>
       <ThemeProvider>
         <ToastProvider>
-          <RouterProvider>
+          <RouterProvider initial={initial}>
             <CaptureProvider>
         <AddPartProvider>
               <AppShell>
@@ -71,40 +70,12 @@ function renderShell() {
   );
 }
 
-describe("AppShell native drop bridge", () => {
-  it("registers the host drop hook, queues the paths, and opens the Add A Part modal", () => {
+describe("AppShell network-only Add A Part boundary", () => {
+  it("does not register a local-file drop bridge or open Add A Part for files", () => {
     renderShell();
-    // the WebView2 host forwards native drop paths through this global (a plain
-    // browser drop cannot see filesystem paths, so this is the only real channel)
-    const hook = window.__STOCKROOM_NATIVE_DROP__;
-    expect(typeof hook).toBe("function");
 
-    const received: string[][] = [];
-    const unsubscribe = onQueuedPaths((paths) => received.push(paths));
-    act(() => {
-      hook!(["C:\\Users\\me\\part.zip", "C:\\Users\\me\\model.step"]);
-    });
-    unsubscribe();
-
-    expect(received).toEqual([["C:\\Users\\me\\part.zip", "C:\\Users\\me\\model.step"]]);
-    expect(screen.getByTestId("addpart-open").textContent).toBe("true");
-  });
-
-  it("unregisters the hook on unmount", () => {
-    const { unmount } = renderShell();
-    expect(typeof window.__STOCKROOM_NATIVE_DROP__).toBe("function");
-    unmount();
-    expect(window.__STOCKROOM_NATIVE_DROP__).toBeUndefined();
-  });
-
-  it("ignores junk from the bridge without opening the modal", () => {
-    renderShell();
-    act(() => {
-      window.__STOCKROOM_NATIVE_DROP__!([]);
-      window.__STOCKROOM_NATIVE_DROP__!([42, null] as unknown as string[]);
-    });
-    // an empty or non-string-bearing call must not open the modal
     expect(screen.getByTestId("addpart-open").textContent).toBe("false");
+    expect(screen.queryByText(/Drop to Add Parts/i)).not.toBeInTheDocument();
   });
 });
 
@@ -173,6 +144,26 @@ describe("AppShell status bar", () => {
     expect(screen.queryByText("Components Loaded")).toBeNull();
   });
 
+  it("renders permanent status facts legibly and separates the profile label from its value", async () => {
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 158 },
+      by_manufacturer: {},
+      complete: 158,
+      incomplete: 0,
+    } as never);
+    mockApi.listProfiles.mockResolvedValue({
+      profiles: ["Stockroom", "Archive"],
+      active: "Stockroom",
+    } as never);
+    renderShell();
+
+    expect(await screen.findByText("158 Components")).toHaveClass("text-t1");
+    const profile = await screen.findByRole("button", { name: "Profile: Stockroom" });
+    expect(profile).toHaveClass("text-t2");
+    expect(profile.textContent).toContain("Profile:");
+    expect(profile.querySelector(".text-t1")).toHaveTextContent("Stockroom");
+  });
+
   it("agrees with its number at exactly one component", async () => {
     // Measured on the owner's real window: the bar read "1 Components" on 10 of the 12 captured
     // screens. A one-part library is the DEFAULT state of a new install, so this was the first
@@ -208,6 +199,13 @@ describe("AppShell status bar", () => {
     expect(await screen.findByText(/Could Not Load Components/)).toBeTruthy();
   });
 
+  it("does not report an unrelated component failure inside STM Viewer", () => {
+    mockApi.facets.mockRejectedValue(new Error("nope"));
+    renderShell("stm");
+    expect(document.querySelector('[data-dev-id="shell.statusbar"]')).toHaveTextContent("STM Viewer");
+    expect(screen.queryByText(/Could Not Load Components/)).toBeNull();
+  });
+
   it("switches the active profile from the status bar", async () => {
     const user = userEvent.setup();
     mockApi.facets.mockResolvedValue({
@@ -220,7 +218,7 @@ describe("AppShell status bar", () => {
     mockApi.activateProfile.mockResolvedValue({ profiles: [], active: "Archive" } as never);
     renderShell();
 
-    const trigger = await screen.findByRole("button", { name: /Profile Stockroom/i });
+    const trigger = await screen.findByRole("button", { name: /Profile: Stockroom/i });
     await user.click(trigger);
     await user.click(await screen.findByRole("button", { name: "Archive" }));
     expect(mockApi.activateProfile).toHaveBeenCalledWith("Archive");
@@ -236,7 +234,7 @@ describe("AppShell status bar", () => {
       active: "Stockroom",
     } as never);
     renderShell();
-    await user.click(await screen.findByRole("button", { name: /Profile Stockroom/i }));
+    await user.click(await screen.findByRole("button", { name: /Profile: Stockroom/i }));
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("button", { name: "Archive" })).toBeNull();
@@ -270,12 +268,22 @@ describe("Rail collapse", () => {
     const user = userEvent.setup();
     renderShell();
     const toggle = await screen.findByRole("button", { name: "Collapse Rail" });
+    const rail = document.querySelector('[data-dev-id="rail.root"]') as HTMLElement;
+    expect(rail).toHaveClass("w-[190px]");
     // labels are visible while expanded
     expect(screen.getByText("Components")).toBeTruthy();
     await user.click(toggle);
-    expect(screen.getByRole("button", { name: "Expand Rail" })).toBeTruthy();
+    const expand = screen.getByRole("button", { name: "Expand Rail" });
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+    expect(rail).toHaveClass("w-[52px]");
     // the nav items survive as icons: still reachable by their accessible names
     expect(screen.getByRole("button", { name: "Components" })).toBeTruthy();
+    await user.click(expand);
+    expect(screen.getByRole("button", { name: "Collapse Rail" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(rail).toHaveClass("w-[190px]");
   });
 
   it("remembers the choice across a remount, because it is a workspace preference", async () => {

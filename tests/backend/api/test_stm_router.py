@@ -29,21 +29,53 @@ def _seed_stm_index(app_ctx) -> StmIndex:
     ).lastrowid
 
     def _insert_mcu(
-        ref_name, family, line, package, pin_count, core, flash_kb, ram_kb,
-        max_freq_mhz, io_count, peripherals,
+        ref_name,
+        family,
+        line,
+        package,
+        pin_count,
+        core,
+        flash_kb,
+        ram_kb,
+        max_freq_mhz,
+        io_count,
+        peripherals,
     ) -> int:
         mcu_id = conn.execute(
             "INSERT INTO mcu (source_artifact_id, ref_name, family, line, package_name, "
             "pin_count, vdd_min, vdd_max, imported_at) VALUES (?,?,?,?,?,?,?,?,?)",
-            (art_id, ref_name, family, line, package, pin_count, "1.8", "3.6",
-             "2026-07-23T00:00:00Z"),
+            (
+                art_id,
+                ref_name,
+                family,
+                line,
+                package,
+                pin_count,
+                "1.8",
+                "3.6",
+                "2026-07-23T00:00:00Z",
+            ),
         ).lastrowid
         conn.execute(
             "INSERT INTO mcu_spec (mcu_id, core, flash_kb, ram_kb, ccm_ram_kb, max_freq_mhz, "
             "io_count, vdd_min, vdd_max, temp_min_c, temp_max_c, current_run_ua, "
             "current_lowest_ua, die) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (mcu_id, core, flash_kb, ram_kb, None, max_freq_mhz, io_count, 1.8, 3.6,
-             -40, 85, None, None, None),
+            (
+                mcu_id,
+                core,
+                flash_kb,
+                ram_kb,
+                None,
+                max_freq_mhz,
+                io_count,
+                1.8,
+                3.6,
+                -40,
+                85,
+                None,
+                None,
+                None,
+            ),
         )
         for name, instance, version in peripherals:
             conn.execute(
@@ -54,32 +86,69 @@ def _seed_stm_index(app_ctx) -> StmIndex:
         return mcu_id
 
     mcu1_id = _insert_mcu(
-        "STM32F407V(E-G)Tx", "STM32F4", "STM32F407", "LQFP64", 64, "Cortex-M4",
-        1024, 192, 168, 51,
+        "STM32F407V(E-G)Tx",
+        "STM32F4",
+        "STM32F407",
+        "LQFP64",
+        64,
+        "Cortex-M4",
+        1024,
+        192,
+        168,
+        51,
         [("USART", "USART1", "1"), ("USART", "USART2", "1"), ("SPI", "SPI1", "1")],
     )
     _insert_mcu(
-        "STM32F103C(8-B)Tx", "STM32F1", "STM32F103", "LQFP48", 48, "Cortex-M3",
-        128, 20, 72, 37,
+        "STM32F103C(8-B)Tx",
+        "STM32F1",
+        "STM32F103",
+        "LQFP48",
+        48,
+        "Cortex-M3",
+        128,
+        20,
+        72,
+        37,
         [("USART", "USART1", "1")],
     )
 
     def _insert_pin(
-        mcu_id, package, position, canonical, raw, pin_type, electrical_class,
-        roles=(), functions=(), afs=(), lqfp_side="left",
+        mcu_id,
+        package,
+        position,
+        canonical,
+        raw,
+        pin_type,
+        electrical_class,
+        roles=(),
+        functions=(),
+        afs=(),
+        lqfp_side="left",
     ) -> int:
         pin_id = conn.execute(
             "INSERT INTO mcu_package_pin (mcu_id, package_name, physical_pin_number, "
             "position_kind, bga_row, bga_col, canonical_pin_name, raw_pin_name, pin_type, "
             "electrical_class, gpio_port, gpio_pin_index, lqfp_side) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (mcu_id, package, position, "numeric", None, None, canonical, raw, pin_type,
-             electrical_class, None, None, lqfp_side),
+            (
+                mcu_id,
+                package,
+                position,
+                "numeric",
+                None,
+                None,
+                canonical,
+                raw,
+                pin_type,
+                electrical_class,
+                None,
+                None,
+                lqfp_side,
+            ),
         ).lastrowid
         for role_name, role_class in roles:
             conn.execute(
-                "INSERT INTO pin_role (mcu_package_pin_id, role_name, role_class) "
-                "VALUES (?,?,?)",
+                "INSERT INTO pin_role (mcu_package_pin_id, role_name, role_class) VALUES (?,?,?)",
                 (pin_id, role_name, role_class),
             )
         for signal, io_modes in functions:
@@ -98,17 +167,35 @@ def _seed_stm_index(app_ctx) -> StmIndex:
 
     # MCU1 (STM32F407V(E-G)Tx) pins, for the 03-04 pinout/pin/AF/signal-candidates tests:
     _insert_pin(
-        mcu1_id, "LQFP64", "1", "VDD", "VDD", "Power", "power",
+        mcu1_id,
+        "LQFP64",
+        "1",
+        "VDD",
+        "VDD",
+        "Power",
+        "power",
         roles=[("power_vdd", "power")],
     )
     _insert_pin(
-        mcu1_id, "LQFP64", "12", "PA9", "PA9", "I/O", "io",
+        mcu1_id,
+        "LQFP64",
+        "12",
+        "PA9",
+        "PA9",
+        "I/O",
+        "io",
         roles=[("gpio", "io")],
         functions=[("USART1_TX", "In/Out")],
         afs=[(7, "USART1_TX", "USART1")],
     )
     _insert_pin(
-        mcu1_id, "LQFP64", "13", "PA10", "PA10", "I/O", "io",
+        mcu1_id,
+        "LQFP64",
+        "13",
+        "PA10",
+        "PA10",
+        "I/O",
+        "io",
         roles=[("gpio", "io")],
         functions=[("USART1_RX", "In/Out")],
         afs=[(7, "USART1_RX", "USART1")],
@@ -116,7 +203,13 @@ def _seed_stm_index(app_ctx) -> StmIndex:
     # PB6 ALSO offers USART1_TX via a different AF index - a real remap alternative,
     # giving GET /signal/candidates?signal=USART1_TX two candidate positions.
     _insert_pin(
-        mcu1_id, "LQFP64", "34", "PB6", "PB6", "I/O", "io",
+        mcu1_id,
+        "LQFP64",
+        "34",
+        "PB6",
+        "PB6",
+        "I/O",
+        "io",
         roles=[("gpio", "io")],
         functions=[("I2C1_SCL", "In/Out")],
         afs=[(4, "I2C1_SCL", "I2C1"), (7, "USART1_TX", "USART1")],
@@ -132,8 +225,16 @@ def _seed_stm_index(app_ctx) -> StmIndex:
     # inferred-geometry pinout tests (defect: an uncurated BGA must never fall back
     # to a perimeter "qfp" shape the frontend cannot lay out).
     mcu3_id = _insert_mcu(
-        "STM32H747X(G-I)Hx", "STM32H7", "STM32H747", "TFBGA240", 240, "Arm Cortex-M7",
-        2048, 1024, 480, 168,
+        "STM32H747X(G-I)Hx",
+        "STM32H7",
+        "STM32H747",
+        "TFBGA240",
+        240,
+        "Arm Cortex-M7",
+        2048,
+        1024,
+        480,
+        168,
         [("USART", "USART1", "1")],
     )
     for position, row, col, canonical, pin_type, ec in (
@@ -146,8 +247,21 @@ def _seed_stm_index(app_ctx) -> StmIndex:
             "position_kind, bga_row, bga_col, canonical_pin_name, raw_pin_name, pin_type, "
             "electrical_class, gpio_port, gpio_pin_index, lqfp_side) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (mcu3_id, "TFBGA240", position, "alnum", row, col, canonical, canonical,
-             pin_type, ec, None, None, None),
+            (
+                mcu3_id,
+                "TFBGA240",
+                position,
+                "alnum",
+                row,
+                col,
+                canonical,
+                canonical,
+                pin_type,
+                ec,
+                None,
+                None,
+                None,
+            ),
         )
 
     for key, value in (
@@ -444,9 +558,7 @@ def test_pinout_geometry_is_inferred_for_an_uncurated_bga_package(client, app_ct
 
 def test_pin_af_returns_the_complete_af_set(client, app_ctx):
     _seed_stm_index(app_ctx)
-    r = client.get(
-        "/api/stm/pin/af", params={"part": "STM32F407V(E-G)Tx", "position": "34"}
-    )
+    r = client.get("/api/stm/pin/af", params={"part": "STM32F407V(E-G)Tx", "position": "34"})
     assert r.status_code == 200
     body = r.json()
     assert body["position"] == "34"
@@ -456,9 +568,7 @@ def test_pin_af_returns_the_complete_af_set(client, app_ctx):
 
 def test_pin_af_404_when_position_absent(client, app_ctx):
     _seed_stm_index(app_ctx)
-    r = client.get(
-        "/api/stm/pin/af", params={"part": "STM32F407V(E-G)Tx", "position": "999"}
-    )
+    r = client.get("/api/stm/pin/af", params={"part": "STM32F407V(E-G)Tx", "position": "999"})
     assert r.status_code == 404
 
 
@@ -516,9 +626,7 @@ def test_compat_union_mixed_package_scope_is_400(client, app_ctx):
 
 def test_compat_union_accepts_a_families_array_scope(client, app_ctx):
     _seed_stm_index(app_ctx)
-    r = client.post(
-        "/api/stm/compat/union", json={"families": ["STM32F4"], "package": "LQFP64"}
-    )
+    r = client.post("/api/stm/compat/union", json={"families": ["STM32F4"], "package": "LQFP64"})
     assert r.status_code == 200
     body = r.json()
     assert body["families"] == ["STM32F4"]
@@ -557,23 +665,23 @@ def test_target_definition_compiles_a_versioned_provenanced_artifact(client, app
                     }
                 ],
                 "safety_rules": [],
-                "channel_fabric": {
-                    "part_mpn": "TEST-SWITCH-8",
-                    "channels_per_device": 8,
-                    "max_devices": 1,
-                    "default_state": "open",
+                "routing_constraints": {
+                    "safe_default": "open",
+                    "maximum_independent_paths": 8,
                 },
             },
         },
     )
     assert r.status_code == 200
     body = r.json()
-    assert body["format"] == "stm-target-definition/1"
+    assert body["format"] == "stm-target-definition/2"
     assert len(body["artifact_digest"]) == 64
     assert body["scope"]["package"] == "LQFP64"
     assert body["requirements"][0]["route_kind"] == "direct"
     assert body["service_groups"][0]["id"] == "boot-uart"
     assert body["functional_foundation"]["groups"]
+    assert body["routing_requirements"]["strategy"] == ("implementation-neutral-independent-paths")
+    assert "channel_fabric" not in body
     assert body["provenance"]["source_sha256"] == "deadbeef"
 
 
@@ -581,6 +689,45 @@ def test_target_definition_is_409_when_the_index_is_not_built(client, app_ctx):
     app_ctx.stm_index = None
     r = client.post(
         "/api/stm/target-definition",
+        json={"parts": ["STM32F407V(E-G)Tx"], "policy": {"id": "test"}},
+    )
+    assert r.status_code == 409
+
+
+def test_socket_solution_compacts_definition_into_support_cells(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.post(
+        "/api/stm/socket-solution",
+        json={
+            "parts": ["STM32F407V(E-G)Tx"],
+            "policy": {
+                "id": "socket-api-test",
+                "revision": 1,
+                "requirements": [],
+                "service_groups": [],
+                "safety_rules": [],
+                "routing_constraints": {"safe_default": "open"},
+            },
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["format"] == "stm-socket-solution/1"
+    assert len(body["artifact_digest"]) == 64
+    assert body["scope"]["package"] == "LQFP64"
+    assert body["summary"]["target_count"] == 1
+    assert body["summary"]["target_cohort_count"] == 1
+    assert body["closure"]["zero_omission"] is True
+    assert body["closure"]["configuration_errors"] == []
+    assert body["support_cells"]
+    assert body["positions"]
+    assert body["safe_state_contract"]["target_change"] == "open-before-reconfigure"
+
+
+def test_socket_solution_is_409_when_the_index_is_not_built(client, app_ctx):
+    app_ctx.stm_index = None
+    r = client.post(
+        "/api/stm/socket-solution",
         json={"parts": ["STM32F407V(E-G)Tx"], "policy": {"id": "test"}},
     )
     assert r.status_code == 409

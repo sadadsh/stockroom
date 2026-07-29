@@ -53,6 +53,16 @@ def _complete(candidate):
     return candidate
 
 
+def _materialize_legacy_fixture(pipe, candidate):
+    """Exercise historical package normalization through LibraryOps, not public ingest.
+
+    Local package inspection remains useful for migration/readback regressions, but
+    IngestPipeline.commit is intentionally metadata-only now. These tests validate
+    the old fixture bytes below the retired product boundary.
+    """
+    return pipe.ops.add_part(candidate.to_staged_part())
+
+
 def test_inspect_a_snapeda_zip(tmp_path, fixtures_dir):
     pipe = _pipeline(tmp_path)
     z = _snapeda_zip(tmp_path, fixtures_dir)
@@ -79,7 +89,7 @@ def test_commit_lands_the_part_in_the_category_lib(tmp_path, fixtures_dir):
     c.category = "ICs"
     c.entry_name = "TESTPART"
     _complete(c)
-    record = pipe.commit(c)
+    record = _materialize_legacy_fixture(pipe, c)
     assert record.category == "ICs"
     assert record.is_complete()  # a landed part is always complete
     sym_lib = SymbolLib.load(pipe.profile.library.symbol_lib_path("ICs"))
@@ -103,7 +113,7 @@ def test_commit_rejects_an_incomplete_part_into_the_primary_library(tmp_path, fi
     c.entry_name = "TESTPART"
     head_before = pipe.repo.head()
     with pytest.raises(IncompleteError) as exc:
-        pipe.commit(c)
+        _materialize_legacy_fixture(pipe, c)
     missing = exc.value.missing
     assert "MPN" in missing
     assert "manufacturer" in missing
@@ -133,7 +143,7 @@ def test_archive_profile_grandfathers_an_incomplete_ingest(tmp_path, fixtures_di
     [c] = pipe.inspect(inputs=[z], workdir=tmp_path / "work")
     c.category = "ICs"
     c.entry_name = "TESTPART"
-    record = pipe.commit(c)  # must NOT raise
+    record = _materialize_legacy_fixture(pipe, c)  # archive migration must not lose data
     assert not record.is_complete()  # honestly incomplete, but grandfathered in
     sym_lib = SymbolLib.load(archive.library.symbol_lib_path("ICs"))
     assert "TESTPART" in sym_lib.symbol_names
@@ -155,7 +165,7 @@ def test_failed_commit_into_new_category_leaves_zero_trace(tmp_path, fixtures_di
     # after ensure_footprint_lib created the .pretty and the empty symbol lib.
     c.symbol_lib_path.write_text("(kicad_symbol_lib (this is broken")
     with pytest.raises(Exception):
-        pipe.commit(c)
+        _materialize_legacy_fixture(pipe, c)
     assert pipe.repo.head() == head_before  # no commit
     pretty = pipe.profile.library.footprint_lib_path("Transistors")
     assert not pretty.exists(), "stray empty .pretty left behind after rollback"
@@ -216,7 +226,7 @@ def test_attach_model_to_existing_part(tmp_path, fixtures_dir):
     c.entry_name = "TESTPART"
     # Commit WITHOUT a model (archive is grandfathered, so this is allowed).
     c.model_path = None
-    record = pipe.commit(c)
+    record = _materialize_legacy_fixture(pipe, c)
     assert record.assets_for("kicad").model is None
 
     model = tmp_path / "late.step"
@@ -248,7 +258,7 @@ def test_end_to_end_ingest_each_vendor_layout(tmp_path, fixtures_dir, vendor):
     c.category = "ICs"
     c.entry_name = f"PART_{vendor}"
     _complete(c)  # the package supplies the assets; add identity + sourcing
-    record = pipe.commit(c)
+    record = _materialize_legacy_fixture(pipe, c)
     assert record.is_complete()  # a landed part passes the gate
     from stockroom.kicad.symbol_lib import SymbolLib
     sym_lib = SymbolLib.load(pipe.profile.library.symbol_lib_path("ICs"))
@@ -267,14 +277,14 @@ def test_second_add_only_adds_to_target_lib(tmp_path, fixtures_dir):
     z1 = make_vendor_zip(tmp_path / "a.zip", "snapeda", fixtures_dir)
     [c1] = pipe.inspect(inputs=[z1], workdir=tmp_path / "w1")
     c1.category = "ICs"; c1.entry_name = "FIRST"; _complete(c1)
-    pipe.commit(c1)
+    _materialize_legacy_fixture(pipe, c1)
     sym_path = pipe.profile.library.symbol_lib_path("ICs")
     after_first = sym_path.read_text(encoding="utf-8")
 
     z2 = make_vendor_zip(tmp_path / "b.zip", "snapeda", fixtures_dir)
     [c2] = pipe.inspect(inputs=[z2], workdir=tmp_path / "w2")
     c2.category = "ICs"; c2.entry_name = "SECOND"; _complete(c2)
-    pipe.commit(c2)
+    _materialize_legacy_fixture(pipe, c2)
     after_second = sym_path.read_text(encoding="utf-8")
 
     assert '(symbol "FIRST"' in after_second
@@ -321,7 +331,7 @@ def test_attach_assets_records_the_vendor_every_asset_came_from(tmp_path, fixtur
     c.category = "ICs"
     c.entry_name = "PROVENANCE"
     _complete(c)
-    record = pipe.commit(c)
+    record = _materialize_legacy_fixture(pipe, c)
 
     z2 = make_vendor_zip(tmp_path / "ul2.zip", "ultralibrarian", fixtures_dir)
     [again] = [x for x in pipe.inspect(inputs=[z2], workdir=tmp_path / "work2")][:1]
@@ -351,7 +361,7 @@ def test_attach_assets_with_no_origin_leaves_the_assets_unattributed(tmp_path, f
     c.category = "ICs"
     c.entry_name = "NOPROV"
     _complete(c)
-    record = pipe.commit(c)
+    record = _materialize_legacy_fixture(pipe, c)
 
     z2 = make_vendor_zip(tmp_path / "ul2.zip", "ultralibrarian", fixtures_dir)
     [again] = [x for x in pipe.inspect(inputs=[z2], workdir=tmp_path / "work2")][:1]

@@ -3,14 +3,12 @@
  * their own body (header + panes); the shell owns the rail and the surface
  * background so every page reads consistent.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Rail } from "./Rail";
-import { DropOverlay } from "./DropOverlay";
 import { AddPartModal } from "./AddPartModal";
-import { useAddPart } from "../lib/addPart";
-import { queuePaths } from "../lib/ingestQueue";
 import { Text } from "../lib/copy";
 import { plural } from "../lib/plural";
+import { useRouter } from "../lib/router";
 import {
   useActivateProfile,
   useFacetsQuery,
@@ -20,31 +18,6 @@ import {
 import { RunningVersionIndicator } from "./RunningVersionIndicator";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { open: openAddPart } = useAddPart();
-  // A file dropped anywhere in the window goes to Add A Part: queue the native
-  // paths, then open the modal so its flow consumes them and inspects.
-  const handleDrop = useCallback(
-    (paths: string[]) => {
-      queuePaths(paths);
-      openAddPart();
-    },
-    [openAddPart],
-  );
-  // The real drop channel on Windows: WebView2 only exposes dropped-file paths to
-  // the HOST (via pywebview's DOM API), which forwards them through this hook. The
-  // in-window DropOverlay still provides the drag scrim and covers any backend that
-  // does expose pywebviewFullPath to the DOM.
-  useEffect(() => {
-    window.__STOCKROOM_NATIVE_DROP__ = (paths) => {
-      const clean = Array.isArray(paths)
-        ? paths.filter((p): p is string => typeof p === "string" && p.length > 0)
-        : [];
-      if (clean.length > 0) handleDrop(clean);
-    };
-    return () => {
-      delete window.__STOCKROOM_NATIVE_DROP__;
-    };
-  }, [handleDrop]);
   return (
     // h-screen (not min-h-screen) so a tall page scrolls INSIDE its own pane and
     // the window never grows a body scrollbar that shifts the rail between pages.
@@ -56,7 +29,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div data-dev-id="shell.content" className="flex min-w-0 flex-1 flex-col">{children}</div>
       </div>
       <ShellStatusBar />
-      <DropOverlay onDrop={handleDrop} />
       <AddPartModal />
     </div>
   );
@@ -68,6 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 // working context that matters day to day - the exact running revision, its remotely proven
 // standing, and the active profile. All read from queries the app already caches.
 function ShellStatusBar() {
+  const { route } = useRouter();
   const facets = useFacetsQuery();
   const update = useUpdateCheck();
   // The library's SCALE, which is a fact worth a permanent slot. This segment used to read
@@ -81,7 +54,11 @@ function ShellStatusBar() {
       data-dev-id="shell.statusbar"
       className="flex h-[24px] flex-none items-center gap-2.5 border-t border-line bg-band px-3 text-2xs text-t2"
     >
-      {facets.isError ? (
+      {route !== "components" ? (
+        <span className="text-t2">
+          {route === "stm" ? "STM Viewer" : "Settings"}
+        </span>
+      ) : facets.isError ? (
         <span className="text-err">
           <Text id="shell.status.load-failed">Could Not Load Components</Text>
         </span>
@@ -94,7 +71,7 @@ function ShellStatusBar() {
           {/* Agrees with its number: this read "1 Components" on 10 of the 12 captured screens.
               The NUMBER stays outside <Text>, whose id maps to one overridable string - folding a
               count into it would mint a different copy key for every library size. */}
-          <span className="tnum">
+          <span className="tnum font-medium text-t1">
             {total.toLocaleString()}{" "}
             <Text id="shell.status.count">{plural(total, "Component")}</Text>
           </span>
@@ -109,7 +86,7 @@ function ShellStatusBar() {
           ) : null}
         </>
       )}
-      <span className="ml-auto flex items-center gap-2.5 text-t3">
+      <span className="ml-auto flex items-center gap-2.5 text-t2">
         <RunningVersionIndicator
           data={update.data}
           checking={update.isPending || update.isFetching}
@@ -163,10 +140,12 @@ function ProfileSwitch() {
         aria-expanded={open}
         disabled={activate.isPending || others.length === 0}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-control px-1 py-0.5 text-2xs text-t3 transition-colors hover:text-t1 disabled:pointer-events-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc"
+        className="inline-flex items-center gap-1 rounded-control px-1 py-0.5 text-2xs text-t2 transition-colors hover:text-t1 disabled:pointer-events-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc"
       >
-        <Text id="shell.status.profile">Profile</Text>{" "}
-        <span className="font-semibold text-t2">{active}</span>
+        <span className="text-t2">
+          <Text id="shell.status.profile">Profile</Text>:
+        </span>
+        <span className="font-semibold text-t1">{active}</span>
         {others.length > 0 ? (
           <span aria-hidden className="text-t3">
             {open ? "▾" : "▴"}

@@ -4,13 +4,19 @@
  * assets in one pass, watching a two-track checklist fill) and DETAILS (datasheet, part number,
  * manufacturer, value). The capture runs through the global CaptureProvider store, so "Keep
  * Working" can hand it off to the background status pill and the user can close this and keep
- * moving while the files land. Applying a row routes to the same seams the detail uses (attach /
- * edit-field / guided capture), so the record stays the single source of truth.
+ * moving while the files land. Metadata rows use the normal edit-field seam; CAD assets can only
+ * arrive through the network capture workflow, so the record stays the single source of truth.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { assetPresent, assetsFor } from "../lib/edaTarget";
-import type { CadSource, PartDetail, Requirement } from "../api/types";
+import type {
+  CadSource,
+  PartDetail,
+  ProviderOutcome,
+  ProviderOutcomeStatus,
+  Requirement,
+} from "../api/types";
 import { useCadSourceQuery } from "../api/queries";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
 import { useToast } from "../lib/toast";
@@ -23,8 +29,6 @@ interface Props {
   detail: PartDetail;
   hasModel: boolean;
   onClose: () => void;
-  onAttachSymbol?: (lib: string, name: string) => void;
-  onAttachFootprint?: (lib: string, name: string) => void;
   onEditField?: (field: string, value: unknown) => void;
   busy?: boolean;
 }
@@ -83,7 +87,11 @@ function SegmentMeter({
             key={n}
             className={"h-2 w-5 " + (received[n] ? "bg-ok" : "bg-raise2")}
             initial={false}
-            animate={received[n] ? { opacity: done ? 1 : 0.92, scaleY: [1, 1.6, 1] } : { opacity: 1, scaleY: 1 }}
+            animate={
+              received[n]
+                ? { opacity: done ? 1 : 0.92, scaleY: [1, 1.6, 1] }
+                : { opacity: 1, scaleY: 1 }
+            }
             transition={{ duration: 0.3, ease: "easeOut" }}
           />
         ))}
@@ -243,17 +251,111 @@ function VendorPicker({
           );
         })}
       </div>
+      <p className="mt-1.5 text-2xs leading-snug text-t3">
+        Verified evidence and automatic routes run first. This preference only orders assisted
+        windows; Stockroom continues through eligible fallbacks and pauses only for a
+        provider-required login, security check, or download choice.
+      </p>
     </div>
   );
 }
 
-function needsSubline(hasKicad: boolean, hasAltium: boolean, vendor: string): string {
-  const scope = hasKicad && hasAltium
-    ? "KiCad and Altium libraries"
-    : hasAltium
-      ? "Altium symbol and footprint"
-      : "KiCad symbol, footprint and 3D model";
-  return `Find, verify and attach its ${scope}; try ${vendor} first if a provider window is needed.`;
+function needsSubline(_hasKicad: boolean, _hasAltium: boolean, vendor: string): string {
+  return (
+    "Reuse verified evidence, then search and rank eligible sources for one shared KiCad + " +
+    `Altium + STEP package; open ${vendor} first only if assistance is needed.`
+  );
+}
+
+const ROUTE_STATUS: Record<ProviderOutcomeStatus, { label: string; tone: string }> = {
+  activated: { label: "Activated", tone: "text-ok" },
+  "succeeded-retained": { label: "Retained", tone: "text-ok" },
+  unavailable: { label: "Unavailable", tone: "text-t3" },
+  "requires-human": { label: "Needs Your Input", tone: "text-warn" },
+  blocked: { label: "Blocked", tone: "text-warn" },
+  failed: { label: "Failed", tone: "text-err" },
+  cancelled: { label: "Cancelled", tone: "text-warn" },
+  "not-attempted": { label: "Not Attempted", tone: "text-warn" },
+};
+
+function routeReason(outcome: ProviderOutcome): string {
+  if (outcome.reason) return outcome.reason;
+  switch (outcome.status) {
+    case "activated":
+      return "This exact provider set is now active.";
+    case "succeeded-retained":
+      return `${outcome.retained} exact ${
+        outcome.retained === 1 ? "file was" : "files were"
+      } retained without replacing the active pair.`;
+    case "unavailable":
+      return "This route was checked and has no exact deliverable.";
+    case "requires-human":
+      return outcome.attempted
+        ? "The route requires your input before collection can continue."
+        : "This route requires a person-driven handoff and collection remains partial.";
+    case "blocked":
+      return "Provider access was blocked and collection remains partial.";
+    case "failed":
+      return "The route failed and collection remains partial.";
+    case "cancelled":
+      return "The route was cancelled and collection remains partial.";
+    case "not-attempted":
+      return "This route was not attempted after an earlier stop, so collection remains partial.";
+  }
+}
+
+function ProviderRouteOutcomes({
+  outcomes,
+  collectionComplete,
+}: {
+  outcomes: ProviderOutcome[];
+  collectionComplete: boolean | null;
+}) {
+  if (outcomes.length === 0) return null;
+  return (
+    <div className="mt-3.5 border-t border-line pt-3" data-dev-id="complete.cad-provider-outcomes">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-t3">
+            Source Results
+          </div>
+          <p
+            className={
+              "mt-1 text-2xs leading-snug " + (collectionComplete ? "text-t3" : "text-warn")
+            }
+          >
+            {collectionComplete
+              ? "Collection Complete. Every route is settled. Unavailable means it was checked and had no exact deliverable."
+              : "Collection Partial. A route requires human input, is blocked or failed, was cancelled, or was not attempted."}
+          </p>
+        </div>
+        <span
+          className={
+            "flex-none rounded-full px-2 py-0.5 text-2xs font-semibold " +
+            (collectionComplete ? "bg-ok/15 text-ok" : "bg-warn/15 text-warn")
+          }
+        >
+          {collectionComplete ? "Complete" : "Partial"}
+        </span>
+      </div>
+      <div className="mt-2 flex flex-col divide-y divide-line">
+        {outcomes.map((outcome) => {
+          const status = ROUTE_STATUS[outcome.status];
+          return (
+            <div
+              key={outcome.route_id}
+              className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 py-2"
+              data-route-id={outcome.route_id}
+            >
+              <div className="truncate text-xs font-medium text-t1">{outcome.label}</div>
+              <div className={"text-2xs font-semibold " + status.tone}>{status.label}</div>
+              <div className="col-span-2 text-2xs leading-snug text-t3">{routeReason(outcome)}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function cadLabel(status: GuidedStatus): string {
@@ -306,17 +408,14 @@ const REQ_TOAST: Record<Requirement, string> = {
   altium_footprint: "Altium footprint received",
 };
 
-function pickIngestFiles(): Promise<string[]> | null {
-  const hostApi = (
-    window as unknown as {
-      pywebview?: { api?: { pick_ingest_files?: () => Promise<string[]> } };
-    }
-  ).pywebview?.api;
-  return hostApi?.pick_ingest_files ? hostApi.pick_ingest_files() : null;
-}
-
 // A quiet section eyebrow that gives FILES and DETAILS a real, legible hierarchy.
-function Eyebrow({ children, trailing }: { children: React.ReactNode; trailing?: React.ReactNode }) {
+function Eyebrow({
+  children,
+  trailing,
+}: {
+  children: React.ReactNode;
+  trailing?: React.ReactNode;
+}) {
   return (
     <div className="mb-2 flex items-center gap-2.5">
       <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-t3">{children}</span>
@@ -326,15 +425,7 @@ function Eyebrow({ children, trailing }: { children: React.ReactNode; trailing?:
   );
 }
 
-export function CompletePartModal({
-  detail,
-  hasModel,
-  onClose,
-  onAttachSymbol,
-  onAttachFootprint,
-  onEditField,
-  busy,
-}: Props) {
+export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy }: Props) {
   const kicadAssets = assetsFor(detail, "kicad");
   const hasSymbol = assetPresent(kicadAssets.symbol);
   const hasFootprint = assetPresent(kicadAssets.footprint);
@@ -349,9 +440,7 @@ export function CompletePartModal({
   // The chosen vendor persists across parts and across launches: over a 90-part sitting, one
   // decision beats ninety. Falls back to the head of the backend's trust order whenever the
   // stored key is absent from what this part actually offers.
-  const [vendorPref, setVendorPref] = useState<string>(
-    () => readVendorPref() ?? "",
-  );
+  const [vendorPref, setVendorPref] = useState<string>(() => readVendorPref() ?? "");
   const vendorKey =
     captureSources.find((v) => v.key === vendorPref)?.key ?? captureSources[0]?.key ?? "";
   const chosen = captureSources.find((v) => v.key === vendorKey) ?? null;
@@ -370,7 +459,10 @@ export function CompletePartModal({
     kicad_footprint: useText("modal.completePart.toast-kicad-footprint", REQ_TOAST.kicad_footprint),
     kicad_model: useText("modal.completePart.toast-kicad-model", REQ_TOAST.kicad_model),
     altium_symbol: useText("modal.completePart.toast-altium-symbol", REQ_TOAST.altium_symbol),
-    altium_footprint: useText("modal.completePart.toast-altium-footprint", REQ_TOAST.altium_footprint),
+    altium_footprint: useText(
+      "modal.completePart.toast-altium-footprint",
+      REQ_TOAST.altium_footprint,
+    ),
   };
   const reqToastRef = useRef(reqToast);
   reqToastRef.current = reqToast;
@@ -378,8 +470,10 @@ export function CompletePartModal({
   const dialogLabel = useText("modal.completePart.aria", "Complete this part");
   const closeLabel = useText("modal.completePart.close", "Close");
   const needs: Requirement[] = download.needs;
-  const showCad = needs.length > 0;
-  const isDone = download.status === "done";
+  const hasExactIdentity = Boolean(detail.manufacturer.trim() && detail.mpn.trim());
+  const showCad = needs.length > 0 || hasExactIdentity;
+  const isDone = download.status === "done" || (cadSource.data !== undefined && needs.length === 0);
+  const collectionPartial = download.collectionComplete === false;
   const cadBusy =
     download.status === "resolving" ||
     download.status === "window-open" ||
@@ -405,13 +499,6 @@ export function CompletePartModal({
     prevReceived.current = { ...rec };
   }, [download.received, toast]);
 
-  async function browse() {
-    const picked = pickIngestFiles();
-    if (!picked) return;
-    const paths = await picked;
-    if (paths && paths.length > 0) void download.submitPaths(paths);
-  }
-
   const kicadRows = KICAD_ROWS.filter((r) => needs.includes(r.req));
   const sharedRows = SHARED_ROWS.filter((r) => needs.includes(r.req));
   const altiumRows = ALTIUM_ROWS.filter((r) => needs.includes(r.req));
@@ -419,25 +506,70 @@ export function CompletePartModal({
   const requirements = useMemo(
     () =>
       [
-        { key: "symbol", label: "Symbol", copyId: "modal.completePart.row-symbol", kind: "asset" as const, present: hasSymbol },
-        { key: "footprint", label: "Footprint", copyId: "modal.completePart.row-footprint", kind: "asset" as const, present: hasFootprint },
-        { key: "model", label: "3D Model", copyId: "modal.completePart.row-model", kind: "cad-only" as const, present: hasModel },
-        { key: "datasheet", label: "Datasheet", copyId: "modal.completePart.row-datasheet", kind: "url" as const, present: hasDatasheet },
-        { key: "mpn", label: "Part Number", copyId: "modal.completePart.row-mpn", kind: "text" as const, present: !!detail.mpn },
-        { key: "manufacturer", label: "Manufacturer", copyId: "modal.completePart.row-manufacturer", kind: "text" as const, present: !!detail.manufacturer },
-        { key: "description", label: "Value / Description", copyId: "modal.completePart.row-description", kind: "text" as const, present: !!detail.derived.description },
+        {
+          key: "symbol",
+          label: "Symbol",
+          copyId: "modal.completePart.row-symbol",
+          kind: "asset" as const,
+          present: hasSymbol,
+        },
+        {
+          key: "footprint",
+          label: "Footprint",
+          copyId: "modal.completePart.row-footprint",
+          kind: "asset" as const,
+          present: hasFootprint,
+        },
+        {
+          key: "model",
+          label: "3D Model",
+          copyId: "modal.completePart.row-model",
+          kind: "cad-only" as const,
+          present: hasModel,
+        },
+        {
+          key: "datasheet",
+          label: "Datasheet",
+          copyId: "modal.completePart.row-datasheet",
+          kind: "url" as const,
+          present: hasDatasheet,
+        },
+        {
+          key: "mpn",
+          label: "Part Number",
+          copyId: "modal.completePart.row-mpn",
+          kind: "text" as const,
+          present: !!detail.mpn,
+        },
+        {
+          key: "manufacturer",
+          label: "Manufacturer",
+          copyId: "modal.completePart.row-manufacturer",
+          kind: "text" as const,
+          present: !!detail.manufacturer,
+        },
+        {
+          key: "description",
+          label: "Value / Description",
+          copyId: "modal.completePart.row-description",
+          kind: "text" as const,
+          present: !!detail.derived.description,
+        },
         // When the FILES section is shown it owns the whole asset story (symbol, footprint,
         // and 3D model), so drop those from DETAILS to avoid the same asset word reading
         // "Added" here and "Needed" in FILES at once. DETAILS then stays metadata-only.
-      ].filter((r) => !(showCad && (r.key === "model" || r.key === "symbol" || r.key === "footprint"))),
+      ].filter(
+        (r) => !(showCad && (r.key === "model" || r.key === "symbol" || r.key === "footprint")),
+      ),
     [detail, hasSymbol, hasFootprint, hasModel, hasDatasheet, showCad],
   );
   const doneCount =
     requirements.filter((r) => r.present).length + needs.filter((n) => download.received[n]).length;
   const total = requirements.length + needs.length;
 
-  const statusTone =
-    download.status === "error"
+  const statusTone = collectionPartial
+    ? "text-warn"
+    : download.status === "error"
       ? "text-err"
       : download.status === "timed-out"
         ? "text-warn"
@@ -472,7 +604,7 @@ export function CompletePartModal({
             </div>
             <div className="mt-0.5 text-xs text-t3">
               <Text id="modal.completePart.subtitle">
-                Add the files and data this part still needs.
+                Stockroom completes remaining data and one verified KiCad + Altium + STEP package.
               </Text>
             </div>
           </div>
@@ -498,7 +630,11 @@ export function CompletePartModal({
               <div
                 className={
                   "rounded-control border p-4 shadow-file transition-colors " +
-                  (isDone ? "border-ok/40 bg-ok/[0.07]" : "border-line2 bg-raise")
+                  (collectionPartial
+                    ? "border-warn/40 bg-warn/[0.07]"
+                    : isDone
+                      ? "border-ok/40 bg-ok/[0.07]"
+                      : "border-line2 bg-raise")
                 }
               >
                 <div className="flex items-start justify-between gap-3">
@@ -509,11 +645,7 @@ export function CompletePartModal({
                         (isDone ? "bg-ok/20 text-ok" : "bg-raise2 text-t1")
                       }
                     >
-                      {isDone ? (
-                        <CheckMark />
-                      ) : (
-                        <DownloadIcon className="h-3.5 w-3.5" />
-                      )}
+                      {isDone ? <CheckMark /> : <DownloadIcon className="h-3.5 w-3.5" />}
                     </span>
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-t1">
@@ -525,7 +657,9 @@ export function CompletePartModal({
                       </div>
                       <div className="mt-0.5 text-2xs leading-snug text-t3">
                         {isDone
-                          ? "Every format this part needed is attached."
+                          ? collectionPartial
+                            ? "The active KiCad and Altium files are complete. Exhaustive source collection still needs attention."
+                            : "Every format this part needed is attached."
                           : needsSubline(
                               kicadRows.length > 0 || sharedRows.length > 0,
                               altiumRows.length > 0,
@@ -534,52 +668,62 @@ export function CompletePartModal({
                       </div>
                     </div>
                   </div>
-                  <SegmentMeter needs={needs} received={download.received} done={isDone} />
+                  {needs.length > 0 ? (
+                    <SegmentMeter needs={needs} received={download.received} done={isDone} />
+                  ) : null}
                 </div>
 
-                {!isDone ? (
-                  <VendorPicker
-                    sources={captureSources}
-                    value={vendorKey}
-                    onChange={pickVendor}
-                    disabled={cadBusy}
-                  />
+                <VendorPicker
+                  sources={captureSources}
+                  value={vendorKey}
+                  onChange={pickVendor}
+                  disabled={cadBusy}
+                />
+
+                {needs.length > 0 ? (
+                  <div data-dev-id="complete.cad-checklist" className="mt-3.5 flex flex-col gap-3">
+                    {kicadRows.length > 0 ? (
+                      <CaptureGroup
+                        tool="KiCad"
+                        copyId="modal.completePart.group-kicad"
+                        rows={kicadRows}
+                        received={download.received}
+                      />
+                    ) : null}
+                    {sharedRows.length > 0 ? (
+                      <CaptureGroup
+                        tool="Shared"
+                        copyId="modal.completePart.group-shared"
+                        rows={sharedRows}
+                        received={download.received}
+                        note="Used by KiCad and Altium"
+                      />
+                    ) : null}
+                    {altiumRows.length > 0 ? (
+                      <CaptureGroup
+                        tool="Altium"
+                        copyId="modal.completePart.group-altium"
+                        rows={altiumRows}
+                        received={download.received}
+                      />
+                    ) : null}
+                  </div>
                 ) : null}
-
-                <div data-dev-id="complete.cad-checklist" className="mt-3.5 flex flex-col gap-3">
-                  {kicadRows.length > 0 ? (
-                    <CaptureGroup
-                      tool="KiCad"
-                      copyId="modal.completePart.group-kicad"
-                      rows={kicadRows}
-                      received={download.received}
-                    />
-                  ) : null}
-                  {sharedRows.length > 0 ? (
-                    <CaptureGroup
-                      tool="Shared"
-                      copyId="modal.completePart.group-shared"
-                      rows={sharedRows}
-                      received={download.received}
-                      note="Used by KiCad and Altium"
-                    />
-                  ) : null}
-                  {altiumRows.length > 0 ? (
-                    <CaptureGroup
-                      tool="Altium"
-                      copyId="modal.completePart.group-altium"
-                      rows={altiumRows}
-                      received={download.received}
-                    />
-                  ) : null}
-                </div>
 
                 {download.message ? (
                   <p className={"mt-3 text-xs " + statusTone}>{download.message}</p>
                 ) : null}
 
-                <div data-dev-id="complete.cad-actions" className="mt-3 flex flex-wrap items-center gap-2">
-                  {!isDone ? (
+                <ProviderRouteOutcomes
+                  outcomes={download.providerOutcomes}
+                  collectionComplete={download.collectionComplete}
+                />
+
+                <div
+                  data-dev-id="complete.cad-actions"
+                  className="mt-3 flex flex-wrap items-center gap-2"
+                >
+                  {needs.length > 0 && !isDone ? (
                     <Button
                       variant="accent"
                       small
@@ -588,7 +732,9 @@ export function CompletePartModal({
                       onClick={() =>
                         void download.start(
                           vendorKey || undefined,
-                          download.status === "error" && vendorKey
+                          download.status === "error" &&
+                            download.providerOutcomes.length === 0 &&
+                            vendorKey
                             ? "assisted"
                             : "automatic",
                         )
@@ -597,15 +743,15 @@ export function CompletePartModal({
                       <Text id={cadButtonId(download.status)}>{cadLabel(download.status)}</Text>
                     </Button>
                   ) : null}
-                  {!isDone ? (
-                    // Direct/keyless acquisition can succeed even when no provider page resolves,
-                    // so Browse always remains the quiet manual fallback.
+                  {hasExactIdentity ? (
                     <Button
+                      variant={isDone ? "accent" : "default"}
                       small
+                      icon={<DownloadIcon className="h-3.5 w-3.5" />}
                       disabled={cadBusy}
-                      onClick={() => void browse()}
+                      onClick={() => void download.start(vendorKey || undefined, "collect-all")}
                     >
-                      <Text id="modal.completePart.browse">Browse For Files</Text>
+                      {cadBusy ? "Collecting All Sources..." : "Collect All Sources"}
                     </Button>
                   ) : null}
                   {canBackground ? (
@@ -629,14 +775,7 @@ export function CompletePartModal({
             <Eyebrow>Details</Eyebrow>
             <div data-dev-id="complete.requirements" className="flex flex-col divide-y divide-line">
               {requirements.map((req) => (
-                <Requirement
-                  key={req.key}
-                  req={req}
-                  busy={busy}
-                  onAttachSymbol={onAttachSymbol}
-                  onAttachFootprint={onAttachFootprint}
-                  onEditField={onEditField}
-                />
+                <Requirement key={req.key} req={req} busy={busy} onEditField={onEditField} />
               ))}
             </div>
           </section>
@@ -663,29 +802,16 @@ type Req = {
 function Requirement({
   req,
   busy,
-  onAttachSymbol,
-  onAttachFootprint,
   onEditField,
 }: {
   req: Req;
   busy?: boolean;
-  onAttachSymbol?: (lib: string, name: string) => void;
-  onAttachFootprint?: (lib: string, name: string) => void;
   onEditField?: (field: string, value: unknown) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [lib, setLib] = useState(req.key === "symbol" ? "Device" : "");
-  const [name, setName] = useState("");
   const [text, setText] = useState("");
-  const editable = !!(onAttachSymbol || onAttachFootprint || onEditField);
+  const editable = !!onEditField && (req.kind === "url" || req.kind === "text");
 
-  function applyAsset() {
-    if (!lib.trim() || !name.trim()) return;
-    if (req.key === "symbol") onAttachSymbol?.(lib.trim(), name.trim());
-    else onAttachFootprint?.(lib.trim(), name.trim());
-    setOpen(false);
-    setName("");
-  }
   function applyValue(field: string) {
     if (!text.trim()) return;
     onEditField?.(field, text.trim());
@@ -713,7 +839,11 @@ function Requirement({
           </span>
         ) : req.kind === "cad-only" ? (
           <span className="text-2xs text-t3">
-            <Text id="modal.completePart.req-from-cad">From the files above</Text>
+            <Text id="modal.completePart.req-from-cad">From network collection</Text>
+          </span>
+        ) : req.kind === "asset" ? (
+          <span className="text-2xs text-t3">
+            <Text id="modal.completePart.req-from-cad">From network collection</Text>
           </span>
         ) : editable ? (
           <button
@@ -733,29 +863,24 @@ function Requirement({
 
       {open && !req.present ? (
         <div className="mt-2.5 pl-6.5">
-          {req.kind === "asset" ? (
-            <div className="flex flex-wrap items-end gap-2">
-              <Field label="Library" value={lib} onChange={setLib} placeholder={req.key === "symbol" ? "Device" : "Resistor_SMD"} />
-              <Field label="Name" value={name} onChange={setName} placeholder={req.key === "symbol" ? "R" : "R_0603_1608Metric"} onEnter={applyAsset} />
-              <Button small variant="accent" disabled={busy || !lib.trim() || !name.trim()} onClick={applyAsset}>
-                <Text id="modal.completePart.attach">Attach</Text>
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-end gap-2">
-              <Field
-                label={req.kind === "url" ? "URL" : req.label}
-                value={text}
-                onChange={setText}
-                placeholder={req.kind === "url" ? "https://..." : ""}
-                wide
-                onEnter={() => applyValue(req.key)}
-              />
-              <Button small variant="accent" disabled={busy || !text.trim()} onClick={() => applyValue(req.key)}>
-                <Text id="modal.completePart.save">Save</Text>
-              </Button>
-            </div>
-          )}
+          <div className="flex flex-wrap items-end gap-2">
+            <Field
+              label={req.kind === "url" ? "URL" : req.label}
+              value={text}
+              onChange={setText}
+              placeholder={req.kind === "url" ? "https://..." : ""}
+              wide
+              onEnter={() => applyValue(req.key)}
+            />
+            <Button
+              small
+              variant="accent"
+              disabled={busy || !text.trim()}
+              onClick={() => applyValue(req.key)}
+            >
+              <Text id="modal.completePart.save">Save</Text>
+            </Button>
+          </div>
         </div>
       ) : null}
     </div>

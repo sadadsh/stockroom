@@ -1,6 +1,6 @@
 # Projects Workspace Rebuild Plan
 
-**Status:** Approved, Phase 0 implementation in progress
+**Status:** Approved, Phase 0 qualification plus Phase 1, 2, 5, and 6 vertical slices in progress
 **Owner:** Stockroom
 **Scope:** Two-person KiCad 10 and Altium Designer 26 collaboration through a shared Git repository
 **Decision:** Rebuild Projects as a visual PCB collaboration editor and BOM maker
@@ -116,17 +116,237 @@ Automated evidence:
 - explicit forced-unlock command separation;
 - no force push, binary merge, or working-copy replacement.
 - real GitHub LFS acquire, observe, release, and absence-after-release round trip;
-- installed KiCad 10.0.4 BOM, ERC, and DRC execution against the real fixture with
-  byte-identical source before and after;
+- installed KiCad 10.0.4 BOM, ERC, DRC, schematic SVG, and PCB 3D-render execution
+  against the real fixture with byte-identical source before and after;
+- a disposable Git-backed KiCad project edited through Stockroom's production field
+  transaction, reopened through a fresh project service, then accepted again by native
+  KiCad BOM and SVG export with a clean working tree;
 - existing real AD26 `.SchDoc` component and Stockroom identity readback retained
   in the paired native evidence suite.
+- installed Altium Designer 26 created, populated, saved, closed, and reopened a
+  real `.PcbDoc` through its SDK with the live `IPCB_Board` recovered;
+- installed Altium Designer 26 changed a real `.SchDoc` MPN through the schematic
+  API, saved it, reopened it, and preserved its manufacturer, supplier, footprint,
+  and binding identity;
+- shared KiCad and Altium project adapters now own discovery, description, runtime,
+  documents, and placement normalization behind one contract;
+- placement geometry qualification now uses a strict paired-output hypothesis:
+  KiCad's native metric position export and Altium's native Pick and Place output
+  must normalize to the same reference, board, X/Y, rotation, side, and footprint
+  record without changing registered source bytes. Direct Altium PCB-object
+  iteration is rejected for this path: it opened and completed on an empty native
+  board, but a persisted synthetic component raised an AD26 native error dialog
+  when dereferenced in two discriminating runs, including one without
+  `SourceDesignator`. The installed `Assembly.OutJob` Pick and Place generator
+  also raised a native dialog against both the synthetic board and a
+  production-valid installed example, including its real project descriptor.
+  Source hashes remained unchanged, so highlighting stays hidden until a new
+  Altium automation hypothesis is qualified.
+- the production Projects route now exposes the same Design, BOM, Assemble, Changes,
+  and Releases tools for both EDAs, including a native folder picker and multi-project
+  discovery before registration;
+- the production Projects shell now inherits the Components/Library interaction
+  grammar: a 320 px searchable picker, compact selected-item title strip, one quiet
+  context bar, shared workbench tabs, and bounded list/detail inspectors. BOM is a
+  selectable line list with a contextual resolver instead of a full-width command
+  table; Design, Assembly, Changes, and Releases use the same hierarchy and tokens;
+- the frontend contains no KiCad/Altium workflow branch below project identity.
+  A permanent source contract scans every Projects workbench for EDA-specific
+  branching, while the page test selects one KiCad and one Altium fixture and proves
+  that both expose the same five tools through the same shell;
+- the route publishes `stockroom-project-parity/1`: one strict, versioned
+  contract for both EDAs covering each tool's actions, inputs, states, results,
+  recovery, and acceptance evidence. Public project capabilities are the same
+  five tools; legacy KiCad-only settings endpoints are no longer advertised as
+  product capabilities;
+- a format-neutral guided assembly slice pins a clean Git commit and placement
+  snapshot, expands it by board quantity, persists immutable Done, Skipped, Reworked,
+  and Issue events immediately, rejects mismatched scanned MPNs, resumes after
+  process restart, and seals a digest-bearing completion receipt;
+- the assembly bench was visually verified at 1280 by 720 with no overflow or
+  browser console errors; the shell now reports Project Workspace status instead of
+  leaking unrelated Components query failures.
+- the Components/Library grammar refit was verified in the real source-host
+  pywebview/WebView2 window at 1384 by 861. Design and BOM were captured in dark
+  mode; BOM, the assembly start surface, and the Git-unavailable Changes state were
+  captured in light mode. Every capture has document/body/viewport width and height
+  parity, and the WebView2 console is empty;
+- active work sessions now persist per library across process restarts, pin their
+  base commit, retain the exact claimed native documents and remote lock identities,
+  and prevent project removal while work is active;
+- the production API exposes one format-neutral collaboration state, Start Work,
+  and Share Changes contract for KiCad and Altium, including clean/synchronized Git
+  preflight, allowlisted claims, scoped commit/push, and classified lock or remote
+  failures;
+- the Projects header, Changes surface, handoff rail, and protected-work drawer now
+  expose the same branch, repository, owner, and claim state for both EDAs;
+- the protected-work drawer was exercised in the running application at 1280 by
+  720: all controls fit, the primary action remained visible, collaborator input
+  produced the expected `work/<owner>/<project>` branch, and the page emitted no
+  browser console errors.
+- a second clone can now discover every pushed `work/*` branch without changing
+  its working copy, see exact base/review commits and changed native documents,
+  and fast-forward only the commit that was actually displayed and rechecked;
+- work branches whose target advanced stay visible with an exact blocker instead
+  of disappearing from the review queue;
+- after integration, the author can verify the shared commit on the remote base,
+  safely return the clean checkout to that base, fast-forward it, release every
+  remote document claim, and clear the durable session;
+- the Changes sign-off workstation was verified through source-host
+  pywebview/WebView2 at 1384 by 861 in dark and light themes with the full
+  Base, Review, Main chain, changed-document ledger, repository inspector, and
+  approval action visible without clipping.
+- change requests now persist as unique immutable annotated Git tags bound to
+  the exact review commit. They cross the remote without changing either
+  collaborator's working copy, refuse a moved review commit, and keep the
+  author's claims held while the named reason is visible;
+- source-host WebView2 verification at 1384 by 861 shows the reviewer form in
+  dark and the author's request-received state in light without clipping;
+- the BOM tab now reads the current native schematics immediately through the
+  shared adapter path for both EDAs, groups placements into the same line schema,
+  scales the build quantity, distinguishes value-qualified basic parts from
+  missing identities, exposes library coverage, and binds the snapshot to its
+  source documents, Git commit when available, and stable BOM digest;
+- the live BOM workstation was verified through source-host WebView2 at 1384 by
+  861 in dark and light themes with dense rows, warnings, filters, source
+  evidence, and the line inspector visible without clipping;
+- the displayed live BOM downloads directly as CSV at the selected board
+  quantity for either EDA, without a separate priced-build cache. A paired API
+  fixture proves the same header and attachment contract for `.kicad_sch` and
+  `.SchDoc`; retained dark/light WebView2 captures have no page overflow or
+  console errors;
+- an independent reviewer can now build deterministic evidence from a disposable
+  worktree at the exact selected commit without changing either collaborator's
+  checkout. The shared KiCad/Altium contract hashes every registered native
+  document, rebuilds the normalized BOM from committed schematic facts, records
+  identity and footprint blockers, runs the format adapter's semantic audit, and
+  binds all results to one evidence digest;
+- approval recomputes that exact-commit evidence inside the integration transaction
+  and fails closed before fast-forwarding when source documents are missing, BOM
+  identity or footprint facts are insufficient, or the semantic audit reports an
+  error. Reviewer-local Altium bindings and catalog enrichment are excluded from
+  this acceptance boundary;
+- the Changes workstation presents the same evidence-ready or evidence-blocked
+  decision for both EDAs, including native-file hashes, BOM identity coverage,
+  semantic error/warning counts, exact blockers, and honest pending states for
+  native validation and visual comparison. Approval cannot be invoked while
+  evidence is loading, unavailable, or blocked;
+- the exact review evidence workstation was verified through source-host
+  pywebview/WebView2 at 1384 by 861 in dark and light themes with four native
+  files, 18/18 BOM identity coverage, a semantic warning, two changed documents,
+  and both reviewer decisions visible without clipping or page overflow;
+- native validation now uses the same exact-commit contract for both EDAs. KiCad
+  runs production ERC and DRC through `kicad-cli`; Altium compiles the project,
+  reads schematic validation violations, and runs the installed version's
+  Design Rules Check OutJob in a second disposable copy. A result is accepted
+  only when every applicable native check produces parseable evidence, registered
+  source hashes remain unchanged, and the validation project/branch/commit/base/
+  source digest matches the review evidence;
+- approval now fails closed until the exact commit has a matching passed native
+  run. Missing runtimes, templates, outputs, failed checks, changed sources, and
+  stale cached results remain visible blockers rather than fabricated success;
+- the Changes UI now presents an ordered commit-acceptance rail instead of loose
+  status summaries. Source evidence and native verification are the two current
+  approval gates; visual comparison is a clearly named next layer. Commit identity
+  and reviewer actions stay anchored while detailed per-document evidence scrolls;
+- a live AD26 run produced and independently parsed a real DRC HTML report from a
+  disposable `.PrjPcb`/`.SchDoc`/`.PcbDoc` review copy. It correctly reported the
+  proof board's unrouted-net violation and left the source project unchanged;
+- retained source-host WebView2 captures at 1384 by 861 verify native-passed dark
+  and light states plus a failed dark state. Viewport/document/body dimensions are
+  identical, horizontal overflow is absent, and integration is disabled on failure;
+- interrupted protected work can now be resumed through the same format-neutral
+  contract for KiCad and Altium. Recovery requires a clean checkout, restores the
+  exact work branch, reacquires only missing document claims, refuses another
+  user's claim, and rolls back any partial reacquisition. Read-only recovery status
+  never polls or mutates the remote after restart;
+- the protected-work drawer makes the recovery decision primary and reports branch
+  and claim readiness independently. It never labels claims or the work branch
+  complete from persisted intent alone, and Share Changes remains unavailable until
+  the recovered session is verified. Retained real-WebView2 dark/light captures at
+  1384 by 861 show the primary action anchored, no page overflow, and no console
+  errors;
+- BOM identity resolution now has one user action for both EDAs. Identical unlinked
+  placements are grouped into one decision; safe library candidates explain their
+  value/footprint evidence; and the system refuses to guess when no candidate is
+  supported. Generic Altium symbols such as `R` or `C` are never accepted as
+  component identity;
+- the storage mechanism is tool-safe while the result remains identical. KiCad
+  writes native schematic identity fields into the project Git history. Altium
+  writes stable unique-component bindings into Stockroom project data and leaves
+  the binary `.SchDoc` unchanged. A real Altium-backed WebView2 run linked R1 and
+  R2 with one click, refreshed to `Every placement linked`, exposed
+  `RC0402FR-0710KL`, and retained SHA-256
+  `537cca3d1d2273d5c8d1fab98aaaf5eb14286b6f6a5277711c33ae61606942ec`
+  before and after;
+- the guided population bench now carries those same linked library identities
+  into a pinned assembly snapshot for either EDA. Resolved progress includes Done,
+  Skipped, and Reworked states; Done requires a matching reel scan when an MPN is
+  available; Enter saves the event; and success advances to the next pending
+  reference while retaining a verified reel across identical consecutive parts.
+  A real Altium-backed WebView2 run saved R1, advanced to R2, and updated live
+  progress to `1/3 resolved · 33.3%` with no page overflow or console errors in
+  either theme;
+- KiCad exact-source visuals are qualified through native SVG export. The Altium
+  adapter and exact-commit visual bundle contract exist, but production remains
+  honestly blocked: six discriminating AD26 PDF-publish attempts did not yield a
+  repeatable artifact, so the UI does not expose a visual approval gate or a
+  fabricated parity result;
+- bounded Windows verification passes 585 tests across the Projects domain,
+  Projects API, Altium driver, and native-validation modules with one intentional
+  platform skip. The latest recovery/BOM slice adds 47 focused cross-EDA tests,
+  all 1,198 frontend tests pass, Ruff is clean on the touched backend surface,
+  TypeScript and token parity pass, and consecutive production builds are
+  byte-identical with tree digest
+  `ed25216045dbe586983c16980372df610923fb9c4c4e30f157aec085bb7b8d71`.
+  The previous broader 644-test API bound predates the added live-BOM contract;
+  aggregate gate remains red only on seven clean-baseline capture-subsystem
+  assertions outside this Projects slice.
 
 Still required before Phase 0 is complete:
 
-- real KiCad render/BOM-write/reopen and real Altium `.PcbDoc`
-  render/BOM-write/reopen/semantic validation;
+- repeatable Altium schematic/`.PcbDoc` render plus production-adapter promotion
+  of the measured native BOM-write/reopen/semantic-validation path;
+- native board-coordinate, side, rotation, and polarity normalization for guided
+  placement highlighting;
+- inventory reservation/reversal and repository publication of completed assembly
+  receipts;
 - injected lock-expiry and forced-unlock recovery evidence through the full session
-  state machine.
+  state machine;
+- lock expiry and forced-unlock recovery evidence through the production API and UI;
+- bind schematic/PCB visual comparison to the exact review commit. Source hashes,
+  normalized BOM identity/digest, shared semantic audit evidence, and native
+  ERC/DRC or validation/DRC results are already bound and enforced before approval.
+
+Altium PCB discriminator record:
+
+- hypothesis: `DM_CreateNewDocument('PCB')` plus `IServerDocument.DoFileSave`
+  persists an empty board;
+- evidence: AD26 returned a real current `IPCB_Board` and `DoFileSave=True`, but no
+  `.PcbDoc` existed;
+- rejected follow-up: `DoSafeChangeFileNameAndSave` also returned `True` with no file;
+- next discriminating test: follow the official PCB scripting contract using
+  `CreateNewDocumentFromDocumentKind('PCB')`, add a real PCB primitive inside
+  `PreProcess`/`PostProcess`, notify the board, then require file existence and a
+  native reopen before accepting the result.
+
+Measured follow-up:
+
+- AD26's reliable new-document persistence path is `Client.OpenNewDocument`,
+  `SetFileName`, `SetModified(True)`, and `DoFileSave('')`, with
+  `WorkspaceManager:SaveObject` as the file-existence fallback;
+- that path wrote a 160,256-byte native `.PcbDoc`, closed it, and reopened a live
+  `IPCB_Board` containing the registered test primitive;
+- AD26 also edited the MPN parameter in a disposable copy of the real checked-in
+  `.SchDoc`, saved it, closed it, and reopened the new value;
+- Stockroom's independent OLE reader recovered the edited MPN plus the unchanged
+  manufacturer, supplier, footprint, binding ID, and remaining component metadata.
+
+Remaining Altium gates: capture a repeatable schematic/board render and promote the
+measured native BOM mutation scripts into the production adapter with semantic-count
+and reopen assertions. The shared resolver already provides safe BOM-authoring parity
+without mutating the binary source; native compile/validation and PCB DRC are production
+review gates.
 
 ## Hard Parity Rule
 
@@ -206,6 +426,8 @@ Sources:
 - [Using External Version Control](https://www.altium.com/documentation/altium-designer/using-external-version-control)
 - [Git-Based Version Control](https://www.altium.com/documentation/altium-designer/using-external-version-control/git)
 - [Collaborators And Conflict Prevention](https://www.altium.com/documentation/altium-designer/collaborators-visualization-conflict-prevention)
+- [Validating Schematic Designs](https://www.altium.com/documentation/altium-designer/schematic/design-validation)
+- [Preparing Outputs With Output Jobs](https://www.altium.com/documentation/altium-designer/preparing-for-manufacture/output-jobs)
 
 ### KiCad
 
@@ -827,8 +1049,9 @@ Frontend:
 
 ## Delivery Plan
 
-The Projects route remains absent from production until the paired collaboration
-prototype and core safety gates pass.
+The Projects route is being delivered in safety-gated vertical slices. Read-only
+surfaces remain available while any unqualified native or collaboration action
+stays visible but blocked with an exact reason.
 
 ### Phase 0: Two-Clone Collaboration Evaluation
 

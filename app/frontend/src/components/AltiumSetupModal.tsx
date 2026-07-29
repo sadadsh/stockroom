@@ -1,9 +1,7 @@
 /**
- * The Altium Setup guide: an in-window modal (the app's scrim idiom) walking the one-time
- * install of the Stockroom Database Library into Altium. Live-aware, never a static help page:
- * step 1 echoes the machine's real ODBC driver probe (with the download when it is missing),
- * step 2 carries the active profile's actual .DbLib path with Copy, and step 4 quotes the live
- * ready count. The same procedure, in full, lives in the vault build card 0B.
+ * Live Altium integration guide. The ODBC driver is the only normal human prerequisite;
+ * Stockroom owns DbLib generation, machine installation, fresh-session verification, and
+ * profile following. The path remains copyable as a diagnostic, never as the primary workflow.
  */
 import { motion } from "motion/react";
 import { useAltiumStatus, useOdbcStatus } from "../api/queries";
@@ -61,7 +59,8 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
             </div>
             <p className="mt-0.5 text-xs text-t3">
               <Text id="altiumdb.setup.subtitle">
-                One-time install. After it, every place-ready part lands in Altium with its symbol, footprint, and fields.
+                Stockroom builds, installs, and verifies the active DbLib automatically; only the
+                ODBC driver may need you.
               </Text>
             </p>
           </div>
@@ -72,29 +71,45 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <ol className="flex flex-col gap-4">
-            <Step n={1} titleId="altiumdb.setup.step1-title" title="Install the SQLite3 ODBC Driver">
+            <Step
+              n={1}
+              titleId="altiumdb.setup.step1-title"
+              title="Install the SQLite3 ODBC Driver"
+            >
               <p className="text-xs leading-relaxed text-t3">
                 <Text id="altiumdb.setup.step1-body">
-                  Altium reads the library through this 64-bit driver, one small install per machine.
+                  Altium reads the library through this 64-bit driver, one small install per
+                  machine.
                 </Text>
               </p>
               <div className="mt-1.5 flex items-center justify-between gap-3">
                 <span className="flex items-center gap-1.5">
-                  <Dot tone={installed === true ? "ok" : installed === false ? "warn" : "neutral"} />
+                  <Dot
+                    tone={installed === true ? "ok" : installed === false ? "warn" : "neutral"}
+                  />
                   <span
                     className={
                       "text-xs " +
-                      (installed === true ? "text-ok" : installed === false ? "text-warn" : "text-t3")
+                      (installed === true
+                        ? "text-ok"
+                        : installed === false
+                          ? "text-warn"
+                          : "text-t3")
                     }
                   >
                     {installed === true ? (
-                      <Text id="altiumdb.setup.step1-done">Installed on this machine. Nothing to do.</Text>
+                      <Text id="altiumdb.setup.step1-done">
+                        Installed on this machine. Nothing to do.
+                      </Text>
                     ) : installed === false ? (
                       <Text id="altiumdb.setup.step1-missing">
-                        Not installed. Run it with all defaults, approve the prompt, then return here.
+                        Not installed. Run it with all defaults, approve the prompt, then return
+                        here.
                       </Text>
                     ) : (
-                      <Text id="altiumdb.setup.step1-unknown">Cannot be verified on this platform.</Text>
+                      <Text id="altiumdb.setup.step1-unknown">
+                        Cannot be verified on this platform.
+                      </Text>
                     )}
                   </span>
                 </span>
@@ -112,42 +127,54 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
               </div>
             </Step>
 
-            <Step n={2} titleId="altiumdb.setup.step2-title" title="Copy the Library Path">
+            <Step n={2} titleId="altiumdb.setup.step2-title" title="Automatic Library Target">
               <p className="text-xs leading-relaxed text-t3">
                 <Text id="altiumdb.setup.step2-body">
-                  The library, its data, and every part asset live together in one folder, so this one path is all Altium needs.
+                  Stockroom builds the machine-local data source at this path and keeps it aligned
+                  with the active profile. Copy it only when diagnosing an integration problem.
                 </Text>
               </p>
               <div className="mt-1.5 flex items-center justify-between gap-3">
-                <span className="min-w-0 truncate font-mono text-xs text-t3" title={data?.dblib ?? ""}>
+                <span
+                  className="min-w-0 truncate font-mono text-xs text-t3"
+                  title={data?.dblib ?? ""}
+                >
                   {data?.dblib ?? ""}
                 </span>
                 <Button small onClick={onCopyPath} disabled={!data} className="flex-none">
-                  <Text id="altiumdb.setup.step2-copy">Copy Path</Text>
+                  <Text id="altiumdb.setup.step2-copy">Copy Diagnostic Path</Text>
                 </Button>
               </div>
             </Step>
 
-            <Step n={3} titleId="altiumdb.setup.step3-title" title="Install It in Altium">
+            <Step
+              n={3}
+              titleId="altiumdb.setup.step3-title"
+              title="Automatic Install And Verification"
+            >
               <p className="text-xs leading-relaxed text-t3">
                 <Text id="altiumdb.setup.step3-body">
-                  In the Components panel, open its menu and choose File-based Libraries Preferences. On the Installed tab click Install, switch the file filter to Database Libraries (*.DbLib), paste the path, and open it. Use the Installed tab, not Project, so the one library serves every project on this machine.
+                  Stockroom installs the active DbLib as an Altium Installed library, closes Altium
+                  cleanly, then proves a real component resolves in a fresh session. Profile
+                  switches and Altium upgrades trigger re-verification; no manual library install is
+                  required.
                 </Text>
               </p>
             </Step>
 
-            <Step n={4} titleId="altiumdb.setup.step4-title" title="Place and Keep It Fresh">
+            <Step n={4} titleId="altiumdb.setup.step4-title" title="Verified Component Flow">
               <p className="text-xs leading-relaxed text-t3">
                 <Text id="altiumdb.setup.step4-body">
-                  The panel lists Stockroom with every place-ready part; a part missing its Altium assets is deliberately absent until you attach them. After an attach or a regenerate, right-click the library in the panel and choose Refresh. For parts already on sheets, run Tools, then Update Parameters From Database.
+                  Only parts with a verified same-download KiCad and native Altium pair are
+                  place-ready. Their shared STEP stays linked in KiCad and embedded in the Altium
+                  footprint. Rebuild DbLib is a recovery action; missing assets return to Components
+                  and Collect All Sources.
                 </Text>
               </p>
               {data ? (
                 <p className="mt-1.5 text-xs text-t3">
                   <span className="tnum font-mono text-t2">{data.ready}</span>{" "}
-                  <Text id="altiumdb.setup.step4-ready">
-                    of
-                  </Text>{" "}
+                  <Text id="altiumdb.setup.step4-ready">of</Text>{" "}
                   <span className="tnum font-mono text-t2">{data.total}</span>{" "}
                   <Text id="altiumdb.setup.step4-ready-tail">
                     parts are ready to place right now.

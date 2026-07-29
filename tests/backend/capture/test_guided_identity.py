@@ -3,7 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from stockroom.capture import guided
-from stockroom.capture.identity import page_identity, select_exact_candidate
+from stockroom.capture.identity import (
+    PageIdentity,
+    exact_observation_error,
+    page_identity,
+    select_exact_candidate,
+)
 from stockroom.capture.vendors import VendorCapability
 from stockroom.ingest.staging import StagingCandidate
 
@@ -36,10 +41,7 @@ def _candidate(
 def test_snapmagic_detail_url_decodes_exact_identity():
     identity = page_identity(
         "snapmagic",
-        (
-            "https://www.snapeda.com/parts/TPD6E05U06RVZR/"
-            "Texas%2520Instruments/view-part/"
-        ),
+        ("https://www.snapeda.com/parts/TPD6E05U06RVZR/Texas%2520Instruments/view-part/"),
     )
 
     assert identity is not None
@@ -49,18 +51,16 @@ def test_snapmagic_detail_url_decodes_exact_identity():
 
 def test_digikey_product_and_samacsys_detail_urls_decode_exact_identity():
     detail_url = (
-        "https://www.digikey.com/en/products/detail/texas-instruments/"
-        "TPD6E05U06RVZR/2094564"
+        "https://www.digikey.com/en/products/detail/texas-instruments/TPD6E05U06RVZR/2094564"
     )
     digikey = page_identity("digikey-ultralibrarian", detail_url)
     digikey_snapmagic = page_identity("digikey-snapmagic", detail_url)
     digikey_traceparts = page_identity("digikey-traceparts", detail_url)
+    digikey_manufacturer = page_identity("digikey-manufacturer", detail_url)
+    digikey_cadenas = page_identity("digikey-cadenas", detail_url)
     samacsys = page_identity(
         "samacsys",
-        (
-            "https://componentsearchengine.com/part-view/TPD6E05U06RVZR/"
-            "Texas%20Instruments"
-        ),
+        ("https://componentsearchengine.com/part-view/TPD6E05U06RVZR/Texas%20Instruments"),
     )
 
     assert digikey is not None
@@ -70,10 +70,28 @@ def test_digikey_product_and_samacsys_detail_urls_decode_exact_identity():
     )
     assert digikey_snapmagic == digikey
     assert digikey_traceparts == digikey
+    assert digikey_manufacturer == digikey
+    assert digikey_cadenas == digikey
     assert samacsys is not None
     assert (samacsys.mpn, samacsys.manufacturer) == (
         "TPD6E05U06RVZR",
         "Texas Instruments",
+    )
+
+
+def test_exact_observation_accepts_only_a_provable_manufacturer_abbreviation():
+    record = _Record()
+
+    assert (
+        exact_observation_error(
+            record,
+            PageIdentity(mpn=record.mpn, manufacturer="TI"),
+        )
+        == ""
+    )
+    assert "manufacturer" in exact_observation_error(
+        record,
+        PageIdentity(mpn=record.mpn, manufacturer="Toshiba"),
     )
 
 
@@ -85,10 +103,7 @@ def test_selector_chooses_the_matching_candidate_instead_of_the_first():
         _Record(),
         [wrong, right],
         vendor_key="snapmagic",
-        detail_url=(
-            "https://www.snapeda.com/parts/TPD6E05U06RVZR/"
-            "Texas%20Instruments/view-part/"
-        ),
+        detail_url=("https://www.snapeda.com/parts/TPD6E05U06RVZR/Texas%20Instruments/view-part/"),
     )
 
     assert selection.error == ""
@@ -122,8 +137,7 @@ def test_selector_rejects_a_vendor_page_for_the_wrong_manufacturer():
         [candidate],
         vendor_key="ultralibrarian",
         detail_url=(
-            "https://app.ultralibrarian.com/details/a-guid/"
-            "Analog%20Devices/TPD6E05U06RVZR"
+            "https://app.ultralibrarian.com/details/a-guid/Analog%20Devices/TPD6E05U06RVZR"
         ),
     )
 
@@ -152,10 +166,7 @@ def test_altium_only_download_requires_an_exact_recognized_provider_page():
         _Record(),
         [],
         vendor_key="snapmagic",
-        detail_url=(
-            "https://www.snapeda.com/parts/TPD6E05U06RVZR/"
-            "Texas%20Instruments/view-part/"
-        ),
+        detail_url=("https://www.snapeda.com/parts/TPD6E05U06RVZR/Texas%20Instruments/view-part/"),
     )
     unknown = select_exact_candidate(
         _Record(),
@@ -178,7 +189,6 @@ def test_guided_attach_does_not_call_either_attach_seam_on_identity_failure(
         manufacturer="Texas Instruments",
     )
     kicad_attaches: list[object] = []
-    altium_attaches: list[object] = []
 
     class _Pipeline:
         def inspect(self, inputs):
@@ -209,7 +219,6 @@ def test_guided_attach_does_not_call_either_attach_seam_on_identity_failure(
         lambda: _Pipeline(),
         vendor="faketron",
         download_root=tmp_path,
-        attach_altium=lambda *args, **kwargs: altium_attaches.append((args, kwargs)),
     )
 
     outcome = source._attach(
@@ -221,7 +230,6 @@ def test_guided_attach_does_not_call_either_attach_seam_on_identity_failure(
 
     assert outcome.error and "exact candidate" in outcome.error
     assert not kicad_attaches
-    assert not altium_attaches
     assert candidate.entry_name == "original-entry"
 
 
@@ -253,9 +261,22 @@ def test_guided_attach_rejects_mixed_digikey_route_receipts(monkeypatch, tmp_pat
         vendor="digikey",
         download_root=tmp_path,
     )
+    def receipt(provider_key: str):
+        return type(
+            "_Receipt",
+            (),
+            {
+                "task_id": _Record.id,
+                "manufacturer_key": _Record.manufacturer,
+                "mpn_canonical": _Record.mpn,
+                "surface_key": "digikey",
+                "evidence_provider_key": provider_key,
+            },
+        )()
+
     landed = [
-        type("_Receipt", (), {"evidence_provider_key": "digikey-snapmagic"})(),
-        type("_Receipt", (), {"evidence_provider_key": "digikey-ultralibrarian"})(),
+        receipt("digikey-snapmagic"),
+        receipt("digikey-ultralibrarian"),
     ]
 
     outcome = source._attach(
@@ -265,4 +286,4 @@ def test_guided_attach_rejects_mixed_digikey_route_receipts(monkeypatch, tmp_pat
         evidence_provider_key="digikey-snapmagic",
     )
 
-    assert "route attribution mismatch" in outcome.error
+    assert "binding mismatch for evidence provider key" in outcome.error

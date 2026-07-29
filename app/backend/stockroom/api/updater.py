@@ -26,6 +26,7 @@ class UpdateState:
     DIVERGED = "diverged"
     NO_REMOTE = "no_remote"
     UNVERIFIED = "unverified"
+    BLOCKED = "blocked"
 
 
 @dataclass
@@ -34,14 +35,24 @@ class UpdateResult:
     updated: bool = False
     detail: str = ""
     restart_requested: bool = False
+    frontend_reload_requested: bool = False
+    seamless_handoff_requested: bool = False
+    activated_revision: str = ""
+    rolled_back: bool = False
 
 
 def _looks_offline(reason: str) -> bool:
     r = reason.lower()
     return any(
         tok in r
-        for tok in ("could not resolve host", "connection", "timed out",
-                    "network", "unable to access", "no route")
+        for tok in (
+            "could not resolve host",
+            "connection",
+            "timed out",
+            "network",
+            "unable to access",
+            "no route",
+        )
     )
 
 
@@ -51,10 +62,18 @@ class AppUpdater:
         repo: GitRepo,
         uv_runner: Callable[[], None] | None = None,
         restart: Callable[[], None] | None = None,
+        frontend_reload: Callable[[], None] | None = None,
+        release_activation: Callable[[str], object] | None = None,
+        active_revision: Callable[[], str] | None = None,
+        active_health: Callable[[], object] | None = None,
     ):
         self.repo = repo
         self._uv = uv_runner or (lambda: None)
         self._restart = restart or (lambda: None)
+        self._frontend_reload = frontend_reload or (lambda: None)
+        self._release_activation = release_activation
+        self._active_revision = active_revision or self.repo.head
+        self._active_health = active_health
 
     def _check_identity(self) -> dict:
         """Stable, non-secret delivery facts the Settings UI can explain.
@@ -63,7 +82,7 @@ class AppUpdater:
         unreachable, or unmanaged one. Keep the payload deliberately small: exact local revision,
         release channel, and the launcher policy. No filesystem path or remote credential is exposed.
         """
-        head = self.repo.head()
+        head = self._active_revision()
         return {
             "current_revision": head[:12] if head else "",
             "channel": self.repo.current_branch() or "detached",
@@ -94,9 +113,8 @@ class AppUpdater:
                 "detail": reason,
                 "target_revision": "",
             }
-        ab = self.repo.ahead_behind()
         target = self.repo.upstream_head()
-        if ab is None or not target:
+        if not target:
             return {
                 **identity,
                 "update_available": False,
@@ -104,27 +122,117 @@ class AppUpdater:
                 "detail": "the application branch has no verifiable upstream revision",
                 "target_revision": "",
             }
-        behind = ab[1]
+        if self._release_activation is None:
+            ab = self.repo.ahead_behind()
+            if ab is None:
+                return {
+                    **identity,
+                    "update_available": False,
+                    "state": UpdateState.UNVERIFIED,
+                    "detail": "the application branch has no verifiable upstream revision",
+                    "target_revision": "",
+                }
+            behind = ab[1]
+            update_available = behind > 0
+        else:
+            current = str(identity["current_revision"])
+            update_available = current != target[:12]
+            behind = 1 if update_available else 0
         return {
             **identity,
-            "update_available": behind > 0,
-            "state": "update_available" if behind > 0 else UpdateState.UP_TO_DATE,
+            "update_available": update_available,
+            "state": "update_available" if update_available else UpdateState.UP_TO_DATE,
             "behind": behind,
             "target_revision": target[:12],
+            # Internal consumers need the collision-free commit address.  The API
+            # may expose it safely: a Git object name is not a credential.
+            "target_revision_full": target,
         }
 
-    def _apply(self) -> UpdateResult:
-        # files changed: sync deps then request a graceful restart + reload
+    @staticmethod
+    def frontend_only(paths: tuple[str, ...]) -> bool:
+        """Whether changed runtime bytes can be adopted by reloading the SPA."""
+        if not paths or not any(path.startswith("app/frontend-dist/") for path in paths):
+            return False
+        harmless = (
+            "app/frontend/",
+            "app/frontend-dist/",
+            "docs/",
+            "tests/",
+        )
+        return all(path.startswith(harmless) for path in paths)
+
+    def _apply(self, paths: tuple[str, ...]) -> UpdateResult:
+        # Frozen dependency reconciliation runs before either adoption path.
         self._uv()
+        if self.frontend_only(paths):
+            self._frontend_reload()
+            return UpdateResult(
+                state=UpdateState.UPDATED,
+                updated=True,
+                frontend_reload_requested=True,
+            )
         self._restart()
         return UpdateResult(state=UpdateState.UPDATED, updated=True, restart_requested=True)
 
-    def update(self) -> UpdateResult:
+    def activate_current(self, *, frontend_only: bool = False) -> UpdateResult:
+        """Retry activation after bytes pulled successfully but dependency sync failed."""
+        paths = ("app/frontend-dist/index.html",) if frontend_only else ("app/backend/",)
+        return self._apply(paths)
+
+    def verify_active(self) -> object | None:
+        return self._active_health() if self._active_health is not None else None
+
+    def update(self, target_revision: str | None = None) -> UpdateResult:
         if not self.repo.has_remote():
             return UpdateResult(state=UpdateState.NO_REMOTE, detail="no remote configured")
+        if self._release_activation is not None:
+            target = (target_revision or "").strip()
+            if not target:
+                ok, reason = self.repo.fetch()
+                if not ok:
+                    state = (
+                        UpdateState.OFFLINE if _looks_offline(reason) else UpdateState.UNVERIFIED
+                    )
+                    return UpdateResult(state=state, detail=reason)
+                target = self.repo.upstream_head()
+            if not target:
+                return UpdateResult(
+                    state=UpdateState.UNVERIFIED,
+                    detail="the application branch has no verifiable upstream revision",
+                )
+            if self._active_revision().casefold() == target.casefold():
+                return UpdateResult(
+                    state=UpdateState.UP_TO_DATE,
+                    activated_revision=target,
+                )
+            outcome = self._release_activation(target)
+            ok = bool(getattr(outcome, "ok", False))
+            revision = str(getattr(outcome, "revision", ""))
+            detail = str(getattr(outcome, "detail", ""))
+            rolled_back = bool(getattr(outcome, "rolled_back", False))
+            return UpdateResult(
+                state=UpdateState.UPDATED if ok else UpdateState.BLOCKED,
+                updated=ok,
+                detail=detail,
+                seamless_handoff_requested=ok,
+                activated_revision=revision,
+                rolled_back=rolled_back,
+            )
+        if self.repo.has_tracked_changes():
+            return UpdateResult(
+                state=UpdateState.BLOCKED,
+                detail="uncommitted tracked application files block automatic convergence",
+            )
+        before = self.repo.head()
         pull = self.repo.pull_ff()
         if pull.ok:
-            return self._apply() if pull.updated else UpdateResult(state=UpdateState.UP_TO_DATE)
+            if not pull.updated:
+                return UpdateResult(state=UpdateState.UP_TO_DATE)
+            paths = self.repo.changed_paths(before, self.repo.head())
+            result = self._apply(paths)
+            result.activated_revision = self.repo.head()
+            return result
         if _looks_offline(pull.reason):
             return UpdateResult(state=UpdateState.OFFLINE, detail=pull.reason)
         # A non-fast-forward is the in-repo library case: local part commits (libraries/) diverge
@@ -135,7 +243,12 @@ class AppUpdater:
         # aborts the rebase and is surfaced honestly as DIVERGED, never guessed (spec section 2.2).
         reb = self.repo.pull_rebase()
         if reb.ok:
-            return self._apply() if reb.updated else UpdateResult(state=UpdateState.UP_TO_DATE)
+            if not reb.updated:
+                return UpdateResult(state=UpdateState.UP_TO_DATE)
+            paths = self.repo.changed_paths(before, self.repo.head())
+            result = self._apply(paths)
+            result.activated_revision = self.repo.head()
+            return result
         if _looks_offline(reb.reason):
             return UpdateResult(state=UpdateState.OFFLINE, detail=reb.reason)
         return UpdateResult(state=UpdateState.DIVERGED, detail=reb.reason)

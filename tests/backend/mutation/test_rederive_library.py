@@ -221,3 +221,43 @@ def test_the_whole_sweep_lands_in_ONE_commit(tmp_path, fixtures_dir):
     assert repo.is_clean()
     if before is not None:
         assert repo.log_count() == before + 1
+
+
+def test_automatic_mode_rewrites_only_older_rulesets(tmp_path, fixtures_dir):
+    """An application update upgrades old evidence without churning current data or
+    downgrading a record produced by a newer peer."""
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    _seed(profile, repo, "older-1111", payload=_MOUSER_PAYLOAD, derived_by="rules@2")
+    _seed(profile, repo, "current-2222", payload=_MOUSER_PAYLOAD, derived_by=DERIVED_BY)
+    _seed(profile, repo, "newer-3333", payload=_MOUSER_PAYLOAD, derived_by="rules@999")
+    current_before = _load(profile, "current-2222").dumps()
+    newer_before = _load(profile, "newer-3333").dumps()
+
+    report = ops.rederive_library(
+        now_iso="2026-07-29T12:00:00Z",
+        only_outdated=True,
+    )
+
+    assert report["rewritten"] == 1
+    assert report["skipped_current"] == 1
+    assert report["skipped_newer"] == 1
+    assert _load(profile, "older-1111").derived_by == DERIVED_BY
+    assert _load(profile, "current-2222").dumps() == current_before
+    assert _load(profile, "newer-3333").dumps() == newer_before
+
+
+def test_automatic_mode_does_not_guess_at_an_unrecognized_ruleset(tmp_path, fixtures_dir):
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    _seed(profile, repo, "future-1111", payload=_MOUSER_PAYLOAD, derived_by="future-engine")
+    before = _load(profile, "future-1111").dumps()
+
+    report = ops.rederive_library(
+        now_iso="2026-07-29T12:00:00Z",
+        only_outdated=True,
+    )
+
+    assert report["skipped_unrecognized"] == 1
+    assert report["rewritten"] == 0
+    assert _load(profile, "future-1111").dumps() == before

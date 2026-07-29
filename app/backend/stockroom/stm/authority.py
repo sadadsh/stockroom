@@ -567,7 +567,7 @@ def socket_union(
                 "af_rows": af_rows,
             }
 
-    positions_out = []
+    positions_out: list[dict[str, object]] = []
     for pos in sorted(per_position, key=_position_sort_key):
         by_mcu = per_position[pos]
         present_on = len(by_mcu)
@@ -626,7 +626,8 @@ def socket_union(
     for entry in positions_out:
         if entry["classification"] != "divergent":
             continue
-        rec = entry["reconcile"] or {}
+        reconcile_value = entry["reconcile"]
+        rec = reconcile_value if isinstance(reconcile_value, dict) else {}
         if rec.get("swappable"):
             swaps_required += 1
         else:

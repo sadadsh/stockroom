@@ -49,7 +49,7 @@ def test_every_router_is_mounted_and_token_guarded(anon_client):
         ("get", "/api/system/workflow-coordinator", None),
         ("get", "/api/library/parts", None),
         ("get", "/api/previews/symbol/x.svg", None),
-        ("post", "/api/ingest/inspect", {"paths": [], "lcsc_ids": []}),
+        ("post", "/api/ingest/inspect", {"paths": []}),
         ("post", "/api/enrich/part", {}),
         ("get", "/api/profiles", None),
         ("get", "/api/sync/status", None),

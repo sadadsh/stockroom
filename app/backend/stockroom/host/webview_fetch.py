@@ -11,13 +11,24 @@ injected so this is protocol-conformance tested on Linux without WebView2."""
 from __future__ import annotations
 
 import time
-from typing import Callable
+from typing import Any, Callable, Protocol
 
 from stockroom.enrich.fetch import FetchResult
 
 
+class _WebViewWindow(Protocol):
+    """The small pywebview surface this fetcher owns."""
+
+    def load_url(self, url: str) -> object: ...
+
+    def evaluate_js(self, script: str) -> Any: ...
+
+
 class WebViewRenderedDomFetcher:
-    def __init__(self, window_provider: Callable[[], object] | None = None):
+    def __init__(
+        self,
+        window_provider: Callable[[], _WebViewWindow | None] | None = None,
+    ):
         # window_provider returns a pywebview window; default resolves the running
         # app window lazily so the API layer never imports pywebview.
         self._window_provider = window_provider or _default_window
@@ -67,7 +78,7 @@ _CHALLENGE_MARKERS = (
 )
 
 
-def _looks_challenged(window) -> bool:
+def _looks_challenged(window: _WebViewWindow) -> bool:
     """True when the current DOM reads like a bot-manager interstitial rather than the
     real product page. Defensive: any evaluate_js failure means "cannot tell", treated
     as NOT challenged, so a page that simply has no body never blocks past readyState
@@ -92,7 +103,7 @@ def _looks_challenged(window) -> bool:
 _MIN_REAL_TEXT = 400
 
 
-def _has_selector(window, selector: str) -> bool:
+def _has_selector(window: _WebViewWindow, selector: str) -> bool:
     """True when the live DOM contains an element matching `selector`. Defensive: an
     evaluate_js failure reads as "present" so a JS quirk never hangs the wait past its
     real content (the stable-text gate still applies)."""
@@ -104,7 +115,11 @@ def _has_selector(window, selector: str) -> bool:
         return True
 
 
-def _wait_for_settle(window, timeout: float, wait_selector: str | None = None) -> None:
+def _wait_for_settle(
+    window: _WebViewWindow,
+    timeout: float,
+    wait_selector: str | None = None,
+) -> None:
     """Return once the page has rendered a substantial, stable body of visible text and
     no longer looks like a bot challenge, or the timeout elapses. Waiting past the
     (text-less) challenge is what lets a real browser reach a page an HTTP client is
@@ -134,7 +149,7 @@ def _wait_for_settle(window, timeout: float, wait_selector: str | None = None) -
         time.sleep(0.3)
 
 
-def _default_window():
+def _default_window() -> _WebViewWindow | None:
     # Use a DEDICATED hidden fetch window, NOT the SPA window: the SPA window carries
     # the token-injecting `loaded` handler, so navigating IT to a bot-protected vendor
     # page would leak the token and hijack the user's view. fetch_window() is created

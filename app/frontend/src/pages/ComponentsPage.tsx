@@ -16,9 +16,8 @@ import {
   useEditField,
   useMoveCategory,
   useDeletePart,
+  useRestoreDeletedPart,
   useSetSpecs,
-  useAttachSymbol,
-  useAttachFootprint,
 } from "../api/queries";
 import { ApiError } from "../api/client";
 import type { SourcedField } from "../api/types";
@@ -41,6 +40,8 @@ export function ComponentsPage() {
   const [duplicatesOnly, setDuplicatesOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [listScrollElement, setListScrollElement] =
+    useState<HTMLDivElement | null>(null);
 
   const partsQuery = usePartsQuery({ q: search, category, completeOnly });
   const facetsQuery = useFacetsQuery();
@@ -49,9 +50,8 @@ export function ComponentsPage() {
   const editField = useEditField();
   const moveCategory = useMoveCategory();
   const deletePart = useDeletePart();
+  const restoreDeletedPart = useRestoreDeletedPart();
   const setSpecs = useSetSpecs();
-  const attachSymbol = useAttachSymbol();
-  const attachFootprint = useAttachFootprint();
   const { toast } = useToast();
   const { open: openAddPart } = useAddPart();
   const { reopenPartId } = useCapture();
@@ -81,9 +81,7 @@ export function ComponentsPage() {
     editField.isPending ||
     moveCategory.isPending ||
     deletePart.isPending ||
-    setSpecs.isPending ||
-    attachSymbol.isPending ||
-    attachFootprint.isPending;
+    setSpecs.isPending;
 
   function toastError(err: unknown, fallback: string) {
     toast(err instanceof ApiError ? err.message : fallback, "err");
@@ -148,33 +146,23 @@ export function ComponentsPage() {
     );
   }
 
-  function handleAttachSymbol(lib: string, name: string) {
-    if (!selectedId) return;
-    attachSymbol.mutate(
-      { id: selectedId, lib, name },
-      {
-        onSuccess: () => toast("Symbol attached", "ok"),
-        onError: (err) => toastError(err, "Could not attach the symbol"),
-      },
-    );
-  }
-
-  function handleAttachFootprint(lib: string, name: string) {
-    if (!selectedId) return;
-    attachFootprint.mutate(
-      { id: selectedId, lib, name },
-      {
-        onSuccess: () => toast("Footprint attached", "ok"),
-        onError: (err) => toastError(err, "Could not attach the footprint"),
-      },
-    );
-  }
-
   function handleDelete() {
     if (!selectedId) return;
-    deletePart.mutate(selectedId, {
+    const deletedId = selectedId;
+    deletePart.mutate(deletedId, {
       onSuccess: () => {
-        toast("Part deleted", "ok");
+        toast("Part deleted", "ok", {
+          label: "Undo Delete",
+          onClick: () => {
+            restoreDeletedPart.mutate(deletedId, {
+              onSuccess: () => {
+                setSelectedId(deletedId);
+                toast("Part restored", "ok");
+              },
+              onError: (err) => toastError(err, "Could not restore the part"),
+            });
+          },
+        });
         // Drop the selection; the auto-select effect picks the next part once the
         // invalidated list refetches.
         setSelectedId(null);
@@ -270,7 +258,11 @@ export function ComponentsPage() {
               onOpenSearch={() => setSearchOpen(true)}
             />
           </div>
-          <div data-dev-id="components.list-scroll" className="mt-2 min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+          <div
+            ref={setListScrollElement}
+            data-dev-id="components.list-scroll"
+            className="mt-2 min-h-0 flex-1 overflow-y-auto px-3 pb-3"
+          >
             <PickerBody
               isLoading={partsQuery.isLoading}
               error={partsQuery.error}
@@ -278,6 +270,7 @@ export function ComponentsPage() {
               duplicateIds={duplicateIds}
               selectedId={selectedId}
               onSelect={setSelectedId}
+              scrollElement={listScrollElement}
               onRetry={() => partsQuery.refetch()}
               hasSearchOrFilter={!!search || !!category || completeOnly || duplicatesOnly}
               onClearFilters={() => {
@@ -307,8 +300,6 @@ export function ComponentsPage() {
               onApplyPinout={handleApplyPinout}
               onUseSpecValue={handleUseSpecValue}
               deleting={deletePart.isPending}
-              onAttachSymbol={handleAttachSymbol}
-              onAttachFootprint={handleAttachFootprint}
               busy={detailBusy}
             />
           ) : (
@@ -336,6 +327,7 @@ function PickerBody({
   duplicateIds,
   selectedId,
   onSelect,
+  scrollElement,
   onRetry,
   hasSearchOrFilter,
   onClearFilters,
@@ -346,6 +338,7 @@ function PickerBody({
   duplicateIds: Set<string>;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  scrollElement: HTMLDivElement | null;
   onRetry: () => void;
   hasSearchOrFilter: boolean;
   onClearFilters: () => void;
@@ -409,6 +402,7 @@ function PickerBody({
       duplicateIds={duplicateIds}
       selectedId={selectedId}
       onSelect={onSelect}
+      scrollElement={scrollElement}
     />
   );
 }

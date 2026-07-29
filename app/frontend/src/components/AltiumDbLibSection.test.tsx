@@ -13,7 +13,6 @@ vi.mock("../api/client", async (importActual) => {
     api: {
       altiumStatus: vi.fn(),
       altiumRegenerate: vi.fn(),
-      altiumAttach: vi.fn(),
       altiumOdbcStatus: vi.fn(),
       altiumModelsPending: vi.fn(),
       altiumEmbedCapability: vi.fn(),
@@ -39,8 +38,26 @@ const STATUS: AltiumStatus = {
   total: 88,
   datasource_present: true,
   rows: [
-    { id: "a", display_name: "BQ24074 Charger", category: "ICs", mpn: "BQ24074RGTT", value: "BQ24074RGTT", symbol: "BQ24074RGTT", footprint: "VQFN-16", ready: true },
-    { id: "b", display_name: "Mystery", category: "ICs", mpn: "", value: "", symbol: "", footprint: "", ready: false },
+    {
+      id: "a",
+      display_name: "BQ24074 Charger",
+      category: "ICs",
+      mpn: "BQ24074RGTT",
+      value: "BQ24074RGTT",
+      symbol: "BQ24074RGTT",
+      footprint: "VQFN-16",
+      ready: true,
+    },
+    {
+      id: "b",
+      display_name: "Mystery",
+      category: "ICs",
+      mpn: "",
+      value: "",
+      symbol: "",
+      footprint: "",
+      ready: false,
+    },
   ],
 };
 
@@ -66,8 +83,12 @@ describe("AltiumDbLibSection", () => {
     // is the state where the action is deliberately absent.
     mockApi.altiumModelsPending.mockResolvedValue({ pending: [], count: 0 });
     mockApi.altiumEmbedCapability.mockResolvedValue({
-      installed: true, binary: "C:/Altium/X2.EXE", requires_tool_installed: true,
-      reason: "", busy: "", available: true,
+      installed: true,
+      binary: "C:/Altium/X2.EXE",
+      requires_tool_installed: true,
+      reason: "",
+      busy: "",
+      available: true,
     });
   });
 
@@ -80,7 +101,10 @@ describe("AltiumDbLibSection", () => {
     expect(screen.getByText(/parts ready to place/)).toBeInTheDocument();
     expect(screen.getByText("Main")).toBeInTheDocument();
     expect(screen.getByTitle(STATUS.dblib)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Regenerate DbLib/ })).toBeInTheDocument();
+    expect(
+      screen.getByText(/builds, installs, and verifies this DbLib automatically/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Rebuild DbLib/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /View Library/ })).toBeInTheDocument();
   });
 
@@ -90,7 +114,7 @@ describe("AltiumDbLibSection", () => {
     renderSection();
 
     await screen.findByText("3");
-    await userEvent.click(screen.getByRole("button", { name: /Regenerate DbLib/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Rebuild DbLib/ }));
 
     await waitFor(() => expect(mockApi.altiumRegenerate).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(/Regenerated the DbLib with 3 parts\./)).toBeInTheDocument();
@@ -103,7 +127,25 @@ describe("AltiumDbLibSection", () => {
     await screen.findByText("3");
     await userEvent.click(screen.getByRole("button", { name: /View Library/ }));
 
-    expect(await screen.findByRole("dialog", { name: "Altium Database Library" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("dialog", { name: "Altium Database Library" }),
+    ).toBeInTheDocument();
+  });
+
+  it("describes automatic Altium convergence instead of a manual install workflow", async () => {
+    mockApi.altiumStatus.mockResolvedValue(STATUS);
+    renderSection();
+
+    await screen.findByText("3");
+    await userEvent.click(screen.getByRole("button", { name: /Setup Guide/ }));
+
+    expect(
+      await screen.findByText(/builds, installs, and verifies the active DbLib automatically/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Automatic Install And Verification")).toBeInTheDocument();
+    expect(screen.getByText(/no manual library install is required/i)).toBeInTheDocument();
+    expect(screen.queryByText("Install It in Altium")).not.toBeInTheDocument();
+    expect(screen.queryByText(/right-click the library/i)).not.toBeInTheDocument();
   });
 
   it("reports the ODBC driver as Not Installed and offers the official installer when it is absent", async () => {
@@ -136,7 +178,7 @@ describe("AltiumDbLibSection", () => {
     expect(screen.queryByRole("link", { name: /Download Driver/ })).toBeNull();
   });
 
-  it("opens the setup guide with the numbered Altium steps and the live library path", async () => {
+  it("opens the setup guide with automatic convergence and the live diagnostic path", async () => {
     mockApi.altiumStatus.mockResolvedValue(STATUS);
     mockApi.altiumOdbcStatus.mockResolvedValue(odbc(true));
     renderSection();
@@ -146,9 +188,10 @@ describe("AltiumDbLibSection", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Altium Setup" });
     // the four steps, with the real mechanics named
-    expect(dialog).toHaveTextContent(/File-based Libraries Preferences/);
-    expect(dialog).toHaveTextContent(/Installed tab/);
-    expect(dialog).toHaveTextContent(/Update Parameters From Database/);
+    expect(dialog).toHaveTextContent(/Automatic Install And Verification/);
+    expect(dialog).toHaveTextContent(/no manual library install is required/i);
+    expect(dialog).toHaveTextContent(/shared STEP stays linked in KiCad/i);
+    expect(dialog).not.toHaveTextContent(/Installed tab/);
     // the LIVE library path is in the guide (not a placeholder)
     expect(dialog).toHaveTextContent(STATUS.dblib);
     // driver installed: step 1 reports done, no download link inside the guide
@@ -208,8 +251,12 @@ describe("AltiumDbLibSection / Embed 3D Models", () => {
     mockApi.altiumOdbcStatus.mockResolvedValue(odbc(null));
     mockApi.altiumStatus.mockResolvedValue(STATUS);
     mockApi.altiumEmbedCapability.mockResolvedValue({
-      installed: true, binary: "C:/Altium/X2.EXE", requires_tool_installed: true,
-      reason: "", busy: "", available: true,
+      installed: true,
+      binary: "C:/Altium/X2.EXE",
+      requires_tool_installed: true,
+      reason: "",
+      busy: "",
+      available: true,
     });
   });
 
@@ -217,7 +264,7 @@ describe("AltiumDbLibSection / Embed 3D Models", () => {
     mockApi.altiumModelsPending.mockResolvedValue({ pending: [], count: 0 });
     renderSection();
 
-    expect(await screen.findByRole("button", { name: /Regenerate DbLib/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Rebuild DbLib/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Embed 3D Models/ })).not.toBeInTheDocument();
   });
 
@@ -225,7 +272,9 @@ describe("AltiumDbLibSection / Embed 3D Models", () => {
     mockApi.altiumModelsPending.mockResolvedValue({ pending: ["a", "b", "c"], count: 3 });
     renderSection();
 
-    expect(await screen.findByRole("button", { name: /Embed 3D Models \(3\)/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /Embed 3D Models \(3\)/ }),
+    ).toBeInTheDocument();
   });
 
   it("is disabled WITH the reason when Altium is holding its license seat", async () => {
@@ -233,8 +282,12 @@ describe("AltiumDbLibSection / Embed 3D Models", () => {
     // one that says why it cannot.
     mockApi.altiumModelsPending.mockResolvedValue({ pending: ["a"], count: 1 });
     mockApi.altiumEmbedCapability.mockResolvedValue({
-      installed: true, binary: "C:/Altium/X2.EXE", requires_tool_installed: true,
-      reason: "", busy: "Stockroom.DbLib - Altium Designer", available: false,
+      installed: true,
+      binary: "C:/Altium/X2.EXE",
+      requires_tool_installed: true,
+      reason: "",
+      busy: "Stockroom.DbLib - Altium Designer",
+      available: false,
     });
     renderSection();
 

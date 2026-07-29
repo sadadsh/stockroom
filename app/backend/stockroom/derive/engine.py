@@ -35,7 +35,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from stockroom.derive.naming import DEFAULT_SCHEME, NameInputs, get_scheme
-from stockroom.derive.payloads import known_sources, parse_one
+from stockroom.derive.payloads import (
+    FIELD_SOURCE_PRIORITY,
+    known_sources,
+    parse_one,
+    sources_for_field,
+)
 from stockroom.enrich.schema import EnrichmentResult
 from stockroom.model.derived import DERIVED_BY, Derived
 from stockroom.model.part_id import is_valid_part_id
@@ -112,15 +117,17 @@ class _CategoryView:
 
 
 def merged_result(identity: Identity, payloads: dict[str, dict | None]) -> EnrichmentResult:
-    """Every stored payload, parsed and merged in registry priority order.
+    """Every stored payload, parsed once and merged by the explicit priority registries.
 
-    Iterates `known_sources()` rather than the payload dict, so the merge order is the REGISTRY's
-    and not whatever order the files happened to be listed in. That is what makes the result
-    deterministic, and determinism is what makes the whole engine idempotent.
+    The default merge iterates `known_sources()` rather than the payload dict, so file listing
+    order cannot pick winners. Canonical fields with measured evidence for a different source
+    order are then selected through `FIELD_SOURCE_PRIORITY`; moving one field never silently
+    moves lifecycle, lead time, tariff, specs, or every other answer with it.
 
     A payload for a source this build does not know is skipped, not an error, and is left on disk
     untouched (see `payloads.parser_for`).
     """
+    parsed: dict[str, EnrichmentResult] = {}
     merged = EnrichmentResult()
     for source in known_sources():
         if source not in payloads:
@@ -128,7 +135,30 @@ def merged_result(identity: Identity, payloads: dict[str, dict | None]) -> Enric
         one = parse_one(source, payloads[source], identity.mpn)
         if not one.filled_fields():
             continue
+        parsed[source] = one
         merged.merge_missing(one)
+
+    # Re-rank ONLY the fields named by the field registry. The complete contender list is kept
+    # in winning order, so choosing a cleaner description never discards Mouser's wording and
+    # the UI can still expose the disagreement.
+    for field in FIELD_SOURCE_PRIORITY:
+        contenders = []
+        for source in sources_for_field(field):
+            one = parsed.get(source)
+            value = getattr(one, field, None) if one is not None else None
+            if value is None:
+                continue
+            normalized = str(value.value).strip().casefold()
+            if any(str(item.value).strip().casefold() == normalized for item in contenders):
+                continue
+            contenders.append(value)
+        if not contenders:
+            continue
+        setattr(merged, field, contenders[0])
+        if len(contenders) > 1:
+            merged.field_conflicts[field] = contenders
+        else:
+            merged.field_conflicts.pop(field, None)
     return merged
 
 

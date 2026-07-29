@@ -88,7 +88,17 @@ const KNOWN_DERIVED: readonly string[] = [
   "detail.asset-hero-open",
   "detail.asset-symbol-open",
   "detail.asset-footprint-open",
-]; // 11
+  // primitives.tsx SegmentedControl derives one id per option. The STM target
+  // definition uses fixed lens and inspector registries at the two call sites.
+  "stm.lens.compatibility",
+  "stm.lens.foundation",
+  "stm.lens.electrical",
+  "stm.lens.access",
+  "stm.lens.board",
+  "stm.inspector.decision",
+  "stm.inspector.targets",
+  "stm.inspector.evidence",
+]; // 19
 
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
@@ -177,8 +187,12 @@ describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
     // TabStrip's generic derivation drives the detail.* tab ids.
     expect(sourceContains("${devIdBase}.tabs")).toBe(true);
     expect(sourceContains("${devIdBase}.tab-${t.id}")).toBe(true);
-    // The detail call site produces the workbench tab ids.
+    // The detail call site produces its workbench tab ids.
     expect(sourceContains('devIdBase="detail"')).toBe(true);
+    // SegmentedControl produces the fixed STM lens and inspector option ids.
+    expect(sourceContains("${devIdBase}.${opt.id}")).toBe(true);
+    expect(sourceContains('devIdBase="stm.lens"')).toBe(true);
+    expect(sourceContains('devIdBase="stm.inspector"')).toBe(true);
   });
 
   it("every KNOWN_DERIVED id is a catalogue id and is genuinely derived (never a literal)", () => {

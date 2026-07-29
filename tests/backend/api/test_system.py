@@ -1,12 +1,95 @@
 from dataclasses import replace
 
-from stockroom.service import WorkflowCoordinatorState, WorkflowCoordinatorStatus
+from stockroom.service import (
+    ControlSnapshot,
+    CoordinatorStatus,
+    ServiceMode,
+    WorkflowCoordinatorState,
+    WorkflowCoordinatorStatus,
+)
 
 
 def test_health_needs_no_token(anon_client):
     r = anon_client.get("/api/health")
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
+
+
+def test_health_is_degraded_when_production_requires_unavailable_authority(
+    client,
+    app_ctx,
+):
+    app_ctx.release_id = "release-packaged"
+    app_ctx.service_generation = 0
+    app_ctx.service_mode = "shadow"
+    app_ctx.service_authority_required = True
+    app_ctx.service_control = None
+    app_ctx.service_fence = None
+    app_ctx.service_degraded_reason = "production_service_bootstrap_failed"
+
+    response = client.get("/api/health")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "status": "degraded",
+        "release_id": "release-packaged",
+        "service_generation": 0,
+        "service_mode": "shadow",
+        "coordinator_status": "unavailable",
+        "blocking_reason": "production_service_bootstrap_failed",
+    }
+
+
+class _ServiceControlStub:
+    def __init__(self, snapshot: ControlSnapshot):
+        self.current = snapshot
+
+    def snapshot(self) -> ControlSnapshot:
+        return self.current
+
+
+def test_health_reads_the_live_generation_fence_without_disclosing_its_owner(
+    client,
+    app_ctx,
+):
+    owner_id = "secret-owner-id"
+    app_ctx.release_id = "release-candidate"
+    app_ctx.service_generation = 7
+    app_ctx.service_mode = "shadow"
+    control = _ServiceControlStub(
+        ControlSnapshot(
+            mode=ServiceMode.SHADOW,
+            status=CoordinatorStatus.ACTIVE,
+            generation=7,
+            owner_id=owner_id,
+            event_sequence=3,
+        )
+    )
+    app_ctx.service_control = control
+
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ok",
+        "release_id": "release-candidate",
+        "service_generation": 7,
+        "service_mode": "shadow",
+        "coordinator_status": "active",
+    }
+    assert owner_id not in response.text
+
+    control.current = replace(control.current, generation=8)
+    stale = client.get("/api/health")
+    assert stale.status_code == 503
+    assert stale.json() == {
+        "status": "stale",
+        "release_id": "release-candidate",
+        "service_generation": 8,
+        "service_mode": "shadow",
+        "coordinator_status": "active",
+    }
+    assert owner_id not in stale.text
 
 
 def test_system_info_requires_a_token(anon_client):

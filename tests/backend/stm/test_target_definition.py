@@ -5,11 +5,12 @@ surface mixed together:
 
 1. What silicon facts differ at one physical package position?
 2. Which service requirement selects a physical route?
-3. Which selected routes consume controllable hardware channels?
+3. Which selected routes require independent, default-open conductive paths?
 """
 
 from __future__ import annotations
 
+import json
 import sqlite3
 
 import pytest
@@ -27,12 +28,9 @@ def _policy(**overrides) -> dict:
         "revision": 1,
         "requirements": [],
         "safety_rules": [],
-        "channel_fabric": {
-            "part_mpn": "TEST-SWITCH-8",
-            "channels_per_device": 8,
-            "max_devices": 2,
-            "default_state": "open",
-            "reference_prefix": "U_ROUTE",
+        "routing_constraints": {
+            "safe_default": "open",
+            "maximum_independent_paths": 16,
         },
         "declared_blockers": [],
     }
@@ -63,7 +61,7 @@ def test_optional_af_differences_do_not_become_hardware_switches(stm_conn, stm_r
     assert positions["13"]["board_action"] == "breakout"
     assert positions["45"]["silicon_class"] == "stable_io"
     assert positions["45"]["board_action"] == "breakout"
-    assert result["channel_fabric"]["required_channels"] == 0
+    assert result["routing_requirements"]["required_independent_paths"] == 0
 
 
 def test_scope_selection_resolves_to_an_explicit_sorted_device_set(stm_conn, stm_refs):
@@ -99,7 +97,7 @@ def test_required_signal_on_one_shared_position_is_a_direct_route(stm_conn, stm_
     route = result["requirements"][0]
     assert route["route_kind"] == "direct"
     assert {row["position"] for row in route["routes"]} == {"12"}
-    assert result["channel_fabric"]["required_channels"] == 0
+    assert result["routing_requirements"]["required_independent_paths"] == 0
     pos12 = next(row for row in result["positions"] if row["position"] == "12")
     assert pos12["board_action"] == "direct"
     assert pos12["route_ids"] == ["uart_tx"]
@@ -189,7 +187,7 @@ def test_safety_collision_requires_an_evidenced_rule():
     blocked = compile_target_definition(conn, refs=refs, policy=_policy(), source_meta=_meta())
     pos1 = blocked["positions"][0]
     assert pos1["silicon_class"] == "safety_collision"
-    assert pos1["board_action"] == "isolate"
+    assert pos1["board_action"] == "selectable"
     assert blocked["readiness"]["status"] == "blocked"
     ground = next(
         group
@@ -208,7 +206,7 @@ def test_safety_collision_requires_an_evidenced_rule():
                     "position": "1",
                     "action": "selectable",
                     "safe_default": "open",
-                    "uses_channel": True,
+                    "requires_independent_path": True,
                     "onehot_group": "collision-ground",
                     "evidence": ["TEST datasheet table 1"],
                 }
@@ -218,8 +216,8 @@ def test_safety_collision_requires_an_evidenced_rule():
     )
     pos1 = resolved["positions"][0]
     assert pos1["board_action"] == "selectable"
-    assert resolved["channel_fabric"]["required_channels"] == 1
-    assert resolved["channel_fabric"]["allocations"][0]["position"] == "1"
+    assert resolved["routing_requirements"]["required_independent_paths"] == 1
+    assert resolved["routing_requirements"]["paths"][0]["position"] == "1"
     assert resolved["readiness"]["status"] == "ready"
     assert resolved["functional_foundation"]["status"] == "complete"
 
@@ -262,8 +260,8 @@ def test_safety_branches_cover_each_identity_and_allocate_each_controlled_endpoi
     )
 
     assert result["readiness"]["status"] == "ready"
-    assert result["channel_fabric"]["required_channels"] == 2
-    assert [row["branch_id"] for row in result["channel_fabric"]["allocations"]] == [
+    assert result["routing_requirements"]["required_independent_paths"] == 2
+    assert [row["branch_id"] for row in result["routing_requirements"]["paths"]] == [
         "ground",
         "vcap",
     ]
@@ -335,13 +333,13 @@ def test_family_variable_required_route_allocates_one_channel_per_endpoint():
     )
 
     assert result["requirements"][0]["route_kind"] == "switched"
-    assert result["channel_fabric"]["required_channels"] == 2
-    allocations = result["channel_fabric"]["allocations"]
-    assert [(row["reference"], row["channel"], row["register_bit"]) for row in allocations] == [
-        ("U_ROUTE_1", 1, 0),
-        ("U_ROUTE_1", 2, 1),
+    assert result["routing_requirements"]["required_independent_paths"] == 2
+    paths = result["routing_requirements"]["paths"]
+    assert [(row["path_id"], row["position"]) for row in paths] == [
+        ("path-001", "1"),
+        ("path-002", "2"),
     ]
-    assert {row["onehot_group"] for row in allocations} == {"service_tx"}
+    assert {row["exclusivity_group"] for row in paths} == {"service_tx"}
 
 
 def test_optional_service_keeps_partial_routes_and_reports_group_coverage():
@@ -427,7 +425,7 @@ def test_capability_only_routes_can_share_a_breakout_without_claiming_board_nets
     position = result["positions"][0]
     assert position["board_action"] == "breakout"
     assert position["route_ids"] == []
-    assert result["channel_fabric"]["required_channels"] == 0
+    assert result["routing_requirements"]["required_independent_paths"] == 0
 
 
 def test_no_connect_pins_are_isolated_and_reported_as_a_functional_obligation():
@@ -453,6 +451,45 @@ def test_no_connect_pins_are_isolated_and_reported_as_a_functional_obligation():
     )
     assert reserved["status"] == "complete"
     assert reserved["resolved_target_count"] == 2
+
+
+def test_named_reserved_and_regulator_controls_override_inconsistent_cubemx_types():
+    conn, refs, mcu_ids = _tiny_connection()
+    for mcu_id in mcu_ids:
+        # These deliberately reproduce the inconsistent CubeMX types found in the real STM32F
+        # source: RFU/PDR_ON are I/O and BYPASS_REG is Reset.
+        _insert_pin(conn, mcu_id, "1", "RFU", "io")
+        _insert_pin(conn, mcu_id, "2", "PDRON", "io")
+        _insert_pin(conn, mcu_id, "3", "BYPASSREG", "reset")
+        _insert_pin(conn, mcu_id, "4", "VDDUSB", "power")
+    conn.commit()
+
+    result = compile_target_definition(
+        conn,
+        refs=refs,
+        policy=_policy(),
+        source_meta=_meta(),
+    )
+
+    positions = {row["position"]: row for row in result["positions"]}
+    assert positions["1"]["identities"] == ["no-connect"]
+    assert positions["1"]["board_action"] == "isolate"
+    assert positions["2"]["identities"] == ["power-control:pdr-on"]
+    assert positions["3"]["identities"] == ["regulator-control:bypass"]
+    assert positions["4"]["identities"] == ["power:vddusb"]
+    regulator = next(
+        group
+        for group in result["functional_foundation"]["groups"]
+        if group["id"] == "power-regulator-control"
+    )
+    assert regulator["positions"] == ["2", "3", "4"]
+    assert regulator["status"] == "complete"
+    reset = next(
+        group
+        for group in result["functional_foundation"]["groups"]
+        if group["id"] == "reset-control"
+    )
+    assert reset["status"] == "unavailable"
 
 
 def test_safety_branch_can_make_a_target_specific_service_route_usable():
@@ -488,14 +525,14 @@ def test_safety_branch_can_make_a_target_specific_service_route_usable():
                             "identity_patterns": [r"PA0"],
                             "action": "breakout",
                             "net": "TARGET_PIN_1",
-                            "uses_channel": False,
+                            "requires_independent_path": False,
                         },
                         {
                             "id": "ground",
                             "identity_patterns": [r"ground"],
                             "action": "switched",
                             "net": "GROUND",
-                            "uses_channel": True,
+                            "requires_independent_path": True,
                         },
                     ],
                 }
@@ -512,6 +549,188 @@ def test_safety_branch_can_make_a_target_specific_service_route_usable():
     assert requirement["routes"][0]["safety_branch"] == "gpio"
     assert result["positions"][0]["board_action"] == "selectable"
     assert result["readiness"]["status"] == "ready"
+
+
+def test_unresolved_collision_emits_a_generic_universalization_strategy():
+    conn, refs, mcu_ids = _tiny_connection()
+    _insert_pin(conn, mcu_ids[0], "1", "VSS", "ground")
+    _insert_pin(conn, mcu_ids[1], "1", "VCAP_1", "vcap")
+    conn.commit()
+
+    result = compile_target_definition(
+        conn,
+        refs=refs,
+        policy=_policy(
+            routing_constraints={"safe_default": "open"},
+        ),
+        source_meta=_meta(),
+    )
+
+    strategy = result["universalization"]["strategies"][0]
+    assert strategy["primitive"] == "exclusive-identity-branches"
+    assert strategy["selection"] == "one-of"
+    assert strategy["safe_default"] == "open"
+    assert strategy["evidence_status"] == "suggested"
+    assert {
+        tuple(branch["matched_identities"]) for branch in strategy["branches"]
+    } == {("ground",), ("vcap",)}
+    assert result["universalization"]["implementation_technology"] == "unspecified"
+    assert result["universalization"]["required_independent_paths"] == 2
+    assert result["readiness"]["status"] == "blocked"
+
+
+def test_gpio_power_collision_prefers_one_selected_power_path_and_passive_gpio():
+    conn, refs, mcu_ids = _tiny_connection()
+    _insert_pin(conn, mcu_ids[0], "1", "PA0", "io")
+    _insert_pin(conn, mcu_ids[1], "1", "VDD", "power")
+    conn.commit()
+
+    result = compile_target_definition(
+        conn,
+        refs=refs,
+        policy=_policy(routing_constraints={"safe_default": "open"}),
+        source_meta=_meta(),
+    )
+
+    strategy = result["universalization"]["strategies"][0]
+    assert strategy["primitive"] == (
+        "conditioned-signal-with-selected-critical-role"
+    )
+    assert strategy["selection"] == "critical-role-only"
+    assert strategy["active_path_count"] == 1
+    assert strategy["passive_path_count"] == 1
+    assert strategy["fallback"]["primitive"] == "exclusive-identity-branches"
+    assert strategy["fallback"]["independent_paths"] == 2
+    assert strategy["validation"] == {
+        "status": "required",
+        "required_checks": [
+            "voltage-range",
+            "source-current",
+            "sink-current",
+            "leakage",
+            "injection-current",
+            "back-power",
+            "bias-loading",
+            "edge-rate",
+            "bandwidth",
+            "power-off-behavior",
+        ],
+        "failure_action": "use-fully-exclusive-fallback",
+    }
+    assert {
+        (
+            tuple(branch["matched_identities"]),
+            branch["connection_mode"],
+            branch["uses_independent_path"],
+        )
+        for branch in strategy["branches"]
+    } == {
+        (("PA0",), "passive-conditioned", False),
+        (("power:vdd",), "selectable", True),
+    }
+    assert result["universalization"]["required_independent_paths"] == 1
+    assert result["universalization"]["passive_conditioned_paths"] == 1
+    assert result["universalization"]["summary"]["compact_hybrid"] == 1
+    assert result["universalization"]["state_contract"]["unknown_target"] == (
+        "all-independent-paths-open"
+    )
+    assert result["universalization"]["state_contract"]["identity_mismatch"] == (
+        "refuse-activation"
+    )
+
+
+def test_generic_routing_requirements_do_not_require_a_component_mpn():
+    conn, refs, mcu_ids = _tiny_connection()
+    _insert_pin(conn, mcu_ids[0], "1", "VSS", "ground")
+    _insert_pin(conn, mcu_ids[1], "1", "VCAP_1", "vcap")
+    conn.commit()
+
+    result = compile_target_definition(
+        conn,
+        refs=refs,
+        policy=_policy(
+            routing_constraints={"safe_default": "open"},
+            safety_rules=[
+                {
+                    "position": "1",
+                    "action": "selectable",
+                    "safe_default": "open",
+                    "evidence": ["TEST target pin tables"],
+                    "branches": [
+                        {
+                            "id": "ground",
+                            "identity_patterns": [r"ground"],
+                            "action": "selectable",
+                        },
+                        {
+                            "id": "vcap",
+                            "identity_patterns": [r"vcap"],
+                            "action": "selectable",
+                        },
+                    ],
+                }
+            ],
+        ),
+        source_meta=_meta(),
+    )
+
+    routing = result["routing_requirements"]
+    assert routing["strategy"] == "implementation-neutral-independent-paths"
+    assert routing["required_independent_paths"] == 2
+    assert [path["path_id"] for path in routing["paths"]] == [
+        "path-001",
+        "path-002",
+    ]
+    assert not {
+        "part_mpn",
+        "reference_prefix",
+        "channels_per_device",
+        "register_bit",
+    } & set(routing)
+    serialized = json.dumps(result, sort_keys=True)
+    for forbidden in (
+        "channel_fabric",
+        "part_mpn",
+        "reference_prefix",
+        "channels_per_device",
+        "register_bit",
+        "device_index",
+    ):
+        assert forbidden not in serialized
+    assert not any(
+        "component MPN" in blocker for blocker in result["readiness"]["blockers"]
+    )
+
+
+def test_target_definition_rejects_downstream_component_and_channel_assignments(
+    stm_conn, stm_refs
+):
+    with pytest.raises(ValueError, match="channel_fabric is not part"):
+        compile_target_definition(
+            stm_conn,
+            refs=[stm_refs["mcu1"], stm_refs["mcu2"]],
+            policy=_policy(
+                channel_fabric={
+                    "part_mpn": "DOWNSTREAM-PART",
+                    "channels_per_device": 8,
+                    "default_state": "open",
+                }
+            ),
+            source_meta=_meta(),
+        )
+
+    with pytest.raises(ValueError, match="implementation-specific or unknown"):
+        compile_target_definition(
+            stm_conn,
+            refs=[stm_refs["mcu1"], stm_refs["mcu2"]],
+            policy=_policy(
+                routing_constraints={
+                    "safe_default": "open",
+                    "reference_prefix": "U_ROUTE",
+                }
+            ),
+            source_meta=_meta(),
+        )
 
 
 def test_claim_scope_is_strict_and_sensitive_pin_only_services_warn():

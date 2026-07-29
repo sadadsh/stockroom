@@ -8,10 +8,12 @@ from pathlib import Path
 
 import pytest
 
+from stockroom.cad_materialization import materialize_pair
 from stockroom.cad_variants import (
     CadVariantResolutionError,
     list_cad_variants,
     resolve_cad_variant,
+    same_cad_evidence_set,
     selection_matches,
 )
 from stockroom.evidence import EvidenceArtifact, EvidenceStore
@@ -213,6 +215,78 @@ def test_altium_bundle_has_native_roles_and_a_verified_kicad_source_closure(
     }
     assert "model" not in resolved.data
     assert resolved.descriptor.source_manifests == (kicad_manifest,)
+
+
+def test_one_manifest_projects_the_same_author_set_to_both_eda_tools(
+    tmp_path: Path,
+) -> None:
+    store = EvidenceStore((tmp_path / "Evidence").resolve())
+    shared_manifest = _record_bundle(
+        store,
+        provider="digikey-ultralibrarian",
+        artifacts={
+            **_kicad_bytes(),
+            "altium_symbol": b"native SchLib bytes",
+            "altium_footprint": b"native PcbLib with embedded 3D bytes",
+        },
+        operation=_KICAD,
+    )
+
+    kicad = resolve_cad_variant(
+        store,
+        identity=_IDENTITY,
+        tool="kicad",
+        manifest_digest=shared_manifest,
+    )
+    altium = resolve_cad_variant(
+        store,
+        identity=_IDENTITY,
+        tool="altium",
+        manifest_digest=shared_manifest,
+    )
+
+    assert same_cad_evidence_set(kicad.descriptor, altium.descriptor)
+    assert kicad.descriptor.provider == altium.descriptor.provider
+    assert kicad.descriptor.manifest_digest == altium.descriptor.manifest_digest
+
+
+def test_same_provider_but_split_manifests_cannot_be_materialized_as_one_pair(
+    tmp_path: Path,
+) -> None:
+    store = EvidenceStore((tmp_path / "Evidence").resolve())
+    kicad_manifest = _record_bundle(
+        store,
+        provider="digikey-ultralibrarian",
+        artifacts=_kicad_bytes(),
+        operation=_KICAD,
+    )
+    altium_manifest = _record_bundle(
+        store,
+        provider="digikey-ultralibrarian",
+        artifacts={
+            "altium_symbol": b"native SchLib bytes",
+            "altium_footprint": b"native PcbLib with embedded 3D bytes",
+        },
+        operation=_ALTIUM,
+        source_manifests=(kicad_manifest,),
+    )
+    kicad = resolve_cad_variant(
+        store,
+        identity=_IDENTITY,
+        tool="kicad",
+        manifest_digest=kicad_manifest,
+    )
+    altium = resolve_cad_variant(
+        store,
+        identity=_IDENTITY,
+        tool="altium",
+        manifest_digest=altium_manifest,
+    )
+
+    assert not same_cad_evidence_set(kicad.descriptor, altium.descriptor)
+    record = PartRecord(id="s1m-0000", mpn="S1M", manufacturer="ON Semiconductor")
+    with pytest.raises(ValueError, match="one provider evidence set"):
+        materialize_pair(object(), record, kicad, altium)
 
 
 def test_a_broken_store_cannot_mix_roles_from_different_manifests() -> None:

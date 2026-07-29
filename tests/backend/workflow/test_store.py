@@ -816,6 +816,41 @@ def test_pause_resume_and_cancel_are_persisted_and_claim_aware(tmp_path):
         )
 
 
+def test_batch_retry_requeues_only_failures_and_is_idempotent(tmp_path):
+    store = _store(tmp_path)
+    batch = store.submit_batch([IntakeIdentity("ACME", "P-1")], now=1)
+    identity = store.claim_ready("worker", now=2, lease_seconds=30, limit=1)[0]
+    _resolve_identity(store, identity, now=3)
+    completed_identity = store.get_stage(identity.id)
+    failed = store.claim_ready("provider-worker", now=4, lease_seconds=30, limit=1)[0]
+    store.fail_stage(
+        failed.id,
+        "provider-worker",
+        {"kind": "provider_failure", "secret": "must-stay-durable"},
+        **_lease(failed),
+        now=5,
+    )
+    assert store.get_batch(batch.id).status is BatchStatus.FAILED
+
+    terminal_events_before = [
+        event for event in store.events(batch.id) if event.kind == "stage_completed"
+    ]
+    retried = store.retry_batch(batch.id, now=6)
+    assert retried.status is BatchStatus.QUEUED
+    assert store.get_stage(identity.id) == completed_identity
+    assert store.get_stage(failed.id).status is StageStatus.READY
+    assert store.get_stage(failed.id).attempt_count == 1
+
+    events_after_first_retry = store.events(batch.id)
+    repeated = store.retry_batch(batch.id, now=7)
+    assert repeated == retried
+    assert store.events(batch.id) == events_after_first_retry
+    assert sum(event.kind == "batch_retry_requested" for event in events_after_first_retry) == 1
+    assert [
+        event for event in events_after_first_retry if event.kind == "stage_completed"
+    ] == terminal_events_before
+
+
 def test_generic_completion_rejects_publish_and_legacy_receipts_stay_empty(tmp_path):
     store = _store(tmp_path)
     batch = store.submit_batch([IntakeIdentity("ACME", "P-1")], now=1)

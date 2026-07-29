@@ -4,16 +4,54 @@ route (the host polls it to know the server is up before opening the window)."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 
 from stockroom.api.errors import ApiError
 from stockroom.kicad.config import detect_running_kicad
+from stockroom.service import CoordinatorStatus
 
 router = APIRouter(prefix="/api")
 
 
 @router.get("/health")
-def health() -> dict:
-    return {"status": "ok"}
+def health(request: Request) -> JSONResponse:
+    """Process identity as well as liveness for host-gated release adoption."""
+
+    ctx = request.app.state.ctx
+    expected_generation = getattr(ctx, "service_generation", 0)
+    expected_mode = getattr(ctx, "service_mode", "standalone")
+    status_code = 200
+    payload: dict[str, object] = {
+        "status": "ok",
+        "release_id": getattr(ctx, "release_id", ""),
+        "service_generation": expected_generation,
+        "service_mode": expected_mode,
+        "coordinator_status": "unmanaged",
+    }
+    control = getattr(ctx, "service_control", None)
+    authority_required = bool(
+        getattr(ctx, "service_authority_required", False)
+    )
+    if authority_required and control is None:
+        payload["status"] = "degraded"
+        payload["coordinator_status"] = "unavailable"
+        payload["blocking_reason"] = (
+            getattr(ctx, "service_degraded_reason", "")
+            or "service_authority_unavailable"
+        )
+        status_code = 503
+    elif control is not None:
+        snapshot = control.snapshot()
+        payload["service_generation"] = snapshot.generation
+        payload["coordinator_status"] = snapshot.status.value
+        if (
+            snapshot.status is not CoordinatorStatus.ACTIVE
+            or snapshot.generation != expected_generation
+            or snapshot.mode.value != expected_mode
+        ):
+            payload["status"] = "stale"
+            status_code = 503
+    return JSONResponse(status_code=status_code, content=payload)
 
 
 def _ctx(request: Request):

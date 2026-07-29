@@ -182,7 +182,7 @@ export function PhotoTrigger({
               ? `View ${count} Photos of ${partName || "this part"}`
               : `View Photo of ${partName || "this part"}`
           }
-          className="group flex w-full items-center gap-2 rounded-control border border-line bg-field px-3 py-2 text-xs font-medium text-t1 transition-colors hover:border-line2 hover:bg-raise2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+          className="group flex h-8 w-full items-center gap-2 rounded-control border border-line bg-field px-3 text-xs font-medium text-t1 transition-colors hover:border-line2 hover:bg-raise2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
         >
           {/* Anatomy DELIBERATELY matched to the CAD row directly beneath it: glyph and label on the
               left, affordance on the right. Measured on the first cut, which centred its content and

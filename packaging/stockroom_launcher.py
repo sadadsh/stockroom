@@ -1,43 +1,97 @@
-"""Frozen launcher entry point (M9e). PyInstaller freezes THIS tiny script into the portable
-Stockroom.exe: it clones / self-updates the app repo working copy and runs the WebView2 host
-from it via `uv`, so the heavy backend deps live in that checkout, never inside the exe.
+"""Frozen entry point for Stockroom's stable managed Windows runtime.
 
-Intentionally imports only stockroom.launcher.* (leaf, stdlib-only) so the frozen exe stays
-small and never drags FastAPI / pywebview into itself. A fatal error becomes a clean native
-message box, never a raw PyInstaller traceback dialog (the exe is windowed, console=False).
+Normal launch starts the signed broker, managed service authority, API, and
+window host.  The same immutable executable is copied into each release set;
+``--port`` dispatches that copy as a windowless candidate worker.
 """
 
 from __future__ import annotations
 
 import ctypes
+import os
 import sys
+from pathlib import Path
 
 if not getattr(sys, "frozen", False):
-    # Running from source (not the frozen exe): make the in-repo stockroom package importable.
-    from pathlib import Path
-
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app" / "backend"))
 
-from stockroom.launcher.launch import main  # noqa: E402
+
+def _fatal(message: str, *, interactive: bool) -> None:
+    if interactive:
+        try:
+            ctypes.windll.user32.MessageBoxW(
+                None,
+                message,
+                "Stockroom could not start",
+                0x10,
+            )
+            return
+        except Exception:  # noqa: BLE001 - no user32: use the process error stream
+            pass
+    sys.stderr.write(message + "\n")
 
 
-def _fatal(message: str) -> None:
-    """Show a clean native error dialog on Windows; fall back to stderr elsewhere."""
+def _prepare_runtime(*, needs_window: bool) -> None:
+    bundle = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    mingit = bundle / "mingit"
+    git = mingit / "cmd" / "git.exe"
+    if git.is_file():
+        os.environ["PATH"] = os.pathsep.join(
+            (
+                str(mingit / "cmd"),
+                str(mingit / "bin"),
+                str(mingit),
+                os.environ.get("PATH", ""),
+            )
+        )
+    if needs_window:
+        from stockroom.launcher.launch import ensure_webview2
+
+        ensure_webview2()
+
+
+def _dispatch() -> None:
+    if "--port" in sys.argv[1:]:
+        _prepare_runtime(needs_window=False)
+        from stockroom.host.worker import main as worker_main
+
+        worker_main()
+        return
+    if len(sys.argv) == 3 and sys.argv[1] == "--managed-host-probe":
+        _prepare_runtime(needs_window=False)
+        from stockroom.host.package_probe import run_managed_host_probe
+
+        run_managed_host_probe(Path(sys.argv[2]))
+        return
+    if any(argument.startswith("--managed-host-probe") for argument in sys.argv[1:]):
+        raise SystemExit(
+            "--managed-host-probe requires exactly one absolute receipt path"
+        )
+    _prepare_runtime(needs_window=True)
+    from stockroom.host.run import main as host_main
+
+    host_main()
+
+
+def _main() -> None:
+    # Both acceptance probes and immutable ``--port`` workers are unattended
+    # subprocesses. A top-level worker failure must reach the broker through its
+    # exit code/stderr, never block forever behind a user32 MessageBox.
+    noninteractive = (
+        "--managed-host-probe" in sys.argv[1:]
+        or "--port" in sys.argv[1:]
+    )
     try:
-        ctypes.windll.user32.MessageBoxW(None, message, "Stockroom could not start", 0x10)
-    except Exception:  # noqa: BLE001 - non-Windows / no user32: fall back to stderr
-        sys.stderr.write(message + "\n")
+        _dispatch()
+    except SystemExit:
+        raise
+    except Exception as exc:  # noqa: BLE001 - native top-level failure boundary
+        _fatal(
+            "Stockroom's managed runtime could not start.\n\n" + str(exc),
+            interactive=not noninteractive,
+        )
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except SystemExit:
-        raise
-    except Exception as exc:  # noqa: BLE001 - top-level: a clean dialog, never a raw traceback
-        _fatal(
-            "Stockroom needs internet on first launch to download its app files and set up its "
-            "environment. If you are online and this keeps happening, the details below may help.\n\n"
-            + str(exc)
-        )
-        raise SystemExit(1)
+    _main()

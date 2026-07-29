@@ -7,6 +7,7 @@ section 3).
 
 from __future__ import annotations
 
+import builtins
 import shutil
 from pathlib import Path
 
@@ -102,7 +103,7 @@ class ProfileStore:
         self.libraries_root = Path(libraries_root)
         self.repo = repo
 
-    def list(self) -> list[str]:
+    def list(self) -> builtins.list[str]:
         if not self.libraries_root.exists():
             return []
         # A profile is always a real subdirectory created by create(); the git repo

@@ -1,17 +1,14 @@
-"""Authenticated inventory and compare-and-switch activation for retained CAD bundles.
+"""Authenticated inventory and atomic pair activation for retained CAD bundles.
 
-Evidence is immutable and machine-local; a part record stores only the one whole-bundle pointer
-currently materialized for each EDA tool.  This surface never selects roles independently.  An
-activation reverifies the requested manifest, installs every required role through the existing
-tool materializer, and persists the pointer in that materializer's single Git Transaction.
+Evidence is immutable and machine-local. Every retained provider variant remains inspectable, but
+only one exact same-provider, same-download KiCad and Altium pair can be activated. Pair activation
+reverifies both projections, installs every required role, and persists both pointers in one Git
+Transaction. The legacy single-tool route remains only to fail closed for older clients.
 """
 
 from __future__ import annotations
 
 import re
-import tempfile
-from datetime import UTC, datetime
-from pathlib import Path
 from typing import Literal
 from urllib.parse import quote
 
@@ -20,19 +17,16 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from stockroom.api.errors import ApiError
+from stockroom.cad_materialization import materialize_pair
 from stockroom.cad_variants import (
     CadVariantDescriptor,
     list_cad_variants,
     resolve_cad_variant,
+    same_cad_evidence_set,
 )
 from stockroom.capture.evidence import exact_identity
 from stockroom.capture.runner import capture_state_root
 from stockroom.evidence import EvidenceStore
-from stockroom.ingest.naming import propose_entry_name
-from stockroom.ingest.pipeline import IngestPipeline
-from stockroom.ingest.staging import StagingCandidate
-from stockroom.kicad.symbol_lib import SymbolLib
-from stockroom.model.asset import AssetOrigin
 from stockroom.model.part import PartRecord
 
 _TOOLS = ("kicad", "altium")
@@ -75,6 +69,29 @@ class ActivateCadVariantBody(BaseModel):
     )
 
 
+class ActivateCadPairBody(BaseModel):
+    """A stale-safe request to switch one cross-EDA-proved pair atomically."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    kicad_variant_id: str = Field(
+        alias="kicadVariantId",
+        pattern=r"sha256:[0-9a-f]{64}",
+    )
+    altium_variant_id: str = Field(
+        alias="altiumVariantId",
+        pattern=r"sha256:[0-9a-f]{64}",
+    )
+    expected_active_kicad_variant_id: str | None = Field(
+        alias="expectedActiveKicadVariantId",
+        pattern=r"sha256:[0-9a-f]{64}",
+    )
+    expected_active_altium_variant_id: str | None = Field(
+        alias="expectedActiveAltiumVariantId",
+        pattern=r"sha256:[0-9a-f]{64}",
+    )
+
+
 def _store() -> EvidenceStore:
     return EvidenceStore((capture_state_root() / "Evidence").resolve())
 
@@ -105,17 +122,11 @@ def _provider_presentation(provider: str) -> tuple[str, int, str, str]:
 
 
 def _descriptor_document(descriptor: CadVariantDescriptor) -> dict:
-    provider, trust_rank, trust_label, trust_reason = _provider_presentation(
-        descriptor.provider
-    )
+    provider, trust_rank, trust_label, trust_reason = _provider_presentation(descriptor.provider)
     return {
         "id": descriptor.variant_key,
         "provider": provider,
-        "format": (
-            "KiCad Native"
-            if descriptor.tool == "kicad"
-            else "Altium Designer (Native)"
-        ),
+        "format": ("KiCad Native" if descriptor.tool == "kicad" else "Altium Designer (Native)"),
         "artifacts": [
             {
                 "kind": artifact.asset_kind,
@@ -192,16 +203,25 @@ def _active_variant_id(record: PartRecord, tool: str) -> str | None:
     return pointer.variant_key if pointer is not None else None
 
 
-def _altium_accepts_kicad(altium_pointer, kicad_manifest: str) -> bool:
-    """Whether native Altium was validated against this exact KiCad bundle.
-
-    A same-manifest bundle can carry both formats directly. A composed Altium manifest instead
-    names the exact KiCad evidence it was cross-EDA checked against in ``source_manifests``.
-    """
-    return (
-        altium_pointer.manifest_digest == kicad_manifest
-        or kicad_manifest in altium_pointer.source_manifests
-    )
+def _pair_document(
+    kicad: CadVariantDescriptor,
+    altium: CadVariantDescriptor,
+) -> dict:
+    kicad_provider, kicad_rank, _, _ = _provider_presentation(kicad.provider)
+    altium_provider, altium_rank, _, _ = _provider_presentation(altium.provider)
+    if kicad_provider != altium_provider:
+        raise ValueError("one CAD evidence set cannot have two provider identities")
+    return {
+        "kicadVariantId": kicad.variant_key,
+        "altiumVariantId": altium.variant_key,
+        "provider": kicad_provider,
+        "trustRank": max(kicad_rank, altium_rank),
+        "trustLabel": "Same-Download Validated Pair",
+        "trustReason": (
+            "KiCad and Altium were projected from the exact same immutable provider "
+            "manifest, adapter, operation, and source closure."
+        ),
+    }
 
 
 def _inventory_document(ctx, part_id: str, store: EvidenceStore | None = None) -> dict:
@@ -213,12 +233,14 @@ def _inventory_document(ctx, part_id: str, store: EvidenceStore | None = None) -
         identity = exact_identity(record)
     evidence = store or _store()
     inventories = []
+    descriptors_by_tool: dict[str, tuple[CadVariantDescriptor, ...]] = {}
     for tool in _TOOLS:
         descriptors = (
             list_cad_variants(evidence, identity=identity, tool=tool)
             if identity is not None
             else ()
         )
+        descriptors_by_tool[tool] = tuple(descriptors)
         inventories.append(
             {
                 "tool": tool,
@@ -227,16 +249,18 @@ def _inventory_document(ctx, part_id: str, store: EvidenceStore | None = None) -
             }
         )
     supplementary = (
-        evidence.list_supplementary_artifacts(identity=identity)
-        if identity is not None
-        else ()
+        evidence.list_supplementary_artifacts(identity=identity) if identity is not None else ()
     )
     return {
         "partId": part_id,
         "inventories": inventories,
-        "supplementary": [
-            _supplementary_document(part_id, item) for item in supplementary
+        "pairs": [
+            _pair_document(kicad, altium)
+            for kicad in descriptors_by_tool["kicad"]
+            for altium in descriptors_by_tool["altium"]
+            if same_cad_evidence_set(kicad, altium)
         ],
+        "supplementary": [_supplementary_document(part_id, item) for item in supplementary],
     }
 
 
@@ -266,8 +290,7 @@ def _supplementary_download(
             (
                 item
                 for item in manifest.artifacts
-                if item.artifact_digest == artifact_digest
-                and item.suggested_name == file_name
+                if item.artifact_digest == artifact_digest and item.suggested_name == file_name
             ),
             None,
         )
@@ -283,152 +306,68 @@ def _supplementary_download(
     )
 
 
-def _origin(descriptor: CadVariantDescriptor) -> AssetOrigin:
-    return AssetOrigin(
-        vendor=descriptor.provider,
-        extra={
-            "evidence_manifest_digest": descriptor.manifest_digest,
-            "evidence_adapter_version": descriptor.adapter_version,
-            "evidence_operation": descriptor.operation,
-        },
-    )
+def _activate_pair(
+    ctx,
+    part_id: str,
+    body: ActivateCadPairBody,
+    store: EvidenceStore,
+) -> None:
+    """Compare both pointers and install one compatible pair without an invalid midpoint."""
 
-
-def _pick_kicad_symbol(path: Path, mpn: str, current_name: str = "") -> str:
-    names = SymbolLib.load(path).symbol_names
-    if not names:
-        raise ValueError("selected KiCad evidence contains no symbol entry")
-    # Installed-readback evidence deliberately retains the whole category library.  Its stable
-    # record binding is stronger than heuristics against the MPN and makes reactivation exact even
-    # when the entry was human-named and the library contains hundreds of neighbours.
-    if current_name and current_name in names:
-        return current_name
-    exact = [name for name in names if name == mpn]
-    if len(exact) == 1:
-        return exact[0]
-    folded = [name for name in names if name.casefold() == mpn.casefold()]
-    if len(folded) == 1:
-        return folded[0]
-    if len(names) == 1:
-        return names[0]
-    raise ValueError(
-        "selected KiCad evidence contains multiple symbols without one exact MPN match"
-    )
-
-
-def _materialize_kicad(ctx, record: PartRecord, resolved) -> PartRecord:
-    with tempfile.TemporaryDirectory(prefix="Stockroom-CAD-Variant-") as temporary:
-        root = Path(temporary)
-        symbol_path = root / "Variant.kicad_sym"
-        footprint_path = root / "Variant.kicad_mod"
-        model_path = root / "Variant.step"
-        symbol_path.write_bytes(resolved.data["symbol"])
-        footprint_path.write_bytes(resolved.data["footprint"])
-        model_path.write_bytes(resolved.data["model"])
-        current_symbol = record.assets_for("kicad").symbol
-        source_name = _pick_kicad_symbol(
-            symbol_path,
-            record.mpn,
-            current_symbol.name if current_symbol is not None else "",
-        )
-        entry_name = (
-            current_symbol.name
-            if current_symbol is not None and current_symbol.name
-            else propose_entry_name(source_name, record.mpn)
-        )
-        candidate = StagingCandidate(
-            vendor=resolved.descriptor.provider,
-            symbol_lib_path=symbol_path,
-            symbol_name=source_name,
-            footprint_variants=[footprint_path],
-            model_path=model_path,
-            entry_name=entry_name,
-            category=record.category,
-            mpn=record.mpn,
-            manufacturer=record.manufacturer,
-        )
-        pipeline = IngestPipeline(ctx.profile, ctx.repo, ctx.cli)
-        return pipeline.attach_assets(
-            record.id,
-            candidate,
-            origin=_origin(resolved.descriptor),
-            now_iso=datetime.now(UTC).isoformat(),
-            active_variant=resolved.pointer,
-            replace_existing=True,
-        )
-
-
-def _materialize_altium(ctx, record: PartRecord, resolved) -> PartRecord:
-    with tempfile.TemporaryDirectory(prefix="Stockroom-CAD-Variant-") as temporary:
-        root = Path(temporary)
-        symbol_path = root / "Variant.SchLib"
-        footprint_path = root / "Variant.PcbLib"
-        symbol_path.write_bytes(resolved.data["symbol"])
-        footprint_path.write_bytes(resolved.data["footprint"])
-        return ctx.ops.attach_altium_assets(
-            record.id,
-            symbol_path,
-            footprint_path,
-            origin=_origin(resolved.descriptor),
-            now_iso=datetime.now(UTC).isoformat(),
-            active_variant=resolved.pointer,
-        )
-
-
-def _activate(ctx, part_id: str, body: ActivateCadVariantBody, store: EvidenceStore) -> None:
-    # Compare and the nested materializer Transaction share this repository-wide re-entrant lock.
-    # No second activation can advance the record between the expected-value check and commit.
     with ctx.repo._write_lock():
         record = ctx.ops.load_record(part_id)
-        current = _active_variant_id(record, body.tool)
-        if current != body.expected_active_variant_id:
-            raise ApiError(
-                409,
-                "the active CAD variant changed; refresh the inventory before switching",
-            )
-        identity = exact_identity(record)
-        descriptors = list_cad_variants(store, identity=identity, tool=body.tool)
-        selected = next(
-            (item for item in descriptors if item.variant_key == body.variant_id),
-            None,
-        )
-        if selected is None:
-            raise ApiError(404, "the requested complete validated CAD variant is not retained")
-        active_kicad = record.cad_variants.selection_for("kicad")
-        active_altium = record.cad_variants.selection_for("altium")
-        if body.tool == "altium":
-            if active_kicad is None:
-                raise ApiError(
-                    409,
-                    "select the compatible KiCad bundle before activating this Altium bundle",
-                )
-            if not _altium_accepts_kicad(
-                selected.pointer(),
-                active_kicad.manifest_digest,
-            ):
-                raise ApiError(
-                    409,
-                    "this Altium bundle was validated against a different active KiCad bundle",
-                )
+        current_kicad = _active_variant_id(record, "kicad")
+        current_altium = _active_variant_id(record, "altium")
         if (
-            body.tool == "kicad"
-            and active_altium is not None
-            and not _altium_accepts_kicad(active_altium, selected.manifest_digest)
+            current_kicad != body.expected_active_kicad_variant_id
+            or current_altium != body.expected_active_altium_variant_id
         ):
             raise ApiError(
                 409,
-                "the active Altium bundle was validated against a different KiCad bundle",
+                "the active CAD pair changed; refresh the inventory before switching",
             )
-        resolved = resolve_cad_variant(
+
+        identity = exact_identity(record)
+        kicad_descriptors = list_cad_variants(
             store,
             identity=identity,
-            tool=body.tool,
-            manifest_digest=selected.manifest_digest,
+            tool="kicad",
         )
-        if body.tool == "kicad":
-            _materialize_kicad(ctx, record, resolved)
-        else:
-            _materialize_altium(ctx, record, resolved)
+        altium_descriptors = list_cad_variants(
+            store,
+            identity=identity,
+            tool="altium",
+        )
+        selected_kicad = next(
+            (item for item in kicad_descriptors if item.variant_key == body.kicad_variant_id),
+            None,
+        )
+        selected_altium = next(
+            (item for item in altium_descriptors if item.variant_key == body.altium_variant_id),
+            None,
+        )
+        if selected_kicad is None or selected_altium is None:
+            raise ApiError(404, "the requested validated CAD pair is not retained")
+        if not same_cad_evidence_set(selected_kicad, selected_altium):
+            raise ApiError(
+                409,
+                "the requested KiCad and Altium variants do not share one exact "
+                "provider download evidence set",
+            )
+
+        resolved_kicad = resolve_cad_variant(
+            store,
+            identity=identity,
+            tool="kicad",
+            manifest_digest=selected_kicad.manifest_digest,
+        )
+        resolved_altium = resolve_cad_variant(
+            store,
+            identity=identity,
+            tool="altium",
+            manifest_digest=selected_altium.manifest_digest,
+        )
+        materialize_pair(ctx, record, resolved_kicad, resolved_altium)
 
 
 def cad_variants_router(require_token) -> APIRouter:
@@ -442,8 +381,7 @@ def cad_variants_router(require_token) -> APIRouter:
         return _inventory_document(request.app.state.ctx, part_id)
 
     @router.get(
-        "/{part_id}/cad-variants/supplementary/"
-        "{manifest_digest}/{artifact_digest}/{file_name}"
+        "/{part_id}/cad-variants/supplementary/{manifest_digest}/{artifact_digest}/{file_name}"
     )
     def supplementary_download(
         request: Request,
@@ -462,9 +400,22 @@ def cad_variants_router(require_token) -> APIRouter:
 
     @router.post("/{part_id}/cad-variants/activate")
     def activate(request: Request, part_id: str, body: ActivateCadVariantBody) -> dict:
+        del request, part_id, body
+        raise ApiError(
+            409,
+            "single-tool CAD activation is disabled; choose one retained same-source "
+            "KiCad and Altium pair",
+        )
+
+    @router.post("/{part_id}/cad-variants/activate-pair")
+    def activate_pair(
+        request: Request,
+        part_id: str,
+        body: ActivateCadPairBody,
+    ) -> dict:
         ctx = request.app.state.ctx
         store = _store()
-        _activate(ctx, part_id, body, store)
+        _activate_pair(ctx, part_id, body, store)
         ctx.rebuild_index()
         ctx.auto_push()
         return _inventory_document(ctx, part_id, store)
@@ -472,4 +423,8 @@ def cad_variants_router(require_token) -> APIRouter:
     return router
 
 
-__all__ = ["ActivateCadVariantBody", "cad_variants_router"]
+__all__ = [
+    "ActivateCadPairBody",
+    "ActivateCadVariantBody",
+    "cad_variants_router",
+]

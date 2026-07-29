@@ -4,14 +4,19 @@
  * one of them, collapsed, turns into the surface quietly lying about the library.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LibraryCompletionSection } from "./LibraryCompletionSection";
 import { ToastProvider } from "../lib/toast";
 import { api } from "../api/client";
 import { resetCompletion } from "../lib/completionStore";
-import type { LibraryCoverage } from "../api/types";
+import type {
+  LibraryCoverage,
+  WorkflowBatchSummary,
+  WorkflowEvent,
+  WorkflowEventsPage,
+} from "../api/types";
 
 function coverage(over: Partial<LibraryCoverage> = {}): LibraryCoverage {
   return {
@@ -29,6 +34,54 @@ function coverage(over: Partial<LibraryCoverage> = {}): LibraryCoverage {
     sources: ["lcsc"],
     can_provide: ["kicad_footprint", "kicad_model", "kicad_symbol"],
     ...over,
+  };
+}
+
+function durableBatch(
+  status: WorkflowBatchSummary["status"],
+  itemCounts: Record<string, number> = {},
+  totalItems = 1,
+): WorkflowBatchSummary {
+  return {
+    id: "batch-1",
+    status,
+    created_at: 1,
+    updated_at: 2,
+    total_items: totalItems,
+    item_counts: itemCounts,
+    cancellation:
+      status === "cancelled"
+        ? {
+            state: "completed",
+            requested_at: 2,
+            completed_at: 2,
+          }
+        : null,
+    actions: {
+      can_pause: ["queued", "running", "blocked"].includes(status),
+      can_resume: status === "paused",
+      can_retry: status === "failed",
+      can_cancel: ["queued", "running", "blocked", "paused", "failed"].includes(status),
+    },
+  };
+}
+
+function durablePage(
+  batch: WorkflowBatchSummary,
+  events: WorkflowEvent[],
+  nextSequence: number,
+  hasMore = false,
+): WorkflowEventsPage {
+  return {
+    schema_version: 1,
+    batch,
+    events,
+    cursor: {
+      after_sequence: 0,
+      next_sequence: nextSequence,
+      limit: 200,
+      has_more: hasMore,
+    },
   };
 }
 
@@ -52,9 +105,7 @@ describe("coverage", () => {
   it("says how many components hold every file they need", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
     renderSection();
-    expect(
-      await screen.findByText(/components have every file they need/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/components have every file they need/i)).toBeInTheDocument();
     // 92 appears in the headline AND in the KiCad symbol cell, which is correct: the sentence
     // and the matrix are two readings of the same fact.
     expect(screen.getAllByText("92").length).toBeGreaterThan(0);
@@ -93,8 +144,10 @@ describe("coverage", () => {
     renderSection();
     // "can be filled" would be a promise the run cannot keep: 19 of those have no catalogue
     // entry and will find nothing. The copy says what is TRIED, not what is guaranteed.
-    expect(await screen.findByText(/47 components have gaps a source can try/i)).toBeInTheDocument();
-    expect(screen.getByText(/Not every one will find files/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/47 components have gaps a source ladder can try/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/retains fallbacks/i)).toBeInTheDocument();
     expect(screen.getByText(/about 7 minutes/i)).toBeInTheDocument();
   });
 
@@ -114,7 +167,7 @@ describe("coverage", () => {
     ).toBeInTheDocument();
   });
 
-  it("explains managed provider work without calling it automatic", async () => {
+  it("explains the one assisted session and its genuine human checkpoints", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(
       coverage({
         needs_assistance: 31,
@@ -128,11 +181,14 @@ describe("coverage", () => {
         (_text, node) =>
           node?.tagName === "P" &&
           !!node.textContent?.match(
-            /31 components have gaps a managed provider window may fill/i,
+            /31 components have gaps that need one explicit collect all sources session/i,
           ),
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText(/remembers the provider session/i)).toBeInTheDocument();
+    expect(screen.getByText(/reuses the provider session/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/provider-required login, security check, or download choice/i),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Provider")).toHaveLength(2);
     expect(screen.queryByText("No Source")).not.toBeInTheDocument();
   });
@@ -176,6 +232,47 @@ describe("running", () => {
     });
   }
 
+  function controlledStream() {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(next) {
+        controller = next;
+      },
+    });
+    return {
+      stream,
+      push(event: string, data: unknown) {
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      },
+      close() {
+        controller.close();
+      },
+    };
+  }
+
+  function progress(
+    partId: string,
+    status: string,
+    done: number,
+    over: Record<string, unknown> = {},
+  ) {
+    return {
+      stage: "completing",
+      done,
+      total: 1_000,
+      pct: (done + 1) / 1_000,
+      part_id: partId,
+      mpn: `MPN-${partId}`,
+      display_name: `Part ${partId}`,
+      status,
+      satisfied: status === "completed" || status === "improved" ? ["kicad_symbol"] : [],
+      remaining: status === "completed" ? [] : ["kicad_model"],
+      message: `MPN-${partId}`,
+      ...over,
+    };
+  }
+
   it("streams each part as it is filed, and offers a way out", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
     vi.spyOn(api, "runCompletion").mockResolvedValue({ job_id: "j1" });
@@ -184,14 +281,109 @@ describe("running", () => {
     vi.spyOn(api, "openJobStream").mockImplementation(async () => {
       await held;
       return streamOf([
-        { event: "result", data: { result: { items: [], counts: {}, stopped: false, stop_reason: "" } } },
+        {
+          event: "result",
+          data: { result: { items: [], counts: {}, stopped: false, stop_reason: "" } },
+        },
       ]);
     });
     renderSection();
     await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
     // A run that cannot be stopped is a commitment the user cannot take back.
     expect(await screen.findByRole("button", { name: "Stop" })).toBeInTheDocument();
-    release();
+    await act(async () => {
+      release();
+    });
+    await screen.findByRole("button", { name: "Fill Supported CAD Gaps" });
+  });
+
+  it("folds per-part SSE outcomes incrementally without polling or replacing the whole report", async () => {
+    const coverageRead = vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
+    vi.spyOn(api, "runCompletion").mockResolvedValue({ job_id: "j1" });
+    const controlled = controlledStream();
+    vi.spyOn(api, "openJobStream").mockResolvedValue(controlled.stream);
+    renderSection();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
+    await screen.findByRole("button", { name: "Stop" });
+
+    await act(async () => {
+      controlled.push("progress", progress("A", "completed", 0));
+    });
+    expect(await screen.findByText("1 Processed")).toBeInTheDocument();
+    expect(screen.getByText("1 Filed")).toBeInTheDocument();
+    expect(screen.getAllByText("MPN-A")).toHaveLength(2);
+
+    await act(async () => {
+      controlled.push("progress", progress("B", "deferred", 1));
+    });
+    expect(await screen.findByText("2 Processed")).toBeInTheDocument();
+    expect(screen.getByText("1 To Retry")).toBeInTheDocument();
+    expect(screen.getByText("MPN-A")).toBeInTheDocument();
+    expect(screen.getAllByText("MPN-B")).toHaveLength(2); // current frame + one log row
+    // The coverage aggregate is still the one initial read. Per-part progress is folded locally.
+    expect(coverageRead).toHaveBeenCalledTimes(1);
+
+    // A replay/correction for the same part replaces that part's live outcome. It cannot grow the
+    // processed total or leave contradictory retry + filed counts behind.
+    await act(async () => {
+      controlled.push("progress", progress("B", "improved", 1));
+    });
+    expect(screen.getByText("2 Processed")).toBeInTheDocument();
+    expect(screen.getByText("2 Filed")).toBeInTheDocument();
+    expect(screen.queryByText("1 To Retry")).toBeNull();
+    expect(screen.getAllByText("MPN-B")).toHaveLength(2);
+
+    await act(async () => {
+      controlled.push("result", {
+        result: {
+          items: [],
+          counts: { completed: 1, improved: 1 },
+          stopped: false,
+          stop_reason: "",
+        },
+      });
+      controlled.push("done", {});
+      controlled.close();
+    });
+    await screen.findByRole("button", { name: "Fill Supported CAD Gaps" });
+    expect(screen.getByText("2 Filed")).toBeInTheDocument();
+    await waitFor(() => expect(coverageRead).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps cooperative stop wired and returns a stopped run to the resumable action", async () => {
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
+    vi.spyOn(api, "runCompletion").mockResolvedValue({ job_id: "j-stop" });
+    vi.spyOn(api, "stopJob").mockResolvedValue({
+      job_id: "j-stop",
+      stopping: true,
+    });
+    const controlled = controlledStream();
+    vi.spyOn(api, "openJobStream").mockResolvedValue(controlled.stream);
+    renderSection();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
+    await act(async () => {
+      controlled.push("progress", progress("A", "completed", 0));
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Stop" }));
+    expect(api.stopJob).toHaveBeenCalledWith("j-stop");
+    expect(await screen.findByRole("button", { name: "Stopping" })).toBeDisabled();
+
+    await act(async () => {
+      controlled.push("result", {
+        result: {
+          items: [],
+          counts: { completed: 1 },
+          stopped: true,
+          stop_reason: "",
+        },
+      });
+      controlled.push("done", {});
+      controlled.close();
+    });
+    expect(await screen.findByText(/Stopped\. Run it again to carry on/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fill Supported CAD Gaps" })).toBeEnabled();
   });
 
   it("keeps a rate-limited part apart from one nothing can help", async () => {
@@ -242,9 +434,7 @@ describe("running", () => {
     );
     renderSection();
     await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
-    expect(
-      await screen.findByText(/the catalogue is refusing requests/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/the catalogue is refusing requests/i)).toBeInTheDocument();
   });
 
   it("shows a provider's non-error reason before the remaining gaps", async () => {
@@ -328,9 +518,9 @@ describe("running", () => {
 
     expect(await screen.findByText("1 Supplementary Retained")).toBeInTheDocument();
     expect(screen.getByText("0 Filed")).toBeInTheDocument();
-    expect(screen.getByText(/DigiKey · TraceParts: retained 1 exact supplementary file/)).toHaveTextContent(
-      /Still needs 3D model/i,
-    );
+    expect(
+      screen.getByText(/DigiKey · TraceParts: retained 1 exact supplementary file/),
+    ).toHaveTextContent(/Still needs 3D model/i);
   });
 
   it("surfaces a failure to start rather than sitting on a spinner", async () => {
@@ -339,8 +529,235 @@ describe("running", () => {
     renderSection();
     await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
     // Reported in two places on purpose: the toast is transient, the paragraph persists.
-    await waitFor(() =>
-      expect(screen.getAllByText(/backend is down/i).length).toBeGreaterThan(0),
+    await waitFor(() => expect(screen.getAllByText(/backend is down/i).length).toBeGreaterThan(0));
+  });
+});
+
+describe("durable completion", () => {
+  const event = (
+    sequence: number,
+    kind: string,
+    details: Record<string, string | number> = {},
+  ): WorkflowEvent => ({
+    sequence,
+    item_id: "item-1",
+    stage_id: "stage-1",
+    kind,
+    details,
+    created_at: sequence,
+  });
+
+  it("reconnects from the last sequence and never duplicates replayed events", async () => {
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
+    vi.spyOn(api, "runCompletion").mockResolvedValue({
+      workflow_batch_id: "batch-1",
+      event_cursor: 10,
+    });
+    const openLegacy = vi.spyOn(api, "openJobStream");
+    const events = vi
+      .spyOn(api, "workflowEvents")
+      .mockResolvedValueOnce(
+        durablePage(
+          durableBatch("running", { running: 1 }),
+          [event(11, "stage_completed", { stage: "metadata" })],
+          11,
+          true,
+        ),
+      )
+      .mockRejectedValueOnce(new Error("connection reset"))
+      .mockResolvedValueOnce(
+        durablePage(
+          durableBatch("completed", { completed: 1 }),
+          [event(12, "stage_completed", { stage: "publish" })],
+          12,
+        ),
+      );
+
+    renderSection();
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
+
+    expect(await screen.findByText(/The durable workflow completed/i)).toBeInTheDocument();
+    expect(screen.getAllByText("#11")).toHaveLength(1);
+    expect(screen.getAllByText("#12")).toHaveLength(1);
+    expect(events.mock.calls).toEqual([
+      ["batch-1", 10, 200],
+      ["batch-1", 11, 200],
+      ["batch-1", 11, 200],
+    ]);
+    expect(api.runCompletion).toHaveBeenCalledWith({ limit: 1_000 });
+    expect(openLegacy).not.toHaveBeenCalled();
+  });
+
+  it("keeps a 1,000-item durable run aggregate while bounding its event-log DOM", async () => {
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
+    vi.spyOn(api, "runCompletion").mockResolvedValue({
+      workflow_batch_id: "batch-1",
+      event_cursor: 0,
+    });
+    const finalCounts = {
+      completed: 742,
+      failed: 125,
+      blocked: 100,
+      cancelled: 33,
+    };
+    const pages = vi
+      .spyOn(api, "workflowEvents")
+      .mockImplementation(async (_batchId, afterSequence) => {
+        const nextSequence = Math.min(afterSequence + 200, 1_000);
+        const isFinal = nextSequence === 1_000;
+        const events = Array.from({ length: nextSequence - afterSequence }, (_, index) =>
+          event(afterSequence + index + 1, "stage_completed", {
+            stage: `stage_${afterSequence + index + 1}`,
+          }),
+        );
+        return durablePage(
+          durableBatch(
+            isFinal ? "failed" : "running",
+            isFinal ? finalCounts : { running: 1 },
+            1_000,
+          ),
+          events,
+          nextSequence,
+          !isFinal,
+        );
+      });
+
+    renderSection();
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
+
+    expect(
+      await screen.findByText(/Completed stages and their terminal evidence are preserved/i),
+    ).toBeInTheDocument();
+    const durableRun = screen.getByTestId("completion-durable-run");
+    expect(durableRun).toHaveTextContent("900 of 1000 settled");
+    expect(screen.getByText("742 Completed")).toBeInTheDocument();
+    expect(screen.getByText("125 Failed")).toBeInTheDocument();
+    expect(screen.getByText("100 Blocked")).toBeInTheDocument();
+    expect(screen.getByText("33 Cancelled")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Resume" })).toBeNull();
+
+    const eventLog = durableRun.querySelector("ul");
+    expect(eventLog).not.toBeNull();
+    expect(eventLog?.querySelectorAll("li")).toHaveLength(40);
+    expect(screen.getByText("#1000")).toBeInTheDocument();
+    expect(screen.getByText("#961")).toBeInTheDocument();
+    expect(screen.queryByText("#960")).toBeNull();
+    expect(screen.queryByText("#1")).toBeNull();
+    expect(pages.mock.calls.map(([, cursor, limit]) => [cursor, limit])).toEqual([
+      [0, 200],
+      [200, 200],
+      [400, 200],
+      [600, 200],
+      [800, 200],
+    ]);
+    expect(api.runCompletion).toHaveBeenCalledWith({ limit: 1_000 });
+  });
+
+  it("recovers a persisted durable cursor when the renderer remounts", async () => {
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
+    sessionStorage.setItem(
+      "stockroom.completion.workflow.v1",
+      JSON.stringify({ batchId: "batch-1", cursor: 77 }),
     );
+    vi.spyOn(api, "workflowEvents").mockResolvedValue(
+      durablePage(
+        durableBatch("completed", { completed: 1 }),
+        [event(78, "stage_completed", { stage: "publish" })],
+        78,
+      ),
+    );
+    const submit = vi.spyOn(api, "runCompletion");
+
+    renderSection();
+
+    expect(await screen.findByText(/The durable workflow completed/i)).toBeInTheDocument();
+    expect(api.workflowEvents).toHaveBeenCalledWith("batch-1", 77, 200);
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("exposes real pause, resume, and cancel controls from durable actions", async () => {
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
+    vi.spyOn(api, "runCompletion").mockResolvedValue({
+      workflow_batch_id: "batch-1",
+      event_cursor: 0,
+    });
+    vi.spyOn(api, "workflowEvents")
+      .mockResolvedValueOnce(durablePage(durableBatch("running", { running: 1 }), [], 0))
+      .mockImplementation(() => new Promise<WorkflowEventsPage>(() => undefined));
+    vi.spyOn(api, "workflowPause").mockResolvedValue({
+      schema_version: 1,
+      operation: "pause",
+      changed: true,
+      batch: durableBatch("paused", { queued: 1 }),
+    });
+    vi.spyOn(api, "workflowResume").mockResolvedValue({
+      schema_version: 1,
+      operation: "resume",
+      changed: true,
+      batch: durableBatch("running", { queued: 1 }),
+    });
+    vi.spyOn(api, "workflowCancel").mockResolvedValue({
+      schema_version: 1,
+      operation: "cancel",
+      changed: true,
+      batch: durableBatch("cancelled", { cancelled: 1 }),
+    });
+
+    renderSection();
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Pause" }));
+    expect(api.workflowPause).toHaveBeenCalledWith("batch-1");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Resume" }));
+    expect(api.workflowResume).toHaveBeenCalledWith("batch-1");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(api.workflowCancel).toHaveBeenCalledWith("batch-1");
+    expect((await screen.findAllByText("Cancelled")).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+  });
+
+  it("retries only a durably failed batch and reports no invented file outcome", async () => {
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
+    vi.spyOn(api, "runCompletion").mockResolvedValue({
+      workflow_batch_id: "batch-1",
+      event_cursor: 4,
+    });
+    vi.spyOn(api, "workflowEvents")
+      .mockResolvedValueOnce(
+        durablePage(
+          durableBatch("failed", { failed: 1 }),
+          [event(5, "stage_failed", { attempt: 1 })],
+          5,
+        ),
+      )
+      .mockResolvedValueOnce(
+        durablePage(
+          durableBatch("completed", { completed: 1 }),
+          [event(6, "stage_completed", { stage: "publish" })],
+          6,
+        ),
+      );
+    vi.spyOn(api, "workflowRetry").mockResolvedValue({
+      schema_version: 1,
+      operation: "retry",
+      changed: true,
+      batch: durableBatch("queued", { queued: 1 }),
+    });
+
+    renderSection();
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
+    expect(
+      await screen.findByText(/Completed stages and their terminal evidence are preserved/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/\d+ Filed/)).toBeNull();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Retry" }));
+    expect(api.workflowRetry).toHaveBeenCalledWith("batch-1");
+    expect(await screen.findByText(/The durable workflow completed/i)).toBeInTheDocument();
+    expect(api.workflowEvents).toHaveBeenLastCalledWith("batch-1", 5, 200);
   });
 });

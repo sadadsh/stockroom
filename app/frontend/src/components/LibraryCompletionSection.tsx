@@ -21,9 +21,15 @@
  *  - The run's cost is stated up front rather than discovered, because at the measured catalogue
  *    pace it is roughly eight parts a minute.
  */
+import { useEffect } from "react";
 import { useLibraryCoverage } from "../api/queries";
 import type { CompletionItem, LibraryCoverage } from "../api/types";
 import {
+  cancelCompletion,
+  pauseCompletion,
+  reconnectCompletion,
+  resumeCompletion,
+  retryCompletion,
   startCompletion,
   stopCompletion,
   useCompletionState,
@@ -64,10 +70,29 @@ export function LibraryCompletionSection() {
   const run = useCompletionState();
   const { toast } = useToast();
 
+  useEffect(() => {
+    void reconnectCompletion();
+  }, []);
+
   async function onRun() {
     const final = await startCompletion({});
     if (final.status === "error") {
       toast(final.error ?? "The run failed.", "err");
+      return;
+    }
+    if (final.transport === "durable") {
+      if (final.status === "done") {
+        toast("The durable completion run finished. Coverage was refreshed.", "ok");
+        coverage.refetch();
+      } else if (final.status === "failed") {
+        toast(
+          "The durable run failed. Retry is available without repeating completed work.",
+          "err",
+        );
+      } else if (final.status === "cancelled") {
+        toast("The durable run was cancelled.", "neutral");
+        coverage.refetch();
+      }
       return;
     }
     const counts = final.result?.counts ?? {};
@@ -91,12 +116,13 @@ export function LibraryCompletionSection() {
         <CoverageBody
           data={coverage.data}
           onRun={onRun}
-          running={run.status === "running"}
+          running={run.status === "running" || run.status === "paused" || run.status === "failed"}
         />
       ) : null}
-      {run.status === "running" ? <LiveRun /> : null}
-      {run.status === "done" && run.result ? <RunReport /> : null}
-      {run.status === "error" && run.error ? (
+      {run.transport === "durable" && run.batchId ? <DurableRun /> : null}
+      {run.transport !== "durable" && run.status === "running" ? <LiveRun /> : null}
+      {run.transport !== "durable" && run.status === "done" && run.result ? <RunReport /> : null}
+      {run.transport !== "durable" && run.status === "error" && run.error ? (
         <p className="mt-3 text-sm text-err">{run.error}</p>
       ) : null}
     </>
@@ -127,9 +153,7 @@ function CoverageBody({
         {total === 0 ? (
           "Your library has no components yet."
         ) : allDone ? (
-          <>
-            All {total} components have every file they need.
-          </>
+          <>All {total} components have every file they need.</>
         ) : (
           <>
             <span className="tnum font-medium text-t1">{complete}</span> of{" "}
@@ -148,8 +172,9 @@ function CoverageBody({
           {needsFiles > 0 ? (
             <>
               {needsFiles} {needsFiles === 1 ? "component has a gap" : "components have gaps"} a
-              source can try, {estimate(needsFiles)}. Not every one will find files. You can stop
-              it at any point and pick up where it left off.
+              source ladder can try, {estimate(needsFiles)}. It reuses verified evidence, ranks
+              eligible sources, and retains fallbacks. You can stop it and resume without repeating
+              settled work.
             </>
           ) : total === 0 ? (
             "Add a component first."
@@ -162,9 +187,12 @@ function CoverageBody({
       {needsAssistance > 0 ? (
         <p className="border-l-2 border-acc pl-3 text-sm text-t2">
           <span className="tnum text-t1">{needsAssistance}</span>{" "}
-          {needsAssistance === 1 ? "component has a gap" : "components have gaps"} a managed
-          provider window may fill. Open Complete Part once; Stockroom remembers the provider
-          session, captures the downloads, validates them, and advances through fallbacks.
+          {needsAssistance === 1
+            ? "component has a gap that needs"
+            : "components have gaps that need"}{" "}
+          one explicit Collect All Sources session. Stockroom reuses the provider session, captures
+          and validates downloads, and advances through fallbacks; the visible window pauses only
+          for a provider-required login, security check, or download choice.
         </p>
       ) : null}
 
@@ -199,7 +227,10 @@ function CoverageMatrix({ data }: { data: LibraryCoverage }) {
         </caption>
         <thead>
           <tr>
-            <th scope="col" className="w-[7rem] pb-2 text-left text-2xs font-medium uppercase tracking-wide text-t3">
+            <th
+              scope="col"
+              className="w-[7rem] pb-2 text-left text-2xs font-medium uppercase tracking-wide text-t3"
+            >
               Tool
             </th>
             {KINDS.map((kind) => (
@@ -304,29 +335,191 @@ const NAMEABLE = new Set([
   "altium_footprint",
 ]);
 
+function DurableRun() {
+  const run = useCompletionState();
+  const batch = run.workflow;
+  if (!batch) {
+    return (
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
+        <p className="text-sm text-t2">{run.error ?? "Connecting to the durable run..."}</p>
+        {run.error ? (
+          <Button small onClick={() => void reconnectCompletion()}>
+            Reconnect
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
+  const counts = batch.item_counts;
+  const completed = counts.completed ?? 0;
+  const failed = counts.failed ?? 0;
+  const cancelled = counts.cancelled ?? 0;
+  const blocked = counts.blocked ?? 0;
+  const settled = completed + failed + cancelled;
+  const cancelling = batch.cancellation?.state === "requested";
+  const statusLabel = cancelling
+    ? "Cancelling"
+    : {
+        queued: "Queued",
+        running: "Running",
+        blocked: "Blocked",
+        paused: "Paused",
+        completed: "Completed",
+        failed: "Failed",
+        cancelled: "Cancelled",
+      }[batch.status];
+  const statusTone =
+    batch.status === "completed"
+      ? "ok"
+      : batch.status === "failed"
+        ? "err"
+        : batch.status === "paused" || batch.status === "blocked"
+          ? "warn"
+          : "neutral";
+  const pending = run.controlPending;
+
+  return (
+    <div
+      data-testid="completion-durable-run"
+      className="mt-4 flex flex-col gap-2 border-t border-line pt-3"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone={statusTone}>{statusLabel}</Badge>
+          <Badge tone="neutral">Durable</Badge>
+          <span className="text-sm text-t2">
+            <span className="tnum">{settled}</span>
+            <span className="text-t3"> of {batch.total_items} settled</span>
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {batch.actions.can_pause ? (
+            <Button small onClick={() => void pauseCompletion()} disabled={pending !== null}>
+              {pending === "pause" ? "Pausing" : "Pause"}
+            </Button>
+          ) : null}
+          {batch.actions.can_resume ? (
+            <Button small onClick={() => void resumeCompletion()} disabled={pending !== null}>
+              {pending === "resume" ? "Resuming" : "Resume"}
+            </Button>
+          ) : null}
+          {batch.actions.can_retry ? (
+            <Button small onClick={() => void retryCompletion()} disabled={pending !== null}>
+              {pending === "retry" ? "Retrying" : "Retry"}
+            </Button>
+          ) : null}
+          {batch.actions.can_cancel ? (
+            <Button
+              small
+              variant="ghost-danger"
+              onClick={() => void cancelCompletion()}
+              disabled={pending !== null}
+            >
+              {pending === "cancel" ? "Cancelling" : "Cancel"}
+            </Button>
+          ) : null}
+          {run.status === "error" ? (
+            <Button small onClick={() => void reconnectCompletion()}>
+              Reconnect
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {completed > 0 ? <Badge tone="ok">{completed} Completed</Badge> : null}
+        {failed > 0 ? <Badge tone="err">{failed} Failed</Badge> : null}
+        {blocked > 0 ? <Badge tone="warn">{blocked} Blocked</Badge> : null}
+        {cancelled > 0 ? <Badge tone="neutral">{cancelled} Cancelled</Badge> : null}
+      </div>
+
+      {batch.status === "completed" ? (
+        <p className="text-sm text-t3">
+          The durable workflow completed. Library coverage is read again from filed component facts;
+          this status does not infer which files changed.
+        </p>
+      ) : batch.status === "failed" ? (
+        <p className="text-sm text-t3">
+          Retry requeues only failed stages. Completed stages and their terminal evidence are
+          preserved.
+        </p>
+      ) : batch.status === "blocked" ? (
+        <p className="text-sm text-t3">
+          Work is waiting on a durable exception decision; unrelated items can still advance.
+        </p>
+      ) : null}
+
+      {run.error ? <p className="text-sm text-err">{run.error}</p> : null}
+      {run.workflowLog.length ? (
+        <ul className="max-h-40 overflow-y-auto text-xs">
+          {run.workflowLog.slice(0, 40).map((event) => (
+            <li
+              key={event.sequence}
+              className="flex items-center gap-2 border-t border-line py-1 first:border-t-0"
+            >
+              <span className="tnum w-14 shrink-0 text-t3">#{event.sequence}</span>
+              <span className="truncate text-t2">{describeWorkflowEvent(event)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function describeWorkflowEvent(event: {
+  kind: string;
+  details: Record<string, string | number>;
+}): string {
+  const eventName = event.kind
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+  const stage = event.details.stage;
+  return typeof stage === "string" ? `${eventName} · ${stage.replaceAll("_", " ")}` : eventName;
+}
+
 function LiveRun() {
   const run = useCompletionState();
   const frame = run.progress;
   const done = frame ? frame.done + 1 : 0;
+  const liveFilled = (run.live.counts.completed ?? 0) + (run.live.counts.improved ?? 0);
+  const liveDeferred = run.live.counts.deferred ?? 0;
+  const liveStuck = (run.live.counts.unchanged ?? 0) + (run.live.counts.error ?? 0);
   return (
     <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-t2">
-          {frame ? (
-            <>
-              <span className="tnum">{done}</span>
-              {frame.total ? <span className="text-t3"> of {frame.total}</span> : null}
-              <span className="text-t3"> filed, working on </span>
-              <span className="font-mono text-xs text-t1">{frame.mpn || frame.part_id}</span>
-            </>
-          ) : (
-            "Starting..."
-          )}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="neutral">Compatibility · 1,000 Max</Badge>
+          <p className="text-sm text-t2">
+            {frame ? (
+              <>
+                <span className="tnum">{done}</span>
+                {frame.total ? <span className="text-t3"> of {frame.total}</span> : null}
+                <span className="text-t3"> filed, working on </span>
+                <span className="font-mono text-xs text-t1">{frame.mpn || frame.part_id}</span>
+              </>
+            ) : (
+              "Starting..."
+            )}
+          </p>
+        </div>
         <Button small onClick={() => void stopCompletion()} disabled={run.stopping}>
           {run.stopping ? "Stopping" : "Stop"}
         </Button>
       </div>
+      {run.live.processed > 0 ? (
+        <div data-testid="completion-live-summary" className="flex flex-wrap items-center gap-2">
+          <Badge tone="neutral">{run.live.processed} Processed</Badge>
+          {liveFilled > 0 ? <Badge tone="ok">{liveFilled} Filed</Badge> : null}
+          {run.live.retained > 0 ? (
+            <Badge tone="neutral">{run.live.retained} Supplementary Retained</Badge>
+          ) : null}
+          {liveDeferred > 0 ? <Badge tone="warn">{liveDeferred} To Retry</Badge> : null}
+          {liveStuck > 0 ? <Badge tone="neutral">{liveStuck} No Source</Badge> : null}
+        </div>
+      ) : null}
       {run.log.length ? (
         <ul className="max-h-40 overflow-y-auto text-xs">
           {run.log.slice(0, 40).map((entry, i) => (
@@ -413,9 +606,7 @@ function RunReport() {
   return (
     <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone={filled ? "ok" : "neutral"}>
-          {filled} Filed
-        </Badge>
+        <Badge tone={filled ? "ok" : "neutral"}>{filled} Filed</Badge>
         {retained > 0 ? <Badge tone="neutral">{retained} Supplementary Retained</Badge> : null}
         {deferred > 0 ? <Badge tone="warn">{deferred} To Retry</Badge> : null}
         {stuck > 0 ? <Badge tone="neutral">{stuck} No Source</Badge> : null}
@@ -451,9 +642,7 @@ function RunReport() {
                     ? `${item.notes.join("; ")}. Still needs ${item.remaining
                         .map((r) => KIND_WORD[r] ?? r)
                         .join(", ")}`
-                    : `still needs ${item.remaining
-                        .map((r) => KIND_WORD[r] ?? r)
-                        .join(", ")}`}
+                    : `still needs ${item.remaining.map((r) => KIND_WORD[r] ?? r).join(", ")}`}
               </span>
             </li>
           ))}

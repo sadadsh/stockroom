@@ -16,7 +16,14 @@ from stockroom.derive import engine as engine_mod
 from stockroom.derive import naming as naming_mod
 from stockroom.derive import payloads as payloads_mod
 from stockroom.derive.engine import assert_no_writer_imported
-from stockroom.derive.payloads import PAYLOAD_PARSERS, known_sources, parse_one, parser_for
+from stockroom.derive.payloads import (
+    FIELD_SOURCE_PRIORITY,
+    PAYLOAD_PARSERS,
+    known_sources,
+    parse_one,
+    parser_for,
+    sources_for_field,
+)
 
 
 def test_the_registry_is_not_empty_and_is_ordered():
@@ -26,6 +33,18 @@ def test_the_registry_is_not_empty_and_is_ordered():
     assert known_sources(), "no payload parsers registered: every re-derive would produce nothing"
     assert isinstance(PAYLOAD_PARSERS, tuple), "a tuple, so priority order cannot be reshuffled"
     assert len(set(known_sources())) == len(known_sources()), "a source is registered twice"
+
+
+def test_every_field_priority_is_complete_deterministic_and_names_registered_sources():
+    known = set(known_sources())
+    for field, preferred in FIELD_SOURCE_PRIORITY.items():
+        assert field
+        assert preferred
+        assert len(preferred) == len(set(preferred))
+        assert set(preferred) <= known
+        ordered = sources_for_field(field)
+        assert set(ordered) == known
+        assert len(ordered) == len(known)
 
 
 def test_every_parser_runs_with_NO_credentials_and_NO_network():

@@ -56,6 +56,7 @@ _ROLE_PIN_NAME = {"cathode": "K", "anode": "A"}
 _LIMITATIONS = (
     "Altium artifacts were acquired from a checked-in fixture, not generated.",
     "Altium semantics were read from OLE fixture streams, not the live official adapter.",
+    "The Altium fixture has no embedded 3D body; cross-EDA 3D linking was not exercised.",
     "Database-library browse, placement, and compilation were not exercised.",
 )
 
@@ -567,6 +568,21 @@ def _project_kicad(bundle: CanonicalPassiveBundle, root: Path) -> ToolProjection
     if footprint.name != "S1M":
         raise ProjectionMismatch(
             f"generated KiCad footprint is named {footprint.name!r}, not 'S1M'"
+        )
+    expected_model_ref = "${KICAD10_3DMODEL_DIR}/Diode_SMD.3dshapes/D_SMA.step"
+    if footprint.model_path != expected_model_ref:
+        raise ProjectionMismatch(
+            "generated KiCad footprint does not retain the qualified stock 3D model reference"
+        )
+    placement = footprint.model_placement
+    if (
+        placement is None
+        or placement.offset != (0.0, 0.0, 0.0)
+        or placement.scale != (1.0, 1.0, 1.0)
+        or placement.rotate != (0.0, 0.0, 0.0)
+    ):
+        raise ProjectionMismatch(
+            "generated KiCad footprint does not retain the qualified stock 3D placement"
         )
     raw_pins = _read_kicad_pins(symbol_path, "S1M")
     raw_pads = tuple(sorted(pad.number for pad in footprint.pads))

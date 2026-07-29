@@ -12,10 +12,13 @@ describe("TargetPolicyEditor", () => {
     const textarea = screen.getByLabelText("Target Definition Policy JSON");
     const edited = cloneCoreBringUpPolicy();
     edited.id = "fixture-policy";
-    edited.channel_fabric.part_mpn = "SWITCH-123";
     fireEvent.change(textarea, { target: { value: JSON.stringify(edited) } });
     fireEvent.click(screen.getByRole("button", { name: "Apply Policy" }));
     expect(onChange).toHaveBeenCalledWith(edited);
+    const value = (textarea as HTMLTextAreaElement).value;
+    expect(value).not.toContain("part_mpn");
+    expect(value).not.toContain("channel_fabric");
+    expect(value).toContain("routing_constraints");
   });
 
   it("keeps an invalid policy local and explains the parse failure", () => {

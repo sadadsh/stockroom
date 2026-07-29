@@ -8,19 +8,19 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+from collections.abc import Sequence
 from contextlib import nullcontext
 from pathlib import Path
 
 from stockroom.ingest.errors import IngestError
 from stockroom.ingest.fingerprint import detect_source
-from stockroom.ingest.lcsc import fetch_lcsc
 from stockroom.ingest.sandbox import unpack_inputs
 from stockroom.ingest.staging import StagingCandidate, build_candidates, merge_candidates
 from stockroom.kicad.category_lib import create_empty_symbol_lib, ensure_footprint_lib
 from stockroom.kicad.cli import KiCadCli
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
-from stockroom.model.asset import AssetOrigin
+from stockroom.model.asset import Asset, AssetOrigin
 from stockroom.model.cad_variant import CadVariantPointer
 from stockroom.model.category import category_nickname
 from stockroom.model.part import AssetRef, PartRecord, Provenance
@@ -56,11 +56,21 @@ def _with_origin(ref: AssetRef, origin: AssetOrigin | None, now_iso: str):
 
 
 class IngestPipeline:
-    def __init__(self, profile: Profile, repo: GitRepo, cli: KiCadCli):
+    def __init__(
+        self,
+        profile: Profile,
+        repo: GitRepo,
+        cli: KiCadCli,
+        *,
+        auto_embed_altium_models: bool = False,
+        altium_driver=None,
+    ):
         self.profile = profile
         self.repo = repo
         self.cli = cli
         self.ops = LibraryOps(profile, repo, cli=cli)
+        self.auto_embed_altium_models = auto_embed_altium_models
+        self.altium_driver = altium_driver
         # Tempdirs inspect() created itself (no workdir supplied); removed by
         # cleanup() or on __exit__ so an inspect->commit cycle never orphans a
         # sandbox tree in the system temp dir.
@@ -68,8 +78,7 @@ class IngestPipeline:
 
     def inspect(
         self,
-        inputs: list[Path] = (),
-        lcsc_ids: list[str] = (),
+        inputs: Sequence[Path] = (),
         workdir: Path | None = None,
     ) -> list[StagingCandidate]:
         if workdir is not None:
@@ -93,31 +102,28 @@ class IngestPipeline:
             stage_dir = workdir / "stage" / u.root.name
             candidates.extend(build_candidates(self.cli, detected, stage_dir, prov))
 
-        for i, lcsc_id in enumerate(lcsc_ids):
-            fetch_dir = workdir / "lcsc" / str(i)
-            # `cli` so the converted footprint is upgraded from easyeda2kicad's KiCad 5
-            # `(module ...)` dialect to the current one before anything tries to parse it.
-            detected = fetch_lcsc(lcsc_id, fetch_dir, runner=None, cli=self.cli)
-            prov = Provenance(source="lcsc", source_url="")
-            stage_dir = workdir / "stage" / f"lcsc-{i}"
-            for c in build_candidates(self.cli, detected, stage_dir, prov):
-                c.mpn = c.mpn or lcsc_id.upper()
-                candidates.append(c)
-
         # A part often arrives split across two vendor files (symbol+footprint in
         # one, the 3D model or datasheet in another): fold the fragments into the
         # candidate they complete instead of staging orphan attach-me cards.
         return merge_candidates(candidates)
 
     def commit(self, candidate: StagingCandidate) -> PartRecord:
-        # Committing is ENTRY into the library, so the strict complete-to-add gate
-        # (spec section 6) applies here in full: an incomplete part is REJECTED with
-        # an honest per-field report (add_part raises IncompleteError.missing), never
-        # a silent partial add. Staging is where a candidate is worked toward
-        # completeness (edit its fields, attach a datasheet/model, paste a purchase
-        # URL); the gate fires only at commit. An archive profile is grandfathered
-        # (spec section 7) and add_part bypasses the gate for it automatically, so a
-        # legacy-library import still lands. This is a full gate, not a deferral.
+        # Public Add A Part creates identity/spec records only. CAD must enter through
+        # the network capture authority, which verifies and publishes one same-source
+        # KiCad + Altium + STEP set atomically. Keeping this check on the pipeline
+        # itself means a caller cannot bypass the API router and revive the former
+        # local-ZIP/KiCad-only lane.
+        if (
+            candidate.symbol_lib_path is not None
+            or bool(candidate.symbol_name)
+            or bool(candidate.footprint_variants)
+            or candidate.model_path is not None
+            or candidate.datasheet_path is not None
+        ):
+            raise IngestError(
+                "local files cannot be added through ingest; add the identity first, "
+                "then use network capture for one coherent KiCad, Altium, and STEP set"
+            )
         staged = candidate.to_staged_part()
         return self.ops.add_part(staged)
 
@@ -143,7 +149,7 @@ class IngestPipeline:
             fp.set_model_path(f"${{SR_LIB}}/models/{model_name}")
             fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
             txn.track(fp_path)
-            kicad.model = AssetRef(file=f"models/{model_name}")
+            kicad.model = Asset.of(AssetRef(file=f"models/{model_name}"))
             json_path.write_text(record.dumps(), encoding="utf-8")
             txn.track(json_path)
             txn.commit(f"Attach 3D model to {part_id}")
@@ -313,10 +319,13 @@ class IngestPipeline:
         altium_active_variant.validate_for_tool("altium")
         if not (
             altium_active_variant.manifest_digest == kicad_active_variant.manifest_digest
-            or kicad_active_variant.manifest_digest
-            in altium_active_variant.source_manifests
+            and altium_active_variant.provider == kicad_active_variant.provider
+            and altium_active_variant.source_manifests
+            == kicad_active_variant.source_manifests
         ):
-            raise IngestError("the Altium bundle is not bound to the supplied KiCad bundle")
+            raise IngestError(
+                "KiCad and Altium must come from the same provider evidence set"
+            )
         with Transaction(self.repo) as txn:
             record = self.ops.load_record(part_id)
             current_symbol = record.assets_for("kicad").symbol
@@ -358,6 +367,18 @@ class IngestPipeline:
                 _transaction=txn,
                 _record=record,
             )
+            if self.auto_embed_altium_models:
+                # The provider STEP has already passed candidate/evidence verification and now
+                # exists at its canonical KiCad path. Embed that exact file into the exact selected
+                # PcbLib footprint before the shared transaction commits. Any Altium, identity, or
+                # native readback failure therefore restores both EDA projections with zero trace.
+                self.ops.embed_altium_model(
+                    part_id,
+                    driver=self.altium_driver,
+                    _transaction=txn,
+                    _record=record,
+                    _require_native_readback=True,
+                )
             txn.commit(f"Attach coherent KiCad and Altium assets to {part_id}")
         return record
 

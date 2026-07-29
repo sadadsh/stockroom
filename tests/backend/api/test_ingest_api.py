@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from tests.backend.conftest import requires_kicad_cli
-
 
 def test_candidate_dto_round_trips_purchase_and_always_includes_the_key():
     # candidate_to_dto must emit a `purchase` key (even empty) so the frontend
@@ -28,14 +26,9 @@ def test_candidate_dto_round_trips_purchase_and_always_includes_the_key():
     assert dto_to_candidate(dto).purchase[0].url == "https://m/x"
 
 
-def test_commit_fires_the_REAL_gate_end_to_end_with_missing_list(client, app_ctx):
-    # No fake: drive the REAL IngestPipeline.commit -> LibraryOps.add_part gate through
-    # the API. The candidate carries real symbol + footprint SOURCES (so to_staged_part
-    # succeeds) but is missing the datasheet/purchase passport fields (the 3D model is an
-    # attachable asset that no longer gates entry), so the
-    # complete-to-add gate must reject it with an honest 422 + per-field missing list,
-    # and NOTHING may be written to the primary Main profile (spec section 6). This is
-    # the proof that an incomplete part cannot be snuck into a primary profile.
+def test_commit_rejects_local_cad_before_any_library_write(client, app_ctx):
+    # Add A Part is metadata-only. Even a structurally valid KiCad symbol/footprint
+    # pair cannot revive the retired local-ZIP lane.
     lib = app_ctx.profile.library
     sym_source = lib.symbol_lib_path("ICs")  # real SR-ICs.kicad_sym from the fixture
     fp_source = lib.footprint_lib_path("ICs") / "TPS62130.kicad_mod"  # real footprint file
@@ -52,17 +45,14 @@ def test_commit_fires_the_REAL_gate_end_to_end_with_missing_list(client, app_ctx
     })
     assert r.status_code == 422
     body = r.json()
-    assert body["error"] == "IncompleteError"
-    assert set(body["missing"]) >= {"datasheet", "purchase link"}
-    # the primary profile is untouched: the rejected add left zero trace
+    assert "local files cannot be added through ingest" in body["detail"]
+    assert "KiCad, Altium, and STEP" in body["detail"]
     assert client.get("/api/library/parts").json()["count"] == before
 
 
-@requires_kicad_cli  # the real /api/ingest/commit merges a symbol lib, which needs kicad-cli
-def test_archive_profile_bypasses_the_gate_through_the_api(client, app_ctx):
-    # The one honest bypass (spec section 7): an archive profile grandfathers a legacy
-    # import, so the SAME incomplete candidate that is rejected on Main is accepted on
-    # an archive profile. Proven end-to-end so the bypass is real and scoped.
+def test_archive_profile_does_not_reopen_public_local_cad_ingest(client, app_ctx):
+    # Archive mode can grandfather historical records through the archive importer,
+    # but it must not weaken the public network-only Add A Part boundary.
     assert client.post("/api/profiles",
                        json={"name": "Legacy", "archive": True}).status_code == 200
     assert client.post("/api/profiles/Legacy/activate").status_code == 200
@@ -81,43 +71,26 @@ def test_archive_profile_bypasses_the_gate_through_the_api(client, app_ctx):
         "category": "ICs", "mpn": "LM358", "display_name": "LM358", "entry_name": "LM358ARCH",
         "manufacturer": "TI", "description": "op amp",
     })
-    # archive grandfathers it: the incomplete part lands (200), not a 422
-    assert r.status_code == 200, r.text
-    assert client.get("/api/library/parts").json()["count"] == 1
+    assert r.status_code == 422, r.text
+    assert "local files cannot be added through ingest" in r.json()["detail"]
+    assert client.get("/api/library/parts").json()["count"] == 0
 
 
-def test_inspect_starts_a_job_and_streams_a_result(client, monkeypatch):
-    # Stub the IngestPipeline factory so no real vendor zip or kicad-cli is needed.
-    from stockroom.ingest.staging import StagingCandidate
+def test_public_inspect_rejects_local_zip_without_starting_a_job(client):
+    r = client.post("/api/ingest/inspect", json={"paths": ["/tmp/part.zip"]})
+    assert r.status_code == 422
+    assert "local ZIP" in r.json()["detail"]
+    assert "job_id" not in r.json()
 
-    class _FakePipeline:
-        def __init__(self, *a, **k):
-            pass
 
-        def inspect(self, inputs=(), lcsc_ids=(), workdir=None):
-            return [StagingCandidate(
-                vendor="snapeda", symbol_lib_path=None, symbol_name="X",
-                footprint_variants=[], category="ICs", mpn="LM358",
-                display_name="LM358", entry_name="LM358",
-                gaps=["no symbol in this package"],
-            )]
+def test_inspect_rejects_lcsc_easyeda_cad_as_a_production_geometry_source(client):
+    response = client.post(
+        "/api/ingest/inspect",
+        json={"paths": [], "lcsc_ids": ["C7666"]},
+    )
 
-        def cleanup(self):
-            pass
-
-    monkeypatch.setattr("stockroom.api.routers.ingest._make_pipeline",
-                        lambda ctx: _FakePipeline())
-
-    r = client.post("/api/ingest/inspect", json={"paths": ["/tmp/part.zip"], "lcsc_ids": []})
-    assert r.status_code == 200
-    job_id = r.json()["job_id"]
-
-    # drain the SSE stream; the terminal result carries the candidate list
-    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
-        body = "".join(chunk for chunk in s.iter_text())
-    assert "LM358" in body
-    assert "result" in body
-    assert "done" in body
+    assert response.status_code == 422
+    assert "LCSC/EasyEDA CAD ingest" in response.json()["detail"]
 
 
 def test_commit_incomplete_candidate_is_422_with_missing(client, monkeypatch):
@@ -155,30 +128,19 @@ def test_events_for_an_unknown_job_id_is_an_honest_404_not_a_silent_200(client):
     assert r.json()["error"] == "KeyError"
 
 
-def test_a_failing_job_surfaces_its_error_over_sse_then_terminates(client, monkeypatch):
-    # A job that raises must stream a labeled 'error' event carrying the message and
-    # STILL end with 'done', so the SSE consumer both sees the failure and terminates
-    # cleanly (honest degradation, never a dropped or hanging stream).
-    class _FakePipeline:
-        def __init__(self, *a, **k):
-            pass
+def test_public_inspect_never_invokes_the_internal_pipeline(client, monkeypatch):
+    called = False
 
-        def inspect(self, inputs=(), lcsc_ids=(), workdir=None):
-            raise RuntimeError("staging blew up")
+    def forbidden(_ctx):
+        nonlocal called
+        called = True
+        raise AssertionError("public local inspect reached the internal capture pipeline")
 
-        def cleanup(self):
-            pass
+    monkeypatch.setattr("stockroom.api.routers.ingest._make_pipeline", forbidden)
+    response = client.post("/api/ingest/inspect", json={"paths": ["/tmp/x.zip"]})
 
-    monkeypatch.setattr("stockroom.api.routers.ingest._make_pipeline",
-                        lambda ctx: _FakePipeline())
-
-    r = client.post("/api/ingest/inspect", json={"paths": ["/tmp/x.zip"], "lcsc_ids": []})
-    job_id = r.json()["job_id"]
-    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
-        body = "".join(chunk for chunk in s.iter_text())
-    assert "error" in body
-    assert "staging blew up" in body
-    assert "done" in body
+    assert response.status_code == 422
+    assert called is False
 
 
 def test_candidate_dto_round_trips_provenance():
@@ -331,7 +293,6 @@ def test_a_candidate_with_no_disagreements_round_trips_to_empty_not_missing():
     assert dto_to_candidate(dto).alternates == {}
 
 
-@requires_kicad_cli  # the real /api/ingest/commit merges a symbol lib, which needs kicad-cli
 def test_a_part_committed_through_the_api_has_the_disagreements_in_its_RECORD(client, app_ctx):
     """End to end, at the layer the sheet reads from.
 
@@ -341,19 +302,14 @@ def test_a_part_committed_through_the_api_has_the_disagreements_in_its_RECORD(cl
     """
     import json
 
-    main_lib = app_ctx.profile.library
-    sym_source = main_lib.symbol_lib_path("ICs")
-    fp_source = main_lib.footprint_lib_path("ICs") / "TPS62130.kicad_mod"
-
     r = client.post("/api/ingest/commit", json={
-        "vendor": "snapeda",
-        "symbol_lib_path": str(sym_source), "symbol_name": "TPS62130",
-        "footprint_variants": [str(fp_source)], "chosen_footprint_index": 0,
+        "vendor": "Mouser",
+        "symbol_lib_path": None, "symbol_name": "",
+        "footprint_variants": [], "chosen_footprint_index": 0,
+        "model_path": None, "datasheet_path": None,
         "category": "ICs", "mpn": "TPS62130RGTR", "display_name": "TPS62130RGTR",
-        "entry_name": "TPS62130CONF", "manufacturer": "Texas Instruments",
+        "entry_name": "", "manufacturer": "Texas Instruments",
         "description": "3A step-down converter",
-        # the complete-to-add gate wants a datasheet and somewhere to buy it; both are real
-        # parts of the add flow, not scaffolding for this assertion
         "provenance": {"source": "mouser", "source_url": "https://ti.com/lit/ds/tps62130.pdf",
                        "original_zip_sha256": "", "ingested_at": ""},
         "purchase": [{"vendor": "Mouser", "url": "https://www.mouser.com/x",

@@ -1,17 +1,17 @@
 /**
  * A controlled selector for immutable, validated CAD variants.
  *
- * Variants and the active pointer are deliberately separate in the prop contract. Switching the
- * pointer never implies deleting a retained download or fetching it again, and the expected active
- * id gives the eventual API seam enough information to reject a stale concurrent switch.
+ * Every provider variant remains visible, while only an exact same-download cross-EDA pair can be
+ * activated. Switching the pair never deletes retained evidence or fetches it again.
  */
 import { useId } from "react";
 import type {
   CadVariant,
-  CadVariantActivation,
   CadVariantArtifact,
   CadVariantArtifactKind,
   CadVariantInventory,
+  CadVariantPair,
+  CadVariantPairActivation,
   CadVariantTool,
   SupplementaryCadEvidence,
 } from "../api/cadVariantClient";
@@ -20,19 +20,24 @@ import { Badge, Button, Card, Dot, EYEBROW_DENSE } from "./primitives";
 
 export type {
   CadVariant,
-  CadVariantActivation,
   CadVariantArtifact,
   CadVariantArtifactKind,
   CadVariantInventory,
+  CadVariantPair,
+  CadVariantPairActivation,
   CadVariantTool,
   SupplementaryCadEvidence,
 } from "../api/cadVariantClient";
 
 interface Props {
   inventories: readonly CadVariantInventory[];
+  pairs: readonly CadVariantPair[];
   supplementary: readonly SupplementaryCadEvidence[];
-  onActivate: (activation: CadVariantActivation) => void;
-  activating?: Pick<CadVariantActivation, "tool" | "variantId"> | null;
+  onActivatePair: (activation: CadVariantPairActivation) => void;
+  activatingPair?: Pick<
+    CadVariantPairActivation,
+    "kicadVariantId" | "altiumVariantId"
+  > | null;
   activationError?: string | null;
 }
 
@@ -77,13 +82,19 @@ function shortDigest(value: string): string {
 
 export function CadVariantSelector({
   inventories,
+  pairs,
   supplementary,
-  onActivate,
-  activating = null,
+  onActivatePair,
+  activatingPair = null,
   activationError = null,
 }: Props) {
   const headingId = useId();
   const inventoryByTool = new Map(inventories.map((inventory) => [inventory.tool, inventory]));
+  const activePair = pairs.find(
+    (pair) =>
+      pair.kicadVariantId === inventoryByTool.get("kicad")?.activeVariantId &&
+      pair.altiumVariantId === inventoryByTool.get("altium")?.activeVariantId,
+  );
   const retainedCount = TOOL_ORDER.reduce(
     (count, tool) => count + (inventoryByTool.get(tool)?.variants.length ?? 0),
     0,
@@ -116,8 +127,8 @@ export function CadVariantSelector({
           </div>
           <p className="mt-1 text-2xs text-t2">
             <Text id="detail.cad-variants.help">
-              Choose the validated bundle each design tool uses. Switching keeps every downloaded
-              variant and its evidence.
+              Review every retained provider variant. Activation is available only for an exact
+              same-provider, same-download KiCad and Altium pair, and one switch updates both.
             </Text>
           </p>
         </div>
@@ -127,6 +138,13 @@ export function CadVariantSelector({
           </p>
         ) : null}
       </header>
+
+      <PairInventory
+        inventories={inventories}
+        pairs={pairs}
+        activating={activatingPair}
+        onActivate={onActivatePair}
+      />
 
       <div className="grid grid-cols-1 gap-px bg-line @xl:grid-cols-2">
         {TOOL_ORDER.map((tool) => {
@@ -139,8 +157,13 @@ export function CadVariantSelector({
             <ToolInventory
               key={tool}
               inventory={inventory}
-              activating={activating}
-              onActivate={onActivate}
+              activePairVariantId={
+                activePair
+                  ? tool === "kicad"
+                    ? activePair.kicadVariantId
+                    : activePair.altiumVariantId
+                  : null
+              }
             />
           );
         })}
@@ -149,6 +172,116 @@ export function CadVariantSelector({
         <SupplementaryInventory evidence={supplementary} />
       ) : null}
     </Card>
+  );
+}
+
+function PairInventory({
+  inventories,
+  pairs,
+  activating,
+  onActivate,
+}: {
+  inventories: readonly CadVariantInventory[];
+  pairs: readonly CadVariantPair[];
+  activating: Pick<
+    CadVariantPairActivation,
+    "kicadVariantId" | "altiumVariantId"
+  > | null;
+  onActivate: (activation: CadVariantPairActivation) => void;
+}) {
+  const kicad = inventories.find((inventory) => inventory.tool === "kicad");
+  const altium = inventories.find((inventory) => inventory.tool === "altium");
+  const ordered = [...pairs].sort(
+    (left, right) =>
+      left.trustRank - right.trustRank ||
+      left.provider.localeCompare(right.provider) ||
+      left.kicadVariantId.localeCompare(right.kicadVariantId) ||
+      left.altiumVariantId.localeCompare(right.altiumVariantId),
+  );
+
+  return (
+    <section
+      aria-label="Same-Download CAD Pairs"
+      className="border-b border-line bg-surface px-3 py-2.5"
+    >
+      <div className="mb-2 flex min-w-0 items-baseline gap-2">
+        <h3 className="text-xs font-semibold text-t1">Same-Download Pairs</h3>
+        <span className="text-2xs text-t3">
+          One switch updates KiCad and Altium together
+        </span>
+      </div>
+      {ordered.length ? (
+        <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
+          {ordered.map((pair) => {
+            const active =
+              pair.kicadVariantId === kicad?.activeVariantId &&
+              pair.altiumVariantId === altium?.activeVariantId;
+            const switching =
+              pair.kicadVariantId === activating?.kicadVariantId &&
+              pair.altiumVariantId === activating?.altiumVariantId;
+            return (
+              <article
+                key={`${pair.kicadVariantId}:${pair.altiumVariantId}`}
+                aria-current={active ? "true" : undefined}
+                className={`relative overflow-hidden rounded-card border bg-raise px-3 py-2 ${
+                  active ? "border-line2" : "border-line"
+                }`}
+              >
+                {active ? (
+                  <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-acc-strong" />
+                ) : null}
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <h4 className="min-w-0 flex-1 truncate text-xs font-semibold text-t1">
+                    {pair.provider}
+                  </h4>
+                  {active ? (
+                    <Badge tone="ok" size="sm">
+                      Active In Both
+                    </Badge>
+                  ) : null}
+                  <Badge tone="neutral" size="sm">
+                    {pair.trustRank === ordered[0]?.trustRank ? "Preferred" : "Fallback"}
+                  </Badge>
+                </div>
+                <div className="mt-2 flex min-w-0 items-center gap-1.5 text-2xs text-t2">
+                  <Dot tone="ok" />
+                  <span className="font-medium text-ok">{pair.trustLabel}</span>
+                  <span className="min-w-0 truncate text-t3" title={pair.trustReason}>
+                    {pair.trustReason}
+                  </span>
+                </div>
+                {!active ? (
+                  <div className="mt-2 flex justify-end border-t border-line pt-2">
+                    <Button
+                      type="button"
+                      small
+                      disabled={switching || activating !== null}
+                      aria-busy={switching || undefined}
+                      aria-label={`Use ${pair.provider} for KiCad and Altium`}
+                      onClick={() =>
+                        onActivate({
+                          kicadVariantId: pair.kicadVariantId,
+                          altiumVariantId: pair.altiumVariantId,
+                          expectedActiveKicadVariantId: kicad?.activeVariantId ?? null,
+                          expectedActiveAltiumVariantId: altium?.activeVariantId ?? null,
+                        })
+                      }
+                    >
+                      {switching ? "Switching Both..." : "Use In Both Tools"}
+                    </Button>
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-card border border-dashed border-line px-3 py-3 text-2xs text-t2">
+          No activatable pair is retained. Individual provider variants remain visible below, but
+          Stockroom will not combine files from separate downloads or activate one EDA alone.
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -228,18 +361,18 @@ function SupplementaryInventory({
 
 function ToolInventory({
   inventory,
-  activating,
-  onActivate,
+  activePairVariantId,
 }: {
   inventory: CadVariantInventory;
-  activating: Pick<CadVariantActivation, "tool" | "variantId"> | null;
-  onActivate: (activation: CadVariantActivation) => void;
+  activePairVariantId: string | null;
 }) {
   const toolLabel = TOOL_LABELS[inventory.tool];
   const variants = orderedVariants(inventory.variants);
   const preferredRank = variants[0]?.trustRank;
-  const activeVariant = variants.find((variant) => variant.id === inventory.activeVariantId);
-  const activeMissing = inventory.activeVariantId !== null && !activeVariant;
+  const activeVariant = variants.find((variant) => variant.id === activePairVariantId);
+  const activeMissing = activePairVariantId !== null && !activeVariant;
+  const unpairedSelection =
+    inventory.activeVariantId !== null && activePairVariantId === null;
 
   return (
     <section
@@ -260,24 +393,30 @@ function ToolInventory({
 
       {activeMissing ? (
         <p role="status" className="mb-2 text-2xs font-medium text-warn">
-          The active {toolLabel} variant is unavailable. Choose a retained variant.
+          The active pair's {toolLabel} variant is unavailable. Refresh the retained evidence.
+        </p>
+      ) : null}
+      {unpairedSelection ? (
+        <p role="status" className="mb-2 text-2xs font-medium text-warn">
+          The stored {toolLabel} selection is not pair-active. Choose a same-download pair above
+          to update both tools atomically.
         </p>
       ) : null}
 
       {variants.length ? (
         <div className="flex flex-col gap-2">
           {variants.map((variant) => {
-            const active = variant.id === inventory.activeVariantId;
+            const active = variant.id === activePairVariantId;
             return (
               <VariantRow
                 key={variant.id}
                 tool={inventory.tool}
                 variant={variant}
                 active={active}
+                storedWithoutPair={
+                  unpairedSelection && variant.id === inventory.activeVariantId
+                }
                 preferred={variant.trustRank === preferredRank}
-                activating={activating}
-                expectedActiveVariantId={inventory.activeVariantId}
-                onActivate={onActivate}
               />
             );
           })}
@@ -295,22 +434,16 @@ function VariantRow({
   tool,
   variant,
   active,
+  storedWithoutPair,
   preferred,
-  activating,
-  expectedActiveVariantId,
-  onActivate,
 }: {
   tool: CadVariantTool;
   variant: CadVariant;
   active: boolean;
+  storedWithoutPair: boolean;
   preferred: boolean;
-  activating: Pick<CadVariantActivation, "tool" | "variantId"> | null;
-  expectedActiveVariantId: string | null;
-  onActivate: (activation: CadVariantActivation) => void;
 }) {
   const toolLabel = TOOL_LABELS[tool];
-  const switching = activating?.tool === tool && activating.variantId === variant.id;
-  const anotherSwitchRunning = activating !== null && !switching;
   const artifacts = orderedArtifacts(variant.artifacts);
   const artifactSummary = [
     ...new Set(artifacts.map((artifact) => ARTIFACT_LABELS[artifact.kind])),
@@ -319,7 +452,9 @@ function VariantRow({
 
   return (
     <article
-      aria-label={`${variant.provider} ${toolLabel} variant${active ? ", active" : ""}`}
+      aria-label={`${variant.provider} ${toolLabel} variant${
+        active ? ", active in pair" : storedWithoutPair ? ", stored without pair" : ""
+      }`}
       aria-current={active ? "true" : undefined}
       className={`relative overflow-hidden rounded-card border bg-raise ${
         active ? "border-line2" : "border-line"
@@ -335,7 +470,12 @@ function VariantRow({
           </h4>
           {active ? (
             <Badge tone="ok" size="sm">
-              Active
+              Active In Pair
+            </Badge>
+          ) : null}
+          {storedWithoutPair ? (
+            <Badge tone="warn" size="sm">
+              Stored Only
             </Badge>
           ) : null}
           <Badge tone="neutral" size="sm">
@@ -381,31 +521,6 @@ function VariantRow({
             {variant.trustLabel}
           </span>
         </div>
-
-        {!active ? (
-          <div className="mt-2 flex justify-end border-t border-line pt-2">
-            <Button
-              type="button"
-              small
-              disabled={switching || anotherSwitchRunning}
-              aria-busy={switching || undefined}
-              aria-label={`Use ${variant.provider} variant for ${toolLabel}`}
-              onClick={() =>
-                onActivate({
-                  tool,
-                  variantId: variant.id,
-                  expectedActiveVariantId,
-                })
-              }
-            >
-              {switching ? (
-                <Text id="detail.cad-variants.switching">Switching...</Text>
-              ) : (
-                <Text id="detail.cad-variants.use">Use This Variant</Text>
-              )}
-            </Button>
-          </div>
-        ) : null}
       </div>
     </article>
   );

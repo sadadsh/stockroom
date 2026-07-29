@@ -183,9 +183,13 @@ def test_new_database_has_durable_settings_schema_ledger_and_sid_binding(
         ledger = connection.execute(
             "SELECT version, name, sha256 FROM schema_migrations"
         ).fetchall()
-        stored_sid = connection.execute(
-            "SELECT windows_sid FROM runtime_identity WHERE singleton = 1"
-        ).fetchone()[0]
+        stored_sid, stored_scope = connection.execute(
+            """
+            SELECT windows_sid, authority_scope
+            FROM runtime_identity
+            WHERE singleton = 1
+            """
+        ).fetchone()
         integrity = connection.execute("PRAGMA integrity_check").fetchall()
         foreign_key_errors = connection.execute("PRAGMA foreign_key_check").fetchall()
 
@@ -201,6 +205,7 @@ def test_new_database_has_durable_settings_schema_ledger_and_sid_binding(
     assert tuple(ledger[0])[:2] == (1, "Initial control authority schema")
     assert len(ledger[0]["sha256"]) == 64
     assert stored_sid == SID_A
+    assert stored_scope == "Coordinator"
     assert [tuple(row) for row in integrity] == [("ok",)]
     assert foreign_key_errors == []
 
@@ -208,6 +213,33 @@ def test_new_database_has_durable_settings_schema_ledger_and_sid_binding(
     assert SID_A not in mutex_name
     assert mutex_name.endswith(hashlib.sha256(SID_A.encode("ascii")).hexdigest())
     assert acl_sid == SID_A
+
+
+def test_authority_scope_is_database_bound_and_names_an_independent_mutex(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "Control.sqlite"
+    mutexes = FakeMutexRegistry()
+    broker = ServiceControl(
+        database,
+        mode=ServiceMode.COORDINATOR,
+        identity=MutableIdentity(),
+        mutex_factory=mutexes,
+        storage_policy=AllowTestStorage(),
+        authority_scope="UpdateBroker",
+    )
+    fence = broker.acquire()
+    broker.release(fence)
+
+    assert ".UpdateBroker." in mutexes.opens[0][0]
+    with pytest.raises(IdentityMismatch, match="authority scope"):
+        ServiceControl(
+            database,
+            mode=ServiceMode.SHADOW,
+            identity=MutableIdentity(),
+            storage_policy=AllowTestStorage(),
+            authority_scope="Coordinator",
+        )
 
 
 def test_two_contenders_and_wall_clock_cannot_take_over_healthy_owner(

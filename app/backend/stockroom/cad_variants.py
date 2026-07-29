@@ -112,6 +112,32 @@ class ResolvedCadVariant:
         return self.descriptor.pointer()
 
 
+def same_cad_evidence_set(
+    kicad: CadVariantDescriptor,
+    altium: CadVariantDescriptor,
+) -> bool:
+    """Whether two projections came from one immutable provider download set.
+
+    Cross-EDA similarity is necessary but is not provenance.  Two independently
+    downloaded libraries can expose compatible pin and pad maps while differing in
+    naming, geometry, courtyard, model revision, or author intent.  Stockroom therefore
+    accepts a dual-EDA release only when both tool bundles are indexed from the exact
+    same evidence manifest.  The shared manifest also fixes the provider, adapter,
+    operation, and source closure; those fields are checked explicitly so a malformed
+    evidence implementation cannot weaken the boundary.
+    """
+
+    return (
+        kicad.tool == "kicad"
+        and altium.tool == "altium"
+        and kicad.manifest_digest == altium.manifest_digest
+        and kicad.provider == altium.provider
+        and kicad.adapter_version == altium.adapter_version
+        and kicad.operation == altium.operation
+        and kicad.source_manifests == altium.source_manifests
+    )
+
+
 def cad_variant_roles(tool: str) -> dict[str, str]:
     try:
         return dict(CAD_VARIANT_ROLE_MAP[tool])
@@ -256,5 +282,6 @@ __all__ = [
     "cad_variant_roles",
     "list_cad_variants",
     "resolve_cad_variant",
+    "same_cad_evidence_set",
     "selection_matches",
 ]

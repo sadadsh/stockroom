@@ -452,8 +452,10 @@ export const tabButtonId = (idBase: string, id: string) => `${idBase}-tab-${id}`
 export const tabPanelId = (idBase: string, id: string) => `${idBase}-panel-${id}`;
 
 // The one guided tab control for the whole app: a segmented pill row, not a set
-// of loose buttons. The Library flagship and the per-project Projects surface both
-// render through this, so a tab reads and behaves identically everywhere. It is a
+// of loose buttons. Every tabbed workspace renders through this, so a tab reads
+// and behaves identically everywhere. `compact`
+// changes only the padding/type step when the strip must share a 34px dock title band.
+// It is a
 // full WAI-ARIA tablist: each option is a real `role="tab"` with `aria-selected`
 // and `aria-controls` pointing at its `TabPanel`; a roving tabindex plus arrow /
 // Home / End keys move between tabs the way a screen reader announces the tablist
@@ -464,6 +466,7 @@ export function TabStrip<T extends string>({
   onSelect,
   idBase,
   devIdBase,
+  density = "default",
   className,
   "aria-label": ariaLabel,
 }: {
@@ -476,6 +479,7 @@ export function TabStrip<T extends string>({
   // templated tab strips get one stable dev-mode id per tab. Omit it and no
   // `data-dev-id` is emitted (zero change for other callers).
   devIdBase?: string;
+  density?: "default" | "compact";
   className?: string;
   "aria-label"?: string;
 }) {
@@ -516,7 +520,8 @@ export function TabStrip<T extends string>({
           onClick={() => onSelect(t.id)}
           onKeyDown={(e) => onKeyDown(e, i)}
           className={cx(
-            "rounded-control px-3 py-1 text-sm transition-colors",
+            "rounded-control transition-colors",
+            density === "compact" ? "px-2.5 py-0.5 text-xs" : "px-3 py-1 text-sm",
             // An UNSELECTED tab is available; only a disabled one should look unavailable. At t3
             // (40% alpha dark / 46% light - the dimmest tier, the one carrying genuinely secondary
             // text) `Handoff`, `Enrich` and `Timeline` read as greyed out beside the active chip,
@@ -552,6 +557,7 @@ export function SegmentedControl<T extends string>({
   onChange,
   size = "default",
   className,
+  devIdBase,
   "aria-label": ariaLabel,
 }: {
   options: readonly SegmentItem<T>[];
@@ -559,6 +565,7 @@ export function SegmentedControl<T extends string>({
   onChange: (id: T) => void;
   size?: "default" | "small";
   className?: string;
+  devIdBase?: string;
   "aria-label": string;
 }) {
   function onKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -589,6 +596,7 @@ export function SegmentedControl<T extends string>({
         <button
           key={opt.id}
           type="button"
+          data-dev-id={devIdBase ? `${devIdBase}.${opt.id}` : undefined}
           role="radio"
           aria-checked={value === opt.id}
           tabIndex={value === opt.id ? 0 : -1}

@@ -5,55 +5,92 @@ import {
   CadVariantSelector,
   type CadVariant,
   type CadVariantInventory,
+  type CadVariantPair,
 } from "./CadVariantSelector";
 
 function variant(overrides: Partial<CadVariant> = {}): CadVariant {
   return {
-    id: "ul-native",
+    id: "ul-shared",
     provider: "Ultra Librarian",
-    format: "Altium Designer (Native)",
+    format: "KiCad 10",
     artifacts: [
-      { kind: "symbol", fileName: "Part.SchLib" },
-      { kind: "footprint", fileName: "Part.PcbLib" },
+      { kind: "symbol", fileName: "Part.kicad_sym" },
+      { kind: "footprint", fileName: "Part.kicad_mod" },
       { kind: "model", fileName: "Part.step" },
     ],
-    evidenceDigest: "aabbccddeeff00112233445566778899",
+    evidenceDigest: "sha256:ul-shared",
     validationChecks: 12,
     trustRank: 10,
-    trustLabel: "Manufacturer Verified",
-    trustReason: "The provider publishes manufacturer-authorized CAD.",
+    trustLabel: "Preferred Source",
+    trustReason: "The provider evidence passed exact validation.",
     ...overrides,
   };
 }
 
-function inventories(): CadVariantInventory[] {
+function inventories(
+  activeKicad: string | null = "ul-shared",
+  activeAltium: string | null = "ul-shared",
+): CadVariantInventory[] {
   return [
     {
       tool: "kicad",
-      activeVariantId: "snap-kicad",
+      activeVariantId: activeKicad,
       variants: [
+        variant(),
         variant({
-          id: "snap-kicad",
+          id: "snap-shared",
           provider: "SnapMagic",
-          format: "KiCad 9",
+          evidenceDigest: "sha256:snap-shared",
           trustRank: 20,
           trustLabel: "Validated Fallback",
-        }),
-        variant({
-          id: "ul-kicad",
-          format: "KiCad 10",
-          artifacts: [
-            { kind: "symbol", fileName: "Part.kicad_sym" },
-            { kind: "footprint", fileName: "Part.kicad_mod" },
-            { kind: "model", fileName: "Part.step" },
-          ],
         }),
       ],
     },
     {
       tool: "altium",
-      activeVariantId: "ul-native",
-      variants: [variant()],
+      activeVariantId: activeAltium,
+      variants: [
+        variant({
+          format: "Altium Designer (Native)",
+          artifacts: [
+            { kind: "symbol", fileName: "Part.SchLib" },
+            { kind: "footprint", fileName: "Part.PcbLib" },
+          ],
+        }),
+        variant({
+          id: "snap-shared",
+          provider: "SnapMagic",
+          format: "Altium Designer (Native)",
+          artifacts: [
+            { kind: "symbol", fileName: "Part.SchLib" },
+            { kind: "footprint", fileName: "Part.PcbLib" },
+          ],
+          evidenceDigest: "sha256:snap-shared",
+          trustRank: 20,
+          trustLabel: "Validated Fallback",
+        }),
+      ],
+    },
+  ];
+}
+
+function pairs(): CadVariantPair[] {
+  return [
+    {
+      kicadVariantId: "ul-shared",
+      altiumVariantId: "ul-shared",
+      provider: "Ultra Librarian",
+      trustRank: 0,
+      trustLabel: "Same-Download Validated Pair",
+      trustReason: "Both projections came from one immutable provider manifest.",
+    },
+    {
+      kicadVariantId: "snap-shared",
+      altiumVariantId: "snap-shared",
+      provider: "SnapMagic",
+      trustRank: 1,
+      trustLabel: "Same-Download Validated Pair",
+      trustReason: "Both projections came from one immutable provider manifest.",
     },
   ];
 }
@@ -90,132 +127,128 @@ const supplementary = [
 ];
 
 describe("CadVariantSelector", () => {
-  it("shows every retained KiCad and Altium variant with the active pointer separate", () => {
+  it("keeps every provider variant visible and marks only the active whole pair", () => {
     render(
       <CadVariantSelector
         inventories={inventories()}
+        pairs={pairs()}
         supplementary={[]}
-        onActivate={vi.fn()}
+        onActivatePair={vi.fn()}
       />,
     );
 
     const kicad = screen.getByRole("region", { name: "KiCad CAD Variants" });
-    expect(within(kicad).getAllByRole("article")).toHaveLength(2);
-    expect(
-      within(kicad).getByText(
-        (_text, node) =>
-          node?.tagName === "SPAN" &&
-          node.classList.contains("ml-auto") &&
-          node.textContent === "Active: SnapMagic",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      within(kicad).getByRole("article", { name: "SnapMagic KiCad variant, active" }),
-    ).toHaveAttribute("aria-current", "true");
-
     const altium = screen.getByRole("region", { name: "Altium CAD Variants" });
-    expect(within(altium).getByText("Altium Designer (Native)")).toBeInTheDocument();
+    expect(within(kicad).getAllByRole("article")).toHaveLength(2);
+    expect(within(altium).getAllByRole("article")).toHaveLength(2);
+    expect(
+      within(kicad).getByRole("article", {
+        name: "Ultra Librarian KiCad variant, active in pair",
+      }),
+    ).toHaveAttribute("aria-current", "true");
     expect(
       within(altium).getByRole("article", {
-        name: "Ultra Librarian Altium variant, active",
+        name: "Ultra Librarian Altium variant, active in pair",
       }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("3 Retained")).toBeInTheDocument();
+    ).toHaveAttribute("aria-current", "true");
+    expect(screen.getByText("4 Retained")).toBeInTheDocument();
   });
 
-  it("orders by supplied trust policy, making Ultra Librarian preferred without hard-coding it", () => {
+  it("switches both EDAs with one compare-and-switch request and exposes no single-tool control", async () => {
+    const onActivatePair = vi.fn();
     render(
       <CadVariantSelector
         inventories={inventories()}
+        pairs={pairs()}
         supplementary={[]}
-        onActivate={vi.fn()}
-      />,
-    );
-
-    const kicad = screen.getByRole("region", { name: "KiCad CAD Variants" });
-    const rows = within(kicad).getAllByRole("article");
-    expect(rows[0]).toHaveAccessibleName("Ultra Librarian KiCad variant");
-    expect(within(rows[0]).getByText("Preferred")).toBeInTheDocument();
-    expect(within(rows[1]).getByText("Fallback")).toBeInTheDocument();
-    expect(within(rows[1]).getByText("Active")).toBeInTheDocument();
-  });
-
-  it("requests a compare-and-switch activation without mutating or removing variants", async () => {
-    const onActivate = vi.fn();
-    render(
-      <CadVariantSelector
-        inventories={inventories()}
-        supplementary={[]}
-        onActivate={onActivate}
+        onActivatePair={onActivatePair}
       />,
     );
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Use Ultra Librarian variant for KiCad" }),
+      screen.getByRole("button", {
+        name: "Use SnapMagic for KiCad and Altium",
+      }),
     );
 
-    expect(onActivate).toHaveBeenCalledWith({
-      tool: "kicad",
-      variantId: "ul-kicad",
-      expectedActiveVariantId: "snap-kicad",
+    expect(onActivatePair).toHaveBeenCalledWith({
+      kicadVariantId: "snap-shared",
+      altiumVariantId: "snap-shared",
+      expectedActiveKicadVariantId: "ul-shared",
+      expectedActiveAltiumVariantId: "ul-shared",
     });
-    expect(screen.getAllByRole("article")).toHaveLength(3);
     expect(
-      screen.getByText(/Switching keeps every downloaded variant and its evidence/i),
+      within(screen.getByRole("region", { name: "KiCad CAD Variants" })).queryByRole(
+        "button",
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Altium CAD Variants" })).queryByRole(
+        "button",
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/same-provider, same-download KiCad and Altium pair/i),
     ).toBeInTheDocument();
   });
 
-  it("locks competing selections while a switch is pending and names the running action", () => {
-    const data = inventories();
-    data[1].variants = [
-      ...data[1].variants,
-      variant({
-        id: "snap-altium",
-        provider: "SnapMagic",
-        trustRank: 20,
-        trustLabel: "Validated Fallback",
-      }),
-    ];
+  it("locks the pair switch while its atomic activation is pending", () => {
     render(
       <CadVariantSelector
-        inventories={data}
+        inventories={inventories()}
+        pairs={pairs()}
         supplementary={[]}
-        onActivate={vi.fn()}
-        activating={{ tool: "kicad", variantId: "ul-kicad" }}
+        onActivatePair={vi.fn()}
+        activatingPair={{
+          kicadVariantId: "snap-shared",
+          altiumVariantId: "snap-shared",
+        }}
       />,
     );
 
     const running = screen.getByRole("button", {
-      name: "Use Ultra Librarian variant for KiCad",
+      name: "Use SnapMagic for KiCad and Altium",
     });
     expect(running).toBeDisabled();
     expect(running).toHaveAttribute("aria-busy", "true");
-    expect(running).toHaveTextContent("Switching...");
-    expect(
-      screen.getByRole("button", { name: "Use SnapMagic variant for Altium" }),
-    ).toBeDisabled();
+    expect(running).toHaveTextContent("Switching Both...");
   });
 
-  it("renders honest empty and stale-pointer states", () => {
+  it("shows split legacy pointers as stored-only and offers no activation fallback", () => {
+    render(
+      <CadVariantSelector
+        inventories={inventories("snap-shared", "ul-shared")}
+        pairs={[]}
+        supplementary={[]}
+        onActivatePair={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/No activatable pair is retained/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Stored Only")).toHaveLength(2);
+    expect(screen.getAllByText(/selection is not pair-active/i)).toHaveLength(2);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByText("Active In Pair")).not.toBeInTheDocument();
+  });
+
+  it("renders honest empty evidence and pair-conflict states", () => {
     render(
       <CadVariantSelector
         inventories={[
           { tool: "kicad", activeVariantId: "missing", variants: [variant()] },
         ]}
+        pairs={[]}
         supplementary={[]}
-        onActivate={vi.fn()}
-        activationError="The library changed before this switch completed."
+        onActivatePair={vi.fn()}
+        activationError="The CAD pair changed before this switch completed."
       />,
     );
 
     expect(
-      screen.getByText("The active KiCad variant is unavailable. Choose a retained variant."),
-    ).toBeInTheDocument();
-    expect(
       screen.getByText("No validated Altium variants are retained for this part."),
     ).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "The library changed before this switch completed.",
+      "The CAD pair changed before this switch completed.",
     );
   });
 
@@ -223,8 +256,9 @@ describe("CadVariantSelector", () => {
     render(
       <CadVariantSelector
         inventories={inventories()}
+        pairs={pairs()}
         supplementary={supplementary}
-        onActivate={vi.fn()}
+        onActivatePair={vi.fn()}
       />,
     );
 

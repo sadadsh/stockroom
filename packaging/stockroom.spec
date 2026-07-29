@@ -1,62 +1,111 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for the Stockroom frozen-once launcher (M9e). BUILD ON WINDOWS:
-#   uv run --with pyinstaller pyinstaller packaging/stockroom.spec --noconfirm --clean
-# Produces dist/Stockroom.exe: a portable, single-file, windowed launcher.
+# PyInstaller spec for Stockroom's stable Windows bootstrap payload.
+# BUILD ON WINDOWS through packaging/Build-Windows-Package.ps1 so the hash seed,
+# PE timestamp, version resource, immutable release inputs, and output paths are
+# explicit and reproducible.
 #
-# The exe is intentionally TINY: it bundles only stockroom.launcher.* + stdlib. The app's
-# heavy deps (FastAPI, uvicorn, pywebview, trimesh, ...) live in the git working copy the
-# launcher clones + self-updates and runs via `uv run`, never inside this exe. That is the
-# "frozen once" model (spec section 12): the exe never needs re-freezing per release.
-#
-# Target prerequisites: git on PATH (a git-native app). uv is BUNDLED into the exe below, so
-# the target machine does NOT need uv installed (uv also provisions Python + the app env).
+# The frozen executable is both the stable broker/window host and, when invoked
+# with --port, the immutable release worker.  It contains the complete backend
+# and committed frontend rather than provisioning a mutable Git checkout.
 import os
-import shutil
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-# Bundle the uv binary beside the launcher so a Windows box without uv still runs (the WinError 2
-# fix). Resolved from the build machine's PATH (the CI installs uv via astral-sh/setup-uv); fail
-# the build loudly rather than silently ship an exe that dies at first `uv sync`.
-_uv = shutil.which("uv") or shutil.which("uv.exe")
-if not _uv:
-    raise SystemExit("packaging/stockroom.spec: uv not found at build time; cannot bundle it")
 
-_datas = [(_uv, ".")]  # uv -> sys._MEIPASS/uv(.exe); resolved at runtime by launcher._uv_bin
+def _required_file(environment_name, fallback=None):
+    candidate = os.environ.get(environment_name) or fallback
+    if not candidate or not os.path.isfile(candidate):
+        raise SystemExit(
+            f"packaging/stockroom.spec: {environment_name} must name an existing file"
+        )
+    return os.path.abspath(candidate)
 
-# Portable git (MinGit), fetched into packaging/mingit by the release CI, bundled so a bare
-# Windows box needs NO system git (clone + the in-app self-update use it via launcher._git_bin,
-# and the host's git ops resolve it through launcher._child_env's PATH prepend). Optional on a
-# local/dev build: absent, git from PATH is used instead. -> sys._MEIPASS/mingit/cmd/git.exe.
-_mingit = os.path.join(SPECPATH, "mingit")  # noqa: F821 (SPECPATH is injected)
-if os.path.isdir(_mingit):
+
+_frontend = os.path.abspath(
+    os.path.join(SPECPATH, "..", "app", "frontend-dist")  # noqa: F821
+)
+if not os.path.isfile(os.path.join(_frontend, "index.html")):
+    raise SystemExit(
+        "packaging/stockroom.spec: committed app/frontend-dist is missing"
+    )
+_assets = os.path.abspath(
+    os.path.join(
+        SPECPATH,  # noqa: F821
+        "..",
+        "app",
+        "backend",
+        "stockroom",
+        "host",
+        "assets",
+    )
+)
+if not os.path.isdir(_assets):
+    raise SystemExit("packaging/stockroom.spec: host assets are missing")
+
+_datas = [
+    (_frontend, "app/frontend-dist"),
+    (_assets, "stockroom/host/assets"),
+]
+_build_identity = _required_file("STOCKROOM_BUILD_IDENTITY")
+_datas.append((_build_identity, "."))
+_datas += collect_data_files("webview")
+
+# Git is a product dependency for the user's library repository, independent
+# of application delivery.  Production carries a pinned MinGit so a clean
+# Windows machine never depends on PATH.  WebView2's Evergreen bootstrapper is
+# retained for machines whose runtime is absent.
+_mingit = os.environ.get("STOCKROOM_MINGIT_ROOT")
+if _mingit:
+    _mingit = os.path.abspath(_mingit)
+    if not os.path.isfile(os.path.join(_mingit, "cmd", "git.exe")):
+        raise SystemExit(
+            "packaging/stockroom.spec: STOCKROOM_MINGIT_ROOT has no cmd/git.exe"
+        )
     _datas.append((_mingit, "mingit"))
 
-# The WebView2 Evergreen Bootstrapper (~2 MB, fetched into packaging/webview2 by the release
-# CI), bundled so a bare Windows box with no WebView2 runtime can install it silently before the
-# host opens its window (launcher.ensure_webview2). Optional on a local/dev build.
-_wv2 = os.path.join(SPECPATH, "webview2", "MicrosoftEdgeWebview2Setup.exe")  # noqa: F821
-if os.path.isfile(_wv2):
-    _datas.append((_wv2, "webview2"))  # -> sys._MEIPASS/webview2/MicrosoftEdgeWebview2Setup.exe
+_wv2 = os.environ.get("STOCKROOM_WEBVIEW2_BOOTSTRAPPER")
+if _wv2:
+    _wv2 = _required_file("STOCKROOM_WEBVIEW2_BOOTSTRAPPER")
+    _datas.append((_wv2, "webview2"))
+
+# Router factories, provider adapters, and the release worker are intentionally
+# imported lazily by the host.  Freeze the whole first-party package so a new
+# registered implementation cannot disappear merely because startup has not
+# imported it yet.
+_hiddenimports = collect_submodules("stockroom")
+_hiddenimports += collect_submodules("webview")
+
+_version_file = os.environ.get("STOCKROOM_VERSION_FILE")
+if _version_file:
+    _version_file = _required_file("STOCKROOM_VERSION_FILE")
+_icon = os.path.join(
+    SPECPATH,  # noqa: F821 (SPECPATH is injected)
+    "..",
+    "app",
+    "backend",
+    "stockroom",
+    "host",
+    "assets",
+    "stockroom.ico",
+)
 
 a = Analysis(
     ["stockroom_launcher.py"],
     pathex=[os.path.join(SPECPATH, "..", "app", "backend")],  # noqa: F821 (SPECPATH is injected)
     binaries=[],
     datas=_datas,
-    # splash + tkinter are imported lazily (inside functions), so name them explicitly to force
-    # PyInstaller to bundle Tcl/Tk for the first-run progress window.
-    hiddenimports=[
-        "stockroom.launcher.launch", "stockroom.launcher.exit_codes",
-        "stockroom.launcher.splash", "tkinter", "tkinter.ttk",
-    ],
+    hiddenimports=_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    # Belt-and-suspenders: the launcher never imports these, but excluding them guarantees a
-    # stray transitive reference can never bloat the "tiny launcher" into the whole backend.
+    # Stockroom's Windows host is WebView2/WinForms.  Exclude unrelated GUI
+    # backends so optional packages on the build runner cannot alter the payload.
     excludes=[
-        "fastapi", "uvicorn", "starlette", "pydantic", "pydantic_core", "sse_starlette",
-        "webview", "pywebview", "PyQt5", "numpy", "trimesh", "cascadio",
-        "easyeda2kicad", "curl_cffi", "pypdf", "httpx",
+        "PyQt5",
+        "PyQt6",
+        "PySide2",
+        "PySide6",
+        "gtk",
+        "qtpy",
     ],
     noarchive=False,
 )
@@ -75,6 +124,8 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,  # windowed: no console flash when the user double-clicks it
+    icon=_icon,
+    version=_version_file,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

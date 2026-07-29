@@ -277,7 +277,8 @@ def apply_stackup_block(doc: SexpDocument, block_text: str) -> bool:
         current = doc.text[st.span[0]:st.span[1]]
         if current == block_text:
             return False
-        doc.replace_span(*st.span, block_text)
+        start, end = st.span
+        doc.replace_span(start, end, block_text)
         return True
     # No stackup yet: insert it as the FIRST child of (setup ...) (KiCad's convention: the stackup
     # always leads the setup block), not the last, so the generated board is native and KiCad does

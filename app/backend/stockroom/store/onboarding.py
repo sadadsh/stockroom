@@ -112,12 +112,12 @@ def bootstrap_library(config: MachineConfig) -> Path:
             config.libraries_root = in_repo
             config.save()
     resolved = resolve_libraries_root(config)
-    if library_is_initialized(resolved):
+    if resolved is not None and library_is_initialized(resolved):
         # An already-usable library: repair a drifted active_profile (a cloned / pulled
         # library, or a config copied from another machine, may not carry this machine's
         # active-profile name) so the immediately-following build_context never 404s the
         # profile. Persist the resolved path when it was implicit. Never onboard here.
-        store = ProfileStore(Path(resolved), GitRepo(Path(resolved)))
+        store = ProfileStore(resolved, GitRepo(resolved))
         names = store.list()
         changed = False
         if names and config.active_profile not in names:
@@ -128,7 +128,7 @@ def bootstrap_library(config: MachineConfig) -> Path:
             changed = True
         if changed:
             config.save()
-        return Path(resolved)
+        return resolved
     # Not usable yet. If a PREVIOUSLY configured library is what went missing, re-show
     # onboarding rather than silently handing back a fresh empty library as if the user's
     # parts were never there; a genuine first run (no path set) uses the internal placeholder.
@@ -176,12 +176,13 @@ def set_library(
                 )
         root.mkdir(parents=True, exist_ok=True)
     elif mode == "clone":
-        if not (url or "").strip():
+        clone_url = (url or "").strip()
+        if not clone_url:
             raise ValueError("a git URL is required to clone a library")
         root = Path(dest) if dest else default_library_dir()
         if root.exists() and any(root.iterdir()):
             raise ValueError(f"clone destination is not empty: {root}")
-        GitRepo(root).clone_from(url.strip())
+        GitRepo(root).clone_from(clone_url)
     else:
         raise ValueError(f"unknown onboarding mode: {mode!r} (expected open / create / clone)")
     return _finalize(root, config, onboarded=True)

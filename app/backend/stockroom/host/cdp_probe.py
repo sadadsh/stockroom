@@ -1,20 +1,15 @@
-"""A tiny Chrome DevTools Protocol (CDP) client for LIVE visibility into the WebView2
-guided-capture page (the vendor cad window).
+"""A tiny Chrome DevTools Protocol (CDP) client for the live WebView2 app shell.
 
-Why this exists: the guided-capture driver runs as injected JS inside a REMOTE WebView2
-page. When a step stalls, pywebview's `evaluate_js` from a background thread can return
-None (a busy page never answers), and a screenshot only shows the last frame - so past
-sessions debugged the two-format download BLIND and went in circles. CDP is a separate,
-out-of-band channel: WebView2 exposes it when launched with
-`--remote-debugging-port=<N>` (pywebview wires that from `webview.settings['REMOTE_
-DEBUGGING_PORT']`). Over it we read `console.log` / thrown exceptions AS THEY HAPPEN
-(buffered by the browser, so they survive a page that later goes unresponsive) and run
-`Runtime.evaluate` in the REAL page context on demand.
+This is an out-of-band diagnostic channel for shell inspection and the ``windrive``
+tool. WebView2 exposes it when launched with ``--remote-debugging-port=<N>``
+(pywebview wires that from ``webview.settings['REMOTE_DEBUGGING_PORT']``). It can read
+console output and evaluate expressions in the real page context even when the normal
+pywebview bridge is unavailable.
 
 Pure-ish: `websocket` + `urllib` imports are lazy inside methods, so the module imports on
 Linux (where WebView2/CDP does not exist) and only ever connects on Windows against a live
 WebView2 debug port. Everything degrades to a logged no-op rather than raising, so a probe
-failure can never crash the capture it is only observing."""
+failure can never crash the shell it is only observing."""
 
 from __future__ import annotations
 
@@ -23,12 +18,24 @@ import logging
 import threading
 import time
 import urllib.request
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 _log = logging.getLogger("stockroom.host.cdp")
 
 # CDP RemoteObject subtypes we render specially when formatting console args.
 _MAX_ARG = 400
+
+
+class _WebSocketConnection(Protocol):
+    """The websocket-client operations required by the CDP transport."""
+
+    def recv(self) -> str | bytes: ...
+
+    def send(self, payload: str) -> object: ...
+
+    def settimeout(self, timeout: float | None) -> object: ...
+
+    def close(self) -> object: ...
 
 
 def list_targets(port: int, *, host: str = "127.0.0.1", timeout: float = 2.0) -> list[dict]:
@@ -117,7 +124,7 @@ class CDPClient:
     def __init__(self, ws_url: str, on_event: Callable[[dict], None] | None = None):
         self._ws_url = ws_url
         self._on_event = on_event
-        self._ws = None
+        self._ws: _WebSocketConnection | None = None
         self._id = 0
         self._id_lock = threading.Lock()
         self._send_lock = threading.Lock()
@@ -154,9 +161,12 @@ class CDPClient:
         return True
 
     def _read_loop(self) -> None:
+        websocket = self._ws
+        if websocket is None:
+            return
         while not self._closed:
             try:
-                raw = self._ws.recv()
+                raw = websocket.recv()
             except Exception:  # noqa: BLE001 - socket closed / error; stop pumping
                 break
             if not raw:
@@ -187,7 +197,8 @@ class CDPClient:
     def send(self, method: str, params: dict | None = None, *, timeout: float = 8.0) -> dict | None:
         """Send a CDP command and wait for its reply (the full message dict), or None on
         timeout / dead socket."""
-        if self._ws is None or self._closed:
+        websocket = self._ws
+        if websocket is None or self._closed:
             return None
         mid = self._next_id()
         box = {"event": threading.Event(), "result": None}
@@ -196,7 +207,7 @@ class CDPClient:
         payload = json.dumps({"id": mid, "method": method, "params": params or {}})
         try:
             with self._send_lock:
-                self._ws.send(payload)
+                websocket.send(payload)
         except Exception as e:  # noqa: BLE001
             _log.warning("cdp: send %s failed: %r", method, e)
             with self._pending_lock:
@@ -237,9 +248,10 @@ class CDPClient:
 
     def close(self) -> None:
         self._closed = True
+        websocket = self._ws
         try:
-            if self._ws is not None:
-                self._ws.close()
+            if websocket is not None:
+                websocket.close()
         except Exception:  # noqa: BLE001
             pass
 

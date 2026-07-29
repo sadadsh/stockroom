@@ -1,5 +1,5 @@
 import { createElement, type ReactNode } from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -9,8 +9,7 @@ import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider } from "../lib/devMode";
 import { AltiumDbLibModal } from "./AltiumDbLibModal";
 
-// One ready row and one not-ready row: the not-ready row renders the Attach button (and its upload
-// glyph), so both the Close and the Attach icons are on screen for the "an svg per icon" assertion.
+// One ready row and one not-ready row prove the read-only readiness surface in both states.
 const STATUS: AltiumStatus = {
   profile: "default",
   dblib: "Stockroom.DbLib",
@@ -67,17 +66,15 @@ afterEach(() => {
 });
 
 describe("AltiumDbLibModal - copy + icon adoption", () => {
-  it("renders identical text and a glyph per icon, with no copy wrappers outside dev mode", async () => {
+  it("renders readiness without a local attach control or copy wrappers outside dev mode", async () => {
     vi.spyOn(api, "altiumStatus").mockResolvedValue(STATUS);
     const { container } = render(<AltiumDbLibModal open onClose={() => {}} />, { wrapper });
 
-    // The title resolves to its default text (no override), and the not-ready row's Attach action
-    // is present, so both the Close and Upload glyphs render.
     expect(await screen.findByText("Altium Database Library")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole("button", { name: "Attach Files" })).toBeInTheDocument());
-
-    // Close glyph + Attach glyph both draw as <svg> (via <Icon>).
-    expect(container.querySelectorAll("svg").length).toBeGreaterThanOrEqual(2);
+    expect(await screen.findByText("Needs Files")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /attach/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(container.querySelectorAll("svg")).toHaveLength(1);
 
     // Off dev mode a <Text> is a bare string with no wrapper: no editable copy targets exist.
     expect(container.querySelector("[data-copy-id]")).toBeNull();
@@ -90,14 +87,13 @@ describe("AltiumDbLibModal - copy + icon adoption", () => {
 
     toggleDevMode();
 
-    // The visible <Text> labels carry their modals.json ids: the title, every table header, the
-    // status cell, and the Attach label of the not-ready row.
+    // The visible <Text> labels carry their modals.json ids: the title, table headers, and status.
     expect(container.querySelector('[data-copy-id="modal.altium.title"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.altium.th-part"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.altium.th-mpn"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.altium.th-status"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.altium.status-ready"]')).not.toBeNull();
-    expect(container.querySelector('[data-copy-id="modal.altium.attach-files"]')).not.toBeNull();
+    expect(container.querySelector('[data-copy-id="modal.altium.attach-files"]')).toBeNull();
 
     // The filter words go through useText (a SegmentedControl option label must be a string, so it
     // cannot host a <Text> node), so they resolve as text but carry no data-copy-id wrapper.

@@ -43,6 +43,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TypedDict
 
 from stockroom.altium.driver import AltiumDriver, RunOutcome
 from stockroom.altium.embed3d import delphi_quote
@@ -88,6 +89,13 @@ class PlaceResult:
     @property
     def resolved_footprint(self) -> bool:
         return bool(self.footprint_library)
+
+
+class _ResolutionFields(TypedDict):
+    symbol_library: str
+    symbol_reference: str
+    footprint_library: str
+    altium_log: str
 
 
 def parse_resolution(log: str) -> dict[str, str]:
@@ -504,8 +512,7 @@ def place_from_dblib(
         newline="\r\n",
     )
     prj.write_text(
-        "[Design]\r\nVersion=1.0\r\nHierarchyMode=0\r\n[Document1]\r\n"
-        f"DocumentPath={pas.name}\r\n",
+        f"[Design]\r\nVersion=1.0\r\nHierarchyMode=0\r\n[Document1]\r\nDocumentPath={pas.name}\r\n",
         encoding="utf-8",
     )
 
@@ -528,7 +535,7 @@ def place_from_dblib(
         (v for k, v in sorted(res.items()) if k.startswith("DisplayPath") and v),
         "",
     )
-    common = {
+    common: _ResolutionFields = {
         "symbol_library": res.get("SymbolLibrary") or display,
         "symbol_reference": res.get("SymbolReference") or res.get("SymbolIdentifier", ""),
         "footprint_library": res.get("FootprintLibrary") or res.get("FootprintIdentifier", ""),

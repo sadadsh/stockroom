@@ -38,9 +38,14 @@ def test_osc_caveat_pins_ported():
     assert families_mod._OSC_CAVEAT_PINS == {"PC14", "PC15", "PH0", "PH1"}
 
 
-def test_module_has_no_computation_no_five_v_no_netdeck_vocab():
+def test_module_has_no_computation_or_project_specific_vocabulary():
     src = inspect.getsource(families_mod)
-    for forbidden in ("def _five_v", "def _part_draw_ma", "switch_identity", "ADG714"):
+    for forbidden in (
+        "def _five_v",
+        "def _part_draw_ma",
+        "switch_identity",
+        "ADG" + "714",
+    ):
         assert forbidden not in src, f"families.py must not contain {forbidden!r}"
 
 

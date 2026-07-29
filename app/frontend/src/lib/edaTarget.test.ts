@@ -45,6 +45,22 @@ function summary(over: Partial<PartSummary> = {}): PartSummary {
     manufacturer: "Acme",
     is_complete: true,
     missing: [],
+    eda_readiness: {
+      kicad: {
+        required: ["symbol", "footprint", "model"],
+        missing: [],
+        coverage_complete: true,
+        trust: "pass",
+        ready: true,
+      },
+      altium: {
+        required: ["symbol", "footprint", "model"],
+        missing: [],
+        coverage_complete: true,
+        trust: "pass",
+        ready: true,
+      },
+    },
     ...over,
   };
 }
@@ -303,17 +319,86 @@ describe("assetReadiness", () => {
 });
 
 describe("summaryReadiness", () => {
-  it("uses the row's own completeness for the default tool", () => {
-    expect(summaryReadiness(summary({ is_complete: true }), "kicad")).toEqual({
+  it("never treats passport completeness as default-tool CAD readiness", () => {
+    const part = summary({
+      is_complete: true,
+      missing: [],
+      eda_readiness: {
+        kicad: {
+          required: ["symbol", "footprint", "model"],
+          missing: ["symbol"],
+          coverage_complete: false,
+          trust: "pass",
+          ready: false,
+        },
+      },
+    });
+    expect(summaryReadiness(part, "kicad")).toEqual({
+      ready: false,
+      coverageComplete: false,
+      trust: "pass",
+      missing: ["Symbol"],
+    });
+  });
+
+  it("uses the same registry-keyed contract for a non-default tool", () => {
+    const part = summary({
+      eda_readiness: {
+        altium: {
+          required: ["symbol", "footprint"],
+          missing: [],
+          coverage_complete: true,
+          trust: "pass",
+          ready: true,
+        },
+      },
+    });
+    expect(summaryReadiness(part, "altium")).toEqual({
       ready: true,
+      coverageComplete: true,
+      trust: "pass",
       missing: [],
     });
   });
 
-  it("is conservative for a non-default tool a summary cannot speak to", () => {
-    expect(summaryReadiness(summary({ is_complete: true }), "altium")).toEqual({
+  it("does not turn complete presence into trust when checks are absent", () => {
+    const part = summary({
+      eda_readiness: {
+        kicad: {
+          required: ["symbol", "footprint"],
+          missing: [],
+          coverage_complete: true,
+          trust: "unknown",
+          ready: false,
+        },
+      },
+    });
+    expect(summaryReadiness(part, "kicad")).toEqual({
       ready: false,
-      missing: ["Symbol", "Footprint"],
+      coverageComplete: true,
+      trust: "unknown",
+      missing: [],
+    });
+  });
+
+  it("fails closed without fabricating a missing-kind diagnosis for a stale tool row", () => {
+    expect(summaryReadiness(summary({ eda_readiness: {} }), "altium")).toEqual({
+      ready: false,
+      coverageComplete: false,
+      trust: "unknown",
+      missing: [],
+    });
+  });
+
+  it("fails closed across a rolling handoff from a backend without the additive field", () => {
+    const legacy = summary();
+    delete legacy.eda_readiness;
+
+    expect(summaryReadiness(legacy, "kicad")).toEqual({
+      ready: false,
+      coverageComplete: false,
+      trust: "unknown",
+      missing: [],
     });
   });
 });
@@ -321,8 +406,20 @@ describe("summaryReadiness", () => {
 describe("libraryReadiness", () => {
   it("rolls up the parts not ready for the selected tool", () => {
     const parts = [
-      summary({ id: "a", is_complete: true }),
-      summary({ id: "b", is_complete: false, missing: ["MPN"] }),
+      summary({ id: "a", is_complete: false, missing: ["MPN"] }),
+      summary({
+        id: "b",
+        is_complete: true,
+        eda_readiness: {
+          kicad: {
+            required: ["symbol"],
+            missing: [],
+            coverage_complete: true,
+            trust: "unknown",
+            ready: false,
+          },
+        },
+      }),
     ];
     expect(libraryReadiness(parts, "kicad")).toEqual({
       total: 2,
@@ -332,8 +429,22 @@ describe("libraryReadiness", () => {
     });
   });
 
-  it("flags every part for a tool no summary can confirm", () => {
-    const parts = [summary({ id: "a" }), summary({ id: "b" })];
-    expect(libraryReadiness(parts, "altium").notReadyIds).toEqual(["a", "b"]);
+  it("rolls up the selected tool independently of default-tool state", () => {
+    const parts = [
+      summary({ id: "a" }),
+      summary({
+        id: "b",
+        eda_readiness: {
+          altium: {
+            required: ["symbol"],
+            missing: ["symbol"],
+            coverage_complete: false,
+            trust: "unknown",
+            ready: false,
+          },
+        },
+      }),
+    ];
+    expect(libraryReadiness(parts, "altium").notReadyIds).toEqual(["b"]);
   });
 });

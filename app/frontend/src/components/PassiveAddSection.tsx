@@ -306,6 +306,7 @@ export function PassiveAddSection({
           <div>
             <Button
               variant="accent"
+              data-dev-id="ingest.passive-add"
               onClick={doAdd}
               disabled={add.isPending || remaining.length > 0}
             >
