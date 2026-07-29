@@ -31,9 +31,11 @@ from stockroom.capture.classify import classify_asset
 from stockroom.capture.requirements import Requirement
 from stockroom.capture.vendors import UltraLibrarianAdapter, formats_for, get_adapter
 
-from .vendor_fixture_server import serve_fixture_vendor
+from .vendor_fixture_server import route_fixture_vendor, serve_fixture_vendor
 
 _NO_BROWSER = chromium_unavailable_reason()
+_MANUFACTURER = "Texas Instruments"
+_MPN = "TPD6E05U06RVZR"
 
 # The reason is the REAL one, never a guessed one. An earlier version printed "chromium is not
 # installed" for every cause, and the actual failure was a TMPDIR that did not exist - so the skip
@@ -54,8 +56,13 @@ def _capture(tmp_path, base_url: str, formats: list[str]):
     browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "dl", headless=True)
     adapter = UltraLibrarianAdapter()
     with browser.session() as page:
-        page.goto(base_url)
-        report = adapter.drive(page, formats)
+        page.goto(route_fixture_vendor(page, base_url))
+        report = adapter.drive(
+            page,
+            formats,
+            expected_manufacturer=_MANUFACTURER,
+            expected_mpn=_MPN,
+        )
         if report.submitted:
             _wait_for_file(browser, page, before=0)
     return report, browser.captured
@@ -132,8 +139,13 @@ def test_the_kicad_v5_export_is_never_the_one_taken(tmp_path, vendor):
     lists v5 one row ABOVE v6+, so an off-by-one row silently poisons the library."""
     browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "dl", headless=True)
     with browser.session() as page:
-        page.goto(vendor)
-        UltraLibrarianAdapter().drive(page, ["kicad"])
+        page.goto(route_fixture_vendor(page, vendor))
+        UltraLibrarianAdapter().drive(
+            page,
+            ["kicad"],
+            expected_manufacturer=_MANUFACTURER,
+            expected_mpn=_MPN,
+        )
         checked = page.eval_on_selector_all(
             "input[name=exports]:checked", "els => els.map(e => e.id)"
         )
@@ -144,8 +156,13 @@ def test_the_required_consent_is_accepted(tmp_path, vendor):
     """Ultra Librarian will not export without it; owner chose auto-tick 2026-07-27."""
     browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "dl", headless=True)
     with browser.session() as page:
-        page.goto(vendor)
-        UltraLibrarianAdapter().drive(page, ["kicad", "model"])
+        page.goto(route_fixture_vendor(page, vendor))
+        UltraLibrarianAdapter().drive(
+            page,
+            ["kicad", "model"],
+            expected_manufacturer=_MANUFACTURER,
+            expected_mpn=_MPN,
+        )
         unticked = page.eval_on_selector_all(
             "input[type=checkbox][id^=consent-]", "els => els.filter(e => !e.checked).length"
         )

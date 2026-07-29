@@ -610,6 +610,86 @@ _PROVIDER_HUD_UPDATE = r"""
   }
 }
 """
+_HANDOFF_HUD_BOOTSTRAP = r"""
+async (payload) => {
+  if (!payload || globalThis !== globalThis.top || globalThis[payload.namespace]) return;
+  let state;
+  try {
+    state = await globalThis[payload.stateBinding](payload.stateToken);
+  } catch {
+    return;
+  }
+  if (!state || !state.active || !document.documentElement) return;
+
+  const host = document.createElement("aside");
+  host.setAttribute("aria-label", "Stockroom security handoff");
+  host.style.cssText = [
+    "all:initial",
+    "position:fixed",
+    "inset:12px 12px auto auto",
+    "z-index:2147483647",
+    "display:block",
+    "width:min(390px,calc(100vw - 24px))",
+  ].join(";");
+  const shadow = host.attachShadow({ mode: "closed" });
+  const style = document.createElement("style");
+  style.textContent = `
+    * { box-sizing: border-box; }
+    section {
+      color: #f8fafc; background: #172033; border: 2px solid #f59e0b; border-radius: 12px;
+      box-shadow: 0 18px 52px rgb(0 0 0 / 48%); padding: 14px;
+      font: 13px/1.45 Inter, ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+    }
+    h1 { margin: 0 0 7px; color: #fde68a; font-size: 15px; }
+    p { margin: 6px 0; overflow-wrap: anywhere; }
+    .identity { color: #dbeafe; font-weight: 700; }
+    .safe { color: #bfdbfe; border-left: 3px solid #60a5fa; padding-left: 8px; }
+    .status { color: #fef3c7; font-weight: 700; }
+  `;
+  const panel = document.createElement("section");
+  panel.setAttribute("role", "alert");
+  const title = document.createElement("h1");
+  title.textContent = "Stockroom Paused For You";
+  const identity = document.createElement("p");
+  identity.className = "identity";
+  identity.textContent = `${state.providerLabel} · ${state.manufacturer} · ${state.mpn}`;
+  const message = document.createElement("p");
+  message.className = "status";
+  message.textContent = state.message;
+  const safe = document.createElement("p");
+  safe.className = "safe";
+  safe.textContent =
+    "Complete the visible sign-in, CAPTCHA, 2FA, or security check yourself. " +
+    "Stockroom will not click it and resumes automatically when it is gone.";
+  panel.append(title, identity, message, safe);
+  shadow.append(style, panel);
+  document.documentElement.append(host);
+
+  Object.defineProperty(globalThis, payload.namespace, {
+    value: Object.freeze({
+      update(next) {
+        if (typeof next === "string" && next) message.textContent = next;
+      },
+      dismiss() { host.remove(); },
+    }),
+    configurable: false,
+    enumerable: false,
+    writable: false,
+  });
+}
+"""
+_HANDOFF_HUD_UPDATE = r"""
+({ namespace, message }) => {
+  const hud = globalThis[namespace];
+  if (hud && typeof hud.update === "function") hud.update(message);
+}
+"""
+_HANDOFF_HUD_DISMISS = r"""
+(namespace) => {
+  const hud = globalThis[namespace];
+  if (hud && typeof hud.dismiss === "function") hud.dismiss();
+}
+"""
 
 
 @dataclass(slots=True)
@@ -995,6 +1075,128 @@ class PlaywrightCaptureBrowser:
                     else [(wired, bound) for wired, bound in self._page_huds if wired is not page]
                 )
                 self._wired_pages = [wired for wired in self._wired_pages if wired is not page]
+
+    def wait_for_user_clearance(
+        self,
+        page,
+        *,
+        provider_label: str,
+        manufacturer: str,
+        mpn: str,
+        message: str,
+        issue_detector: Callable[[], str],
+        should_cancel: Callable[[], bool] | None = None,
+        timeout_s: float = 600.0,
+        poll_interval_s: float = 0.25,
+    ) -> bool:
+        """Show a Stockroom HUD while the person clears authentication or a security control.
+
+        The detector observes only whether a gate remains. This method never locates, fills, clicks,
+        or submits any provider element. The HUD is registered for future documents before it is
+        mounted on the current one, so an SSO or 2FA navigation retains the handoff. Once cleared,
+        the binding returns inactive and later automation navigations cannot remount stale guidance.
+        """
+
+        for value, label in (
+            (provider_label, "provider_label"),
+            (manufacturer, "manufacturer"),
+            (mpn, "mpn"),
+            (message, "message"),
+        ):
+            if type(value) is not str or not value or value != value.strip():
+                raise ValueError(f"{label} must be exact non-empty text")
+        if not callable(issue_detector):
+            raise TypeError("issue_detector must be callable")
+        if should_cancel is not None and not callable(should_cancel):
+            raise TypeError("should_cancel must be callable")
+        timeout = _bounded_seconds(timeout_s, "timeout_s", maximum=3600.0)
+        poll = _bounded_seconds(poll_interval_s, "poll_interval_s", maximum=1.0)
+
+        try:
+            current_issue = issue_detector() or ""
+        except Exception:  # noqa: BLE001 - unreadable gate stays blocked and visible
+            current_issue = message
+        if not current_issue:
+            return True
+
+        namespace = f"__stockroom_security_handoff_{secrets.token_hex(12)}"
+        state_binding = f"__stockroom_security_state_{secrets.token_hex(12)}"
+        state_token = secrets.token_hex(24)
+        state: dict[str, object] = {
+            "active": True,
+            "providerLabel": provider_label,
+            "manufacturer": manufacturer,
+            "mpn": mpn,
+            "message": current_issue,
+        }
+
+        def provide_state(_source, token) -> dict[str, object]:
+            if type(token) is not str or not secrets.compare_digest(token, state_token):
+                return {"active": False}
+            return dict(state)
+
+        payload = {
+            "namespace": namespace,
+            "stateBinding": state_binding,
+            "stateToken": state_token,
+        }
+        bootstrap = (
+            f"({_HANDOFF_HUD_BOOTSTRAP})("
+            f"{json.dumps(payload, ensure_ascii=True, separators=(',', ':'))}"
+            ");"
+        )
+        try:
+            page.expose_binding(state_binding, provide_state)
+            page.add_init_script(bootstrap)
+            page.evaluate(_HANDOFF_HUD_BOOTSTRAP, payload)
+        except Exception as exc:  # noqa: BLE001 - a hidden handoff is not a safe handoff
+            state["active"] = False
+            raise CaptureBrowserError(
+                "could not show the Stockroom security handoff before pausing automation"
+            ) from exc
+
+        deadline = time.monotonic() + timeout
+        last_issue = current_issue
+        while time.monotonic() < deadline:
+            if should_cancel is not None and should_cancel():
+                state["active"] = False
+                try:
+                    page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
+                except Exception:  # noqa: BLE001 - cancellation is already authoritative
+                    pass
+                return False
+            if _page_is_closed(page):
+                state["active"] = False
+                return False
+            try:
+                issue = issue_detector() or ""
+            except Exception:  # noqa: BLE001 - navigation can temporarily make the page unreadable
+                issue = last_issue
+            if not issue:
+                state["active"] = False
+                try:
+                    page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
+                except Exception:  # noqa: BLE001 - navigation may already have removed the document
+                    pass
+                return True
+            if issue != last_issue:
+                last_issue = issue
+                state["message"] = issue
+                try:
+                    page.evaluate(
+                        _HANDOFF_HUD_UPDATE,
+                        {"namespace": namespace, "message": issue},
+                    )
+                except Exception:  # noqa: BLE001 - the init script remounts after navigation
+                    pass
+            page.wait_for_timeout(max(1, int(poll * 1000)))
+
+        state["active"] = False
+        try:
+            page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
+        except Exception:  # noqa: BLE001 - timeout is already the authoritative outcome
+            pass
+        return False
 
     def capture_user_downloads(
         self,

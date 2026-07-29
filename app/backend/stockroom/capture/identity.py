@@ -17,6 +17,22 @@ if TYPE_CHECKING:
     from stockroom.ingest.staging import StagingCandidate
 
 
+_PROVIDER_HOSTS = {
+    "ultralibrarian": frozenset(
+        {
+            "app.ultralibrarian.com",
+            "www.ultralibrarian.com",
+        }
+    ),
+    "snapmagic": frozenset(
+        {
+            "snapeda.com",
+            "www.snapeda.com",
+        }
+    ),
+}
+
+
 @dataclass(frozen=True)
 class PageIdentity:
     mpn: str
@@ -81,14 +97,56 @@ def _manufacturer_key(value: str) -> str:
     return "".join(character for character in normalized if character.isalnum())
 
 
-def page_identity(vendor_key: str, url: str) -> PageIdentity | None:
+def provider_url_allowed(
+    vendor_key: str,
+    url: str,
+    *,
+    allow_relative: bool = False,
+) -> bool:
+    """Only an official provider origin, or an explicitly allowed relative href, is trusted."""
+
+    try:
+        parsed = urlparse(url or "")
+    except Exception:  # noqa: BLE001 - malformed URLs establish no identity
+        return False
+    if not parsed.netloc:
+        return (
+            allow_relative
+            and not parsed.scheme
+            and bool(parsed.path)
+            and parsed.path.startswith("/")
+        )
+    return (
+        parsed.scheme.casefold() == "https"
+        and (parsed.hostname or "").casefold() in _PROVIDER_HOSTS.get(vendor_key, ())
+        and parsed.username is None
+        and parsed.password is None
+    )
+
+
+def page_identity(
+    vendor_key: str,
+    url: str,
+    *,
+    allow_relative: bool = False,
+) -> PageIdentity | None:
     """Read identity from the canonical detail URL shapes used by current adapters."""
+    if not provider_url_allowed(vendor_key, url, allow_relative=allow_relative):
+        return None
     segments = [_decode_segment(segment) for segment in urlparse(url or "").path.split("/") if segment]
     try:
         if vendor_key == "ultralibrarian":
             index = segments.index("details")
-            # /details/<guid>/<manufacturer>/<mpn>
-            return PageIdentity(mpn=segments[index + 3], manufacturer=segments[index + 2])
+            # Both current shapes are in circulation:
+            # /details/<manufacturer>/<mpn> and /details/<guid>/<manufacturer>/<mpn>.
+            # Identity is always the final two detail segments; an opaque catalogue id is not.
+            detail_segments = segments[index + 1 :]
+            if len(detail_segments) < 2:
+                return None
+            return PageIdentity(
+                mpn=detail_segments[-1],
+                manufacturer=detail_segments[-2],
+            )
         if vendor_key == "snapmagic":
             index = segments.index("parts")
             # /parts/<mpn>/<manufacturer>/view-part/

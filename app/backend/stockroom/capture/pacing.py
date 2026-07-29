@@ -29,8 +29,14 @@ running it again.
 
 from __future__ import annotations
 
+import json
+import math
+import os
 import re
+import threading
 import time
+from contextlib import contextmanager
+from pathlib import Path
 
 # Throttle signals, matched against a source's own error text. Deliberately NARROW: every
 # pattern here names a rate/availability condition, never a generic failure. A loose pattern
@@ -49,6 +55,157 @@ _RATE_LIMITED = re.compile(
     r")",
     re.IGNORECASE,
 )
+_DURABLE_LEDGER_LOCK = threading.RLock()
+
+
+class DurableSlidingWindowLimiter:
+    """A provider-wide sliding window that survives jobs, processes, and app restarts.
+
+    Browser-profile ownership already serializes one provider's full session, but a restart releases
+    that lock and must not erase recent request starts. This small machine-local ledger stores only
+    wall-clock timestamps. Its own OS file lock makes the rate contract independent of which process
+    currently owns the browser profile.
+    """
+
+    def __init__(
+        self,
+        path: Path,
+        limit: int,
+        window: float,
+        *,
+        clock=time.time,
+        sleeper=time.sleep,
+    ) -> None:
+        if limit < 1:
+            raise ValueError("limit must be >= 1")
+        if not math.isfinite(window) or window <= 0:
+            raise ValueError("window must be a positive finite duration")
+        self.path = Path(path)
+        self.limit = int(limit)
+        self.window = float(window)
+        self._clock = clock
+        self._sleep = sleeper
+
+    def acquire(self, *, should_cancel=None) -> bool:
+        if should_cancel is not None and not callable(should_cancel):
+            raise TypeError("should_cancel must be callable")
+        while True:
+            if should_cancel is not None and should_cancel():
+                return False
+            with _locked_rate_ledger(self.path):
+                now = float(self._clock())
+                if not math.isfinite(now):
+                    raise RuntimeError("provider rate-limit clock is not finite")
+                starts = self._read()
+                if any(start > now + 1.0 for start in starts):
+                    raise RuntimeError(
+                        "provider rate-limit clock moved backward; automatic access stopped"
+                    )
+                starts = [start for start in starts if now - start < self.window]
+                if len(starts) < self.limit:
+                    starts.append(now)
+                    self._write(starts)
+                    return True
+                wait = self.window - (now - starts[0]) + 0.1
+            remaining = max(0.1, wait)
+            while remaining > 0:
+                if should_cancel is not None and should_cancel():
+                    return False
+                interval = min(0.25, remaining)
+                self._sleep(interval)
+                remaining -= interval
+
+    def _read(self) -> list[float]:
+        if not self.path.exists():
+            return []
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+            raw = payload["starts"]
+            if payload.get("schema") != "stockroom-provider-rate/v1" or not isinstance(raw, list):
+                raise ValueError
+            starts = [float(value) for value in raw]
+        except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            raise RuntimeError(
+                f"provider rate ledger is unreadable at {self.path}; automatic access stopped"
+            ) from exc
+        if any(not math.isfinite(value) or value < 0 for value in starts):
+            raise RuntimeError(
+                f"provider rate ledger is invalid at {self.path}; automatic access stopped"
+            )
+        return sorted(starts)
+
+    def _write(self, starts: list[float]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.path.with_name(
+            f".{self.path.name}.{os.getpid()}.{threading.get_ident()}.tmp"
+        )
+        try:
+            temporary.write_text(
+                json.dumps(
+                    {
+                        "schema": "stockroom-provider-rate/v1",
+                        "starts": starts,
+                    },
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            os.replace(temporary, self.path)
+        except OSError as exc:
+            temporary.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"could not persist provider rate ledger at {self.path}; automatic access stopped"
+            ) from exc
+
+
+@contextmanager
+def _locked_rate_ledger(ledger: Path):
+    """Cross-process lock for one durable rate ledger."""
+
+    lock_path = ledger.with_suffix(ledger.suffix + ".lock")
+    with _DURABLE_LEDGER_LOCK:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        handle = lock_path.open("a+b")
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+        handle.seek(0)
+        deadline = time.monotonic() + 10.0
+        acquired = False
+        try:
+            while not acquired:
+                try:
+                    if os.name == "nt":
+                        import msvcrt
+
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                    else:  # pragma: no cover - Windows authoritative; tests remain portable
+                        import fcntl
+
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    acquired = True
+                except (OSError, BlockingIOError) as exc:
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError(
+                            f"provider rate ledger stayed busy at {ledger}"
+                        ) from exc
+                    time.sleep(0.05)
+            yield
+        finally:
+            if acquired:
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:  # pragma: no cover - Windows authoritative; tests remain portable
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
 
 
 def looks_rate_limited(text: str) -> bool:
