@@ -1073,17 +1073,20 @@ class GuidedCaptureSource:
         altium_sources = _altium_libraries(landed)
         pipeline = self._make_pipeline()
         try:
-            try:
-                candidates = pipeline.inspect(inputs=[item.path for item in landed])
-            except Exception as exc:  # noqa: BLE001
-                # The ingest inspector is intentionally KiCad-shaped and raises when a download
-                # contains only native Altium libraries. That is not an unreadable package:
-                # `_altium_libraries` already decoded a usable SchLib/PcbLib/IntLib above, and the
-                # Altium-only evidence path below binds it to the reverified active KiCad bundle.
-                if altium_sources:
-                    candidates = []
-                else:
-                    return SourceOutcome(error=f"could not read the download: {exc}")
+            candidates = []
+            inspect_errors: list[Exception] = []
+            # Exclusive-format providers deliver KiCad and Altium as sibling files. Inspecting
+            # the whole list in one call aborts on the Altium-only sibling and discards the valid
+            # KiCad candidate already found in the first file. Inspect each captured file through
+            # the same pipeline and combine successful candidates instead.
+            for item in landed:
+                try:
+                    candidates.extend(pipeline.inspect(inputs=[item.path]))
+                except Exception as exc:  # noqa: BLE001
+                    inspect_errors.append(exc)
+            if not candidates and not altium_sources:
+                detail = inspect_errors[0] if inspect_errors else "no CAD candidate found"
+                return SourceOutcome(error=f"could not read the download: {detail}")
 
             kicad_offered: list[Requirement] = []
             selection = select_exact_candidate(
@@ -1210,6 +1213,17 @@ class GuidedCaptureSource:
                     attach_kwargs = {"origin": origin}
                     if kicad_active_variant is not None:
                         attach_kwargs["active_variant"] = kicad_active_variant
+                    if (
+                        cross_eda_verified
+                        and kicad_active_variant is not None
+                        and altium_active_variant is not None
+                    ):
+                        # A verified dual-format provider bundle is one coherent alternative to
+                        # the currently projected files. Activate its KiCad half atomically first
+                        # so the Altium attach below can bind to the same manifest. Immutable
+                        # evidence retains every prior provider variant; only the active projection
+                        # is replaced.
+                        attach_kwargs["replace_existing"] = True
                     self._run_write(
                         lambda: pipeline.attach_assets(
                             record.id,
