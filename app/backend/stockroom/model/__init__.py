@@ -1,6 +1,12 @@
 """Pure data layer: category taxonomy and the part record. No IO."""
 
 from stockroom.model.asset import Asset, AssetOrigin, AssetRef, EdaAssets
+from stockroom.model.cad_variant import (
+    CAD_VARIANT_ROLE_MAP,
+    CadVariantArtifactPointer,
+    CadVariantPointer,
+    CadVariantSelections,
+)
 from stockroom.model.category import (
     CATEGORIES,
     category_footprint_lib,
@@ -41,6 +47,10 @@ __all__ = [
     "AssetCheck",
     "AssetOrigin",
     "AssetRef",
+    "CAD_VARIANT_ROLE_MAP",
+    "CadVariantArtifactPointer",
+    "CadVariantPointer",
+    "CadVariantSelections",
     "Datasheet",
     "Derived",
     "EdaAssets",

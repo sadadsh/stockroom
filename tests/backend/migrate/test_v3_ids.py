@@ -15,7 +15,7 @@ from stockroom.migrate.v3_ids import (
     count_orphan_bindings,
     plan_migration,
 )
-from stockroom.model.part import PartRecord
+from stockroom.model.part import SCHEMA_VERSION, PartRecord
 from stockroom.model.part_id import is_valid_part_id, make_part_id
 
 
@@ -177,7 +177,7 @@ def test_apply_renames_the_record_upgrades_it_and_loses_nothing(tmp_path):
 
     written = json.loads((root / "parts" / f"{new_id}.json").read_text(encoding="utf-8"))
     assert written["id"] == new_id
-    assert written["schema_version"] == 3
+    assert written["schema_version"] == SCHEMA_VERSION
     assert "eda" not in written and "passive" not in written, "v2 keys survived the upgrade"
     assert "derived" in written and "part_class" in written
 

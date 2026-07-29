@@ -1,4 +1,4 @@
-"""The v3 part record: identity + part_class + a DERIVED block + asset refs + a sources index.
+"""The v3 foundation and its v4 active-CAD-selection extension.
 
 The shape is drawn in `docs/specs/2026-07-27-owner-spec-complete-trusted-library.md` section 9
 and is not re-litigated here. What IS tested here is that the shape holds:
@@ -35,9 +35,9 @@ def _rec(**kw) -> PartRecord:
 # ------------------------------------------------- the persisted shape
 
 
-def test_the_schema_version_is_three():
-    assert SCHEMA_VERSION == 3
-    assert json.loads(_rec().dumps())["schema_version"] == 3
+def test_the_schema_version_is_four():
+    assert SCHEMA_VERSION == 4
+    assert json.loads(_rec().dumps())["schema_version"] == 4
 
 
 def test_the_top_level_keys_are_identity_derived_sources_and_assets():
