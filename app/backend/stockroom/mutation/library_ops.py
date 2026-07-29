@@ -19,6 +19,7 @@ from stockroom.ingest.describe import apply_clean_identity
 from stockroom.kicad.category_lib import create_empty_symbol_lib, ensure_footprint_lib
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
+from stockroom.model.cad_variant import CadVariantPointer
 from stockroom.model.category import category_nickname
 from stockroom.model.part import (
     Asset,
@@ -760,6 +761,7 @@ class LibraryOps:
     def attach_altium_assets(
         self, part_id: str, *sources,
         origin: AssetOrigin | None = None, now_iso: str = "",
+        active_variant: CadVariantPointer | None = None,
     ) -> PartRecord:
         """Store a part's Altium assets verbatim under <profile>/altium/ and set
         altium_symbol/altium_footprint. `*sources` is EITHER a loose .SchLib + .PcbLib pair OR
@@ -774,10 +776,16 @@ class LibraryOps:
         (*"its not trusted where we've gotten them"*) - so the provenance story held for one tool
         and quietly did not for the other. Omitted still means honestly UNATTRIBUTED, and
         `captured_at` is stamped HERE rather than taken from a caller, because a timestamp the
-        caller chooses is not evidence of when anything was captured."""
+        caller chooses is not evidence of when anything was captured.
+
+        ``active_variant`` binds a complete native Altium symbol/footprint pair to its retained
+        evidence manifest. It is persisted only after both files land, inside this same
+        Transaction, so a caller can never publish a selection-only success."""
         from stockroom.altium.extract import normalize_altium_source
         from stockroom.altium.oleread import pick_entry, read_footprint_names, read_symbol_names
 
+        if active_variant is not None:
+            active_variant.validate_for_tool("altium")
         record = self.load_record(part_id)
         altium_dir = self.lib.parts_dir.parent / "altium"
         json_path = self.lib.parts_dir / f"{part_id}.json"
@@ -787,6 +795,10 @@ class LibraryOps:
             # vendor delivery attaches one side per capture forward; the other side keeps
             # whatever the record already carries)
             sch_src, pcb_src = normalize_altium_source(*sources, out_dir=td)
+            if active_variant is not None and (sch_src is None or pcb_src is None):
+                raise ValueError(
+                    "an active Altium CAD variant must materialize both SchLib and PcbLib"
+                )
             # Exact or uniquely inferable entry binding. A multi-entry vendor library with no
             # unique MPN match cannot be attached: file order is not identity and the wrong
             # Altium entry is not a recoverable success.
@@ -805,8 +817,8 @@ class LibraryOps:
             with Transaction(self.repo) as txn:
                 txn.track_dir(*fresh)
                 landed: list[str] = []
-                # track EACH file right after its copy so a failure of the second copy still
-                # rolls back the first (no leaked .SchLib on a partial failure)
+                # Track EACH deterministic destination before copying so a partial write, or a
+                # failure of the second copy, restores both files (no leaked/corrupt SchLib).
                 def _filed(ref: AssetRef):
                     """The asset to file: bare when nobody recorded a source, attributed when
                     they did. A bare ref is `Asset.of`-wrapped with `origin=None` downstream,
@@ -825,8 +837,8 @@ class LibraryOps:
 
                 if sch_src is not None:
                     sch_dst = altium_dir / f"{part_id}.SchLib"
-                    shutil.copyfile(sch_src, sch_dst)
                     txn.track(sch_dst)
+                    shutil.copyfile(sch_src, sch_dst)
                     # pick_entry returns None when the library names no entry; an AssetRef holds
                     # strings, and a None name would read as "attached but unnamed".
                     _altium(record).symbol = _filed(
@@ -835,12 +847,16 @@ class LibraryOps:
                     landed.append(sym_name or sch_dst.name)
                 if pcb_src is not None:
                     pcb_dst = altium_dir / f"{part_id}.PcbLib"
-                    shutil.copyfile(pcb_src, pcb_dst)
                     txn.track(pcb_dst)
+                    shutil.copyfile(pcb_src, pcb_dst)
                     _altium(record).footprint = _filed(
                         AssetRef(lib=pcb_dst.name, name=fp_name or "")
                     )
                     landed.append(fp_name or pcb_dst.name)
+                if active_variant is not None:
+                    # Whole-bundle pointer last, immediately before the canonical record write.
+                    # Transaction rollback restores both native binaries and this pointer.
+                    record.cad_variants.select("altium", active_variant)
                 json_path.write_text(record.dumps(), encoding="utf-8")
                 txn.track(json_path)
                 txn.commit(f"Attach Altium assets to {part_id}: {' + '.join(landed)}")
