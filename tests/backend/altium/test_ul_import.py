@@ -26,11 +26,21 @@ Var
 
 Function CheckLeft(BaseStr: String, Srch: String): Boolean;
 Begin
+    ShowMessage('NOTE: This version of Altium has issues in the test fixture');
     Result := True;
 End;
 
-Procedure InitLibDocs;
+Function InitLibDocs(BasePath: String, Out sLib : ISch_Document): Boolean;
+Var
+    WorkSpace : IWorkSpace;
 Begin
+    sLib := SchServer.GetSchDocumentByPath(BasePath + '.SchLib');
+    If sLib = Nil Then Begin
+        ShowMessage('Nil sLib');
+        Exit;
+    End;
+    // Done
+    Result := True;
 End;
 
 Procedure ImportAscIIData(InFileName : String);
@@ -134,7 +144,7 @@ def _approve_archive(monkeypatch: pytest.MonkeyPatch, archive: Path) -> None:
     monkeypatch.setattr(
         ul_import_module,
         "_APPROVED_IMPORTER_REVISIONS",
-        {digest: 0},
+        {digest: IMPORTER.count("ShowMessage(")},
     )
 
 
@@ -169,6 +179,7 @@ def test_ul_script_package_converts_a_sandbox_copy_to_native_libraries(
     assert "ImportAscIIData(" in script
     assert "TerminateWithExitCode(0)" in script
     assert "ShowMessage(" not in script
+    assert "sLib.RemoveSchComponent(StockroomDefaultComponent)" in script
     assert result.workdir.exists()
     result.cleanup()
     assert not result.workdir.exists()

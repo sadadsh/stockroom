@@ -47,6 +47,7 @@ from stockroom.capture.browser import (
     ProviderHudSpec,
     SharedPlaywrightRuntime,
 )
+from stockroom.capture.cad_composition import OwnedMaterialization
 from stockroom.capture.complete import SourceOutcome
 from stockroom.capture.cross_eda import (
     CrossEdaVerificationError,
@@ -67,6 +68,8 @@ from stockroom.capture.identity import (
 )
 from stockroom.capture.requirements import Requirement, asset_present, capture_needs
 from stockroom.capture.vendors import DriveReport, formats_for, get_adapter
+from stockroom.ingest.staging import StagingCandidate
+from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.asset import AssetOrigin
 
 # How long to wait for the vendor's file after the adapter submits. Generous because a heavy part's
@@ -441,17 +444,15 @@ def _provider_hud_labels(adapter, formats: list[str]) -> tuple[str, ...]:
 _ALTIUM_LIBRARY_SUFFIXES = (".schlib", ".pcblib", ".intlib")
 
 
-def _altium_libraries(landed) -> list[Path]:
+def _altium_libraries(landed) -> OwnedMaterialization | None:
     """Altium library files inside the download, unpacked with the ingest sandbox.
 
     Uses `unpack_inputs` rather than a second unzip: it already handles a directory, a loose file
     and a zip identically, and its `_safe_extract` refuses path traversal. A private zip reader
     here would be a second implementation of the one thing the ingest layer already does safely.
 
-    The temp tree is intentionally NOT cleaned up here - the paths are handed to
-    `attach_altium_assets`, which copies them into the library inside its own transaction, and
-    tearing the tree down first would pull the files out from under it. It lives under the system
-    temp dir and is reclaimed there.
+    The returned owner keeps the paths alive through synchronous attachment and then removes the
+    tree explicitly. Empty and unreadable downloads leave no temporary root.
     """
     from stockroom.ingest.sandbox import unpack_inputs
 
@@ -463,8 +464,85 @@ def _altium_libraries(landed) -> list[Path]:
                 if path.is_file() and path.suffix.lower() in _ALTIUM_LIBRARY_SUFFIXES:
                     found.append(path)
     except Exception:  # noqa: BLE001 - an unreadable download is the KiCad path's error to report
-        return []
-    return found
+        import shutil
+
+        shutil.rmtree(workdir, ignore_errors=True)
+        return None
+    if not found:
+        import shutil
+
+        shutil.rmtree(workdir, ignore_errors=True)
+        return None
+    return OwnedMaterialization.adopt(workdir, tuple(found))
+
+
+def _resolved_variant_files(resolved) -> dict[str, bytes]:
+    """Materialization filenames bound to a reverified whole-tool variant."""
+
+    fallbacks = {
+        "symbol": "Variant.kicad_sym" if resolved.descriptor.tool == "kicad" else "Variant.SchLib",
+        "footprint": (
+            "Variant.kicad_mod" if resolved.descriptor.tool == "kicad" else "Variant.PcbLib"
+        ),
+        "model": "Variant.step",
+    }
+    files: dict[str, bytes] = {}
+    for artifact in resolved.descriptor.artifacts:
+        name = artifact.suggested_name or fallbacks[artifact.asset_kind]
+        files[name] = resolved.data[artifact.asset_kind]
+    if len(files) != len(resolved.data):
+        raise ValueError("verified CAD variant filenames collide")
+    return files
+
+
+def _resolved_kicad_candidate(record, resolved, owner: OwnedMaterialization) -> StagingCandidate:
+    """Build the normal ingest candidate from one reverified retained KiCad bundle."""
+
+    paths_by_kind = {
+        artifact.asset_kind: path
+        for artifact, path in zip(resolved.descriptor.artifacts, owner.paths, strict=True)
+    }
+    symbol_path = paths_by_kind["symbol"]
+    names = SymbolLib.load(symbol_path).symbol_names
+    exact = [name for name in names if name == record.mpn]
+    folded = [name for name in names if name.casefold() == record.mpn.casefold()]
+    if len(exact) == 1:
+        source_name = exact[0]
+    elif len(folded) == 1:
+        source_name = folded[0]
+    elif len(names) == 1:
+        source_name = names[0]
+    else:
+        raise ValueError(
+            "retained KiCad evidence contains multiple symbols without one exact MPN match"
+        )
+    current_symbol = record.assets_for("kicad").symbol
+    entry_name = (
+        current_symbol.name
+        if current_symbol is not None and current_symbol.name
+        else record.mpn
+    )
+    return StagingCandidate(
+        vendor=resolved.descriptor.provider,
+        symbol_lib_path=symbol_path,
+        symbol_name=source_name,
+        footprint_variants=[paths_by_kind["footprint"]],
+        model_path=paths_by_kind["model"],
+        entry_name=entry_name,
+        category=record.category,
+        mpn=record.mpn,
+        manufacturer=record.manufacturer,
+    )
+
+
+def _model_only_fragment(candidate) -> bool:
+    """True for a bare STEP discovered beside a converted provider script package."""
+
+    if getattr(candidate, "symbol_lib_path", None) is not None:
+        return False
+    if getattr(candidate, "footprint_variants", ()):
+        return False
+    return getattr(candidate, "model_path", None) is not None
 
 
 @dataclass
@@ -1090,12 +1168,10 @@ class GuidedCaptureSource:
         Reuses the ingest pipeline the rest of the app already attaches through, so a guided
         capture and a hand-dropped zip land identically - there is no second attach path to drift.
 
-        BOTH TOOLS, through their own existing seams. KiCad assets go through `IngestPipeline`;
-        Altium libraries go through `library_ops.attach_altium_assets`, which was already written
-        and already atomic but which guided capture never called - so a vendor shipping real
-        `.SchLib`/`.PcbLib` had them downloaded and then silently dropped. Each attach is its own
-        atomic commit (two commits when a download carries both), because that is what the two
-        underlying seams each guarantee; neither can leave a partial write behind.
+        BOTH TOOLS, through their existing seams. KiCad assets go through `IngestPipeline`;
+        Altium libraries go through `library_ops.attach_altium_assets`. When strict cross-EDA
+        evidence selects both, the pipeline borrows one shared Transaction so every native file
+        and both active pointers commit or roll back together.
         """
         adapter = get_adapter(self._vendor_key)
         if adapter is None:
@@ -1109,7 +1185,13 @@ class GuidedCaptureSource:
         kicad_active_variant = None
         altium_active_variant = None
         compatible_kicad_variant = None
-        altium_sources = _altium_libraries(landed)
+        kicad_origin = None
+        cad_pair_handled = False
+        converted_altium = False
+        captured_altium = _altium_libraries(landed)
+        if captured_altium is not None:
+            cleanup_callbacks.append(captured_altium.cleanup)
+        altium_sources = [] if captured_altium is None else list(captured_altium.paths)
         if not altium_sources and self._convert_altium is not None:
             try:
                 converted = self._convert_altium(
@@ -1118,10 +1200,11 @@ class GuidedCaptureSource:
                     record.mpn,
                 )
                 if converted is not None:
-                    altium_sources = list(converted.libraries)
+                    converted_altium = True
                     cleanup = getattr(converted, "cleanup", None)
                     if callable(cleanup):
                         cleanup_callbacks.append(cleanup)
+                    altium_sources = list(converted.libraries)
             except Exception as exc:  # noqa: BLE001 - keep usable KiCad and report this gap
                 failures.append(f"could not convert the provider's Altium package: {exc}")
         pipeline = self._make_pipeline()
@@ -1142,6 +1225,17 @@ class GuidedCaptureSource:
                     candidates.extend(pipeline.inspect(inputs=[]))
                 except Exception as exc:  # noqa: BLE001
                     inspect_errors.append(exc)
+            if converted_altium:
+                # DigiKey's UL script ZIP carries a root STEP named for the package, not the MPN.
+                # The ingest fingerprint correctly exposes it as a model-only candidate, but it
+                # is supplemental package data rather than a second KiCad definition. Keep any
+                # symbol/footprint-bearing candidate; drop model-only fragments so the verified
+                # native Altium pair composes with active KiCad rather than competing with it.
+                candidates = [
+                    candidate
+                    for candidate in candidates
+                    if not _model_only_fragment(candidate)
+                ]
             if not candidates and not altium_sources and inspect_errors:
                 return SourceOutcome(error=f"could not read the download: {inspect_errors[0]}")
 
@@ -1215,7 +1309,7 @@ class GuidedCaptureSource:
                         )
                     )
                 try:
-                    evidence_digest, verified_sources = record_composed_browser_altium_evidence(
+                    composed = record_composed_browser_altium_evidence(
                         store=self._evidence_store,
                         record=record,
                         profile=pipeline.profile,
@@ -1224,29 +1318,63 @@ class GuidedCaptureSource:
                         altium_sources=tuple(altium_sources),
                         cross_eda_verifier=self._cross_eda_verifier,
                     )
+                    altium_owner = OwnedMaterialization.from_bytes(
+                        _resolved_variant_files(composed.altium_variant),
+                        prefix="sr-verified-altium-",
+                    )
+                    cleanup_callbacks.append(altium_owner.cleanup)
                 except Exception as exc:  # noqa: BLE001 - fail closed before any library write
                     return SourceOutcome(error=f"CAD evidence verification failed: {exc}")
-                altium_sources = list(verified_sources)
+                altium_sources = list(altium_owner.paths)
                 cross_eda_verified = True
                 evidence_operation = "cad:altium"
                 try:
-                    identity = exact_identity(record)
-                    altium_active_variant = resolve_cad_variant(
-                        self._evidence_store,
-                        identity=identity,
-                        tool="altium",
-                        manifest_digest=evidence_digest,
-                    ).pointer
+                    altium_active_variant = composed.altium_variant.pointer
+                    evidence_digest = composed.altium_variant.descriptor.manifest_digest
                     if len(altium_active_variant.source_manifests) != 1:
                         raise ValueError(
                             "composed Altium evidence must name one exact KiCad source manifest"
                         )
-                    compatible_kicad_variant = resolve_cad_variant(
-                        self._evidence_store,
-                        identity=identity,
-                        tool="kicad",
-                        manifest_digest=altium_active_variant.source_manifests[0],
-                    ).pointer
+                    compatible_kicad_variant = composed.kicad_variant.pointer
+                    if (
+                        compatible_kicad_variant.manifest_digest
+                        != altium_active_variant.source_manifests[0]
+                    ):
+                        raise ValueError(
+                            "composed Altium evidence resolved a different KiCad source manifest"
+                        )
+                    if not composed.uses_installed_kicad:
+                        kicad_owner = OwnedMaterialization.from_bytes(
+                            _resolved_variant_files(composed.kicad_variant),
+                            prefix="sr-verified-kicad-",
+                        )
+                        cleanup_callbacks.append(kicad_owner.cleanup)
+                        candidate = _resolved_kicad_candidate(
+                            record,
+                            composed.kicad_variant,
+                            kicad_owner,
+                        )
+                        kicad_active_variant = compatible_kicad_variant
+                        kicad_offered = [
+                            Requirement.KICAD_SYMBOL,
+                            Requirement.KICAD_FOOTPRINT,
+                            Requirement.KICAD_MODEL,
+                        ]
+                        kicad_origin = AssetOrigin(
+                            vendor=composed.kicad_variant.descriptor.provider,
+                            captured_at=self._now_iso() if self._now_iso else "",
+                            extra={
+                                "evidence_adapter_version": (
+                                    composed.kicad_variant.descriptor.adapter_version
+                                ),
+                                "evidence_manifest_digest": (
+                                    composed.kicad_variant.descriptor.manifest_digest
+                                ),
+                                "evidence_operation": (
+                                    composed.kicad_variant.descriptor.operation
+                                ),
+                            },
+                        )
                 except Exception as exc:  # noqa: BLE001 - no guessed source binding
                     return SourceOutcome(
                         error=f"CAD evidence pointer resolution failed: {exc}"
@@ -1267,29 +1395,44 @@ class GuidedCaptureSource:
             )
             if kicad_offered:
                 try:
-                    attach_kwargs = {"origin": origin}
-                    if kicad_active_variant is not None:
-                        attach_kwargs["active_variant"] = kicad_active_variant
                     if (
                         cross_eda_verified
                         and kicad_active_variant is not None
                         and altium_active_variant is not None
+                        and altium_sources
                     ):
-                        # A verified dual-format provider bundle is one coherent alternative to
-                        # the currently projected files. Activate its KiCad half atomically first
-                        # so the Altium attach below can bind to the same manifest. Immutable
-                        # evidence retains every prior provider variant; only the active projection
-                        # is replaced.
-                        attach_kwargs["replace_existing"] = True
-                    self._run_write(
-                        lambda: pipeline.attach_assets(
-                            record.id,
-                            candidate,
-                            **attach_kwargs,
+                        cad_pair_handled = True
+                        updated = self._run_write(
+                            lambda: pipeline.attach_coherent_cad_assets(
+                                record.id,
+                                candidate,
+                                *altium_sources,
+                                kicad_origin=kicad_origin or origin,
+                                altium_origin=origin,
+                                now_iso=self._now_iso() if self._now_iso else "",
+                                kicad_active_variant=kicad_active_variant,
+                                altium_active_variant=altium_active_variant,
+                            )
                         )
-                    )
-                    offered.extend(kicad_offered)
-                except Exception as exc:  # noqa: BLE001 - each attach is atomic; a failure is a row
+                        offered.extend(kicad_offered)
+                        altium_bundle = updated.assets_for("altium")
+                        if asset_present(altium_bundle.symbol):
+                            offered.append(Requirement.ALTIUM_SYMBOL)
+                        if asset_present(altium_bundle.footprint):
+                            offered.append(Requirement.ALTIUM_FOOTPRINT)
+                    else:
+                        attach_kwargs = {"origin": kicad_origin or origin}
+                        if kicad_active_variant is not None:
+                            attach_kwargs["active_variant"] = kicad_active_variant
+                        self._run_write(
+                            lambda: pipeline.attach_assets(
+                                record.id,
+                                candidate,
+                                **attach_kwargs,
+                            )
+                        )
+                        offered.extend(kicad_offered)
+                except Exception as exc:  # noqa: BLE001 - the whole pair rolls back as one row
                     failures.append(str(exc))
         finally:
             pipeline.cleanup()
@@ -1300,7 +1443,9 @@ class GuidedCaptureSource:
         if identity_error:
             return SourceOutcome(error=identity_error)
 
-        if altium_sources and self._evidence_store is not None and not cross_eda_verified:
+        if cad_pair_handled:
+            pass
+        elif altium_sources and self._evidence_store is not None and not cross_eda_verified:
             failures.append(
                 "native Altium files were left unattached: "
                 "cross-EDA terminal, pad, and package equivalence is not verified"
@@ -1361,7 +1506,9 @@ class GuidedCaptureSource:
         if self._attach_altium is None:
             return []
         attach_altium = self._attach_altium
-        sources = _altium_libraries(landed) if sources is None else sources
+        owned_sources = _altium_libraries(landed) if sources is None else None
+        if sources is None:
+            sources = [] if owned_sources is None else list(owned_sources.paths)
         if not sources:
             return []
         try:
@@ -1377,6 +1524,9 @@ class GuidedCaptureSource:
         except Exception as exc:  # noqa: BLE001 - atomic: a failure leaves the part untouched
             failures.append(f"could not attach the Altium libraries: {exc}")
             return []
+        finally:
+            if owned_sources is not None:
+                owned_sources.cleanup()
         if updated is None:
             return []
         bundle = updated.assets_for("altium") or {}

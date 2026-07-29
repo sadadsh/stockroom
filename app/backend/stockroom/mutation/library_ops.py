@@ -815,6 +815,8 @@ class LibraryOps:
         origin: AssetOrigin | None = None, now_iso: str = "",
         active_variant: CadVariantPointer | None = None,
         compatible_kicad_variant: CadVariantPointer | None = None,
+        _transaction: Transaction | None = None,
+        _record: PartRecord | None = None,
     ) -> PartRecord:
         """Store a part's Altium assets verbatim under <profile>/altium/ and set
         altium_symbol/altium_footprint. `*sources` is EITHER a loose .SchLib + .PcbLib pair OR
@@ -853,7 +855,7 @@ class LibraryOps:
                 raise ValueError(
                     "the Altium bundle is not bound to the supplied KiCad source manifest"
                 )
-        record = self.load_record(part_id)
+        record = _record or self.load_record(part_id)
         altium_dir = self.lib.parts_dir.parent / "altium"
         json_path = self.lib.parts_dir / f"{part_id}.json"
 
@@ -881,7 +883,12 @@ class LibraryOps:
             # mkdir AFTER validation so a normalize/read failure leaves zero trace
             fresh = [] if altium_dir.exists() else [altium_dir]
             altium_dir.mkdir(parents=True, exist_ok=True)
-            with Transaction(self.repo) as txn:
+            transaction_scope = (
+                Transaction(self.repo)
+                if _transaction is None
+                else contextlib.nullcontext(_transaction)
+            )
+            with transaction_scope as txn:
                 locked_record = self.load_record(part_id)
                 if locked_record.dumps() != record.dumps():
                     raise ValueError("the part changed while its Altium bundle was being verified")
@@ -949,7 +956,8 @@ class LibraryOps:
                     record.cad_variants.select("altium", active_variant)
                 json_path.write_text(record.dumps(), encoding="utf-8")
                 txn.track(json_path)
-                txn.commit(f"Attach Altium assets to {part_id}: {' + '.join(landed)}")
+                if _transaction is None:
+                    txn.commit(f"Attach Altium assets to {part_id}: {' + '.join(landed)}")
         return record
 
     def _model_source(self, record: PartRecord):

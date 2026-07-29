@@ -3,7 +3,7 @@ import shutil
 import pytest
 
 from stockroom.mutation.transaction import Transaction, TransactionError
-from stockroom.vcs.repo import GitRepo
+from stockroom.vcs.repo import GitError, GitRepo
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
 
@@ -113,3 +113,29 @@ def test_rollback_restores_edited_tracked_file(tmp_path):
         txn.track(tracked)
         # no commit -> rollback restores original content
     assert tracked.read_text() == "(kicad_symbol_lib (version 20251024))"
+
+
+def test_commit_failure_after_staging_removes_new_index_entry(
+    monkeypatch,
+    tmp_path,
+):
+    repo = _repo(tmp_path)
+    before = repo.head()
+    original_run = repo._run
+
+    def fail_commit(*args, **kwargs):
+        if args and args[0] == "commit":
+            raise GitError("simulated commit failure after staging")
+        return original_run(*args, **kwargs)
+
+    monkeypatch.setattr(repo, "_run", fail_commit)
+    created = tmp_path / "staged-new.json"
+    with pytest.raises(GitError, match="after staging"):
+        with Transaction(repo) as txn:
+            created.write_text('{"new": true}', encoding="utf-8")
+            txn.track(created)
+            txn.commit("must roll back")
+
+    assert repo.head() == before
+    assert not created.exists()
+    assert repo.status_porcelain() == []

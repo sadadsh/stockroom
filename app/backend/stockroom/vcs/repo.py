@@ -401,15 +401,26 @@ class GitRepo:
         rollback (spec section 9)."""
         for p in paths:
             rel = str(p)
-            tracked = self._run("ls-files", "--error-unmatch", "--", rel, check=False).returncode == 0
-            if tracked:
-                self._run("checkout", "HEAD", "--", rel, check=False)
-            else:
-                path = Path(p)
-                if path.is_dir():
-                    shutil.rmtree(path, ignore_errors=True)
-                elif path.exists():
-                    path.unlink()
+            if self._in_head(p):
+                self._run(
+                    "restore",
+                    "--source=HEAD",
+                    "--staged",
+                    "--worktree",
+                    "--",
+                    rel,
+                )
+                continue
+            if self._is_tracked(p):
+                # A commit can fail after `git add`, leaving a new path in the index even though
+                # HEAD has never contained it. `checkout HEAD` cannot restore that shape; remove
+                # the staged entry first, then prune the transaction-created working file.
+                self._run("rm", "--cached", "-f", "--ignore-unmatch", "--", rel)
+            path = Path(p)
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+            elif path.exists():
+                path.unlink()
 
     @_serialized
     def revert(self, sha: str) -> str:
