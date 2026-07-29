@@ -32,7 +32,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 from unicodedata import normalize
 from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
@@ -154,6 +154,9 @@ class DriveReport:
     # control that Stockroom must never operate. The browser shows a handoff HUD and resumes only
     # after the person clears it.
     requires_user_clearance: bool = False
+    # The embedded author route is absent for this exact part, so remaining formats on that same
+    # route must not each pay another navigation and visibility timeout.
+    route_unavailable: bool = False
     message: str = ""
 
     @property
@@ -1166,29 +1169,69 @@ class SnapMagicAdapter:
 _ADAPTERS[SnapMagicAdapter.capability.key] = SnapMagicAdapter()
 
 
-class DigiKeyUltraLibrarianAdapter:
-    """Ultra Librarian's embedded exporter on DigiKey's exact product/model pages.
+@dataclass(frozen=True, slots=True)
+class DigiKeyProviderRoute:
+    """One CAD author exposed inside DigiKey's shared model-download surface."""
 
-    DigiKey is the browser surface, not the CAD author. ``evidence_provider_key`` keeps captured
-    variants attributed to ``digikey-ultralibrarian`` while the UI/provider route remains the
-    familiar ``digikey`` entry. The controls below were measured on DigiKey's dedicated
-    ``/en/models/<id>`` page: one radio-format download at a time. Its Altium choice is explicitly
-    script based, so Stockroom runs that recognized project through its guarded Altium converter
-    before treating the result as a native library.
+    evidence_provider_key: str
+    label: str
+    row_id: str
+    modal_id: str
+    altium_label: str
+
+
+_DIGIKEY_SNAPMAGIC_ROUTE = DigiKeyProviderRoute(
+    evidence_provider_key="digikey-snapmagic",
+    label="SnapMagic",
+    row_id="snapmagic-media-active",
+    modal_id="snapeda-export-options",
+    altium_label="altium designer",
+)
+_DIGIKEY_ULTRALIBRARIAN_ROUTE = DigiKeyProviderRoute(
+    evidence_provider_key="digikey-ultralibrarian",
+    label="Ultra Librarian",
+    row_id="ultra-media-active",
+    modal_id="ultralib-export-options",
+    altium_label="altium designer (script based)",
+)
+
+
+def _digikey_format_label_matches(
+    route: DigiKeyProviderRoute,
+    fmt: str,
+    label: str,
+) -> bool:
+    """Exact route-aware format matching for DigiKey's stable ``data-original`` labels."""
+
+    text = " ".join(normalize("NFKC", label).split()).casefold()
+    if fmt in {"kicad", "model"}:
+        return "kicad" in text and ("v6" in text or "6" in text)
+    if fmt == "altium":
+        return text == route.altium_label
+    return False
+
+
+class DigiKeyUltraLibrarianAdapter:
+    """DigiKey's exact product/model pages with independently attributed CAD-author routes.
+
+    DigiKey is the browser surface, not the CAD author. One persistent session enumerates the
+    SnapMagic and Ultra Librarian rows separately. Every captured variant retains its author route;
+    Ultra Librarian's script-based Altium package alone enters the guarded converter.
     """
 
     evidence_provider_key = "digikey-ultralibrarian"
+    max_download_attempts = 3
     capability = VendorCapability(
         key="digikey",
-        label="DigiKey · Ultra Librarian",
+        label="DigiKey CAD Models",
         tools=("kicad", "altium"),
         formats_exclusive=True,
         aggregator=True,
         needs_login=True,
         instruction=(
-            "Stockroom opens the exact DigiKey product, uses its Ultra Librarian model panel, "
-            "selects KiCad 6+, STEP, and the Altium script package, converts that package to native "
-            "libraries, and verifies every result. Sign in only if DigiKey requires it."
+            "Stockroom opens the exact DigiKey product once, captures every supported SnapMagic "
+            "and Ultra Librarian variant, converts only the recognized Ultra Librarian Altium "
+            "script package, and activates a strictly compatible cross-EDA set."
         ),
         machine_format_labels={
             "kicad": "KiCad v6+",
@@ -1206,6 +1249,11 @@ class DigiKeyUltraLibrarianAdapter:
 
     def __init__(self) -> None:
         self._exact_product_url = ""
+
+    def capture_routes(self) -> tuple[object, ...]:
+        """Collect SnapMagic first and preferred Ultra Librarian last in one DigiKey session."""
+
+        return (DigiKeySnapMagicRouteAdapter(self), self)
 
     def resolve_url(self, mpn: str) -> str:
         return "https://www.digikey.com/en/products/result?keywords=" + quote_plus(mpn)
@@ -1296,11 +1344,12 @@ class DigiKeyUltraLibrarianAdapter:
         *,
         expected_manufacturer: str = "",
         expected_mpn: str = "",
+        _provider_key: str = "digikey-ultralibrarian",
     ) -> str:
         """Return the exact product URL retained before DigiKey moved to its opaque model id."""
 
         issue = _detail_identity_issue(
-            "digikey-ultralibrarian",
+            _provider_key,
             self._exact_product_url,
             expected_manufacturer,
             expected_mpn,
@@ -1313,6 +1362,7 @@ class DigiKeyUltraLibrarianAdapter:
         *,
         expected_manufacturer: str = "",
         expected_mpn: str = "",
+        _route: DigiKeyProviderRoute = _DIGIKEY_ULTRALIBRARIAN_ROUTE,
     ) -> str:
         challenge = _challenge_issue(page, self.capability.label)
         if challenge:
@@ -1368,12 +1418,12 @@ class DigiKeyUltraLibrarianAdapter:
                 "refusing to download."
             )
 
-        row = page.locator("#ultra-media-active").first
+        row = page.locator(f"#{_route.row_id}").first
         try:
             row.wait_for(state="visible", timeout=15_000)
         except Exception:  # noqa: BLE001 - provider availability varies by exact product
-            return "DigiKey does not offer Ultra Librarian for this exact product."
-        modal = page.locator("#ultralib-export-options").first
+            return f"DigiKey does not offer {_route.label} for this exact product."
+        modal = page.locator(f"#{_route.modal_id}").first
         labels = modal.locator("label[data-original]")
         if labels.count() > 0:
             try:
@@ -1382,8 +1432,8 @@ class DigiKeyUltraLibrarianAdapter:
             except Exception:  # noqa: BLE001 - hidden template labels are not an open modal
                 pass
         opener = page.locator(
-            'a[onclick*="ultralib-export-options"], '
-            'button[onclick*="ultralib-export-options"]'
+            f'a[onclick*="{_route.modal_id}"], '
+            f'button[onclick*="{_route.modal_id}"]'
         ).first
         try:
             opener_visible = opener.count() > 0 and opener.is_visible()
@@ -1394,26 +1444,28 @@ class DigiKeyUltraLibrarianAdapter:
                 row.click(force=True, timeout=5_000)
             except Exception:  # noqa: BLE001 - DigiKey's left bar can intercept the row
                 pass
-            page.evaluate("() => document.querySelector('#ultra-media-active')?.click()")
+            page.evaluate(
+                "(selector) => document.querySelector(selector)?.click()",
+                f"#{_route.row_id}",
+            )
             try:
                 opener.wait_for(state="visible", timeout=15_000)
             except Exception:  # noqa: BLE001 - the provider section failed to materialize
-                return "DigiKey's Ultra Librarian section exposed no format selector."
+                return f"DigiKey's {_route.label} section exposed no format selector."
         try:
             opener.click(force=True, timeout=5_000)
         except Exception:  # noqa: BLE001 - the provider's own handler remains the target
             page.evaluate(
-                """() => {
-                    const button = document.querySelector(
-                        '[onclick*="ultralib-export-options"]'
-                    );
+                """(modalId) => {
+                    const button = document.querySelector(`[onclick*="${modalId}"]`);
                     button?.click();
-                }"""
+                }""",
+                _route.modal_id,
             )
         try:
             labels.first.wait_for(state="visible", timeout=15_000)
         except Exception:  # noqa: BLE001 - no labels means no supported export choice
-            return "DigiKey's Ultra Librarian format list did not open."
+            return f"DigiKey's {_route.label} format list did not open."
         return ""
 
     @staticmethod
@@ -1478,6 +1530,7 @@ class DigiKeyUltraLibrarianAdapter:
         *,
         expected_manufacturer: str = "",
         expected_mpn: str = "",
+        _route: DigiKeyProviderRoute = _DIGIKEY_ULTRALIBRARIAN_ROUTE,
     ) -> DriveReport:
         if not expected_manufacturer.strip() or not expected_mpn.strip():
             return DriveReport(
@@ -1489,17 +1542,22 @@ class DigiKeyUltraLibrarianAdapter:
             page,
             expected_manufacturer=expected_manufacturer,
             expected_mpn=expected_mpn,
+            _route=_route,
         )
         if issue:
             clearance = self.user_clearance_issue(page)
+            route_unavailable = issue == (
+                f"DigiKey does not offer {_route.label} for this exact product."
+            )
             return DriveReport(
                 missed=list(formats),
                 blocked=bool(clearance) or _is_global_blockage(issue),
                 requires_user_clearance=bool(clearance),
+                route_unavailable=route_unavailable,
                 message=issue,
             )
         fmt = formats[0] if formats else ""
-        modal = page.locator("#ultralib-export-options").first
+        modal = page.locator(f"#{_route.modal_id}").first
         clear = modal.locator('[id^="btn-clear-selection-"]').first
         if clear.count() > 0:
             try:
@@ -1507,24 +1565,20 @@ class DigiKeyUltraLibrarianAdapter:
             except Exception:  # noqa: BLE001 - selections are still verified below
                 pass
 
-        base_predicate = {
-            "kicad": lambda text: "kicad" in text and ("v6" in text or "6" in text),
-            "altium": lambda text: text == "altium designer (script based)",
-            # DigiKey's STEP radio accompanies a 2D export. Use current KiCad as the carrier when
-            # STEP is the only missing role, rather than selecting an obsolete arbitrary format.
-            "model": lambda text: "kicad" in text and ("v6" in text or "6" in text),
-        }.get(fmt)
+        base_predicate = lambda text: _digikey_format_label_matches(_route, fmt, text)
         if base_predicate is None or not self._select_label(page, modal, base_predicate):
             return DriveReport(
                 missed=[fmt] if fmt else list(formats),
-                message=f"DigiKey Ultra Librarian does not offer the pinned {fmt or 'CAD'} format.",
+                message=(
+                    f"DigiKey {_route.label} does not offer the pinned {fmt or 'CAD'} format."
+                ),
             )
 
         step_selected = self._select_label(page, modal, lambda text: text == "step")
         if fmt == "model" and not step_selected:
             return DriveReport(
                 missed=[fmt],
-                message="DigiKey Ultra Librarian exposed no STEP choice for this exact product.",
+                message=f"DigiKey {_route.label} exposed no STEP choice for this exact product.",
             )
         # Selecting a 3D companion must never steal the 2D radio group. Re-prove the pinned base.
         base_remained_selected = self._label_is_selected(page, modal, base_predicate)
@@ -1536,11 +1590,11 @@ class DigiKeyUltraLibrarianAdapter:
                 message="DigiKey changed the pinned format while STEP was selected; refusing.",
             )
 
-        submit = page.locator("#btn-download-Ultra").first
+        submit = modal.locator('[id^="btn-download-"]').first
         if submit.count() == 0:
             return DriveReport(
                 missed=[fmt],
-                message="DigiKey Ultra Librarian showed no Download control.",
+                message=f"DigiKey {_route.label} showed no Download control.",
             )
         try:
             if submit.is_disabled():
@@ -1554,7 +1608,7 @@ class DigiKeyUltraLibrarianAdapter:
         return DriveReport(
             selected=[fmt],
             submitted=True,
-            message=f"Requested {fmt} from Ultra Librarian through DigiKey.",
+            message=f"Requested {fmt} from {_route.label} through DigiKey.",
         )
 
     def user_clearance_issue(self, page) -> str:
@@ -1585,6 +1639,133 @@ class DigiKeyUltraLibrarianAdapter:
 
     def download_gate(self, page) -> str:
         return self.user_clearance_issue(page)
+
+
+    def retryable_download_issue(self, page) -> str:
+        """Return a visible DigiKey export failure that merits one bounded fresh retry."""
+
+        try:
+            notices = page.locator(
+                '[role="alert"], [role="dialog"], .toast, .notification, '
+                '[class*="error" i], [class*="alert" i]'
+            )
+            for index in range(min(notices.count(), 30)):
+                notice = notices.nth(index)
+                if not notice.is_visible():
+                    continue
+                text = " ".join((notice.inner_text() or "").split())
+                folded = text.casefold()
+                retryable = (
+                    "download cannot be completed" in folded
+                    or "download could not be completed" in folded
+                    or "unable to complete" in folded
+                    and "download" in folded
+                    or "download failed" in folded
+                    or "failed to generate" in folded
+                    or "something went wrong" in folded
+                    and "download" in folded
+                )
+                if retryable:
+                    return f"DigiKey reported a retryable download failure: {text[:180]}"
+        except Exception:  # noqa: BLE001 - unreadable UI is not retry evidence
+            pass
+        return ""
+
+
+class DigiKeySnapMagicRouteAdapter:
+    """SnapMagic's independently attributed route inside a shared DigiKey session."""
+
+    evidence_provider_key = _DIGIKEY_SNAPMAGIC_ROUTE.evidence_provider_key
+    max_download_attempts = 3
+    capability = VendorCapability(
+        key="digikey",
+        label="DigiKey · SnapMagic",
+        tools=("kicad", "altium"),
+        formats_exclusive=True,
+        aggregator=True,
+        needs_login=True,
+        instruction=(
+            "Stockroom selects the pinned KiCad 6+, STEP, and native Altium exports from "
+            "DigiKey's SnapMagic row and retains them as SnapMagic-authored variants."
+        ),
+        machine_format_labels={
+            "kicad": "KiCad v6+",
+            "model": "STEP",
+            "altium": "Altium Designer",
+        },
+        user_format_labels={
+            "kicad": "KiCad v6 or later",
+            "model": "STEP",
+            "altium": "Altium Designer",
+        },
+        browser_access="machine_allowed",
+        browser_engine="camoufox",
+    )
+
+    def __init__(self, surface: DigiKeyUltraLibrarianAdapter) -> None:
+        self._surface = surface
+
+    def resolve_url(self, mpn: str) -> str:
+        return self._surface.resolve_url(mpn)
+
+    def signed_in(self, page) -> bool:
+        return self._surface.signed_in(page)
+
+    def sign_in(self, page, username: str, password: str) -> str:
+        return self._surface.sign_in(page, username, password)
+
+    def evidence_detail_url(
+        self,
+        page,
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> str:
+        return self._surface.evidence_detail_url(
+            page,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+            _provider_key=self.evidence_provider_key,
+        )
+
+    def open_panel(
+        self,
+        page,
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> str:
+        return self._surface.open_panel(
+            page,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+            _route=_DIGIKEY_SNAPMAGIC_ROUTE,
+        )
+
+    def drive(
+        self,
+        page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> DriveReport:
+        return self._surface.drive(
+            page,
+            formats,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+            _route=_DIGIKEY_SNAPMAGIC_ROUTE,
+        )
+
+    def user_clearance_issue(self, page) -> str:
+        return self._surface.user_clearance_issue(page)
+
+    def download_gate(self, page) -> str:
+        return self._surface.download_gate(page)
+
+    def retryable_download_issue(self, page) -> str:
+        return self._surface.retryable_download_issue(page)
 
 
 class SamacSysAssistedAdapter:
@@ -1639,7 +1820,10 @@ class SamacSysAssistedAdapter:
 
 
 _ADAPTERS[DigiKeyUltraLibrarianAdapter.capability.key] = DigiKeyUltraLibrarianAdapter()
-_ADAPTERS[SamacSysAssistedAdapter.capability.key] = SamacSysAssistedAdapter()
+_ADAPTERS[SamacSysAssistedAdapter.capability.key] = cast(
+    VendorAdapter,
+    SamacSysAssistedAdapter(),
+)
 
 
 def _requested_mpn(url: str, names: tuple[str, ...]) -> str:

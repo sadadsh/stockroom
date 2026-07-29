@@ -926,6 +926,85 @@ def test_the_default_vendor_chain_prefers_manufacturer_verified_ultra_librarian(
     assert runner._vendor_chain(None) == ["ultralibrarian", "snapmagic"]
 
 
+def test_digikey_collects_every_embedded_author_route_after_first_success(
+    monkeypatch,
+    tmp_path,
+):
+    def capability(label: str) -> VendorCapability:
+        return VendorCapability(
+            key="digikey",
+            label=label,
+            tools=("kicad", "altium"),
+            formats_exclusive=True,
+            aggregator=True,
+            needs_login=True,
+            instruction="",
+            machine_format_labels={
+                "kicad": "KiCad v6+",
+                "model": "STEP",
+                "altium": "Altium Designer",
+            },
+            browser_access="machine_allowed",
+        )
+
+    snap = type(
+        "_Route",
+        (),
+        {
+            "capability": capability("DigiKey · SnapMagic"),
+            "evidence_provider_key": "digikey-snapmagic",
+        },
+    )()
+    ultra = type(
+        "_Route",
+        (),
+        {
+            "capability": capability("DigiKey · Ultra Librarian"),
+            "evidence_provider_key": "digikey-ultralibrarian",
+        },
+    )()
+
+    class _DigiKey:
+        evidence_provider_key = "digikey-ultralibrarian"
+
+        def resolve_url(self, mpn):
+            return f"https://www.digikey.com/en/products/result?keywords={mpn}"
+
+        def capture_routes(self):
+            return (snap, ultra)
+
+    parent = _DigiKey()
+    parent.capability = capability("DigiKey CAD Models")
+    monkeypatch.setattr(guided, "get_adapter", lambda _key: parent)
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="digikey",
+        download_root=tmp_path / "Downloads",
+        machine_access_check=lambda: True,
+    )
+    source._session = guided._Session(browser=_FakeBrowser(), ctx_manager=None, page=_FakePage())
+    captured_routes: list[str] = []
+
+    def capture_route(_record, _session, route, *_args):
+        captured_routes.append(route.evidence_provider_key)
+        return SourceOutcome(
+            satisfied=(
+                Requirement.KICAD_SYMBOL,
+                Requirement.KICAD_FOOTPRINT,
+            )
+        )
+
+    source._supply_automated_route = capture_route
+
+    outcome = source.supply(_Record())
+
+    assert captured_routes == ["digikey-snapmagic", "digikey-ultralibrarian"]
+    assert set(outcome.satisfied) == {
+        Requirement.KICAD_SYMBOL,
+        Requirement.KICAD_FOOTPRINT,
+    }
+
+
 def test_a_preferred_vendor_keeps_the_other_implemented_provider_as_fallback():
     """A chosen provider changes priority without disabling automatic fallback."""
     from stockroom.capture import runner
@@ -1021,6 +1100,51 @@ def test_exclusive_formats_are_downloaded_one_at_a_time(monkeypatch, tmp_path):
     assert report.selected == ["kicad", "altium"]
     assert report.submitted is True
     assert len(browser.captured) == 2, "each exclusive format must produce its OWN download"
+
+
+def test_digikey_transient_download_failure_reopens_and_retries_exact_format(tmp_path):
+    browser = _FakeBrowser()
+    attempts: list[str] = []
+
+    class _RetryingDigiKey:
+        max_download_attempts = 3
+        capability = VendorCapability(
+            key="digikey",
+            label="DigiKey · SnapMagic",
+            tools=("kicad",),
+            formats_exclusive=True,
+            aggregator=True,
+            needs_login=True,
+            instruction="",
+            machine_format_labels={"kicad": "KiCad v6+"},
+            browser_access="machine_allowed",
+        )
+
+        def drive(self, _page, formats):
+            attempts.append(formats[0])
+            if len(attempts) == 2:
+                browser.captured.append(_CapturedFile(tmp_path / "landed.zip"))
+            return DriveReport(selected=list(formats), submitted=True)
+
+        def retryable_download_issue(self, _page):
+            return (
+                "DigiKey reported a retryable download failure"
+                if len(attempts) == 1
+                else ""
+            )
+
+    report, failure = guided.drive_formats(
+        browser,
+        _FakePage(),
+        _RetryingDigiKey(),
+        ["kicad"],
+        "https://www.digikey.com/en/products/result?keywords=ABC-1",
+    )
+
+    assert failure is None
+    assert attempts == ["kicad", "kicad"]
+    assert report.selected == ["kicad"]
+    assert report.submitted is True
 
 
 def test_a_submitted_format_that_never_arrives_is_an_error_not_a_skip(monkeypatch, tmp_path):
@@ -1310,4 +1434,44 @@ def test_exclusive_provider_stops_remaining_formats_after_global_account_gate():
 
     assert failure is None
     assert report.blocked is True
+    assert attempts == [["kicad"]]
+
+
+def test_missing_digikey_author_route_skips_remaining_format_timeouts():
+    attempts: list[list[str]] = []
+
+    class _UnavailableRoute:
+        capability = VendorCapability(
+            key="digikey",
+            label="DigiKey · SnapMagic",
+            tools=("kicad", "altium"),
+            formats_exclusive=True,
+            aggregator=True,
+            needs_login=True,
+            instruction="",
+            machine_format_labels={
+                "kicad": "KiCad v6+",
+                "model": "STEP",
+                "altium": "Altium Designer",
+            },
+        )
+
+        def drive(self, _page, formats):
+            attempts.append(list(formats))
+            return DriveReport(
+                missed=list(formats),
+                route_unavailable=True,
+                message="DigiKey does not offer SnapMagic for this exact product.",
+            )
+
+    report, failure = guided.drive_formats(
+        _FakeBrowser(),
+        _FakePage(),
+        _UnavailableRoute(),
+        ["kicad", "model", "altium"],
+        "https://www.digikey.com/en/products/result?keywords=ABC-1",
+    )
+
+    assert failure is None
+    assert report.route_unavailable is True
     assert attempts == [["kicad"]]

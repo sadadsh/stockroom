@@ -48,13 +48,12 @@ def test_snapmagic_detail_url_decodes_exact_identity():
 
 
 def test_digikey_product_and_samacsys_detail_urls_decode_exact_identity():
-    digikey = page_identity(
-        "digikey-ultralibrarian",
-        (
-            "https://www.digikey.com/en/products/detail/texas-instruments/"
-            "TPD6E05U06RVZR/2094564"
-        ),
+    detail_url = (
+        "https://www.digikey.com/en/products/detail/texas-instruments/"
+        "TPD6E05U06RVZR/2094564"
     )
+    digikey = page_identity("digikey-ultralibrarian", detail_url)
+    digikey_snapmagic = page_identity("digikey-snapmagic", detail_url)
     samacsys = page_identity(
         "samacsys",
         (
@@ -68,6 +67,7 @@ def test_digikey_product_and_samacsys_detail_urls_decode_exact_identity():
         "TPD6E05U06RVZR",
         "texas-instruments",
     )
+    assert digikey_snapmagic == digikey
     assert samacsys is not None
     assert (samacsys.mpn, samacsys.manufacturer) == (
         "TPD6E05U06RVZR",
@@ -221,3 +221,46 @@ def test_guided_attach_does_not_call_either_attach_seam_on_identity_failure(
     assert not kicad_attaches
     assert not altium_attaches
     assert candidate.entry_name == "original-entry"
+
+
+def test_guided_attach_rejects_mixed_digikey_route_receipts(monkeypatch, tmp_path):
+    capability = VendorCapability(
+        key="digikey",
+        label="DigiKey CAD Models",
+        tools=("kicad", "altium"),
+        formats_exclusive=True,
+        aggregator=True,
+        needs_login=True,
+        instruction="",
+        machine_format_labels={"kicad": "KiCad v6+"},
+    )
+    monkeypatch.setattr(
+        guided,
+        "get_adapter",
+        lambda _key: type(
+            "_Adapter",
+            (),
+            {
+                "capability": capability,
+                "evidence_provider_key": "digikey-ultralibrarian",
+            },
+        )(),
+    )
+    source = guided.GuidedCaptureSource(
+        lambda: (_ for _ in ()).throw(AssertionError("mixed routes must fail before inspect")),
+        vendor="digikey",
+        download_root=tmp_path,
+    )
+    landed = [
+        type("_Receipt", (), {"evidence_provider_key": "digikey-snapmagic"})(),
+        type("_Receipt", (), {"evidence_provider_key": "digikey-ultralibrarian"})(),
+    ]
+
+    outcome = source._attach(
+        _Record(),
+        landed,
+        "https://www.digikey.com/en/products/result?keywords=TPD6E05U06RVZR",
+        evidence_provider_key="digikey-snapmagic",
+    )
+
+    assert "route attribution mismatch" in outcome.error

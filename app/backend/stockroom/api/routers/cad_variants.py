@@ -71,6 +71,18 @@ def _provider_presentation(provider: str) -> tuple[str, int, str, str]:
     known = _PROVIDER_PRESENTATION.get(provider)
     if known is not None:
         return known
+    for family, presentation in _PROVIDER_PRESENTATION.items():
+        suffix = f"-{family}"
+        if provider.endswith(suffix):
+            surface = re.sub(r"[._-]+", " ", provider[: -len(suffix)]).title()
+            label, rank, trust_label, _reason = presentation
+            return (
+                f"{surface} · {label}",
+                rank,
+                trust_label,
+                f"{label}-authored retained variant acquired through {surface}; "
+                "exact identity and bundle validation passed.",
+            )
     display = re.sub(r"[._-]+", " ", provider).title()
     return (
         display,

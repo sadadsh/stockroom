@@ -293,7 +293,9 @@ def test_role_index_preserves_every_variant_and_ranks_ultra_librarian_first(
     manifests = []
     for provider, content in (
         ("snapmagic", b'(kicad_symbol_lib (symbol "Snap"))'),
+        ("digikey-snapmagic", b'(kicad_symbol_lib (symbol "DigiKey Snap"))'),
         ("ultralibrarian", b'(kicad_symbol_lib (symbol "Ultra"))'),
+        ("digikey-ultralibrarian", b'(kicad_symbol_lib (symbol "DigiKey Ultra"))'),
     ):
         manifests.append(
             store.record_role_artifact_success(
@@ -319,14 +321,16 @@ def test_role_index_preserves_every_variant_and_ranks_ultra_librarian_first(
 
     variants = store.list_role_variants(identity=_IDENTITY, role="symbol")
 
-    assert len(variants) == 2
+    assert len(variants) == 4
     assert [variant.provider_key for variant in variants] == [
         "ultralibrarian",
+        "digikey-ultralibrarian",
         "snapmagic",
+        "digikey-snapmagic",
     ]
     assert {variant.manifest_digest for variant in variants} == set(manifests)
     index_entries = list((store.root / "Indexes").rglob("*.json"))
-    assert len(index_entries) == 2
+    assert len(index_entries) == 4
 
 
 def test_composed_role_manifest_recursively_reverifies_its_exact_source_bytes(
