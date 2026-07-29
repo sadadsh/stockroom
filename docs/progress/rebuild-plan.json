@@ -40,11 +40,11 @@
       {
         "id": "deploy-and-durable-state",
         "name": "Deploy And Durable State",
-        "status": "pending",
+        "status": "verified",
         "owner": "development tool · Windows deployment and Obsidian state",
-        "evidence": "Canonical main and origin/main are at abe30c42. The installed checkout remains at 3ce8845c with preserved fixture changes and untracked evidence. Current provider and conversion changes are scoped working-tree edits; no visible app or desktop process was touched during this pass.",
-        "blocker": "The scoped provider changes still need the full practical gate, commit, push, non-destructive installed-checkout adoption, and current-state/QMD refresh.",
-        "next_action": "Complete the scoped gates, commit and push exact paths, deploy without restarting the active desktop session, refresh project knowledge, and schedule only the live AD26 conversion for a desktop-free window."
+        "evidence": "Implementation commit 29fd20a5 is on canonical main and origin/main. The installed checkout was fast-forwarded to that revision with an explicit ul_import.py content marker while preserving all five modified KiCad fixtures plus drive-shots/ and paste_list.js. Stockroom was not restarted or launched, and no visible browser, mouse, keyboard, or desktop control was used. The permanent Current State records the exact proven boundary and the QMD project collection was refreshed.",
+        "blocker": "No deployment blocker remains for the headless provider route. Live AD26 conversion remains a separate desktop-free verification, and the two broad backend gate attempts timed out without a result.",
+        "next_action": "When the owner is no longer using the desktop, run only the live AD26 conversion canary and then continue unrelated-MPN/provider scale qualification."
       }
     ]
   },
