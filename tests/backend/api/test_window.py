@@ -952,7 +952,8 @@ def test_cad_loaded_scripts_order_and_omission():
     )
     assert len(with_creds) == 2  # overlay, driver - no autofill
     assert "__STOCKROOM_OVERLAY__" in with_creds[0]  # overlay first
-    assert "KiCad" in with_creds[1] and "Altium" in with_creds[1]  # driver last
+    assert "kicad, altium" in with_creds[1]  # guidance-only compatibility script last
+    assert ".click()" not in with_creds[1]
     assert "p" not in "".join(with_creds) or True  # creds never injected into the vendor page
 
     no_creds = cad_loaded_scripts(
@@ -960,7 +961,8 @@ def test_cad_loaded_scripts_order_and_omission():
     )
     assert len(no_creds) == 2  # overlay, driver
     assert "__STOCKROOM_OVERLAY__" in no_creds[0]
-    assert "KiCad" in no_creds[1]
+    assert "kicad" in no_creds[1]
+    assert ".click()" not in no_creds[1]
 
 
 # -- light defensive re-injection (Phase 2 LGN-03): cad_scripts_for_url + current-url
@@ -985,7 +987,7 @@ def _stub_creds(monkeypatch, **fields):
     monkeypatch.setattr(MC.MachineConfig, "load", classmethod(lambda cls: cfg))
 
 
-def test_cad_scripts_for_url_digikey_is_overlay_and_driver_only_manual_login(monkeypatch):
+def test_cad_scripts_for_url_digikey_is_overlay_and_guidance_only(monkeypatch):
     from stockroom.host import window as W
 
     _stub_creds(monkeypatch, digikey_username="dku", digikey_password="dkp")
@@ -995,17 +997,17 @@ def test_cad_scripts_for_url_digikey_is_overlay_and_driver_only_manual_login(mon
     # login is MANUAL: overlay + driver only, and the saved creds never reach the vendor page
     assert len(scripts) == 2
     assert "__STOCKROOM_OVERLAY__" in scripts[0]
-    assert "eda-cad-model-link" in scripts[1]  # the digikey models-page driver
+    assert "managed capture route" in scripts[1]
+    assert ".click()" not in scripts[1]
     assert "dku" not in "".join(scripts) and "dkp" not in "".join(scripts)
 
 
-def test_cad_scripts_for_a_wandered_page_still_carry_the_session_reactor(monkeypatch):
+def test_cad_scripts_for_a_wandered_page_never_recreate_a_provider_reactor(monkeypatch):
     from stockroom.host import window as W
 
     _stub_creds(monkeypatch)
-    # The user wandered the capture window off to a non-vendor site: the CURRENT url derives
-    # to no vendor, but the session's target_url still yields the DigiKey reactor - whose
-    # off-site branch brings them back to the part page - never the guidance-only noop.
+    # The retired host bridge may identify the original vendor for useful guidance, but it must
+    # never recreate the removed DigiKey reactor or operate a remote page.
     scripts = W.cad_scripts_for_url(
         "https://www.example.com/somewhere",
         ["kicad_symbol"],
@@ -1013,9 +1015,10 @@ def test_cad_scripts_for_a_wandered_page_still_carry_the_session_reactor(monkeyp
         target_url="https://www.digikey.com/en/products/detail/x/13563754",
     )
     joined = "".join(scripts)
-    assert "__SR_DK_RUNNING__" in joined  # the DigiKey reactor
-    assert "digikey.com/en/products/detail/x/13563754" in joined  # TARGET embedded
-    assert "No automation for this vendor" not in joined
+    assert "__SR_DK_RUNNING__" not in joined
+    assert ".click()" not in joined
+    assert "managed capture route" in joined
+    assert "digikey.com/en/products/detail/x/13563754" not in joined
 
 
 def test_cad_scripts_for_url_snapeda_and_samacsys_autofill(monkeypatch):
@@ -1034,13 +1037,15 @@ def test_cad_scripts_for_url_snapeda_and_samacsys_autofill(monkeypatch):
     assert len(sam) == 2 and "smu" not in "".join(sam)
 
 
-def test_cad_scripts_for_url_without_creds_is_overlay_and_driver_only(monkeypatch):
+def test_cad_scripts_for_url_without_creds_is_overlay_and_guidance_only(monkeypatch):
     from stockroom.host import window as W
 
     _stub_creds(monkeypatch)  # nothing saved
     scripts = W.cad_scripts_for_url("https://www.digikey.com/x", ["kicad_symbol"])
     assert len(scripts) == 2  # overlay + driver, autofill omitted
-    assert "__STOCKROOM_OVERLAY__" in scripts[0] and "eda-cad-model-link" in scripts[1]
+    assert "__STOCKROOM_OVERLAY__" in scripts[0]
+    assert "managed capture route" in scripts[1]
+    assert ".click()" not in scripts[1]
 
 
 def test_inject_cad_scripts_re_derives_from_the_current_url(monkeypatch):
