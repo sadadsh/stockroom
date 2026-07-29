@@ -834,8 +834,18 @@ class GuidedCaptureSource:
         def current_issue() -> str:
             return str(detector(page) or "")
 
-        def clear_security_gate() -> SourceOutcome | None:
-            issue = current_issue()
+        def security_issue() -> str:
+            # A normal signed-out page is not a security gate. The provider's broader
+            # user-clearance detector also reports its Login link, so using it before
+            # `_sign_in_once` deadlocks automatic login: Stockroom waits for the person
+            # without ever trying the saved credentials. Only actual CAPTCHA/MFA/passkey
+            # evidence is eligible for the pre-login handoff.
+            from stockroom.capture.vendors import _security_verification_issue
+
+            return _security_verification_issue(page, adapter.capability.label)
+
+        def clear_security_gate(issue_detector=current_issue) -> SourceOutcome | None:
+            issue = issue_detector()
             if not issue:
                 return None
             wait_for_clearance = getattr(session.browser, "wait_for_user_clearance", None)
@@ -847,7 +857,7 @@ class GuidedCaptureSource:
                 manufacturer=manufacturer,
                 mpn=mpn,
                 message=issue,
-                issue_detector=current_issue,
+                issue_detector=issue_detector,
                 should_cancel=self._user_cancelled,
                 timeout_s=self._user_clearance_timeout_s,
             )
@@ -867,7 +877,7 @@ class GuidedCaptureSource:
                 blocked=not cancelled,
             )
 
-        gate_outcome = clear_security_gate()
+        gate_outcome = clear_security_gate(security_issue)
         if gate_outcome is not None:
             return gate_outcome
         signed_in = getattr(adapter, "signed_in", None)
