@@ -1,8 +1,10 @@
+import hashlib
 from pathlib import Path
 
 import pytest
 
-from stockroom.model.part import PartRecord
+from stockroom.model.cad_variant import CadVariantArtifactPointer, CadVariantPointer
+from stockroom.model.part import AssetRef, PartRecord
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -12,6 +14,57 @@ def _seed(ops, pid, mpn):
     (ops.lib.parts_dir / f"{pid}.json").write_text(
         PartRecord(id=pid, display_name=pid, category="Diodes", mpn=mpn).dumps(), encoding="utf-8"
     )
+
+
+def _digest(data: bytes) -> str:
+    return f"sha256:{hashlib.sha256(data).hexdigest()}"
+
+
+def _seed_installed_kicad_with_pointers(ops, pid: str):
+    _seed(ops, pid, "S1M")
+    record = ops.load_record(pid)
+    library = ops.lib
+    symbol = library.symbol_lib_path("Diodes")
+    footprint = library.footprint_lib_path("Diodes") / "S1M.kicad_mod"
+    model = library.models_dir / "S1M.step"
+    for path in (symbol, footprint, model):
+        path.parent.mkdir(parents=True, exist_ok=True)
+    symbol_bytes = b'(kicad_symbol_lib (version 20240101) (symbol "S1M"))'
+    footprint_bytes = b'(footprint "S1M" (version 20240108))'
+    model_bytes = b"ISO-10303-21;\nEND-ISO-10303-21;\n"
+    symbol.write_bytes(symbol_bytes)
+    footprint.write_bytes(footprint_bytes)
+    model.write_bytes(model_bytes)
+    record.assets_for("kicad").symbol = AssetRef(lib="SR-Diodes", name="S1M")
+    record.assets_for("kicad").footprint = AssetRef(lib="SR-Diodes", name="S1M")
+    record.assets_for("kicad").model = AssetRef(file="models/S1M.step")
+    record_path = library.parts_dir / f"{pid}.json"
+    record_path.write_text(record.dumps(), encoding="utf-8")
+    ops.repo.commit("seed installed KiCad projection", [symbol, footprint, model, record_path])
+
+    kicad_manifest = _digest(b"installed KiCad manifest")
+    kicad_pointer = CadVariantPointer(
+        manifest_digest=kicad_manifest,
+        provider="stockroom-library",
+        artifacts={
+            "symbol": CadVariantArtifactPointer(_digest(symbol_bytes), "symbol"),
+            "footprint": CadVariantArtifactPointer(_digest(footprint_bytes), "footprint"),
+            "model": CadVariantArtifactPointer(_digest(model_bytes), "model"),
+        },
+    )
+    altium_pointer = CadVariantPointer(
+        manifest_digest=_digest(b"composed Altium manifest"),
+        provider="ultralibrarian",
+        artifacts={
+            "symbol": CadVariantArtifactPointer(_digest(b"SchLib"), "altium_symbol"),
+            "footprint": CadVariantArtifactPointer(
+                _digest(b"PcbLib"),
+                "altium_footprint",
+            ),
+        },
+        source_manifests=(kicad_manifest,),
+    )
+    return kicad_pointer, altium_pointer, model, record_path
 
 
 def test_attach_from_loose_pair(library_ops):
@@ -190,3 +243,47 @@ def test_attach_takes_the_loose_pair_when_a_bundle_carries_intlib_and_pair(libra
         "trio", FIX / "sample.IntLib", FIX / "sample.SchLib", FIX / "sample.PcbLib"
     )
     assert record.assets_for("altium").symbol is not None and record.assets_for("altium").footprint is not None
+
+
+def test_composed_altium_attach_atomically_adopts_only_the_exact_installed_kicad_pointer(
+    library_ops,
+):
+    ops = library_ops
+    kicad_pointer, altium_pointer, model_path, record_path = (
+        _seed_installed_kicad_with_pointers(ops, "composed")
+    )
+
+    record = ops.attach_altium_assets(
+        "composed",
+        FIX / "sample.SchLib",
+        FIX / "sample.PcbLib",
+        active_variant=altium_pointer,
+        compatible_kicad_variant=kicad_pointer,
+    )
+
+    assert record.cad_variants.selection_for("kicad") == kicad_pointer
+    assert record.cad_variants.selection_for("altium") == altium_pointer
+    persisted = ops.load_record("composed")
+    assert persisted.cad_variants.selection_for("kicad") == kicad_pointer
+    assert persisted.cad_variants.selection_for("altium") == altium_pointer
+
+    altium_dir = ops.lib.parts_dir.parent / "altium"
+    sch_before = (altium_dir / "composed.SchLib").read_bytes()
+    pcb_before = (altium_dir / "composed.PcbLib").read_bytes()
+    record_before = record_path.read_bytes()
+    head_before = ops.repo.head()
+    model_path.write_bytes(b"tampered installed model")
+
+    with pytest.raises(ValueError, match="differs from the cross-EDA source manifest"):
+        ops.attach_altium_assets(
+            "composed",
+            FIX / "sample.SchLib",
+            FIX / "sample.PcbLib",
+            active_variant=altium_pointer,
+            compatible_kicad_variant=kicad_pointer,
+        )
+
+    assert ops.repo.head() == head_before
+    assert (altium_dir / "composed.SchLib").read_bytes() == sch_before
+    assert (altium_dir / "composed.PcbLib").read_bytes() == pcb_before
+    assert record_path.read_bytes() == record_before
