@@ -477,18 +477,25 @@ def test_altium_only_download_composes_with_reverified_active_kicad_without_repl
             {"capability": type("_Capability", (), {"label": "Ultra Librarian"})()},
         )(),
     )
+
+    def _verify_installed_names(**kwargs):
+        assert kwargs["kicad_symbol"].name == "Diodes.kicad_sym"
+        assert kwargs["kicad_footprint"].name == "D_SMA.kicad_mod"
+        assert kwargs["step_model"].name == "S1M.step"
+        return {
+            "valid": True,
+            "terminal_equivalence": True,
+            "pad_equivalence": True,
+            "package_equivalence": True,
+        }
+
     source = GuidedCaptureSource(
         lambda: _Pipeline(),
         vendor="ultralibrarian",
         download_root=tmp_path / "Downloads",
         attach_altium=_attach_altium,
         evidence_store=store,
-        cross_eda_verifier=lambda **_kwargs: {
-            "valid": True,
-            "terminal_equivalence": True,
-            "pad_equivalence": True,
-            "package_equivalence": True,
-        },
+        cross_eda_verifier=_verify_installed_names,
         now_iso=lambda: "2026-07-28T00:00:00Z",
     )
 

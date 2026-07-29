@@ -458,13 +458,21 @@ def record_composed_browser_altium_evidence(
     )
     with tempfile.TemporaryDirectory(prefix="stockroom-composed-kicad-") as temporary:
         root = Path(temporary)
-        materialized = {
-            "symbol": root / "Active.kicad_sym",
-            "footprint": root / "Active.kicad_mod",
-            "model": root / "Active.step",
+        defaults = {
+            "symbol": "Active.kicad_sym",
+            "footprint": "Active.kicad_mod",
+            "model": "Active.step",
         }
-        for role, path in materialized.items():
-            data = verified_kicad[role].data
+        materialized: dict[str, Path] = {}
+        for role, fallback in defaults.items():
+            variant = verified_kicad[role]
+            # Footprints name their STEP payload by basename. Re-materializing verified bytes
+            # under invented "Active.*" names changes that relationship and makes the verifier
+            # reject a correct installed component. Evidence suggested names are already
+            # path-free validated filenames, so preserve them exactly.
+            path = root / (variant.suggested_name or fallback)
+            materialized[role] = path
+            data = variant.data
             path.write_bytes(data)
             if path.read_bytes() != data:
                 raise ValueError(f"could not re-materialize verified KiCad {role} bytes")
