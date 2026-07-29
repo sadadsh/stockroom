@@ -6,7 +6,7 @@
   "note": "Owner outcomes are the product source of truth. The historical engineering checklist is retained below as unweighted implementation history and must never be presented as product readiness.",
   "product_scope": "Windows-only component-library management for both KiCad and Altium. A capability ships only when both EDA workflows are supported. KiCad-only project management is deferred and removed from the current frontend; its backend and Git history are preserved.",
   "active_work": {
-    "last_updated": "2026-07-29T08:08:11Z",
+    "last_updated": "2026-07-29T08:11:40Z",
     "objective": "Finish exact-MPN-to-assets acquisition with the smallest possible user workload: use verified direct sources and reviewed provider automation, retain every usable file, convert supported provider packages into native outputs, and require exact identity plus semantic and cross-EDA verification before attachment.",
     "refresh_policy": "Manually refreshed at meaningful checkpoints; this is not real-time telemetry.",
     "workstreams": [
@@ -42,9 +42,9 @@
         "name": "Deploy And Durable State",
         "status": "completed",
         "owner": "Codex · Windows deployment and Obsidian state",
-        "evidence": "Implementation and frontend-bundle commit b3e831cd is contained in canonical main, origin/main, and the converged managed Windows install. Deployment verified the AP214 route, supplementary evidence schema, and exact committed frontend bundle while preserving unrelated working changes and installed fixtures. Stockroom was not running, so no process restart was needed.",
-        "blocker": "Source, remote, and installed checkout convergence is complete for the multi-author DigiKey implementation. Automatic hot adoption without a deploy/restart ritual is still a separate unfinished product outcome.",
-        "next_action": "Deploy commit 04c5bd9d and its progress checkpoint, then continue unrelated-MPN and package-class qualification without desktop takeover."
+        "evidence": "Implementation commit 04c5bd9d and live-proof checkpoint ea55785c are contained in canonical main, origin/main, and the converged managed Windows install. Deployment verified the CloakBrowser Chromium engine, pinned cloakbrowser 0.5.2 dependency, and live artifact digest while preserving unrelated working changes and installed fixtures. The managed environment was synchronized with the frozen lock and imports cloakbrowser 0.5.2. Stockroom was not running, so no process restart was needed.",
+        "blocker": "Source, remote, managed checkout, and managed dependency convergence are complete for the live broker-retention implementation. Automatic hot adoption without a deploy/restart ritual is still a separate unfinished product outcome.",
+        "next_action": "Continue unrelated-MPN and package-class qualification without desktop takeover."
       }
     ]
   },
