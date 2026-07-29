@@ -728,6 +728,15 @@ def library_router(require_token) -> APIRouter:
                 raise ValueError(
                     "assisted capture does not accept a batch limit; select exactly one part"
                 )
+            adapter = get_adapter(vendor)
+            if (
+                background
+                and adapter is not None
+                and adapter.capability.browser_access == "user_driven"
+            ):
+                raise ValueError(
+                    f"{adapter.capability.label} requires a visible person-driven provider page"
+                )
         if part_ids is not None and len(part_ids) == 1 and ctx.index.get(part_ids[0]) is None:
             raise FileNotFoundError(f"no such part: {part_ids[0]}")
 

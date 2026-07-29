@@ -47,6 +47,18 @@ _RETRY_BACKOFF = 15.0
 _BREAKER_THRESHOLD = 5
 
 
+def _convert_ul_altium_package(inputs, expected_manufacturer: str, expected_mpn: str):
+    """Lazy bridge from capture to the Windows-only Altium conversion capability."""
+
+    from stockroom.altium.ul_import import convert_ul_altium_package
+
+    return convert_ul_altium_package(
+        inputs,
+        expected_manufacturer=expected_manufacturer,
+        expected_mpn=expected_mpn,
+    )
+
+
 def build_sources(ctx, *, run_write=None, paced: bool = True):
     """The asset sources for this context, cheapest first.
 
@@ -307,6 +319,10 @@ def run_guided_capture(
         adapter = get_adapter(key)
         if adapter is None:
             raise ValueError(f"no network capture adapter for provider {key!r}")
+        evidence_provider_key = getattr(adapter, "evidence_provider_key", key)
+        source_user_driven = user_driven or (
+            operator_authorized and not adapter.capability.operator_automation
+        )
         policy = (
             machine_access_policy(key)
             if not user_driven and not operator_authorized
@@ -344,16 +360,24 @@ def run_guided_capture(
             # never called - so a vendor shipping real .SchLib/.PcbLib had them downloaded and
             # dropped. Passed in rather than imported so capture/ stays clear of the mutation layer.
             attach_altium=ctx.ops.attach_altium_assets,
+            # DigiKey's embedded UL exporter labels its Altium output honestly as a scripting
+            # project. Convert only that reviewed provider package, through the existing Altium
+            # watchdog, before the normal native-library verification and attach path.
+            convert_altium=(
+                _convert_ul_altium_package
+                if evidence_provider_key == "digikey-ultralibrarian"
+                else None
+            ),
             # Credentials are supplied only to providers whose reviewed policy explicitly permits
             # machine access. User-driven providers retain their session in the isolated profile
             # without Stockroom impersonating provider-side choices.
-            credentials=None if user_driven else _saved_credentials,
+            credentials=None if source_user_driven else _saved_credentials,
             run_write=ctx.jobs.run_write,
             now_iso=_utc_now_iso,
             evidence_store=evidence_store,
             playwright_runtime=playwright_runtime,
-            user_driven=user_driven,
-            operator_authorized=operator_authorized,
+            user_driven=source_user_driven,
+            operator_authorized=operator_authorized and not source_user_driven,
             user_cancelled=capture_should_stop,
             cancel_workflow=workflow_cancelled.set,
             rate_limiter=rate_limiter,
@@ -508,6 +532,7 @@ def _take(iterable, n: int):
 # Where each vendor's saved sign-in lives in the machine config. DATA, not a branch: adding a
 # vendor is adding a row here, never an `if vendor == ...` inside the capture engine.
 _CREDENTIAL_FIELDS = {
+    "digikey": ("digikey_username", "digikey_password"),
     "ultralibrarian": ("ul_username", "ul_password"),
     "snapmagic": ("snapeda_username", "snapeda_password"),
     "samacsys": ("samacsys_username", "samacsys_password"),

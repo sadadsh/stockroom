@@ -47,6 +47,34 @@ def test_snapmagic_detail_url_decodes_exact_identity():
     assert identity.manufacturer == "Texas Instruments"
 
 
+def test_digikey_product_and_samacsys_detail_urls_decode_exact_identity():
+    digikey = page_identity(
+        "digikey-ultralibrarian",
+        (
+            "https://www.digikey.com/en/products/detail/texas-instruments/"
+            "TPD6E05U06RVZR/2094564"
+        ),
+    )
+    samacsys = page_identity(
+        "samacsys",
+        (
+            "https://componentsearchengine.com/part-view/TPD6E05U06RVZR/"
+            "Texas%20Instruments"
+        ),
+    )
+
+    assert digikey is not None
+    assert (digikey.mpn, digikey.manufacturer) == (
+        "TPD6E05U06RVZR",
+        "texas-instruments",
+    )
+    assert samacsys is not None
+    assert (samacsys.mpn, samacsys.manufacturer) == (
+        "TPD6E05U06RVZR",
+        "Texas Instruments",
+    )
+
+
 def test_selector_chooses_the_matching_candidate_instead_of_the_first():
     wrong = _candidate("TPD6E05U06RVZ", manufacturer="Texas Instruments")
     right = _candidate(symbol_name="TPD6E05U06RVZR", manufacturer="Texas Instruments")

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from stockroom.capture.vendors import (
+    DigiKeyUltraLibrarianAdapter,
+    SamacSysAssistedAdapter,
     SnapMagicAdapter,
     UltraLibrarianAdapter,
     _challenge_issue,
@@ -49,6 +51,32 @@ def test_requested_mpn_is_recovered_without_losing_identity_punctuation():
     assert (
         _requested_mpn("https://www.snapeda.com/search/?q=MAX6817EUT%2BT", ("q",)) == "MAX6817EUT+T"
     )
+    assert (
+        _requested_mpn(
+            "https://www.digikey.com/en/products/result?keywords=MAX6817EUT%2BT",
+            ("keywords",),
+        )
+        == "MAX6817EUT+T"
+    )
+
+
+def test_digikey_ultralibrarian_is_a_distinct_evidence_route() -> None:
+    adapter = DigiKeyUltraLibrarianAdapter()
+
+    assert adapter.capability.key == "digikey"
+    assert adapter.evidence_provider_key == "digikey-ultralibrarian"
+    assert adapter.capability.browser_access == "machine_allowed"
+    assert adapter.capability.supported_formats == {"kicad", "model", "altium"}
+    assert adapter.resolve_url("MCP4728-E/UN").endswith("keywords=MCP4728-E%2FUN")
+
+
+def test_samacsys_controls_remain_user_driven_but_validation_is_implemented() -> None:
+    adapter = SamacSysAssistedAdapter()
+
+    assert adapter.capability.browser_access == "user_driven"
+    assert adapter.capability.operator_automation is False
+    assert adapter.capability.supported_formats == {"kicad", "model", "altium"}
+    assert adapter.resolve_url("MAX6817EUT+T").endswith("term=MAX6817EUT%2BT")
 
 
 def test_result_navigation_requires_a_whole_exact_mpn_component():

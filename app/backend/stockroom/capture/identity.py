@@ -18,6 +18,29 @@ if TYPE_CHECKING:
 
 
 _PROVIDER_HOSTS = {
+    "digikey": frozenset(
+        {
+            "digikey.com",
+            "www.digikey.com",
+        }
+    ),
+    # The browser surface belongs to DigiKey, but the retained artifact provenance names the
+    # library that authored and exported the bytes. Keeping this key distinct prevents DigiKey
+    # from looking like a fourth CAD author in variant history.
+    "digikey-ultralibrarian": frozenset(
+        {
+            "digikey.com",
+            "www.digikey.com",
+        }
+    ),
+    "samacsys": frozenset(
+        {
+            "componentsearchengine.com",
+            "www.componentsearchengine.com",
+            "samacsys.com",
+            "www.samacsys.com",
+        }
+    ),
     "ultralibrarian": frozenset(
         {
             "app.ultralibrarian.com",
@@ -151,6 +174,14 @@ def page_identity(
             index = segments.index("parts")
             # /parts/<mpn>/<manufacturer>/view-part/
             return PageIdentity(mpn=segments[index + 1], manufacturer=segments[index + 2])
+        if vendor_key in {"digikey", "digikey-ultralibrarian"}:
+            index = segments.index("detail")
+            # /en/products/detail/<manufacturer>/<mpn>/<opaque-product-id>
+            return PageIdentity(mpn=segments[index + 2], manufacturer=segments[index + 1])
+        if vendor_key == "samacsys":
+            index = segments.index("part-view")
+            # /part-view/<mpn>/<manufacturer>
+            return PageIdentity(mpn=segments[index + 1], manufacturer=segments[index + 2])
     except (ValueError, IndexError):
         return None
     return None
@@ -207,7 +238,12 @@ def select_exact_candidate(
         # A native Altium-only archive has no ingest candidate to interrogate. For the implemented
         # browser providers, the canonical detail page must therefore carry the exact identity;
         # otherwise `_attach_altium_assets` would fall back to an arbitrary first library entry.
-        if vendor_key in {"ultralibrarian", "snapmagic"} and detail is None:
+        if vendor_key in {
+            "digikey-ultralibrarian",
+            "samacsys",
+            "snapmagic",
+            "ultralibrarian",
+        } and detail is None:
             return CandidateSelection(
                 error=(
                     "the vendor page does not demonstrate the requested part identity; "

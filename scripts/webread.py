@@ -224,15 +224,15 @@ def _drive(browser, args) -> int:
     if adapter is None:
         raise SystemExit(f"no capture adapter for vendor {args.vendor!r}")
     formats = [f.strip() for f in args.drive.split(",") if f.strip()]
-    pins = adapter.capability.version_pins
-    unpinned = [f for f in formats if f not in pins]
+    selectable = adapter.capability.supported_formats
+    unpinned = [f for f in formats if f not in selectable]
     if unpinned:
-        # `version_pins` is the honest answer to "what can this adapter really select". Driving an
-        # unpinned format would click nothing and then report a vendor limitation that is really an
-        # adapter gap.
+        # `supported_formats` includes stable control ids AND exact reviewed visible labels.
+        # Driving anything else would click nothing and misreport an adapter gap as a catalogue
+        # limitation.
         print(f"NOT PINNED  {', '.join(unpinned)} - this adapter can only select: "
-              f"{', '.join(sorted(pins))}")
-        formats = [f for f in formats if f in pins]
+              f"{', '.join(sorted(selectable))}")
+        formats = [f for f in formats if f in selectable]
         if not formats:
             return 2
 

@@ -34,7 +34,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Literal, Protocol
 from unicodedata import normalize
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 from stockroom.capture.identity import (
     exact_observation_error,
@@ -101,6 +101,9 @@ class VendorCapability:
     # The measured browser runtime for this provider. This is capability data because a single
     # acquisition chain can span providers with different browser requirements.
     browser_engine: BrowserEngine = "chromium"
+    # Whether one explicit part+provider selection authorizes Stockroom to operate ordinary export
+    # controls. False keeps those controls person-driven even in the explicit-provider lane.
+    operator_automation: bool = True
 
     @property
     def supported_formats(self) -> frozenset[str]:
@@ -1161,6 +1164,482 @@ class SnapMagicAdapter:
 
 
 _ADAPTERS[SnapMagicAdapter.capability.key] = SnapMagicAdapter()
+
+
+class DigiKeyUltraLibrarianAdapter:
+    """Ultra Librarian's embedded exporter on DigiKey's exact product/model pages.
+
+    DigiKey is the browser surface, not the CAD author. ``evidence_provider_key`` keeps captured
+    variants attributed to ``digikey-ultralibrarian`` while the UI/provider route remains the
+    familiar ``digikey`` entry. The controls below were measured on DigiKey's dedicated
+    ``/en/models/<id>`` page: one radio-format download at a time. Its Altium choice is explicitly
+    script based, so Stockroom runs that recognized project through its guarded Altium converter
+    before treating the result as a native library.
+    """
+
+    evidence_provider_key = "digikey-ultralibrarian"
+    capability = VendorCapability(
+        key="digikey",
+        label="DigiKey · Ultra Librarian",
+        tools=("kicad", "altium"),
+        formats_exclusive=True,
+        aggregator=True,
+        needs_login=True,
+        instruction=(
+            "Stockroom opens the exact DigiKey product, uses its Ultra Librarian model panel, "
+            "selects KiCad 6+, STEP, and the Altium script package, converts that package to native "
+            "libraries, and verifies every result. Sign in only if DigiKey requires it."
+        ),
+        machine_format_labels={
+            "kicad": "KiCad v6+",
+            "model": "STEP",
+            "altium": "Altium Designer (script based)",
+        },
+        user_format_labels={
+            "kicad": "KiCad v6 or later",
+            "model": "STEP",
+            "altium": "Altium Designer",
+        },
+        browser_access="machine_allowed",
+        browser_engine="camoufox",
+    )
+
+    def __init__(self) -> None:
+        self._exact_product_url = ""
+
+    def resolve_url(self, mpn: str) -> str:
+        return "https://www.digikey.com/en/products/result?keywords=" + quote_plus(mpn)
+
+    def signed_in(self, page) -> bool:
+        """Positive DigiKey account state, never inferred from one missing login link."""
+
+        try:
+            host = (urlparse(page.url or "").hostname or "").casefold()
+            if host not in {"digikey.com", "www.digikey.com"}:
+                return False
+            logged_in = page.locator("#my_digikey_logged_in").first
+            logged_out = page.locator("#my_digikey_logged_out").first
+            return (
+                logged_in.count() > 0
+                and logged_in.is_visible()
+                and (logged_out.count() == 0 or not logged_out.is_visible())
+            )
+        except Exception:  # noqa: BLE001 - unreadable account state is not signed in
+            return False
+
+    def sign_in(self, page, username: str, password: str) -> str:
+        """Use DigiKey's measured two-step OIDC form; stop at every security control."""
+
+        if not username or not password:
+            return "no DigiKey web-account credentials are saved in Settings"
+        try:
+            page.goto(
+                "https://www.digikey.com/MyDigiKey/Login"
+                "?site=US&lang=en&returnurl=https%3A%2F%2Fwww.digikey.com%2Fen%2F",
+                wait_until="domcontentloaded",
+                timeout=60_000,
+            )
+            if self.signed_in(page):
+                return ""
+            username_box = page.locator("#username").first
+            try:
+                username_box.wait_for(state="visible", timeout=30_000)
+            except Exception:  # noqa: BLE001 - an existing SSO session may redirect past the form
+                if self.signed_in(page):
+                    return ""
+                security = _security_verification_issue(page, self.capability.label)
+                return security or "DigiKey did not show its email step"
+            username_box.fill(username)
+            page.locator("#signOnButton").first.click()
+            try:
+                page.locator("#password").first.wait_for(state="visible", timeout=30_000)
+            except Exception:  # noqa: BLE001 - a security step or rejection explains the state
+                security = _security_verification_issue(page, self.capability.label)
+                return security or "DigiKey did not show its password step"
+            security = _security_verification_issue(page, self.capability.label)
+            if security:
+                return security
+            page.locator("#password").first.fill(password)
+            page.locator("#signOnButton").first.click()
+
+            import time as _time
+
+            deadline = _time.monotonic() + 45.0
+            while _time.monotonic() < deadline:
+                security = _security_verification_issue(page, self.capability.label)
+                if security:
+                    return security
+                if self.signed_in(page):
+                    return ""
+                try:
+                    body = (page.inner_text("body") or "").casefold()
+                except Exception:  # noqa: BLE001 - navigation in flight is not a verdict
+                    body = ""
+                if any(
+                    marker in body
+                    for marker in (
+                        "account locked",
+                        "incorrect email or password",
+                        "invalid email or password",
+                        "unable to sign in",
+                    )
+                ):
+                    return "DigiKey did not accept the saved web-account credentials"
+                page.wait_for_timeout(400)
+            return "DigiKey did not confirm the sign-in"
+        except Exception as exc:  # noqa: BLE001 - one provider login cannot crash the run
+            return f"could not sign in to DigiKey: {exc}"
+
+    def evidence_detail_url(
+        self,
+        _page,
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> str:
+        """Return the exact product URL retained before DigiKey moved to its opaque model id."""
+
+        issue = _detail_identity_issue(
+            "digikey-ultralibrarian",
+            self._exact_product_url,
+            expected_manufacturer,
+            expected_mpn,
+        )
+        return "" if issue else self._exact_product_url
+
+    def open_panel(
+        self,
+        page,
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> str:
+        challenge = _challenge_issue(page, self.capability.label)
+        if challenge:
+            return challenge
+        url = page.url or ""
+        if "/products/result" in url:
+            self._exact_product_url = ""
+            requested_mpn = expected_mpn or _requested_mpn(url, ("keywords",))
+            results = page.locator('a[href*="/products/detail/"]')
+            try:
+                results.first.wait_for(state="visible", timeout=20_000)
+            except Exception:  # noqa: BLE001 - a normal exact-part miss
+                return "DigiKey has no exact product result for this MPN."
+            href, error = _exact_result_href(
+                results,
+                requested_mpn,
+                expected_manufacturer=expected_manufacturer,
+                vendor_key="digikey",
+            )
+            if error:
+                return f"DigiKey {error}"
+            page.goto(_absolute(page, href), wait_until="domcontentloaded")
+            url = page.url or ""
+
+        if "/products/detail/" in url:
+            issue = _detail_identity_issue(
+                "digikey",
+                url,
+                expected_manufacturer,
+                expected_mpn,
+            )
+            if issue:
+                return issue
+            self._exact_product_url = url
+            model_link = page.locator('a[data-testid="eda-cad-model-link"]').first
+            if model_link.count() == 0:
+                model_link = page.locator('a[href*="/models/"]').first
+            try:
+                model_link.wait_for(state="visible", timeout=15_000)
+            except Exception:  # noqa: BLE001 - no models page is a terminal catalogue fact
+                return "DigiKey offers no EDA / CAD Models page for this exact product."
+            href = model_link.get_attribute("href") or ""
+            if not provider_url_allowed("digikey", _absolute(page, href)):
+                return "DigiKey exposed a CAD models link outside its official origin."
+            page.goto(_absolute(page, href), wait_until="domcontentloaded")
+            url = page.url or ""
+
+        if "/models/" not in url:
+            return "DigiKey did not reach its dedicated EDA / CAD Models page."
+        if not self._exact_product_url:
+            return (
+                "DigiKey's opaque model page is missing its exact product-page identity; "
+                "refusing to download."
+            )
+
+        row = page.locator("#ultra-media-active").first
+        try:
+            row.wait_for(state="visible", timeout=15_000)
+        except Exception:  # noqa: BLE001 - provider availability varies by exact product
+            return "DigiKey does not offer Ultra Librarian for this exact product."
+        modal = page.locator("#ultralib-export-options").first
+        labels = modal.locator("label[data-original]")
+        if labels.count() > 0:
+            try:
+                if labels.first.is_visible():
+                    return ""
+            except Exception:  # noqa: BLE001 - hidden template labels are not an open modal
+                pass
+        opener = page.locator(
+            'a[onclick*="ultralib-export-options"], '
+            'button[onclick*="ultralib-export-options"]'
+        ).first
+        try:
+            opener_visible = opener.count() > 0 and opener.is_visible()
+        except Exception:  # noqa: BLE001 - an unreadable control is not actionable
+            opener_visible = False
+        if not opener_visible:
+            try:
+                row.click(force=True, timeout=5_000)
+            except Exception:  # noqa: BLE001 - DigiKey's left bar can intercept the row
+                pass
+            page.evaluate("() => document.querySelector('#ultra-media-active')?.click()")
+            try:
+                opener.wait_for(state="visible", timeout=15_000)
+            except Exception:  # noqa: BLE001 - the provider section failed to materialize
+                return "DigiKey's Ultra Librarian section exposed no format selector."
+        try:
+            opener.click(force=True, timeout=5_000)
+        except Exception:  # noqa: BLE001 - the provider's own handler remains the target
+            page.evaluate(
+                """() => {
+                    const button = document.querySelector(
+                        '[onclick*="ultralib-export-options"]'
+                    );
+                    button?.click();
+                }"""
+            )
+        try:
+            labels.first.wait_for(state="visible", timeout=15_000)
+        except Exception:  # noqa: BLE001 - no labels means no supported export choice
+            return "DigiKey's Ultra Librarian format list did not open."
+        return ""
+
+    @staticmethod
+    def _label_text(label) -> str:
+        raw = label.get_attribute("data-original") or label.inner_text() or ""
+        return " ".join(normalize("NFKC", raw).split()).casefold()
+
+    @classmethod
+    def _select_label(cls, page, modal, predicate) -> bool:
+        labels = modal.locator("label[data-original]")
+        matches = [
+            labels.nth(index)
+            for index in range(labels.count())
+            if predicate(cls._label_text(labels.nth(index)))
+        ]
+        if len(matches) != 1:
+            return False
+        label = matches[0]
+        control_id = (label.get_attribute("for") or "").strip()
+        if not control_id:
+            return False
+        escaped = control_id.replace("\\", "\\\\").replace('"', '\\"')
+        control = page.locator(f'[id="{escaped}"]').first
+        if control.count() == 0:
+            return False
+        try:
+            control.check(force=True, timeout=5_000)
+        except Exception:  # noqa: BLE001 - styled DigiKey radios may require their label
+            try:
+                label.click()
+            except Exception:  # noqa: BLE001 - verified state below remains authoritative
+                return False
+        try:
+            return control.is_checked()
+        except Exception:  # noqa: BLE001 - an unreadable state is not a selection
+            return False
+
+    @classmethod
+    def _label_is_selected(cls, page, modal, predicate) -> bool:
+        labels = modal.locator("label[data-original]")
+        matches = [
+            labels.nth(index)
+            for index in range(labels.count())
+            if predicate(cls._label_text(labels.nth(index)))
+        ]
+        if len(matches) != 1:
+            return False
+        control_id = (matches[0].get_attribute("for") or "").strip()
+        if not control_id:
+            return False
+        escaped = control_id.replace("\\", "\\\\").replace('"', '\\"')
+        control = page.locator(f'[id="{escaped}"]').first
+        try:
+            return control.count() == 1 and control.is_checked()
+        except Exception:  # noqa: BLE001 - unreadable state is not a selection
+            return False
+
+    def drive(
+        self,
+        page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> DriveReport:
+        if not expected_manufacturer.strip() or not expected_mpn.strip():
+            return DriveReport(
+                missed=list(formats),
+                blocked=True,
+                message="DigiKey capture requires the exact expected manufacturer and MPN.",
+            )
+        issue = self.open_panel(
+            page,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+        )
+        if issue:
+            clearance = self.user_clearance_issue(page)
+            return DriveReport(
+                missed=list(formats),
+                blocked=bool(clearance) or _is_global_blockage(issue),
+                requires_user_clearance=bool(clearance),
+                message=issue,
+            )
+        fmt = formats[0] if formats else ""
+        modal = page.locator("#ultralib-export-options").first
+        clear = modal.locator('[id^="btn-clear-selection-"]').first
+        if clear.count() > 0:
+            try:
+                clear.click()
+            except Exception:  # noqa: BLE001 - selections are still verified below
+                pass
+
+        base_predicate = {
+            "kicad": lambda text: "kicad" in text and ("v6" in text or "6" in text),
+            "altium": lambda text: text == "altium designer (script based)",
+            # DigiKey's STEP radio accompanies a 2D export. Use current KiCad as the carrier when
+            # STEP is the only missing role, rather than selecting an obsolete arbitrary format.
+            "model": lambda text: "kicad" in text and ("v6" in text or "6" in text),
+        }.get(fmt)
+        if base_predicate is None or not self._select_label(page, modal, base_predicate):
+            return DriveReport(
+                missed=[fmt] if fmt else list(formats),
+                message=f"DigiKey Ultra Librarian does not offer the pinned {fmt or 'CAD'} format.",
+            )
+
+        step_selected = self._select_label(page, modal, lambda text: text == "step")
+        if fmt == "model" and not step_selected:
+            return DriveReport(
+                missed=[fmt],
+                message="DigiKey Ultra Librarian exposed no STEP choice for this exact product.",
+            )
+        # Selecting a 3D companion must never steal the 2D radio group. Re-prove the pinned base.
+        base_remained_selected = self._label_is_selected(page, modal, base_predicate)
+        if not base_remained_selected and fmt != "model":
+            base_remained_selected = self._select_label(page, modal, base_predicate)
+        if not base_remained_selected:
+            return DriveReport(
+                missed=[fmt],
+                message="DigiKey changed the pinned format while STEP was selected; refusing.",
+            )
+
+        submit = page.locator("#btn-download-Ultra").first
+        if submit.count() == 0:
+            return DriveReport(
+                missed=[fmt],
+                message="DigiKey Ultra Librarian showed no Download control.",
+            )
+        try:
+            if submit.is_disabled():
+                return DriveReport(
+                    missed=[fmt],
+                    message="DigiKey did not enable Download for the verified format selection.",
+                )
+        except Exception:  # noqa: BLE001 - click plus saved-file evidence remains authoritative
+            pass
+        submit.click()
+        return DriveReport(
+            selected=[fmt],
+            submitted=True,
+            message=f"Requested {fmt} from Ultra Librarian through DigiKey.",
+        )
+
+    def user_clearance_issue(self, page) -> str:
+        security = _security_verification_issue(page, self.capability.label)
+        if security:
+            return security
+        try:
+            url = (page.url or "").casefold()
+            if "auth.digikey.com" in url:
+                return (
+                    "DigiKey needs you to finish sign-in in this window. Stockroom resumes after "
+                    "the provider security flow clears."
+                )
+            dialogs = page.locator('[role="dialog"], [class*="modal"]')
+            for index in range(min(dialogs.count(), 20)):
+                dialog = dialogs.nth(index)
+                if not dialog.is_visible():
+                    continue
+                text = " ".join((dialog.inner_text() or "").split()).casefold()
+                if "download speed bump" in text or "guest limit" in text:
+                    return (
+                        "DigiKey reached its guest download limit. Sign in once in this window; "
+                        "the isolated provider profile remembers the session."
+                    )
+        except Exception:  # noqa: BLE001 - unreadable state establishes no account gate
+            pass
+        return ""
+
+    def download_gate(self, page) -> str:
+        return self.user_clearance_issue(page)
+
+
+class SamacSysAssistedAdapter:
+    """Person-triggered SamacSys acquisition with automatic Stockroom capture and validation.
+
+    The current Supplyframe/Component Search Engine terms prohibit automated agents and scripts.
+    Stockroom therefore navigates and overlays the exact task but does not operate provider
+    controls. Once the person starts the download, the same broker, ingest, evidence, native
+    readback, and atomic attach path used by every other provider takes over.
+    """
+
+    capability = VendorCapability(
+        key="samacsys",
+        label="SamacSys",
+        tools=("kicad", "altium"),
+        formats_exclusive=False,
+        aggregator=False,
+        needs_login=True,
+        instruction=(
+            "Open the exact result and start its CAD download. Stockroom captures every delivered "
+            "file, rejects pointer-only .epw files, validates native contents, and attaches only "
+            "a complete exact component."
+        ),
+        user_format_labels={
+            "kicad": "KiCad symbol and footprint",
+            "model": "STEP model",
+            "altium": "Altium Designer libraries",
+        },
+        browser_access="user_driven",
+        operator_automation=False,
+    )
+
+    def resolve_url(self, mpn: str) -> str:
+        return "https://componentsearchengine.com/search?term=" + quote_plus(mpn)
+
+    def drive(
+        self,
+        _page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> DriveReport:
+        return DriveReport(
+            missed=list(formats),
+            blocked=True,
+            message=(
+                "SamacSys provider controls are person-driven; Stockroom takes over after the "
+                "download is started."
+            ),
+        )
+
+
+_ADAPTERS[DigiKeyUltraLibrarianAdapter.capability.key] = DigiKeyUltraLibrarianAdapter()
+_ADAPTERS[SamacSysAssistedAdapter.capability.key] = SamacSysAssistedAdapter()
 
 
 def _requested_mpn(url: str, names: tuple[str, ...]) -> str:
