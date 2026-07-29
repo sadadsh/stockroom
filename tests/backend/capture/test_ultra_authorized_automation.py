@@ -235,6 +235,14 @@ def test_guided_machine_mode_rejects_user_only_and_unchecked_adapters(tmp_path):
     )
     assert "explicit live machine-authorization" in unchecked_source._machine_access_issue(ultra)
 
+    selected_provider_source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="snapmagic",
+        download_root=tmp_path,
+        operator_authorized=True,
+    )
+    assert selected_provider_source._machine_access_issue(snapmagic) == ""
+
 
 def test_ultra_result_gate_requires_the_exact_manufacturer_and_mpn():
     exact = "/details/catalogue/Acme/ABC-1?uid=right"

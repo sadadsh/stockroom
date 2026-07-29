@@ -680,9 +680,10 @@ def library_router(require_token) -> APIRouter:
 
         Automatic mode is the default and supports one component or the derived incomplete
         worklist. It tries keyless/direct and policy-permitted machine sources without opening a
-        commercial page. Assisted mode is deliberately one component + one preferred provider:
-        the selected provider opens first, and the same job may advance to another user-driven
-        provider when the first cannot close every remaining gap.
+        commercial page. Assisted mode is deliberately one component + one selected provider:
+        that click authorizes Stockroom to use saved login state and operate the provider's
+        ordinary export controls. Only a real CAPTCHA, MFA, or security gate is handed back to
+        the person.
         """
         from stockroom.capture.runner import run_guided_capture
         from stockroom.capture.vendors import get_adapter
@@ -735,7 +736,7 @@ def library_router(require_token) -> APIRouter:
                 progress=progress,
                 should_stop=should_stop,
                 limit=(int(limit) if limit else None),
-                user_driven=mode == "assisted",
+                operator_authorized=mode == "assisted",
             )
 
         return {"job_id": ctx.jobs.submit_cancellable(work)}
