@@ -334,6 +334,11 @@ def test_user_driven_guided_supply_skips_provider_automation_and_validates_captu
     assert captured_call["url"] == "https://example.invalid/part"
     assert captured_call["broker"].task.task_id == _Record.id
     assert captured_call["broker"].task.mpn_canonical == _Record.mpn
+    hud = captured_call["options"].pop("hud")
+    assert hud.provider_label == "Faketron"
+    assert hud.manufacturer == _Record.manufacturer
+    assert hud.mpn == _Record.mpn
+    assert hud.required_file_labels == ("KiCad symbol and footprint",)
     assert captured_call["options"] == {
         "should_finish": finished,
         "should_cancel": cancelled,
@@ -341,6 +346,44 @@ def test_user_driven_guided_supply_skips_provider_automation_and_validates_captu
     }
     assert pipeline.inputs == [landed]
     assert "nothing this part can use" in (outcome.error or "")
+
+
+@pytest.mark.parametrize(
+    ("status", "message", "workflow_cancelled"),
+    [
+        ("try_another", "left for another provider", False),
+        ("cancelled", "capture was cancelled", True),
+    ],
+)
+def test_user_hud_action_advances_or_cancels_without_attaching(
+    monkeypatch,
+    tmp_path,
+    status,
+    message,
+    workflow_cancelled,
+):
+    browser = _FakeBrowser()
+    _install_adapter(monkeypatch, browser, on_drive=lambda _browser: None)
+    cancel_calls: list[bool] = []
+
+    def capture_user_downloads(_url, _broker, **options):
+        assert options["hud"].required_file_labels == ("KiCad symbol and footprint",)
+        return UserCaptureResult(status=status, files=(), final_url="https://example.invalid/part")
+
+    browser.capture_user_downloads = capture_user_downloads
+    source = guided.GuidedCaptureSource(
+        lambda: (_ for _ in ()).throw(AssertionError("an action without files must not attach")),
+        vendor="faketron",
+        download_root=tmp_path / "Downloads",
+        user_driven=True,
+        cancel_workflow=lambda: cancel_calls.append(True),
+    )
+    source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+
+    outcome = source.supply(_Record())
+
+    assert message in outcome.skipped
+    assert bool(cancel_calls) is workflow_cancelled
 
 
 def test_guided_supply_refuses_ambiguous_identity_before_opening_a_browser(monkeypatch, tmp_path):
@@ -535,6 +578,29 @@ def test_altium_libraries_in_a_download_are_attached_not_dropped(monkeypatch, tm
     assert set(outcome.satisfied) == {Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT}, (
         f"an Altium-only download must report Altium requirements, got {outcome!r}"
     )
+
+
+def test_current_ul_native_archive_shape_exposes_both_altium_libraries(tmp_path):
+    """UL's current .LibPkg bundle also carries native libraries Stockroom can attach directly."""
+    fixtures = Path(__file__).parents[1] / "altium" / "fixtures"
+    bundle = _zip_with(
+        tmp_path,
+        {
+            "Altium Designer (Native)/TPD6E05U06RVZR.LibPkg": b"native package descriptor",
+            "Altium Designer (Native)/TPD6E05U06RVZR.SchLib": (
+                fixtures / "sample.SchLib"
+            ).read_bytes(),
+            "Altium Designer (Native)/TPD6E05U06RVZR.PcbLib": (
+                fixtures / "sample.PcbLib"
+            ).read_bytes(),
+            "Altium Designer (Native)/TPD6E05U06RVZR.step": b"ISO-10303-21;",
+        },
+    )
+
+    found = guided._altium_libraries([_CapturedFile(bundle)])
+
+    assert sorted(path.suffix.casefold() for path in found) == [".pcblib", ".schlib"]
+    assert all(path.read_bytes().startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1") for path in found)
 
 
 def test_only_the_side_the_record_actually_holds_is_reported(monkeypatch, tmp_path):
@@ -822,15 +888,11 @@ def test_signed_in_needs_all_three_signals_not_any_one():
 # --------------------------------------------------------------------------------------------
 
 
-def test_the_default_vendor_chain_prefers_the_only_complete_dual_eda_bundle():
-    """SnapMagic is lower-trust but uniquely supplies same-provider native dual-EDA evidence.
-
-    Exact identity, native readback, cross-EDA equivalence, and immutable evidence mitigate the
-    trust tradeoff; manufacturer-authored Ultra Librarian remains the availability fallback.
-    """
+def test_the_default_vendor_chain_prefers_manufacturer_verified_ultra_librarian():
+    """Trust wins the default; SnapMagic remains the availability fallback."""
     from stockroom.capture import runner
 
-    assert runner._vendor_chain(None) == ["snapmagic", "ultralibrarian"]
+    assert runner._vendor_chain(None) == ["ultralibrarian", "snapmagic"]
 
 
 def test_a_preferred_vendor_keeps_the_other_implemented_provider_as_fallback():
@@ -852,12 +914,7 @@ def test_an_unknown_or_empty_vendor_choice_fails_honestly():
 
 
 def test_snapmagic_serves_native_altium_which_needs_no_conversion():
-    """The reason SnapMagic matters for the owner's Altium half.
-
-    Ultra Librarian's Altium row ships a P-CAD `.lia`, which nothing here converts yet. SnapMagic's
-    `altium_native` is real `.SchLib`/`.PcbLib`, which `_attach` already stores - so the Altium gap
-    closes through the vendor rather than through a converter.
-    """
+    """SnapMagic remains a second native Altium route, not the only one."""
     from stockroom.capture.vendors import get_adapter
 
     sm = get_adapter("snapmagic")
@@ -868,6 +925,32 @@ def test_snapmagic_serves_native_altium_which_needs_no_conversion():
     assert sm.capability.version_pins["kicad"] == "kicad_modv6"
     # one button per format, so the engine MUST sequence it
     assert sm.capability.formats_exclusive is True
+
+
+def test_ultra_librarian_native_altium_is_sourceable_without_a_dom_selector(tmp_path):
+    """The user selects the current native export; Stockroom owns validation and attachment."""
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="ultralibrarian",
+        download_root=tmp_path / "downloads",
+        user_driven=True,
+    )
+
+    assert source.provides() == {
+        Requirement.KICAD_SYMBOL,
+        Requirement.KICAD_FOOTPRINT,
+        Requirement.KICAD_MODEL,
+        Requirement.ALTIUM_SYMBOL,
+        Requirement.ALTIUM_FOOTPRINT,
+    }
+    assert guided._provider_formats(
+        guided.get_adapter("ultralibrarian"),
+        [Requirement.ALTIUM_SYMBOL],
+    ) == ["kicad", "model", "altium"]
+    assert guided._provider_hud_labels(
+        guided.get_adapter("ultralibrarian"),
+        ["kicad", "model", "altium"],
+    ) == ("KiCad 6 or later", "STEP", "Altium Designer (Native)")
 
 
 def test_exclusive_formats_are_downloaded_one_at_a_time(monkeypatch, tmp_path):

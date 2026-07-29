@@ -162,24 +162,8 @@ def test_nothing_is_reported_downloaded_before_a_file_exists(tmp_path, vendor):
         assert item.path.is_file(), f"{item.path} was reported captured but is not on disk"
 
 
-def test_the_registry_does_not_claim_altium_the_app_cannot_yet_attach(tmp_path):
-    """Capability is DATA the engine trusts, so it must say the TRUE thing.
-
-    THE SUBTLE PART, and the reason this test is worth its length: the vendor is NOT the blocker.
-    Ultra Librarian's Altium accordion holds three rows, from the real export panel captured at
-    tests/backend/host/fixtures/ul-export-panel.html:
-
-      * `#AltiumDesigner` "Altium Designer (script based)" -> `UL_Import.pas` + a `.PrjScr` and no
-        libraries at all. Measuring ONLY this row produced the over-general conclusion "UL cannot
-        supply Altium", which is wrong.
-      * `#AltiumPCADV15` "PCAD v15" -> `AltiumV15/<stamp>.lia`, a P-CAD ASCII library Altium
-        imports directly, carrying one symbolDef AND one patternDef.
-
-    So UL genuinely can serve it. What cannot happen yet is STORING it: nothing turns a `.lia` into
-    the record's Altium bundle (see the sibling test below). Because `provides()` is derived from
-    `version_pins`, claiming altium here would schedule parts for requirements no code can satisfy -
-    downloaded every run, never completed. Capability must describe the WHOLE path, vendor and app.
-    """
+def test_ultra_librarian_claims_its_current_native_altium_export():
+    """Official current UL export is native, while the old fixture remains a legacy snapshot."""
     adapter = get_adapter("ultralibrarian")
     assert adapter is not None
     assert adapter.capability.formats_exclusive is False
@@ -187,23 +171,16 @@ def test_the_registry_does_not_claim_altium_the_app_cannot_yet_attach(tmp_path):
     # Current live panel (2026-07-28). The older captured fixture uses `MfrThreeDModel`; the
     # adapter keeps that as a selector fallback but must declare the production control first.
     assert adapter.capability.version_pins["model"] == "ThreeDModel"
-
-    # NOT altium - and the reason is a missing ATTACH, not a missing vendor feature. The PCAD row
-    # really does deliver a `.lia` (proved by the fixture, which serves exactly that). But
-    # `provides()` derives from these pins, so claiming altium would schedule parts for altium
-    # requirements that `_attach` cannot satisfy and `normalize_altium_source` refuses outright -
-    # a part requested and downloaded forever without ever completing.
-    assert "altium" not in adapter.capability.tools
+    assert adapter.capability.tools == ("kicad", "altium")
+    assert adapter.capability.user_format_labels["altium"] == "Altium Designer (Native)"
+    assert adapter.capability.supported_formats == {"kicad", "model", "altium"}
+    # DOM ids are not guessed from documentation. UL is a user-driven provider, so the visible
+    # format declaration can be executable without a machine-control selector.
     assert "altium" not in adapter.capability.version_pins
 
 
-def test_the_altium_attach_really_is_the_thing_that_is_missing(tmp_path):
-    """Pins the REASON above to the code, so the capability is re-enabled for the right cause.
-
-    If someone wires `.lia` through the attach path, this test starts failing and says so - which
-    is the signal that the capability flip is now correct. Without it, the comment on
-    UltraLibrarianAdapter is just prose that can quietly go stale.
-    """
+def test_legacy_pcad_lia_still_requires_a_conversion_route(tmp_path):
+    """Native UL is primary; a legacy PCAD archive must not masquerade as native Altium."""
     from stockroom.altium.extract import normalize_altium_source
 
     lia = tmp_path / "2026-07-27_20-52-11.lia"

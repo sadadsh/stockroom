@@ -212,7 +212,13 @@ def test_a_deferred_part_is_not_counted_as_completed_or_failed():
         breaker=CircuitBreaker(threshold=99),
     )
     assert report.counts() == {"deferred": 1}
-    assert report.items[0].remaining == ["kicad_symbol"]
+    assert report.items[0].remaining == [
+        "kicad_symbol",
+        "kicad_footprint",
+        "kicad_model",
+        "altium_symbol",
+        "altium_footprint",
+    ]
 
 
 def test_a_healthy_run_is_unaffected_by_the_breaker():
@@ -233,4 +239,5 @@ def test_a_healthy_run_is_unaffected_by_the_breaker():
         breaker=CircuitBreaker(threshold=2),
     )
     assert report.stopped is False
-    assert report.counts() == {"completed": 5}
+    # The source made real progress but filled only one of the five required CAD roles.
+    assert report.counts() == {"improved": 5}

@@ -14,6 +14,7 @@ guided source may attach them.
 from __future__ import annotations
 
 import json
+import tempfile
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Protocol
@@ -22,9 +23,14 @@ from stockroom.capture.cross_eda import verify_kicad_component
 from stockroom.capture.identity import page_identity, select_exact_candidate
 from stockroom.evidence import EvidenceArtifact, EvidenceStore
 from stockroom.ingest.staging import StagingCandidate
-from stockroom.planning import KICAD_CAD_OPERATION, ExactPartIdentity
+from stockroom.planning import (
+    ALTIUM_CAD_OPERATION,
+    KICAD_CAD_OPERATION,
+    ExactPartIdentity,
+)
 
 BROWSER_CAPTURE_ADAPTER_VERSION = "browser-guided-cad-v1"
+INSTALLED_KICAD_READBACK_ADAPTER_VERSION = "installed-kicad-readback-v1"
 
 
 class CrossEdaVerifier(Protocol):
@@ -139,6 +145,296 @@ def _canonical_report(
         raise ValueError("cross-EDA validation report must be strict JSON") from exc
 
 
+def _cross_eda_is_proved(report: object) -> bool:
+    if not isinstance(report, dict) or report.get("valid") is not True:
+        return False
+    explicit = (
+        report.get("terminal_equivalence"),
+        report.get("pad_equivalence"),
+        report.get("package_equivalence"),
+    )
+    if any(value is not None for value in explicit):
+        return all(value is True for value in explicit)
+    if report.get("schema") != "stockroom.cross-eda-verification/1":
+        return False
+    terminal_map = report.get("terminal_map")
+    geometry = report.get("geometry")
+    kicad = report.get("kicad")
+    altium = report.get("altium")
+    if (
+        not isinstance(terminal_map, list)
+        or not terminal_map
+        or not isinstance(geometry, dict)
+        or geometry.get("method") != "mapped-pad-distance-and-size-signatures"
+        or not isinstance(kicad, dict)
+        or not isinstance(altium, dict)
+    ):
+        return False
+    kicad_pins = kicad.get("pin_count")
+    kicad_pads = kicad.get("pad_count")
+    altium_pins = altium.get("pin_count")
+    altium_pads = altium.get("pad_count")
+    return (
+        all(
+            isinstance(value, int) and value > 0
+            for value in (kicad_pins, kicad_pads, altium_pins, altium_pads)
+        )
+        and kicad_pins == altium_pins == len(terminal_map)
+        and kicad_pads == altium_pads
+    )
+
+
+def _canonical_role_report(
+    *,
+    identity: ExactPartIdentity,
+    operation: str,
+    provider_key: str,
+    roles: tuple[str, ...],
+    source_manifests: tuple[str, ...],
+    verification: object,
+    observations: object,
+) -> bytes:
+    document = {
+        "identity": {
+            "authoritative_manufacturer_key": identity.authoritative_manufacturer_key,
+            "mpn_canonical": identity.mpn_canonical,
+        },
+        "observations": observations,
+        "operation": operation,
+        "provider": provider_key,
+        "roles": sorted(roles),
+        "schema": "stockroom.cad-role-validation/1",
+        "source_manifests": sorted(source_manifests),
+        "valid": True,
+        "verification": verification,
+    }
+    try:
+        return json.dumps(
+            document,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("CAD role validation report must be strict JSON") from exc
+
+
+def _installed_kicad_paths(record: object, profile: object) -> tuple[Path, Path, Path]:
+    assets_for = getattr(record, "assets_for", None)
+    library = getattr(profile, "library", None)
+    category = getattr(record, "category", "")
+    if not callable(assets_for) or library is None or not isinstance(category, str) or not category:
+        raise ValueError("existing KiCad assets cannot be resolved from the active library")
+    kicad = assets_for("kicad")
+    symbol_asset = getattr(kicad, "symbol", None)
+    footprint_asset = getattr(kicad, "footprint", None)
+    model_asset = getattr(kicad, "model", None)
+    symbol_name = getattr(symbol_asset, "name", "")
+    footprint_name = getattr(footprint_asset, "name", "")
+    model_file = getattr(model_asset, "file", "")
+    if not all(
+        isinstance(value, str) and value for value in (symbol_name, footprint_name, model_file)
+    ):
+        raise ValueError(
+            "Altium composition requires an already-attached KiCad symbol, footprint, and STEP"
+        )
+    model_relative = Path(model_file)
+    if model_relative.is_absolute() or ".." in model_relative.parts:
+        raise ValueError("existing KiCad model reference is not a safe library-relative path")
+    root = Path(getattr(library, "root", ""))
+    if not root.is_absolute() or not root.is_dir() or root.is_symlink():
+        raise ValueError("active library root is unavailable or linked")
+    root = root.resolve(strict=True)
+    symbol = Path(library.symbol_lib_path(category))
+    footprint = Path(library.footprint_lib_path(category)) / f"{footprint_name}.kicad_mod"
+    model = root / model_relative
+    for path in (symbol, footprint, model):
+        if (
+            not path.is_file()
+            or path.is_symlink()
+            or not path.resolve(strict=True).is_relative_to(root)
+        ):
+            raise ValueError(
+                f"existing KiCad artifact is missing, linked, or outside the library: {path}"
+            )
+    return symbol, footprint, model
+
+
+def _installed_provider(record: object) -> tuple[str, dict[str, object]]:
+    assets_for = getattr(record, "assets_for")
+    kicad = assets_for("kicad")
+    observations: dict[str, object] = {}
+    providers: set[str] = set()
+    for role in ("symbol", "footprint", "model"):
+        asset = getattr(kicad, role, None)
+        origin = getattr(asset, "origin", None)
+        provider = getattr(origin, "vendor", "")
+        evidence_digest = getattr(origin, "extra", {}).get("evidence_manifest_digest", "")
+        role_observation: dict[str, object] = {}
+        if isinstance(provider, str) and provider:
+            role_observation["provider"] = provider
+            providers.add(provider)
+        if isinstance(evidence_digest, str) and evidence_digest:
+            role_observation["prior_evidence_manifest"] = evidence_digest
+        observations[role] = role_observation
+    provider_key = next(iter(providers)) if len(providers) == 1 else "stockroom-library"
+    if (
+        not provider_key
+        or provider_key != provider_key.lower()
+        or not provider_key[0].isalnum()
+        or any(
+            character not in "abcdefghijklmnopqrstuvwxyz0123456789._-" for character in provider_key
+        )
+    ):
+        provider_key = "stockroom-library"
+    return provider_key, observations
+
+
+def record_installed_kicad_role_evidence(
+    *,
+    store: EvidenceStore,
+    record: object,
+    profile: object,
+) -> tuple[str, tuple[Path, Path, Path]]:
+    """Read back and index the exact KiCad bytes currently active for a part."""
+    identity = exact_identity(record)
+    symbol, footprint, model = _installed_kicad_paths(record, profile)
+    report = verify_kicad_component(
+        identity=identity,
+        kicad_symbol=symbol,
+        kicad_footprint=footprint,
+        step_model=model,
+    )
+    if not isinstance(report, dict) or report.get("valid") is not True:
+        raise ValueError("existing KiCad artifact readback did not prove a complete component")
+    provider_key, observations = _installed_provider(record)
+    artifacts = (
+        _artifact(symbol, "symbol", "application/vnd.kicad.symbol-library"),
+        _artifact(footprint, "footprint", "application/vnd.kicad.footprint"),
+        _artifact(model, "model", "model/step"),
+    )
+    roles = tuple(artifact.role for artifact in artifacts)
+    validation = _canonical_role_report(
+        identity=identity,
+        operation=KICAD_CAD_OPERATION.label,
+        provider_key=provider_key,
+        roles=roles,
+        source_manifests=(),
+        verification=report,
+        observations={"active_library_origins": observations},
+    )
+    digest = store.record_role_artifact_success(
+        identity=identity,
+        operation=KICAD_CAD_OPERATION,
+        provider_key=provider_key,
+        adapter_version=INSTALLED_KICAD_READBACK_ADAPTER_VERSION,
+        artifacts=artifacts,
+        validation_report=validation,
+    )
+    return digest, (symbol, footprint, model)
+
+
+def record_composed_browser_altium_evidence(
+    *,
+    store: EvidenceStore,
+    record: object,
+    profile: object,
+    provider_key: str,
+    detail_url: str,
+    altium_sources: tuple[Path, ...],
+    cross_eda_verifier: CrossEdaVerifier,
+) -> tuple[str, tuple[Path, ...]]:
+    """Prove native Altium against the active KiCad variant and return CAS-backed files."""
+    identity = exact_identity(record)
+    selection = select_exact_candidate(
+        record,
+        [],
+        vendor_key=provider_key,
+        detail_url=detail_url,
+    )
+    if selection.error:
+        raise ValueError(selection.error)
+    native_altium = tuple(Path(path) for path in altium_sources)
+    altium_artifacts = _altium_artifacts(native_altium)
+    if not altium_artifacts:
+        raise ValueError("browser Altium evidence contains no native library")
+
+    kicad_manifest, _ = record_installed_kicad_role_evidence(
+        store=store,
+        record=record,
+        profile=profile,
+    )
+    verified_kicad = store.verified_role_artifacts(
+        kicad_manifest,
+        identity=identity,
+        roles=("symbol", "footprint", "model"),
+    )
+    with tempfile.TemporaryDirectory(prefix="stockroom-composed-kicad-") as temporary:
+        root = Path(temporary)
+        materialized = {
+            "symbol": root / "Active.kicad_sym",
+            "footprint": root / "Active.kicad_mod",
+            "model": root / "Active.step",
+        }
+        for role, path in materialized.items():
+            data = verified_kicad[role].data
+            path.write_bytes(data)
+            if path.read_bytes() != data:
+                raise ValueError(f"could not re-materialize verified KiCad {role} bytes")
+        cross_eda_report = cross_eda_verifier(
+            identity=identity,
+            kicad_symbol=materialized["symbol"],
+            kicad_footprint=materialized["footprint"],
+            step_model=materialized["model"],
+            altium_sources=native_altium,
+        )
+    if not _cross_eda_is_proved(cross_eda_report):
+        raise ValueError("cross-EDA verifier did not prove terminal, pad, and package equivalence")
+
+    roles = tuple(artifact.role for artifact in altium_artifacts)
+    validation = _canonical_role_report(
+        identity=identity,
+        operation=ALTIUM_CAD_OPERATION.label,
+        provider_key=provider_key,
+        roles=roles,
+        source_manifests=(kicad_manifest,),
+        verification=cross_eda_report,
+        observations={
+            "provider_detail_page": (
+                None
+                if (detail := page_identity(provider_key, detail_url)) is None
+                else {"manufacturer": detail.manufacturer, "mpn": detail.mpn}
+            )
+        },
+    )
+    digest = store.record_role_artifact_success(
+        identity=identity,
+        operation=ALTIUM_CAD_OPERATION,
+        provider_key=provider_key,
+        adapter_version=BROWSER_CAPTURE_ADAPTER_VERSION,
+        artifacts=altium_artifacts,
+        validation_report=validation,
+        source_manifests=(kicad_manifest,),
+    )
+    verified_altium = store.verified_role_artifacts(
+        digest,
+        identity=identity,
+        roles=roles,
+    )
+    materialized_root = Path(tempfile.mkdtemp(prefix="sr-verified-altium-"))
+    materialized_paths: list[Path] = []
+    for role in roles:
+        variant = verified_altium[role]
+        name = variant.suggested_name or f"{role}.bin"
+        destination = materialized_root / name
+        destination.write_bytes(variant.data)
+        if destination.read_bytes() != variant.data:
+            raise ValueError(f"could not re-materialize verified Altium {role} bytes")
+        materialized_paths.append(destination)
+    return digest, tuple(materialized_paths)
+
+
 def record_browser_cad_evidence(
     *,
     store: EvidenceStore,
@@ -204,7 +500,7 @@ def record_browser_cad_evidence(
             step_model=model_path,
             altium_sources=native_altium,
         )
-        if not isinstance(cross_eda_report, dict) or cross_eda_report.get("valid") is not True:
+        if not _cross_eda_is_proved(cross_eda_report):
             raise ValueError(
                 "cross-EDA verifier did not prove terminal, pad, and package equivalence"
             )
@@ -218,6 +514,7 @@ def record_browser_cad_evidence(
         kicad_report=kicad_report,
         cross_eda_report=cross_eda_report,
     )
+    altium_artifacts = _altium_artifacts(native_altium)
     artifacts = (
         _artifact(Path(symbol), "symbol", "application/vnd.kicad.symbol-library"),
         _artifact(Path(footprint), "footprint", "application/vnd.kicad.footprint"),
@@ -228,7 +525,7 @@ def record_browser_cad_evidence(
             "application/json",
             "Validation Report.json",
         ),
-        *_altium_artifacts(native_altium),
+        *altium_artifacts,
     )
     digest = store.record_provider_artifact_success(
         identity=identity,
@@ -244,12 +541,23 @@ def record_browser_cad_evidence(
         provider_key=provider_key,
         adapter_version=BROWSER_CAPTURE_ADAPTER_VERSION,
     )
+    index_roles = ["symbol", "footprint", "model"]
+    if cross_eda_report is not None:
+        index_roles.extend(artifact.role for artifact in altium_artifacts)
+    store.index_artifact_manifest(
+        digest,
+        identity=identity,
+        roles=tuple(index_roles),
+    )
     return digest, cross_eda_report is not None
 
 
 __all__ = [
     "BROWSER_CAPTURE_ADAPTER_VERSION",
     "CrossEdaVerifier",
+    "INSTALLED_KICAD_READBACK_ADAPTER_VERSION",
     "exact_identity",
     "record_browser_cad_evidence",
+    "record_composed_browser_altium_evidence",
+    "record_installed_kicad_role_evidence",
 ]

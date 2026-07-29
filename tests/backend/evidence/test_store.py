@@ -12,7 +12,12 @@ from stockroom.evidence import (
     EvidenceManifestMismatch,
     EvidenceStore,
 )
-from stockroom.planning import KICAD_CAD_OPERATION, METADATA_OPERATION, ExactPartIdentity
+from stockroom.planning import (
+    ALTIUM_CAD_OPERATION,
+    KICAD_CAD_OPERATION,
+    METADATA_OPERATION,
+    ExactPartIdentity,
+)
 
 _IDENTITY = ExactPartIdentity("ON Semiconductor", "S1M")
 
@@ -250,4 +255,151 @@ def test_tampered_cad_artifact_fails_verification(tmp_path: Path) -> None:
             operation=KICAD_CAD_OPERATION,
             provider_key="snapmagic",
             adapter_version="1.0.0",
+        )
+
+
+def _role_report(
+    *,
+    operation: str,
+    provider: str,
+    roles: tuple[str, ...],
+    sources: tuple[str, ...] = (),
+) -> bytes:
+    return json.dumps(
+        {
+            "identity": {
+                "authoritative_manufacturer_key": "ON Semiconductor",
+                "mpn_canonical": "S1M",
+            },
+            "observations": {},
+            "operation": operation,
+            "provider": provider,
+            "roles": sorted(roles),
+            "schema": "stockroom.cad-role-validation/1",
+            "source_manifests": sorted(sources),
+            "valid": True,
+            "verification": {"valid": True},
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def test_role_index_preserves_every_variant_and_ranks_ultra_librarian_first(
+    tmp_path: Path,
+) -> None:
+    store = EvidenceStore(tmp_path / "Evidence")
+    manifests = []
+    for provider, content in (
+        ("snapmagic", b'(kicad_symbol_lib (symbol "Snap"))'),
+        ("ultralibrarian", b'(kicad_symbol_lib (symbol "Ultra"))'),
+    ):
+        manifests.append(
+            store.record_role_artifact_success(
+                identity=_IDENTITY,
+                operation=KICAD_CAD_OPERATION,
+                provider_key=provider,
+                adapter_version="1.0.0",
+                artifacts=(
+                    EvidenceArtifact(
+                        "symbol",
+                        content,
+                        "application/vnd.kicad.symbol-library",
+                        "S1M.kicad_sym",
+                    ),
+                ),
+                validation_report=_role_report(
+                    operation=KICAD_CAD_OPERATION.label,
+                    provider=provider,
+                    roles=("symbol",),
+                ),
+            )
+        )
+
+    variants = store.list_role_variants(identity=_IDENTITY, role="symbol")
+
+    assert len(variants) == 2
+    assert [variant.provider_key for variant in variants] == [
+        "ultralibrarian",
+        "snapmagic",
+    ]
+    assert {variant.manifest_digest for variant in variants} == set(manifests)
+    index_entries = list((store.root / "Indexes").rglob("*.json"))
+    assert len(index_entries) == 2
+
+
+def test_composed_role_manifest_recursively_reverifies_its_exact_source_bytes(
+    tmp_path: Path,
+) -> None:
+    store = EvidenceStore(tmp_path / "Evidence")
+    kicad_roles = ("symbol", "footprint", "model")
+    kicad_manifest = store.record_role_artifact_success(
+        identity=_IDENTITY,
+        operation=KICAD_CAD_OPERATION,
+        provider_key="lcsc",
+        adapter_version="installed-readback-v1",
+        artifacts=(
+            EvidenceArtifact("symbol", b"symbol", "application/octet-stream", "S1M.kicad_sym"),
+            EvidenceArtifact(
+                "footprint",
+                b"footprint",
+                "application/octet-stream",
+                "S1M.kicad_mod",
+            ),
+            EvidenceArtifact("model", b"step", "application/octet-stream", "S1M.step"),
+        ),
+        validation_report=_role_report(
+            operation=KICAD_CAD_OPERATION.label,
+            provider="lcsc",
+            roles=kicad_roles,
+        ),
+    )
+    altium_roles = ("altium_symbol", "altium_footprint")
+    altium_manifest = store.record_role_artifact_success(
+        identity=_IDENTITY,
+        operation=ALTIUM_CAD_OPERATION,
+        provider_key="ultralibrarian",
+        adapter_version="browser-v1",
+        artifacts=(
+            EvidenceArtifact(
+                "altium_symbol",
+                b"schlib",
+                "application/octet-stream",
+                "S1M.SchLib",
+            ),
+            EvidenceArtifact(
+                "altium_footprint",
+                b"pcblib",
+                "application/octet-stream",
+                "S1M.PcbLib",
+            ),
+        ),
+        validation_report=_role_report(
+            operation=ALTIUM_CAD_OPERATION.label,
+            provider="ultralibrarian",
+            roles=altium_roles,
+            sources=(kicad_manifest,),
+        ),
+        source_manifests=(kicad_manifest,),
+    )
+
+    verified = store.verify_role_artifact_success(
+        altium_manifest,
+        identity=_IDENTITY,
+        required_roles=altium_roles,
+    )
+    assert verified["source_manifests"] == [kicad_manifest]
+
+    kicad = store.verified_role_artifacts(
+        kicad_manifest,
+        identity=_IDENTITY,
+        roles=("symbol",),
+    )["symbol"]
+    store.object_path(kicad.artifact_digest).write_bytes(b"tampered")
+    with pytest.raises(EvidenceCorruption):
+        store.verify_role_artifact_success(
+            altium_manifest,
+            identity=_IDENTITY,
+            required_roles=altium_roles,
         )

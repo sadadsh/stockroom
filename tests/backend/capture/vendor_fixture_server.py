@@ -84,7 +84,7 @@ _FOOTPRINT = """(footprint "RVZ0014A" (version 20211014) (generator stockroom_te
 
 # A P-CAD ASCII library shaped like the real one: ACCEL_ASCII header, one symbolDef (the schematic
 # symbol) and one patternDef (the PCB footprint), so ONE file satisfies BOTH Altium requirements.
-# This is what Ultra Librarian's PCAD row actually delivers - see UltraLibrarianAdapter.
+# This is what the captured legacy Ultra Librarian PCAD row delivers.
 _LIA = """ACCEL_ASCII "TEST.LIA"
 (asciiHeader (asciiVersion 3 0))
 (library (libraryName "TPD6E05U06RVZR")
@@ -96,17 +96,14 @@ _LIA = """ACCEL_ASCII "TEST.LIA"
 
 
 def _kicad_altium_zip() -> bytes:
-    """A bundle shaped like a real two-format export: KiCad symbol + footprint + STEP, and the
-    Altium pair. Classified by `capture.classify.classify_asset` exactly as a vendor's would be."""
+    """A bundle shaped like the captured legacy PCAD export plus KiCad and STEP."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as zf:
         zf.writestr("TPD6E05U06RVZR.kicad_sym", _SYMBOL_LIB)
         zf.writestr("footprints.pretty/RVZ0014A.kicad_mod", _FOOTPRINT)
         zf.writestr("RVZ0014A.stp", READABLE_STEP.read_bytes())
-        # What Ultra Librarian ACTUALLY delivers for Altium: a P-CAD ASCII library nested under
-        # AltiumV15/, carrying the symbol AND the footprint in one file. NOT .SchLib/.PcbLib - the
-        # fixture claimed those for a while, and no vendor this app drives produces them that way,
-        # so the fixture was testing a shape that does not exist.
+        # What Ultra Librarian's legacy PCAD v15 choice delivers: one P-CAD ASCII library carrying
+        # both sides. Current native Altium export is tested separately as .SchLib/.PcbLib.
         zf.writestr("AltiumV15/2026-07-27_20-52-11.lia", _LIA)
         zf.writestr("AltiumV15/ImportGuide.html", "<html></html>")
     return buffer.getvalue()

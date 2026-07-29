@@ -41,14 +41,15 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 import shutil
 import threading
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast
 from urllib.parse import urlsplit
 
 from stockroom.capture.download_broker import (
@@ -60,6 +61,39 @@ from stockroom.capture.download_broker import (
 
 class CaptureBrowserError(RuntimeError):
     """Something the caller must fix, phrased so the message names the actual blocker."""
+
+
+UserCaptureStatus = Literal["completed", "try_another", "cancelled", "timed_out"]
+ProviderHudAction = Literal["finish", "try_another", "cancel"]
+_PROVIDER_HUD_ACTIONS = frozenset({"finish", "try_another", "cancel"})
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderHudSpec:
+    """Exact Stockroom-owned text shown over one person-controlled provider page."""
+
+    provider_label: str
+    manufacturer: str
+    mpn: str
+    required_file_labels: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        for value, label in (
+            (self.provider_label, "provider_label"),
+            (self.manufacturer, "manufacturer"),
+            (self.mpn, "mpn"),
+        ):
+            if type(value) is not str or not value or value != value.strip():
+                raise ValueError(f"{label} must be exact non-empty text")
+        labels = self.required_file_labels
+        if (
+            type(labels) is not tuple
+            or not labels
+            or any(
+                type(label) is not str or not label or label != label.strip() for label in labels
+            )
+        ):
+            raise ValueError("required_file_labels must be a non-empty tuple of exact labels")
 
 
 @dataclass(frozen=True)
@@ -79,7 +113,7 @@ class CapturedFile:
 class UserCaptureResult:
     """Files Stockroom intercepted while the person controlled the provider page."""
 
-    status: Literal["completed", "cancelled", "timed_out"]
+    status: UserCaptureStatus
     files: tuple[DownloadReceipt, ...]
     final_url: str
 
@@ -119,6 +153,516 @@ _DISABLE_WEBRTC_INIT_SCRIPT = """
   }
 })();
 """
+_PROVIDER_HUD_BOOTSTRAP = r"""
+(payload) => {
+  if (!payload || globalThis !== globalThis.top || globalThis[payload.namespace]) {
+    return;
+  }
+
+  const mount = () => {
+    if (!document.documentElement || globalThis[payload.namespace]) {
+      return;
+    }
+
+    const make = (tag, className = "", text = "") => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text) node.textContent = text;
+      return node;
+    };
+
+    const host = document.createElement("aside");
+    host.setAttribute("popover", "manual");
+    host.setAttribute("aria-label", "Stockroom capture assistant");
+    const shadow = host.attachShadow({ mode: "closed" });
+
+    const style = document.createElement("style");
+    style.textContent = `
+      :host {
+        all: initial;
+        position: fixed;
+        inset: 12px 12px auto auto;
+        z-index: 2147483647;
+        display: block;
+        width: min(360px, calc(100vw - 24px));
+        margin: 0;
+        padding: 0;
+        border: 0;
+        color-scheme: dark;
+        font: 13px/1.4 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+      .panel {
+        overflow: hidden;
+        color: #f8fafc;
+        background: #101827;
+        border: 1px solid #64748b;
+        border-radius: 12px;
+        box-shadow: 0 18px 48px rgb(0 0 0 / 42%);
+      }
+      .header {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 7px;
+        min-height: 44px;
+        padding: 6px 7px;
+        background: #172236;
+        border-bottom: 1px solid #334155;
+        cursor: grab;
+        user-select: none;
+        touch-action: none;
+      }
+      .header.dragging {
+        cursor: grabbing;
+      }
+      .move,
+      .collapse {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        color: #e2e8f0;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        font: inherit;
+      }
+      .move {
+        cursor: grab;
+        font-size: 18px;
+        letter-spacing: -4px;
+      }
+      .collapse {
+        cursor: pointer;
+        font-size: 17px;
+      }
+      .title {
+        min-width: 0;
+        font-size: 13px;
+        font-weight: 750;
+        letter-spacing: .01em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .count {
+        min-width: 28px;
+        padding: 3px 7px;
+        color: #dbeafe;
+        background: #1e3a5f;
+        border: 1px solid #3b82f6;
+        border-radius: 999px;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        text-align: center;
+      }
+      .content {
+        display: grid;
+        gap: 10px;
+        max-height: min(72vh, 610px);
+        padding: 11px;
+        overflow: auto;
+        scrollbar-color: #64748b transparent;
+      }
+      .identity {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: 4px 9px;
+        margin: 0;
+        padding: 8px;
+        background: #0b1220;
+        border: 1px solid #334155;
+        border-radius: 8px;
+      }
+      dt {
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .045em;
+        text-transform: uppercase;
+      }
+      dd {
+        min-width: 0;
+        margin: 0;
+        color: #f8fafc;
+        font-weight: 650;
+        overflow-wrap: anywhere;
+        user-select: text;
+      }
+      h2 {
+        margin: 0 0 5px;
+        color: #cbd5e1;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .055em;
+        text-transform: uppercase;
+      }
+      .files {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .files li {
+        padding: 4px 7px;
+        color: #e0f2fe;
+        background: #123047;
+        border: 1px solid #0ea5e9;
+        border-radius: 6px;
+        overflow-wrap: anywhere;
+      }
+      .steps {
+        display: grid;
+        gap: 5px;
+        margin: 0;
+        padding-left: 22px;
+        color: #dbe4f0;
+      }
+      .steps li {
+        padding-left: 2px;
+      }
+      .steps li::marker {
+        color: #7dd3fc;
+        font-weight: 800;
+      }
+      .live {
+        margin: 0;
+        padding: 7px 8px;
+        color: #bfdbfe;
+        background: #172554;
+        border-left: 3px solid #60a5fa;
+        border-radius: 5px;
+        font-weight: 700;
+      }
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1.35fr 1fr;
+        gap: 6px;
+      }
+      .action {
+        min-height: 36px;
+        padding: 6px 8px;
+        color: #f8fafc;
+        background: #263449;
+        border: 1px solid #64748b;
+        border-radius: 7px;
+        cursor: pointer;
+        font: 700 12px/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      .finish {
+        color: #052e16;
+        background: #86efac;
+        border-color: #4ade80;
+      }
+      .another {
+        color: #172554;
+        background: #bfdbfe;
+        border-color: #60a5fa;
+      }
+      .cancel {
+        color: #fee2e2;
+        background: #451a1a;
+        border-color: #ef4444;
+      }
+      button:hover:not(:disabled) {
+        filter: brightness(1.08);
+      }
+      button:focus-visible {
+        outline: 3px solid #fbbf24;
+        outline-offset: 2px;
+      }
+      button:disabled {
+        cursor: wait;
+        filter: grayscale(.5);
+        opacity: .68;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          scroll-behavior: auto !important;
+          animation-duration: .001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: .001ms !important;
+        }
+      }
+      @media (forced-colors: active) {
+        .panel,
+        .identity,
+        .files li,
+        .action {
+          border: 1px solid ButtonText;
+        }
+      }
+    `;
+
+    const panel = make("section", "panel");
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-labelledby", `${payload.namespace}-title`);
+
+    const header = make("header", "header");
+    const move = make("button", "move", "⠿");
+    move.type = "button";
+    move.setAttribute("aria-label", "Move Stockroom panel; use arrow keys");
+    const title = make("div", "title", `Stockroom · ${payload.providerLabel}`);
+    title.id = `${payload.namespace}-title`;
+    const count = make("span", "count", "0");
+    count.setAttribute("aria-label", "Downloads captured: 0");
+    const collapse = make("button", "collapse", "−");
+    collapse.type = "button";
+    collapse.setAttribute("aria-expanded", "true");
+    collapse.setAttribute("aria-controls", `${payload.namespace}-content`);
+    collapse.setAttribute("aria-label", "Collapse Stockroom panel");
+    header.append(move, title, count, collapse);
+
+    const content = make("div", "content");
+    content.id = `${payload.namespace}-content`;
+
+    const identity = make("dl", "identity");
+    for (const [label, value] of [
+      ["Provider", payload.providerLabel],
+      ["Manufacturer", payload.manufacturer],
+      ["MPN", payload.mpn],
+    ]) {
+      identity.append(make("dt", "", label), make("dd", "", value));
+    }
+
+    const filesSection = make("section");
+    filesSection.append(make("h2", "", "Required files"));
+    const files = make("ul", "files");
+    files.setAttribute("aria-label", "Required file formats");
+    for (const label of payload.requiredFileLabels) {
+      files.append(make("li", "", label));
+    }
+    filesSection.append(files);
+
+    const instructions = make("section");
+    instructions.append(make("h2", "", "What to do"));
+    const steps = make("ol", "steps");
+    for (const text of [
+      "Sign in if asked—this session is remembered on this PC.",
+      "Choose the result matching the exact manufacturer and MPN shown above.",
+      "Select every required file format listed here.",
+      "Download each file. Stockroom captures it automatically.",
+      "Choose Finish, Try Another Provider, or Cancel.",
+    ]) {
+      steps.append(make("li", "", text));
+    }
+    instructions.append(steps);
+
+    const live = make("p", "live", "Downloads captured: 0");
+    live.setAttribute("role", "status");
+    live.setAttribute("aria-live", "polite");
+    live.setAttribute("aria-atomic", "true");
+
+    const actionStatus = make("p", "sr-only", "");
+    actionStatus.setAttribute("role", "status");
+    actionStatus.setAttribute("aria-live", "polite");
+
+    const actions = make("div", "actions");
+    const finish = make("button", "action finish", "Finish");
+    const another = make("button", "action another", "Try Another Provider");
+    const cancel = make("button", "action cancel", "Cancel");
+    for (const button of [finish, another, cancel]) button.type = "button";
+    actions.append(finish, another, cancel);
+    content.append(identity, filesSection, instructions, live, actionStatus, actions);
+    panel.append(header, content);
+    shadow.append(style, panel);
+    document.documentElement.append(host);
+
+    let shownInTopLayer = false;
+    if (typeof host.showPopover === "function") {
+      try {
+        host.showPopover();
+        shownInTopLayer = true;
+      } catch {}
+    }
+    if (!shownInTopLayer) host.removeAttribute("popover");
+
+    let collapsed = false;
+    collapse.addEventListener("click", () => {
+      collapsed = !collapsed;
+      content.hidden = collapsed;
+      collapse.textContent = collapsed ? "+" : "−";
+      collapse.setAttribute("aria-expanded", String(!collapsed));
+      collapse.setAttribute(
+        "aria-label",
+        collapsed ? "Expand Stockroom panel" : "Collapse Stockroom panel",
+      );
+    });
+
+    const place = (left, top) => {
+      const maxLeft = Math.max(0, globalThis.innerWidth - host.offsetWidth);
+      const maxTop = Math.max(0, globalThis.innerHeight - host.offsetHeight);
+      host.style.inset = "auto";
+      host.style.left = `${Math.max(0, Math.min(left, maxLeft))}px`;
+      host.style.top = `${Math.max(0, Math.min(top, maxTop))}px`;
+    };
+
+    let drag = null;
+    header.addEventListener("pointerdown", (event) => {
+      if (event.target === collapse || event.button !== 0) return;
+      drag = {
+        pointer: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        left: host.offsetLeft,
+        top: host.offsetTop,
+      };
+      header.classList.add("dragging");
+      header.setPointerCapture(event.pointerId);
+    });
+    header.addEventListener("pointermove", (event) => {
+      if (!drag || drag.pointer !== event.pointerId) return;
+      place(drag.left + event.clientX - drag.x, drag.top + event.clientY - drag.y);
+    });
+    const endDrag = (event) => {
+      if (!drag || drag.pointer !== event.pointerId) return;
+      drag = null;
+      header.classList.remove("dragging");
+    };
+    header.addEventListener("pointerup", endDrag);
+    header.addEventListener("pointercancel", endDrag);
+    move.addEventListener("keydown", (event) => {
+      const delta = event.shiftKey ? 40 : 10;
+      const offsets = {
+        ArrowLeft: [-delta, 0],
+        ArrowRight: [delta, 0],
+        ArrowUp: [0, -delta],
+        ArrowDown: [0, delta],
+      };
+      if (event.key === "Home") {
+        event.preventDefault();
+        place(globalThis.innerWidth - host.offsetWidth - 12, 12);
+        return;
+      }
+      const offset = offsets[event.key];
+      if (!offset) return;
+      event.preventDefault();
+      place(host.offsetLeft + offset[0], host.offsetTop + offset[1]);
+    });
+
+    let actionPending = false;
+    const actionButtons = [finish, another, cancel];
+    const requestAction = async (action, spokenLabel) => {
+      if (actionPending) return;
+      actionPending = true;
+      for (const button of actionButtons) button.disabled = true;
+      actionStatus.textContent = `${spokenLabel} requested.`;
+      try {
+        const accepted = await globalThis[payload.actionBinding](action, payload.actionToken);
+        if (accepted) return;
+      } catch {}
+      actionPending = false;
+      for (const button of actionButtons) button.disabled = false;
+      actionStatus.textContent = "Stockroom could not accept that action. Try again.";
+    };
+    finish.addEventListener("click", () => requestAction("finish", "Finish"));
+    another.addEventListener(
+      "click",
+      () => requestAction("try_another", "Try another provider"),
+    );
+    cancel.addEventListener("click", () => requestAction("cancel", "Cancel"));
+
+    const updateDownloadCount = (value) => {
+      if (!Number.isInteger(value) || value < 0) return;
+      const noun = value === 1 ? "file" : "files";
+      count.textContent = String(value);
+      count.setAttribute("aria-label", `Downloads captured: ${value}`);
+      live.textContent = `Downloads captured: ${value} ${noun}`;
+    };
+    updateDownloadCount(payload.downloadCount);
+
+    Object.defineProperty(globalThis, payload.namespace, {
+      value: Object.freeze({ updateDownloadCount }),
+      configurable: false,
+      enumerable: false,
+      writable: false,
+    });
+  };
+
+  if (document.documentElement) {
+    mount();
+  } else {
+    document.addEventListener("DOMContentLoaded", mount, { once: true });
+  }
+}
+"""
+_PROVIDER_HUD_UPDATE = r"""
+({ namespace, downloadCount }) => {
+  const hud = globalThis[namespace];
+  if (hud && typeof hud.updateDownloadCount === "function") {
+    hud.updateDownloadCount(downloadCount);
+  }
+}
+"""
+
+
+@dataclass(slots=True)
+class _ProviderHudState:
+    spec: ProviderHudSpec
+    namespace: str = field(
+        default_factory=lambda: f"__stockroom_capture_hud_{secrets.token_hex(12)}"
+    )
+    action_binding: str = field(
+        default_factory=lambda: f"__stockroom_capture_action_{secrets.token_hex(12)}"
+    )
+    action_token: str = field(default_factory=lambda: secrets.token_hex(24))
+    _action: ProviderHudAction | None = None
+    _download_count: int = 0
+    _lock: threading.RLock = field(default_factory=threading.RLock)
+
+    @property
+    def action(self) -> ProviderHudAction | None:
+        with self._lock:
+            return self._action
+
+    def request_action(self, action: object, token: object) -> bool:
+        if (
+            type(action) is not str
+            or action not in _PROVIDER_HUD_ACTIONS
+            or type(token) is not str
+            or not secrets.compare_digest(token, self.action_token)
+        ):
+            return False
+        with self._lock:
+            if self._action is not None:
+                return False
+            self._action = cast(ProviderHudAction, action)
+            return True
+
+    def update_download_count(self, count: int) -> None:
+        if type(count) is not int or count < 0:
+            raise ValueError("download count must be a non-negative integer")
+        with self._lock:
+            self._download_count = count
+
+    def payload(self) -> dict[str, object]:
+        with self._lock:
+            return {
+                "namespace": self.namespace,
+                "actionBinding": self.action_binding,
+                "actionToken": self.action_token,
+                "providerLabel": self.spec.provider_label,
+                "manufacturer": self.spec.manufacturer,
+                "mpn": self.spec.mpn,
+                "requiredFileLabels": list(self.spec.required_file_labels),
+                "downloadCount": self._download_count,
+            }
 
 
 def _disable_webrtc(context) -> None:
@@ -388,6 +932,7 @@ class PlaywrightCaptureBrowser:
         self._download_errors: list[CaptureBrowserError] = []
         self._wired_pages: list[object] = []
         self._page_brokers: list[tuple[object, DownloadBroker]] = []
+        self._page_huds: list[tuple[Any, _ProviderHudState]] = []
         self._context = None
         # Playwright's synchronous API may re-enter the download callback while ``save_as`` for
         # the previous file pumps protocol events.  A provider action that emits a symbol,
@@ -406,7 +951,12 @@ class PlaywrightCaptureBrowser:
             return tuple(self._download_errors)
 
     @contextmanager
-    def task_page(self, broker: DownloadBroker):
+    def task_page(
+        self,
+        broker: DownloadBroker,
+        *,
+        hud_state: _ProviderHudState | None = None,
+    ):
         """Open one page whose downloads can belong to exactly one workflow task.
 
         A provider context persists for the run so cookies and sign-in survive, but pages do not
@@ -416,6 +966,8 @@ class PlaywrightCaptureBrowser:
         """
         if type(broker) is not DownloadBroker:
             raise TypeError("broker must be a DownloadBroker")
+        if hud_state is not None and type(hud_state) is not _ProviderHudState:
+            raise TypeError("hud_state must be Stockroom-owned provider HUD state")
         with self._download_lock:
             context = self._context
         if context is None:
@@ -425,6 +977,8 @@ class PlaywrightCaptureBrowser:
         with self._download_lock:
             self._page_brokers.append((page, broker))
         try:
+            if hud_state is not None:
+                self._bind_provider_hud(page, hud_state)
             yield page
         finally:
             try:
@@ -435,6 +989,11 @@ class PlaywrightCaptureBrowser:
                 self._page_brokers = [
                     (wired, bound) for wired, bound in self._page_brokers if wired is not page
                 ]
+                self._page_huds = (
+                    [(wired, bound) for wired, bound in self._page_huds if bound is not hud_state]
+                    if hud_state is not None
+                    else [(wired, bound) for wired, bound in self._page_huds if wired is not page]
+                )
                 self._wired_pages = [wired for wired in self._wired_pages if wired is not page]
 
     def capture_user_downloads(
@@ -442,6 +1001,7 @@ class PlaywrightCaptureBrowser:
         url: str,
         broker: DownloadBroker,
         *,
+        hud: ProviderHudSpec | None = None,
         should_finish: Callable[[], bool] | None = None,
         should_cancel: Callable[[], bool] | None = None,
         timeout_s: float = 600.0,
@@ -451,19 +1011,32 @@ class PlaywrightCaptureBrowser:
         """Open one provider page and observe downloads while the person controls it.
 
         This is deliberately a small browser lifecycle, not a provider driver. Production code
-        wires the task-bound download handler *before* navigation, opens exactly ``url``, pumps
-        Playwright, and observes only explicit completion, cancellation, page closure, or timeout.
-        It never inspects or searches the DOM, fills credentials, selects a result or format,
-        accepts terms, or clicks a provider control.
+        wires the task-bound download handler and optional Stockroom HUD *before* navigation, opens
+        exactly ``url``, pumps Playwright, and observes only explicit HUD/caller actions, page
+        closure, or timeout. The HUD is a closed-shadow, top-layer Stockroom surface whose exact
+        identity and required-file labels come only from ``hud``. Neither Python nor that surface
+        inspects or searches provider DOM, reads credentials, fills fields, selects a result or
+        format, accepts terms, or clicks a provider control.
 
-        ``should_finish`` is the future UI's explicit "I am done" signal. Without one, closing the
-        capture page completes the session. A short quiet period after that signal keeps sibling
-        downloads from one user click bound to the same task. Cancellation and timeout return every
-        file already intercepted, but callers decide whether those files may be attached.
+        ``should_finish`` remains a caller-owned completion signal beside the HUD's Finish button.
+        Without either, closing the capture page completes the session. A short quiet period after
+        that signal keeps sibling downloads from one user click bound to the same task. Try Another
+        Provider, cancellation, and timeout return every file already intercepted, but callers
+        decide whether those files may be attached.
         """
 
         if type(broker) is not DownloadBroker:
             raise TypeError("broker must be a DownloadBroker")
+        if hud is not None:
+            if type(hud) is not ProviderHudSpec:
+                raise TypeError("hud must be a ProviderHudSpec")
+            if (
+                hud.manufacturer != broker.task.manufacturer_key
+                or hud.mpn != broker.task.mpn_canonical
+            ):
+                raise CaptureBrowserError(
+                    "provider HUD identity must exactly match its bound download task"
+                )
         _validate_capture_url(url)
         for callback, label in (
             (should_finish, "should_finish"),
@@ -485,11 +1058,14 @@ class PlaywrightCaptureBrowser:
         )
 
         deadline = time.monotonic() + timeout
-        status: Literal["completed", "cancelled", "timed_out"] = "timed_out"
+        status: UserCaptureStatus = "timed_out"
         final_url = url
         error_mark = len(self.download_errors)
+        hud_state = _ProviderHudState(hud) if hud is not None else None
+        if hud_state is not None:
+            hud_state.update_download_count(len(broker.receipts))
 
-        with self.task_page(broker) as page:
+        with self.task_page(broker, hud_state=hud_state) as page:
             if should_cancel is not None and should_cancel():
                 status = "cancelled"
             else:
@@ -501,8 +1077,15 @@ class PlaywrightCaptureBrowser:
                     )
                 except Exception:
                     final_url = _page_url(page, url)
+                    hud_action = hud_state.action if hud_state is not None else None
                     if should_cancel is not None and should_cancel():
                         status = "cancelled"
+                    elif hud_action == "cancel":
+                        status = "cancelled"
+                    elif hud_action == "try_another":
+                        status = "try_another"
+                    elif hud_action == "finish":
+                        status = "completed"
                     elif _page_is_closed(page):
                         status = "completed"
                     elif time.monotonic() >= deadline:
@@ -512,6 +1095,8 @@ class PlaywrightCaptureBrowser:
                 else:
                     final_url = _page_url(page, url)
                     receipt_count = len(broker.receipts)
+                    if hud_state is not None:
+                        self._update_provider_hud(hud_state, receipt_count)
                     quiet_since = time.monotonic()
                     finish_requested = False
                     while True:
@@ -524,14 +1109,27 @@ class PlaywrightCaptureBrowser:
                         if current_count != receipt_count:
                             receipt_count = current_count
                             quiet_since = now
+                        if hud_state is not None:
+                            # This cheap Stockroom-namespace update also restores the current count
+                            # after an in-page navigation remounts the init-script HUD.
+                            self._update_provider_hud(hud_state, current_count)
 
                         if should_cancel is not None and should_cancel():
                             status = "cancelled"
+                            break
+                        hud_action = hud_state.action if hud_state is not None else None
+                        if hud_action == "cancel":
+                            status = "cancelled"
+                            break
+                        if hud_action == "try_another":
+                            status = "try_another"
                             break
                         if _page_is_closed(page):
                             status = "completed"
                             break
                         if should_finish is not None and should_finish():
+                            finish_requested = True
+                        if hud_action == "finish":
                             finish_requested = True
                         if finish_requested and (current_count == 0 or now - quiet_since >= settle):
                             status = "completed"
@@ -619,6 +1217,7 @@ class PlaywrightCaptureBrowser:
             with self._download_lock:
                 self._context = None
                 self._page_brokers.clear()
+                self._page_huds.clear()
                 self._wired_pages.clear()
 
     def _launch_playwright(self, pw):
@@ -757,7 +1356,61 @@ class PlaywrightCaptureBrowser:
                 with self._download_lock:
                     self._context = None
                     self._page_brokers.clear()
+                    self._page_huds.clear()
                     self._wired_pages.clear()
+
+    def _bind_provider_hud(self, page, state: _ProviderHudState) -> None:
+        """Install one Stockroom-owned HUD without reading provider-controlled page content."""
+
+        with self._download_lock:
+            if any(wired is page for wired, _bound in self._page_huds):
+                return
+
+        payload = state.payload()
+
+        def receive_action(_source, action, token) -> bool:
+            return state.request_action(action, token)
+
+        init_script = (
+            f"({_PROVIDER_HUD_BOOTSTRAP})("
+            f"{json.dumps(payload, ensure_ascii=True, separators=(',', ':'))}"
+            ");"
+        )
+        try:
+            page.expose_binding(state.action_binding, receive_action)
+            # Registration precedes the first provider navigation and runs again for every
+            # subsequent document. Evaluating the same idempotent bootstrap mounts it in the
+            # existing about:blank document too.
+            page.add_init_script(init_script)
+            with self._download_lock:
+                self._page_huds.append((page, state))
+            page.evaluate(_PROVIDER_HUD_BOOTSTRAP, payload)
+        except Exception as exc:  # noqa: BLE001 - Playwright implementations vary
+            with self._download_lock:
+                self._page_huds = [
+                    (wired, bound) for wired, bound in self._page_huds if wired is not page
+                ]
+            raise CaptureBrowserError(
+                "could not install the Stockroom capture panel before provider navigation"
+            ) from exc
+
+    def _update_provider_hud(self, state: _ProviderHudState, download_count: int) -> None:
+        """Push Stockroom's receipt count into every page displaying this task's HUD."""
+
+        state.update_download_count(download_count)
+        with self._download_lock:
+            pages = [page for page, bound in self._page_huds if bound is state]
+        payload = {
+            "namespace": state.namespace,
+            "downloadCount": download_count,
+        }
+        for page in pages:
+            try:
+                page.evaluate(_PROVIDER_HUD_UPDATE, payload)
+            except Exception:  # noqa: BLE001 - navigation can replace an execution context
+                # The registered init script remounts the HUD; the capture loop retries this
+                # Stockroom-namespace update on its next bounded poll.
+                pass
 
     def _wire_downloads(self, page) -> None:
         with self._download_lock:
@@ -779,6 +1432,11 @@ class PlaywrightCaptureBrowser:
                     self._download_errors.append(exc)
 
         page.on("download", record_download)
+        inherited_hud = self._hud_for_page(page)
+        if inherited_hud is not None:
+            # Context-created popups inherit task ownership through their opener. Binding the same
+            # state gives those user-driven pages the same exact identity, actions, and live count.
+            self._bind_provider_hud(page, inherited_hud)
 
     def _broker_for_page(self, page) -> DownloadBroker | None:
         current = page
@@ -792,6 +1450,25 @@ class PlaywrightCaptureBrowser:
                 )
             if broker is not None:
                 return broker
+            opener = getattr(current, "opener", None)
+            try:
+                current = opener() if callable(opener) else None
+            except Exception:  # noqa: BLE001 - an unreadable opener is simply unbound
+                current = None
+        return None
+
+    def _hud_for_page(self, page) -> _ProviderHudState | None:
+        current = page
+        seen: set[int] = set()
+        while current is not None and id(current) not in seen:
+            seen.add(id(current))
+            with self._download_lock:
+                state = next(
+                    (bound for wired, bound in self._page_huds if wired is current),
+                    None,
+                )
+            if state is not None:
+                return state
             opener = getattr(current, "opener", None)
             try:
                 current = opener() if callable(opener) else None

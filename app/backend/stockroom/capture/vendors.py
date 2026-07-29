@@ -15,23 +15,23 @@ config, because sites need real logic (signatures, headers, protocol quirks).
 
 So the split here is deliberate:
   * CAPABILITY is data on the adapter - what it emits, whether formats are exclusive, whether it
-    needs a login, and (critically) WHICH VERSION of each tool's export to take.
+    needs a login, and (critically) WHICH exact export choice to take.
   * BEHAVIOUR is a method - `drive()` - written per vendor against measured selectors and locked
     by a driver-execution test over a captured fixture of the real page.
 
-THE VERSION PIN IS NOT AN OPTIONAL FIELD
+THE EXPORT CHOICE IS NOT OPTIONAL
 Two vendors independently offer exports this repo cannot ingest: Ultra Librarian lists KiCAD v5
 one row above v6+, and SnapEDA's KiCad chooser offers "V3 & Prior" / "V4 & Later" / "V6 & Later".
 KiCad 5 emits `(module ...)` footprints that `Footprint.load` REFUSES. A wrong pick downloads a
-file that fails much later, far from the cause, so the version is declared explicitly per vendor
-and never defaulted.
+file that fails much later, far from the cause, so the machine selector or exact human-visible
+choice is declared explicitly per vendor and never defaulted.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 from unicodedata import normalize
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -41,6 +41,7 @@ _KICAD_REQS = frozenset(
     {Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT, Requirement.KICAD_MODEL}
 )
 _ALTIUM_REQS = frozenset({Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT})
+BrowserAccessPolicy = Literal["user_driven", "machine_allowed"]
 
 
 def formats_for(needs) -> list[str]:
@@ -78,8 +79,21 @@ class VendorCapability:
     needs_login: bool
     # What a human has to do on that page, shown in the guided window.
     instruction: str
-    # The EXACT export to take per format. See the module docstring: never defaulted.
+    # Exact provider control id/value for formats a reviewed machine-access adapter may drive.
     version_pins: dict[str, str] = field(default_factory=dict)
+    # Exact visible choices a person selects in a provider-controlled page. These are deliberately
+    # separate from DOM ids: a user-driven provider can be a supported acquisition route without
+    # granting Stockroom permission to inspect or operate its controls.
+    user_format_labels: dict[str, str] = field(default_factory=dict)
+    # Provider-side DOM automation is opt-in, never inferred from having an adapter. Commercial
+    # sites remain user-driven until a separately reviewed machine-access contract permits it.
+    browser_access: BrowserAccessPolicy = "user_driven"
+
+    @property
+    def supported_formats(self) -> frozenset[str]:
+        """Formats the end-to-end capture path can accept, independent of browser-control policy."""
+
+        return frozenset(self.version_pins) | frozenset(self.user_format_labels)
 
 
 class VendorAdapter(Protocol):
@@ -127,74 +141,32 @@ class UltraLibrarianAdapter:
     capability = VendorCapability(
         key="ultralibrarian",
         label="Ultra Librarian",
-        # Altium IS supplied - through the PCAD row, NOT the script row.
-        #
-        # The Altium accordion holds THREE rows and they are not interchangeable. From the real
-        # export panel captured at tests/backend/host/fixtures/ul-export-panel.html:
-        #     #AltiumDesigner  value=0  "Altium Designer (script based)"
-        #     #AltiumPCADv14   value=1  "PCAD v14"
-        #     #AltiumPCADV15   value=2  "PCAD v15"
-        # The script row ships `AltiumDesigner/UL_Import.pas` + a `.PrjScr` - a Delphi script that
-        # builds the libraries INSIDE Altium - and no library files at all. The PCAD rows ship
-        # `AltiumV15/<stamp>.lia`, a P-CAD ASCII library Altium imports directly, carrying one
-        # symbolDef AND one patternDef, so ONE file satisfies altium_symbol and altium_footprint
-        # together (see capture/classify.py and its tests).
-        #
-        # THE VENDOR CAN SUPPLY IT; THIS APP CANNOT YET STORE IT. Both halves matter, so read on
-        # before flipping this to ("kicad", "altium") - that flip was tried on 2026-07-27 and is
-        # what this comment exists to stop being retried blind.
-        #
-        # What is TRUE about the vendor: measuring only the script row and concluding "Ultra
-        # Librarian cannot supply Altium" was WRONG, an over-generalisation from one row of three.
-        # Owner, 2026-07-27: *"in ul when u download the altium pcad files it gives u a lia"*.
-        # Ticking #AltiumPCADV15 really does deliver `AltiumV15/<stamp>.lia`, and
-        # `capture/classify.py` correctly reads a P-CAD ASCII library as BOTH Altium assets. That
-        # much is verified end to end against the fixture.
-        #
-        # WHY THE CAPABILITY STILL SAYS ("kicad",): `version_pins` is what `GuidedCaptureSource.
-        # provides()` derives from, so adding "altium" here makes the engine SCHEDULE parts for
-        # altium_symbol/altium_footprint - and nothing downstream can satisfy them:
-        #   * `capture/guided.py::_attach` only ever offers the three KiCad requirements;
-        #   * `ingest/staging.py::StagingCandidate` carries no Altium field at all;
-        #   * `library_ops.attach_altium_assets` -> `altium/extract.py::normalize_altium_source`
-        #     accepts .SchLib/.PcbLib/.IntLib and raises ValueError on anything else, so a `.lia`
-        #     is refused outright.
-        # The result would be a part requested, downloaded and then never satisfied: a run that
-        # reports progress forever, which is precisely the "success that attached nothing" this
-        # file already got burned by once.
-        #
-        # DONE LOOKS LIKE: a `.lia` converted to `.SchLib`/`.PcbLib` and attached. THAT IS A BUILD
-        # TASK WITH A DOCUMENTED PATH, not an open research question - a previous version of this
-        # comment implied otherwise, which was a negative conclusion reached without researching it
-        # (owner corrected it, 2026-07-27).
-        #
-        # THREE independent routes exist, and Altium is only one of them - an earlier version of
-        # this comment implied Altium was required, which the owner pushed back on and was right:
-        #   1. NO CONVERSION AT ALL. A vendor shipping native `.SchLib`/`.PcbLib` (SnapMagic's
-        #      `altium_native`) needs none of this, and `guided.py::_attach` already stores those.
-        #      This is the cheapest path and should be measured before either of the others.
-        #   2. OPEN TOOLING, no Altium and no Windows. ACCEL_ASCII is an open format with existing
-        #      parsers (`xtoolbox/pcad2kicad`; KiCad loads P-CAD ASCII natively), and `AltiumSharp`
-        #      reads AND WRITES `.SchLib`/`.PcbLib` without Altium installed. Cost is a .NET
-        #      dependency beside a Python backend, which is a real tradeoff, not a blocker.
-        #   3. ALTIUM ITSELF. Its Import Wizard translates a P-CAD library carrying BOTH pattern and
-        #      symbol info into a `.PcbLib` AND a `.SchLib` (the documented caveat about symbol-ONLY
-        #      libraries does not apply here); `altium/driver.py` already drives it. Windows + a
-        #      license only. The same reasoning rehabilitates the `#AltiumDesigner` script row:
-        #      `UL_Import.pas` IS DelphiScript, which is exactly what Altium's scripting system runs.
-        tools=("kicad",),
+        # Ultra Librarian introduced a native Altium export on 2025-10-16. Its current official
+        # workflow yields .LibPkg, .SchLib, .PcbLib, and an integrated STEP model. The 2026-07-27
+        # fixture predates that option and remains useful only for the legacy PCAD/script controls.
+        # Sources: ultralibrarian.com/native_export_for_altium_designer and
+        # app.ultralibrarian.com/content/help/altium_designer_2.htm.
+        # Production is user-driven, so support is keyed to the exact visible native choice below
+        # without inventing a DOM selector or granting machine control of the commercial page.
+        tools=("kicad", "altium"),
         formats_exclusive=False,
         aggregator=False,
         needs_login=True,
-        instruction="Pick the part, then Download Now. Symbol, footprint and 3D come together.",
+        instruction=(
+            "Confirm the exact part, select KiCad, STEP, and Altium Designer (Native), then choose "
+            "Download Now. Stockroom captures every delivered file."
+        ),
         # Measured element ids on the export panel. `model` is separate from `kicad`: the STEP
         # sits behind its own "3D CAD Model" accordion and is missed entirely if not ticked.
         # `ThreeDModel` is the current live id (2026-07-28). Older captured panels used
         # `MfrThreeDModel`; `_export_selectors` retains that as a compatibility fallback without
         # making the stale id the declared production pin.
-        # When altium IS wired, its pin must be "AltiumPCADV15" (the PCAD row) and never
-        # "AltiumDesigner" (the script row, which ships UL_Import.pas and no libraries).
         version_pins={"kicad": "KiCADv6", "model": "ThreeDModel"},
+        user_format_labels={
+            "kicad": "KiCad 6 or later",
+            "model": "STEP",
+            "altium": "Altium Designer (Native)",
+        },
     )
 
     # The accordion each format hides behind, by its visible text.
@@ -646,9 +618,8 @@ class SnapMagicAdapter:
         wrong one downloads a library `Footprint.load` REFUSES - the same version trap Ultra
         Librarian has, at a second vendor, which is why the pin is mandatory data rather than a
         default.
-      * Altium is ONE step, `[data-format=altium_native]`, and NATIVE - `.SchLib`/`.PcbLib` rather
-        than Ultra Librarian's P-CAD `.lia`. That matters: `guided.py::_attach` can store those
-        directly, with no conversion anywhere.
+      * Altium is ONE step, `[data-format=altium_native]`, and NATIVE - `.SchLib`/`.PcbLib`, which
+        `guided.py::_attach` can store directly.
       * the 3D model is a SEPARATE download (`#download_step_model`), not part of either.
 
     THE WALL, stated because it decides the workflow: SnapEDA can serve a Cloudflare Turnstile
@@ -661,17 +632,21 @@ class SnapMagicAdapter:
     capability = VendorCapability(
         key="snapmagic",
         label="SnapMagic",
-        # Altium is NATIVE here, unlike Ultra Librarian's PCAD `.lia`, so both tools are real.
+        # Both tools are native, so both can pass through Stockroom's existing attach seams.
         tools=("kicad", "altium"),
         formats_exclusive=True,
         # It hosts community and AI-generated models as well as authored ones, so its bytes are
-        # lower-trust than Ultra Librarian's. It is nevertheless first for dual-EDA acquisition
-        # because only it supplies one native coherent bundle; verification, not provider prose,
-        # decides whether those bytes can attach.
+        # lower-trust than Ultra Librarian's. Verification, not provider prose, decides whether
+        # those bytes can attach.
         aggregator=False,
         needs_login=True,
         instruction="Clear the human check once if it appears, then the downloads run themselves.",
         version_pins={"kicad": "kicad_modv6", "altium": "altium_native", "model": "step_model"},
+        user_format_labels={
+            "kicad": "KiCad V6 & Later",
+            "model": "STEP model",
+            "altium": "Altium native",
+        },
     )
 
     def resolve_url(self, mpn: str) -> str:

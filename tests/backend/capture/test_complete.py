@@ -17,9 +17,17 @@ from stockroom.capture.complete import (
 from stockroom.capture.requirements import Requirement
 from stockroom.model.part import AssetRef, PartRecord
 
+ALL_REQUIREMENTS = tuple(Requirement)
+
 
 def _rec(part_id="p1", **kw) -> PartRecord:
     return PartRecord(id=part_id, display_name=part_id, category="ICs", mpn=part_id.upper(), **kw)
+
+
+def _fill_all_assets(record: PartRecord) -> None:
+    for requirement in ALL_REQUIREMENTS:
+        tool, _, kind = requirement.value.partition("_")
+        record.assets_for(tool).set(kind, AssetRef(lib="L", name="N"))
 
 
 class FakeSource:
@@ -103,12 +111,12 @@ def test_sourceable_needs_adds_a_tool_the_moment_a_source_for_it_is_registered()
 def test_complete_part_runs_sources_until_the_needs_are_met():
     rec = _rec()
     records = {"p1": rec}
-    src = FakeSource("lcsc", [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT])
+    src = FakeSource("complete", ALL_REQUIREMENTS)
     item = complete_part("p1", load_record=_loader(records), sources=[src])
     assert item.status == "completed"
-    assert item.satisfied == ["kicad_symbol", "kicad_footprint"]
+    assert item.satisfied == [requirement.value for requirement in ALL_REQUIREMENTS]
     assert item.remaining == []
-    assert item.sources == ["lcsc"]
+    assert item.sources == ["complete"]
 
 
 def test_complete_part_reports_improved_when_only_some_needs_were_met():
@@ -123,15 +131,18 @@ def test_complete_part_reports_improved_when_only_some_needs_were_met():
     )
     item = complete_part("p1", load_record=_loader(records), sources=[src])
     assert item.status == "improved"
-    assert item.remaining == ["kicad_model"]
+    assert item.remaining == [
+        "kicad_model",
+        "altium_symbol",
+        "altium_footprint",
+    ]
 
 
 def test_complete_part_is_a_no_op_when_nothing_is_needed():
     # Idempotence, which is what makes a 10k run RESUMABLE: re-running costs nothing on the
     # parts already done, so "run it again" is never a full-price operation.
     rec = _rec()
-    for kind in ("symbol", "footprint", "model"):
-        rec.assets_for("kicad").set(kind, AssetRef(lib="L", name="N"))
+    _fill_all_assets(rec)
     src = FakeSource("lcsc", [Requirement.KICAD_SYMBOL])
     item = complete_part("p1", load_record=_loader({"p1": rec}), sources=[src])
     assert item.status == "already-complete"
@@ -183,7 +194,7 @@ def test_a_source_that_raises_is_caught_and_the_next_source_still_runs():
             raise RuntimeError("converter segfaulted")
 
     rec = _rec()
-    good = FakeSource("passive", [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT])
+    good = FakeSource("passive", ALL_REQUIREMENTS)
     item = complete_part("p1", load_record=_loader({"p1": rec}), sources=[Exploding(), good])
     assert item.status == "completed"
     assert "converter segfaulted" in item.error
@@ -199,6 +210,46 @@ def test_a_later_source_is_skipped_once_its_requirements_are_already_met():
     item = complete_part("p1", load_record=_loader({"p1": rec}), sources=[first, second])
     assert second.calls == []
     assert item.sources == ["offline"]
+
+
+def test_a_later_source_receives_the_record_persisted_by_the_previous_source():
+    stale = _rec()
+    records = {"p1": stale}
+    observed = []
+
+    class Persisting:
+        key = "persisting"
+
+        def provides(self):
+            return frozenset({Requirement.KICAD_SYMBOL})
+
+        def supply(self, record):
+            assert record is stale
+            refreshed = _rec()
+            refreshed.assets_for("kicad").set("symbol", AssetRef(lib="L", name="N"))
+            records["p1"] = refreshed
+            return SourceOutcome(satisfied=(Requirement.KICAD_SYMBOL,))
+
+    class Observing:
+        key = "observing"
+
+        def provides(self):
+            return frozenset({Requirement.KICAD_FOOTPRINT})
+
+        def supply(self, record):
+            observed.append(record)
+            return SourceOutcome(skipped="observed")
+
+    item = complete_part(
+        "p1",
+        load_record=_loader(records),
+        sources=[Persisting(), Observing()],
+    )
+
+    assert observed == [records["p1"]]
+    assert observed[0] is not stale
+    assert observed[0].assets_for("kicad").symbol is not None
+    assert item.satisfied == ["kicad_symbol"]
 
 
 def test_a_part_that_cannot_be_loaded_is_a_row_not_an_abort():
@@ -224,7 +275,7 @@ def test_complete_library_streams_and_never_materialises_the_whole_worklist():
             seen_order.append(f"produced:p{i}")
             yield f"p{i}"
 
-    src = FakeSource("s", [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT])
+    src = FakeSource("s", ALL_REQUIREMENTS)
 
     def load(pid):
         seen_order.append(f"worked:{pid}")
@@ -248,7 +299,7 @@ def test_one_failing_part_never_aborts_the_batch():
             raise RuntimeError("disk read error")
         return records[pid]
 
-    src = FakeSource("s", [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT])
+    src = FakeSource("s", ALL_REQUIREMENTS)
     report = complete_library(["p0", "p1", "p2", "p3"], load_record=load, sources=[src])
     assert [i.status for i in report.items] == [
         "completed",
@@ -260,11 +311,11 @@ def test_one_failing_part_never_aborts_the_batch():
 
 
 def test_a_run_can_be_stopped_and_reports_what_it_finished():
-    """"Endlessly" has to mean STOPPABLE, or a 10k run is a hostage situation. The stop is
+    """ "Endlessly" has to mean STOPPABLE, or a 10k run is a hostage situation. The stop is
     cooperative and checked BEFORE each part, so a stopped run never leaves a half-attached
     part behind -- each part is its own atomic unit."""
     records = {f"p{i}": _rec(f"p{i}") for i in range(10)}
-    src = FakeSource("s", [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT])
+    src = FakeSource("s", ALL_REQUIREMENTS)
     done: list[str] = []
 
     def on_progress(ev):
@@ -290,7 +341,10 @@ def test_progress_names_the_part_it_is_on():
     events: list[dict] = []
     src = FakeSource("s", [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT])
     complete_library(
-        ["p0"], load_record=_loader(records), sources=[src], total=1,
+        ["p0"],
+        load_record=_loader(records),
+        sources=[src],
+        total=1,
         on_progress=events.append,
     )
     assert events[0]["part_id"] == "p0"
@@ -300,12 +354,9 @@ def test_progress_names_the_part_it_is_on():
 
 def test_report_counts_group_by_status():
     records = {f"p{i}": _rec(f"p{i}") for i in range(3)}
-    for kind in ("symbol", "footprint", "model"):
-        records["p2"].assets_for("kicad").set(kind, AssetRef(lib="L", name="N"))
-    src = FakeSource("s", [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT])
-    report = complete_library(
-        ["p0", "p1", "p2"], load_record=_loader(records), sources=[src]
-    )
+    _fill_all_assets(records["p2"])
+    src = FakeSource("s", ALL_REQUIREMENTS)
+    report = complete_library(["p0", "p1", "p2"], load_record=_loader(records), sources=[src])
     assert report.counts() == {"completed": 2, "already-complete": 1}
 
 
@@ -323,8 +374,9 @@ def test_iter_incomplete_yields_only_parts_a_source_could_help_and_stays_lazy(tm
         (parts / f"{rec.id}.json").write_text(rec.dumps(), encoding="utf-8")
 
     src = FakeSource("s", [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT])
-    got = iter_incomplete(parts, load_record=lambda pid: {"full": full, "empty": empty}[pid],
-                          sources=[src])
+    got = iter_incomplete(
+        parts, load_record=lambda pid: {"full": full, "empty": empty}[pid], sources=[src]
+    )
     assert not isinstance(got, list)  # a generator: 10k records are never all in memory
     assert list(got) == ["empty"]
 
