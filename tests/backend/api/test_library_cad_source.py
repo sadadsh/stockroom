@@ -71,8 +71,8 @@ def test_cad_source_distinguishes_a_page_link_from_an_implemented_capture_adapte
 
     assert by_key["ultralibrarian"]["capture_available"] is True
     assert by_key["snapmagic"]["capture_available"] is True
-    assert by_key["digikey"]["capture_available"] is False
-    assert by_key["samacsys"]["capture_available"] is False
+    assert by_key["digikey"]["capture_available"] is True
+    assert by_key["samacsys"]["capture_available"] is True
 
 
 def test_each_vendor_carries_a_real_url_for_this_part(client, app_ctx):
@@ -137,6 +137,9 @@ def test_user_driven_capture_route_requires_one_part_and_one_provider(client, ap
         ({"mode": "assisted", "part_ids": [part_id], "vendor": "snapmagic",
           "background": "yes"},
          "background must be a boolean"),
+        ({"mode": "assisted", "part_ids": [part_id], "vendor": "samacsys",
+          "background": True},
+         "requires a visible person-driven provider page"),
     )
 
     for payload, detail in cases:

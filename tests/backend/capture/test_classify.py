@@ -31,6 +31,13 @@ def test_unknown_extension():
     assert c.tool == "unknown" and c.requirements == frozenset()
 
 
+def test_samacsys_epw_pointer_is_not_counted_as_cad():
+    c = classify_asset(Path("download.epw"))
+    assert c.tool == "unknown"
+    assert c.kind == "unknown"
+    assert c.requirements == frozenset()
+
+
 def test_mixed_zip(tmp_path):
     z = tmp_path / "bundle.zip"
     with zipfile.ZipFile(z, "w") as zf:

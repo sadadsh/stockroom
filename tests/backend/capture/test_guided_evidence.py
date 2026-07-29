@@ -484,6 +484,93 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
     altium_variant.validate_for_tool("altium")
 
 
+def test_provider_script_conversion_feeds_the_normal_verified_altium_attach(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    candidate = _candidate(tmp_path)
+    record = _InstalledRecord()
+    provider_zip = tmp_path / "Provider.zip"
+    with zipfile.ZipFile(provider_zip, "w") as archive:
+        archive.writestr("AltiumDesigner/UL_Import.pas", "provider script")
+    native = tmp_path / "Native"
+    native.mkdir()
+    schlib = native / "S1M.SchLib"
+    pcblib = native / "S1M.PcbLib"
+    shutil.copy2(_ALTIUM_FIXTURES / "sample.SchLib", schlib)
+    shutil.copy2(_ALTIUM_FIXTURES / "sample.PcbLib", pcblib)
+    conversion_calls = []
+    cleanup_calls = []
+    altium_calls = []
+
+    class _Pipeline:
+        def inspect(self, inputs):
+            assert inputs == [provider_zip]
+            return [candidate]
+
+        def attach_assets(self, *_args, **_kwargs):
+            return None
+
+        def cleanup(self):
+            return None
+
+    def _convert(inputs, manufacturer, mpn):
+        conversion_calls.append((inputs, manufacturer, mpn))
+        return type(
+            "_Converted",
+            (),
+            {
+                "libraries": (schlib, pcblib),
+                "cleanup": lambda _self: cleanup_calls.append("cleaned"),
+            },
+        )()
+
+    def _attach_altium(part_id, *sources, **kwargs):
+        altium_calls.append((part_id, sources, kwargs))
+        record.assets["altium"] = EdaAssets(
+            symbol=AssetRef(lib="S1M.SchLib", name="S1M"),
+            footprint=AssetRef(lib="S1M.PcbLib", name="S1M"),
+        )
+        return record
+
+    monkeypatch.setattr(
+        "stockroom.capture.guided.get_adapter",
+        lambda _key: type(
+            "_Adapter",
+            (),
+            {"capability": type("_Capability", (), {"label": "DigiKey · Ultra Librarian"})()},
+        )(),
+    )
+    source = GuidedCaptureSource(
+        lambda: _Pipeline(),
+        vendor="digikey",
+        download_root=tmp_path / "Downloads",
+        attach_altium=_attach_altium,
+        convert_altium=_convert,
+        evidence_store=EvidenceStore(tmp_path / "Evidence"),
+        cross_eda_verifier=lambda **_kwargs: {
+            "valid": True,
+            "terminal_equivalence": True,
+            "pad_equivalence": True,
+            "package_equivalence": True,
+        },
+    )
+
+    outcome = source._attach(
+        record,
+        [type("_Captured", (), {"path": provider_zip})()],
+        _DETAIL_URL,
+        detail_url=_DETAIL_URL,
+    )
+
+    assert conversion_calls == [((provider_zip,), "ON Semiconductor", "S1M")]
+    assert cleanup_calls == ["cleaned"]
+    assert len(altium_calls) == 1
+    assert altium_calls[0][1] == (schlib, pcblib)
+    assert Requirement.ALTIUM_SYMBOL in outcome.satisfied
+    assert Requirement.ALTIUM_FOOTPRINT in outcome.satisfied
+
+
 def _installed_kicad(
     tmp_path: Path,
     candidate: StagingCandidate,

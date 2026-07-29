@@ -144,3 +144,18 @@ def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_expl
     assert all(options["credentials"] is runner._saved_credentials for options in assisted)
     assert all(source.closed for source in source_batches[1])
     assert runtimes == []
+
+    runner.run_guided_capture(
+        ctx,
+        part_ids=["part-a"],
+        vendor="digikey",
+        operator_authorized=True,
+        should_stop=stop,
+    )
+
+    digikey = constructed[-1]
+    assert digikey["vendor"] == "digikey"
+    assert digikey["engine"] == "camoufox"
+    assert digikey["convert_altium"] is runner._convert_ul_altium_package
+    assert digikey["user_driven"] is False
+    assert digikey["operator_authorized"] is True

@@ -395,6 +395,8 @@ def _resolved_provider_url_issue(adapter, url: str, record) -> str:
         error = exact_observation_error(record, detail)
         return f"{adapter.capability.label} {error}." if error else ""
     query_name = {
+        "digikey": "keywords",
+        "samacsys": "term",
         "ultralibrarian": "queryText",
         "snapmagic": "q",
     }.get(provider_key)
@@ -519,6 +521,7 @@ class GuidedCaptureSource:
         headless: bool = False,
         engine: str = "chromium",
         attach_altium=None,
+        convert_altium=None,
         credentials=None,
         run_write=None,
         now_iso=None,
@@ -538,6 +541,9 @@ class GuidedCaptureSource:
         self._make_pipeline = make_pipeline
         self._vendor_key = vendor
         adapter = get_adapter(vendor)
+        self._evidence_provider_key = (
+            getattr(adapter, "evidence_provider_key", vendor) if adapter is not None else vendor
+        )
         # Public, human-facing identity for completion reports. `key` must remain "guided"
         # because it names the source implementation, while two instances in one fallback chain
         # need distinct provider names so their honest decline reasons remain distinguishable.
@@ -550,6 +556,10 @@ class GuidedCaptureSource:
         # `library_ops.attach_altium_assets`, injected rather than imported, so this module stays
         # free of the mutation layer and a test can drive the Altium path without a real library.
         self._attach_altium = attach_altium
+        # Optional provider-package conversion seam. DigiKey's embedded Ultra Librarian route
+        # delivers an official Altium scripting project, not native libraries. The runner injects
+        # the narrowly recognized converter only for that route.
+        self._convert_altium = convert_altium
         # `(vendor_key) -> (username, password) | None`. Injected, so capture/ never reads the
         # machine config itself and a test can drive sign-in without one.
         self._credentials = credentials
@@ -758,6 +768,13 @@ class GuidedCaptureSource:
                         settle_seconds=0.75,
                     )
                 detail_url = getattr(task_page, "url", "") or ""
+                evidence_detail_url = getattr(adapter, "evidence_detail_url", None)
+                if callable(evidence_detail_url):
+                    detail_url = evidence_detail_url(
+                        task_page,
+                        expected_manufacturer=manufacturer,
+                        expected_mpn=mpn,
+                    )
         except Exception as exc:  # noqa: BLE001 - one part's failure is a row, not a crash
             return SourceOutcome(error=f"{adapter.capability.label}: {exc}")
 
@@ -1046,6 +1063,28 @@ class GuidedCaptureSource:
         )
 
     def _attach(self, record, landed, url: str, *, detail_url: str = "") -> SourceOutcome:
+        cleanup_callbacks = []
+        try:
+            return self._attach_impl(
+                record,
+                landed,
+                url,
+                detail_url=detail_url,
+                cleanup_callbacks=cleanup_callbacks,
+            )
+        finally:
+            for cleanup in reversed(cleanup_callbacks):
+                cleanup()
+
+    def _attach_impl(
+        self,
+        record,
+        landed,
+        url: str,
+        *,
+        detail_url: str = "",
+        cleanup_callbacks,
+    ) -> SourceOutcome:
         """Turn the downloaded file(s) into attached assets, with provenance.
 
         Reuses the ingest pipeline the rest of the app already attaches through, so a guided
@@ -1071,6 +1110,20 @@ class GuidedCaptureSource:
         altium_active_variant = None
         compatible_kicad_variant = None
         altium_sources = _altium_libraries(landed)
+        if not altium_sources and self._convert_altium is not None:
+            try:
+                converted = self._convert_altium(
+                    tuple(item.path for item in landed),
+                    record.manufacturer,
+                    record.mpn,
+                )
+                if converted is not None:
+                    altium_sources = list(converted.libraries)
+                    cleanup = getattr(converted, "cleanup", None)
+                    if callable(cleanup):
+                        cleanup_callbacks.append(cleanup)
+            except Exception as exc:  # noqa: BLE001 - keep usable KiCad and report this gap
+                failures.append(f"could not convert the provider's Altium package: {exc}")
         pipeline = self._make_pipeline()
         try:
             candidates = []
@@ -1084,15 +1137,19 @@ class GuidedCaptureSource:
                     candidates.extend(pipeline.inspect(inputs=[item.path]))
                 except Exception as exc:  # noqa: BLE001
                     inspect_errors.append(exc)
-            if not candidates and not altium_sources:
-                detail = inspect_errors[0] if inspect_errors else "no CAD candidate found"
-                return SourceOutcome(error=f"could not read the download: {detail}")
+            if not landed:
+                try:
+                    candidates.extend(pipeline.inspect(inputs=[]))
+                except Exception as exc:  # noqa: BLE001
+                    inspect_errors.append(exc)
+            if not candidates and not altium_sources and inspect_errors:
+                return SourceOutcome(error=f"could not read the download: {inspect_errors[0]}")
 
             kicad_offered: list[Requirement] = []
             selection = select_exact_candidate(
                 record,
                 candidates,
-                vendor_key=self._vendor_key,
+                vendor_key=self._evidence_provider_key,
                 detail_url=detail_url,
             )
             candidate = selection.candidate
@@ -1111,7 +1168,7 @@ class GuidedCaptureSource:
                             store=self._evidence_store,
                             record=record,
                             candidate=candidate,
-                            provider_key=self._vendor_key,
+                            provider_key=self._evidence_provider_key,
                             detail_url=detail_url,
                             altium_sources=tuple(altium_sources),
                             cross_eda_verifier=self._cross_eda_verifier,
@@ -1125,7 +1182,7 @@ class GuidedCaptureSource:
                             store=self._evidence_store,
                             record=record,
                             candidate=candidate,
-                            provider_key=self._vendor_key,
+                            provider_key=self._evidence_provider_key,
                             detail_url=detail_url,
                         )
                     except Exception as exc:  # noqa: BLE001 - fail closed before any library write
@@ -1162,7 +1219,7 @@ class GuidedCaptureSource:
                         store=self._evidence_store,
                         record=record,
                         profile=pipeline.profile,
-                        provider_key=self._vendor_key,
+                        provider_key=self._evidence_provider_key,
                         detail_url=detail_url,
                         altium_sources=tuple(altium_sources),
                         cross_eda_verifier=self._cross_eda_verifier,
@@ -1195,7 +1252,7 @@ class GuidedCaptureSource:
                         error=f"CAD evidence pointer resolution failed: {exc}"
                     )
             origin = AssetOrigin(
-                vendor=self._vendor_key,
+                vendor=self._evidence_provider_key,
                 url=url,
                 captured_at=self._now_iso() if self._now_iso else "",
                 extra=(

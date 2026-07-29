@@ -6,8 +6,8 @@
   "note": "Owner outcomes are the product source of truth. The historical engineering checklist is retained below as unweighted implementation history and must never be presented as product readiness.",
   "product_scope": "Windows-only component-library management for both KiCad and Altium. A capability ships only when both EDA workflows are supported. KiCad-only project management is deferred and removed from the current frontend; its backend and Git history are preserved.",
   "active_work": {
-    "last_updated": "2026-07-29T00:17:43Z",
-    "objective": "Finish policy-compliant MPN-to-assets acquisition: use verified cache, permitted direct/open sources, deterministic generation, and separately approved adapters automatically. Treat commercial provider pages as a managed user-driven fallback, with Stockroom owning opening, interception, validation, attachment, and subsequent fallback while the user owns every provider-side interaction.",
+    "last_updated": "2026-07-29T04:24:04Z",
+    "objective": "Finish exact-MPN-to-assets acquisition with the smallest possible user workload: use verified direct sources and reviewed provider automation, retain every usable file, convert supported provider packages into native outputs, and require exact identity plus semantic and cross-EDA verification before attachment.",
     "refresh_policy": "Manually refreshed at meaningful checkpoints; this is not real-time telemetry.",
     "workstreams": [
       {
@@ -15,54 +15,36 @@
         "name": "Automatic MPN-To-Assets Acquisition",
         "status": "active",
         "owner": "development tool · acquisition planning and provider adapters",
-        "evidence": "The existing acquisition broker already owns task-bound permitted direct HTTP and user-driven browser materialization, exact part/manufacturer/MPN identity, atomic saved bytes, hashes, URL sanitization, deduplication, and validation/attach seams. Recent provider diagnostics now report an exact provider model absence instead of pretending a download exists (commit 3a296a1e). The current working tree adds exact-role evidence composition and an append-only variant index; this is verified source foundation, not proof that arbitrary MPNs complete automatically.",
-        "blocker": "Verified-cache reuse, permitted direct/open retrieval, deterministic generation, and policy-permitted adapters are not yet connected into one arbitrary-MPN primary path. No live end-to-end IC51 bundle has passed KiCad, native Altium, STEP, exact-identity, attach, reopen, and evidence verification, and no explicit active-variant selector is implemented.",
-        "next_action": "Rank verified cache and permitted direct/open sources first, use deterministic generation when evidence is sufficient, and invoke only separately policy-approved adapters automatically. Preserve every exact validated variant, select only a compatible set, and add an explicit reversible active selector instead of replacing references when a later provider returns another candidate."
+        "evidence": "The isolated UL Canary profile now contains one complete Texas Instruments TPD6E05U06RVZR component captured from real SnapMagic downloads. Active KiCad and Altium variants share manifest sha256:5b0cb30d1b83ab28b392032602469fef0c20aa0725861d03b60e747c24e2092a; independent readback proved eight pins, fourteen pads, the same mechanical-pad allowance, and terminal, pad, and package equivalence. DigiKey and SamacSys now expose distinct implemented routes rather than discovery-only links.",
+        "blocker": "One successful provider canary does not prove arbitrary-MPN completion. The production Stockroom profile still contains only incomplete IC51-0484-806, and provider availability, verified-cache reuse, deterministic generation, and fallback performance remain unqualified at scale.",
+        "next_action": "Use the TPD6E05U06RVZR canary as the fixed regression, finish the DigiKey script-package conversion proof, then exercise several unrelated MPN and package classes through the same acquisition and fallback engine."
       },
       {
         "id": "cad-evidence-composition",
         "name": "CAD Evidence Composition And Variants",
-        "status": "verification",
+        "status": "verified",
         "owner": "development tool · immutable evidence and cross-EDA validation",
-        "evidence": "The current working tree adds partial CAD role manifests bound to exact manufacturer/MPN, provider, adapter, role, content digest, validation report, and source manifests. The index is append-only: Ultra Librarian ranks before SnapMagic by default, but every exact validated variant remains addressable and no evidence write changes the active library reference. An Altium-only capture can reuse the currently attached KiCad symbol, footprint, and STEP only after re-reading them, installing and re-verifying their CAS bytes, and proving terminal, pad, and package equivalence; attachment then uses re-materialized CAS bytes. Ruff and Ty pass, and 20 focused evidence/guided/legacy-seam tests pass.",
-        "blocker": "This slice is uncommitted, no live provider capture has exercised it, the current IC51 record still has no assets, and the application has no explicit active-variant selection UI or durable active-selection pointer.",
-        "next_action": "Review and commit the evidence slice, run one real Ultra Librarian native-Altium composition canary through attach and reopen, then build an explicit active-variant selector that switches among compatible preserved sets without redownload or deletion."
+        "evidence": "Committed role manifests and active CAD pointers preserve exact identity, provider, content digest, validation, and compatible source-manifest links. The real SnapMagic canary retained three Ultra Librarian KiCad manifests and the coherent SnapMagic pair, then atomically projected the compatible KiCad and Altium variants without deleting alternatives.",
+        "blocker": "The current per-tool activation endpoint still cannot switch an already-complete pair through an incompatible intermediate state. Pair switching must be one coherent transaction, not weaker compatibility guards.",
+        "next_action": "Add one atomic compatible-pair activation action and expose the retained provider variants in the component UI."
       },
       {
-        "id": "user-driven-capture-fallback",
-        "name": "User-Driven Capture Fallback",
+        "id": "digikey-ultralibrarian-conversion",
+        "name": "DigiKey Ultra Librarian Conversion",
         "status": "verification",
-        "owner": "development tool · managed Chromium capture boundary",
-        "evidence": "Commit caf031a7 adds an exact-provider-page fallback in Stockroom-managed Chromium, wires the task-bound broker before navigation, intercepts every download, and completes on page close, explicit finish, cancellation, or timeout without reading credentials or driving provider controls. The current working tree adds one-part/one-provider production wiring plus a Stockroom-owned HUD injected before navigation. The HUD shows the exact provider, manufacturer, MPN, required formats, and live receipt count, and exposes Finish, Try Another Provider, and Cancel without inspecting provider DOM; nine focused HUD and Ultra Librarian capability tests pass. Ultra Librarian's official 2025-10-16 native export announcement confirms native schematic library, PCB library, LibPkg, and integrated STEP output: https://www.ultralibrarian.com/native_export_for_altium_designer.",
-        "blocker": "The production wiring and HUD are still uncommitted, have not been inspected on a real provider page in the installed Windows app, and have not been deployed. Provider login, exact-result selection, format selection, Download controls, CAPTCHA, and license acceptance remain intentionally user-driven.",
-        "next_action": "Review and commit the production wiring and HUD, then run one real interactive Ultra Librarian capture. Prove the HUD survives navigation, captures the native .LibPkg/.SchLib/.PcbLib plus STEP delivery, and advances or cancels without DOM driving before deploying it."
-      },
-      {
-        "id": "capture-browser-firewall",
-        "name": "Capture Browser Firewall Prevention",
-        "status": "verification",
-        "owner": "development tool · managed Chromium host",
-        "evidence": "Commit 15db4098 injects a pre-page script that removes RTCPeerConnection and webkitRTCPeerConnection from Playwright and Camoufox capture contexts so CAD pages cannot open unneeded wildcard WebRTC UDP listeners. Focused browser tests cover both names and the initialization path.",
-        "blocker": "The installed checkout remains at 3a296a1e, before this commit, so the absence of the Windows Defender Firewall prompt has not yet been proved in the user-visible installed app.",
-        "next_action": "Deploy the converged source, launch from the interactive Windows session, repeat the real provider flow, and record a screenshot-backed no-firewall-prompt result."
-      },
-      {
-        "id": "ic51-kicad-generation",
-        "name": "IC51 KiCad Generation",
-        "status": "active",
-        "owner": "development tool · shared component definition and KiCad projection",
-        "evidence": "The Yamaichi IC51-0484-806 datasheet and detailed drawing establish 48 contacts at 0.5 mm pitch, 48 plated holes, four 3.2 mm mounting holes, and the measured contact/mounting geometry. New shared-definition and KiCad-generation modules are present in the working tree and remain under implementation and review.",
-        "blocker": "No trustworthy STEP model, body-height stack, or manufacturer copper-land diameter has been found. Generated output must remain production_ready=false and name those blockers; no missing geometry may be fabricated.",
-        "next_action": "Finish deterministic symbol and footprint output, prove KiCad 10 native parse/export plus semantic geometry readback, and publish the exact blockers alongside the inspectable assets."
+        "owner": "development tool · DigiKey browser adapter and guarded Altium bridge",
+        "evidence": "A real isolated headless Camoufox run reused saved DigiKey credentials, selected the exact product/model page, and downloaded TPD6E05U06RVZR.zip. The measured Altium choice is script based and contains STEP, one ASCII component payload, and the Ultra Librarian importer, not native libraries. Before extraction Stockroom requires the reviewed six-file archive shape, exact static and importer hashes, safe paths, bounded size/compression, and exact payload manufacturer/MPN/component/footprint identity. In a temporary sandbox it ignores the one reviewed AD26 informational dialog, captures every other provider dialog as a failure, generates a minimal one-document project, routes execution through the existing watchdog, requires exact native-library entry readback, and deletes the sandbox after guided attachment or any failure. The real ZIP passed recognition and all 26 dialog-site transformations; 154 focused provider tests plus Ruff pass without launching Altium. Two broader backend invocations timed out without terminal output and are not counted as passing evidence.",
+        "blocker": "The patched importer has not yet run through installed AD26, because that live application run was intentionally deferred while the owner was using the desktop. Native output and cross-EDA equivalence are therefore not yet live proof.",
+        "next_action": "When the desktop is free, execute the already-recognized package through AD26, verify the native SchLib/PcbLib against coherent KiCad assets, retain original and derived evidence, and reject the route if any dialog, timeout, or semantic mismatch remains."
       },
       {
         "id": "deploy-and-durable-state",
         "name": "Deploy And Durable State",
         "status": "pending",
         "owner": "development tool · Windows deployment and Obsidian state",
-        "evidence": "Canonical main and origin/main are at d5daa9b1 while the installed checkout is still at 3a296a1e. The blocked deterministic IC51 generation is on main; the capture HUD, production wiring, evidence composition, variant index, and related frontend guidance are still working-tree changes. The canonical Stockroom Current State note therefore remains behind this session.",
-        "blocker": "Source review, the remaining aggregate-gate failures, scoped commits, final deployment, installed-app proof, and the permanent Current State and tracked-todo update have not completed.",
-        "next_action": "Converge and test the scoped source, push main, deploy and relaunch the installed app, verify the user-visible workflow, then update the Obsidian project state with the proven revision and remaining gaps."
+        "evidence": "Canonical main and origin/main are at abe30c42. The installed checkout remains at 3ce8845c with preserved fixture changes and untracked evidence. Current provider and conversion changes are scoped working-tree edits; no visible app or desktop process was touched during this pass.",
+        "blocker": "The scoped provider changes still need the full practical gate, commit, push, non-destructive installed-checkout adoption, and current-state/QMD refresh.",
+        "next_action": "Complete the scoped gates, commit and push exact paths, deploy without restarting the active desktop session, refresh project knowledge, and schedule only the live AD26 conversion for a desktop-free window."
       }
     ]
   },
