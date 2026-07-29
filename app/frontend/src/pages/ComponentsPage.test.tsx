@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError } from "../api/client";
 import { api } from "../api/client";
+import { cadVariantApi } from "../api/cadVariantClient";
 import type { EnrichmentResult, PartDetail, PartSummary } from "../api/types";
 import { makePartDetail } from "../test/partFixture";
 import { ToastProvider } from "../lib/toast";
@@ -35,7 +36,19 @@ vi.mock("../api/client", async (importActual) => {
   };
 });
 
+vi.mock("../api/cadVariantClient", async (importActual) => {
+  const actual = await importActual<typeof import("../api/cadVariantClient")>();
+  return {
+    ...actual,
+    cadVariantApi: {
+      inventory: vi.fn(),
+      activate: vi.fn(),
+    },
+  };
+});
+
 const mockApi = vi.mocked(api);
+const mockCadVariantApi = vi.mocked(cadVariantApi);
 
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
   const enc = new TextEncoder();
@@ -62,6 +75,14 @@ function mockEnrich(r: EnrichmentResult) {
 // Default: no duplicates. Individual tests override to exercise the badge + filter.
 beforeEach(() => {
   mockApi.getDuplicates.mockResolvedValue({ by_mpn: [], by_footprint: [] });
+  mockCadVariantApi.inventory.mockResolvedValue({
+    partId: "lm358",
+    inventories: [],
+  });
+  mockCadVariantApi.activate.mockResolvedValue({
+    partId: "lm358",
+    inventories: [],
+  });
 });
 
 const SUMMARY: PartSummary = {

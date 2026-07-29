@@ -6,44 +6,25 @@
  * id gives the eventual API seam enough information to reject a stale concurrent switch.
  */
 import { useId } from "react";
+import type {
+  CadVariant,
+  CadVariantActivation,
+  CadVariantArtifact,
+  CadVariantArtifactKind,
+  CadVariantInventory,
+  CadVariantTool,
+} from "../api/cadVariantClient";
 import { Text } from "../lib/copy";
 import { Badge, Button, Card, Dot, EYEBROW_DENSE } from "./primitives";
 
-export type CadVariantTool = "kicad" | "altium";
-export type CadVariantArtifactKind = "symbol" | "footprint" | "model";
-
-export interface CadVariantArtifact {
-  kind: CadVariantArtifactKind;
-  fileName: string;
-}
-
-export interface CadVariant {
-  id: string;
-  provider: string;
-  format: string;
-  artifacts: readonly CadVariantArtifact[];
-  evidenceDigest: string;
-  validationChecks: number;
-  /**
-   * Lower is more trusted. The policy stays outside the component, so Ultra Librarian can be
-   * preferred today without hard-coding a provider name into presentation logic.
-   */
-  trustRank: number;
-  trustLabel: string;
-  trustReason?: string;
-}
-
-export interface CadVariantInventory {
-  tool: CadVariantTool;
-  activeVariantId: string | null;
-  variants: readonly CadVariant[];
-}
-
-export interface CadVariantActivation {
-  tool: CadVariantTool;
-  variantId: string;
-  expectedActiveVariantId: string | null;
-}
+export type {
+  CadVariant,
+  CadVariantActivation,
+  CadVariantArtifact,
+  CadVariantArtifactKind,
+  CadVariantInventory,
+  CadVariantTool,
+} from "../api/cadVariantClient";
 
 interface Props {
   inventories: readonly CadVariantInventory[];

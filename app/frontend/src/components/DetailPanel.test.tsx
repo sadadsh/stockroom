@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
+import { cadVariantApi } from "../api/cadVariantClient";
 import type { PartDetail } from "../api/types";
 import { DEV_ID_BY_ID } from "../lib/devIds";
 import { ThemeProvider } from "../lib/theme";
@@ -37,6 +38,17 @@ vi.mock("../api/client", async (importActual) => {
   };
 });
 
+vi.mock("../api/cadVariantClient", async (importActual) => {
+  const actual = await importActual<typeof import("../api/cadVariantClient")>();
+  return {
+    ...actual,
+    cadVariantApi: {
+      inventory: vi.fn(),
+      activate: vi.fn(),
+    },
+  };
+});
+
 // three.js is verified in the Windows pixel gate; mock the scene so opening the 3D
 // tab does not need a WebGL context here.
 // the scene returns a handle ({dispose, setView}); see PartPreview.test.tsx
@@ -54,6 +66,7 @@ vi.mock("../lib/threeScene", () => ({
 }));
 
 const mockApi = vi.mocked(api);
+const mockCadVariantApi = vi.mocked(cadVariantApi);
 
 beforeEach(() => {
   mockApi.previewSvg.mockResolvedValue(new Blob(["<svg/>"], { type: "image/svg+xml" }));
@@ -76,6 +89,14 @@ beforeEach(() => {
     vendor: "DigiKey",
     needs: [],
   } as never);
+  mockCadVariantApi.inventory.mockResolvedValue({
+    partId: "lm358",
+    inventories: [],
+  });
+  mockCadVariantApi.activate.mockResolvedValue({
+    partId: "lm358",
+    inventories: [],
+  });
 });
 
 // Delegates to the ONE shared wire-shaped factory (src/test/partFixture.ts); only the default
@@ -505,6 +526,18 @@ describe("DetailPanel dev-mode ids (IDSYS-01)", () => {
     expect(within(representation).getAllByText("Symbol").length).toBeGreaterThan(0);
     expect(within(representation).getAllByText("Footprint").length).toBeGreaterThan(0);
     expect(within(representation).getAllByText("3D Model").length).toBeGreaterThan(0);
+  });
+
+  it("loads retained variants only when Representations opens for the selected part", async () => {
+    mockCadVariantApi.inventory.mockClear();
+    wrap(<DetailPanel detail={detail()} {...BASE} />);
+
+    expect(mockCadVariantApi.inventory).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
+
+    expect(await screen.findByText("0 Retained")).toBeInTheDocument();
+    expect(mockCadVariantApi.inventory).toHaveBeenCalledTimes(1);
+    expect(mockCadVariantApi.inventory).toHaveBeenCalledWith("lm358");
   });
 
   it("emits the derived tab-strip ids via TabStrip devIdBase, resolving via DEV_ID_BY_ID", () => {
