@@ -16,7 +16,7 @@ export const UI_SESSION_VERSION = 1 as const;
 export const INTAKE_DRAFT_SCHEMA = "stockroom.intake-draft" as const;
 export const INTAKE_DRAFT_VERSION = 1 as const;
 
-export type UiSessionRoute = "components" | "stm" | "settings";
+export type UiSessionRoute = "components" | "projects" | "stm" | "settings";
 export type DetailTab = "specs" | "sourcing" | "enrich" | "history" | "handoff";
 export type SettingsGroup = "general" | "library" | "eda" | "sources" | "maintenance";
 export type OpenSurface = "search" | "add_part" | "complete_part" | null;
@@ -47,6 +47,7 @@ export interface UiSessionSnapshotV1 {
   route: UiSessionRoute;
   selected_ids: {
     component: string | null;
+    project: string | null;
     stm_part: string | null;
     stm_pin: string | null;
     workflow_batch: string | null;
@@ -181,6 +182,7 @@ export function defaultUiSession(): UiSessionSnapshotV1 {
     route: "components",
     selected_ids: {
       component: null,
+      project: null,
       stm_part: null,
       stm_pin: null,
       workflow_batch: null,
@@ -338,7 +340,7 @@ export function parseUiSession(value: unknown): UiSessionSnapshotV1 | null {
     ]) ||
     object.schema !== UI_SESSION_SCHEMA ||
     object.version !== UI_SESSION_VERSION ||
-    !["components", "stm", "settings"].includes(String(object.route))
+    !["components", "projects", "stm", "settings"].includes(String(object.route))
   ) {
     return null;
   }
@@ -353,6 +355,7 @@ export function parseUiSession(value: unknown): UiSessionSnapshotV1 | null {
     !selected ||
     !exactKeys(selected, [
       "component",
+      "project",
       "stm_part",
       "stm_pin",
       "workflow_batch",
@@ -373,6 +376,7 @@ export function parseUiSession(value: unknown): UiSessionSnapshotV1 | null {
   }
 
   const component = nullableString(selected.component, MAX_ID);
+  const project = nullableString(selected.project, MAX_ID);
   const stmPart = nullableString(selected.stm_part, MAX_ID);
   const stmPin = nullableString(selected.stm_pin, MAX_ID);
   const workflowBatch = nullableString(selected.workflow_batch, MAX_ID);
@@ -394,6 +398,7 @@ export function parseUiSession(value: unknown): UiSessionSnapshotV1 | null {
   const eventSequence = nonNegativeInteger(object.event_sequence);
   if (
     component === undefined ||
+    project === undefined ||
     stmPart === undefined ||
     stmPin === undefined ||
     workflowBatch === undefined ||
@@ -451,6 +456,7 @@ export function parseUiSession(value: unknown): UiSessionSnapshotV1 | null {
     route: object.route as UiSessionRoute,
     selected_ids: {
       component,
+      project,
       stm_part: stmPart,
       stm_pin: stmPin,
       workflow_batch: workflowBatch,

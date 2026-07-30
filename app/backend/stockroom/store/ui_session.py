@@ -50,7 +50,7 @@ _MAX_SAFE_JSON_NODES = 2_048
 _MAX_SCROLL_OFFSET = 10_000_000
 _MAX_EVENT_SEQUENCE = (1 << 63) - 1
 
-_ROUTES = {"components", "stm", "settings"}
+_ROUTES = {"components", "projects", "stm", "settings"}
 _DETAIL_TABS = {"specs", "sourcing", "enrich", "history", "handoff"}
 _SETTINGS_GROUPS = {"general", "library", "eda", "sources", "maintenance"}
 _OPEN_SURFACES = {None, "search", "add_part", "complete_part"}
@@ -206,6 +206,7 @@ def default_snapshot() -> dict:
         "route": "components",
         "selected_ids": {
             "component": None,
+            "project": None,
             "stm_part": None,
             "stm_pin": None,
             "workflow_batch": None,
@@ -251,6 +252,7 @@ def _selected_ids(value: object) -> dict:
         field="selected_ids",
         required={
             "component",
+            "project",
             "stm_part",
             "stm_pin",
             "workflow_batch",
@@ -261,6 +263,7 @@ def _selected_ids(value: object) -> dict:
         key: _nullable_text(obj[key], f"selected_ids.{key}")
         for key in (
             "component",
+            "project",
             "stm_part",
             "stm_pin",
             "workflow_batch",

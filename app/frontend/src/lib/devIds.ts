@@ -21,6 +21,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "rail.wordmark", label: "Wordmark tile", area: "rail" },
   { id: "rail.nav", label: "Primary nav group", area: "rail" },
   { id: "rail.nav-components", label: "Components nav item", area: "rail" },
+  { id: "rail.nav-projects", label: "Projects nav item", area: "rail" },
   { id: "rail.nav-stm", label: "STM Viewer nav item", area: "rail" },
   { id: "rail.footer", label: "Rail footer", area: "rail" },
   { id: "rail.nav-settings", label: "Settings nav item", area: "rail" },
@@ -44,6 +45,22 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "components.detail-pane", label: "Detail viewport column", area: "components" },
   { id: "components.empty", label: "Empty library state", area: "components" },
   { id: "components.select-prompt", label: "No-selection prompt", area: "components" },
+  { id: "projects.root", label: "Projects page", area: "projects" },
+  { id: "projects.picker", label: "Project picker column", area: "projects" },
+  { id: "projects.list-title", label: "Project list title strip", area: "projects" },
+  { id: "projects.workspace", label: "Selected project workspace", area: "projects" },
+  { id: "projects.title-strip", label: "Project title strip", area: "projects" },
+  { id: "projects.tabs", label: "Project tool tabs", area: "projects" },
+  { id: "projects.tab-overview", label: "Overview tab", area: "projects" },
+  { id: "projects.tab-bom", label: "BOM tab", area: "projects" },
+  { id: "projects.tab-build", label: "Build tab", area: "projects" },
+  { id: "projects.tab-activity", label: "Activity tab", area: "projects" },
+  { id: "projects.overview", label: "Overview workbench", area: "projects" },
+  { id: "projects.bom", label: "BOM workbench", area: "projects" },
+  { id: "projects.build", label: "Build workbench", area: "projects" },
+  { id: "projects.activity", label: "Activity workbench", area: "projects" },
+  { id: "projects.placement-stage", label: "Placement map", area: "projects" },
+  { id: "projects.native-board-render", label: "Native PCB render", area: "projects" },
   { id: "components.finder", label: "Search + facet finder", area: "components" },
   { id: "components.search-box", label: "Search box", area: "components" },
   { id: "components.search-input", label: "Search input", area: "components" },
@@ -283,7 +300,7 @@ export const DEV_IDS: DevIdEntry[] = [
 ];
 
 // The areas in first-appearance order, for grouping the catalogue.
-export const DEV_ID_AREAS: readonly string[] = ["rail", "about", "components", "detail", "search", "addpart", "ingest", "stm", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell"];
+export const DEV_ID_AREAS: readonly string[] = ["rail", "about", "components", "projects", "detail", "search", "addpart", "ingest", "stm", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell"];
 
 // A by-id lookup so consumers resolve an entry in one call instead of re-scanning the list.
 export const DEV_ID_BY_ID: ReadonlyMap<string, DevIdEntry> = new Map(

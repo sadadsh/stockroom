@@ -37,7 +37,8 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 259 with the source-collection outcome ledger exposed to the dev-mode inspector.
 // 256 after the unified inspection instrument replaced eight legacy asset-card ids with four
 // direct instrument/stage/expand/status ids.
-const EXPECTED_ENTRIES = 256;
+// 273 after restoring the shared Projects rail, shell, picker, workbenches, and native PCB stage.
+const EXPECTED_ENTRIES = 273;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
@@ -64,11 +65,12 @@ describe("devIds catalogue", () => {
     expect(seen.size).toBe(EXPECTED_ENTRIES);
   });
 
-  it("enumerates the 15 areas in first-appearance order, and every entry is a member", () => {
+  it("enumerates the 16 areas in first-appearance order, and every entry is a member", () => {
     expect(DEV_ID_AREAS).toEqual([
       "rail",
       "about",
       "components",
+      "projects",
       "detail",
       "search",
       "addpart",
@@ -82,7 +84,7 @@ describe("devIds catalogue", () => {
       "confirm",
       "shell",
     ]);
-    expect(DEV_ID_AREAS).toHaveLength(15);
+    expect(DEV_ID_AREAS).toHaveLength(16);
 
     // Every catalogued area is declared in DEV_ID_AREAS...
     const declared = new Set(DEV_ID_AREAS);

@@ -18,8 +18,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
+import tempfile
 import threading
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -29,6 +31,7 @@ from stockroom.api.schemas import (
     AssemblyEventBody,
     AssignGroupBody,
     ConformBody,
+    ConnectProjectRemoteBody,
     DiscoverProjectsBody,
     ManualFillBody,
     ProjectSummary,
@@ -53,6 +56,7 @@ from stockroom.projects.collaboration import (
     WorkSessionManager,
     work_session_recovery,
 )
+from stockroom.projects.native_open import open_project_document
 from stockroom.projects.parity import PROJECT_TOOLS, parity_payload
 from stockroom.projects.review_evidence import (
     attach_native_validation,
@@ -62,6 +66,7 @@ from stockroom.projects.review_evidence import (
 )
 from stockroom.vcs.locks import GitLfsLockService
 from stockroom.vcs.repo import GitRepo
+from stockroom.vcs.sync import SyncEngine
 
 _WORK_SESSION_LOCKS: dict[str, threading.RLock] = {}
 _WORK_SESSION_LOCKS_GUARD = threading.Lock()
@@ -164,6 +169,48 @@ def _bom_evidence(rec, rows: list[dict]) -> dict:
 
 def projects_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/projects", dependencies=[Depends(require_token)])
+    visual_cache: dict[str, tuple[tuple, object]] = {}
+
+    def visual_source_key(rec) -> tuple:
+        """Fingerprint native documents without changing their contents."""
+
+        rows = []
+        for relative in (*rec.sheet_paths, *rec.board_paths):
+            path = Path(rec.root) / relative
+            try:
+                stat = path.stat()
+                rows.append((relative, stat.st_size, stat.st_mtime_ns))
+            except OSError:
+                rows.append((relative, -1, -1))
+        return rec.eda or "kicad", tuple(rows)
+
+    def project_visual_bundle(ctx, project_id: str, *, refresh: bool = False):
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        source_key = visual_source_key(rec)
+        cached = visual_cache.get(project_id)
+        if not refresh and cached is not None and cached[0] == source_key:
+            return cached[1]
+        adapter = get_adapter(rec.eda or "kicad")
+        if (rec.eda or "kicad") == "kicad":
+            # KiCad CLI may write a .kicad_prl preference sidecar while exporting.
+            # Render a complete mirror so viewing a board cannot dirty the Git checkout.
+            with tempfile.TemporaryDirectory(prefix="stockroom-kicad-render-") as raw:
+                mirror_root = Path(raw) / "project"
+                shutil.copytree(
+                    Path(rec.root),
+                    mirror_root,
+                    symlinks=True,
+                    ignore=shutil.ignore_patterns(".git", "Project Outputs for *"),
+                )
+                bundle = adapter.render(
+                    replace(rec, root=mirror_root.as_posix(), git_root=None)
+                )
+        else:
+            bundle = adapter.render(rec)
+        visual_cache[project_id] = (source_key, bundle)
+        return bundle
 
     @r.get("")
     def list_projects(request: Request) -> list:
@@ -202,6 +249,76 @@ def projects_router(require_token) -> APIRouter:
             "documents": [asdict(document) for document in adapter.documents(rec)],
         }
 
+    @r.get("/{project_id}/board-geometry")
+    def project_board_geometry(request: Request, project_id: str) -> dict:
+        """Read native placement geometry through the selected EDA adapter."""
+
+        rec = request.app.state.ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        return get_adapter(rec.eda or "kicad").board_geometry(rec)
+
+    @r.post("/{project_id}/documents/{document_id:path}/open")
+    def open_linked_project_document(
+        request: Request,
+        project_id: str,
+        document_id: str,
+    ) -> dict:
+        """Open one adapter-reported document through the Windows association."""
+
+        rec = request.app.state.ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        document = open_project_document(
+            Path(rec.root),
+            document_id,
+            get_adapter(rec.eda).documents(rec),
+        )
+        return {
+            "opened": True,
+            "document_id": document.document_id,
+            "path": document.path,
+        }
+
+    @r.get("/{project_id}/visuals")
+    def project_visuals(
+        request: Request,
+        project_id: str,
+        refresh: bool = False,
+    ) -> dict:
+        """Render native project documents through the selected EDA adapter."""
+
+        return project_visual_bundle(
+            request.app.state.ctx,
+            project_id,
+            refresh=refresh,
+        ).evidence
+
+    @r.get("/{project_id}/visuals/{artifact_id}")
+    def project_visual_artifact(
+        request: Request,
+        project_id: str,
+        artifact_id: str,
+    ) -> Response:
+        """Serve one immutable artifact from the same native render bundle."""
+
+        artifact = project_visual_bundle(
+            request.app.state.ctx,
+            project_id,
+        ).artifacts.get(artifact_id)
+        if artifact is None:
+            raise FileNotFoundError(
+                f"no such project visual artifact: {artifact_id}"
+            )
+        return Response(
+            content=artifact.content,
+            media_type=artifact.media_type,
+            headers={
+                "Cache-Control": "private, max-age=31536000, immutable",
+                "ETag": f'"{artifact_id}"',
+            },
+        )
+
     @r.get("/{project_id}/collaboration")
     def project_collaboration(request: Request, project_id: str) -> dict:
         rec = request.app.state.ctx.project_ops.get(project_id)
@@ -215,6 +332,29 @@ def projects_router(require_token) -> APIRouter:
                 "blocked_reason": "Link this project to a Git repository to collaborate.",
             }
         return _collaboration_payload(rec, request.app.state.ctx)
+
+    @r.post("/{project_id}/collaboration/remote")
+    def connect_project_remote(
+        request: Request,
+        project_id: str,
+        body: ConnectProjectRemoteBody,
+    ) -> dict:
+        """Add origin once, then run the existing non-force synchronization."""
+
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        with _work_session_lock(project_id):
+            repo = _project_repo(rec)
+            if repo.remote_url("origin"):
+                raise ValueError("origin is already configured for this project")
+            repo.add_remote("origin", body.url)
+            sync = SyncEngine(repo).sync()
+            return {
+                "collaboration": _collaboration_payload(rec, ctx),
+                "sync": asdict(sync),
+            }
 
     @r.post("/{project_id}/work-sessions")
     def start_work_session(
@@ -557,6 +697,7 @@ def projects_router(require_token) -> APIRouter:
                 "complete the active assembly run before unlinking this project"
             )
         ctx.project_ops.delete(project_id)
+        visual_cache.pop(project_id, None)
         ctx.checks_cache.pop(project_id, None)  # the cached ERC/DRC is now stale
         ctx.bom_cache.pop(project_id, None)  # the cached BOM is now stale too
         ctx.rebuild_project_index()

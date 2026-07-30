@@ -14,6 +14,7 @@ from xml.etree import ElementTree
 from stockroom.kicad.cli import KiCadCli
 from stockroom.kicad.errors import KiCadCliError
 from stockroom.model.project import ProjectRecord
+from stockroom.projects.board_scene import parse_ipc2581_board_scene
 
 _SCHEMA_VERSION = 1
 _NUMBER = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)")
@@ -282,6 +283,22 @@ def _render_kicad_board(
 ) -> dict:
     pending: dict[str, VisualArtifact] = {}
     try:
+        ipc2581 = output / f"{Path(relative).stem}-scene.xml"
+        cli._run(
+            "pcb",
+            "export",
+            "ipc2581",
+            "--output",
+            str(ipc2581),
+            "--version",
+            "C",
+            "--units",
+            "mm",
+            str(Path(project.root) / relative),
+        )
+        if not ipc2581.is_file():
+            raise KiCadCliError("KiCad returned without producing the interactive PCB scene")
+        scene = parse_ipc2581_board_scene(ipc2581, board=relative)
         rows = [
             _render_kicad_board_view(
                 cli,
@@ -309,8 +326,9 @@ def _render_kicad_board(
         "kind": "pcb",
         "path": relative,
         "status": "ready",
-        "detail": "Native top and bottom board views",
+        "detail": "Native top and bottom board views with exact component geometry",
         "artifacts": rows,
+        "scene": scene,
     }
 
 

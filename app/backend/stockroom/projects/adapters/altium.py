@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
+import threading
+import time
 from pathlib import Path
 
 from stockroom.altium.driver import AltiumDriver
@@ -11,7 +15,6 @@ from stockroom.altium.project_visuals import render_altium_project
 from stockroom.altium.schdoc import read_schdoc_components
 from stockroom.model.project import ProjectRecord
 from stockroom.projects.matching import AltiumProjectMatchStrategy
-from stockroom.projects.placement_geometry import altium_board_geometry
 from stockroom.projects.project_visuals import ProjectVisualBundle
 
 from .models import (
@@ -44,6 +47,8 @@ class AltiumProjectAdapter:
 
     def __init__(self, driver: AltiumDriver | None = None) -> None:
         self.driver = driver or AltiumDriver()
+        self._render_lock = threading.Lock()
+        self._render_cache: tuple[tuple, float, ProjectVisualBundle] | None = None
 
     @staticmethod
     def _root(candidate: Path) -> Path:
@@ -188,10 +193,117 @@ class AltiumProjectAdapter:
         return out
 
     def board_geometry(self, project: ProjectRecord) -> dict:
-        return altium_board_geometry(project, self.driver)
+        bundle = self._render_shared(project)
+        documents = [
+            document
+            for document in bundle.evidence.get("documents", [])
+            if document.get("kind") == "pcb" and document.get("scene")
+        ]
+        if not documents:
+            return _blocked_geometry(project, bundle.evidence)
+        placements = []
+        for document in documents:
+            placements.extend(
+                {
+                    "reference": component["reference"],
+                    "board": document["path"],
+                    "x_mm": component["x_mm"],
+                    "y_mm": component["y_mm"],
+                    "rotation_deg": component["rotation_deg"],
+                    "side": component["side"],
+                    "footprint": component["package"],
+                }
+                for component in document["scene"]["components"]
+            )
+        placements.sort(key=lambda row: (row["board"].casefold(), row["reference"]))
+        source_files = []
+        for relative in project.board_paths:
+            path = Path(project.root) / relative
+            if path.is_file():
+                source_files.append(
+                    {
+                        "path": relative,
+                        "bytes": path.stat().st_size,
+                        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                    }
+                )
+        result = {
+            "schema_version": 1,
+            "adapter": self.key,
+            "status": "ready",
+            "runtime": bundle.evidence["runtime"],
+            "boards": [document["path"] for document in documents],
+            "placements": placements,
+            "summary": {
+                "boards": len(documents),
+                "placements": len(placements),
+                "top": sum(row["side"] == "top" for row in placements),
+                "bottom": sum(row["side"] == "bottom" for row in placements),
+            },
+            "source": {
+                "digest": _digest(source_files),
+                "files": source_files,
+                "preserved": True,
+            },
+            "detail": "Native PCB placement geometry is ready.",
+        }
+        result["digest"] = _digest(result)
+        return result
 
     def validate(self, project: ProjectRecord) -> dict:
         return validate_altium_project(project, self.driver)
 
     def render(self, project: ProjectRecord) -> ProjectVisualBundle:
-        return render_altium_project(project, self.driver)
+        return self._render_shared(project)
+
+    def _render_shared(self, project: ProjectRecord) -> ProjectVisualBundle:
+        """Coalesce concurrent geometry and artwork requests into one Altium run."""
+
+        key = (
+            Path(project.root).resolve().as_posix(),
+            project.pro_path,
+            tuple(
+                (
+                    relative,
+                    (Path(project.root) / relative).stat().st_size,
+                    (Path(project.root) / relative).stat().st_mtime_ns,
+                )
+                for relative in (*project.sheet_paths, *project.board_paths)
+                if (Path(project.root) / relative).is_file()
+            ),
+        )
+        with self._render_lock:
+            cached = self._render_cache
+            if cached is not None and cached[0] == key and time.monotonic() - cached[1] < 5:
+                return cached[2]
+            bundle = render_altium_project(project, self.driver)
+            self._render_cache = (key, time.monotonic(), bundle)
+            return bundle
+
+
+def _digest(value: object) -> str:
+    content = json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(content).hexdigest()
+
+
+def _blocked_geometry(project: ProjectRecord, evidence: dict) -> dict:
+    result = {
+        "schema_version": 1,
+        "adapter": "altium",
+        "status": "blocked",
+        "runtime": evidence.get("runtime", {}),
+        "boards": [],
+        "placements": [],
+        "summary": {"boards": 0, "placements": 0, "top": 0, "bottom": 0},
+        "source": {"digest": "", "files": [], "preserved": True},
+        "detail": evidence.get("detail") or (
+            f"Native placement geometry is not available for {project.name}."
+        ),
+    }
+    result["digest"] = _digest(result)
+    return result

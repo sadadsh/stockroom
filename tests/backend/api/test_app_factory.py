@@ -10,6 +10,7 @@ from stockroom.host.service_authority import (
     install_service_authority_routes,
 )
 from stockroom.mutation.library_ops import IncompleteError
+from stockroom.projects.collaboration import CollaborationError
 from stockroom.vcs.repo import GitError
 
 
@@ -82,3 +83,14 @@ def test_private_service_routes_precede_the_real_frontend_mount(app_ctx):
         )
     assert response.status_code == 200
     assert response.json()["generation"] == 8
+
+
+def test_collaboration_conflicts_keep_their_machine_readable_code():
+    exc = CollaborationError("review_changed", "the reviewed commit changed")
+
+    assert status_for(exc) == 409
+    assert error_body(exc) == {
+        "error": "CollaborationError",
+        "detail": "the reviewed commit changed",
+        "code": "review_changed",
+    }

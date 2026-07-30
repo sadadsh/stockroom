@@ -29,6 +29,28 @@ class _FakeCli:
                 '<svg width="640" height="480"></svg>',
                 encoding="utf-8",
             )
+        elif args[:3] == ("pcb", "export", "ipc2581"):
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(
+                """\
+<IPC-2581 xmlns="http://webstds.ipc.org/2581">
+  <Profile><Polygon>
+    <PolyBegin x="10" y="-20"/>
+    <PolyStepSegment x="50" y="-20"/>
+    <PolyStepSegment x="50" y="-80"/>
+    <PolyStepSegment x="10" y="-80"/>
+  </Polygon></Profile>
+  <Package name="R"><Outline><Polygon>
+    <PolyBegin x="-0.5" y="-0.25"/>
+    <PolyStepSegment x="0.5" y="0.25"/>
+  </Polygon></Outline></Package>
+  <Component refDes="R1" packageRef="R" layerRef="F.Cu">
+    <Location x="20" y="-30"/>
+  </Component>
+</IPC-2581>
+""",
+                encoding="utf-8",
+            )
         return ""
 
 
@@ -98,6 +120,20 @@ def test_kicad_visuals_normalize_schematic_and_board_views(tmp_path: Path):
         for artifact in document["artifacts"]
     ]
     assert views == ["page-1", "top", "bottom"]
+    board = next(
+        document
+        for document in bundle.evidence["documents"]
+        if document["kind"] == "pcb"
+    )
+    assert board["scene"]["bounds"] == {
+        "min_x": 10.0,
+        "min_y": -80.0,
+        "max_x": 50.0,
+        "max_y": -20.0,
+        "width": 40.0,
+        "height": 60.0,
+    }
+    assert board["scene"]["components"][0]["reference"] == "R1"
     assert {
         (artifact.media_type, len(artifact.content))
         for artifact in bundle.artifacts.values()

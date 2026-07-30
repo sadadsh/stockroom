@@ -7,6 +7,10 @@ No em dashes anywhere (standing owner rule)."""
 
 from __future__ import annotations
 
+from urllib.parse import quote
+
+import pytest
+
 from tests.backend.api.conftest import _drain_job
 
 # a single unannotated resistor symbol with an empty Footprint: yields both an
@@ -835,6 +839,172 @@ def test_collaboration_status_explains_when_git_is_not_linked(client, tmp_path):
         "recovery": None,
         "blocked_reason": "Link this project to a Git repository to collaborate.",
     }
+
+
+def test_open_document_route_uses_the_same_adapter_reported_id_for_both_edas(
+    client,
+    monkeypatch,
+    tmp_path,
+):
+    kicad_root = _make_project(tmp_path / "open" / "kicad")
+    (kicad_root / "board.kicad_pcb").write_text("(kicad_pcb)\n", encoding="utf-8")
+    altium_root = _make_altium_api_project(tmp_path / "open" / "altium")
+    (altium_root / "Amp.PrjPcb").write_text(
+        "[Design]\nVersion=1.0\n\n"
+        "[Document1]\nDocumentPath=Amp.SchDoc\n\n"
+        "[Document2]\nDocumentPath=Amp.PcbDoc\n",
+        encoding="utf-8",
+    )
+    (altium_root / "Amp.PcbDoc").write_bytes(b"Stockroom route fixture")
+    projects = [
+        _register(client, kicad_root),
+        _register(client, altium_root),
+    ]
+    calls = []
+
+    def open_document(root, document_id, documents):
+        document = next(row for row in documents if row.document_id == document_id)
+        calls.append((root, document.document_id, document.path))
+        return document
+
+    monkeypatch.setattr(
+        "stockroom.api.routers.projects.open_project_document",
+        open_document,
+    )
+
+    for project in projects:
+        workspace = client.get(f"/api/projects/{project['id']}/workspace").json()
+        document = next(row for row in workspace["documents"] if row["kind"] == "pcb")
+        response = client.post(
+            f"/api/projects/{project['id']}/documents/"
+            f"{quote(document['document_id'], safe='')}/open"
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "opened": True,
+            "document_id": document["document_id"],
+            "path": document["path"],
+        }
+
+    assert [path for _root, _document_id, path in calls] == [
+        "board.kicad_pcb",
+        "Amp.PcbDoc",
+    ]
+
+
+def test_connect_project_remote_adds_origin_and_runs_one_safe_sync(
+    client,
+    monkeypatch,
+    tmp_path,
+):
+    from stockroom.vcs.repo import GitRepo
+    from stockroom.vcs.sync import SyncResult
+
+    project_root, _head = _make_git_project(
+        tmp_path / "connect-remote",
+        _UNANNOTATED,
+    )
+    project = _register(client, project_root)
+    calls = []
+    remote = "https://github.com/team/power-board.git"
+    unsafe = client.post(
+        f"/api/projects/{project['id']}/collaboration/remote",
+        json={"url": "https://token@github.com/team/power-board.git"},
+    )
+    assert unsafe.status_code == 422, unsafe.text
+    assert GitRepo(project_root).remote_url("origin") == ""
+
+    class SafeSync:
+        def __init__(self, repo):
+            calls.append(("init", repo.root))
+
+        def sync(self):
+            calls.append(("sync",))
+            return SyncResult(state="pushed", pushed=True)
+
+    monkeypatch.setattr("stockroom.api.routers.projects.SyncEngine", SafeSync)
+    response = client.post(
+        f"/api/projects/{project['id']}/collaboration/remote",
+        json={"url": remote},
+    )
+
+    assert response.status_code == 200, response.text
+    assert GitRepo(project_root).remote_url("origin") == remote
+    assert response.json()["collaboration"]["repository"]["remote"] == remote
+    assert response.json()["collaboration"]["repository"]["has_remote"] is True
+    assert response.json()["sync"] == {
+        "state": "pushed",
+        "pulled": False,
+        "pushed": True,
+        "detail": "",
+        "converged": False,
+    }
+    assert calls == [("init", project_root), ("sync",)]
+
+
+def test_connect_project_remote_accepts_the_secure_collaboration_url_set():
+    from stockroom.api.schemas import ConnectProjectRemoteBody
+
+    accepted = [
+        "https://github.com/team/power-board.git",
+        "ssh://git@github.com/team/power-board.git",
+        "git@github.com:team/power-board.git",
+        "git@forge:team/power-board.git",
+    ]
+
+    assert [ConnectProjectRemoteBody(url=url).url for url in accepted] == accepted
+
+
+def test_connect_project_remote_rejects_unsafe_or_non_shareable_urls():
+    from pydantic import ValidationError
+
+    from stockroom.api.schemas import ConnectProjectRemoteBody
+
+    rejected = [
+        "",
+        "-uhttps://github.com/team/project.git",
+        "http://github.com/team/project.git",
+        "git://github.com/team/project.git",
+        "ftp://github.com/team/project.git",
+        "file:///C:/work/project",
+        "C:\\work\\project",
+        "../project",
+        "ext::sh -c whoami",
+        "https://token@github.com/team/project.git",
+        "ssh://git:token@github.com/team/project.git",
+        "https://github.com/team/project.git?token=secret",
+        "https://github.com/team/project.git#fragment",
+        "https://github.com/team/\nproject.git",
+        "git@github.com:",
+        "git@github..com:team/project.git",
+        "https://-github.com/team/project.git",
+        "https://git_hub.com/team/project.git",
+    ]
+
+    for remote in rejected:
+        with pytest.raises(ValidationError):
+            ConnectProjectRemoteBody(url=remote)
+
+
+def test_connect_project_remote_never_replaces_existing_origin(client, tmp_path):
+    from stockroom.vcs.repo import GitRepo
+
+    project_root, _head = _make_git_project(
+        tmp_path / "existing-origin",
+        _UNANNOTATED,
+    )
+    project = _register(client, project_root)
+    repo = GitRepo(project_root)
+    original = "https://github.com/team/original.git"
+    repo.add_remote("origin", original)
+
+    response = client.post(
+        f"/api/projects/{project['id']}/collaboration/remote",
+        json={"url": "https://github.com/team/replacement.git"},
+    )
+
+    assert response.status_code == 400, response.text
+    assert repo.remote_url("origin") == original
 
 
 # ---- get --------------------------------------------------------------------

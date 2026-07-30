@@ -8,6 +8,7 @@
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
+  ApproveProjectReviewResult,
   AssemblyRun,
   AltiumEmbedCapability,
   AltiumEmbedResult,
@@ -26,6 +27,7 @@ import type {
   OdbcStatus,
   CadSourceResponse,
   CaptureWorkflowSession,
+  ConnectProjectRemoteResult,
   DiffResponse,
   DoctorScan,
   DuplicatesResponse,
@@ -43,16 +45,18 @@ import type {
   LibraryLfsResult,
   LibraryLfsStatus,
   OnboardingStatus,
+  OpenProjectDocumentResult,
   ProfilesResponse,
   ProjectSummary,
   ProjectBom,
   ProjectAssignments,
   ProjectCollaboration,
+  ProjectPlacementGeometry,
+  ProjectVisualBundle,
   ProjectReviewCandidate,
   ProjectReviewEvidence,
   ProjectNativeValidation,
   ProjectReviews,
-  ApproveProjectReviewResult,
   RequestProjectChangesResult,
   FinishWorkSessionResult,
   ProjectWorkspace,
@@ -105,7 +109,33 @@ interface RequestOptions {
   body?: unknown;
 }
 
-async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+function responseErrorMessage(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object") return fallback;
+  const payload = body as Record<string, unknown>;
+  for (const key of ["detail", "error", "message"]) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  if (Array.isArray(payload.detail)) {
+    const messages = payload.detail
+      .map((entry) =>
+        entry && typeof entry === "object"
+          ? (entry as Record<string, unknown>).msg
+          : null,
+      )
+      .filter((message): message is string => typeof message === "string")
+      .map((message) => message.replace(/^Value error,\s*/i, "").trim())
+      .filter(Boolean);
+    if (messages.length) return [...new Set(messages)].join(" ");
+  }
+  return fallback;
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  opts: RequestOptions = {},
+): Promise<T> {
   const url = new URL(apiBase() + path);
   if (opts.params) {
     for (const [k, v] of Object.entries(opts.params)) {
@@ -140,7 +170,7 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
     let missing: string[] | undefined;
     try {
       const body = await res.json();
-      msg = body.detail || body.error || body.message || msg;
+      msg = responseErrorMessage(body, msg);
       // The complete-to-add gate returns 422 with a `missing` label list; carry it
       // on the error so the ingest commit flow can highlight the unfilled fields.
       if (Array.isArray(body.missing)) missing = body.missing as string[];
@@ -294,12 +324,32 @@ export const api = {
     });
   },
 
-  registerProject(root: string, eda: "kicad" | "altium"): Promise<unknown> {
-    return request("POST", "/api/projects", { body: { root, eda } });
+  registerProject(root: string, eda: "kicad" | "altium"): Promise<ProjectSummary> {
+    return request<ProjectSummary>("POST", "/api/projects", { body: { root, eda } });
   },
 
   projectWorkspace(projectId: string): Promise<ProjectWorkspace> {
     return apiGet<ProjectWorkspace>(`/api/projects/${encodeURIComponent(projectId)}/workspace`);
+  },
+
+  projectPlacementGeometry(projectId: string): Promise<ProjectPlacementGeometry> {
+    return apiGet<ProjectPlacementGeometry>(
+      `/api/projects/${encodeURIComponent(projectId)}/board-geometry`,
+    );
+  },
+
+  projectVisuals(projectId: string, refresh = false): Promise<ProjectVisualBundle> {
+    return apiGet<ProjectVisualBundle>(
+      `/api/projects/${encodeURIComponent(projectId)}/visuals`,
+      refresh ? { refresh: "true" } : undefined,
+    );
+  },
+
+  projectVisualArtifact(projectId: string, artifactId: string): Promise<Blob> {
+    return fetchPreviewBlob(
+      `/api/projects/${encodeURIComponent(projectId)}/visuals/${encodeURIComponent(artifactId)}`,
+      "image/*",
+    );
   },
 
   liveProjectBom(projectId: string, boards = 1): Promise<ProjectBom> {
@@ -338,6 +388,27 @@ export const api = {
   projectCollaboration(projectId: string): Promise<ProjectCollaboration> {
     return apiGet<ProjectCollaboration>(
       `/api/projects/${encodeURIComponent(projectId)}/collaboration`,
+    );
+  },
+
+  openProjectDocument(
+    projectId: string,
+    documentId: string,
+  ): Promise<OpenProjectDocumentResult> {
+    return request<OpenProjectDocumentResult>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(documentId)}/open`,
+    );
+  },
+
+  connectProjectRemote(
+    projectId: string,
+    url: string,
+  ): Promise<ConnectProjectRemoteResult> {
+    return request<ConnectProjectRemoteResult>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/collaboration/remote`,
+      { body: { url } },
     );
   },
 

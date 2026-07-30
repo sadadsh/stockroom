@@ -4,7 +4,10 @@ the derived index (spec sections 5.1, 5.2)."""
 
 from __future__ import annotations
 
+import ipaddress
+import re
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -86,6 +89,87 @@ class StartWorkBody(BaseModel):
 
 class ShareWorkBody(BaseModel):
     message: str
+
+
+_SCP_REMOTE = re.compile(
+    r"^(?:(?P<user>[A-Za-z0-9._-]+)@)?"
+    r"(?P<host>[A-Za-z0-9.-]+):"
+    r"(?P<path>[^\\/:][^\\]*)$"
+)
+_HOST_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+
+
+def _valid_remote_host(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        labels = host.split(".")
+        return (
+            len(host) <= 253
+            and all(label and _HOST_LABEL.fullmatch(label) for label in labels)
+        )
+
+
+class ConnectProjectRemoteBody(BaseModel):
+    """A credential-safe Git remote suitable for project collaboration.
+
+    Stockroom stores this value in the project's local ``.git/config``. Teams can
+    share repositories through secure HTTPS, SSH URLs, and SCP-like SSH. Stockroom
+    rejects local paths, executable remote helpers, and credentials.
+    """
+
+    url: str
+
+    @field_validator("url")
+    @classmethod
+    def _secure_remote(cls, value: str) -> str:
+        remote = value.strip()
+        message = "use a secure HTTPS or SSH repository URL"
+        if (
+            not remote
+            or len(remote) > 2048
+            or remote.startswith("-")
+            or any(ord(char) < 32 or ord(char) == 127 for char in remote)
+            or any(char.isspace() for char in remote)
+            or "#" in remote
+            or "?" in remote
+            or "::" in remote
+        ):
+            raise ValueError(message)
+
+        if "://" not in remote:
+            match = _SCP_REMOTE.fullmatch(remote)
+            if (
+                not match
+                or not _valid_remote_host(match.group("host"))
+                or (match.group("user") is None and len(match.group("host")) == 1)
+            ):
+                raise ValueError(message)
+            return remote
+
+        try:
+            parsed = urlsplit(remote)
+            # Accessing port performs urllib's numeric/range validation.
+            parsed.port
+        except ValueError as exc:
+            raise ValueError(message) from exc
+
+        scheme = parsed.scheme.lower()
+        if (
+            scheme not in {"https", "ssh"}
+            or not parsed.hostname
+            or not _valid_remote_host(parsed.hostname)
+            or parsed.path in {"", "/"}
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError(message)
+        if scheme == "https" and (parsed.username is not None or parsed.password is not None):
+            raise ValueError(message)
+        if scheme == "ssh" and parsed.password is not None:
+            raise ValueError(message)
+        return remote
 
 
 class ApproveReviewBody(BaseModel):
