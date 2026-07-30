@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlsplit
 
 import stockroom.host.window as window_module
 from stockroom.host.run import _reload_active_window
@@ -51,10 +52,14 @@ def test_adoption_and_rollback_reload_preserve_the_active_same_origin_route(
     _reload_active_window("http://127.0.0.1:43210")
     _reload_active_window("http://127.0.0.1:43210")
 
-    assert window.navigations == [
-        "http://127.0.0.1:43210/settings/providers?source=ultra#credentials",
-        "http://127.0.0.1:43210/settings/providers?source=ultra#credentials",
-    ]
+    first, second = (urlsplit(url) for url in window.navigations)
+    assert first.path == second.path == "/settings/providers"
+    assert first.fragment == second.fragment == "credentials"
+    assert parse_qs(first.query)["source"] == ["ultra"]
+    assert parse_qs(second.query)["source"] == ["ultra"]
+    assert parse_qs(first.query)["__stockroom_reload"]
+    assert parse_qs(second.query)["__stockroom_reload"]
+    assert first.query != second.query
 
 
 def test_update_reload_does_not_carry_a_cross_origin_route(monkeypatch) -> None:
@@ -63,4 +68,9 @@ def test_update_reload_does_not_carry_a_cross_origin_route(monkeypatch) -> None:
 
     _reload_active_window("http://127.0.0.1:43210")
 
-    assert window.navigations == ["http://127.0.0.1:43210"]
+    navigation = urlsplit(window.navigations[0])
+    assert navigation.scheme == "http"
+    assert navigation.netloc == "127.0.0.1:43210"
+    assert navigation.path == ""
+    assert navigation.fragment == ""
+    assert parse_qs(navigation.query)["__stockroom_reload"]

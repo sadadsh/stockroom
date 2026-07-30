@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -85,7 +86,11 @@ def test_reload_stages_last_keystroke_draft_then_snapshot_before_navigation(
 
     _reload_active_window("http://127.0.0.1:43210")
 
-    assert window.navigations == ["http://127.0.0.1:43210/#route=components"]
+    navigation = urlsplit(window.navigations[0])
+    assert navigation.scheme == "http"
+    assert navigation.netloc == "127.0.0.1:43210"
+    assert navigation.fragment == "route=components"
+    assert parse_qs(navigation.query)["__stockroom_reload"]
     restored = load_snapshot()
     assert restored["event_sequence"] == 77
     assert restored["selected_ids"]["workflow_batch"] == "batch-live"
