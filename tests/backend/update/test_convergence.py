@@ -12,6 +12,7 @@ from stockroom.update import ActivationOutcome, ConvergencePhase, UpdateConverge
 from stockroom.vcs.repo import GitRepo
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
+_BACKGROUND_UPDATE_TIMEOUT_SECONDS = 15.0
 
 
 def _origin_and_clone(tmp_path: Path, path: str) -> tuple[GitRepo, GitRepo]:
@@ -50,17 +51,21 @@ def test_scheduled_service_adopts_frontend_without_closing_the_window(
         interval_seconds=1,
     )
 
-    stop = service.start(initial_delay_seconds=0)
-    assert reloaded.wait(5)
-    deadline = time.monotonic() + 5
-    while (
-        service.status()["convergence_phase"] != ConvergencePhase.CURRENT
-        and time.monotonic() < deadline
-    ):
-        time.sleep(0.01)
-    stop.set()
+    loop = service.start(initial_delay_seconds=0)
+    try:
+        assert reloaded.wait(_BACKGROUND_UPDATE_TIMEOUT_SECONDS)
+        deadline = time.monotonic() + _BACKGROUND_UPDATE_TIMEOUT_SECONDS
+        while (
+            service.status()["convergence_phase"] != ConvergencePhase.CURRENT
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.01)
+        status = service.status()
+    finally:
+        loop.set()
+        loop.join(timeout=_BACKGROUND_UPDATE_TIMEOUT_SECONDS)
 
-    status = service.status()
+    assert not loop.is_alive()
     assert not restarted.is_set()
     assert status["convergence_phase"] == ConvergencePhase.CURRENT
     assert status["current_revision"] == target[:12]
@@ -244,6 +249,7 @@ def test_two_dirty_installs_converge_runtime_without_rewriting_either_checkout(
 
 def test_background_loop_survives_an_unhandled_check_failure_and_can_be_joined(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _, install = _origin_and_clone(tmp_path, "app/backend/stockroom/example.py")
     service = UpdateConvergenceService(
@@ -258,7 +264,7 @@ def test_background_loop_survives_an_unhandled_check_failure_and_can_be_joined(
         attempts += 1
         raise RuntimeError("https://secret@example.invalid/private")
 
-    service.run_once = broken_check  # type: ignore[method-assign]
+    monkeypatch.setattr(service, "run_once", broken_check)
     loop = service.start(initial_delay_seconds=0)
     deadline = time.monotonic() + 2
     while service.status()["convergence_phase"] != ConvergencePhase.FAILED:
