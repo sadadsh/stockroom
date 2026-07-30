@@ -21,6 +21,7 @@ import { Text, useText } from "../../lib/copy";
 import { useToast } from "../../lib/toast";
 import { Badge, Button, Panel, SectionHeading } from "../primitives";
 import { GitIcon } from "../icons";
+import { ProjectInspectorFacts } from "./ProjectInspectorFacts";
 
 export function ProjectChangesWorkbench({
   projectId,
@@ -90,7 +91,7 @@ export function ProjectChangesWorkbench({
       ) : !repository.has_remote ? (
         <ConnectRepositoryPanel projectId={projectId} collaboration={collaboration.data!} />
       ) : selected ? (
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(320px,0.72fr)_minmax(500px,1.28fr)] overflow-hidden rounded-card border border-line bg-surface max-[1180px]:grid-cols-[210px_minmax(380px,1fr)]">
+        <div className="grid min-h-0 flex-1 grid-cols-[230px_minmax(0,1fr)] overflow-hidden rounded-card border border-line bg-surface @[60rem]:grid-cols-[minmax(320px,0.72fr)_minmax(500px,1.28fr)]">
           <section className="flex min-h-0 flex-col border-r border-line">
             <WorkSessionCard
               projectId={projectId}
@@ -110,7 +111,7 @@ export function ProjectChangesWorkbench({
           <ReviewInspector projectId={projectId} candidate={selected} />
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(320px,0.82fr)_minmax(380px,1.18fr)] overflow-hidden rounded-card border border-line bg-surface max-[1180px]:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)] overflow-hidden rounded-card border border-line bg-surface @[60rem]:grid-cols-[minmax(320px,0.82fr)_minmax(380px,1.18fr)]">
           <section className="min-h-0 overflow-y-auto border-r border-line">
             <WorkSessionCard
               projectId={projectId}
@@ -127,15 +128,15 @@ export function ProjectChangesWorkbench({
 
 function ReviewQueueEmpty() {
   return (
-    <section className="flex min-h-0 items-center justify-center overflow-y-auto px-8 py-10">
-      <div className="w-full max-w-[440px]">
-        <span
-          aria-hidden
-          className="flex size-10 items-center justify-center rounded-card border border-line bg-band text-t2"
-        >
-          <GitIcon />
+    <section className="min-h-0 overflow-y-auto">
+      <div className="flex h-[34px] items-center gap-2 border-b border-line bg-band px-4">
+        <span className="text-xs font-semibold text-t2">
+          <Text id="projects.activity.review-queue">Review Queue</Text>
         </span>
-        <p className="mt-5 text-sm font-semibold text-t1">
+        <span className="font-mono text-2xs text-t3">0</span>
+      </div>
+      <div className="w-full max-w-[520px] px-5 py-5">
+        <p className="text-sm font-semibold text-t1">
           <Text id="projects.activity.no-reviews-title">No shared work yet</Text>
         </p>
         <p className="mt-1.5 text-xs leading-5 text-t3">
@@ -144,7 +145,7 @@ function ReviewQueueEmpty() {
             and native design checks.
           </Text>
         </p>
-        <div className="mt-6 divide-y divide-line border-y border-line">
+        <div className="mt-5 divide-y divide-line border-y border-line">
           <WorkflowStep
             number="1"
             titleId="projects.activity.workflow-claim"
@@ -645,13 +646,13 @@ function WorkSessionCard({
           {documents.length}
         </Badge>
       </div>
-      <div className="overflow-hidden rounded-card border border-line bg-field">
+      <div className="border-y border-line">
         {workspace.documents
           .filter((document) => document.lock_required)
           .map((document) => (
             <label
               key={document.document_id}
-              className="flex items-center gap-2 border-b border-line px-2.5 py-2 text-xs text-t2 transition-colors last:border-b-0 hover:bg-raise"
+              className="flex items-center gap-2 border-b border-line px-1 py-2.5 text-xs text-t2 transition-colors last:border-b-0 hover:bg-raise"
             >
               <input
                 type="checkbox"
@@ -712,6 +713,9 @@ function ReviewInspector({
   const reviewAria = useText("projects.activity.review-evidence-aria", "Review evidence");
   const reviewerPlaceholder = useText("projects.activity.reviewer-placeholder", "Reviewer name");
   const requestPlaceholder = useText("projects.activity.request-placeholder", "What should change?");
+  const reviewerLabel = useText("projects.activity.reviewer-label", "Reviewer Name");
+  const reviewNoteLabel = useText("projects.activity.review-note-label", "Review Note");
+  const decisionLabel = useText("projects.activity.decision", "Decision");
   const selectReview = useText("projects.activity.select-review", "Select a review.");
   const checkingCommit = useText("projects.activity.checking-commit", "Checking commit...");
   const changedFilesLabel = useText("projects.activity.changed-files", "Changed Files");
@@ -795,27 +799,51 @@ function ReviewInspector({
         <ChangesMessage tone="err">{evidence.error.message}</ChangesMessage>
       ) : result ? (
         <>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <EvidenceMetric label={filesLabel} value={String(result.documents.length)} />
-            <EvidenceMetric
-              label={bomLinkedLabel}
-              value={`${result.bom.lines.filter((line) => line.identity_ready).length}/${result.bom.line_count}`}
-              tone={
-                result.bom.lines.every((line) => line.identity_ready) ? "ok" : "warn"
-              }
-            />
-            <EvidenceMetric
-              label={designChecksLabel}
-              value={`${result.semantic_audit.counts.by_severity.error} ${errorsLabel}`}
-              tone={
-                result.semantic_audit.counts.by_severity.error === 0 ? "ok" : "err"
-              }
-            />
-          </div>
-          <Panel title={changedFilesLabel} className="mt-4" bodyClassName="p-0">
-            <div className="divide-y divide-line">
+          <ProjectInspectorFacts
+            items={[
+              {
+                label: filesLabel,
+                value: <span className="font-mono">{result.documents.length}</span>,
+              },
+              {
+                label: bomLinkedLabel,
+                value: (
+                  <span
+                    className={`font-mono ${
+                      result.bom.lines.every((line) => line.identity_ready)
+                        ? "text-ok"
+                        : "text-warn"
+                    }`}
+                  >
+                    {result.bom.lines.filter((line) => line.identity_ready).length}/
+                    {result.bom.line_count}
+                  </span>
+                ),
+              },
+              {
+                label: designChecksLabel,
+                value: (
+                  <span
+                    className={`font-mono ${
+                      result.semantic_audit.counts.by_severity.error === 0
+                        ? "text-ok"
+                        : "text-err"
+                    }`}
+                  >
+                    {result.semantic_audit.counts.by_severity.error} {errorsLabel}
+                  </span>
+                ),
+              },
+            ]}
+          />
+
+          <ReviewSection
+            title={changedFilesLabel}
+            count={candidate.changed_paths.length}
+          >
+            <div className="divide-y divide-line border-y border-line">
               {candidate.changed_paths.map((path) => (
-                <div key={path} className="flex items-center gap-3 px-4 py-2.5">
+                <div key={path} className="flex items-center gap-3 py-2.5">
                   <span className="min-w-0 flex-1 truncate font-mono text-xs text-t2">
                     {path}
                   </span>
@@ -825,15 +853,25 @@ function ReviewInspector({
                 </div>
               ))}
             </div>
-          </Panel>
-          <Panel title={reviewChecksLabel} className="mt-4">
-            <GateRow label={sourceLabel} status={result.reviewable ? "passed" : "failed"} />
-            <GateRow
-              label={nativeChecksLabel}
-              status={validation?.status ?? "pending"}
-              detail={validation?.detail}
-            />
-            <GateRow label={visualDiffLabel} status={result.visual_diff.status} detail={result.visual_diff.detail} />
+          </ReviewSection>
+
+          <ReviewSection title={reviewChecksLabel}>
+            <div className="border-y border-line">
+              <GateRow
+                label={sourceLabel}
+                status={result.reviewable ? "passed" : "failed"}
+              />
+              <GateRow
+                label={nativeChecksLabel}
+                status={validation?.status ?? "pending"}
+                detail={validation?.detail}
+              />
+              <GateRow
+                label={visualDiffLabel}
+                status={result.visual_diff.status}
+                detail={result.visual_diff.detail}
+              />
+            </div>
             {validation?.status !== "passed" ? (
               <Button
                 className="mt-3"
@@ -854,108 +892,116 @@ function ReviewInspector({
                   : <Text id="projects.activity.run-native-checks">Run Native Checks</Text>}
               </Button>
             ) : null}
-          </Panel>
-          <div className="mt-4 grid gap-3 border-t border-line pt-4 @xl:grid-cols-2">
-            <div>
-              <input
-                value={reviewer}
-                onChange={(event) => setReviewer(event.target.value)}
-                className={INPUT}
-                placeholder={reviewerPlaceholder}
-              />
-              <input
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                className={`${INPUT} mt-2`}
-                placeholder={requestPlaceholder}
-              />
-              <Button
-                variant="ghost-danger"
-                className="mt-2"
-                disabled={!reviewer.trim() || !message.trim() || requestChanges.isPending}
-                onClick={() =>
-                  requestChanges.mutate(
-                    {
-                      ...candidate,
-                      reviewer: reviewer.trim(),
-                      message: message.trim(),
-                    },
-                    {
-                      onSuccess: () => {
-                        setMessage("");
-                        toast(changesRequested, "ok");
+          </ReviewSection>
+
+          <section className="mt-5 border-t border-line pt-4">
+            <h4 className="text-xs font-semibold text-t2">{decisionLabel}</h4>
+            <div className="mt-3 grid gap-4 @xl:grid-cols-2">
+              <div>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-t2">
+                    {reviewerLabel}
+                  </span>
+                  <input
+                    aria-label={reviewerLabel}
+                    value={reviewer}
+                    onChange={(event) => setReviewer(event.target.value)}
+                    className={INPUT}
+                    placeholder={reviewerPlaceholder}
+                  />
+                </label>
+                <label className="mt-3 block">
+                  <span className="mb-1.5 block text-xs font-medium text-t2">
+                    {reviewNoteLabel}
+                  </span>
+                  <input
+                    aria-label={reviewNoteLabel}
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    className={INPUT}
+                    placeholder={requestPlaceholder}
+                  />
+                </label>
+                <Button
+                  variant="ghost-danger"
+                  className="mt-2"
+                  disabled={!reviewer.trim() || !message.trim() || requestChanges.isPending}
+                  onClick={() =>
+                    requestChanges.mutate(
+                      {
+                        ...candidate,
+                        reviewer: reviewer.trim(),
+                        message: message.trim(),
                       },
+                      {
+                        onSuccess: () => {
+                          setMessage("");
+                          toast(changesRequested, "ok");
+                        },
+                        onError: (error) =>
+                          toast(
+                            error instanceof Error
+                              ? error.message
+                              : requestFailed,
+                            "err",
+                          ),
+                      },
+                    )
+                  }
+                >
+                  <Text id="projects.activity.request-changes">Request Changes</Text>
+                </Button>
+              </div>
+              <div className="flex flex-col items-end justify-end">
+                <p className="mb-2 text-right text-xs leading-5 text-t3">
+                  {approvesCommitLabel} {candidate.commit.slice(0, 12)}.
+                </p>
+                <Button
+                  variant="accent"
+                  disabled={!canApprove}
+                  onClick={() =>
+                    approve.mutate(candidate, {
+                      onSuccess: () => toast(approvedLabel, "ok"),
                       onError: (error) =>
                         toast(
-                          error instanceof Error
-                            ? error.message
-                            : requestFailed,
+                          error instanceof Error ? error.message : approvalFailed,
                           "err",
                         ),
-                    },
-                  )
-                }
-              >
-                <Text id="projects.activity.request-changes">Request Changes</Text>
-              </Button>
+                    })
+                  }
+                >
+                  {approve.isPending
+                    ? <Text id="projects.activity.approving">Approving...</Text>
+                    : <Text id="projects.activity.approve-merge">Approve And Merge</Text>}
+                </Button>
+              </div>
             </div>
-            <div className="flex flex-col items-end justify-end">
-              <p className="mb-2 text-right text-xs leading-5 text-t3">
-                {approvesCommitLabel} {candidate.commit.slice(0, 12)}.
-              </p>
-              <Button
-                variant="accent"
-                disabled={!canApprove}
-                onClick={() =>
-                  approve.mutate(candidate, {
-                    onSuccess: () => toast(approvedLabel, "ok"),
-                    onError: (error) =>
-                      toast(
-                        error instanceof Error ? error.message : approvalFailed,
-                        "err",
-                      ),
-                  })
-                }
-              >
-                {approve.isPending
-                  ? <Text id="projects.activity.approving">Approving...</Text>
-                  : <Text id="projects.activity.approve-merge">Approve And Merge</Text>}
-              </Button>
-            </div>
-          </div>
+          </section>
         </>
       ) : null}
     </aside>
   );
 }
 
-function EvidenceMetric({
-  label,
-  value,
-  tone = "neutral",
+function ReviewSection({
+  title,
+  count,
+  children,
 }: {
-  label: string;
-  value: string;
-  tone?: "neutral" | "ok" | "warn" | "err";
+  title: string;
+  count?: number;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-card border border-line bg-field p-3">
-      <p className="text-2xs font-semibold text-t3">{label}</p>
-      <p
-        className={
-          "mt-1 font-mono text-sm font-semibold " +
-          (tone === "ok"
-            ? "text-ok"
-            : tone === "warn"
-              ? "text-warn"
-              : tone === "err"
-                ? "text-err"
-                : "text-t1")
-        }
-      >
-        {value}
-      </p>
-    </div>
+    <section className="mt-5">
+      <div className="mb-2 flex items-center gap-2">
+        <h4 className="text-xs font-semibold text-t2">{title}</h4>
+        {count === undefined ? null : (
+          <span className="font-mono text-2xs text-t3">{count}</span>
+        )}
+      </div>
+      {children}
+    </section>
   );
 }
 
