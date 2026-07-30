@@ -64,6 +64,31 @@ def test_the_rules_actually_take_effect_for_a_peer(tmp_path):
     assert repo.status_porcelain() == []
 
 
+@pytest.mark.parametrize(
+    "filename",
+    ("board.kicad_sch", "Owner's Main Board.kicad_sch"),
+)
+def test_text_policy_normalizes_legacy_crlf_blob_without_touching_worktree(
+    tmp_path,
+    filename,
+):
+    root = tmp_path / "legacy-crlf"
+    repo = GitRepo(root)
+    repo.init()
+    repo._run("config", "core.autocrlf", "false")
+    schematic = root / filename
+    schematic.write_bytes(b"(kicad_sch)\r\n")
+    repo.commit("seed legacy Windows bytes", [schematic])
+    assert "i/crlf" in repo._run("ls-files", "--eol", "--", schematic.name).stdout
+
+    result = apply_hygiene(root, ["kicad"], repo=repo)
+
+    assert result["renormalized"] == [filename]
+    assert "i/lf" in repo._run("ls-files", "--eol", "--", schematic.name).stdout
+    assert schematic.read_bytes() == b"(kicad_sch)\r\n"
+    assert repo.status_porcelain() == []
+
+
 def test_an_existing_user_gitignore_survives(tmp_path):
     root, repo = _repo(tmp_path, {"board.kicad_sch": "(kicad_sch)\n",
                                   ".gitignore": "# mine\nsecrets.env\n"})

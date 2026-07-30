@@ -390,11 +390,18 @@ class _ActivationBoundary:
     def launch_shadow(self, candidate, *, generation: int):
         return (candidate.release_id, generation)
 
-    def stop_shadow(self, handle, *, generation: int) -> None:
-        del handle, generation
+    def stop_shadow(self, launch_handle, *, generation: int) -> None:
+        del launch_handle, generation
 
-    def check(self, candidate, handle, *, stage: ReleaseHealthStage, generation: int) -> None:
-        del candidate, handle, stage, generation
+    def check(
+        self,
+        candidate,
+        launch_handle,
+        *,
+        stage: ReleaseHealthStage,
+        generation: int,
+    ) -> None:
+        del candidate, launch_handle, stage, generation
 
     def drain(self, current, *, generation: int):
         assert self.live_release_id == current.release_id
@@ -404,8 +411,16 @@ class _ActivationBoundary:
         del drain_receipt, generation
         assert self.live_release_id == current.release_id
 
-    def adopt(self, candidate, current, handle, drain_receipt, *, generation: int):
-        del handle, drain_receipt, generation
+    def adopt(
+        self,
+        candidate,
+        current,
+        launch_handle,
+        drain_receipt,
+        *,
+        generation: int,
+    ):
+        del launch_handle, drain_receipt, generation
         assert self.live_release_id == current.release_id
         self.live_release_id = candidate.release_id
         return (current.release_id, candidate.release_id)
@@ -427,23 +442,25 @@ def test_persisted_v1_release_activates_packaged_v2_in_shared_data_root(
     executable.write_bytes(b"MZv1-v2-shared-root")
     v1_bundle = tmp_path / "V1 Bundle"
     v2_bundle = tmp_path / "V2 Bundle"
-    common = {
-        "mode": "Fixture",
-        "executable": executable,
-        "feed_base_uri": "https://updates.example.invalid/stockroom/x64",
-        "source_revision": "0123456789012345678901234567890123456789",
-        "source_date_epoch": 1704067200,
-        "tuf_root_path": None,
-    }
     build_release_bundle(
-        **common,
+        mode="Fixture",
+        executable=executable,
         bundle_root=v1_bundle,
         version="1.0.0.0",
+        feed_base_uri="https://updates.example.invalid/stockroom/x64",
+        source_revision="0123456789012345678901234567890123456789",
+        source_date_epoch=1704067200,
+        tuf_root_path=None,
     )
     build_release_bundle(
-        **common,
+        mode="Fixture",
+        executable=executable,
         bundle_root=v2_bundle,
         version="2.0.0.0",
+        feed_base_uri="https://updates.example.invalid/stockroom/x64",
+        source_revision="0123456789012345678901234567890123456789",
+        source_date_epoch=1704067200,
+        tuf_root_path=None,
         rollback_release_id="release-1.0.0.0",
         compatible_from_release_ids=(
             "release-bootstrap",

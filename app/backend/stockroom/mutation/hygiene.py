@@ -10,8 +10,11 @@ two-part operation, because measuring it showed one part alone does nothing:
      ignore rule has no effect on a tracked file, and the owner's `.kicad_prl` / `fp-info-cache` are
      already committed, which is exactly why two peers conflict on them. `git rm --cached` leaves the
      working copy on disk, so nobody loses their local editor state.
+  3. When a new `text eol=lf` policy lands, ask Git to renormalize only matching files that were
+     clean before the operation. This migrates legacy Windows CRLF blobs without staging a person's
+     in-progress design edit or rewriting their working-copy bytes.
 
-Both parts land in ONE commit or neither does, through the same Transaction every other Stockroom
+All parts land in ONE commit or none does, through the same Transaction every other Stockroom
 mutation uses.
 
 No em dashes anywhere (standing owner rule).
@@ -26,7 +29,7 @@ from stockroom.eda.registry import _resolve, workspace_gitattributes, workspace_
 from stockroom.mutation.transaction import Transaction
 from stockroom.text import counted
 from stockroom.vcs import lfs as lfs_backend
-from stockroom.vcs.repo import GitRepo
+from stockroom.vcs.repo import GitError, GitRepo
 
 IGNORE_FILE = ".gitignore"
 ATTRIBUTES_FILE = ".gitattributes"
@@ -43,6 +46,58 @@ def _rules_for(tool_keys) -> list[str]:
         # too, or the generated rules would claim it is ignored while git keeps sharing it.
         out.extend(tool.ignored_patterns())
     return out
+
+
+def _text_eol_rules(rendered_attributes: str) -> list[str]:
+    """Patterns whose tracked blobs must be normalized when the policy first lands."""
+    rules: list[str] = []
+    for raw_line in rendered_attributes.splitlines():
+        fields = raw_line.split()
+        if len(fields) >= 3 and "text" in fields[1:] and "eol=lf" in fields[1:]:
+            rules.append(fields[0])
+    return rules
+
+
+def _diff_paths(repo: GitRepo) -> set[str]:
+    """Unstaged tracked paths, with exact unquoted repo-relative names."""
+    return {
+        path
+        for path in repo._run(
+            "-c",
+            "core.quotepath=false",
+            "diff",
+            "--name-only",
+            "-z",
+        ).stdout.split("\0")
+        if path
+    }
+
+
+def _renormalize_dry_run(repo: GitRepo, candidates: list[str]) -> list[str]:
+    """Exact clean paths `git add --renormalize` would change, without touching the index."""
+    if not candidates:
+        return []
+    output = repo._run(
+        "-c",
+        "core.quotepath=false",
+        "add",
+        "--dry-run",
+        "--verbose",
+        "--renormalize",
+        "--pathspec-from-file=-",
+        "--pathspec-file-nul",
+        input_text="\0".join(candidates) + "\0",
+    ).stdout
+    expected = set(candidates)
+    changed: list[str] = []
+    for line in output.splitlines():
+        if not line.startswith("add '") or not line.endswith("'"):
+            raise GitError(f"unexpected git renormalize preview: {line!r}")
+        path = line[5:-1]
+        if path not in expected:
+            raise GitError(f"unexpected git renormalize path: {path!r}")
+        changed.append(path)
+    return sorted(set(changed))
 
 
 def detect_lfs(root) -> tuple[bool, bool]:
@@ -88,7 +143,11 @@ def _planned(root: Path, tool_keys, repo: GitRepo, lfs: bool = False, lockable: 
     # Never offer to untrack the hygiene files themselves; they are meant to be committed.
     candidates = [p for p in tracked if p not in (IGNORE_FILE, ATTRIBUTES_FILE)]
     untrack = workspace.matching(candidates, _rules_for(tool_keys))
-    return sorted(writes), sorted(untrack), merged
+    normalize = workspace.matching(
+        candidates,
+        _text_eol_rules(rendered[ATTRIBUTES_FILE]),
+    )
+    return sorted(writes), sorted(untrack), sorted(normalize), merged
 
 
 def _lfs_flags(root, lfs, lockable) -> tuple[bool, bool]:
@@ -103,15 +162,21 @@ def hygiene_preview(root, tool_keys, repo: GitRepo | None = None, lfs=None, lock
     root = Path(root)
     repo = repo or GitRepo(root)
     use_lfs, use_lockable = _lfs_flags(root, lfs, lockable)
-    writes, untrack, _merged = _planned(root, tool_keys, repo, use_lfs, use_lockable)
+    writes, untrack, _normalize, _merged = _planned(
+        root,
+        tool_keys,
+        repo,
+        use_lfs,
+        use_lockable,
+    )
     return {"writes": writes, "untracked": untrack}
 
 
 def apply_hygiene(root, tool_keys, repo: GitRepo | None = None, lfs=None, lockable=None) -> dict:
     """Write the managed blocks and untrack the per-user files, as ONE commit on `repo`.
 
-    Returns {writes, untracked, committed}. A run that would change nothing is an honest no-commit
-    no-op ({committed: None}), so re-syncing does not churn history.
+    Returns {writes, untracked, renormalized, committed}. A run that would change nothing is an
+    honest no-commit no-op ({committed: None}), so re-syncing does not churn history.
 
     `lfs` / `lockable` default to whatever this workspace has ALREADY adopted (read back from its
     own `.gitattributes`), so a routine sync never silently un-adopts LFS. Passing `lfs=True` is
@@ -120,9 +185,9 @@ def apply_hygiene(root, tool_keys, repo: GitRepo | None = None, lfs=None, lockab
     normally while reporting nothing, so writing one without the other would look like success and
     do nothing.
 
-    Raises ValueError for a tree with uncommitted changes (a hygiene commit stages whole paths, so an
-    in-progress user edit must never be swept into it), for a hygiene file whose managed block was
-    left unterminated by a hand edit, or when `lockable` is asked for without `lfs`.
+    Raises ValueError when the index already contains staged work, when either hygiene file has an
+    uncommitted edit, when a managed block is unterminated, or when `lockable` is asked for without
+    `lfs`. Unrelated unstaged work is preserved and does not block the operation.
     """
     root = Path(root)
     repo = repo or GitRepo(root)
@@ -151,7 +216,27 @@ def apply_hygiene(root, tool_keys, repo: GitRepo | None = None, lfs=None, lockab
             f"{IGNORE_FILE} or {ATTRIBUTES_FILE} has uncommitted changes; commit or discard them "
             "before syncing workspace hygiene"
         )
-    writes, untrack, merged = _planned(root, tool_keys, repo, use_lfs, use_lockable)
+    dirty_before = _diff_paths(repo)
+    writes, untrack, normalize, merged = _planned(
+        root,
+        tool_keys,
+        repo,
+        use_lfs,
+        use_lockable,
+    )
+    # Adding `text eol=lf` to a Windows repository that historically committed
+    # CRLF blobs makes every otherwise-clean EDA source look modified. Normalize
+    # only files that were clean before this operation; an actual in-progress
+    # edit remains unstaged and untouched.
+    normalize = (
+        [
+            path
+            for path in normalize
+            if path not in dirty_before and path not in untrack
+        ]
+        if ATTRIBUTES_FILE in writes
+        else []
+    )
     # The filter has to exist BEFORE the attributes are committed, or the very commit that adopts
     # LFS stores its own payloads as ordinary blobs. Idempotent, and it only touches this repo's
     # config, never the user's global git.
@@ -165,7 +250,12 @@ def apply_hygiene(root, tool_keys, repo: GitRepo | None = None, lfs=None, lockab
     if use_lfs:
         lfs_backend.enable(repo)
     if not writes and not untrack:
-        return {"writes": [], "untracked": [], "committed": None}
+        return {
+            "writes": [],
+            "untracked": [],
+            "renormalized": [],
+            "committed": None,
+        }
 
     touched = [root / name for name in (IGNORE_FILE, ATTRIBUTES_FILE)]
     touched += [root / p for p in untrack]
@@ -184,9 +274,30 @@ def apply_hygiene(root, tool_keys, repo: GitRepo | None = None, lfs=None, lockab
         # --cached keeps the working copy: this is about what git SHARES, never about deleting
         # somebody's editor state.
         repo.untrack([root / p for p in untrack])
+        # Work out the exact paths whose clean-filtered content changed only
+        # after the new attributes became visible. Track them before staging so
+        # a later validation/commit failure restores both index and worktree.
+        renormalized = _renormalize_dry_run(repo, normalize)
+        for path in renormalized:
+            txn.track(root / path)
+        if renormalized:
+            repo._run(
+                "add",
+                "--renormalize",
+                "--pathspec-from-file=-",
+                "--pathspec-file-nul",
+                input_text="\0".join(renormalized) + "\0",
+            )
+        if renormalized:
+            label.append(f"{counted(len(renormalized), 'text file')} normalized")
         # commit_staged, NOT commit(paths): a pathspec makes git imply --only, which takes the
         # WORKING TREE content of those paths and would silently re-add the very files just
-        # untracked. Safe here only because a dirty tree was refused above, so nothing foreign
-        # can be staged.
+        # untracked. Safe here because foreign staged work was refused above, and normalization
+        # admitted only paths proven clean before this operation.
         sha = txn.commit_staged(f"Sync workspace hygiene: {', '.join(label)}")
-    return {"writes": writes, "untracked": untrack, "committed": sha}
+    return {
+        "writes": writes,
+        "untracked": untrack,
+        "renormalized": renormalized,
+        "committed": sha,
+    }

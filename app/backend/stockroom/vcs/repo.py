@@ -380,9 +380,9 @@ class GitRepo:
         exactly the workspace-hygiene case: the same commit adds ignore rules and untracks the
         per-user files those rules cover, while deliberately leaving those files on disk.
 
-        The caller MUST have verified the tree was clean before staging, or this sweeps foreign work
-        into what is supposed to be a scoped commit. `mutation/hygiene.apply_hygiene` enforces that
-        with an explicit refuse.
+        The caller MUST have verified that the index contains no foreign staged work and then stage
+        only paths it owns. Unrelated unstaged work is safe because a bare commit reads the index,
+        not the working tree. `mutation/hygiene.apply_hygiene` enforces both boundaries.
         """
         if not message.strip():
             raise GitError("commit message must not be empty")
