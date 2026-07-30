@@ -4,6 +4,8 @@ from collections.abc import Callable
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 
+import pytest
+
 import stockroom.host.window as window_module
 from stockroom.host.run import _reload_active_window
 
@@ -74,3 +76,12 @@ def test_update_reload_does_not_carry_a_cross_origin_route(monkeypatch) -> None:
     assert navigation.path == ""
     assert navigation.fragment == ""
     assert parse_qs(navigation.query)["__stockroom_reload"]
+
+
+def test_update_reload_never_claims_success_without_an_active_window(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(window_module, "active_window", lambda: None)
+
+    with pytest.raises(RuntimeError, match="active Stockroom window is unavailable"):
+        _reload_active_window("http://127.0.0.1:43210")
