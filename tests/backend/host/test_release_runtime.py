@@ -29,6 +29,7 @@ from stockroom.host.release_runtime import (
     HostUpdateMode,
     ProductionUpdateRuntime,
     _numeric_version,
+    _prefer_newer_packaged_release,
     create_production_update_runtime,
     host_update_mode,
 )
@@ -240,6 +241,7 @@ def _release(
     managed_mode: str | None = None,
     compatible_from_release_ids: tuple[str, ...] | None = None,
     minimum_host_version: str = "0.1.0",
+    package_version: str = "0.1.0",
 ) -> VerifiedReleaseSet:
     directory = releases / release_id
     backend = (
@@ -271,7 +273,7 @@ def _release(
             "control": {"from": 1, "to": 1},
         },
         "minimum_host_version": minimum_host_version,
-        "package_version": "0.1.0",
+        "package_version": package_version,
         "protocol_version": 1,
         "release_id": release_id,
         "required_eda_bridge_version": "1",
@@ -1413,3 +1415,68 @@ def test_frozen_v1_host_accepts_v2_candidate_supported_by_v1_broker(
 def test_numeric_host_versions_pad_missing_windows_components() -> None:
     assert _numeric_version("0.1.0") == _numeric_version("0.1.0.0")
     assert _numeric_version("1.2") < _numeric_version("1.2.0.1")
+
+
+def test_newer_packaged_release_supersedes_stale_pointer_but_not_newer_download(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("STOCKROOM_UPDATE_MODE", raising=False)
+    releases = tmp_path / "Releases"
+    prior = _release(
+        releases,
+        "release-0.1.7.0",
+        rollback_release_id="release-0.1.6.0",
+        mode="ok",
+        package_version="0.1.7.0",
+    )
+    packaged = _release(
+        releases,
+        "release-0.1.8.0",
+        rollback_release_id=prior.release_id,
+        compatible_from_release_ids=(prior.release_id,),
+        mode="ok",
+        package_version="0.1.8.0",
+    )
+    control, fence = _control(tmp_path / "Control")
+    store = ImmutableReleaseStore(
+        releases_directory=releases,
+        state_directory=tmp_path / "State",
+    )
+    try:
+        accepted_prior = store.accept_verified(prior, control=control, fence=fence)
+        active = store.select_active(
+            accepted_prior,
+            previous=None,
+            selection_reason="initialize",
+            control=control,
+            fence=fence,
+        )
+        accepted_packaged = store.accept_verified(
+            packaged,
+            control=control,
+            fence=fence,
+        )
+
+        upgraded = _prefer_newer_packaged_release(
+            store,
+            active,
+            accepted_packaged,
+            control=control,
+            fence=fence,
+        )
+        unchanged = _prefer_newer_packaged_release(
+            store,
+            upgraded,
+            accepted_prior,
+            control=control,
+            fence=fence,
+        )
+
+        assert upgraded.current.release_id == packaged.release_id
+        assert upgraded.previous is not None
+        assert upgraded.previous.release_id == prior.release_id
+        assert unchanged == upgraded
+    finally:
+        control.release(fence)
+        control.close()
