@@ -272,11 +272,62 @@ def _current_process_window_handle(window, user32=None, process_id: int | None =
         return None
 
 
+def _current_process_named_window_handle(
+    title: str,
+    *,
+    user32=None,
+    process_id: int | None = None,
+) -> int | None:
+    """Find an exact titled top-level window owned by this process."""
+
+    if not _is_windows():
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        api = user32 or ctypes.windll.user32
+        expected_process_id = os.getpid() if process_id is None else int(process_id)
+        matches: list[int] = []
+        enum_callback = ctypes.WINFUNCTYPE(
+            wintypes.BOOL,
+            wintypes.HWND,
+            wintypes.LPARAM,
+        )
+
+        @enum_callback
+        def _visit(hwnd, _lparam):
+            actual_process_id = wintypes.DWORD(0)
+            if not api.GetWindowThreadProcessId(
+                hwnd,
+                ctypes.byref(actual_process_id),
+            ):
+                return True
+            if actual_process_id.value != expected_process_id:
+                return True
+            length = int(api.GetWindowTextLengthW(hwnd))
+            if length <= 0:
+                return True
+            buffer = ctypes.create_unicode_buffer(length + 1)
+            api.GetWindowTextW(hwnd, buffer, len(buffer))
+            if buffer.value == title:
+                matches.append(int(hwnd))
+                return False
+            return True
+
+        api.EnumWindows(_visit, 0)
+        return matches[0] if matches else None
+    except Exception:  # noqa: BLE001 - discovery is a fallback, never unverified authority
+        _log.debug("native Stockroom window discovery failed", exc_info=True)
+        return None
+
+
 def request_window_close(
     window=None,
     *,
     user32=None,
     process_id: int | None = None,
+    timeout: float = 5.0,
 ) -> bool:
     """Close Stockroom from any host thread through its verified native HWND.
 
@@ -288,13 +339,21 @@ def request_window_close(
     """
 
     target = window if window is not None else active_window()
-    if target is None:
-        return True
-    hwnd = _current_process_window_handle(
-        target,
-        user32=user32,
-        process_id=process_id,
+    hwnd = (
+        _current_process_window_handle(
+            target,
+            user32=user32,
+            process_id=process_id,
+        )
+        if target is not None
+        else None
     )
+    if hwnd is None:
+        hwnd = _current_process_named_window_handle(
+            "Stockroom",
+            user32=user32,
+            process_id=process_id,
+        )
     if hwnd is not None:
         try:
             import ctypes
@@ -313,9 +372,15 @@ def request_window_close(
                 wintypes.BOOL,
             )
             if bool(post(hwnd, _WM_CLOSE, 0, 0)):
-                return True
+                deadline = time.monotonic() + max(0.0, float(timeout))
+                while bool(api.IsWindow(hwnd)) and time.monotonic() < deadline:
+                    time.sleep(0.02)
+                if not bool(api.IsWindow(hwnd)):
+                    return True
         except Exception:  # noqa: BLE001 - direct destroy remains a safe fallback
             _log.debug("native Stockroom close request failed", exc_info=True)
+    if target is None:
+        return False
     try:
         target.destroy()
         return True
