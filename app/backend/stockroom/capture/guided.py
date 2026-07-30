@@ -1777,7 +1777,7 @@ class GuidedCaptureSource:
                 skipped=f"{provider_label} capture was cancelled{suffix}; nothing was attached",
                 blocked=True,
             )
-        if result.status == "try_another":
+        if result.status == "try_another" and not result.files:
             suffix = f" after receiving {received} file(s)" if received else ""
             return SourceOutcome(
                 skipped=(
@@ -1785,7 +1785,7 @@ class GuidedCaptureSource:
                 ),
                 blocked=True,
             )
-        if result.status == "timed_out":
+        if result.status == "timed_out" and not result.files:
             suffix = f" after receiving {received} file(s)" if received else ""
             return SourceOutcome(
                 error=f"{provider_label} capture timed out{suffix}; nothing was attached"

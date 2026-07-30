@@ -129,6 +129,7 @@ _WINDOWS_RESERVED_NAMES = {
 }
 _PROCESS_LOCK_GUARD = threading.Lock()
 _PROCESS_LOCKS: set[str] = set()
+_USER_CAPTURE_WINDOW_LOCK = threading.Lock()
 _CLOAK_BROWSER_VERSION = "146.0.7680.177.5"
 _CHROMIUM_PREFERENCES = Path("Default") / "Preferences"
 _BROWSER_LAUNCH_TIMEOUT_MS = 20_000
@@ -145,6 +146,19 @@ _DISABLE_WEBRTC_INIT_SCRIPT = """
   }
 })();
 """
+
+
+@contextmanager
+def _exclusive_user_capture_window():
+    if not _USER_CAPTURE_WINDOW_LOCK.acquire(blocking=False):
+        raise CaptureBrowserError(
+            "another assisted capture window is already active; Stockroom will retry this "
+            "task after that window finishes"
+        )
+    try:
+        yield
+    finally:
+        _USER_CAPTURE_WINDOW_LOCK.release()
 _PROVIDER_HUD_BOOTSTRAP = r"""
 (payload) => {
   if (!payload || globalThis !== globalThis.top || globalThis[payload.namespace]) {
@@ -611,7 +625,7 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
     actionStatus.setAttribute("aria-live", "polite");
 
     const actions = make("div", "actions");
-    const finish = make("button", "action finish", "Resume Stockroom");
+    const finish = make("button", "action finish", "Resume Now");
     const another = make("button", "action another", "Use Another Provider");
     const cancel = make("button", "action cancel", "Close Capture");
     for (const button of [finish, another, cancel]) button.type = "button";
@@ -730,7 +744,7 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
       finish.disabled = currentDownloadCount < 1;
       actionStatus.textContent = "Stockroom could not accept that action. Try again.";
     };
-    finish.addEventListener("click", () => requestAction("finish", "Resume Stockroom"));
+    finish.addEventListener("click", () => requestAction("finish", "Resume now"));
     another.addEventListener(
       "click",
       () => requestAction("try_another", "Use another provider"),
@@ -754,7 +768,7 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
         automationValue.textContent =
           value === 0
             ? payload.automatedStep
-            : `${value} ${noun} captured. Listening for companion downloads.`;
+            : `${value} ${noun} captured. Stockroom will resume automatically after downloads settle.`;
       }
     };
     updateDownloadCount(payload.downloadCount);
@@ -1483,7 +1497,25 @@ class PlaywrightCaptureBrowser:
             context = self._context
         if context is None:
             raise CaptureBrowserError("the capture browser session is not open")
-        page = context.new_page()
+        # A persistent Playwright context normally starts with one about:blank page. Opening a
+        # second page here left that inert first window visible beside the task-bound one, which
+        # made Stockroom appear to launch duplicate browsers even though only one could capture.
+        # Claim that untouched page for the first task; later tasks still receive fresh pages.
+        with self._download_lock:
+            bound_pages = {id(wired) for wired, _bound in self._page_brokers}
+        pages = list(getattr(context, "pages", ()) or ())
+        page = next(
+            (
+                candidate
+                for candidate in pages
+                if id(candidate) not in bound_pages
+                and not _page_is_closed(candidate)
+                and _page_url(candidate, "about:blank") in {"", "about:blank"}
+            ),
+            None,
+        )
+        if page is None:
+            page = context.new_page()
         self._wire_downloads(page)
         with self._download_lock:
             self._page_brokers.append((page, broker))
@@ -1492,20 +1524,50 @@ class PlaywrightCaptureBrowser:
                 self._bind_provider_hud(page, hud_state)
             yield page
         finally:
-            try:
-                page.close()
-            except Exception:  # noqa: BLE001 - teardown is best effort
-                pass
+            # Provider download actions can open child tabs/windows. They inherit the broker
+            # binding through their opener, so they are part of this task and must close with it.
+            # Leaving them behind produces stale windows whose controls no longer attach files.
+            owned_pages = [page]
+            for candidate in list(getattr(context, "pages", ()) or ()):
+                if candidate is page:
+                    continue
+                current = candidate
+                seen: set[int] = set()
+                while current is not None and id(current) not in seen:
+                    seen.add(id(current))
+                    opener = getattr(current, "opener", None)
+                    current = opener() if callable(opener) else None
+                    if current is page:
+                        owned_pages.append(candidate)
+                        break
+            for owned in reversed(owned_pages):
+                try:
+                    owned.close()
+                except Exception:  # noqa: BLE001 - teardown is best effort
+                    pass
+            owned_ids = {id(owned) for owned in owned_pages}
             with self._download_lock:
                 self._page_brokers = [
-                    (wired, bound) for wired, bound in self._page_brokers if wired is not page
+                    (wired, bound)
+                    for wired, bound in self._page_brokers
+                    if id(wired) not in owned_ids
                 ]
                 self._page_huds = (
-                    [(wired, bound) for wired, bound in self._page_huds if bound is not hud_state]
+                    [
+                        (wired, bound)
+                        for wired, bound in self._page_huds
+                        if bound is not hud_state and id(wired) not in owned_ids
+                    ]
                     if hud_state is not None
-                    else [(wired, bound) for wired, bound in self._page_huds if wired is not page]
+                    else [
+                        (wired, bound)
+                        for wired, bound in self._page_huds
+                        if id(wired) not in owned_ids
+                    ]
                 )
-                self._wired_pages = [wired for wired in self._wired_pages if wired is not page]
+                self._wired_pages = [
+                    wired for wired in self._wired_pages if id(wired) not in owned_ids
+                ]
 
     def wait_for_user_clearance(
         self,
@@ -1651,6 +1713,7 @@ class PlaywrightCaptureBrowser:
         timeout_s: float = 600.0,
         poll_interval_s: float = 0.1,
         settle_seconds: float = 0.75,
+        auto_finish_seconds: float = 2.0,
     ) -> UserCaptureResult:
         """Open one provider page and observe downloads while the person controls it.
 
@@ -1663,10 +1726,10 @@ class PlaywrightCaptureBrowser:
         format, accepts terms, or clicks a provider control.
 
         ``should_finish`` remains a caller-owned completion signal beside the HUD's Finish button.
-        Without either, closing the capture page completes the session. A short quiet period after
-        that signal keeps sibling downloads from one user click bound to the same task. Try Another
-        Provider, cancellation, and timeout return every file already intercepted, but callers
-        decide whether those files may be attached.
+        A completed download automatically finishes after a bounded quiet period, so detecting a
+        file is sufficient for Stockroom to ingest it. The quiet period resets for every companion
+        file. Closing the page also completes the session. Try Another Provider, cancellation, and
+        timeout return every file already intercepted; staging never depends on a second click.
         """
 
         if type(broker) is not DownloadBroker:
@@ -1700,6 +1763,12 @@ class PlaywrightCaptureBrowser:
             maximum=30.0,
             allow_zero=True,
         )
+        auto_finish = _bounded_seconds(
+            auto_finish_seconds,
+            "auto_finish_seconds",
+            maximum=30.0,
+            allow_zero=True,
+        )
 
         deadline = time.monotonic() + timeout
         status: UserCaptureStatus = "timed_out"
@@ -1713,7 +1782,10 @@ class PlaywrightCaptureBrowser:
         if hud_state is not None:
             hud_state.update_download_count(len(broker.receipts))
 
-        with self.task_page(broker, hud_state=hud_state) as page:
+        with _exclusive_user_capture_window(), self.task_page(
+            broker,
+            hud_state=hud_state,
+        ) as page:
             if should_cancel is not None and should_cancel():
                 status = "cancelled"
             else:
@@ -1733,6 +1805,11 @@ class PlaywrightCaptureBrowser:
                     elif hud_action == "try_another":
                         status = "try_another"
                     elif hud_action == "finish":
+                        status = "completed"
+                    elif broker.receipts:
+                        # Navigation can be aborted by the provider as the download response
+                        # replaces or closes the document. Completed task-bound receipts are
+                        # authoritative and must still advance to ingestion.
                         status = "completed"
                     elif _page_is_closed(page):
                         status = "completed"
@@ -1779,7 +1856,12 @@ class PlaywrightCaptureBrowser:
                             finish_requested = True
                         if hud_action == "finish":
                             finish_requested = True
-                        if finish_requested and (current_count == 0 or now - quiet_since >= settle):
+                        if finish_requested and (
+                            current_count == 0 or now - quiet_since >= settle
+                        ):
+                            status = "completed"
+                            break
+                        if current_count > 0 and now - quiet_since >= auto_finish:
                             status = "completed"
                             break
                         if now >= deadline:

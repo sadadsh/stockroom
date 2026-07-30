@@ -408,9 +408,11 @@ def test_reusable_exclusive_route_downloads_all_formats_without_reloading():
     assert report.selected == ["kicad", "model", "altium"]
 
 
-def test_user_driven_guided_supply_skips_provider_automation_and_validates_captured_files(
+@pytest.mark.parametrize("capture_status", ["completed", "timed_out", "try_another"])
+def test_user_driven_guided_supply_never_discards_captured_files(
     monkeypatch,
     tmp_path,
+    capture_status,
 ):
     landed = tmp_path / "captured.payload"
     landed.write_bytes(b"captured-bytes")
@@ -460,7 +462,7 @@ def test_user_driven_guided_supply_skips_provider_automation_and_validates_captu
         def capture_user_downloads(self, url, broker, **options):
             captured_call.update(url=url, broker=broker, options=options)
             return UserCaptureResult(
-                status="completed",
+                status=capture_status,
                 files=(receipt,),
                 final_url="https://vendor.example.test/details/MPN-A",
             )

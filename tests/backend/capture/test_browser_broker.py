@@ -618,6 +618,7 @@ def _hud_capture(
     action: str | None = None,
     profile_dir: Path | None = None,
     provider_key: str | None = None,
+    auto_finish_seconds: float = 2.0,
 ):
     staging = tmp_path / "Staging"
     staging.mkdir()
@@ -638,6 +639,7 @@ def _hud_capture(
         timeout_s=1,
         poll_interval_s=0.01,
         settle_seconds=0,
+        auto_finish_seconds=auto_finish_seconds,
     )
     return result, broker
 
@@ -690,7 +692,8 @@ def test_user_capture_hud_is_injected_before_navigation_and_survives_without_dom
     assert 'live.setAttribute("aria-live", "polite")' in bootstrap
     assert 'header.addEventListener("pointerdown"' in bootstrap
     assert 'move.addEventListener("keydown"' in bootstrap
-    assert '"Resume Stockroom"' in bootstrap
+    assert '"Resume Now"' in bootstrap
+    assert "Stockroom will resume automatically after downloads settle." in bootstrap
     assert '"Use Another Provider"' in bootstrap
     assert '"Close Capture"' in bootstrap
 
@@ -769,6 +772,46 @@ def test_user_capture_hud_receives_live_stockroom_download_count(tmp_path):
         if isinstance(argument, dict) and "downloadCount" in argument
     ]
     assert 1 in count_updates
+
+
+def test_user_capture_resumes_automatically_after_a_detected_download(tmp_path):
+    class Download:
+        suggested_filename = "symbol.kicad_sym"
+        url = "https://vendor.example.test/files/symbol.kicad_sym"
+
+        def save_as(self, destination: str) -> None:
+            Path(destination).write_bytes(b"captured-symbol")
+
+    page = _HudPage()
+    page.on_goto = lambda: page.handlers[0](Download())
+
+    result, broker = _hud_capture(tmp_path, page, auto_finish_seconds=0)
+
+    assert result.status == "completed"
+    assert len(broker.receipts) == 1
+    assert broker.receipts[0].path.read_bytes() == b"captured-symbol"
+    assert page.waits == 0
+
+
+def test_download_survives_provider_navigation_abort(tmp_path):
+    class Download:
+        suggested_filename = "complete.zip"
+        url = "https://vendor.example.test/files/complete.zip"
+
+        def save_as(self, destination: str) -> None:
+            Path(destination).write_bytes(b"complete-cad-archive")
+
+    class AbortingPage(_HudPage):
+        def goto(self, url: str, **options) -> None:
+            super().goto(url, **options)
+            self.handlers[0](Download())
+            raise RuntimeError("download response aborted the page navigation")
+
+    result, broker = _hud_capture(tmp_path, AbortingPage())
+
+    assert result.status == "completed"
+    assert len(broker.receipts) == 1
+    assert broker.receipts[0].path.read_bytes() == b"complete-cad-archive"
 
 
 @pytest.mark.parametrize(
@@ -947,6 +990,33 @@ def test_one_permanent_handler_routes_one_physical_download_to_the_bound_task(tm
     assert len(broker.receipts) == 1
     assert browser.captured[0].path == broker.receipts[0].path
     assert broker.receipts[0].path.parent == staging / "part-a"
+
+
+def test_task_page_reuses_initial_blank_page_and_closes_its_popups(tmp_path):
+    class Popup(_EventPage):
+        def __init__(self, parent):
+            super().__init__()
+            self._parent = parent
+
+        def opener(self):
+            return self._parent
+
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
+    initial = _EventPage()
+    context = _PageContext()
+    context.pages.append(initial)
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    browser._context = context
+
+    with browser.task_page(broker) as page:
+        popup = Popup(page)
+        context.pages.append(popup)
+        assert page is initial
+
+    assert initial.closed is True
+    assert popup.closed is True
 
 
 def test_user_capture_wires_before_navigation_and_collects_every_download_without_dom_actions(
