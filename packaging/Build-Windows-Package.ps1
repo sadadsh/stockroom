@@ -417,12 +417,16 @@ function Build-Executable {
         $env:STOCKROOM_VERSION_FILE = $VersionInfoPath
         $env:STOCKROOM_BUILD_IDENTITY = $BuildIdentityPath
         $env:STOCKROOM_UV_EXECUTABLE = $UvPath
-        if ($Mode -eq "Production") {
+        if (-not [string]::IsNullOrWhiteSpace($MinGitRoot)) {
             $env:STOCKROOM_MINGIT_ROOT = $MinGitRoot
-            $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER = $WebView2BootstrapperPath
         }
         else {
             Remove-Item Env:STOCKROOM_MINGIT_ROOT -ErrorAction SilentlyContinue
+        }
+        if (-not [string]::IsNullOrWhiteSpace($WebView2BootstrapperPath)) {
+            $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER = $WebView2BootstrapperPath
+        }
+        else {
             Remove-Item Env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER -ErrorAction SilentlyContinue
         }
 
@@ -964,14 +968,16 @@ $Evidence = [ordered]@{
             path = $SignTool
             file_version = (Get-Item -LiteralPath $SignTool).VersionInfo.FileVersion
         }
-        bundled_mingit = if ($Mode -eq "Production") {
+        bundled_mingit = if (-not [string]::IsNullOrWhiteSpace($MinGitRoot)) {
             [ordered]@{
                 git_executable_sha256 = Get-Sha256 -Path (
                     Join-Path $MinGitRoot "cmd\git.exe"
                 )
             }
         } else { $null }
-        webview2_bootstrapper = if ($Mode -eq "Production") {
+        webview2_bootstrapper = if (
+            -not [string]::IsNullOrWhiteSpace($WebView2BootstrapperPath)
+        ) {
             [ordered]@{
                 sha256 = Get-Sha256 -Path $WebView2BootstrapperPath
             }
