@@ -134,12 +134,8 @@ def test_run_windowed_returns_false_on_a_normal_close(app_ctx):
     assert run_windowed(ctx=app_ctx, open_window=lambda base_url, token: None) is False
 
 
-def test_development_source_convergence_reloads_frontend_and_restarts_backend(
-    monkeypatch,
-):
+def test_development_source_convergence_restarts_frontend_and_backend():
     from types import SimpleNamespace
-
-    from stockroom.host import run as run_mod
 
     events: list[object] = []
 
@@ -151,18 +147,10 @@ def test_development_source_convergence_reloads_frontend_and_restarts_backend(
             return "main"
 
     ctx = SimpleNamespace(uv_sync=lambda: events.append("sync"))
-    config = object()
-    monkeypatch.setattr(
-        run_mod,
-        "_reload_active_window",
-        lambda base_url, *, config: events.append(("reload", base_url, config)),
-    )
 
     convergence = _mount_development_source_convergence(
         ctx,
         _Repo(),
-        base_url="http://127.0.0.1:5123",
-        host_config=config,
         request_restart=lambda: events.append("restart"),
     )
 
@@ -171,7 +159,7 @@ def test_development_source_convergence_reloads_frontend_and_restarts_backend(
     assert ctx.app_updater.activate_current(frontend_only=False).restart_requested
     assert events == [
         "sync",
-        ("reload", "http://127.0.0.1:5123", config),
+        "restart",
         "sync",
         "restart",
     ]

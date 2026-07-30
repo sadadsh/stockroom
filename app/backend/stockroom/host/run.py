@@ -405,17 +405,17 @@ def _mount_development_source_convergence(
     ctx: AppContext,
     app_repo,
     *,
-    base_url: str,
-    host_config,
     request_restart: Callable[[], None],
 ):
     """Continuously adopt ``main`` while the real Windows service authority owns work.
 
     The Windows source host already has one long-lived workflow/service authority, so it
     must not start the candidate-backend handoff used by lightweight development embeds.
-    It still needs the same continuous Git delivery contract: frontend-only revisions
-    reload the active WebView, while backend revisions close cleanly for the stable
-    launcher to restart on the newly pulled source.
+    It still needs the same continuous Git delivery contract. WebView2 proved unable
+    to adopt replaced bundle bytes reliably in this long-lived authority process, so
+    every revision uses one session-preserving native restart through the stable
+    launcher. That keeps the visible behavior deterministic without requiring the
+    user to close the app or download another executable.
     """
 
     from stockroom.api.updater import AppUpdater
@@ -425,10 +425,7 @@ def _mount_development_source_convergence(
         app_repo,
         uv_runner=ctx.uv_sync,
         restart=request_restart,
-        frontend_reload=lambda: _reload_active_window(
-            base_url,
-            config=host_config,
-        ),
+        frontend_reload=request_restart,
     )
     setattr(ctx, "app_updater", updater)
     convergence = UpdateConvergenceService(
@@ -713,8 +710,6 @@ def run_windowed(
             _mount_development_source_convergence(
                 ctx,
                 app_repo,
-                base_url=base_url,
-                host_config=host_config,
                 request_restart=_request_restart,
             )
         convergence = getattr(ctx, "update_convergence", None)
