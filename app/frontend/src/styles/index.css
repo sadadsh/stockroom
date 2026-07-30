@@ -34,6 +34,12 @@
     --c-ok: #5fd39a;
     --c-warn: #e0b354;
     --c-err: #e8756c;
+    /* Semantic colors used as small text on popovers. Keep these separate from
+       the surface/border tokens above: the error surface hue is intentionally
+       quieter, while 2xs route labels must clear WCAG AA against --c-popover. */
+    --c-ok-text: #5fd39a;
+    --c-warn-text: #e0b354;
+    --c-err-text: #f58b83;
     /* Category hues (FIX-03): a subtle, distinct tint per component family so the list-row
        fallback thumbnails read apart at a glance. Dark-theme values sit light enough (L ~62-70%)
        to clear >=3:1 against the recessed near-black tile; the light theme darkens them below. */
@@ -192,6 +198,11 @@
     --c-ok: #2f9e63;
     --c-warn: #a9761b;
     --c-err: #cf4a40;
+    /* Small semantic text on the white popover; each clears 4.5:1 without
+       changing the gentler semantic fills and borders used across the app. */
+    --c-ok-text: #267c4d;
+    --c-warn-text: #815609;
+    --c-err-text: #b8322a;
     /* Category hues (FIX-03), darkened (L ~34-45%) so they clear >=3:1 against the light tile. */
     --cat-resistor: #b6710f;
     --cat-capacitor: #1f6fc4;

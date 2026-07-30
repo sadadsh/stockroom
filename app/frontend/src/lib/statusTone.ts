@@ -21,13 +21,22 @@ export interface StatusTone {
   className: string;
 }
 
+// Keep arbitrary-value utilities as complete literals so Tailwind never emits a
+// `${token}` placeholder into production CSS.
+const TINT_CLASSES: Readonly<Record<string, string>> = {
+  "--c-acc:14": "bg-[color-mix(in_srgb,var(--c-acc)_14%,transparent)]",
+  "--c-warn:15": "bg-[color-mix(in_srgb,var(--c-warn)_15%,transparent)]",
+  "--c-ok:15": "bg-[color-mix(in_srgb,var(--c-ok)_15%,transparent)]",
+  "--c-err:15": "bg-[color-mix(in_srgb,var(--c-err)_15%,transparent)]",
+};
+
 function tone(role: StatusToneRole, token: StatusTone["token"], text: string, tintPct: number): StatusTone {
   // A theme-adaptive tint: the token mixed against transparent, so light and dark both get a
   // faint wash of the SAME semantic hue (no hardcoded rgba, no per-theme literal).
   const tint =
     role === "neutral"
       ? "bg-raise2"
-      : `bg-[color-mix(in_srgb,var(${token})_${tintPct}%,transparent)]`;
+      : (TINT_CLASSES[`${token}:${tintPct}`] ?? "bg-raise2");
   return { role, token, text, tint, className: `${text} ${tint}` };
 }
 

@@ -40,6 +40,39 @@ export type PinCategory =
 
 export type UnionClassification = "shared" | "divergent" | "partial";
 
+// Complete literals are deliberate: Tailwind's scanner cannot safely expand an
+// arbitrary-value utility assembled from a `${token}` placeholder.
+const TILE_CLASSES: Readonly<Record<string, string>> = {
+  "--stm-gpio":
+    "bg-[color-mix(in_srgb,var(--stm-gpio)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-gpio)_34%,transparent)]",
+  "--stm-analog":
+    "bg-[color-mix(in_srgb,var(--stm-analog)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-analog)_34%,transparent)]",
+  "--stm-debug":
+    "bg-[color-mix(in_srgb,var(--stm-debug)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-debug)_34%,transparent)]",
+  "--stm-oscillator":
+    "bg-[color-mix(in_srgb,var(--stm-oscillator)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-oscillator)_34%,transparent)]",
+  "--stm-power":
+    "bg-[color-mix(in_srgb,var(--stm-power)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-power)_34%,transparent)]",
+  "--stm-ground":
+    "bg-[color-mix(in_srgb,var(--stm-ground)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-ground)_34%,transparent)]",
+  "--stm-reset":
+    "bg-[color-mix(in_srgb,var(--stm-reset)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-reset)_34%,transparent)]",
+  "--stm-boot":
+    "bg-[color-mix(in_srgb,var(--stm-boot)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-boot)_34%,transparent)]",
+  "--stm-vcap":
+    "bg-[color-mix(in_srgb,var(--stm-vcap)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-vcap)_34%,transparent)]",
+  "--stm-nc":
+    "bg-[color-mix(in_srgb,var(--stm-nc)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-nc)_34%,transparent)]",
+  "--stm-io":
+    "bg-[color-mix(in_srgb,var(--stm-io)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-io)_34%,transparent)]",
+  "--stm-classify-shared":
+    "bg-[color-mix(in_srgb,var(--stm-classify-shared)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-classify-shared)_34%,transparent)]",
+  "--stm-classify-divergent":
+    "bg-[color-mix(in_srgb,var(--stm-classify-divergent)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-classify-divergent)_34%,transparent)]",
+  "--stm-classify-partial":
+    "bg-[color-mix(in_srgb,var(--stm-classify-partial)_12%,transparent)] border-[color-mix(in_srgb,var(--stm-classify-partial)_34%,transparent)]",
+};
+
 // A hue descriptor for one token. The tile tint mirrors categoryHue's tileClass: a faint wash of the
 // same hue plus a slightly stronger hairline, both mixed against transparent so they adapt per theme
 // with no per-theme literal.
@@ -49,9 +82,7 @@ function makeHue(key: string, label: string, token: string): StmHue {
     label,
     token,
     stroke: `var(${token})`,
-    tileClass:
-      `bg-[color-mix(in_srgb,var(${token})_12%,transparent)] ` +
-      `border-[color-mix(in_srgb,var(${token})_34%,transparent)]`,
+    tileClass: TILE_CLASSES[token] ?? "",
   };
 }
 
