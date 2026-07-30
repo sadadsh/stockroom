@@ -97,6 +97,7 @@ class UpdateConvergenceService:
             attempts=0,
             check_interval_seconds=self._interval,
         )
+        self._running_revision_full = revision
         self._activation_pending = False
         self._activation_frontend_only = False
         self._state_lock = threading.RLock()
@@ -167,7 +168,9 @@ class UpdateConvergenceService:
 
     def _record_result(self, result: UpdateResult, target_revision: str) -> None:
         if result.updated:
-            new_revision = (result.activated_revision or self._updater.repo.head())[:12]
+            activated_revision = result.activated_revision or self._updater.repo.head()
+            new_revision = activated_revision[:12]
+            self._running_revision_full = activated_revision
             self._activation_pending = False
             if result.seamless_handoff_requested:
                 phase = ConvergencePhase.CURRENT
@@ -267,6 +270,43 @@ class UpdateConvergenceService:
                 return self.status()
 
             if not bool(checked.get("update_available", False)):
+                checkout_revision = self._updater.repo.head()
+                if (
+                    self._running_revision_full
+                    and checkout_revision
+                    and checkout_revision != self._running_revision_full
+                ):
+                    # The library and application intentionally share one Git
+                    # checkout. Library sync may therefore pull application bytes
+                    # before this service runs. Remote state then says "current",
+                    # but the loaded Python/frontend revision is still older and
+                    # must be activated rather than falsely reported as current.
+                    try:
+                        paths = self._updater.repo.changed_paths(
+                            self._running_revision_full,
+                            checkout_revision,
+                        )
+                    except Exception:
+                        paths = ()
+                    self._replace(
+                        convergence_phase=ConvergencePhase.APPLYING,
+                        detail="Activating an application revision already downloaded by sync.",
+                    )
+                    try:
+                        result = self._updater.activate_current(
+                            frontend_only=self._updater.frontend_only(paths)
+                        )
+                    except Exception as exc:
+                        self._activation_pending = True
+                        self._activation_frontend_only = self._updater.frontend_only(paths)
+                        self._replace(
+                            convergence_phase=ConvergencePhase.FAILED,
+                            detail=f"Activation failed and will retry automatically: {exc}",
+                        )
+                        return self.status()
+                    result.activated_revision = checkout_revision
+                    self._record_result(result, target or checkout_revision[:12])
+                    return self.status()
                 state = str(checked.get("state", UpdateState.UNVERIFIED))
                 phase = (
                     ConvergencePhase.CURRENT

@@ -92,6 +92,30 @@ def test_backend_update_requests_automatic_process_handoff(tmp_path: Path) -> No
     assert status["current_revision"] == target[:12]
 
 
+def test_prepulled_backend_revision_still_requests_process_handoff(
+    tmp_path: Path,
+) -> None:
+    path = "app/backend/stockroom/example.py"
+    origin, install = _origin_and_clone(tmp_path, path)
+    running_revision = install.head()
+    target = _advance(origin, path)
+    assert install.pull_ff().updated
+    assert install.head() == target
+    restarted = threading.Event()
+    service = UpdateConvergenceService(
+        AppUpdater(install, uv_runner=lambda: None, restart=restarted.set),
+        interval_seconds=1,
+        running_revision=running_revision,
+    )
+
+    status = service.run_once()
+
+    assert restarted.is_set()
+    assert status["convergence_phase"] == ConvergencePhase.RESTARTING
+    assert status["current_revision"] == target[:12]
+    assert status["target_revision"] == target[:12]
+
+
 def test_failed_dependency_activation_retries_without_repulling_or_false_current(
     tmp_path: Path,
 ) -> None:
