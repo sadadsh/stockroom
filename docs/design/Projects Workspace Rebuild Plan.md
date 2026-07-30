@@ -226,6 +226,12 @@ differ and require reconciliation.
   native board colors, so selection is unmistakable in KiCad and Altium renders.
   Escape steps back from a via to its net, then from the net to its footprint;
   selection guidance uses the normal interface text floor instead of microcopy.
+- Activity now follows the same inspector grammar as Components, BOM, and Build.
+  The empty state is a factual `Review Queue`, while a shared branch opens as one
+  divided evidence sheet for changed files, BOM identity, native checks, visual
+  diff, and the exact commit decision. Its split responds to the workbench rather
+  than the outer window; the audited 1024 px layout is 230 px of session/review
+  context plus a 515 px evidence pane with no document overflow.
 - KiCad drill `LayerFeature` vias and Altium `PadStack/LayerHole` vias normalize
   to the same net, coordinate, diameter, span, and visible-side contract. Duplicate
   Altium drill-guide holes are excluded. The qualified boards yield 450 unique
@@ -244,6 +250,8 @@ differ and require reconciliation.
   document.
 - The retained automated gates pass 601 backend tests, 1,198 frontend tests,
   TypeScript, production build/token parity, and Ruff for the new boundary.
+- The current isolated frontend passes all 1,210 tests across 112 files, the
+  production build, TypeScript, and token parity after the Activity refinement.
 
 ### Rejected Framings
 

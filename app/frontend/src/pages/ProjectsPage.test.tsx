@@ -30,6 +30,7 @@ vi.mock("../api/client", async (importActual) => {
       openProjectDocument: vi.fn(),
       connectProjectRemote: vi.fn(),
       projectReviews: vi.fn(),
+      projectReviewEvidence: vi.fn(),
       liveProjectBom: vi.fn(),
       projectAssignments: vi.fn(),
       assignProjectGroup: vi.fn(),
@@ -1037,6 +1038,116 @@ describe("ProjectsPage shared workspace", () => {
       "altium-project",
       "https://github.com/team/control-board.git",
     );
+  });
+
+  it("presents a shared review as one evidence sheet instead of dashboard cards", async () => {
+    const user = userEvent.setup();
+    const candidate = {
+      branch: "work/alex/power-board",
+      commit: "abcdef0123456789",
+      base_branch: "main",
+      base_commit: "0123456789abcdef",
+      fork_commit: "0123456789abcdef",
+      changed_paths: ["Power.kicad_sch", "Power.kicad_pcb"],
+      commit_count: 2,
+      ready: true,
+      blocked_reason: "",
+      events: [],
+    };
+    mockApi.projectReviews.mockResolvedValue({
+      base_branch: "main",
+      candidates: [candidate],
+    });
+    mockApi.projectReviewEvidence.mockResolvedValue({
+      schema_version: 1,
+      project_id: "kicad-project",
+      project_name: "Power Board",
+      eda: "kicad",
+      branch: candidate.branch,
+      commit: candidate.commit,
+      base_branch: candidate.base_branch,
+      base_commit: candidate.base_commit,
+      source_digest: "source-digest",
+      documents: [
+        { path: "Power.kicad_sch", kind: "schematic", bytes: 1200, sha256: "a" },
+        { path: "Power.kicad_pcb", kind: "pcb", bytes: 2400, sha256: "b" },
+      ],
+      bom: {
+        variant: "Default",
+        line_count: 2,
+        component_count: 3,
+        digest: "bom-digest",
+        lines: [
+          {
+            refs: ["R1", "R2"],
+            qty: 2,
+            value: "10k",
+            mpn: "RC0402FR-0710KL",
+            manufacturer: "Yageo",
+            footprint: "R_0402_1005Metric",
+            package: "0402",
+            description: "Resistor",
+            datasheet: "",
+            basic: false,
+            identity_ready: true,
+          },
+          {
+            refs: ["C1"],
+            qty: 1,
+            value: "100n",
+            mpn: "",
+            manufacturer: "",
+            footprint: "C_0402_1005Metric",
+            package: "0402",
+            description: "Capacitor",
+            datasheet: "",
+            basic: false,
+            identity_ready: false,
+          },
+        ],
+      },
+      semantic_audit: {
+        components: 3,
+        sheets: 1,
+        counts: {
+          by_severity: { error: 0, warning: 1, info: 0 },
+          by_kind: { missing_identity: 1 },
+        },
+        findings: [],
+        digest: "audit-digest",
+      },
+      blockers: [],
+      warnings: [],
+      reviewable: true,
+      native_validation: {
+        status: "passed",
+        detail: "KiCad checks passed.",
+      },
+      visual_diff: {
+        status: "passed",
+        detail: "Board render changed.",
+      },
+      digest: "review-digest",
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Power Board" });
+
+    await user.click(screen.getByRole("tab", { name: "Activity" }));
+
+    const review = await screen.findByRole("complementary", {
+      name: "Review evidence",
+    });
+    expect(within(review).getByRole("heading", { name: candidate.branch }))
+      .toBeInTheDocument();
+    expect(within(review).getByText("BOM Linked").closest("dl")?.className)
+      .toContain("border-y");
+    expect(within(review).getByText("1/2")).toHaveClass("text-warn");
+    expect(within(review).getByText("Changed Files")).toBeInTheDocument();
+    expect(within(review).getByText("Power.kicad_pcb")).toBeInTheDocument();
+    expect(within(review).getByText("Review Checks")).toBeInTheDocument();
+    expect(within(review).getByLabelText("Reviewer Name")).toBeInTheDocument();
+    expect(within(review).getByLabelText("Review Note")).toBeInTheDocument();
+    expect(within(review).getByText("Decision")).toBeInTheDocument();
   });
 
   it("returns an invalid remote to the repository URL field with clear guidance", async () => {
