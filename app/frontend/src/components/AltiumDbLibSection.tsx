@@ -13,6 +13,7 @@ import {
   useAltiumEmbedModels,
   useAltiumModelsPending,
   useAltiumRegenerate,
+  useAltiumSetup,
   useAltiumStatus,
   useOdbcStatus,
 } from "../api/queries";
@@ -27,6 +28,7 @@ import { Icon } from "./Icon";
 export function AltiumDbLibSection() {
   const status = useAltiumStatus();
   const regenerate = useAltiumRegenerate();
+  const setup = useAltiumSetup();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
@@ -55,6 +57,15 @@ export function AltiumDbLibSection() {
       toast("Copied the install path.", "ok");
     } catch {
       toast("Could not copy the path.", "err");
+    }
+  }
+
+  async function onSetup() {
+    try {
+      const result = await setup.mutateAsync();
+      toast(result.detail, ["verified", "already-verified"].includes(result.status) ? "ok" : "err");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not set up the DbLib in Altium.", "err");
     }
   }
 
@@ -100,8 +111,8 @@ export function AltiumDbLibSection() {
           </div>
           <p className="text-xs text-t3">
             <Text id="altiumdb.section-install-note">
-              Stockroom builds, installs, and verifies this DbLib automatically for the active
-              profile. Copy the path only for diagnostics.
+              Opening Stockroom never launches Altium. Set Up In Altium performs the one-time
+              install and fresh-session verification when you choose it.
             </Text>
           </p>
           {!data.datasource_present ? (
@@ -109,8 +120,8 @@ export function AltiumDbLibSection() {
             // never been opened here has none. Saying so beats letting Altium fail with an ODBC
             // error against a file nobody mentioned.
             <p className="text-xs text-warn" data-testid="altium-datasource-missing">
-              Automatic setup has not built this machine-local data source yet. Rebuild it now;
-              Stockroom will retry installation and verification in the background.
+              This machine-local data source has not been built yet. Rebuild the DbLib before
+              setting it up in Altium.
             </p>
           ) : null}
         </div>
@@ -130,6 +141,18 @@ export function AltiumDbLibSection() {
         >
           {regenerate.isPending ? "Rebuilding..." : "Rebuild DbLib"}
         </Button>
+        <Button
+          onClick={onSetup}
+          disabled={setup.isPending || !data?.datasource_present}
+          title={
+            data?.datasource_present
+              ? "This action opens Altium to install and verify the active DbLib."
+              : "Rebuild the DbLib first."
+          }
+          icon={<ExternalIcon className="h-3.5 w-3.5" />}
+        >
+          {setup.isPending ? "Setting Up..." : "Set Up In Altium"}
+        </Button>
         <EmbedAllModelsButton />
         <Button
           onClick={() => setOpen(true)}
@@ -138,7 +161,7 @@ export function AltiumDbLibSection() {
         >
           View Library
         </Button>
-        <Button onClick={() => setSetupOpen(true)} icon={<ExternalIcon className="h-3.5 w-3.5" />}>
+        <Button onClick={() => setSetupOpen(true)} icon={<LibraryIcon className="h-3.5 w-3.5" />}>
           <Text id="altiumdb.section-setup">Setup Guide</Text>
         </Button>
       </div>

@@ -476,7 +476,9 @@ def run_windowed(
                             else _development_service_state_root()
                         )
                     ),
-                    enable_altium=owns_context,
+                    # Native Altium work is user-triggered from Settings. Merely opening the
+                    # source host must not consume a seat or create command windows.
+                    enable_altium=False,
                 )
             )
         elif update_mode is HostUpdateMode.DEVELOPMENT_SOURCE:

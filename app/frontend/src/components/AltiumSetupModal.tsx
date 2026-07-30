@@ -1,7 +1,6 @@
 /**
- * Live Altium integration guide. The ODBC driver is the only normal human prerequisite;
- * Stockroom owns DbLib generation, machine installation, fresh-session verification, and
- * profile following. The path remains copyable as a diagnostic, never as the primary workflow.
+ * Live Altium integration guide. Stockroom never launches a licensed editor merely because the
+ * app opened; installation and fresh-session verification begin from the explicit Settings action.
  */
 import { motion } from "motion/react";
 import { useAltiumStatus, useOdbcStatus } from "../api/queries";
@@ -59,8 +58,8 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
             </div>
             <p className="mt-0.5 text-xs text-t3">
               <Text id="altiumdb.setup.subtitle">
-                Stockroom builds, installs, and verifies the active DbLib automatically; only the
-                ODBC driver may need you.
+                Stockroom prepares the active DbLib without opening Altium until you choose the
+                setup action.
               </Text>
             </p>
           </div>
@@ -127,7 +126,7 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
               </div>
             </Step>
 
-            <Step n={2} titleId="altiumdb.setup.step2-title" title="Automatic Library Target">
+            <Step n={2} titleId="altiumdb.setup.step2-title" title="Prepared Library Target">
               <p className="text-xs leading-relaxed text-t3">
                 <Text id="altiumdb.setup.step2-body">
                   Stockroom builds the machine-local data source at this path and keeps it aligned
@@ -150,14 +149,14 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
             <Step
               n={3}
               titleId="altiumdb.setup.step3-title"
-              title="Automatic Install And Verification"
+              title="Explicit Install And Verification"
             >
               <p className="text-xs leading-relaxed text-t3">
                 <Text id="altiumdb.setup.step3-body">
                   Stockroom installs the active DbLib as an Altium Installed library, closes Altium
-                  cleanly, then proves a real component resolves in a fresh session. Profile
-                  switches and Altium upgrades trigger re-verification; no manual library install is
-                  required.
+                  cleanly, then proves a real component resolves in a fresh session only after you
+                  press Set Up In Altium. Opening Stockroom, switching profiles, and rebuilding the
+                  DbLib never launch Altium.
                 </Text>
               </p>
             </Step>

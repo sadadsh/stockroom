@@ -13,6 +13,7 @@ vi.mock("../api/client", async (importActual) => {
     api: {
       altiumStatus: vi.fn(),
       altiumRegenerate: vi.fn(),
+      altiumSetup: vi.fn(),
       altiumOdbcStatus: vi.fn(),
       altiumModelsPending: vi.fn(),
       altiumEmbedCapability: vi.fn(),
@@ -102,9 +103,10 @@ describe("AltiumDbLibSection", () => {
     expect(screen.getByText("Main")).toBeInTheDocument();
     expect(screen.getByTitle(STATUS.dblib)).toBeInTheDocument();
     expect(
-      screen.getByText(/builds, installs, and verifies this DbLib automatically/i),
+      screen.getByText(/opening Stockroom never launches Altium/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Rebuild DbLib/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Set Up In Altium/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /View Library/ })).toBeInTheDocument();
   });
 
@@ -132,7 +134,7 @@ describe("AltiumDbLibSection", () => {
     ).toBeInTheDocument();
   });
 
-  it("describes automatic Altium convergence instead of a manual install workflow", async () => {
+  it("makes native Altium setup an explicit action", async () => {
     mockApi.altiumStatus.mockResolvedValue(STATUS);
     renderSection();
 
@@ -140,12 +142,33 @@ describe("AltiumDbLibSection", () => {
     await userEvent.click(screen.getByRole("button", { name: /Setup Guide/ }));
 
     expect(
-      await screen.findByText(/builds, installs, and verifies the active DbLib automatically/i),
+      await screen.findByText(/without opening Altium until you choose the setup action/i),
     ).toBeInTheDocument();
-    expect(screen.getByText("Automatic Install And Verification")).toBeInTheDocument();
-    expect(screen.getByText(/no manual library install is required/i)).toBeInTheDocument();
-    expect(screen.queryByText("Install It in Altium")).not.toBeInTheDocument();
+    expect(screen.getByText("Explicit Install And Verification")).toBeInTheDocument();
+    expect(screen.getByText(/Opening Stockroom, switching profiles, and rebuilding the DbLib never launch Altium/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Set Up In Altium/ })).toBeInTheDocument();
     expect(screen.queryByText(/right-click the library/i)).not.toBeInTheDocument();
+  });
+
+  it("launches setup only after the explicit button is pressed", async () => {
+    mockApi.altiumStatus.mockResolvedValue(STATUS);
+    mockApi.altiumSetup.mockResolvedValue({
+      status: "verified",
+      detail: "Installed and verified from the explicit action.",
+      dblib: STATUS.dblib,
+      component_key: "TPS62130",
+      symbol_library: "TPS62130.SchLib",
+      footprint_library: "TPS62130.PcbLib",
+      receipt_path: "receipt.json",
+    });
+    renderSection();
+
+    await screen.findByText("3");
+    expect(mockApi.altiumSetup).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: /Set Up In Altium/ }));
+
+    await waitFor(() => expect(mockApi.altiumSetup).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/Installed and verified from the explicit action/)).toBeInTheDocument();
   });
 
   it("reports the ODBC driver as Not Installed and offers the official installer when it is absent", async () => {
@@ -178,7 +201,7 @@ describe("AltiumDbLibSection", () => {
     expect(screen.queryByRole("link", { name: /Download Driver/ })).toBeNull();
   });
 
-  it("opens the setup guide with automatic convergence and the live diagnostic path", async () => {
+  it("opens the on-demand setup guide with the live diagnostic path", async () => {
     mockApi.altiumStatus.mockResolvedValue(STATUS);
     mockApi.altiumOdbcStatus.mockResolvedValue(odbc(true));
     renderSection();
@@ -188,8 +211,8 @@ describe("AltiumDbLibSection", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Altium Setup" });
     // the four steps, with the real mechanics named
-    expect(dialog).toHaveTextContent(/Automatic Install And Verification/);
-    expect(dialog).toHaveTextContent(/no manual library install is required/i);
+    expect(dialog).toHaveTextContent(/Explicit Install And Verification/);
+    expect(dialog).toHaveTextContent(/never launch Altium/i);
     expect(dialog).toHaveTextContent(/shared STEP stays linked in KiCad/i);
     expect(dialog).not.toHaveTextContent(/Installed tab/);
     // the LIVE library path is in the guide (not a placeholder)

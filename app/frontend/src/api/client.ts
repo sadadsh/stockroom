@@ -21,6 +21,7 @@ import type {
   LibraryDerivation,
   CadInventory,
   AltiumRegenerateResult,
+  AltiumSetupResult,
   DevSaveBody,
   DevSaveResult,
   AltiumStatus,
@@ -1162,6 +1163,12 @@ export const api = {
   // Regenerate the DbLib + its data source over every place-ready part (synchronous, one commit).
   altiumRegenerate(): Promise<AltiumRegenerateResult> {
     return request<AltiumRegenerateResult>("POST", "/api/altium/regenerate");
+  },
+
+  // Explicitly install and verify the active DbLib. This is the only ordinary application action
+  // that may launch Altium for library setup; host startup and passive reads never call it.
+  altiumSetup(): Promise<AltiumSetupResult> {
+    return request<AltiumSetupResult>("POST", "/api/altium/setup");
   },
 
   // --- STM Viewer (Phase 3 contract, section 4). Every read raises ApiError(409, "STM index

@@ -62,7 +62,7 @@ def main() -> None:
             ctx,
             workflow_database=Path(workflow_database),
             workflow_registry_factory=(build_production_workflow_registry_for_context),
-            enable_altium=True,
+            enable_altium=False,
             require_publication_executor=True,
         )
         authority = ContextServiceAuthority(

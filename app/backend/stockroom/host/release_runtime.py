@@ -1846,7 +1846,9 @@ def create_production_update_runtime(
         context,
         workflow_database=workflow_database,
         workflow_registry_factory=build_production_workflow_registry_for_context,
-        enable_altium=True,
+        # Starting Stockroom must never launch a licensed native editor. DbLib installation and
+        # verification are an explicit API action so a user can see and control the attempt.
+        enable_altium=False,
         require_publication_executor=True,
     )
 
