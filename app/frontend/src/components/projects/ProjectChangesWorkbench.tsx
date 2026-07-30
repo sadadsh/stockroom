@@ -84,9 +84,7 @@ export function ProjectChangesWorkbench({
       </div>
       {!repository ? (
         <div className="min-h-0 flex-1 overflow-y-auto rounded-card border border-line bg-surface">
-          <div className="mx-auto w-full max-w-[680px] px-6 py-5">
-            <GitRequiredPanel />
-          </div>
+          <GitRequiredPanel />
         </div>
       ) : !repository.has_remote ? (
         <ConnectRepositoryPanel projectId={projectId} collaboration={collaboration.data!} />
@@ -205,16 +203,25 @@ function WorkflowStep({
 
 function GitRequiredPanel() {
   return (
-    <Panel inset>
-      <p className="text-sm font-medium text-t1">
-        <Text id="projects.activity.git-required-panel">Git Required</Text>
-      </p>
-      <p className="mt-1 text-xs leading-5 text-t3">
-        <Text id="projects.activity.git-required-detail">
-          Initialize Git for this project before connecting a shared repository.
-        </Text>
-      </p>
-    </Panel>
+    <>
+      <div className="flex h-[34px] items-center border-b border-line bg-band px-4">
+        <span className="text-xs font-semibold text-t2">
+          <Text id="projects.activity.local-repository">Local Repository</Text>
+        </span>
+      </div>
+      <section className="w-full max-w-[520px] px-5 py-5">
+        <p className="text-sm font-semibold text-t1">
+          <Text id="projects.activity.git-not-initialized">
+            Git Is Not Initialized
+          </Text>
+        </p>
+        <p className="mt-1.5 text-xs leading-5 text-t3">
+          <Text id="projects.activity.git-required-detail">
+            Initialize Git in this project folder before connecting the shared repository.
+          </Text>
+        </p>
+      </section>
+    </>
   );
 }
 
@@ -243,6 +250,12 @@ function ConnectRepositoryPanel({
     "projects.activity.remote-url-requirement",
     "Use a secure HTTPS or SSH repository URL.",
   );
+  const branchLabel = useText("projects.activity.branch", "Branch");
+  const stateLabel = useText("projects.activity.state", "State");
+  const latestCommitLabel = useText(
+    "projects.activity.commit-label",
+    "Commit",
+  );
 
   function submit() {
     const remote = url.trim();
@@ -270,85 +283,100 @@ function ConnectRepositoryPanel({
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto rounded-card border border-line bg-surface">
-      <div className="mx-auto flex w-full max-w-[640px] flex-col px-6 py-8">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-card border border-line bg-field text-t2">
-            <GitIcon />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold tracking-[-0.02em] text-t1">
-              <Text id="projects.activity.connect-repository">
-                Connect This Repository
-              </Text>
-            </h2>
-            <p className="mt-0.5 text-xs text-t3">
-              <Text id="projects.activity.connect-repository-detail">
-                Add the Git repository shared by both engineers. Stockroom uses it for protected work sessions and review.
-              </Text>
-            </p>
-          </div>
-        </div>
-
-        <dl className="mt-6 grid grid-cols-[120px_minmax(0,1fr)] gap-x-4 gap-y-3 rounded-card border border-line bg-field px-4 py-3 text-xs">
-          <dt className="text-t3"><Text id="projects.activity.branch">Branch</Text></dt>
-          <dd className="truncate font-mono text-t1">{repository.branch}</dd>
-          <dt className="text-t3"><Text id="projects.activity.state">State</Text></dt>
-          <dd className="text-t1">
-            {repository.clean
-              ? <Text id="projects.activity.clean">Clean</Text>
-              : `${repository.dirty_paths.length} changed`}
-          </dd>
-          <dt className="text-t3"><Text id="projects.activity.latest-commit">Latest Commit</Text></dt>
-          <dd className="truncate font-mono text-t1">
-            {repository.commit ? repository.commit.slice(0, 12) : "No commits"}
-          </dd>
-        </dl>
-
-        <form
-          className="mt-6"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submit();
-          }}
-        >
-          <label htmlFor="project-remote-url" className="text-xs font-semibold text-t2">
-            <Text id="projects.activity.repository-url">Repository URL</Text>
-          </label>
-          <input
-            ref={inputRef}
-            id="project-remote-url"
-            value={url}
-            onChange={(event) => {
-              setUrl(event.target.value);
-              if (error) setError("");
-            }}
-            className={`${INPUT} mt-2`}
-            placeholder="https://github.com/team/project.git"
-            aria-describedby="project-remote-guidance"
-            aria-invalid={!!error}
-          />
-          <p
-            id="project-remote-guidance"
-            className={`mt-2 text-xs leading-5 ${error ? "text-err" : "text-t3"}`}
-          >
-            {error || (
-              <Text id="projects.activity.repository-url-detail">
-                Use a secure HTTPS or SSH URL, including git@host:path. Keep passwords and tokens out of it.
-              </Text>
-            )}
+    <div className="@container/repository flex min-h-0 flex-1 flex-col overflow-y-auto rounded-card border border-line bg-surface">
+      <div className="flex h-[34px] items-center border-b border-line bg-band px-4">
+        <span className="text-xs font-semibold text-t2">
+          <Text id="projects.activity.shared-repository">Shared Repository</Text>
+        </span>
+      </div>
+      <div className="grid min-h-0 flex-1 content-start @[46rem]/repository:grid-cols-[minmax(220px,0.78fr)_minmax(340px,1.22fr)]">
+        <section className="border-b border-line px-5 py-5 @[46rem]/repository:border-b-0 @[46rem]/repository:border-r">
+          <h2 className="text-sm font-semibold text-t1">
+            <Text id="projects.activity.local-project">Local Project</Text>
+          </h2>
+          <p className="mt-1.5 max-w-[34rem] text-xs leading-5 text-t3">
+            <Text id="projects.activity.local-project-detail">
+              This project has local Git history and is ready to connect.
+            </Text>
           </p>
-          <Button
-            type="submit"
-            variant="accent"
+          <ProjectInspectorFacts
             className="mt-4"
-            disabled={!url.trim() || connect.isPending}
+            items={[
+              { label: branchLabel, value: repository.branch, mono: true },
+              {
+                label: stateLabel,
+                value: repository.clean ? (
+                  <Text id="projects.activity.clean">Clean</Text>
+                ) : (
+                  `${repository.dirty_paths.length} changed`
+                ),
+              },
+              {
+                label: latestCommitLabel,
+                value: repository.commit
+                  ? repository.commit.slice(0, 12)
+                  : <Text id="projects.activity.no-commits">No commits</Text>,
+                mono: !!repository.commit,
+              },
+            ]}
+          />
+        </section>
+        <section className="px-5 py-5">
+          <h2 className="text-sm font-semibold text-t1">
+            <Text id="projects.activity.connect-repository">
+              Remote Repository
+            </Text>
+          </h2>
+          <p className="mt-1.5 max-w-[38rem] text-xs leading-5 text-t3">
+            <Text id="projects.activity.connect-repository-detail">
+              Connect the repository both engineers use for protected work and review.
+            </Text>
+          </p>
+          <form
+            className="mt-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submit();
+            }}
           >
-            {connect.isPending
-              ? <Text id="projects.activity.connecting">Connecting...</Text>
-              : <Text id="projects.activity.connect">Connect</Text>}
-          </Button>
-        </form>
+            <label htmlFor="project-remote-url" className="text-xs font-semibold text-t2">
+              <Text id="projects.activity.repository-url">Repository URL</Text>
+            </label>
+            <input
+              ref={inputRef}
+              id="project-remote-url"
+              value={url}
+              onChange={(event) => {
+                setUrl(event.target.value);
+                if (error) setError("");
+              }}
+              className={`${INPUT} mt-2`}
+              placeholder="https://github.com/team/project.git"
+              aria-describedby="project-remote-guidance"
+              aria-invalid={!!error}
+            />
+            <p
+              id="project-remote-guidance"
+              className={`mt-2 text-xs leading-5 ${error ? "text-err" : "text-t3"}`}
+            >
+              {error || (
+                <Text id="projects.activity.repository-url-detail">
+                  Use a secure HTTPS or SSH URL, including git@host:path. Keep passwords and tokens out of it.
+                </Text>
+              )}
+            </p>
+            <Button
+              type="submit"
+              variant="accent"
+              className="mt-4"
+              disabled={!url.trim() || connect.isPending}
+            >
+              {connect.isPending
+                ? <Text id="projects.activity.connecting">Connecting...</Text>
+                : <Text id="projects.activity.connect">Connect Repository</Text>}
+            </Button>
+          </form>
+        </section>
       </div>
     </div>
   );

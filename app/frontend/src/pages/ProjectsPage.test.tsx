@@ -1001,13 +1001,18 @@ describe("ProjectsPage shared workspace", () => {
 
     await user.click(screen.getByRole("tab", { name: "Activity" }));
 
-    expect(await screen.findByText("Connect This Repository")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Remote Repository" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Local Only")).toBeInTheDocument();
+    expect(screen.getByText("Shared Repository")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Add the Git repository shared by both engineers. Stockroom uses it for protected work sessions and review.",
+        "Connect the repository both engineers use for protected work and review.",
       ),
     ).toBeInTheDocument();
+    expect(screen.getByText("Branch").closest("dl")?.className)
+      .toContain("border-y");
     expect(screen.queryByText("No Reviews Yet")).not.toBeInTheDocument();
     expect(screen.queryByText("Select a review.")).not.toBeInTheDocument();
     expect(mockApi.projectReviews).not.toHaveBeenCalled();
@@ -1016,7 +1021,7 @@ describe("ProjectsPage shared workspace", () => {
       screen.getByLabelText("Repository URL"),
       "git@github.com:team/power-board.git",
     );
-    await user.click(screen.getByRole("button", { name: "Connect" }));
+    await user.click(screen.getByRole("button", { name: "Connect Repository" }));
 
     expect(mockApi.connectProjectRemote).toHaveBeenCalledWith(
       "kicad-project",
@@ -1033,7 +1038,7 @@ describe("ProjectsPage shared workspace", () => {
     await user.click(screen.getByRole("tab", { name: "Activity" }));
     const altiumUrl = await screen.findByLabelText("Repository URL");
     await user.type(altiumUrl, "https://github.com/team/control-board.git");
-    await user.click(screen.getByRole("button", { name: "Connect" }));
+    await user.click(screen.getByRole("button", { name: "Connect Repository" }));
     expect(mockApi.connectProjectRemote).toHaveBeenLastCalledWith(
       "altium-project",
       "https://github.com/team/control-board.git",
@@ -1170,13 +1175,34 @@ describe("ProjectsPage shared workspace", () => {
 
     const input = await screen.findByLabelText("Repository URL");
     await user.type(input, "ftp://example.com/power-board.git");
-    await user.click(screen.getByRole("button", { name: "Connect" }));
+    await user.click(screen.getByRole("button", { name: "Connect Repository" }));
 
     expect(
       await screen.findAllByText("use a secure HTTPS or SSH repository URL"),
     ).not.toHaveLength(0);
     expect(input).toHaveFocus();
     expect(input).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("shows the exact next action when the project is not a Git repository", async () => {
+    const user = userEvent.setup();
+    mockApi.projectCollaboration.mockResolvedValue({
+      ...COLLABORATION,
+      repository: null,
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Power Board" });
+    await user.click(screen.getByRole("tab", { name: "Activity" }));
+
+    expect(await screen.findByText("Local Repository")).toBeInTheDocument();
+    expect(screen.getByText("Git Is Not Initialized")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Initialize Git in this project folder before connecting the shared repository.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Repository URL")).not.toBeInTheDocument();
+    expect(mockApi.projectReviews).not.toHaveBeenCalled();
   });
 
   it("turns native placement blockers into an actionable shared state", async () => {
