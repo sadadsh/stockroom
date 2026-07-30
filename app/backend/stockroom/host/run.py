@@ -77,11 +77,10 @@ def _close_active_window() -> None:
     run_window, which stops the server, so the process exits and the launcher can
     relaunch on the freshly pulled code. The relaunch loop itself is Windows-verified;
     on Linux (no window) this is a safe no-op."""
-    from stockroom.host.window import active_window
+    from stockroom.host.window import request_window_close
 
-    win = active_window()
-    if win is not None:
-        win.destroy()
+    if not request_window_close():
+        raise RuntimeError("the active Stockroom window did not accept a close request")
 
 
 def _same_origin_reload_url(base_url: str, current_url: str | None) -> str:
