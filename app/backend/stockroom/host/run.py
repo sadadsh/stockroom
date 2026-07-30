@@ -169,34 +169,35 @@ def _reload_active_window(
     from stockroom.host.window import active_window
 
     win = active_window()
-    if win is not None:
-        _persist_active_window_session(win, config)
-        try:
-            current_url = win.get_current_url()
-        except Exception:  # noqa: BLE001 - an unreadable route falls back to the app root
-            current_url = None
-        target_url = _cache_busted_reload_url(
-            _same_origin_reload_url(base_url, current_url),
-            uuid4().hex,
-        )
-        loaded = threading.Event()
+    if win is None:
+        raise RuntimeError("the active Stockroom window is unavailable for frontend adoption")
+    _persist_active_window_session(win, config)
+    try:
+        current_url = win.get_current_url()
+    except Exception:  # noqa: BLE001 - an unreadable route falls back to the app root
+        current_url = None
+    target_url = _cache_busted_reload_url(
+        _same_origin_reload_url(base_url, current_url),
+        uuid4().hex,
+    )
+    loaded = threading.Event()
 
-        def _loaded() -> None:
-            loaded.set()
+    def _loaded() -> None:
+        loaded.set()
 
-        event = getattr(getattr(win, "events", None), "loaded", None)
-        if event is None:
-            raise RuntimeError("the active window has no load-completion event")
-        event += _loaded
+    event = getattr(getattr(win, "events", None), "loaded", None)
+    if event is None:
+        raise RuntimeError("the active window has no load-completion event")
+    event += _loaded
+    try:
+        win.load_url(target_url)
+        if not loaded.wait(timeout):
+            raise RuntimeError("the active window did not load before the deadline")
+    finally:
         try:
-            win.load_url(target_url)
-            if not loaded.wait(timeout):
-                raise RuntimeError("the active window did not load before the deadline")
-        finally:
-            try:
-                event -= _loaded
-            except Exception:  # noqa: BLE001 - an event cleanup failure cannot undo navigation
-                pass
+            event -= _loaded
+        except Exception:  # noqa: BLE001 - an event cleanup failure cannot undo navigation
+            pass
 
 
 def _prepare_release_candidate(root: Path) -> None:
