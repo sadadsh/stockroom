@@ -21,7 +21,8 @@ import threading
 import time
 from pathlib import Path
 from typing import Callable
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from uuid import uuid4
 
 from stockroom.api.context import AppContext
 from stockroom.launcher.exit_codes import EXIT_RESTART
@@ -106,6 +107,27 @@ def _same_origin_reload_url(base_url: str, current_url: str | None) -> str:
     )
 
 
+def _cache_busted_reload_url(url: str, token: str) -> str:
+    """Force WebView2 to fetch the replaced index while preserving the active route."""
+
+    parsed = urlsplit(url)
+    query = [
+        (key, value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if key != "__stockroom_reload"
+    ]
+    query.append(("__stockroom_reload", token))
+    return urlunsplit(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            urlencode(query),
+            parsed.fragment,
+        )
+    )
+
+
 def _persist_active_window_session(win, config=None) -> bool:
     """Synchronously capture the renderer's last-keystroke state, when supported.
 
@@ -154,7 +176,10 @@ def _reload_active_window(
             current_url = win.get_current_url()
         except Exception:  # noqa: BLE001 - an unreadable route falls back to the app root
             current_url = None
-        target_url = _same_origin_reload_url(base_url, current_url)
+        target_url = _cache_busted_reload_url(
+            _same_origin_reload_url(base_url, current_url),
+            uuid4().hex,
+        )
         loaded = threading.Event()
 
         def _loaded() -> None:
