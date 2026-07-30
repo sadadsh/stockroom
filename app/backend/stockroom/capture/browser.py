@@ -2016,12 +2016,14 @@ class PlaywrightCaptureBrowser:
     def _cloak_session(self):
         """Launch the pinned free stealth-Chromium build through the one browser owner.
 
-        DigiKey's CAD-provider application currently renders in Chromium but not Camoufox's
-        Firefox engine, while stock Playwright Chromium reaches DigiKey's automation
-        interstitial. CloakBrowser supplies a source-patched Chromium binary and the same
-        synchronous Playwright objects this class already owns. Its public v146 build is pinned
-        deliberately: it requires no account or API key, is downloaded independently on each
-        installation, and its wrapper verifies the published signature/checksum.
+        CloakBrowser remains the Chromium fallback for a provider surface that requires Chromium.
+        DigiKey no longer uses it: a current live check showed Camoufox rendering DigiKey's exact
+        product and CAD-model pages, while DigiKey's Cloudflare login challenge repeatedly
+        rejected the visible CloakBrowser session after a person completed the checkbox.
+        CloakBrowser supplies a source-patched Chromium binary and the same synchronous Playwright
+        objects this class already owns. Its public v146 build is pinned deliberately: it requires
+        no account or API key, is downloaded independently on each installation, and its wrapper
+        verifies the published signature/checksum.
         """
 
         try:

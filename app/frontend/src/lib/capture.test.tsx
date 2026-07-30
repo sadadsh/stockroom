@@ -233,7 +233,7 @@ describe("CaptureProvider store", () => {
     });
 
     expect(result.current.active.status).toBe("error");
-    expect(result.current.active.message).toContain("Choose Open Provider");
+    expect(result.current.active.message).toContain("Open the ultralibrarian provider browser");
     expect(result.current.active.providerOutcomes[0]?.status).toBe("requires-human");
     expect(readUiSession().selected_ids.workflow_batch).toBeNull();
   });
