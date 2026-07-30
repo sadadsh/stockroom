@@ -12,6 +12,18 @@ declare global {
 window.__API_BASE__ = "http://127.0.0.1:8765";
 window.__STOCKROOM_TOKEN__ = "test-token";
 
+beforeEach(async () => {
+  // Hash routing is intentionally durable in the real WebView. jsdom keeps the
+  // same window between tests, so clear that browser-owned route before each
+  // spec just as we reset the server-owned UI session below.
+  window.history.replaceState({}, "", "/");
+  // Import after each spec file's hoisted API mock is installed. A static setup
+  // import would pin uiSession.ts to the real client before files that exercise
+  // draft restoration can replace that client with their deterministic fake.
+  const { resetUiSessionForTests } = await import("../lib/uiSession");
+  resetUiSessionForTests();
+});
+
 // jsdom has no URL.createObjectURL/revokeObjectURL; the preview viewer (M6d) turns a
 // fetched SVG/GLB blob into an object URL for an <img> src. Provide a deterministic
 // stub so the viewer components can be tested without a real object-URL store.

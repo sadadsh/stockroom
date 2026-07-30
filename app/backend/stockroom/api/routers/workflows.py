@@ -128,6 +128,16 @@ def _actions(status: str, cancellation_state: str | None) -> dict[str, bool]:
     }
 
 
+def _workflow_kind(coordinator, batch_id: str) -> str:
+    items = coordinator.list_items(batch_id)
+    if items and all(
+        isinstance(item.payload, dict) and item.payload.get("workflow_kind") == "guided_capture"
+        for item in items
+    ):
+        return "guided_capture"
+    return "completion"
+
+
 def _summary(coordinator, batch_id: str) -> dict:
     batch = coordinator.get_batch(batch_id)
     counts = {
@@ -137,6 +147,7 @@ def _summary(coordinator, batch_id: str) -> dict:
     cancellation_state = None if cancellation is None else cancellation.state.value
     return {
         "id": batch.id,
+        "kind": _workflow_kind(coordinator, batch_id),
         "status": batch.status.value,
         "created_at": batch.created_at,
         "updated_at": batch.updated_at,

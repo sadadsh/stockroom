@@ -754,12 +754,12 @@ class ScaleSimulationHarness:
             performance_target_seconds=performance_target_seconds,
             performance_target_met=elapsed <= performance_target_seconds,
             optimization_hypothesis=(
-                "workflow scheduler, dependency-context, and status-refresh queries "
-                "grow nonlinearly with persisted stage and event rows"
+                "indexed lease-expiry probes, atomic dependency-result reads, "
+                "and aggregate status refreshes bound repeated ledger work"
             ),
             next_discriminating_optimization_target=(
-                "profile claim_ready, runtime prior-result reconstruction, and item/batch "
-                "status refresh at 1000 identities before changing durability"
+                "profile transaction commit latency and claim-ready scheduling "
+                "before weakening any durability invariant"
             ),
             database_file_size_bytes=database_size,
             database_wal_size_bytes=wal_size,

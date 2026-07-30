@@ -112,6 +112,17 @@ class _HandoffSeams:
         assert generation > 0
         self._call("rehearse")
 
+    def rehearse_rollback(
+        self,
+        candidate: AcceptedRelease,
+        current: AcceptedRelease,
+        *,
+        generation: int,
+    ) -> None:
+        assert candidate.release_id != current.release_id
+        assert generation > 0
+        self._call("rehearse_rollback")
+
     def launch_shadow(
         self,
         candidate: AcceptedRelease,
@@ -193,9 +204,24 @@ class _HandoffSeams:
         self._call("rollback")
         self.live_release_id = current.release_id
 
+    def commit(
+        self,
+        candidate: AcceptedRelease,
+        current: AcceptedRelease,
+        adoption_receipt: object,
+        *,
+        generation: int,
+    ) -> None:
+        assert self.live_release_id == candidate.release_id
+        assert current.release_id
+        assert adoption_receipt
+        assert generation > 0
+        self._call("commit")
+
 
 class _FailingCommitStore(ImmutableReleaseStore):
     fail_activation_commit = False
+    fail_rollback_commit = False
 
     def select_active(
         self,
@@ -207,6 +233,8 @@ class _FailingCommitStore(ImmutableReleaseStore):
         fence: GenerationFence,
     ) -> ActiveReleaseState:
         if self.fail_activation_commit and selection_reason == "activate":
+            raise AcceptedReleaseCorruption(_SECRET_ERROR)
+        if self.fail_rollback_commit and selection_reason == "rollback":
             raise AcceptedReleaseCorruption(_SECRET_ERROR)
         return super().select_active(
             current,
@@ -504,6 +532,7 @@ def test_successful_activation_commits_only_after_post_health_and_retains_prior(
         "drain",
         "adopt",
         "post_health",
+        "commit",
     ]
     assert seams.live_release_id == candidate.release_id
     assert pointer_seen_during_post_health == [initial.release_id]
@@ -634,6 +663,42 @@ def test_pointer_commit_failure_uses_same_post_adoption_rollback_boundary(
     assert seams.calls[-3:] == ["rollback", "resume", "stop"]
     assert seams.live_release_id == initial.release_id
     assert store.verify_startup(control).current.release_id == initial.release_id
+    control.release(fence)
+
+
+def test_host_commit_runs_after_pointer_and_failure_restores_prior_release(
+    tmp_path: Path,
+) -> None:
+    control, fence, _, store, initial = _setup(tmp_path)
+    candidate = _verified_release(
+        store.releases_directory,
+        release_id="2026.07.29.1",
+        rollback_release_id=initial.release_id,
+        content="2",
+    )
+    pointer_seen_during_commit: list[str] = []
+    seams = _HandoffSeams(
+        live_release_id=initial.release_id,
+        fail_at="commit",
+        on_call={
+            "commit": lambda: pointer_seen_during_commit.append(
+                store.verify_startup(control).current.release_id
+            )
+        },
+    )
+
+    with pytest.raises(ReleaseActivationFailed) as failure:
+        _activator(control, fence, store, seams).activate(candidate)
+
+    assert pointer_seen_during_commit == [candidate.release_id]
+    assert failure.value.reason == "adoption_commit_failed"
+    assert failure.value.rolled_back is True
+    assert seams.calls[-4:] == ["commit", "rollback", "resume", "stop"]
+    assert seams.live_release_id == initial.release_id
+    restored = store.verify_startup(control)
+    assert restored.current.release_id == initial.release_id
+    assert restored.previous is None
+    assert restored.selection_reason == "rollback"
     control.release(fence)
 
 

@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)..\..\..\work\Native Window Host\Build\Tests\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)..\..\..\work\Native Window Host\Obj\Tests\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(MSBuildThisFileDirectory)..\..\..\work\Native Window Host\Obj\Tests\</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+</Project>

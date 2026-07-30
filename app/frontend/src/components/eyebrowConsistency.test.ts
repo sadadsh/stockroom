@@ -47,13 +47,13 @@ describe("eyebrow consistency", () => {
     ).toEqual([]);
   });
 
-  it("there is exactly ONE canonical dense-eyebrow letter-spacing in the primitives", () => {
-    // The whole point is a single decision. Two spacings in the primitive would just move the
-    // inconsistency somewhere harder to see.
+  it("keeps the canonical dense metadata role free of decorative letter spacing", () => {
+    // Dense property metadata now uses the semantic type and helper-colour roles.
+    // Reintroducing arbitrary tracking here would create a second visual authority.
     const spacings = new Set(
       [...source("primitives.tsx").matchAll(/tracking-\[([0-9.]+em)\]/g)].map((m) => m[1]),
     );
-    expect([...spacings]).toEqual(["0.07em"]);
+    expect([...spacings]).toEqual([]);
   });
 });
 

@@ -644,7 +644,10 @@ describe("api client", () => {
   it("preserves the durable completion reference returned by submission", async () => {
     fetchMock.mockResolvedValueOnce(okJson({ workflow_batch_id: "batch-1", event_cursor: 17 }));
 
-    const result = await api.runCompletion({ limit: 1_000 });
+    const result = await api.runCompletion({
+      limit: 1_000,
+      idempotencyKey: "completion-command-1",
+    });
 
     expect(result).toEqual({
       workflow_batch_id: "batch-1",
@@ -655,6 +658,7 @@ describe("api client", () => {
     expect((init as RequestInit).method).toBe("POST");
     expect(JSON.parse(String((init as RequestInit).body))).toEqual({
       limit: 1_000,
+      idempotency_key: "completion-command-1",
     });
   });
 

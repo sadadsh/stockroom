@@ -6,6 +6,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
+from stockroom import BUILD_IDENTITY
 from stockroom.api.errors import ApiError
 from stockroom.kicad.config import detect_running_kicad
 from stockroom.service import CoordinatorStatus
@@ -60,6 +61,28 @@ def _ctx(request: Request):
 
 def system_info_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/system", dependencies=[Depends(require_token)])
+
+    @r.get("/identity")
+    def identity(request: Request) -> dict:
+        """Return the immutable build and active service identity.
+
+        Unlike ``/api/health``, this authenticated endpoint is an acceptance
+        surface: release rehearsals can prove which manifest-bound backend is
+        actually serving the stable window without treating liveness as build
+        identity.
+        """
+
+        ctx = _ctx(request)
+        return {
+            "release_id": getattr(ctx, "release_id", "")
+            or BUILD_IDENTITY.release_id,
+            "build_release_id": BUILD_IDENTITY.release_id,
+            "package_version": BUILD_IDENTITY.package_version,
+            "protocol_version": BUILD_IDENTITY.protocol_version,
+            "source_revision": BUILD_IDENTITY.source_revision,
+            "service_generation": getattr(ctx, "service_generation", 0),
+            "service_mode": getattr(ctx, "service_mode", "standalone"),
+        }
 
     @r.get("/info")
     def info(request: Request) -> dict:

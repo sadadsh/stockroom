@@ -37,14 +37,17 @@ def _utc_now_iso() -> str:
 
 
 def _resolve_git_root(start: Path) -> str | None:
-    """The nearest ancestor of `start` (inclusive) that holds `.git`, as_posix, or None.
+    """The nearest usable ancestor Git root of ``start``, as_posix, or None.
 
     `.git` is tested with exists() so a submodule/worktree `.git` FILE counts, not just a
-    directory. This is what makes the commit-time asset gate meaningful: a project write
-    commits into the project's own repo, and a project with no git_root refuses the write."""
+    directory. An enclosing repository does not own a project below one of its ignore rules:
+    a pin or hygiene commit there could never reach a peer. A nested repository still owns its
+    own root even when an outer repository ignores the directory containing it."""
     start = Path(start).resolve()
     for candidate in (start, *start.parents):
         if (candidate / ".git").exists():
+            if candidate != start and GitRepo(candidate)._is_ignored(start):
+                return None
             return candidate.as_posix()
     return None
 

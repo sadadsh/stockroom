@@ -1,8 +1,9 @@
 /**
  * Test doubles for the guided-capture route.
  *
- * Capture runs through `POST /api/library/capture/run` plus the job's SSE stream. These shared
- * doubles keep that one route consistent across the tests that exercise it.
+ * Capture runs through a durable workflow submission, event cursor, and
+ * terminal report projection. These doubles keep that reconnectable contract
+ * consistent across the tests that exercise it.
  */
 import { vi } from "vitest";
 import { api } from "../api/client";
@@ -24,60 +25,138 @@ export function sseStream(frames: { event: string; data: unknown }[]): ReadableS
 
 export interface CaptureMock {
   run: ReturnType<typeof vi.spyOn>;
+  events: ReturnType<typeof vi.spyOn>;
+  session: ReturnType<typeof vi.spyOn>;
+  /** Legacy seam spy: durable UI tests require that it remains unused. */
   stream: ReturnType<typeof vi.spyOn>;
 }
 
 /**
- * Mock a capture run. By default it reports progress and finishes cleanly.
+ * Mock a durable capture run. By default it publishes one verified result.
  *
- * `frames` overrides the stream so a test can drive the failure paths (an `error` frame) exactly
- * as the backend would, instead of asserting on a shape no server produces.
+ * `frames` preserves the earlier fixture input shape while translating its
+ * terminal result/error into the durable batch and report projections.
  */
 export function mockCapture(
   frames?: { event: string; data: unknown }[],
 ): CaptureMock {
-  let request: { partIds: string[]; needs?: string[] } | null = null;
+  type Request = {
+    partIds?: string[];
+    vendor?: string;
+    mode?: "automatic" | "assisted" | "collect-all";
+  };
+  type Run = {
+    request: Request;
+    report: Record<string, unknown> | null;
+    failed: boolean;
+  };
+
+  let counter = 0;
+  const runs = new Map<string, Run>();
   const run = vi.spyOn(api, "runCapture").mockImplementation(async (body) => {
-    request = body as { partIds: string[]; needs?: string[] };
-    return { job_id: "job-1" };
-  });
-  const stream = vi
-    .spyOn(api, "openJobStream")
-    .mockImplementation(async () => {
-      const partId = request?.partIds[0] ?? "p1";
-      const needs = request?.needs ?? ["kicad_symbol"];
-      const emitted =
-        frames ??
-        [
-          { event: "progress", data: { message: "Working through the vendor page." } },
-          {
-            event: "result",
-            data: {
-              result: {
-                items: [
-                  {
-                    part_id: partId,
-                    mpn: "M",
-                    display_name: "Captured Part",
-                    category: "ICs",
-                    status: "completed",
-                    needed: needs,
-                    satisfied: needs,
-                    remaining: [],
-                    sources: ["ultralibrarian"],
-                    notes: [],
-                    error: "",
-                  },
-                ],
-                counts: { completed: 1 },
-                stopped: false,
-                stop_reason: "",
+    counter += 1;
+    const request = body as Request;
+    const partId = request.partIds?.[0] ?? "p1";
+    const suppliedResult = frames?.find((frame) => frame.event === "result")?.data as
+      | { result?: Record<string, unknown> }
+      | undefined;
+    const failed = Boolean(frames?.some((frame) => frame.event === "error"));
+    const report =
+      suppliedResult?.result ??
+      (failed
+        ? null
+        : {
+            items: [
+              {
+                part_id: partId,
+                mpn: "M",
+                display_name: "Captured Part",
+                category: "ICs",
+                status: "completed",
+                needed: ["kicad_symbol"],
+                satisfied: ["kicad_symbol"],
+                remaining: [],
+                sources: ["ultralibrarian"],
+                notes: [],
+                error: "",
+                completion_evidence: {
+                  state: "verified",
+                  manifest_digest:
+                    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  reason: "The active CAD package was reverified from this immutable manifest.",
+                },
               },
-            },
-          },
-          { event: "done", data: {} },
-        ];
-      return sseStream(emitted) as never;
-    });
-  return { run, stream } as CaptureMock;
+            ],
+            counts: { completed: 1 },
+            stopped: false,
+            stop_reason: "",
+          });
+    const batchId = `batch-capture-mock-${counter}`;
+    runs.set(batchId, { request, report, failed });
+    return {
+      workflow_batch_id: batchId,
+      workflow_item_id: `item-capture-mock-${counter}`,
+      event_cursor: 0,
+    };
+  });
+  const events = vi.spyOn(api, "workflowEvents").mockImplementation(async (batchId) => {
+    const captured = runs.get(batchId);
+    if (!captured) throw new Error("unknown mocked capture batch");
+    return {
+      schema_version: 1,
+      batch: {
+        id: batchId,
+        kind: "guided_capture",
+        status: captured.failed ? "failed" : "completed",
+        created_at: 1,
+        updated_at: 2,
+        total_items: 1,
+        item_counts: { [captured.failed ? "failed" : "completed"]: 1 },
+        cancellation: null,
+        actions: {
+          can_pause: false,
+          can_resume: false,
+          can_retry: captured.failed,
+          can_cancel: captured.failed,
+        },
+      },
+      events: [
+        {
+          sequence: 1,
+          item_id: null,
+          stage_id: null,
+          kind: captured.failed ? "stage_failed" : "publication_completed",
+          details: { stage: captured.failed ? "cad_acquisition" : "publish" },
+          created_at: 2,
+        },
+      ],
+      cursor: {
+        after_sequence: 0,
+        next_sequence: 1,
+        limit: 200,
+        has_more: false,
+      },
+    };
+  });
+  const session = vi.spyOn(api, "captureWorkflow").mockImplementation(async (batchId) => {
+    const captured = runs.get(batchId);
+    if (!captured) throw new Error("unknown mocked capture batch");
+    const item = (
+      captured.report as { items?: Array<{ needed?: string[] }> } | null
+    )?.items?.[0];
+    const segments = batchId.split("-");
+    const suffix = segments[segments.length - 1] ?? "1";
+    return {
+      workflow_batch_id: batchId,
+      workflow_item_id: `item-capture-mock-${suffix}`,
+      part_id: captured.request.partIds?.[0] ?? "p1",
+      mode: captured.request.mode ?? "automatic",
+      vendor: captured.request.vendor ?? null,
+      background: false,
+      initial_needs: (item?.needed ?? ["kicad_symbol"]) as never,
+      report: captured.report as never,
+    };
+  });
+  const stream = vi.spyOn(api, "openJobStream");
+  return { run, events, session, stream } as CaptureMock;
 }

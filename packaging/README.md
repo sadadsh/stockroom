@@ -3,6 +3,7 @@
 This directory contains Stockroom's production Windows package boundary:
 
 - deterministic full-application PyInstaller payload creation;
+- a self-contained .NET 10 `win-x64` native window-host publish;
 - a pinned TUF root and complete immutable built-in release set;
 - one executable that runs the stable broker/window host normally and an
   immutable candidate worker with `--port`;
@@ -40,10 +41,12 @@ Fixture mode is deliberately non-installable:
 - no certificate is created, installed, trusted, or used; and
 - both the executable and MSIX remain unsigned.
 
-Unless `-SkipReproducibilityProof` is supplied, the command builds the
-PyInstaller executable twice in independent directories and requires identical
-SHA-256 digests. For an unsigned fixture it also creates the MSIX twice and
-requires identical package and App Installer bytes.
+The build requires a .NET 10 SDK resolved from the canonical `dotnet` command.
+Unless `-SkipReproducibilityProof` is supplied, the command builds both the
+PyInstaller executable and complete native window-host publish twice in
+independent directories and requires identical content. For an unsigned fixture
+it also creates the MSIX twice and requires identical package and App Installer
+bytes.
 
 Outputs are written under `Artifacts`:
 
@@ -211,8 +214,8 @@ The build fixes:
 
 The installed x64 Windows SDK `MakeAppx.exe` runs without `/nv`, so its normal
 semantic validation remains enabled. The command then unpacks the produced
-MSIX, requires the executable, manifest, and complete immutable update bundle
-to be byte-identical to staging, and reruns the strict Stockroom contract
+MSIX, requires the executable, manifest, native `WindowHost` runtime tree, and
+complete immutable update bundle to be byte-identical to staging, and reruns the strict Stockroom contract
 validator against the unpacked contents and App Installer file. It then starts
 that exact unpacked executable in headless acceptance mode and requires a
 receipt proving active generation authority, a running workflow coordinator,
@@ -235,8 +238,11 @@ Microsoft references:
 ## Application identity
 
 The EXE, native host window, installed-app entry, Start tile, and taskbar tile
-all derive from the same tracked multi-resolution ICO. Its flat grayscale
-pad-field mark is generated deterministically rather than edited by hand:
+all derive from one deterministic grayscale system: the mirrored `S` is the
+box's top-panel joint and continues into its exact front seam. The ICO contains
+directly rendered 16–256 px frames; MSIX adds exact target-size resources plus
+dark- and light-surface unplated variants rather than resizing one master at
+package time:
 
 ```powershell
 uv run python packaging\brand_assets.py --write

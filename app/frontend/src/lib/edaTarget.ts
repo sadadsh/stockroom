@@ -205,10 +205,19 @@ export interface SummaryReadiness {
 // `is_complete` / `missing` are passport-data fields, not CAD facts, and a default-tool branch
 // would quietly turn metadata presence into both CAD coverage and trust. A missing/stale tool row
 // fails closed without fabricating which asset is absent.
-export function summaryReadiness(part: PartSummary, tool: EdaTool): SummaryReadiness {
+export function summaryReadiness(
+  part: Pick<PartSummary, "eda_readiness">,
+  tool: EdaTool,
+): SummaryReadiness {
   const state = part.eda_readiness?.[tool];
   return {
-    ready: state?.ready ?? false,
+    // Treat the backend's convenience boolean as a claim that must agree with its
+    // underlying evidence. A stale or partially upgraded row can never make the UI
+    // say Ready without complete coverage and a passing trust verdict.
+    ready:
+      state?.ready === true &&
+      state.coverage_complete === true &&
+      state.trust === "pass",
     coverageComplete: state?.coverage_complete ?? false,
     trust: state?.trust ?? "unknown",
     missing: (state?.missing ?? []).map(assetTitleLabel),

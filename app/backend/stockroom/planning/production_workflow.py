@@ -31,6 +31,7 @@ import re
 import tempfile
 import time
 from collections.abc import Callable, Iterator, Mapping
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
@@ -105,6 +106,10 @@ from .provider_workflow import (
 )
 
 JsonObject: TypeAlias = dict[str, object]
+ProviderStageScope: TypeAlias = Callable[
+    [StageContext, ExactPartIdentity],
+    AbstractContextManager[None],
+]
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z", re.ASCII)
 _TECHNICAL_KEY = re.compile(r"[a-z][a-z0-9._-]{1,127}\Z", re.ASCII)
 _IDENTITY_RULE_REVISION = "production-part-record-exact-v1"
@@ -559,12 +564,10 @@ class ExactEvidenceCadBundleAdapter:
                 ) as temporary:
                     root = Path(temporary)
                     kicad_artifacts = {
-                        artifact.asset_kind: artifact
-                        for artifact in kicad.descriptor.artifacts
+                        artifact.asset_kind: artifact for artifact in kicad.descriptor.artifacts
                     }
                     altium_artifacts = {
-                        artifact.asset_kind: artifact
-                        for artifact in altium.descriptor.artifacts
+                        artifact.asset_kind: artifact for artifact in altium.descriptor.artifacts
                     }
                     symbol = root / _native_artifact_name(
                         NativeCadRole.KICAD_SYMBOL,
@@ -714,6 +717,7 @@ class ProductionWorkflowRegistry(Mapping[StageName, StageHandler]):
         publication_adapter: ProductionPublicationAdapter,
         publisher: ScopedComponentPublisher,
         cad_bundle_adapter: ProductionCadBundleAdapter | None = None,
+        provider_stage_scope: ProviderStageScope | None = None,
         clock: Callable[[], float] = time.time,
         retry_policy: ProductionRetryPolicy = ProductionRetryPolicy(),
         provider_retry_bounds: ProviderRetryBounds = ProviderRetryBounds(),
@@ -732,6 +736,8 @@ class ProductionWorkflowRegistry(Mapping[StageName, StageHandler]):
             raise TypeError("retry_policy must be a ProductionRetryPolicy")
         if not callable(clock):
             raise TypeError("clock must be callable")
+        if provider_stage_scope is not None and not callable(provider_stage_scope):
+            raise TypeError("provider_stage_scope must be callable")
 
         repo_root = repository.root.resolve(strict=True)
         library = Path(library_root)
@@ -798,6 +804,7 @@ class ProductionWorkflowRegistry(Mapping[StageName, StageHandler]):
         self.semantic_adapters = MappingProxyType(supplied_semantic)
         self.cad_bundle_adapter = native_adapter
         self.publication_adapter = publication_adapter
+        self.provider_stage_scope = provider_stage_scope
         self.clock = clock
         self.retry_policy = retry_policy
 
@@ -1108,7 +1115,15 @@ class ProductionWorkflowRegistry(Mapping[StageName, StageHandler]):
         def execute(context: StageContext) -> StageOutcome:
             if context.stage.name is not stage:
                 return self._failure(stage, "handler_stage_mismatch")
-            guarded = self._invoke_guarded(stage, context, lambda: handler(context))
+
+            def invoke() -> StageOutcome:
+                if stage is not StageName.CAD_ACQUISITION or self.provider_stage_scope is None:
+                    return handler(context)
+                identity = self._provider_identity(context)
+                with self.provider_stage_scope(context, identity):
+                    return handler(context)
+
+            guarded = self._invoke_guarded(stage, context, invoke)
             if isinstance(guarded, PermanentFailureOutcome):
                 return guarded
             outcome = cast(StageOutcome, guarded)
@@ -2108,6 +2123,7 @@ def build_production_workflow_handlers(
     publication_adapter: ProductionPublicationAdapter,
     publisher: ScopedComponentPublisher,
     cad_bundle_adapter: ProductionCadBundleAdapter | None = None,
+    provider_stage_scope: ProviderStageScope | None = None,
     clock: Callable[[], float] = time.time,
     retry_policy: ProductionRetryPolicy = ProductionRetryPolicy(),
     provider_retry_bounds: ProviderRetryBounds = ProviderRetryBounds(),
@@ -2127,6 +2143,7 @@ def build_production_workflow_handlers(
         publication_adapter=publication_adapter,
         publisher=publisher,
         cad_bundle_adapter=cad_bundle_adapter,
+        provider_stage_scope=provider_stage_scope,
         clock=clock,
         retry_policy=retry_policy,
         provider_retry_bounds=provider_retry_bounds,

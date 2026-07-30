@@ -5,47 +5,71 @@
  * filter (black line art → near-white ink in dark, black in light), so it flips with
  * the app and never bakes a colour that only reads on one theme.
  */
+import { useEffect } from "react";
 import { useObjectUrl } from "../lib/useObjectUrl";
 import { usePanZoom } from "../lib/usePanZoom";
 import { useTheme } from "../lib/theme";
+
+export type SvgVisibility = "checking" | "visible" | "unavailable";
 
 export function SvgViewport({
   blob,
   alt,
   downloadName,
+  compact = false,
+  onVisibilityChange,
 }: {
   blob: Blob;
   alt: string;
   downloadName?: string;
+  /** Passive in-pane presentation. Expansion keeps this same viewport and view state. */
+  compact?: boolean;
+  /** Reports decoded pixels, not merely a fetched SVG blob. */
+  onVisibilityChange?: (state: SvgVisibility) => void;
 }) {
   const url = useObjectUrl(blob);
   const { theme } = useTheme();
   const { view, frameRef, handlers, reset, zoomIn, zoomOut } = usePanZoom();
   const scalePercent = Math.round(view.scale * 100);
 
+  useEffect(() => {
+    onVisibilityChange?.("checking");
+  }, [blob, onVisibilityChange]);
+
   return (
     <div className="relative h-full w-full">
       <div
         ref={frameRef}
         data-testid="svg-viewport"
-        tabIndex={0}
-        role="application"
-        aria-label={`${alt} inspection canvas. Drag to pan, scroll or use plus and minus to zoom, and press 0 to fit.`}
-        onDoubleClick={reset}
-        onKeyDown={(event) => {
-          if (event.key === "+" || event.key === "=") {
-            event.preventDefault();
-            zoomIn();
-          } else if (event.key === "-" || event.key === "_") {
-            event.preventDefault();
-            zoomOut();
-          } else if (event.key === "0" || event.key.toLowerCase() === "f") {
-            event.preventDefault();
-            reset();
-          }
-        }}
-        className="absolute inset-0 cursor-grab overflow-hidden outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc"
-        {...handlers}
+        tabIndex={compact ? -1 : 0}
+        role={compact ? undefined : "application"}
+        aria-label={
+          compact
+            ? undefined
+            : `${alt} inspection canvas. Drag to pan, scroll or use plus and minus to zoom, and press 0 to fit.`
+        }
+        onDoubleClick={compact ? undefined : reset}
+        onKeyDown={
+          compact
+            ? undefined
+            : (event) => {
+                if (event.key === "+" || event.key === "=") {
+                  event.preventDefault();
+                  zoomIn();
+                } else if (event.key === "-" || event.key === "_") {
+                  event.preventDefault();
+                  zoomOut();
+                } else if (event.key === "0" || event.key.toLowerCase() === "f") {
+                  event.preventDefault();
+                  reset();
+                }
+              }
+        }
+        className={
+          "absolute inset-0 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc " +
+          (compact ? "cursor-default" : "cursor-grab active:cursor-grabbing")
+        }
+        {...(compact ? {} : handlers)}
       >
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           {url ? (
@@ -53,9 +77,14 @@ export function SvgViewport({
               src={url}
               alt={alt}
               draggable={false}
+              onLoad={() => onVisibilityChange?.("visible")}
+              onError={() => onVisibilityChange?.("unavailable")}
               // Fill the viewport (object-contain upscales the small-intrinsic KiCad
               // SVG to fit); the transform below adds the pan/zoom on top.
-              className="h-full w-full select-none object-contain p-10"
+              className={
+                "h-full w-full select-none object-contain " +
+                (compact ? "p-4" : "p-[clamp(1rem,3vmin,2.5rem)]")
+              }
               style={{
                 transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
                 filter: theme === "dark" ? "invert(1)" : "none",
@@ -64,6 +93,7 @@ export function SvgViewport({
           ) : null}
         </div>
       </div>
+      {!compact ? (
       <div className="absolute bottom-3 right-3 flex items-center overflow-hidden rounded-control border border-line2 bg-popover/95 shadow-pop">
         <button
           type="button"
@@ -110,6 +140,7 @@ export function SvgViewport({
           </a>
         ) : null}
       </div>
+      ) : null}
     </div>
   );
 }

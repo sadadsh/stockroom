@@ -12,6 +12,28 @@ const DOCUMENT: CadVariantDocument = {
   supplementary: [],
 };
 
+const REVERIFIED_DOCUMENT: CadVariantDocument = {
+  ...DOCUMENT,
+  inventories: [
+    {
+      tool: "kicad",
+      activeVariantId: "sha256:manifest",
+      variants: [
+        {
+          id: "sha256:manifest",
+          provider: "Ultra Librarian",
+          format: "KiCad 10",
+          artifacts: [{ kind: "symbol", fileName: "Part.kicad_sym" }],
+          evidenceDigest: "sha256:manifest",
+          verificationState: "reverified",
+          trustRank: 0,
+          trustLabel: "Preferred Source",
+        },
+      ],
+    },
+  ],
+};
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -37,6 +59,24 @@ describe("cadVariantApi", () => {
         },
       },
     );
+  });
+
+  it("preserves the reverified evidence state without a fabricated check count", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(REVERIFIED_DOCUMENT), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    const result = await cadVariantApi.inventory("part/1");
+    const variant = result.inventories[0]?.variants[0];
+
+    expect(variant?.verificationState).toBe("reverified");
+    expect(variant).not.toHaveProperty("validationChecks");
   });
 
   it("posts both expected pointers when atomically switching a validated pair", async () => {

@@ -30,6 +30,18 @@ import { EnrichStages } from "../components/EnrichStages";
 import { PassiveAddSection } from "../components/PassiveAddSection";
 import { PhotoTrigger, productPhotoUrl } from "../components/ProductPhoto";
 import { PulledDepth } from "../components/PulledDepth";
+import {
+  discardIntakeDraft,
+  loadIntakeDraft,
+  readUiSession,
+  setPendingIntakeDraft,
+  type IntakeDraftBodyV1,
+  type IntakeDraftCandidate,
+  type IntakeDraftNetworkInput,
+  type IntakeDraftPurchase,
+  type IntakeDraftReview,
+  type JsonValue,
+} from "../lib/uiSession";
 
 // Each staged candidate carries a stable id assigned on load, so committing or
 // removing one never shifts another's React key (which would remount its sibling
@@ -133,6 +145,66 @@ export function IngestPage() {
   const toastLookupFailed = useText("ingest.toast-lookup-failed", "Look up failed.");
   const toastAdded = useText("ingest.toast-added", "Added");
 
+  // Rehydrate the server-staged draft once. The session document contains only
+  // its immutable id/revision; network input and review fields live in the
+  // separately bounded draft store and never in the host/session snapshot.
+  useEffect(() => {
+    if (!readUiSession().intake_draft_ref) return;
+    let cancelled = false;
+    void loadIntakeDraft()
+      .then((saved) => {
+        if (!saved || cancelled) return;
+        const value = saved.network_input.value;
+        const review = saved.review;
+        setInput(value);
+        setLookedUpInput(review.lookup_input?.value ?? "");
+        setResult(review.enrichment_result);
+        const restored = review.candidates.map((candidate) => {
+          const match = /^candidate-(\d+)$/.exec(candidate.client_id);
+          const id = match ? Number(match[1]) : nextId.current;
+          nextId.current = Math.max(nextId.current, id + 1);
+          return stagedFromDraft(id, candidate);
+        });
+        setStaged(restored.length > 0 ? restored : null);
+      })
+      .catch(() => {
+        // The visible draft stays empty when its referenced bytes are unavailable;
+        // the backend retains the honest missing/corrupt state for diagnostics.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Keep the latest keystroke and review edits available to both the background
+  // server checkpoint and the host's synchronous pre-update export hook.
+  useEffect(() => {
+    const value = input.trim();
+    if (!value && (!staged || staged.length === 0)) {
+      setPendingIntakeDraft(null);
+      return;
+    }
+    // A review is identity-bound to the input that produced it. If the person
+    // begins typing a different MPN after lookup, preserve that latest input
+    // without falsely attaching the previous candidate to it.
+    const first =
+      value === lookedUpInput.trim() ? staged?.[0] : undefined;
+    const lookupInput =
+      value === lookedUpInput.trim() && value
+        ? networkInput(value)
+        : null;
+    const review: IntakeDraftReview = {
+      lookup_input: lookupInput,
+      enrichment_result: lookupInput ? result : null,
+      candidates: first ? (staged ?? []).map(draftCandidate) : [],
+    };
+    const draft: IntakeDraftBodyV1 = {
+      network_input: networkInput(value),
+      review,
+    };
+    setPendingIntakeDraft(draft);
+  }, [input, lookedUpInput, result, staged]);
+
   const lookUp = useCallback(() => {
     const v = input.trim();
     if (!v || looking) return;
@@ -214,6 +286,7 @@ export function IngestPage() {
     // Tear down the source job as well as the local mirror so a stale successful
     // lookup cannot contaminate the next part.
     enrich.reset();
+    void discardIntakeDraft();
   }
 
   const plan = result?.add_plan ?? null;
@@ -422,6 +495,143 @@ export function IngestPage() {
       <BulkImportSection />
     </div>
   );
+}
+
+function jsonValue(value: unknown): JsonValue {
+  return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
+function networkInput(value: string): IntakeDraftNetworkInput {
+  return {
+    kind: isUrl(value) ? "product_url" : "mpn",
+    value,
+  };
+}
+
+function draftPurchase(value: StagingCandidate["purchase"][number]): IntakeDraftPurchase {
+  const priceBreaks = Array.isArray(value.price_breaks)
+    ? value.price_breaks.flatMap((entry) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+        const row = entry as Record<string, unknown>;
+        const qty = Number(row.qty);
+        const price = Number(row.price);
+        if (!Number.isFinite(qty) || qty < 0 || !Number.isFinite(price)) return [];
+        return [
+          {
+            qty,
+            price,
+            currency: typeof row.currency === "string" ? row.currency : "",
+          },
+        ];
+      })
+    : [];
+  return {
+    vendor: value.vendor ?? "",
+    url: value.url ?? "",
+    part_number: value.part_number ?? "",
+    price_breaks: priceBreaks,
+    stock:
+      value.stock === null || (typeof value.stock === "number" && Number.isFinite(value.stock))
+        ? value.stock
+        : null,
+    currency: value.currency ?? "",
+    fetched_at: value.fetched_at ?? "",
+  };
+}
+
+function draftCandidate(staged: Staged): IntakeDraftCandidate {
+  const candidate = staged.candidate;
+  return {
+    client_id: `candidate-${staged.id}`,
+    vendor: candidate.vendor,
+    display_name: candidate.display_name,
+    entry_name: candidate.entry_name,
+    category: candidate.category,
+    mpn: candidate.mpn,
+    manufacturer: candidate.manufacturer,
+    description: candidate.description,
+    tags: [...candidate.tags],
+    purchase: candidate.purchase.map(draftPurchase),
+    gaps: [...candidate.gaps],
+    specs: Object.entries(candidate.specs ?? {}).map(([key, value]) => ({
+      key,
+      value: jsonValue(value),
+    })),
+    alternates: Object.entries(candidate.alternates ?? {}).map(([key, values]) => ({
+      key,
+      values: values.map((value) => ({
+        value: jsonValue(value.value),
+        source: value.source,
+        confidence: value.confidence,
+      })),
+    })),
+    enrichment: Object.entries(candidate.enrichment ?? {}).map(([key, value]) => ({
+      key,
+      source: value.source,
+      confidence: value.confidence,
+    })),
+    datasheet_url: staged.datasheetUrl,
+    conflicts: staged.conflicts.map((conflict) => ({
+      key: conflict.key,
+      values: conflict.values.map((value) => ({
+        value: jsonValue(value.value),
+        source: value.source,
+      })),
+    })),
+  };
+}
+
+function stagedFromDraft(id: number, saved: IntakeDraftCandidate): Staged {
+  const candidate: StagingCandidate = {
+    ...FILE_LESS_CANDIDATE,
+    vendor: saved.vendor,
+    display_name: saved.display_name,
+    entry_name: saved.entry_name,
+    category: saved.category,
+    mpn: saved.mpn,
+    manufacturer: saved.manufacturer,
+    description: saved.description,
+    tags: [...saved.tags],
+    purchase: saved.purchase.map((purchase) => ({
+      vendor: purchase.vendor,
+      url: purchase.url,
+      part_number: purchase.part_number,
+      price_breaks: purchase.price_breaks.map((entry) => ({ ...entry })),
+      stock: purchase.stock,
+      currency: purchase.currency,
+      fetched_at: purchase.fetched_at,
+    })),
+    gaps: [...saved.gaps],
+    specs: Object.fromEntries(saved.specs.map(({ key, value }) => [key, value])),
+    alternates: Object.fromEntries(
+      saved.alternates.map(({ key, values }) => [
+        key,
+        values.map((value) => ({
+          value: String(value.value ?? ""),
+          source: value.source,
+          confidence: value.confidence,
+        })),
+      ]),
+    ),
+    enrichment: Object.fromEntries(
+      saved.enrichment.map(({ key, source, confidence }) => [
+        key,
+        { source, confidence },
+      ]),
+    ),
+  };
+  return {
+    id,
+    candidate,
+    datasheetUrl: saved.datasheet_url,
+    conflicts: saved.conflicts.map(({ key, values }) => ({
+      key,
+      values: values.map(({ value, source }) => ({
+        value: String(value ?? ""),
+        source,
+      })),
+    })),
+  };
 }
 
 function PulledSummary({ result }: { result: EnrichmentResult }) {

@@ -4,7 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { mockCapture } from "../test/captureMocks";
-import type { PartDetail } from "../api/types";
+import type {
+  CompletionEvidence,
+  PartDetail,
+  WorkflowBatchStatus,
+  WorkflowEventsPage,
+} from "../api/types";
 import { makeAsset, makeEdaAssets, makePartDetail } from "../test/partFixture";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
@@ -57,14 +62,36 @@ const DETAIL: PartDetail = makePartDetail({
   assets: { kicad: makeEdaAssets() },
 });
 
-function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
-  const enc = new TextEncoder();
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      for (const c of chunks) controller.enqueue(enc.encode(c));
-      controller.close();
+function durableCapturePage(
+  batchId: string,
+  status: WorkflowBatchStatus,
+): WorkflowEventsPage {
+  return {
+    schema_version: 1,
+    batch: {
+      id: batchId,
+      kind: "guided_capture",
+      status,
+      created_at: 1,
+      updated_at: 2,
+      total_items: 1,
+      item_counts: { [status]: 1 },
+      cancellation: null,
+      actions: {
+        can_pause: false,
+        can_resume: false,
+        can_retry: status === "failed",
+        can_cancel: false,
+      },
     },
-  });
+    events: [],
+    cursor: {
+      after_sequence: 0,
+      next_sequence: 1,
+      limit: 200,
+      has_more: false,
+    },
+  };
 }
 
 // The real DTO: every vendor in the owner's trust order, plus the flattened head.
@@ -107,12 +134,16 @@ const CAD_SOURCES = [
   },
 ];
 
-function mockCadSource(needs: string[]) {
+function mockCadSource(
+  needs: string[],
+  completionEvidence?: CompletionEvidence,
+) {
   vi.spyOn(api, "partCadSource").mockResolvedValue({
     url: CAD_SOURCES[0].url,
     mpn: "BQ24074",
     vendor: "DigiKey",
     needs,
+    completion_evidence: completionEvidence,
     sources: CAD_SOURCES,
   } as never);
 }
@@ -223,6 +254,12 @@ describe("CompletePartModal - automatic capture", () => {
                 sources: [],
                 notes: [],
                 error: "",
+                completion_evidence: {
+                  state: "verified",
+                  manifest_digest:
+                    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  reason: "The active pair was reverified from retained evidence.",
+                },
                 provider_outcomes: [
                   {
                     route_id: "verified-cache:verified-cache",
@@ -254,8 +291,9 @@ describe("CompletePartModal - automatic capture", () => {
       wrapper,
     });
 
-    expect(await screen.findByText("Files Complete")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Get Files" })).toBeNull();
+    expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
+    expect(screen.queryByText("Files Reverified")).toBeNull();
+    expect(screen.getByRole("button", { name: "Get Files" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Collect All Sources" }));
 
     await waitFor(() => expect(capture.run).toHaveBeenCalled());
@@ -266,6 +304,9 @@ describe("CompletePartModal - automatic capture", () => {
         mode: "collect-all",
       }),
     );
+    expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
+    expect(screen.getByText(/Reverified from sha256:bbbbbbbbbbbbb/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Get Files" })).toBeNull();
     expect(
       await screen.findByText(
         "Collection Complete. Every route is settled. Unavailable means it was checked and had no exact deliverable.",
@@ -297,6 +338,12 @@ describe("CompletePartModal - automatic capture", () => {
                 sources: [],
                 notes: [],
                 error: "",
+                completion_evidence: {
+                  state: "verified",
+                  manifest_digest:
+                    "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                  reason: "The active pair was reverified from retained evidence.",
+                },
                 provider_outcomes: [
                   {
                     route_id: "digikey:digikey-ultralibrarian",
@@ -349,9 +396,10 @@ describe("CompletePartModal - automatic capture", () => {
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, {
       wrapper,
     });
-    await screen.findByText("Files Complete");
+    await screen.findByText("Automatic Completion");
     await user.click(screen.getByRole("button", { name: "Collect All Sources" }));
 
+    expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
     expect(
       await screen.findByText(
         "Collection Partial. A route requires human input, is blocked or failed, was cancelled, or was not attempted.",
@@ -365,6 +413,94 @@ describe("CompletePartModal - automatic capture", () => {
     expect(screen.getByText("Needs Your Input")).toHaveClass("text-[var(--c-warn-text)]");
     expect(screen.getByText("Not Attempted")).toHaveClass("text-[var(--c-warn-text)]");
     expect(screen.getByText("No exact deliverable was offered.")).toHaveClass("text-t2");
+  });
+
+  it("never treats an empty needs projection as completion evidence", async () => {
+    mockCadSource([]);
+
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, {
+      wrapper,
+    });
+
+    expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "No completion evidence is recorded. Run verification before treating this part as complete.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Get Files" })).toBeInTheDocument();
+    expect(screen.queryByText("Files Reverified")).toBeNull();
+    expect(screen.queryByText("CAD Files Not Required")).toBeNull();
+  });
+
+  it("renders persistent verified evidence without requiring another capture", async () => {
+    mockCadSource([], {
+      state: "verified",
+      manifest_digest:
+        "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      reason: "The active projections were re-resolved from retained evidence.",
+    });
+
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, {
+      wrapper,
+    });
+
+    expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
+    expect(screen.getByText(/Reverified from sha256:eeeeeeeeeeeee/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Get Files" })).toBeNull();
+    expect(
+      document.querySelector('[data-completion-evidence="verified"]'),
+    ).not.toBeNull();
+  });
+
+  it("renders a not-required verdict distinctly without claiming files were verified", async () => {
+    const user = userEvent.setup();
+    mockCadSource([]);
+    mockCapture([
+      {
+        event: "result",
+        data: {
+          result: {
+            items: [
+              {
+                part_id: DETAIL.id,
+                mpn: DETAIL.mpn,
+                display_name: DETAIL.derived.display_name,
+                category: "Mechanical",
+                status: "already-complete",
+                needed: [],
+                satisfied: [],
+                remaining: [],
+                sources: [],
+                notes: [],
+                error: "",
+                completion_evidence: {
+                  state: "not-required",
+                  manifest_digest: null,
+                  reason: "This mechanical record has no EDA deliverables.",
+                },
+              },
+            ],
+            counts: { "already-complete": 1 },
+            stopped: false,
+            stop_reason: "",
+          },
+        },
+      },
+      { event: "done", data: {} },
+    ]);
+
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, {
+      wrapper,
+    });
+    await user.click(await screen.findByRole("button", { name: "Get Files" }));
+
+    expect(await screen.findByText("CAD Files Not Required")).toBeInTheDocument();
+    expect(screen.getByText("This mechanical record has no EDA deliverables.")).toBeInTheDocument();
+    expect(screen.queryByText("Files Reverified")).toBeNull();
+    expect(
+      document.querySelector('[data-completion-evidence="not-required"]'),
+    ).not.toBeNull();
   });
 
   it("never shows an asset word as both Added and Needed: DETAILS is metadata-only when FILES owns the assets", async () => {
@@ -403,8 +539,14 @@ describe("CompletePartModal - automatic capture", () => {
     // you press to leave a capture running and get on with something else. A mock that finished
     // instantly would take the modal straight to done and the button would never render - which
     // would make this test fail for a reason that has nothing to do with the behaviour it guards.
-    vi.spyOn(api, "runCapture").mockResolvedValue({ job_id: "job-1" });
-    vi.spyOn(api, "openJobStream").mockImplementation(() => new Promise(() => {}) as never);
+    vi.spyOn(api, "runCapture").mockResolvedValue({
+      workflow_batch_id: "batch-background",
+      workflow_item_id: "item-background",
+      event_cursor: 0,
+    });
+    vi.spyOn(api, "workflowEvents").mockImplementation(
+      () => new Promise(() => undefined),
+    );
     const onClose = vi.fn();
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={onClose} />, { wrapper });
     await user.click(await screen.findByRole("button", { name: "Get Files" }));
@@ -553,21 +695,93 @@ describe("CompletePartModal - vendor choice", () => {
     mockCadSource(["kicad_symbol"]);
     const run = vi
       .spyOn(api, "runCapture")
-      .mockResolvedValueOnce({ job_id: "automatic-job" })
-      .mockResolvedValueOnce({ job_id: "assisted-job" });
-    vi.spyOn(api, "openJobStream")
+      .mockResolvedValueOnce({
+        workflow_batch_id: "automatic-batch",
+        workflow_item_id: "automatic-item",
+        event_cursor: 0,
+      })
+      .mockResolvedValueOnce({
+        workflow_batch_id: "assisted-batch",
+        workflow_item_id: "assisted-item",
+        event_cursor: 0,
+      });
+    vi.spyOn(api, "workflowEvents")
       .mockResolvedValueOnce(
-        streamOf([
-          'event: result\ndata: {"result":{"items":[{"part_id":"part1","mpn":"BQ24074","display_name":"BQ24074","category":"ICs","status":"unchanged","needed":["kicad_symbol"],"satisfied":[],"remaining":["kicad_symbol"],"sources":[],"notes":["SnapMagic: provider interaction required"],"error":""}],"counts":{"unchanged":1},"stopped":false,"stop_reason":""}}\n\n',
-          "event: done\ndata: {}\n\n",
-        ]),
+        durableCapturePage("automatic-batch", "completed"),
       )
       .mockResolvedValueOnce(
-        streamOf([
-          'event: result\ndata: {"result":{"items":[{"part_id":"part1","mpn":"BQ24074","display_name":"BQ24074","category":"ICs","status":"completed","needed":["kicad_symbol"],"satisfied":["kicad_symbol"],"remaining":[],"sources":["snapmagic"],"notes":[],"error":""}],"counts":{"completed":1},"stopped":false,"stop_reason":""}}\n\n',
-          "event: done\ndata: {}\n\n",
-        ]),
+        durableCapturePage("assisted-batch", "completed"),
       );
+    vi.spyOn(api, "captureWorkflow")
+      .mockResolvedValueOnce({
+        workflow_batch_id: "automatic-batch",
+        workflow_item_id: "automatic-item",
+        part_id: "part1",
+        mode: "automatic",
+        vendor: "snapmagic",
+        background: false,
+        initial_needs: ["kicad_symbol"],
+        report: {
+          items: [
+            {
+              part_id: "part1",
+              mpn: "BQ24074",
+              display_name: "BQ24074",
+              category: "ICs",
+              status: "unchanged",
+              needed: ["kicad_symbol"],
+              satisfied: [],
+              remaining: ["kicad_symbol"],
+              sources: [],
+              notes: ["SnapMagic: provider interaction required"],
+              error: "",
+              completion_evidence: {
+                state: "unverified",
+                manifest_digest: null,
+                reason: "No complete shared CAD package was verified.",
+              },
+            },
+          ],
+          counts: { unchanged: 1 },
+          stopped: false,
+          stop_reason: "",
+        },
+      })
+      .mockResolvedValueOnce({
+        workflow_batch_id: "assisted-batch",
+        workflow_item_id: "assisted-item",
+        part_id: "part1",
+        mode: "assisted",
+        vendor: "snapmagic",
+        background: false,
+        initial_needs: ["kicad_symbol"],
+        report: {
+          items: [
+            {
+              part_id: "part1",
+              mpn: "BQ24074",
+              display_name: "BQ24074",
+              category: "ICs",
+              status: "completed",
+              needed: ["kicad_symbol"],
+              satisfied: ["kicad_symbol"],
+              remaining: [],
+              sources: ["snapmagic"],
+              notes: [],
+              error: "",
+              completion_evidence: {
+                state: "verified",
+                manifest_digest:
+                  "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                reason: "The active package was reverified.",
+              },
+            },
+          ],
+          counts: { completed: 1 },
+          stopped: false,
+          stop_reason: "",
+        },
+      });
     RENDER();
     await screen.findByText("Preferred Source");
     await user.click(vendorButton(/SnapMagic/));

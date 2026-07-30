@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { ApiError, api } from "../api/client";
+import { ApiError, api, type LandPattern } from "../api/client";
 import { ThemeProvider } from "../lib/theme";
 import { ModelViewer } from "./ModelViewer";
 import { Glb3DView } from "./Glb3DView";
@@ -28,6 +28,7 @@ vi.mock("../api/client", async (importActual) => {
 function sceneHandle() {
   return {
     dispose: vi.fn(),
+    fit: vi.fn(),
     setView: vi.fn(),
     setSpin: vi.fn((wanted: boolean) => wanted),
     setLandPattern: vi.fn(),
@@ -42,14 +43,14 @@ const mountSpy = vi.fn(
   (
     _container: HTMLElement,
     _glb: ArrayBuffer,
-    _options?: { onError?: () => void },
+    _options?: { onError?: () => void; onReady?: () => void },
   ) => sceneHandle(),
 );
 vi.mock("../lib/threeScene", () => ({
   mountModelScene: (
     c: HTMLElement,
     g: ArrayBuffer,
-    options?: { onError?: () => void },
+    options?: { onError?: () => void; onReady?: () => void },
   ) => mountSpy(c, g, options),
 }));
 
@@ -260,7 +261,7 @@ describe("Glb3DView scene synchronization", () => {
     );
     await waitFor(() => expect(mountSpy).toHaveBeenCalled());
     expect(handle.setLandPattern).toHaveBeenCalledWith(land);
-    expect(handle.setRenderMode).toHaveBeenCalledWith("realistic");
+    expect(handle.setRenderMode).toHaveBeenCalledWith("studio");
     expect(handle.setLayers).toHaveBeenCalledWith({
       model: true,
       pads: true,
@@ -270,10 +271,75 @@ describe("Glb3DView scene synchronization", () => {
     expect(handle.setPlacementMode).toHaveBeenCalledWith("auto");
     expect(screen.getByRole("group", { name: "Layers" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Appearance" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Source Color" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     expect(screen.getByRole("group", { name: "Motion" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Camera view" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Auto rotate" })).toHaveClass("min-h-[32px]");
     expect(screen.getByRole("button", { name: "Isometric" })).toHaveClass("min-h-[32px]");
+  });
+
+  it("reports visible only after the scene proves renderable geometry", async () => {
+    const handle = sceneHandle();
+    mountSpy.mockReturnValue(handle);
+    const onVisibilityChange = vi.fn();
+    wrap(
+      <Glb3DView
+        data={bytes}
+        isLoading={false}
+        isError={false}
+        onVisibilityChange={onVisibilityChange}
+      />,
+    );
+
+    await waitFor(() => expect(mountSpy).toHaveBeenCalled());
+    expect(onVisibilityChange).toHaveBeenCalledWith("checking");
+    expect(onVisibilityChange).not.toHaveBeenCalledWith("visible");
+
+    mountSpy.mock.calls[mountSpy.mock.calls.length - 1]?.[2]?.onReady?.();
+    expect(onVisibilityChange).toHaveBeenCalledWith("visible");
+  });
+
+  it("fits the whole visible model from the button and keyboard", async () => {
+    const handle = sceneHandle();
+    mountSpy.mockReturnValue(handle);
+    wrap(
+      <Glb3DView
+        data={bytes}
+        isLoading={false}
+        isError={false}
+        showViews
+      />,
+    );
+    await waitFor(() => expect(mountSpy).toHaveBeenCalled());
+
+    await userEvent.click(screen.getByRole("button", { name: "Fit" }));
+    const canvas = screen.getByRole("application", { name: /3d model inspection canvas/i });
+    canvas.focus();
+    await userEvent.keyboard("f");
+    expect(handle.fit).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the model usable when a legacy land response omits pad metadata", async () => {
+    const handle = sceneHandle();
+    mountSpy.mockReturnValue(handle);
+    const incompleteLand = { units: "mm" } as LandPattern;
+    wrap(
+      <Glb3DView
+        data={bytes}
+        isLoading={false}
+        isError={false}
+        land={incompleteLand}
+        showViews
+      />,
+    );
+
+    await waitFor(() => expect(mountSpy).toHaveBeenCalled());
+    expect(screen.getByTestId("model-canvas")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pads" })).not.toBeInTheDocument();
+    expect(handle.setLandPattern).not.toHaveBeenCalledWith(incompleteLand);
   });
 
   it("makes the compact viewer a passive auto-rotating specimen", async () => {

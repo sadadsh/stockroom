@@ -50,9 +50,10 @@ def test_register_discovers_files_and_commits(tmp_path):
 
 def test_register_resolves_git_root_by_walking_up(tmp_path):
     store = _store(tmp_path)
-    # a project two levels under a dir that holds .git
+    # a project two levels under a real repository
     workspace = tmp_path / "ws"
-    (workspace / ".git").mkdir(parents=True)
+    workspace_repo = GitRepo(workspace)
+    workspace_repo.init()
     proj_dir = _make_project(workspace / "boards" / "board")
     rec = store.register(proj_dir)
     assert rec.git_root == workspace.as_posix()
@@ -62,6 +63,23 @@ def test_register_reports_no_git_root_when_not_under_git(tmp_path):
     store = _store(tmp_path)
     proj_dir = _make_project(tmp_path / "loose" / "board")
     rec = store.register(proj_dir)
+    assert rec.git_root is None
+
+
+def test_register_does_not_borrow_an_enclosing_repo_that_ignores_the_project(
+    tmp_path,
+):
+    store = _store(tmp_path)
+    enclosing = tmp_path / "enclosing"
+    enclosing_repo = GitRepo(enclosing)
+    enclosing_repo.init()
+    ignore = enclosing / ".gitignore"
+    ignore.write_text("scratch/\n", encoding="utf-8")
+    enclosing_repo.commit("ignore scratch space", [ignore])
+    proj_dir = _make_project(enclosing / "scratch" / "board")
+
+    rec = store.register(proj_dir)
+
     assert rec.git_root is None
 
 

@@ -49,9 +49,10 @@ def test_release_workflow_parses_and_has_least_privilege_jobs() -> None:
 def test_every_external_action_is_pinned_to_an_exact_commit() -> None:
     references = re.findall(r"^\s*uses:\s*([^#\s]+)", WORKFLOW_TEXT, flags=re.MULTILINE)
     assert set(references) == {
-        "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-        "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
-        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+            "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
+            "actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1",
+            "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
         "astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86",
     }
     assert all(

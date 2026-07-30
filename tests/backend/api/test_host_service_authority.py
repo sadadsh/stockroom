@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.global_windows_mutex
+
 from stockroom.api.jobs import JobRunner, JobRunnerUnavailable
 from stockroom.host.service_authority import (
     ContextServiceAuthority,

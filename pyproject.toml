@@ -93,6 +93,8 @@ markers = [
     "live_enrich: hits the real network; deselected by default, opt-in only",
     "windows_only: needs a real Windows machine (WebView2, KiCad config surgery); skipped elsewhere",
     "requires_browser: test launches a real headless Chromium; skipped when Playwright/Chromium cannot launch",
+    "global_windows_mutex: test owns the one current-user Windows coordinator mutex and must run outside the parallel backend pool",
+    "performance_budget: wall-clock acceptance budget that must run without competing backend workers",
 ]
 
 [tool.ruff]

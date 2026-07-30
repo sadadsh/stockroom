@@ -2,7 +2,7 @@ import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PartSummary } from "../api/types";
-import { PartsList } from "./PartsList";
+import { partAttention, PartsList } from "./PartsList";
 
 const FIXTURE_VIEWPORT_HEIGHT = 640;
 // Count budget for a measured 640px list viewport: ~14 visible mixed-height items plus eight
@@ -54,7 +54,60 @@ function Harness({
   );
 }
 
+function StatefulHarness({
+  fixture,
+  onSelect,
+}: {
+  fixture: PartSummary[];
+  onSelect: (id: string) => void;
+}) {
+  const [selectedId, setSelectedId] = useState(fixture[0]?.id ?? null);
+  return (
+    <Harness
+      fixture={fixture}
+      selectedId={selectedId}
+      onSelect={(id) => {
+        setSelectedId(id);
+        onSelect(id);
+      }}
+    />
+  );
+}
+
 describe("PartsList virtualization", () => {
+  it("turns every incomplete-row warning into a reason and automatic next step", () => {
+    const fixture = parts(1);
+    const attention = partAttention({
+      ...fixture[0],
+      missing: ["kicad_model", "altium_footprint"],
+    });
+
+    expect(attention).toEqual({
+      reason: "Missing KiCad Model + Altium Footprint",
+      next: "Next: Collecting Evidence",
+      description:
+        "Needs Attention. Missing KiCad Model, Altium Footprint. Next: Stockroom will continue source collection and verification.",
+    });
+
+    render(
+      <Harness
+        fixture={[{ ...fixture[0], missing: ["kicad_model", "altium_footprint"] }]}
+        selectedId={fixture[0].id}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByRole("button", { name: /Part 0000/ });
+    const warning = row.querySelector(
+      '[data-dev-id="components.row-warn"]',
+    );
+    expect(warning).toHaveTextContent("Missing KiCad Model + Altium Footprint");
+    expect(warning).toHaveTextContent("Next: Collecting Evidence");
+    expect(row).toHaveAccessibleDescription(
+      /Stockroom will continue source collection and verification/,
+    );
+  });
+
   it("keeps a 1,000-part library's mounted DOM bounded while preserving row contracts", async () => {
     const fixture = parts(1_000);
     const onSelect = vi.fn();
@@ -174,5 +227,40 @@ describe("PartsList virtualization", () => {
       "true",
     );
     expect(screen.queryByRole("button", { name: /Part 0000/ })).toBeNull();
+  });
+
+  it("uses stable-id keyboard navigation without duplicate selection", async () => {
+    const fixture = parts(1_000);
+    const onSelect = vi.fn();
+    render(<StatefulHarness fixture={fixture} onSelect={onSelect} />);
+
+    const first = screen.getByRole("button", { name: /Part 0000/ });
+    expect(first).toHaveAttribute("aria-setsize", "1000");
+    expect(first).toHaveAttribute("aria-posinset", "1");
+    first.focus();
+
+    await userEvent.keyboard("{ArrowDown}");
+    const second = await screen.findByRole("button", { name: /Part 0001/ });
+    expect(second).toHaveAttribute("aria-current", "true");
+    expect(second).toHaveFocus();
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenLastCalledWith("part-0001");
+
+    const scroll = screen.getByTestId("parts-scroll");
+    await userEvent.keyboard("{End}");
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenLastCalledWith("part-0999");
+
+    // jsdom has no layout-backed scrollTo. Drive the same settled range event
+    // that the browser emits after the navigation helper scrolls to the tail.
+    scroll.scrollTop = 47_740;
+    fireEvent.scroll(scroll);
+
+    const last = await screen.findByRole("button", { name: /Part 0999/ });
+    expect(last).toHaveAttribute("aria-current", "true");
+    await waitFor(() => expect(last).toHaveFocus());
+
+    await userEvent.keyboard("{End}");
+    expect(onSelect).toHaveBeenCalledTimes(2);
   });
 });

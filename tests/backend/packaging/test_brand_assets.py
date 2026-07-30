@@ -7,12 +7,16 @@ from PIL import Image, ImageChops
 from PIL.IcoImagePlugin import IcoImageFile
 
 from packaging.brand_assets import (
-    ACTIVE_PAD,
+    FRONTEND_FAVICON,
     GRAPHITE,
     ICON_SIZES,
+    LEFT_FACE,
     PAPER,
+    RIGHT_FACE,
     SOURCE_ICON,
+    TOP_FACE,
     render_ico_bytes,
+    render_png,
 )
 
 
@@ -22,6 +26,7 @@ def test_tracked_icon_is_the_deterministic_brand_asset() -> None:
 
     assert first == second
     assert SOURCE_ICON.read_bytes() == first
+    assert FRONTEND_FAVICON.read_bytes() == first
     assert hashlib.sha256(first).hexdigest() == hashlib.sha256(second).hexdigest()
 
 
@@ -34,6 +39,7 @@ def test_icon_contains_every_windows_size_and_uses_only_grayscale() -> None:
         for size in ICON_SIZES:
             frame = icon.ico.getimage((size, size)).convert("RGBA")
             assert frame.size == (size, size)
+            assert ImageChops.difference(frame, render_png(size)).getbbox() is None
             red, green, blue, alpha = frame.split()
             midpoint = size // 2
             assert alpha.crop((0, 0, 1, 1)).getbbox() is None
@@ -42,8 +48,7 @@ def test_icon_contains_every_windows_size_and_uses_only_grayscale() -> None:
             assert ImageChops.difference(green, blue).getbbox() is None
 
 
-def test_brand_palette_has_clear_tile_pad_and_active_pad_tones() -> None:
-    assert GRAPHITE[0] < ACTIVE_PAD[0] < PAPER[0]
-    assert GRAPHITE[0] == GRAPHITE[1] == GRAPHITE[2]
-    assert ACTIVE_PAD[0] == ACTIVE_PAD[1] == ACTIVE_PAD[2]
-    assert PAPER[0] == PAPER[1] == PAPER[2]
+def test_brand_palette_is_grayscale_with_distinct_cube_planes() -> None:
+    assert GRAPHITE[0] < RIGHT_FACE[0] < LEFT_FACE[0] < TOP_FACE[0] < PAPER[0]
+    for color in (GRAPHITE, RIGHT_FACE, LEFT_FACE, TOP_FACE, PAPER):
+        assert color[0] == color[1] == color[2]

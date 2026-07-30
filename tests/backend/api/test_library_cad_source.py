@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from stockroom.model.part import Datasheet, PartRecord, Purchase
+from stockroom.capture.requirements import Requirement, split_requirement
+from stockroom.model.part import AssetRef, Datasheet, PartRecord, Purchase
+from stockroom.model.part_class import PartClass
 
 
 def _land_bare_part(app_ctx) -> str:
@@ -33,6 +35,62 @@ def test_cad_source_resolves_digikey_and_reports_needs(client, app_ctx):
     assert "kicad_footprint" in needs
     assert "altium_symbol" in needs
     assert "altium_footprint" in needs
+    assert body["completion_evidence"]["state"] == "unverified"
+    assert body["completion_evidence"]["manifest_digest"] is None
+    assert body["completion_evidence"]["reason"]
+
+
+def test_cad_source_does_not_treat_populated_bare_references_as_verified(
+    client,
+    app_ctx,
+):
+    part_id = _land_bare_part(app_ctx)
+    record = app_ctx.ops.load_record(part_id)
+    for owned in Requirement:
+        tool, kind = split_requirement(owned)
+        reference = (
+            AssetRef(file=f"{part_id}.step")
+            if kind == "model"
+            else AssetRef(lib="LooksPresent", name=record.mpn)
+        )
+        record.assets_for(tool).set(kind, reference)
+    (app_ctx.profile.library.parts_dir / f"{part_id}.json").write_text(
+        record.dumps(),
+        encoding="utf-8",
+    )
+    app_ctx.rebuild_index()
+
+    body = client.get(f"/api/library/parts/{part_id}/cad-source").json()
+
+    assert body["completion_evidence"]["state"] == "unverified"
+    assert body["completion_evidence"]["manifest_digest"] is None
+    assert body["needs"] == [requirement.value for requirement in Requirement]
+
+
+def test_cad_source_marks_a_passive_explicitly_not_required(client, app_ctx):
+    record = PartRecord(
+        id="",
+        display_name="10K",
+        category="Resistors",
+        description="generic passive",
+        value="10k",
+        mpn="RC0402FR-0710KL",
+        manufacturer="Yageo",
+        part_class=PartClass.PASSIVE,
+        datasheet=Datasheet(source_url="https://example.com/passive.pdf"),
+        purchase=[Purchase(vendor="Mouser", url="https://mouser.com/p/passive")],
+    )
+    landed = app_ctx.ops.add_reference_part(record)
+    app_ctx.rebuild_index()
+
+    body = client.get(f"/api/library/parts/{landed.id}/cad-source").json()
+
+    assert body["needs"] == []
+    assert body["completion_evidence"] == {
+        "state": "not-required",
+        "manifest_digest": None,
+        "reason": "this part class has no owned CAD requirements",
+    }
 
 
 def test_cad_source_unknown_part_is_404(client):

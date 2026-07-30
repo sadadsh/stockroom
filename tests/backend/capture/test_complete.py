@@ -8,20 +8,20 @@ lean hard on STREAMING, per-part isolation and resumability rather than on any o
 
 import pytest
 
+from stockroom.capture import complete as completion_engine
 from stockroom.capture.complete import (
+    CompletionEvidence,
     CompletionItem,
     ProviderOutcome,
     SourceOutcome,
-    complete_library,
-    complete_part,
-    iter_incomplete,
     sanitize_provider_reason,
-    sourceable_needs,
 )
-from stockroom.capture.requirements import Requirement
+from stockroom.capture.requirements import Requirement, capture_needs
 from stockroom.model.part import AssetRef, PartRecord
+from stockroom.model.part_class import PartClass
 
 ALL_REQUIREMENTS = tuple(Requirement)
+_TEST_MANIFEST = "sha256:" + ("0" * 64)
 
 
 def _rec(part_id="p1", **kw) -> PartRecord:
@@ -78,6 +78,38 @@ def _loader(records):
     return lambda pid: records[pid]
 
 
+def _test_evidence(record) -> CompletionEvidence:
+    """Simulate the immutable verifier for engine tests that do not build a CAS."""
+
+    if capture_needs(record):
+        return CompletionEvidence.unverified("the simulated bundle is incomplete")
+    return CompletionEvidence(
+        state="verified",
+        manifest_digest=_TEST_MANIFEST,
+        reason="the simulated immutable bundle was reverified",
+    )
+
+
+def complete_part(*args, **kwargs):
+    kwargs.setdefault("evidence_resolver", _test_evidence)
+    return completion_engine.complete_part(*args, **kwargs)
+
+
+def complete_library(*args, **kwargs):
+    kwargs.setdefault("evidence_resolver", _test_evidence)
+    return completion_engine.complete_library(*args, **kwargs)
+
+
+def sourceable_needs(*args, **kwargs):
+    kwargs.setdefault("evidence_resolver", _test_evidence)
+    return completion_engine.sourceable_needs(*args, **kwargs)
+
+
+def iter_incomplete(*args, **kwargs):
+    kwargs.setdefault("evidence_resolver", _test_evidence)
+    return completion_engine.iter_incomplete(*args, **kwargs)
+
+
 # --- what a part still needs, filtered to what a source could actually give it ---------
 
 
@@ -94,8 +126,7 @@ def test_sourceable_needs_only_reports_what_a_registered_source_can_supply():
 
 def test_sourceable_needs_is_empty_when_the_part_already_has_those_assets():
     rec = _rec()
-    rec.assets_for("kicad").set("symbol", AssetRef(lib="L", name="N"))
-    rec.assets_for("kicad").set("footprint", AssetRef(lib="L", name="N"))
+    _fill_all_assets(rec)
     src = FakeSource("k", [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT])
     assert sourceable_needs(rec, [src]) == []
 
@@ -123,6 +154,69 @@ def test_complete_part_runs_sources_until_the_needs_are_met():
     assert item.satisfied == [requirement.value for requirement in ALL_REQUIREMENTS]
     assert item.remaining == []
     assert item.sources == ["complete"]
+    assert item.completion_evidence.state == "verified"
+    assert item.to_dict()["completion_evidence"] == {
+        "state": "verified",
+        "manifest_digest": _TEST_MANIFEST,
+        "reason": "the simulated immutable bundle was reverified",
+    }
+
+
+def test_bare_references_and_a_satisfied_claim_cannot_complete_without_evidence():
+    rec = _rec()
+    records = {"p1": rec}
+    source = FakeSource("presence-only", ALL_REQUIREMENTS)
+
+    item = completion_engine.complete_part(
+        "p1",
+        load_record=_loader(records),
+        sources=[source],
+    )
+
+    assert capture_needs(rec) == []
+    assert item.status == "unchanged"
+    assert item.satisfied == []
+    assert item.remaining == [requirement.value for requirement in ALL_REQUIREMENTS]
+    assert item.completion_evidence.state == "unverified"
+    assert item.completion_evidence.manifest_digest is None
+
+
+def test_evidence_resolver_exception_fails_closed_after_files_land():
+    rec = _rec()
+    source = FakeSource("presence-only", ALL_REQUIREMENTS)
+
+    def broken_evidence(_record):
+        raise RuntimeError("simulated verifier failure")
+
+    item = completion_engine.complete_part(
+        "p1",
+        load_record=_loader({"p1": rec}),
+        sources=[source],
+        evidence_resolver=broken_evidence,
+    )
+
+    assert capture_needs(rec) == []
+    assert item.status == "unchanged"
+    assert item.remaining == [requirement.value for requirement in ALL_REQUIREMENTS]
+    assert item.completion_evidence.state == "unverified"
+    assert "RuntimeError" in item.completion_evidence.reason
+
+
+@pytest.mark.parametrize("part_class", [PartClass.PASSIVE, PartClass.VIRTUAL])
+def test_no_owned_cad_is_explicitly_not_required(part_class: PartClass):
+    rec = _rec(part_class=part_class)
+
+    item = completion_engine.complete_part(
+        "p1",
+        load_record=_loader({"p1": rec}),
+        sources=[],
+    )
+
+    assert item.status == "already-complete"
+    assert item.needed == []
+    assert item.remaining == []
+    assert item.completion_evidence.state == "not-required"
+    assert item.completion_evidence.manifest_digest is None
 
 
 def test_complete_part_reports_improved_when_only_some_needs_were_met():
@@ -136,8 +230,10 @@ def test_complete_part_reports_improved_when_only_some_needs_were_met():
         fills=[Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT],
     )
     item = complete_part("p1", load_record=_loader(records), sources=[src])
-    assert item.status == "improved"
+    assert item.status == "unchanged"
     assert item.remaining == [
+        "kicad_symbol",
+        "kicad_footprint",
         "kicad_model",
         "altium_symbol",
         "altium_footprint",
@@ -432,15 +528,16 @@ def test_a_source_that_raises_is_caught_and_the_next_source_still_runs():
     assert item.sources == ["passive"]
 
 
-def test_a_later_source_is_skipped_once_its_requirements_are_already_met():
-    # Sources are ordered cheapest-first (offline decode before a network fetch). Running an
-    # expensive one for an asset that already landed is pure waste at 10k parts.
+def test_a_later_source_is_not_skipped_while_prior_references_remain_unverified():
+    # Presence cannot suppress a later evidence-capable source. The first source populated
+    # two references but did not establish a terminal immutable bundle.
     rec = _rec()
     first = FakeSource("offline", [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT])
     second = FakeSource("network", [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT])
     item = complete_part("p1", load_record=_loader({"p1": rec}), sources=[first, second])
-    assert second.calls == []
-    assert item.sources == ["offline"]
+    assert second.calls == ["p1"]
+    assert item.sources == []
+    assert item.completion_evidence.state == "unverified"
 
 
 def test_a_later_source_receives_the_record_persisted_by_the_previous_source():
@@ -480,7 +577,8 @@ def test_a_later_source_receives_the_record_persisted_by_the_previous_source():
     assert observed == [records["p1"]]
     assert observed[0] is not stale
     assert observed[0].assets_for("kicad").symbol is not None
-    assert item.satisfied == ["kicad_symbol"]
+    assert item.satisfied == []
+    assert item.completion_evidence.state == "unverified"
 
 
 def test_a_part_that_cannot_be_loaded_is_a_row_not_an_abort():
@@ -594,7 +692,7 @@ def test_report_counts_group_by_status():
 # --- deriving the worklist from the library ---------------------------------------------
 
 
-def test_iter_incomplete_yields_only_parts_a_source_could_help_and_stays_lazy(tmp_path):
+def test_iter_incomplete_keeps_present_but_unverified_parts_and_stays_lazy(tmp_path):
     parts = tmp_path / "parts"
     parts.mkdir()
     full = _rec("full")
@@ -609,7 +707,7 @@ def test_iter_incomplete_yields_only_parts_a_source_could_help_and_stays_lazy(tm
         parts, load_record=lambda pid: {"full": full, "empty": empty}[pid], sources=[src]
     )
     assert not isinstance(got, list)  # a generator: 10k records are never all in memory
-    assert list(got) == ["empty"]
+    assert list(got) == ["empty", "full"]
 
 
 def test_iter_incomplete_skips_an_unreadable_record_instead_of_dying(tmp_path):

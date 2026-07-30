@@ -11,6 +11,37 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $failures = [System.Collections.Generic.List[string]]::new()
 
+function Resolve-DotNetSdk {
+    $requiredVersion = (
+        Get-Content -Raw -LiteralPath (Join-Path $projectRoot 'global.json') |
+            ConvertFrom-Json
+    ).sdk.version
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    $command = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue
+    if ($command) {
+        $candidates.Add($command.Source)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:DOTNET_ROOT)) {
+        $rootExecutable = Join-Path $env:DOTNET_ROOT 'dotnet.exe'
+        if (Test-Path -LiteralPath $rootExecutable -PathType Leaf) {
+            $candidates.Add($rootExecutable)
+        }
+    }
+    $workspaceLauncher = 'D:\Workspace\System\Capabilities\Bin\dotnet-sdk.cmd'
+    if (Test-Path -LiteralPath $workspaceLauncher -PathType Leaf) {
+        $candidates.Add($workspaceLauncher)
+    }
+
+    foreach ($candidate in @($candidates | Select-Object -Unique)) {
+        $version = & $candidate --version 2>$null
+        if ($LASTEXITCODE -eq 0 -and $version -ceq $requiredVersion) {
+            Write-Host ".NET SDK: $version ($candidate)"
+            return $candidate
+        }
+    }
+    throw ".NET SDK $requiredVersion is required by global.json"
+}
+
 function Enable-KiCadCli {
     $command = Get-Command kicad-cli -CommandType Application -ErrorAction SilentlyContinue
     if (-not $command) {
@@ -129,7 +160,9 @@ try {
     }
 
     Invoke-Checked 'GitHub Actions Workflows' {
-        $actionlint = Get-Command actionlint -CommandType Application -ErrorAction SilentlyContinue
+        $actionlint = @(
+            Get-Command actionlint -CommandType Application -ErrorAction SilentlyContinue
+        )[0]
         if (-not $actionlint) {
             throw 'actionlint is required; install rhysd.actionlint with winget'
         }
@@ -141,9 +174,30 @@ try {
     Invoke-Checked 'Backend Type Check' {
         & uv run ty check app\backend\stockroom
     }
-    Invoke-Checked 'Backend Tests' {
+    Invoke-Checked 'Native Window Host Tests' {
+        $dotnetSdk = Resolve-DotNetSdk
+        & $dotnetSdk restore `
+            tests\native\Stockroom.WindowHost.Tests\Stockroom.WindowHost.Tests.csproj `
+            --locked-mode `
+            --nologo
+        if ($LASTEXITCODE -ne 0) {
+            return
+        }
+        & $dotnetSdk test `
+            tests\native\Stockroom.WindowHost.Tests\Stockroom.WindowHost.Tests.csproj `
+            --configuration Release `
+            --no-restore `
+            --nologo
+    }
+    Invoke-Checked 'Backend Tests - Parallel Safe' {
         & uv run pytest tests\backend -q -p no:randomly `
+            -m 'not live_enrich and not global_windows_mutex and not performance_budget' `
             --dist loadgroup -n $Workers
+    }
+    Invoke-Checked 'Backend Tests - Serialized Windows And Budgets' {
+        & uv run pytest tests\backend -q -p no:randomly `
+            -m 'not live_enrich and (global_windows_mutex or performance_budget)' `
+            -n 0
     }
     Invoke-Checked 'Frontend Tests' {
         & npm.cmd --prefix app\frontend run test:run

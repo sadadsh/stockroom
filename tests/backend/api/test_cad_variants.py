@@ -317,10 +317,44 @@ def test_inventory_lists_every_variant_but_only_exact_shared_manifests_as_pairs(
         (pair["kicadVariantId"], pair["altiumVariantId"])
         for pair in document["pairs"]
     } == {(ultra, ultra), (snap, snap)}
+    variants = [
+        variant
+        for inventory in inventories.values()
+        for variant in inventory["variants"]
+    ]
+    assert variants
+    assert all(variant["verificationState"] == "reverified" for variant in variants)
+    assert all("validationChecks" not in variant for variant in variants)
+    assert all(
+        pair["verificationState"] == "reverified"
+        for pair in document["pairs"]
+    )
     assert all(
         pair["trustLabel"] == "Same-Download Validated Pair"
         for pair in document["pairs"]
     )
+
+
+def test_tampered_evidence_cannot_emit_a_reverified_inventory(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    store, identity = _evidence(app_ctx, tmp_path, monkeypatch)
+    _record_pair(
+        store,
+        identity,
+        provider="ultralibrarian",
+        marker="tamper-target",
+    )
+    symbol = store.list_role_variants(identity=identity, role="symbol")[0]
+    store.object_path(symbol.artifact_digest).write_bytes(b"tampered")
+
+    response = client.get("/api/library/parts/tps62130/cad-variants")
+
+    assert response.status_code == 500
+    assert "reverified" not in response.text
 
 
 def test_pair_activation_materializes_all_five_roles_and_both_pointers(

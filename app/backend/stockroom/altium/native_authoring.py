@@ -32,6 +32,7 @@ from typing import Literal
 import olefile
 
 from stockroom.domain import CanonicalPassiveBundle
+from stockroom.templates import representative_passive_template
 
 from .driver import AltiumDriver
 from .embed3d import delphi_quote, model_name_present, read_model_index
@@ -39,20 +40,25 @@ from .oleread import read_footprint_names, read_symbol_names
 
 Bootstrap = Literal["factory", "workspace"]
 
-_SUPPORTED_PACKAGE = "SMA (DO-214AC)"
-_SUPPORTED_TEMPLATES = (
-    "shared.passive.diode.two_pin.v1",
-    "shared.passive.diode.sma_do_214ac.v1",
+_SUPPORTED_PROFILE = representative_passive_template()
+_SUPPORTED_PACKAGE = _SUPPORTED_PROFILE.package
+_SUPPORTED_BODY = (
+    _SUPPORTED_PROFILE.body_min_x_nm,
+    _SUPPORTED_PROFILE.body_min_y_nm,
+    _SUPPORTED_PROFILE.body_max_x_nm,
+    _SUPPORTED_PROFILE.body_max_y_nm,
 )
-_SUPPORTED_BODY = (-1_000_000, -500_000, 1_000_000, 500_000)
-_SUPPORTED_TERMINALS = (
-    ("1", "cathode", -2_540_000, 0, 0, "passive"),
-    ("2", "anode", 2_540_000, 0, 180_000_000, "passive"),
+_SUPPORTED_TERMINALS = tuple(
+    (
+        terminal.number,
+        terminal.role,
+        terminal.x_nm,
+        terminal.y_nm,
+        terminal.rotation_udeg,
+        terminal.electrical_type,
+    )
+    for terminal in _SUPPORTED_PROFILE.terminals
 )
-_SUPPORTED_TOOL_TERMINALS = {
-    "kicad": ("1", "2"),
-    "altium": ("C", "A"),
-}
 _ROLE_PIN_NAME = {"cathode": "K", "anode": "A"}
 _IDENTIFIER_SLUG_LIMIT = 40
 _MAX_ALTIUM_IDENTIFIER_LENGTH = 104
@@ -93,32 +99,6 @@ class NativeAuthoringResult:
     @property
     def ok(self) -> bool:
         return self.status == "ok"
-
-
-def _template_contract_digest(template_id: str, kind: str) -> str:
-    payload = json.dumps(
-        {
-            "kind": kind,
-            "schema_version": 1,
-            "template_id": template_id,
-        },
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-    return f"sha256:{hashlib.sha256(payload).hexdigest()}"
-
-
-def _supported_template_contracts() -> tuple[tuple[str, str, str], tuple[str, str, str]]:
-    symbol_id, footprint_id = _SUPPORTED_TEMPLATES
-    return (
-        (symbol_id, "symbol", _template_contract_digest(symbol_id, "symbol")),
-        (
-            footprint_id,
-            "footprint",
-            _template_contract_digest(footprint_id, "footprint"),
-        ),
-    )
 
 
 def _validated_supported_bundle(
@@ -178,16 +158,24 @@ def _validated_supported_bundle(
         )
         for tool, binding in bindings.items()
     }
+    expected_templates = tuple(
+        (template.template_id, template.kind, template.contract_digest)
+        for template in _SUPPORTED_PROFILE.artifacts
+    )
     expected_bindings = {
-        tool: (*_SUPPORTED_TEMPLATES, terminals)
-        for tool, terminals in _SUPPORTED_TOOL_TERMINALS.items()
+        binding.tool: (
+            binding.symbol_template_id,
+            binding.footprint_template_id,
+            tuple(terminal.tool_terminal for terminal in binding.terminal_bindings),
+        )
+        for binding in _SUPPORTED_PROFILE.tool_bindings
     }
 
     if (
         checked.definition.definition_kind != "two_pin_passive"
-        or checked.definition.functional_kind != "diode"
+        or checked.definition.functional_kind != _SUPPORTED_PROFILE.functional_kind
         or package != _SUPPORTED_PACKAGE
-        or templates != _supported_template_contracts()
+        or templates != expected_templates
         or body_contract != _SUPPORTED_BODY
         or terminal_contract != _SUPPORTED_TERMINALS
         or binding_contract != expected_bindings

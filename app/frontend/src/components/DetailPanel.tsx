@@ -1,13 +1,12 @@
 /**
  * The part detail view, laid out as a bench workstation rather than a stack of cards.
  *
- * A fixed LEFT rail is the specimen card: the one identity (a derived headline + the MPN
+ * A fixed LEFT rail is the specimen card: the one identity (the canonical display name + the MPN
  * serial + manufacturer, all editable in place), the 3D object as the hero with its symbol
  * and footprint as supporting embodiments, and a single readiness read (KiCad / Altium, what
- * each still needs) with the one Complete Part action. The RIGHT workbench is a tabbed panel
- * (Overview / Representations / Sources / Activity) so the reference depth lives in one panel
- * height and never pushes the page into a long scroll. A slim footer carries the filing
- * (category) control and the quiet Delete.
+ * each still needs). The RIGHT workbench is organized by the questions a librarian asks:
+ * Identity / Readiness / Evidence / Activity. Component-wide completion and destructive actions
+ * stay in the title strip; field, projection, and background actions stay beside their scope.
  *
  * Identity is stated exactly once (the old Overview card is gone), assets read as one strip
  * instead of a tall rail, and the spec sheet no longer dominates the page. Everything degrades
@@ -22,12 +21,13 @@ import {
 } from "react";
 import type {
   Asset,
+  EdaReadinessSummary,
   PartDetail,
   PurchaseRef,
   SourcedAlternate,
   SourcedField,
 } from "../api/types";
-import { deriveTitle, isReferenceOnlySpecKey } from "../lib/derive";
+import { isReferenceOnlySpecKey } from "../lib/derive";
 import { useCapture } from "../lib/capture";
 import {
   groupSpecs,
@@ -51,7 +51,9 @@ import {
   assetsFor,
   assetTitleLabel,
   neededKinds,
+  summaryReadiness,
   type AssetReadiness,
+  type SummaryReadiness,
 } from "../lib/edaTarget";
 import { EDA_TOOLS, partClass } from "../lib/edaRegistry.generated";
 import { useInlineEdit } from "../lib/useInlineEdit";
@@ -61,8 +63,8 @@ import { EnrichPanel } from "./EnrichPanel";
 import { CompactPinoutCard, parsePinout } from "./PinoutViewer";
 import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { PreviewImage } from "./PreviewImage";
 import { HandoffBand } from "./HandoffBand";
+import { ComponentInspectionStage } from "./ComponentInspectionStage";
 import {
   type PinnedSpecs,
   effectiveKeySpecKeys,
@@ -75,39 +77,30 @@ import {
 } from "../lib/keySpecs";
 import { readPref, writePref } from "../lib/uiPrefs";
 import { PhotoTrigger, partPhotos } from "./ProductPhoto";
-import { Glb3DView } from "./Glb3DView";
 import {
   useAltiumEmbedCapability,
   useAltiumEmbedModel,
   useCadSourceQuery,
   useDetachAsset,
-  useLandPattern,
-  usePreviewGlb,
   useRefreshSourcing,
 } from "../api/queries";
 import { useToast } from "../lib/toast";
-import { PreviewModal, type PreviewKind } from "./PreviewModal";
 import { CompletePartModal } from "./CompletePartModal";
 import { CadVariantSection } from "./CadVariantSection";
 import {
-  CubeArt,
   ExternalIcon,
-  EyeIcon,
-  FootprintArt,
   RefreshIcon,
-  SymbolArt,
   TrashIcon,
-  UploadIcon,
   WarnIcon,
 } from "./icons";
 import {
   EYEBROW_DENSE,
-  IconButton,
   TabStrip,
   tabButtonId,
   tabPanelId,
   type TabItem,
 } from "./primitives";
+import { readUiSession, updateUiSession } from "../lib/uiSession";
 
 // Spec presentation (grouping into Electrical / Physical / Ratings / Other, hidden-key and
 // empty-value filtering, value+unit split) lives in lib/specSchema, shared with the parametric
@@ -170,7 +163,13 @@ function sourceLabel(asset: Asset | null | undefined): string {
  * tool-neutral Asset/Origin/Check contract visible without forcing Altium through KiCad-shaped
  * cards or reducing provenance to a decorative source badge.
  */
-function RepresentationMatrix({ detail }: { detail: PartDetail }) {
+function RepresentationMatrix({
+  detail,
+  edaReadiness,
+}: {
+  detail: PartDetail;
+  edaReadiness?: Record<string, EdaReadinessSummary>;
+}) {
   const kinds = Array.from(new Set(EDA_TOOLS.flatMap((tool) => tool.assetKinds)));
 
   return (
@@ -198,7 +197,7 @@ function RepresentationMatrix({ detail }: { detail: PartDetail }) {
         </div>
         {EDA_TOOLS.map((tool) => {
           const bundle = assetsFor(detail, tool.key);
-          const readiness = assetReadiness(detail, tool.key);
+          const readiness = summaryReadiness({ eda_readiness: edaReadiness }, tool.key);
           const requiredKinds = new Set(
             neededKinds(detail, tool.key, partClass(detail.part_class)),
           );
@@ -211,7 +210,13 @@ function RepresentationMatrix({ detail }: { detail: PartDetail }) {
               <div className="flex min-h-14 flex-col justify-center px-3 py-2">
                 <div className="truncate text-2xs font-semibold text-t1">{tool.label}</div>
                 <div className={`text-2xs ${readiness.ready ? "text-ok" : "text-warn"}`}>
-                  {readiness.ready ? "Ready" : `${readiness.missing.length} needed`}
+                  {readiness.ready
+                    ? "Ready"
+                    : readiness.trust === "fail"
+                      ? "Verification failed"
+                      : readiness.missing.length > 0
+                        ? `${readiness.missing.length} needed`
+                        : "Unverified"}
                 </div>
               </div>
               {kinds.map((kind) => {
@@ -348,37 +353,21 @@ function KeySpecificationsBlock({
   // below. Derived from the same call that produced `rows`, never recomputed, or the two could
   // disagree the moment either rule changed.
   const effective = effectiveKeySpecKeys(groups, category, pinned);
-  // Nothing to lead with: render NOTHING rather than an empty card. A titled card with no rows in the
-  // sheet's most prominent slot reads as a failure, which is exactly what the old empty-state faults
-  // in the punch list were about.
+  // Nothing to lead with: render nothing rather than a titled empty region.
   if (rows.length === 0) return null;
   return (
-    // DISTINCT from the Specifications list below, and it has to be: since the owner reversed to
-    // "copy the specifications", the same row appears in both places, and two identically-styled
-    // lists showing one fact read as a bug rather than as a summary. So this is a CARD OF CELLS -
-    // label above value, two across, on a tinted surface - against a plain label-left/value-right
-    // list. It is deliberately the cell treatment the owner already accepted in this very slot when
-    // the EDA handoff band lived here, so it is new to the reader without being unfamiliar.
-    // (dev-id stays `detail.key-specs`: it is an internal handle, and renaming it churns the
-    // catalogue's count gate for no reader-visible gain.)
     <section
       data-dev-id="detail.key-specs"
       aria-label="Key Specifications"
-      className="@container mb-3 flex flex-none flex-col rounded-card border border-line bg-surface"
+      className="@container mb-3 flex flex-none flex-col"
     >
-      <header className="flex h-6 items-center gap-2.5 border-b border-line px-3">
-        <span className="text-xs font-semibold text-t1">
+      <header className="mb-1 flex h-6 items-center gap-2.5">
+        <span className="text-ui-heading font-semibold text-ink">
           <Text id="detail.top-specifications">Key Specifications</Text>
         </span>
-        <span className="truncate text-2xs text-t3">Recommended and pinned</span>
-        {/* A PIN, marking what this block IS: the rows pinned up out of the list below. Owner,
-            2026-07-26, replacing the "What This Part Is" caption that used to sit here - the caption
-            explained the block in words, the pin says the same thing in the same glyph the row
-            control uses, and it does not compete with the section title for the eye.
-            NOT a button: pinning happens on the rows themselves, and a control here would imply an
-            action this header does not have. */}
+        <span className="truncate text-ui-caption text-helper">Recommended and pinned</span>
         <span
-          className="ml-auto flex-none text-t3"
+          className="ml-auto flex-none text-helper"
           title="Pinned and recommended specifications"
           aria-hidden="true"
         >
@@ -389,24 +378,19 @@ function KeySpecificationsBlock({
           </svg>
         </span>
       </header>
-      {/* gap-px on a line-coloured background draws the cell grid with no per-cell borders */}
-      <div className="grid grid-cols-1 gap-px bg-line @sm:grid-cols-2">
+      <dl className="grid grid-cols-1 gap-x-5 @sm:grid-cols-2">
         {rows.map((row) => (
-          <div key={row.key} className="group relative flex flex-col gap-0.5 bg-surface px-3 py-2">
-            <span className={EYEBROW_DENSE + " truncate"} title={row.label}>
+          <div
+            key={row.key}
+            className="group relative grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line/60 py-1.5"
+          >
+            <dt className="truncate text-ui-caption text-copy" title={row.label}>
               {row.label}
-            </span>
-            <span className="tnum break-words font-mono text-sm font-medium leading-tight text-t1">
+            </dt>
+            <dd className="tnum min-w-0 break-words pr-5 text-right font-mono text-ui-body font-semibold text-ink">
               <SpecValue value={row.unit ? `${row.value} ${row.unit}` : row.value} />
-            </span>
-            {/* corner-anchored so it never displaces the value it belongs to */}
-            {/* Only a row the USER pinned carries a star up here, and it is the control that takes
-                it back down. A curated row gets NONE: every row in this block is by definition in
-                this block, so a star on each says nothing the header's pin has not already said,
-                and five identical filled stars that cannot be pressed are noise that looks like
-                five controls. The star that carries information is the one in the list BELOW,
-                where it distinguishes a row already up here from one that is not. */}
-            <span className="absolute right-1.5 top-1.5">
+            </dd>
+            <span className="absolute right-0 top-1">
               {isCuratedOnly(effective, pinned, category, row.key) ? null : (
                 <PinStar
                   pinned={isPinned(pinned, category, row.id ?? row.key)}
@@ -417,17 +401,7 @@ function KeySpecificationsBlock({
             </span>
           </div>
         ))}
-        {/* AN ODD NUMBER OF CELLS LEAVES A PAINTED HOLE. The grid draws its own rules by sitting on
-            `bg-line` and letting a 1px gap show through between `bg-surface` cells - which means any
-            grid AREA with no cell in it shows that line colour at FULL SIZE, not as a line. With
-            five curated specs the second column of the last row was a solid block of border colour,
-            reading as a broken or still-loading tile in both themes. This fills it with the surface
-            the cells use, and exists ONLY at the two-column breakpoint, because at one column every
-            row is full and a filler would add an empty cell of its own. */}
-        {rows.length % 2 === 1 ? (
-          <div aria-hidden="true" className="hidden bg-surface @sm:block" />
-        ) : null}
-      </div>
+      </dl>
     </section>
   );
 }
@@ -458,6 +432,30 @@ export function panesTemplate(specsOpen: boolean, sourcingOpen: boolean): string
   if (specsOpen) return `320px minmax(16rem,1fr) ${rail}`;
   if (sourcingOpen) return `320px ${rail} minmax(16rem,1fr)`;
   return `minmax(320px,1fr) ${rail} ${rail}`;
+}
+
+/**
+ * Whether Sourcing has evidence worth reserving a full pane for.
+ *
+ * A bare purchase object is not evidence: importers can retain an empty shell while collection is
+ * pending. A URL, stock answer, price ladder, or a real trade/compliance fact is enough. This pure
+ * predicate is shared by the initial-collapse behavior and its regression test.
+ */
+export function hasRecordedSourcing(
+  detail: PartDetail | null | undefined,
+): boolean {
+  if (!detail) return false;
+  const hasPurchaseEvidence = detail.purchase.some(
+    (purchase) =>
+      Boolean(purchase.url?.trim()) ||
+      purchase.stock != null ||
+      purchase.price_breaks.length > 0,
+  );
+  const hasTradeEvidence = groupSpecs(
+    detail.derived.category,
+    detail.derived.specs,
+  ).some((group) => group.title === TRADE_GROUP && group.rows.length > 0);
+  return hasPurchaseEvidence || hasTradeEvidence;
 }
 
 /**
@@ -579,6 +577,9 @@ function PinStar({
 
 interface Props {
   detail: PartDetail | undefined;
+  // The detail endpoint returns the raw record. Verified per-tool readiness belongs
+  // to the list-summary DTO and is passed alongside it; absence must fail closed.
+  edaReadiness?: Record<string, EdaReadinessSummary>;
   isLoading: boolean;
   error: Error | null;
   missing: string[];
@@ -608,6 +609,7 @@ interface Props {
 
 export function DetailPanel({
   detail,
+  edaReadiness,
   isLoading,
   error,
   missing,
@@ -621,11 +623,11 @@ export function DetailPanel({
   busy = false,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Which preview is expanded in the in-window modal (null = closed). The modal has
-  // tabs, so this is only the tab it opens on.
-  const [preview, setPreview] = useState<PreviewKind | null>(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
   // The one Complete-Part window (adds every missing file + data field in one place) - open flag.
-  const [completeOpen, setCompleteOpen] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(
+    () => readUiSession().open_surface === "complete_part",
+  );
   // Finish the background-pill reopen handoff: when the pill asked to reopen THIS part (the page
   // already selected it), open the Complete-Part window and clear the intent.
   const { reopenPartId, clearReopen } = useCapture();
@@ -637,7 +639,33 @@ export function DetailPanel({
   }, [reopenPartId, detail?.id, clearReopen]);
   // Which workbench tab is showing. It resets to Specs whenever the active id falls out
   // of the available set (a part switch that drops the Pinout / Enrich tab).
-  const [tab, setTab] = useState<WorkbenchTab>("specs");
+  const [tab, setTab] = useState<WorkbenchTab>(
+    () => readUiSession().detail_tab,
+  );
+  useEffect(() => {
+    const current = readUiSession();
+    const surface = completeOpen
+      ? "complete_part"
+      : current.open_surface === "complete_part"
+        ? null
+        : current.open_surface;
+    if (
+      current.detail_tab === tab &&
+      current.open_surface === surface &&
+      (!detail?.id || current.selected_ids.component === detail.id)
+    ) {
+      return;
+    }
+    updateUiSession((snapshot) => ({
+      ...snapshot,
+      selected_ids: {
+        ...snapshot.selected_ids,
+        component: detail?.id ?? snapshot.selected_ids.component,
+      },
+      detail_tab: tab,
+      open_surface: surface,
+    }));
+  }, [completeOpen, detail?.id, tab]);
   // Pinned specs, per category, persisted through the machine config like the theme and the rail:
   // localStorage alone resets on every launch because the host binds an ephemeral port (uiPrefs.ts).
   const [pinnedSpecs, setPinnedSpecs] = useState<PinnedSpecs>(readPinnedSpecs);
@@ -672,16 +700,10 @@ export function DetailPanel({
   // different photograph was preserved in `alternates["Image"]` and shown to nobody. Still hidden
   // until clicked - it is the trigger that got bigger, not the default state.
   const partPhotoSet = partPhotos(detail?.derived.specs, detail?.alternates);
-  // Inline 3D render (C1/C2): fetch + render the GLB right in the hero, auto-rotating and
-  // pointer-events-none so it never fights the tile's own click. Enabled only for a part that
-  // actually has a model, so a model-less part pays nothing.
-  const modelGlb = usePreviewGlb(detail?.id ?? "", hasModel);
-  const landPattern = useLandPattern(detail?.id ?? "", hasModel);
   // Warm the cad-source (DigiKey URL) cache so the Complete Part window opens instantly; its
-  // result is NOT used for readiness anymore. Readiness (incl. Altium) reads the part RECORD via
-  // assetReadiness, so it refreshes on the clean ["part", id] invalidation after an attach - the
-  // old cad-source-derived Altium needs went stale and left a captured part stuck on "CAD
-  // Incomplete" (live 2026-07-24). Prefetch only; a failure never affects the readiness display.
+  // result is NOT a readiness verdict. Verified tool state arrives through the list summary,
+  // while the raw record below is used only to plan missing-asset actions. Prefetch only; a
+  // failure never affects the readiness display.
   useCadSourceQuery(detail?.id ?? null, true);
   // The per-part sourcing refresh (POST .../refresh): a write-lane job re-pulling
   // price/stock/lifecycle from the distributor APIs. Its outcome reports through the
@@ -708,14 +730,27 @@ export function DetailPanel({
   // This exact trap already cost this file 11 test failures once (a `useMemo` for the promoted-spec
   // set, placed below these same returns), and it caught this slice too.
   const [specsOpen, setSpecsOpen] = useState(true);
-  const [sourcingOpen, setSourcingOpen] = useState(true);
+  const [sourcingOpen, setSourcingOpen] = useState(() =>
+    hasRecordedSourcing(detail),
+  );
   const refreshStatus = refreshJob.status;
   const refreshError = refreshJob.error;
+  const sourcingHasEvidence = hasRecordedSourcing(detail);
   useEffect(() => {
     if (refreshStatus === "done") toast("Sourcing refreshed.", "ok");
     else if (refreshStatus === "error")
       toast(refreshError || "Could not refresh sourcing.", "err");
   }, [refreshStatus, refreshError, toast]);
+  useEffect(() => {
+    if (!detail) return;
+    // Empty evidence does not permanently occupy a third of the workbench. Running and failed
+    // background collection open the pane because their progress/recovery belongs beside Sourcing.
+    setSourcingOpen(
+      sourcingHasEvidence ||
+        refreshStatus === "running" ||
+        refreshStatus === "error",
+    );
+  }, [detail?.id, refreshStatus, sourcingHasEvidence]);
   if (isLoading) {
     return <PanelMessage>Loading part...</PanelMessage>;
   }
@@ -730,11 +765,13 @@ export function DetailPanel({
     return <PanelMessage>Select a part to see its details.</PanelMessage>;
   }
 
-  // Per-tool readiness read straight off the part RECORD (KiCad from symbol/footprint/model,
-  // Altium from altium_symbol/altium_footprint) - so an attach refreshes it on the ["part", id]
-  // invalidation. Declared before the needs derivation below, which reads altium.missing.
+  // Local asset coverage is used to plan capture/embed/remove actions. It is deliberately
+  // separate from the backend summary evidence that grants Ready below: presence alone is not
+  // verification. Declared before the needs derivation, which reads altium.missing.
   const kicad = assetReadiness(detail, "kicad");
   const altium = assetReadiness(detail, "altium");
+  const kicadEvidence = summaryReadiness({ eda_readiness: edaReadiness }, "kicad");
+  const altiumEvidence = summaryReadiness({ eda_readiness: edaReadiness }, "altium");
 
   // The Altium 3D embed affordance. Every precondition is a real one, and each has its own
   // message: a 3D body is written INTO the footprint's .PcbLib, so there must be a footprint to
@@ -791,14 +828,11 @@ export function DetailPanel({
   // callback here: symbols, footprints, and models arrive through the network collection flow.
   const canComplete = !!onEditField;
 
-  const derived = deriveTitle(detail);
-  const name = detail.derived.display_name.trim();
-  // The headline is the best HUMAN name: a passive gets its derived spec title
-  // ("0.1 µF X7R Capacitor"); an opaque part whose title fell back to the MPN shows its
-  // display name instead when that carries something the MPN does not, so the MPN never
-  // headlines AND reads again on the serial line below.
-  const titleIsMpn = derived === detail.mpn.trim();
-  const headline = titleIsMpn && name && name !== detail.mpn.trim() ? name : derived;
+  // One canonical identity across the picker, Search, this header, and downstream EDA projection.
+  // The description below explains what the component is; parametric prose never silently replaces
+  // the record's display name and creates a third name for the same selected entry.
+  const canonicalName =
+    detail.derived.display_name.trim() || detail.mpn.trim() || "Unnamed Component";
   // Grouped, extensible spec sheet (Electrical / Physical / Ratings / Other) from lib/specSchema,
   // with catalog metadata (manufacturer, country, packaging, ...) dropped so the sheet is the
   // physical parameters, not a distributor page. Groups emptied by the filter fall away.
@@ -836,18 +870,14 @@ export function DetailPanel({
   const pinout = parsePinout(detail.derived.specs);
   const pinoutProvenance = detail.enrichment?.pinout;
 
-  // Pinout belongs beside the component's CAD representations in the specimen rail, where it
-  // remains visible without adding another top-level destination. Sources is present only in
-  // editable mode with an MPN to look up by; Activity is always available. The active tab falls
-  // back to Overview when the current id is not in the set (a part switch).
+  // Pinout belongs beside the component's CAD representations in the specimen rail. The
+  // destinations name the user's decision, not the implementation surface: record truth, dual-EDA
+  // readiness, gathered evidence, and the activity/decision trail.
   const hasEnrich = !!onEditField && !!detail.mpn;
   const tabs: TabItem<WorkbenchTab>[] = [
-    { id: "specs", label: "Overview" },
-    // Its own tab (owner's choice from previews, 2026-07-26), rather than a band at the head of the
-    // Specifications column. That slot now carries Key Specifications, which is what a person opens
-    // a part to read; the handoff is what a person needs once they are about to PLACE it.
-    { id: "handoff", label: "Representations" },
-    ...(hasEnrich ? [{ id: "enrich" as const, label: "Sources" }] : []),
+    { id: "specs", label: "Identity" },
+    { id: "handoff", label: "Readiness" },
+    ...(hasEnrich ? [{ id: "enrich" as const, label: "Evidence" }] : []),
     { id: "history", label: "Activity" },
   ];
   const activeTab = tabs.some((t) => t.id === tab) ? tab : "specs";
@@ -868,7 +898,7 @@ export function DetailPanel({
         className="flex h-[34px] flex-none items-center gap-4 border-b border-line bg-band px-6"
       >
         <TitleBlock
-          headline={headline}
+          headline={canonicalName}
           name={detail.derived.display_name}
           onRename={onEditField ? (v) => onEditField("display_name", v) : undefined}
           busy={busy}
@@ -888,6 +918,53 @@ export function DetailPanel({
             aria-label="Part views"
           />
         </div>
+        {canComplete && needsList.length > 0 ? (
+          <button
+            data-dev-id="detail.complete-part"
+            type="button"
+            aria-label={`Complete Part. Add ${needsList.join(", ")}`}
+            title={`Add ${needsList.join(", ")}`}
+            onClick={() => setCompleteOpen(true)}
+            className="inline-flex h-6 flex-none items-center gap-1.5 rounded-control border border-warn/50 bg-warn/[0.08] px-2.5 text-ui-caption font-semibold text-t1 transition-colors hover:border-warn hover:bg-warn/[0.14] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+          >
+            <WarnIcon className="h-3.5 w-3.5 flex-none text-warn" />
+            <Text id="detail.complete-part">Complete Part</Text>
+          </button>
+        ) : null}
+        {onDelete ? (
+          <div className="relative flex-none">
+            <button
+              type="button"
+              aria-expanded={actionsOpen}
+              onClick={() => setActionsOpen((open) => !open)}
+              className="inline-flex h-6 items-center gap-1.5 rounded-control border border-line bg-field px-2.5 text-ui-caption font-semibold text-copy transition-colors hover:border-line2 hover:bg-raise2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+            >
+              More Actions
+              <Icon
+                id="detail.chevron-right"
+                className={`h-3 w-3 transition-transform ${actionsOpen ? "rotate-90" : ""}`}
+              />
+            </button>
+            {actionsOpen ? (
+              <div className="absolute right-0 top-[calc(100%+6px)] z-[80] min-w-44 rounded-card border border-line2 bg-popover p-1.5 shadow-pop">
+                <button
+                  type="button"
+                  data-dev-id="detail.delete"
+                  aria-busy={deleting}
+                  disabled={busy || deleting}
+                  onClick={() => {
+                    setActionsOpen(false);
+                    setConfirmDelete(true);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-control px-2.5 py-2 text-left text-ui-body font-semibold text-err transition-colors hover:bg-err/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc disabled:pointer-events-none disabled:opacity-60"
+                >
+                  <TrashIcon />
+                  {deleting ? "Deleting Part" : "Delete Part"}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       {/* @container: the query root every `@`-prefixed breakpoint inside this sheet resolves
           against. It must sit here, on the pane, so the sheet reacts to the room it actually has
@@ -953,117 +1030,19 @@ export function DetailPanel({
               tiles to 17 visible pixels and left ~288x330px of dead space beneath them. At three
               columns there is only one row, so the span is released. */}
           <div className="flex min-h-0 flex-col gap-2.5 overflow-y-auto px-4 @xl:row-span-2 @4xl:row-span-1">
-          {/* the physical object as the hero, its symbol + footprint as supporting embodiments.
-              flex-1 (no min-h-0): the canvas absorbs the pane's slack so the hero grows to fill
-              the column beside a tall specs pane, and still scrolls when content genuinely
-              overflows (min-height:auto keeps it from compressing below its content). */}
-          <div data-dev-id="detail.canvas" className="flex flex-none flex-col gap-2.5">
-            <AssetTile
-              devId="detail.asset-hero"
-              stageDevId="detail.asset-stage"
-              name="3D Model"
-              present={hasModel}
-              // The hero EARNS its size by having something to show. `min-h-[300px] flex-1` was
-              // unconditional, so an absent model still claimed a 300px floor AND all the column's
-              // slack: measured, a featureless "No 3D Model" placeholder rendered ~420px tall above
-              // 142px Symbol and Footprint tiles, making the emptiest thing on the sheet the most
-              // prominent. Empty, it now sits as a PEER of its siblings at the same 142px.
-              //
-              // Present, it keeps the full hero treatment because then the space is carrying a
-              // render.
-              //
-              // TRIED AND REVERTED 2026-07-25, deliberately, so it is not re-attempted blind:
-              // `aspect-[3/2] min-h-[180px]`. The reasoning was sound - `flex-1` gives the hero
-              // whatever slack the column has, so beside a tall specs pane it measured a 530x965
-              // PORTRAIT stage for a subject that is landscape, and a portrait stage makes the
-              // camera fit width-limited so the spare height can never be filled without running
-              // the pads off the sides. But shipping it ALONE made two things worse, both seen in
-              // the shot: the layer and shading chips are absolutely positioned bottom-left and
-              // landed ON the model once the stage was short, and roughly 300px of dead column
-              // opened below the Footprint tile because nothing else absorbs the slack. The tile's
-              // proportion is therefore part of the COLUMN BALANCE slice (the owner's "sourcing is
-              // squished, specifications is too large" and "do not look cramped"), not a change
-              // that can be made on its own. See the Batch Plan.
-              // A FIXED 300px, not `flex-1` (owner's choice, 2026-07-25). With flex-1 the stage
-              // stretched to whatever height the Specifications column happened to need - measured
-              // 266x618, aspect 0.43, a portrait stage for a part that is inherently landscape,
-              // which is the "grotesquely out of proportion" complaint. Pinning the height keeps
-              // the 3D tile clearly dominant over its 142px siblings without letting a long spec
-              // sheet stretch it. The column ends above the pane bottom as a result; that dead
-              // space is the accepted trade, chosen over a portrait stage.
-              // GROWS with the column, but BOUNDED (owner, 2026-07-25). Unbounded `flex-1` is what
-              // produced the 266x618 portrait stage: it took every pixel a long spec sheet gave the
-              // column. A flex SHARE with a max-height lets the tiles fill the space when there is
-              // some, while the ceiling stops the stage ever going portrait again. The hero keeps
-              // twice the share of the pair below it, so it stays clearly dominant at any height.
-              // GROWN, but not stretchy. A flex share with a max-height did grow the tiles, and
-              // left 132px of slack INSIDE the column - a hole between the footprint tiles and the
-              // CAD row, which reads worse than the same space falling below the column's end.
-              // Fixed heights take the growth (stage 268 -> ~250 tall at 266 wide, aspect ~1.06
-              // instead of the original 0.43) and let the leftover land at the bottom, where an
-              // ended column simply looks ended.
-              className={hasModel ? "h-[340px]" : "h-[142px]"}
-              art={<CubeArt />}
-              thumb={
-                hasModel ? (
-                  <div className="pointer-events-none h-full w-full">
-                    <Glb3DView
-                      data={modelGlb.data}
-                      isLoading={modelGlb.isLoading}
-                      isError={modelGlb.isError}
-                      error={modelGlb.error}
-                      land={landPattern.data ?? null}
-                      // THE MINI TILE GETS EVERYTHING (owner 2026-07-26: "the mini 3d window should
-                      // also be interactable with with all the same settings"). These two default to
-                      // false and only the modal passed them, so the tile had the layer chips and
-                      // nothing else - no views, no shading, no spin control.
-                      showViews
-                      showShading
-                      // ICON chips here: this tile is ~280px, where ten text-labelled controls wrapped
-                      // to three rows and took a third of the stage. The modal keeps its labels.
-                      compact
-                    />
-                  </div>
-                ) : undefined
-              }
-              onOpen={hasModel ? () => setPreview("model") : undefined}
+          {/* One inspection instrument. Projection changes and expansion preserve the same
+              mounted canvases, so a camera or pan state cannot regress simply because the
+              presentation changes size. */}
+          <div data-dev-id="detail.canvas" className="flex-none">
+            <ComponentInspectionStage
+              partId={detail.id}
+              partName={canonicalName}
+              available={{
+                model: hasModel,
+                symbol: assetPresent(kicadAssets?.symbol),
+                footprint: assetPresent(kicadAssets?.footprint),
+              }}
             />
-            {/* Content-sized, NOT `h-[200px]`. That literal sat here holding two `h-[142px]` tiles,
-                so it guaranteed 58px of empty row under the cards on every part, forever - and with
-                the column's former `gap-4` on top of it that is the 74px void the owner reported as
-                "odd spacing underneath the model symbol and footprint before the cad complete
-                button" (measured 75px on their window, 89px ink-to-ink here including the CAD row's
-                own padding). Two hardcoded heights that disagreed by 58px, in the same element. */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <AssetTile
-                devId="detail.asset-symbol"
-                name="Symbol"
-                present={assetPresent(kicadAssets?.symbol)}
-                className="h-[142px]"
-                art={<SymbolArt />}
-                thumb={
-                  assetPresent(kicadAssets?.symbol) ? (
-                    <PreviewImage kind="symbol" partId={detail.id} fallback={<SymbolArt />} />
-                  ) : undefined
-                }
-                onOpen={assetPresent(kicadAssets?.symbol) ? () => setPreview("symbol") : undefined}
-              />
-              <AssetTile
-                devId="detail.asset-footprint"
-                name="Footprint"
-                present={assetPresent(kicadAssets?.footprint)}
-                className="h-[142px]"
-                art={<FootprintArt />}
-                thumb={
-                  assetPresent(kicadAssets?.footprint) ? (
-                    <PreviewImage kind="footprint" partId={detail.id} fallback={<FootprintArt />} />
-                  ) : undefined
-                }
-                onOpen={
-                  assetPresent(kicadAssets?.footprint) ? () => setPreview("footprint") : undefined
-                }
-              />
-            </div>
           </div>
 
           {/* THE PHOTOGRAPH, directly above the CAD row (owner 2026-07-26: "place product photo above
@@ -1093,11 +1072,10 @@ export function DetailPanel({
             <ReadinessBlock
               kicad={kicad}
               altium={altium}
+              kicadEvidence={kicadEvidence}
+              altiumEvidence={altiumEvidence}
               altiumNeeds={altiumNeeds}
               embed3d={embed3d}
-              canComplete={canComplete}
-              needsList={needsList}
-              onComplete={() => setCompleteOpen(true)}
               removable={
                 // a class that needs no assets of its own (a passive, a fiducial) references
                 // STOCK assets by id and owns no files; element removal applies to owned files
@@ -1235,15 +1213,15 @@ export function DetailPanel({
                     data-dev-id="detail.sourcing-refresh"
                     onClick={() => refreshJob.run()}
                     disabled={refreshStatus === "running"}
-                    className="inline-flex h-6 items-center gap-1 rounded-control border border-line bg-field px-2 text-2xs font-semibold text-t2 transition-colors hover:border-line2 hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc disabled:pointer-events-none disabled:opacity-60"
+                    className="inline-flex h-6 items-center gap-1 rounded-control border border-line bg-field px-2 text-ui-caption font-semibold text-copy transition-colors hover:border-line2 hover:bg-raise2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc disabled:pointer-events-none disabled:opacity-60"
                   >
                     <RefreshIcon
                       className={refreshStatus === "running" ? "animate-spin" : undefined}
                     />
                     {refreshStatus === "running" ? (
-                      <Text id="detail.sourcing-refreshing">Refreshing</Text>
+                      <Text id="detail.sourcing-refreshing">Refreshing Sourcing</Text>
                     ) : (
-                      <Text id="detail.sourcing-refresh-label">Refresh</Text>
+                      <Text id="detail.sourcing-refresh-label">Refresh Sourcing</Text>
                     )}
                   </button>
                 ) : null}
@@ -1255,7 +1233,12 @@ export function DetailPanel({
                 </span>
               }
             >
-              <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
+              <Sourcing
+                purchase={detail.purchase}
+                hasMpn={!!detail.mpn}
+                status={refreshStatus}
+                error={refreshError}
+              />
               {tradeGroup ? (
                 <TradeCompliance
                   group={tradeGroup}
@@ -1301,7 +1284,7 @@ export function DetailPanel({
           className="mt-3 min-h-0 flex-1 overflow-hidden"
         >
           <div className="mx-auto flex h-full min-h-0 w-full max-w-[980px] flex-col gap-3 px-1">
-            <RepresentationMatrix detail={detail} />
+            <RepresentationMatrix detail={detail} edaReadiness={edaReadiness} />
             <div className="min-h-0 flex-1 overflow-auto rounded-panel">
               <div className="flex flex-col gap-3">
                 <CadVariantSection
@@ -1344,27 +1327,6 @@ export function DetailPanel({
           <PartTimeline key={detail.id} partId={detail.id} />
         </WorkbenchPanel>
 
-      {/* footer: filing moved into the part pane; a destructive action never earns prime real
-          estate, so Delete sits at the far edge - but as a GLYPH that states its consequence when
-          you approach it, not as dim text that reads like a caption (punch 15). The shared
-          IconButton carries the reveal, the tone and the running state, so every other destructive
-          action in the app inherits the same language for free. */}
-      <footer data-dev-id="detail.footer" className="mt-3 flex flex-none items-center justify-end border-t border-line pt-2.5">
-        {onDelete ? (
-          <IconButton
-            data-dev-id="detail.delete"
-            compact
-            small
-            variant="ghost-danger"
-            icon={<TrashIcon />}
-            label="Delete Part?"
-            pending={deleting}
-            pendingLabel="Deleting"
-            onClick={() => setConfirmDelete(true)}
-            disabled={busy}
-          />
-        ) : null}
-      </footer>
       </div>
 
       {/* The one Complete-Part window: network collection fills CAD while editable rows fill
@@ -1378,19 +1340,6 @@ export function DetailPanel({
           onEditField={onEditField}
         />
       ) : null}
-
-      <PreviewModal
-        open={preview !== null}
-        partId={detail.id}
-        partName={detail.derived.display_name}
-        available={{
-          model: hasModel,
-          symbol: assetPresent(kicadAssets?.symbol),
-          footprint: assetPresent(kicadAssets?.footprint),
-        }}
-        initialKind={preview ?? "symbol"}
-        onClose={() => setPreview(null)}
-      />
 
       <ConfirmDialog
         open={pendingDetach !== null}
@@ -1612,21 +1561,19 @@ export interface Embed3dState {
 function ReadinessBlock({
   kicad,
   altium,
+  kicadEvidence,
+  altiumEvidence,
   altiumNeeds,
   embed3d,
-  canComplete,
-  needsList,
-  onComplete,
   removable = [],
   onRemove,
 }: {
   kicad: AssetReadiness;
   altium: AssetReadiness;
+  kicadEvidence: SummaryReadiness;
+  altiumEvidence: SummaryReadiness;
   altiumNeeds: string[];
   embed3d: Embed3dState | null;
-  canComplete: boolean;
-  needsList: string[];
-  onComplete: () => void;
   // The elements this part carries that can be removed one by one (owner 2026-07-24:
   // a wrong capture must be deletable without touching the rest of the part).
   removable?: { kind: string; label: string }[];
@@ -1640,9 +1587,13 @@ function ReadinessBlock({
     altiumNeeds.length > 0
       ? altiumNeeds.map((n) => n.replace(/^Altium /, ""))
       : altium.missing.filter((m) => m !== "3D Model");
-  const allReady = kicad.ready && altium.ready;
-  // Readiness is tucked behind a button (owner's call): a compact status chip that opens a mini
-  // popover carrying the KiCad + Altium detail and the Complete action, so the pane stays clean.
+  const allReady = kicadEvidence.ready && altiumEvidence.ready;
+  const readinessLabel = `CAD readiness: KiCad ${
+    kicadEvidence.ready ? "ready" : "unverified"
+  }; Altium ${altiumEvidence.ready ? "ready" : "unverified"}`;
+  // Readiness is tucked behind a button: a compact status chip that opens the KiCad + Altium
+  // evidence detail. Component-wide completion stays in the title strip instead of hiding inside
+  // this projection-scoped popover.
   return (
     <div className="relative" data-dev-id="detail.readiness">
       {/* The same row anatomy as Filing below (icon + uppercase label + value + chevron), so the
@@ -1651,6 +1602,7 @@ function ReadinessBlock({
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
+        aria-label={readinessLabel}
         className="flex h-8 w-full items-center gap-2.5 rounded-control border border-line bg-field px-3 text-left transition-colors hover:border-line2 hover:bg-raise2"
       >
         {allReady ? (
@@ -1658,9 +1610,14 @@ function ReadinessBlock({
         ) : (
           <WarnIcon className="h-3.5 w-3.5 flex-none text-warn" />
         )}
-        <span className={EYEBROW_DENSE}>CAD</span>
-        <span className="ml-auto min-w-0 truncate text-xs font-medium text-t1">
-          {allReady ? "Complete" : "Incomplete"}
+        <span className="flex min-w-0 flex-1 items-center justify-end gap-2 text-2xs font-medium">
+          <span className={kicadEvidence.ready ? "text-ok" : "text-t2"}>
+            KiCad {kicadEvidence.ready ? "Ready" : "Unverified"}
+          </span>
+          <span aria-hidden className="text-t3">·</span>
+          <span className={altiumEvidence.ready ? "text-ok" : "text-t2"}>
+            Altium {altiumEvidence.ready ? "Ready" : "Unverified"}
+          </span>
         </span>
         <Icon
           id="detail.chevron-right"
@@ -1678,30 +1635,13 @@ function ReadinessBlock({
         // action and the Remove chips had ALL been unreachable. Anchoring to the bottom gives the
         // popover the whole rail height above it, which is always available here.
         <div className="absolute inset-x-0 bottom-[calc(100%+6px)] z-[70] rounded-card border border-line2 bg-popover p-3 shadow-pop">
-          <ReadinessRow label="KiCad" ready={kicad.ready} needs={kicadNeeds} />
-          <ReadinessRow label="Altium" ready={altium.ready} needs={altiumBlocking} />
+          <ReadinessRow label="KiCad" readiness={kicadEvidence} localNeeds={kicadNeeds} />
+          <ReadinessRow
+            label="Altium"
+            readiness={altiumEvidence}
+            localNeeds={altiumBlocking}
+          />
           {embed3d ? <Embed3dRow state={embed3d} /> : null}
-          {canComplete && needsList.length > 0 ? (
-            <button
-              data-dev-id="detail.complete-part"
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onComplete();
-              }}
-              className="group mt-3 flex w-full items-start gap-2.5 rounded-control border border-warn/40 bg-warn/[0.08] px-3 py-2.5 text-left transition hover:border-warn/70 hover:bg-warn/[0.12]"
-            >
-              <WarnIcon className="mt-0.5 h-4 w-4 flex-none text-warn" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-t1">
-                  <Text id="detail.complete-part">Complete Part</Text>
-                </span>
-                <span className="mt-0.5 block text-2xs leading-snug text-t2">
-                  Add {needsList.join(", ")} to make this part usable.
-                </span>
-              </span>
-            </button>
-          ) : null}
           {onRemove && removable.length > 0 ? (
             <div className="mt-3 border-t border-line pt-2.5">
               <div className={`mb-1.5 ${EYEBROW_DENSE}`}>
@@ -1797,18 +1737,31 @@ function Embed3dRow({ state }: { state: Embed3dState }) {
 
 function ReadinessRow({
   label,
-  ready,
-  needs,
+  readiness,
+  localNeeds,
 }: {
   label: string;
-  ready: boolean;
-  needs: string[];
+  readiness: SummaryReadiness;
+  // Local presence can explain what the repair action will collect, but it
+  // never grants Ready. Prefer the backend diagnosis whenever one exists.
+  localNeeds: string[];
 }) {
+  const status = readiness.ready
+    ? "Ready"
+    : readiness.trust === "fail"
+      ? "Verification failed"
+      : readiness.missing.length > 0
+        ? `Needs ${readiness.missing.map((n) => n.toLowerCase()).join(" + ")}`
+        : readiness.coverageComplete
+          ? "Evidence pending"
+          : localNeeds.length > 0
+            ? `Unverified · ${localNeeds.map((n) => n.toLowerCase()).join(" + ")} missing`
+            : "Evidence unavailable";
   return (
     <DataRow
       label={
         <span className="flex items-center gap-2">
-          {ready ? (
+          {readiness.ready ? (
             <Icon id="detail.ready-check" className="h-3.5 w-3.5 flex-none" />
           ) : (
             <span
@@ -1820,130 +1773,12 @@ function ReadinessRow({
         </span>
       }
     >
-      <span className={ready ? "text-ok" : "text-t2"}>
-        {ready
-          ? "Ready"
-          : needs.length > 0
-            ? `Needs ${needs.map((n) => n.toLowerCase()).join(" + ")}`
-            : "Not ready"}
+      <span className={readiness.ready ? "text-ok" : "text-t2"}>
+        {status}
       </span>
     </DataRow>
   );
 }
-
-
-// One Part Canvas tile. `hero` is the big physical (3D) stage; `tile` is a compact
-// embodiment (symbol / footprint). A present asset exposes the SAME stage-centred Expand
-// affordance on hover or keyboard focus; the footer is identity/status only. Missing assets stay
-// the honest Not Linked state and are completed through the network workflow, never this tile.
-function AssetTile({
-  name,
-  present,
-  art,
-  thumb,
-  onOpen,
-  className,
-  devId,
-  stageDevId,
-}: {
-  name: string;
-  present: boolean;
-  art: ReactNode;
-  // The live render shown when present (falls back to `art` internally on failure);
-  // omit it and `art` is shown directly.
-  thumb?: ReactNode;
-  // When present and set, the stage offers a hover/focus Expand action.
-  onOpen?: () => void;
-  // Height / extra classes for the tile shell (the caller sizes it in its layout).
-  className?: string;
-  // The stable dev-mode id for the tile shell; each of the three call sites passes a
-  // distinct value (hero / symbol / footprint) so inspect can name them apart.
-  devId?: string;
-  // The stable dev-mode id for the inner stage chamber (the hero copper-glow stage).
-  stageDevId?: string;
-}) {
-  const stage = (
-    <div
-      data-dev-id={stageDevId}
-      className={
-        "group relative flex min-h-0 flex-1 items-center justify-center overflow-hidden " +
-        (present ? "bg-stage" : "flex-col gap-2 bg-stage text-t3")
-      }
-    >
-      {/* no stage dressing: the 3D chamber is the flat bg-stage surface (owner's call - the
-          glow/vignette gradient is gone), so the render sits on a plain field like the
-          symbol and footprint tiles */}
-      {/* absolute so the preview image / 3D canvas is taken OUT of the intrinsic-height flow:
-          otherwise a large SVG/GLB render leaks its natural height into the flex/grid column and
-          balloons the whole row. The stage (relative, min-h-0) then collapses to nothing on its
-          own and simply fills whatever height the grid cell gives it. */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        {present ? (
-          thumb ?? art
-        ) : (
-          <div className="flex flex-col items-center gap-1.5">
-            <UploadIcon />
-            <span className="text-2xs">No {name}</span>
-          </div>
-        )}
-      </div>
-      {present && onOpen ? (
-        <button
-          type="button"
-          data-dev-id={devId ? `${devId}-open` : undefined}
-          onClick={onOpen}
-          aria-label={`Open ${name} Preview`}
-          className="absolute inset-0 z-10 flex items-center justify-center bg-canvas/0 opacity-0 transition-[background-color,opacity] duration-150 group-hover:bg-canvas/70 group-hover:opacity-100 focus-visible:bg-canvas/70 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
-        >
-          <span className="inline-flex items-center gap-2 rounded-control border border-line2 bg-popover px-3 py-2 text-xs font-semibold text-t1 shadow-pop">
-            <EyeIcon className="h-4 w-4 text-t2" />
-            Expand
-          </span>
-        </button>
-      ) : null}
-    </div>
-  );
-  const footer = (
-    <div className="flex h-7 items-center gap-2 px-3">
-      <span className="min-w-0 truncate text-2xs font-semibold text-t1">{name}</span>
-      {/* The STATUS never wraps: "Not Linked" broke as "Not / Linked" across two lines in the
-          130px Symbol and Footprint tiles, which made a two-word state read as two states and
-          pushed the footer to a second row. It is two short words and a dot, so it is the NAME
-          on the left that should give way (truncate) if anything has to. */}
-      <span className="ml-auto inline-flex flex-none items-center gap-1.5 whitespace-nowrap text-2xs text-t3">
-        {present ? (
-          <>Linked</>
-        ) : (
-          <>
-            <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden="true" />
-            Not Linked
-          </>
-        )}
-      </span>
-    </div>
-  );
-  const base =
-    "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border border-line bg-raise " +
-    (className ?? "");
-  // Present previews are plain shells with one consistent action INSIDE the stage. That keeps the
-  // footer quiet, avoids nesting a button around the renderer, and gives 3D, Symbol, and Footprint
-  // the same interaction instead of three subtly different click contracts.
-  if (onOpen && present) {
-    return (
-      <div data-dev-id={devId} className={base}>
-        {stage}
-        {footer}
-      </div>
-    );
-  }
-  return (
-    <div data-dev-id={devId} className={base}>
-      {stage}
-      {footer}
-    </div>
-  );
-}
-
 // All specs render at once inside the Specs tab (never collapsed): each group (Electrical /
 // Physical / Ratings / Other) is its own labelled block, and the rows within it are a compact
 // two-column definition list - the key in quiet sans on the left, the value in the mono readout
@@ -2571,9 +2406,13 @@ function VendorLadder({
 function Sourcing({
   purchase,
   hasMpn,
+  status,
+  error,
 }: {
   purchase: PurchaseRef[];
   hasMpn: boolean;
+  status: "idle" | "running" | "done" | "error";
+  error: string | null;
 }) {
   // Mouser leads, then DigiKey, then the rest (punch 4). The record's own order is whatever the
   // add flow stored - the pasted vendor led it - so a part bought once from DigiKey listed
@@ -2592,10 +2431,14 @@ function Sourcing({
   const orderable = orderPurchases(purchase.filter((p) => p.url));
   if (orderable.length === 0) {
     return (
-      <div data-dev-id="detail.sourcing" className="text-xs text-t2">
-        {hasMpn
-          ? "No purchase link on record yet."
-          : "Not orderable yet, this component has no part number."}
+      <div data-dev-id="detail.sourcing" className="text-ui-body text-copy">
+        {status === "running"
+          ? "Acquiring distributor evidence. Stockroom will add verified availability and pricing here."
+          : status === "error"
+            ? `${error || "Sourcing could not be refreshed."} Next: retry the background sourcing job.`
+            : hasMpn
+              ? "No sourcing evidence is recorded yet. Stockroom will continue with the next eligible source."
+              : "Sourcing cannot start until this component has an exact manufacturer part number."}
       </div>
     );
   }
@@ -2626,13 +2469,9 @@ function Sourcing({
         return (
           <div
             key={`${p.vendor}-${i}`}
-            // A CARD per distributor (owner: "give the sourcing cards a different style than current").
-            // Was a bare row on a hairline, with four data types on one line and no headers - a fault
-            // the screen critique logged. The recommended one is bordered in the ok tint so the badge
-            // is not the only thing carrying that state.
             className={
-              "mb-1.5 rounded-card border px-2.5 py-2 transition-colors last:mb-0 " +
-              (isBest ? "border-ok/50 bg-ok/[0.05]" : "border-line bg-surface hover:bg-raise2")
+              "border-b border-line py-2.5 last:border-b-0 " +
+              (isBest ? "text-ink" : "")
             }
           >
             {/* TWO LINES, not one. Seven things want this row - vendor, Recommended, stock, the volume

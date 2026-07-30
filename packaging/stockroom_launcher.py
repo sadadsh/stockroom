@@ -2,7 +2,8 @@
 
 Normal launch starts the signed broker, managed service authority, API, and
 window host.  The same immutable executable is copied into each release set;
-``--port`` dispatches that copy as a windowless candidate worker.
+``--port`` dispatches that copy as a windowless candidate worker, while the
+strict ``--window-host`` form starts a release-owned isolated WebView shell.
 """
 
 from __future__ import annotations
@@ -51,7 +52,18 @@ def _prepare_runtime(*, needs_window: bool) -> None:
 
 
 def _dispatch() -> None:
-    if "--port" in sys.argv[1:]:
+    arguments = sys.argv[1:]
+    if any(argument.startswith("--window-host") for argument in arguments):
+        from stockroom.host.window_process import (
+            parse_window_host_arguments,
+            run_window_host,
+        )
+
+        parsed = parse_window_host_arguments(arguments)
+        _prepare_runtime(needs_window=True)
+        run_window_host(parsed)
+        return
+    if "--port" in arguments:
         _prepare_runtime(needs_window=False)
         from stockroom.host.worker import main as worker_main
 
@@ -64,9 +76,7 @@ def _dispatch() -> None:
         run_managed_host_probe(Path(sys.argv[2]))
         return
     if any(argument.startswith("--managed-host-probe") for argument in sys.argv[1:]):
-        raise SystemExit(
-            "--managed-host-probe requires exactly one absolute receipt path"
-        )
+        raise SystemExit("--managed-host-probe requires exactly one absolute receipt path")
     _prepare_runtime(needs_window=True)
     from stockroom.host.run import main as host_main
 
@@ -80,6 +90,7 @@ def _main() -> None:
     noninteractive = (
         "--managed-host-probe" in sys.argv[1:]
         or "--port" in sys.argv[1:]
+        or any(argument.startswith("--window-host") for argument in sys.argv[1:])
     )
     try:
         _dispatch()

@@ -30,7 +30,12 @@
     --c-band: #2b2b30;
     --c-t1: #f4f4f4;
     --c-t2: rgba(244, 244, 244, 0.66);
-    --c-t3: rgba(244, 244, 244, 0.4);
+    /* Helper copy is still quiet, but it is text, not decoration. This solid
+       tier clears 4.5:1 against canvas, band, popover, and raised surfaces. */
+    --c-t3: #aaaab0;
+    --c-text-primary: var(--c-t1);
+    --c-text-secondary: var(--c-t2);
+    --c-text-helper: var(--c-t3);
     --c-ok: #5fd39a;
     --c-warn: #e0b354;
     --c-err: #e8756c;
@@ -134,49 +139,27 @@
     --r-card: 3px;
     --r-control: 2px;
 
-    /* --- Type scale (theme-agnostic) --------------------------------------------
-       The compact desktop scale. Only the px size is a token: the line-heights are
-       bundled with each step in tailwind.config.js, and the body sets the 13px root.
-       Hierarchy here is the whole point -- 2xs is the eyebrow/microcopy tier and title
-       the page headline, so these must stay distinct steps rather than collapse. */
-    /* THE WHOLE SCALE FOLLOWS THE WINDOW (owner, 2026-07-26: "i want to avoid text wrapping as
-       much as i can in any of our content, resize text based on windows size so everything fits
-       without wrapping").
+    /* --- Semantic compact type scale (theme-agnostic) ---------------------------
+       Every interface role has one named token. Each clamp moves only half to one
+       pixel between the supported 1024px and 1600px workstations, preserving the
+       owner's compact density without the former sub-10px microcopy or an unrelated
+       inherited body size. The legacy aliases keep older components on this same
+       authority while surfaces migrate to the role names. */
+    --fs-ui-meta: clamp(10px, calc(10px + (100vw - 1024px) * 0.000868), 10.5px);
+    --fs-ui-caption: clamp(10.5px, calc(10.5px + (100vw - 1024px) * 0.000868), 11px);
+    --fs-ui-body: clamp(11px, calc(11px + (100vw - 1024px) * 0.000868), 11.5px);
+    --fs-ui-label: clamp(11.5px, calc(11.5px + (100vw - 1024px) * 0.000868), 12px);
+    --fs-ui-heading: clamp(13px, calc(13px + (100vw - 1024px) * 0.000868), 13.5px);
+    --fs-ui-subtitle: clamp(14px, calc(14px + (100vw - 1024px) * 0.000868), 14.5px);
+    --fs-ui-title: clamp(16px, calc(16px + (100vw - 1024px) * 0.001736), 17px);
 
-       ONE multiplier, applied to every step, so the hierarchy above is preserved exactly - the
-       steps shrink together rather than converging, which is what would happen if each were
-       clamped independently. Tokens only, no JavaScript: CSS cannot measure overflow, but it can
-       be told how much room there is, and the window IS the input the owner named.
-
-       0.90 at 1024px up to 1.00 at 1600px, then flat. Deliberately a narrow range: this buys back
-       roughly a character per ten at the small end, which is the difference between a spec value
-       fitting its column and wrapping, without making the app illegible on a small screen.
-
-       It SHRINKS, it never CLIPS. `break-words` stays on the value rows as the last resort,
-       because a value cut to "100 ..." has lost the data - that is why wrapping was chosen in the
-       first place, and this reduces how often it is reached rather than replacing it with
-       truncation. */
-    /* ONE ratio per step, expressed as a clamp on the SIZE ITSELF.
-
-       A shared unitless multiplier is the obvious shape and is INVALID CSS: `calc(0.9 + (100vw -
-       1024px) / 5760)` adds a number to a length, so the declaration is dropped, every --fs-* that
-       referenced it became invalid, and all text silently fell back to the 13px root. Caught by
-       adding a COMPUTED font-size readout to the shot probe - the declared token reports its calc()
-       text verbatim, so it looked identical at every width and proved nothing.
-
-       Each step therefore carries its own clamp: 0.90x at 1024px, rising to 1.00x at 1600px, flat
-       above. They share one ratio, so the hierarchy is preserved rather than converging.
-
-       It SHRINKS, it never CLIPS. `break-words` stays on the value rows as the last resort, since a
-       value cut to "100 ..." has lost the data - this reduces how often wrapping is reached rather
-       than replacing it with truncation. */
-    --fs-2xs: clamp(8.55px, calc(8.55px + (100vw - 1024px) * 0.001649), 9.5px);
-    --fs-xs: clamp(9.45px, calc(9.45px + (100vw - 1024px) * 0.001823), 10.5px);
-    --fs-sm: clamp(9.9px, calc(9.9px + (100vw - 1024px) * 0.00191), 11px);
-    --fs-base: clamp(10.35px, calc(10.35px + (100vw - 1024px) * 0.001997), 11.5px);
-    --fs-lg: clamp(11.7px, calc(11.7px + (100vw - 1024px) * 0.002257), 13px);
-    --fs-xl: clamp(13.05px, calc(13.05px + (100vw - 1024px) * 0.002517), 14.5px);
-    --fs-title: clamp(15.3px, calc(15.3px + (100vw - 1024px) * 0.002951), 17px);
+    --fs-2xs: var(--fs-ui-meta);
+    --fs-xs: var(--fs-ui-caption);
+    --fs-sm: var(--fs-ui-body);
+    --fs-base: var(--fs-ui-label);
+    --fs-lg: var(--fs-ui-heading);
+    --fs-xl: var(--fs-ui-subtitle);
+    --fs-title: var(--fs-ui-title);
   }
 
   :root[data-theme="light"] {
@@ -194,7 +177,11 @@
     --c-band: #e2e4e9;
     --c-t1: #17181b;
     --c-t2: rgba(23, 24, 27, 0.68);
-    --c-t3: rgba(23, 24, 27, 0.46);
+    /* 4.79:1 or better against the light theme's palest supported text surface. */
+    --c-t3: #606268;
+    --c-text-primary: var(--c-t1);
+    --c-text-secondary: var(--c-t2);
+    --c-text-helper: var(--c-t3);
     --c-ok: #2f9e63;
     --c-warn: #a9761b;
     --c-err: #cf4a40;

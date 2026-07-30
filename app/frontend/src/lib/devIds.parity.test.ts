@@ -17,8 +17,8 @@
  *     full id string is never written in source. Each is justified by an asserted
  *     derivation source below (Rail's `rail.nav-${route}`, TabStrip's `${base}.tabs` /
  *     `${base}.tab-${id}`).
- *  2. KNOWN_PROP_PASSED — passed into a child as a plain string prop (e.g. AssetTile's
- *     `devId="detail.asset-hero"`, WorkbenchPanel's `devId="detail.enrich"`) which the
+ *  2. KNOWN_PROP_PASSED — passed into a child as a plain string prop (e.g.
+ *     WorkbenchPanel's `devId="detail.enrich"`) which the
  *     child then renders as `data-dev-id={devId}`. The id string DOES exist in source,
  *     just not on a `data-dev-id="..."` attribute. Each is verified present as a quoted
  *     literal below, so this list is checked, not rubber-stamped.
@@ -83,11 +83,6 @@ const KNOWN_DERIVED: readonly string[] = [
   "detail.tab-sourcing",
   "detail.tab-enrich",
   "detail.tab-history",
-  // DetailPanel AssetTile: data-dev-id={`${devId}-open`} on the shared stage-centred Inspect
-  // overlay. Each present representation gets the same addressable hover/focus action.
-  "detail.asset-hero-open",
-  "detail.asset-symbol-open",
-  "detail.asset-footprint-open",
   // primitives.tsx SegmentedControl derives one id per option. The STM target
   // definition uses fixed lens and inspector registries at the two call sites.
   "stm.lens.compatibility",
@@ -130,11 +125,6 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   // three-viewport-gizmo creates its own DOM node, so threeScene attaches this id after
   // construction with setAttribute instead of emitting it through JSX.
   "detail.model-gizmo",
-  // DetailPanel.tsx AssetTile: devId=/stageDevId= string props.
-  "detail.asset-hero",
-  "detail.asset-symbol",
-  "detail.asset-footprint",
-  "detail.asset-stage",
   // DetailPanel.tsx WorkbenchPanel: devId= string prop for the conditional workbench tabs.
   "detail.enrich",
   "detail.history",

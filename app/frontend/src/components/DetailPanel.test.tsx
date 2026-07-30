@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
 import { cadVariantApi } from "../api/cadVariantClient";
-import type { PartDetail } from "../api/types";
+import type { EdaReadinessSummary, PartDetail } from "../api/types";
 import { DEV_ID_BY_ID } from "../lib/devIds";
 import { ThemeProvider } from "../lib/theme";
 import { ToastProvider } from "../lib/toast";
@@ -55,6 +55,7 @@ vi.mock("../api/cadVariantClient", async (importActual) => {
 vi.mock("../lib/threeScene", () => ({
   mountModelScene: vi.fn(() => ({
     dispose: vi.fn(),
+    fit: vi.fn(),
     setView: vi.fn(),
     setSpin: vi.fn((wanted: boolean) => wanted),
     setLandPattern: vi.fn(),
@@ -138,24 +139,42 @@ const BASE = {
   isComplete: true,
 };
 
+const VERIFIED_EDA = {
+  kicad: {
+    required: ["symbol", "footprint", "model"],
+    missing: [],
+    coverage_complete: true,
+    trust: "pass",
+    ready: true,
+  },
+  altium: {
+    required: ["symbol", "footprint"],
+    missing: [],
+    coverage_complete: true,
+    trust: "pass",
+    ready: true,
+  },
+} satisfies Record<string, EdaReadinessSummary>;
+
 describe("DetailPanel files previews (M6d)", () => {
   it("puts the 3D canvas on the theme-aware stage instead of painting a local backdrop", () => {
-    const { container } = wrap(<DetailPanel detail={detail()} {...BASE} />);
-    const stage = container.querySelector('[data-dev-id="detail.asset-stage"]') as HTMLElement;
+    wrap(<DetailPanel detail={detail()} {...BASE} />);
+    const stage = screen.getByTestId("inspection-stage");
 
     expect(stage).toHaveClass("bg-stage");
     expect(stage.style.background).toBe("");
     expect(stage.style.backgroundColor).toBe("");
   });
 
-  it("opens the preview modal on the clicked kind when a Files card is clicked", async () => {
+  it("expands the same inspection stage on the selected projection", async () => {
     mockApi.previewSvg.mockResolvedValue(new Blob(["<svg/>"], { type: "image/svg+xml" }));
     wrap(<DetailPanel detail={detail()} {...BASE} />);
 
     // no modal until a card is clicked
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Open Symbol Preview" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Symbol" }));
+    await userEvent.click(screen.getByRole("button", { name: "Expand Inspection" }));
 
     const dialog = await screen.findByRole("dialog", { name: "Inspect LM358" });
     expect(dialog).toBeInTheDocument();
@@ -165,11 +184,15 @@ describe("DetailPanel files previews (M6d)", () => {
     );
   });
 
-  it("opens directly on the 3D tab from the 3D Model card", async () => {
+  it("opens directly on the model projection when 3D is available", async () => {
     mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
     wrap(<DetailPanel detail={detail()} {...BASE} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Open 3D Model Preview" }));
+    expect(screen.getByRole("tab", { name: "3D Model" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Expand Inspection" }));
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "3D Model" })).toHaveAttribute(
@@ -178,11 +201,9 @@ describe("DetailPanel files previews (M6d)", () => {
     );
   });
 
-  it("does not make a missing file's card clickable", () => {
+  it("disables a missing model projection", () => {
     wrap(<DetailPanel detail={detail({ assets: { kicad: { symbol: SYM, footprint: FP, model: null } } })} {...BASE} />);
-    expect(
-      screen.queryByRole("button", { name: "Open 3D Model Preview" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "3D Model" })).toBeDisabled();
   });
 
   it("lists the record's parametric specs in a Specifications section, hiding asset keys (B1)", () => {
@@ -233,7 +254,7 @@ describe("DetailPanel files previews (M6d)", () => {
     expect(screen.getByText("Spec 14")).toBeInTheDocument();
   });
 
-  it("shows a passive's 3D model as present via its footprint, not Not Linked (A8)", () => {
+  it("shows a passive's stock-footprint 3D projection as available (A8)", () => {
     // A passive owns no model.file but inherits the KiCad stock footprint's built-in 3D model,
     // which the model.glb endpoint resolves from the footprint; the card must read as present.
     wrap(
@@ -247,9 +268,7 @@ describe("DetailPanel files previews (M6d)", () => {
         {...BASE}
       />,
     );
-    expect(
-      screen.getByRole("button", { name: "Open 3D Model Preview" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "3D Model" })).toBeEnabled();
   });
 });
 
@@ -390,8 +409,8 @@ describe("DetailPanel network-only completion affordance", () => {
     expect(
       screen.queryByRole("button", { name: /Complete Part/ }),
     ).not.toBeInTheDocument();
-    // it degrades to the honest Not Linked state on the tile
-    expect(screen.getByText("Not Linked")).toBeInTheDocument();
+    // The inspector never fabricates a preview for an absent representation.
+    expect(screen.getByRole("tab", { name: "Symbol" })).toBeDisabled();
   });
 
   it("offers Complete Part for a KiCad-complete part that still needs Altium assets", async () => {
@@ -401,13 +420,10 @@ describe("DetailPanel network-only completion affordance", () => {
     wrap(<DetailPanel detail={detail()} {...BASE} onEditField={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: /CAD/ }));
     const trigger = await screen.findByRole("button", { name: /Complete Part/ });
-    expect(trigger).toHaveTextContent("Altium Symbol");
-    expect(trigger).toHaveTextContent("Altium Footprint");
+    expect(trigger).toHaveAccessibleName(/Altium Symbol.*Altium Footprint/);
   });
 
-  it("shows CAD Complete once BOTH the KiCad and Altium assets are on the record", () => {
-    // the regression the owner hit: a part with its Altium libraries attached stayed on
-    // "CAD Incomplete" forever because readiness read the KiCad fields for Altium.
+  it("does not claim readiness from local KiCad and Altium presence alone", () => {
     const complete = detail({
       assets: {
         kicad: { symbol: SYM, footprint: FP, model: MODEL },
@@ -419,8 +435,25 @@ describe("DetailPanel network-only completion affordance", () => {
       },
     });
     wrap(<DetailPanel detail={complete} {...BASE} onEditField={vi.fn()} />);
-    expect(screen.getByText("Complete")).toBeInTheDocument();
-    expect(screen.queryByText("Incomplete")).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: /CAD readiness/ });
+    expect(trigger).toHaveTextContent("KiCad Unverified");
+    expect(trigger).toHaveTextContent("Altium Unverified");
+    expect(screen.queryByText(/^Complete$/)).not.toBeInTheDocument();
+  });
+
+  it("names both tools as ready only when backend coverage and trust pass", () => {
+    wrap(
+      <DetailPanel
+        detail={detail()}
+        edaReadiness={VERIFIED_EDA}
+        {...BASE}
+        onEditField={vi.fn()}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: /CAD readiness/ });
+    expect(trigger).toHaveTextContent("KiCad Ready");
+    expect(trigger).toHaveTextContent("Altium Ready");
+    expect(screen.queryByText(/^Complete$/)).not.toBeInTheDocument();
   });
 });
 
@@ -492,6 +525,9 @@ describe("DetailPanel sourcing refresh", () => {
     const user = userEvent.setup();
     const { container } = wrap(<DetailPanel detail={detail()} {...BASE} />);
 
+    // Empty sourcing is collapsed by default; opening its named rail exposes the scoped
+    // background-job action without permanently consuming a workbench column.
+    await user.click(screen.getByRole("button", { name: "Sourcing" }));
     const btn = container.querySelector('[data-dev-id="detail.sourcing-refresh"]');
     expect(btn).not.toBeNull();
     await user.click(btn as HTMLElement);
@@ -502,6 +538,25 @@ describe("DetailPanel sourcing refresh", () => {
   it("offers no refresh without an MPN (nothing to look up by)", () => {
     const { container } = wrap(<DetailPanel detail={detail({ mpn: "" })} {...BASE} />);
     expect(container.querySelector('[data-dev-id="detail.sourcing-refresh"]')).toBeNull();
+  });
+
+  it("collapses an empty Sourcing pane but opens it for active recovery", async () => {
+    const user = userEvent.setup();
+    const { container } = wrap(<DetailPanel detail={detail()} {...BASE} />);
+
+    expect(
+      container.querySelector('[data-dev-id="detail.sourcing-refresh"]'),
+    ).toBeNull();
+    const rail = screen.getByRole("button", { name: "Sourcing" });
+    expect(rail).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(rail);
+    expect(
+      screen.getByText(/No sourcing evidence is recorded yet/),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-dev-id="detail.sourcing-refresh"]'),
+    ).not.toBeNull();
   });
 });
 
@@ -523,7 +578,7 @@ describe("DetailPanel dev-mode ids (IDSYS-01)", () => {
 
     expect(overview.style.display).toBe("");
     expect(representations.style.display).toBe("none");
-    await user.click(screen.getByRole("tab", { name: "Representations" }));
+    await user.click(screen.getByRole("tab", { name: "Readiness" }));
     expect(overview.style.display).toBe("none");
     expect(representations.style.display).toBe("");
     expect(representations).toHaveClass("overflow-hidden");
@@ -546,7 +601,7 @@ describe("DetailPanel dev-mode ids (IDSYS-01)", () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
 
     expect(mockCadVariantApi.inventory).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Readiness" }));
 
     expect(await screen.findByText("0 Retained")).toBeInTheDocument();
     expect(mockCadVariantApi.inventory).toHaveBeenCalledTimes(1);
@@ -564,6 +619,20 @@ describe("DetailPanel dev-mode ids (IDSYS-01)", () => {
     // both derived ids are real catalog entries, not invented strings
     expect(DEV_ID_BY_ID.has("detail.tabs")).toBe(true);
     expect(DEV_ID_BY_ID.has("detail.tab-specs")).toBe(true);
+  });
+
+  it("organizes navigation around truth, readiness, evidence, and activity", () => {
+    wrap(
+      <DetailPanel
+        detail={detail()}
+        {...BASE}
+        onEditField={vi.fn()}
+      />,
+    );
+    const partViews = screen.getByRole("tablist", { name: "Part views" });
+    expect(
+      within(partViews).getAllByRole("tab").map((tab) => tab.textContent),
+    ).toEqual(["Identity", "Readiness", "Evidence", "Activity"]);
   });
 
   it("uses the specimen column across both stacked rows while each long pane remains scrollable", () => {
@@ -653,7 +722,7 @@ describe("DetailPanel spec sheet + identity", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("headlines a passive by its derived title", () => {
+  it("uses the canonical display name for a passive while specs remain supporting truth", () => {
     wrap(
       <DetailPanel
         detail={detail({
@@ -668,8 +737,9 @@ describe("DetailPanel spec sheet + identity", () => {
       />,
     );
     expect(
-      screen.getByRole("heading", { name: "10 kΩ ±1% Resistor" }),
+      screen.getByRole("heading", { name: "10k 1% 0603" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("10 kΩ")).toBeInTheDocument();
   });
 });
 
@@ -714,7 +784,7 @@ describe("Altium 3D embed (punch 16)", () => {
   };
 
   async function openReadiness(over: DeepPartial<PartDetail> = {}) {
-    wrap(<DetailPanel detail={detail(over)} {...BASE} />);
+    wrap(<DetailPanel detail={detail(over)} edaReadiness={VERIFIED_EDA} {...BASE} />);
     await userEvent.click(screen.getByRole("button", { name: /CAD/ }));
   }
 
@@ -850,7 +920,7 @@ describe("DetailPanel alternates", () => {
   it("says how many answers a field has, without spending space until asked", async () => {
     wrap(<DetailPanel detail={withTwoDescriptions()} {...BASE} />);
     // description + datasheet now live on the Handoff TAB (owner's choice 2026-07-26)
-    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Readiness" }));
     expect(screen.getByRole("button", { name: /2 Sources/i })).toBeTruthy();
     // the other distributor's wording stays out of the way until the disclosure is opened
     expect(screen.queryByText("Step-Down Regulator, 3 A")).toBeNull();
@@ -859,7 +929,7 @@ describe("DetailPanel alternates", () => {
   it("shows each answer with the distributor that gave it once opened", async () => {
     const user = userEvent.setup();
     wrap(<DetailPanel detail={withTwoDescriptions()} {...BASE} />);
-    await user.click(screen.getByRole("tab", { name: "Representations" }));
+    await user.click(screen.getByRole("tab", { name: "Readiness" }));
     await user.click(screen.getByRole("button", { name: /2 Sources/i }));
     expect(screen.getByText("Step-Down Regulator, 3 A")).toBeTruthy();
     expect(screen.getByText("DigiKey")).toBeTruthy();
@@ -874,13 +944,13 @@ describe("DetailPanel alternates", () => {
     );
     // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
     // open it before asserting on them. The assertions themselves are unchanged.
-    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Readiness" }));
     // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
     // open it before asserting on them. The assertions themselves are unchanged.
-    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Readiness" }));
     // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
     // open it before asserting on them. The assertions themselves are unchanged.
-    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Readiness" }));
     await user.click(screen.getByRole("button", { name: /2 Sources/i }));
     await user.click(screen.getByRole("button", { name: /Use DigiKey/i }));
     expect(onEditField).toHaveBeenCalledWith("description", "Step-Down Regulator, 3 A");
@@ -893,7 +963,7 @@ describe("DetailPanel alternates", () => {
     );
     // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
     // open it before asserting on them. The assertions themselves are unchanged.
-    await userEvent.click(screen.getByRole("tab", { name: "Representations" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Readiness" }));
     await user.click(screen.getByRole("button", { name: /2 Sources/i }));
     expect(screen.queryByRole("button", { name: /Use Mouser/i })).toBeNull();
   });
@@ -960,25 +1030,50 @@ describe("DetailPanel alternates comparison", () => {
   });
 });
 
-// -- punch 15: the destructive action's interaction language. It was dim text in a corner reading
-// "Delete Part"; the owner asked for a red X that expands to "Delete Part?" on hover with a loading
-// state, and generalised the philosophy to the whole app - so it is the shared IconButton primitive
-// (which already had the reveal behaviour, zero tests and zero callers) rather than a one-off.
+// Destructive actions are component-wide but not primary. They live under one labeled title-strip
+// scope control, and remain fully named once revealed.
 describe("DetailPanel delete action", () => {
-  it("reads as a destructive action that names its consequence as a question", () => {
-    wrap(<DetailPanel detail={detail()} {...BASE} onDelete={vi.fn()} />);
-    const del = screen.getByRole("button", { name: "Delete Part?" });
-    // Reads as destructive at rest via the err token, but MUTED - no border, no fill. The full
-    // ghost-danger treatment arrives with the label when the control is approached, because a
-    // permanently bordered red box in the corner shouts louder than the text it replaced.
-    expect(del.className).toContain("--c-err");
-    expect(del.className).toContain("border-transparent");
-    expect(del.getAttribute("data-revealed")).toBe("false");
+  it("keeps component-wide actions in the title strip and out of projection details", () => {
+    const { container } = wrap(
+      <DetailPanel
+        detail={detail()}
+        {...BASE}
+        onEditField={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    const titleStrip = container.querySelector(
+      '[data-dev-id="detail.title-strip"]',
+    )!;
+    const readiness = container.querySelector(
+      '[data-dev-id="detail.readiness"]',
+    )!;
+
+    expect(
+      titleStrip.querySelector('[data-dev-id="detail.complete-part"]'),
+    ).not.toBeNull();
+    expect(
+      within(titleStrip as HTMLElement).getByRole("button", {
+        name: "More Actions",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      readiness.querySelector('[data-dev-id="detail.complete-part"]'),
+    ).toBeNull();
   });
 
-  it("shows the running state ON the control, not only in a toast", () => {
+  it("places a fully labeled destructive action under the component-wide scope", async () => {
+    wrap(<DetailPanel detail={detail()} {...BASE} onDelete={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "More Actions" }));
+    const del = screen.getByRole("button", { name: "Delete Part" });
+    expect(del).toHaveTextContent("Delete Part");
+    expect(del.className).toContain("text-err");
+  });
+
+  it("shows the running state ON the control, not only in a toast", async () => {
     wrap(<DetailPanel detail={detail()} {...BASE} onDelete={vi.fn()} deleting />);
-    const del = screen.getByRole("button", { name: "Deleting" });
+    await userEvent.click(screen.getByRole("button", { name: "More Actions" }));
+    const del = screen.getByRole("button", { name: "Deleting Part" });
     expect(del).toBeDisabled();
     expect(del).toHaveAttribute("aria-busy", "true");
   });
@@ -994,7 +1089,8 @@ describe("DetailPanel delete action", () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
     wrap(<DetailPanel detail={detail()} {...BASE} onDelete={onDelete} />);
-    await user.click(screen.getByRole("button", { name: "Delete Part?" }));
+    await user.click(screen.getByRole("button", { name: "More Actions" }));
+    await user.click(screen.getByRole("button", { name: "Delete Part" }));
     // the dialog that says it commits and can be restored from git history
     expect(await screen.findByRole("dialog")).toBeTruthy();
     expect(onDelete).not.toHaveBeenCalled();
@@ -1026,7 +1122,7 @@ describe("DetailPanel spec row pairing", () => {
 });
 
 describe("DetailPanel key specifications", () => {
-  it("fills the unused second cell when an odd key-spec count reaches the two-column grid", () => {
+  it("uses one flat definition-list elevation without a painted filler cell", () => {
     wrap(
       <DetailPanel
         detail={detail({
@@ -1046,11 +1142,10 @@ describe("DetailPanel key specifications", () => {
     );
 
     const key = screen.getByRole("region", { name: "Key Specifications" });
-    const filler = [...key.querySelectorAll('div[aria-hidden="true"]')].find((element) =>
-      element.className.includes("@sm:block"),
-    );
-    expect(filler).toBeDefined();
-    expect(filler?.className).toContain("bg-surface");
+    expect(key.className).not.toContain("border");
+    expect(key.className).not.toContain("bg-surface");
+    expect(key.querySelector("dl")).not.toBeNull();
+    expect(key.querySelector('div[aria-hidden="true"]')).toBeNull();
   });
 
   it("promotes key rows once instead of duplicating them in the full specification list", () => {
@@ -1172,7 +1267,7 @@ describe("DetailPanel links row anatomy", () => {
     wrap(<DetailPanel detail={withDatasheet()} {...BASE} onEditField={onEditField} />);
     // The datasheet field moved to the Handoff TAB (owner's choice, 2026-07-26); open it before
     // asserting on it. The assertions themselves are unchanged.
-    await user.click(screen.getByRole("tab", { name: "Representations" }));
+    await user.click(screen.getByRole("tab", { name: "Readiness" }));
     // OPENS: a real anchor at the FULL url, never the shortened display label.
     expect(screen.getByRole("link", { name: /Open Datasheet/i })).toHaveAttribute(
       "href",
@@ -1194,15 +1289,11 @@ describe("DetailPanel links row anatomy", () => {
     expect(cell.textContent).toMatch(/Not Set|Add Datasheet/);
   });
 
-  it("moves the eye into a labelled Expand action over the asset stage", () => {
+  it("uses one labelled inspection command over the asset stage", () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    // The footer is identity/status only; expansion is one large, consistent stage affordance.
-    expect(screen.queryByText("View")).toBeNull();
-    const tile = document.querySelector('[data-dev-id="detail.asset-symbol"]')!;
-    const footer = tile.lastElementChild as HTMLElement;
-    expect(within(footer).queryByRole("button")).toBeNull();
-    expect(screen.getByRole("button", { name: "Open Symbol Preview" })).toHaveTextContent(
-      "Expand",
+    const inspector = screen.getByRole("region", { name: "Inspect LM358" });
+    expect(within(inspector).getByRole("button", { name: "Expand Inspection" })).toHaveTextContent(
+      "Inspect",
     );
   });
 });
@@ -1264,45 +1355,45 @@ describe("the description lede", () => {
   });
 });
 
-// --- Compact assets use one stage-centred inspection affordance (owner, 2026-07-28). --------------
-// The mini renderer is now a passive auto-rotating specimen. Hover/focus reveals one labelled eye
-// over every present representation; detached footer glyphs and whole-card click contracts are gone.
+// --- One inspection instrument owns projection and expansion (owner, 2026-07-29). ----------------
 
-describe("the 3D tile's click target", () => {
-  it("does NOT open the modal when the stage shell outside Inspect is clicked", async () => {
+describe("the unified inspection stage", () => {
+  it("does not expand when the stage surface is clicked", () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    const tile = document.querySelector('[data-dev-id="detail.asset-hero"]');
-    expect(tile).not.toBeNull();
-    // Expansion has one explicit command, not a surprising click-anywhere contract.
-    const stage = tile!.firstElementChild as HTMLElement;
-    fireEvent.click(stage);
+    fireEvent.click(screen.getByTestId("inspection-stage"));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("keeps every present representation shell out of the button role", () => {
+  it("changes projection without expanding or replacing the instrument", async () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    for (const id of ["detail.asset-hero", "detail.asset-symbol", "detail.asset-footprint"]) {
-      expect(document.querySelector(`[data-dev-id="${id}"]`)!.tagName).toBe("DIV");
-    }
+    const inspector = screen.getByRole("region", { name: "Inspect LM358" });
+    const projectionTabs = within(inspector).getByRole("tablist", {
+      name: /inspection projection/i,
+    });
+    await userEvent.click(within(projectionTabs).getByRole("tab", { name: "Symbol" }));
+    expect(within(projectionTabs).getByRole("tab", { name: "Symbol" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("opens the modal from the labelled Expand overlay", async () => {
+  it("expands only from the labelled command", async () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    await userEvent.click(screen.getByRole("button", { name: "Open 3D Model Preview" }));
+    await userEvent.click(screen.getByRole("button", { name: "Expand Inspection" }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
-  it("gives all three present representations the same Expand contract", () => {
+  it("offers all three present representations through one selector and one command", () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    expect(screen.getByRole("button", { name: "Open 3D Model Preview" })).toHaveTextContent(
-      "Expand",
-    );
-    expect(screen.getByRole("button", { name: "Open Symbol Preview" })).toHaveTextContent(
-      "Expand",
-    );
-    expect(screen.getByRole("button", { name: "Open Footprint Preview" })).toHaveTextContent(
-      "Expand",
-    );
+    const inspector = screen.getByRole("region", { name: "Inspect LM358" });
+    const projectionTabs = within(inspector).getByRole("tablist", {
+      name: /inspection projection/i,
+    });
+    expect(
+      within(projectionTabs).getAllByRole("tab").map((tab) => tab.textContent),
+    ).toEqual(["Symbol", "Footprint", "3D Model"]);
+    expect(within(inspector).getAllByRole("button", { name: "Expand Inspection" })).toHaveLength(1);
   });
 });
 

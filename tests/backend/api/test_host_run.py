@@ -6,8 +6,10 @@ actual WebView2 window is Windows-verified."""
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
-from stockroom.host.run import run_windowed
+from stockroom.api.app import create_app
+from stockroom.host.run import _install_injected_index, run_windowed
 
 
 def test_run_windowed_serves_a_live_token_guarded_api_then_shuts_down(app_ctx):
@@ -68,6 +70,24 @@ def test_run_windowed_serves_index_with_the_token_injected(app_ctx):
     assert "__STOCKROOM_TOKEN__" in seen["index"]
     assert "testtoken" in seen["index"]
     assert "__API_BASE__" in seen["index"]
+
+
+def test_native_header_host_serves_bootstrap_without_renderer_token(app_ctx):
+    app = create_app(app_ctx)
+    _install_injected_index(
+        app,
+        "http://127.0.0.1:5123",
+        app_ctx.token,
+        app_ctx.config,
+        expose_token_to_renderer=False,
+    )
+
+    index = TestClient(app).get("/").text
+
+    assert "__API_BASE__" in index
+    assert "__STOCKROOM_SESSION__" in index
+    assert "__STOCKROOM_TOKEN__" not in index
+    assert app_ctx.token not in index
 
 
 def test_run_windowed_returns_true_when_a_restart_is_requested(app_ctx):
@@ -200,6 +220,7 @@ def test_production_host_uses_signed_runtime_and_never_touches_git_fallback(
         def __init__(self):
             self.started = False
             self.closed = False
+            self.owns_native_window = False
 
         def start(self):
             self.started = True

@@ -25,6 +25,7 @@ import type {
   AltiumStatus,
   OdbcStatus,
   CadSourceResponse,
+  CaptureWorkflowSession,
   DiffResponse,
   DoctorScan,
   DuplicatesResponse,
@@ -731,6 +732,37 @@ export const api = {
     return request<SettingsInfo>("PATCH", "/api/settings", { body: patch });
   },
 
+  // Versioned, non-secret renderer continuity. The backend validates these
+  // documents strictly and persists them outside the library repository; the
+  // loose `unknown` boundary here is intentional so the validator in
+  // lib/uiSession.ts remains the one frontend authority for the wire shape.
+  getUiSession(): Promise<unknown> {
+    return apiGet<unknown>("/api/ui-session");
+  },
+
+  putUiSession(snapshot: unknown): Promise<unknown> {
+    return request<unknown>("PUT", "/api/ui-session", { body: snapshot });
+  },
+
+  createIntakeDraft(draft: unknown): Promise<unknown> {
+    return request<unknown>("POST", "/api/intake-drafts", { body: draft });
+  },
+
+  getIntakeDraft(draftId: string, revision?: number): Promise<unknown> {
+    const suffix = revision === undefined ? "" : `?revision=${encodeURIComponent(String(revision))}`;
+    return apiGet<unknown>(`/api/intake-drafts/${encodeURIComponent(draftId)}${suffix}`);
+  },
+
+  updateIntakeDraft(draftId: string, draft: unknown): Promise<unknown> {
+    return request<unknown>("PUT", `/api/intake-drafts/${encodeURIComponent(draftId)}`, {
+      body: draft,
+    });
+  },
+
+  deleteIntakeDraft(draftId: string): Promise<void> {
+    return request<void>("DELETE", `/api/intake-drafts/${encodeURIComponent(draftId)}`);
+  },
+
   // Dev convenience (the hidden Settings combo): load any API keys / logins from the per-machine
   // dev-creds.json (in the OS config dir, never the public repo) into the config. Returns the
   // redacted settings plus `loaded`, the field names that were applied.
@@ -902,9 +934,15 @@ export const api = {
   // Give every part the files it still needs. A JOB, and a long one: at the measured catalogue
   // pace a 10,000-part library is around 21 hours, which is exactly why it is stoppable and why
   // resuming is free (the worklist is derived from the library, never bookkept).
-  runCompletion(input: { partIds?: string[]; limit?: number } = {}): Promise<CompletionRunRef> {
+  runCompletion(
+    input: { partIds?: string[]; limit?: number; idempotencyKey?: string } = {},
+  ): Promise<CompletionRunRef> {
     return request<CompletionRunRef>("POST", "/api/library/completion/run", {
-      body: { part_ids: input.partIds, limit: input.limit },
+      body: {
+        part_ids: input.partIds,
+        limit: input.limit,
+        idempotency_key: input.idempotencyKey,
+      },
     });
   },
 
@@ -968,18 +1006,26 @@ export const api = {
       vendor?: string;
       limit?: number;
       mode?: "automatic" | "assisted" | "collect-all";
+      background?: boolean;
+      idempotencyKey?: string;
     } = {},
-  ): Promise<{
-    job_id: string;
-  }> {
-    return request<{ job_id: string }>("POST", "/api/library/capture/run", {
+  ): Promise<CompletionRunRef> {
+    return request<CompletionRunRef>("POST", "/api/library/capture/run", {
       body: {
         part_ids: input.partIds,
         vendor: input.vendor,
         limit: input.limit,
         mode: input.mode,
+        background: input.background,
+        idempotency_key: input.idempotencyKey,
       },
     });
+  },
+
+  captureWorkflow(batchId: string): Promise<CaptureWorkflowSession> {
+    return apiGet<CaptureWorkflowSession>(
+      `/api/library/capture/batches/${encodeURIComponent(batchId)}`,
+    );
   },
 
   // The providers automatic acquisition can actually drive, read off the adapter registry so a

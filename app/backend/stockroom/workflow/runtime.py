@@ -268,14 +268,18 @@ class WorkflowRuntime:
 
     def _context_for(self, claim: StageRecord) -> StageContext:
         ancestors = _ANCESTORS[claim.name]
-        results: dict[StageName, FrozenJson] = {}
-        for stage in self._store.list_stages(claim.item_id):
-            if stage.name in ancestors and stage.status is StageStatus.COMPLETED:
-                results[stage.name] = _freeze_json(stage.result)
+        item, persisted_results = self._store.get_item_with_completed_results(
+            claim.item_id,
+            tuple(sorted(ancestors, key=lambda name: name.value)),
+        )
+        results = {
+            name: _freeze_json(result)
+            for name, result in persisted_results.items()
+        }
         if set(results) != set(ancestors):
             raise WorkflowConflict(f"{claim.name.value} was claimed without all dependency results")
         return StageContext(
-            item=self._store.get_item(claim.item_id),
+            item=item,
             stage=claim,
             prior_results=MappingProxyType(results),
         )

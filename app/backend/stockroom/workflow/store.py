@@ -77,7 +77,7 @@ from .model import (
 from .planner import WORKFLOW_GRAPH_VERSION, StageName, default_stage_plan
 from .publication import RECONCILABLE_PUBLICATION_STATES, is_post_commit_fence
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 BUSY_TIMEOUT_MS = 5000
 MAX_BATCH_SIZE = 1000
 MAX_CLAIM_LIMIT = 1000
@@ -571,11 +571,19 @@ _MIGRATION_4 = (
     """,
 )
 
+_MIGRATION_5 = (
+    """
+    CREATE INDEX idx_stages_lease_expiry
+    ON stages(status, lease_expires_at, id)
+    """,
+)
+
 _MIGRATIONS = {
     1: _MIGRATION_1,
     2: _MIGRATION_2,
     3: _MIGRATION_3,
     4: _MIGRATION_4,
+    5: _MIGRATION_5,
 }
 
 _BASE_TABLE_COLUMNS = {
@@ -825,6 +833,14 @@ _INDEX_SPECS = {
         "idx_batch_cancellations_state": (
             "batch_cancellations",
             ("state", "requested_at"),
+            False,
+            False,
+        ),
+    },
+    5: {
+        "idx_stages_lease_expiry": (
+            "stages",
+            ("status", "lease_expires_at", "id"),
             False,
             False,
         ),
@@ -1794,6 +1810,43 @@ class WorkflowStore:
             if row is None:
                 raise KeyError(item_id)
             return self._item_from_row(row)
+
+    def get_item_with_completed_results(
+        self,
+        item_id: str,
+        stage_names: Sequence[StageName],
+    ) -> tuple[ItemRecord, dict[StageName, JsonValue]]:
+        """Read one handler's item and required completed results atomically."""
+
+        names = tuple(dict.fromkeys(StageName(name) for name in stage_names))
+        with self._reading() as connection:
+            item_row = connection.execute(
+                "SELECT * FROM items WHERE id = ?",
+                (item_id,),
+            ).fetchone()
+            if item_row is None:
+                raise KeyError(item_id)
+            if not names:
+                return self._item_from_row(item_row), {}
+            rows = connection.execute(
+                f"""
+                SELECT name, result_json
+                FROM stages
+                WHERE item_id = ?
+                  AND status = ?
+                  AND name IN ({",".join("?" for _ in names)})
+                ORDER BY ordinal
+                """,
+                (
+                    item_id,
+                    StageStatus.COMPLETED.value,
+                    *(name.value for name in names),
+                ),
+            ).fetchall()
+            return self._item_from_row(item_row), {
+                StageName(row["name"]): decode_json(row["result_json"])
+                for row in rows
+            }
 
     def resolve_exact_identity(
         self,
@@ -3250,47 +3303,54 @@ class WorkflowStore:
         now: float,
     ) -> str:
         row = connection.execute(
-            "SELECT status FROM items WHERE id = ?",
+            """
+            SELECT
+                i.status AS item_status,
+                i.batch_id,
+                s.status AS stage_status,
+                COUNT(s.id) AS status_count
+            FROM items AS i
+            LEFT JOIN stages AS s ON s.item_id = i.id
+            WHERE i.id = ?
+            GROUP BY i.id, i.status, i.batch_id, s.status
+            """,
             (item_id,),
-        ).fetchone()
-        if row is None:
+        ).fetchall()
+        if not row:
             raise KeyError(item_id)
-        statuses = [
-            StageStatus(stage["status"])
-            for stage in connection.execute(
-                "SELECT status FROM stages WHERE item_id = ?",
-                (item_id,),
-            )
-        ]
-        automatically_advancing = {
-            StageStatus.READY,
-            StageStatus.RUNNING,
-            StageStatus.WAITING_RETRY,
+        status_counts = {
+            StageStatus(status_row["stage_status"]): int(status_row["status_count"])
+            for status_row in row
+            if status_row["stage_status"] is not None
         }
-        if any(status is StageStatus.FAILED for status in statuses):
+        stage_count = sum(status_counts.values())
+        if status_counts.get(StageStatus.FAILED, 0):
             derived = ItemStatus.FAILED
-        elif statuses and all(status is StageStatus.COMPLETED for status in statuses):
+        elif stage_count and status_counts.get(StageStatus.COMPLETED, 0) == stage_count:
             derived = ItemStatus.COMPLETED
-        elif any(status is StageStatus.RUNNING for status in statuses):
+        elif status_counts.get(StageStatus.RUNNING, 0):
             derived = ItemStatus.RUNNING
-        elif any(status in automatically_advancing for status in statuses):
+        elif any(
+            status_counts.get(status, 0)
+            for status in (
+                StageStatus.READY,
+                StageStatus.RUNNING,
+                StageStatus.WAITING_RETRY,
+            )
+        ):
             derived = ItemStatus.QUEUED
-        elif any(status is StageStatus.BLOCKED for status in statuses):
+        elif status_counts.get(StageStatus.BLOCKED, 0):
             derived = ItemStatus.BLOCKED
-        elif any(status is StageStatus.CANCELLED for status in statuses):
+        elif status_counts.get(StageStatus.CANCELLED, 0):
             derived = ItemStatus.CANCELLED
         else:
             derived = ItemStatus.QUEUED
-        if row["status"] != derived.value:
+        if row[0]["item_status"] != derived.value:
             connection.execute(
                 "UPDATE items SET status = ?, updated_at = ? WHERE id = ?",
                 (derived.value, now, item_id),
             )
-        batch_id = connection.execute(
-            "SELECT batch_id FROM items WHERE id = ?",
-            (item_id,),
-        ).fetchone()["batch_id"]
-        return batch_id
+        return str(row[0]["batch_id"])
 
     def _refresh_batch(
         self,
@@ -3298,20 +3358,27 @@ class WorkflowStore:
         batch_id: str,
         now: float,
     ) -> None:
-        row = self._require_batch_row(connection, batch_id)
-        current = BatchStatus(row["status"])
-        if current in {BatchStatus.PAUSED, BatchStatus.CANCELLED}:
-            return
-        cancellation = connection.execute(
+        row = connection.execute(
             """
-            SELECT state FROM batch_cancellations
-            WHERE batch_id = ?
+            SELECT
+                b.status,
+                cancellation.state AS cancellation_state
+            FROM batches AS b
+            LEFT JOIN batch_cancellations AS cancellation
+              ON cancellation.batch_id = b.id
+            WHERE b.id = ?
             """,
             (batch_id,),
         ).fetchone()
+        if row is None:
+            raise KeyError(batch_id)
+        current = BatchStatus(row["status"])
+        if current in {BatchStatus.PAUSED, BatchStatus.CANCELLED}:
+            return
         if (
-            cancellation is not None
-            and BatchCancellationState(cancellation["state"]) is BatchCancellationState.REQUESTED
+            row["cancellation_state"] is not None
+            and BatchCancellationState(row["cancellation_state"])
+            is BatchCancellationState.REQUESTED
         ):
             self._finalize_batch_cancellation(
                 connection,
@@ -3320,39 +3387,39 @@ class WorkflowStore:
             )
             return
 
-        statuses = [
-            ItemStatus(item["status"])
-            for item in connection.execute(
-                "SELECT status FROM items WHERE batch_id = ?",
+        status_counts = {
+            ItemStatus(status_row["status"]): int(status_row["count"])
+            for status_row in connection.execute(
+                """
+                SELECT status, COUNT(*) AS count
+                FROM items
+                WHERE batch_id = ?
+                GROUP BY status
+                """,
                 (batch_id,),
             )
-        ]
-        terminal = {
-            ItemStatus.COMPLETED,
-            ItemStatus.FAILED,
-            ItemStatus.CANCELLED,
         }
-        if statuses and all(status is ItemStatus.COMPLETED for status in statuses):
+        item_count = sum(status_counts.values())
+        terminal_count = (
+            status_counts.get(ItemStatus.COMPLETED, 0)
+            + status_counts.get(ItemStatus.FAILED, 0)
+            + status_counts.get(ItemStatus.CANCELLED, 0)
+        )
+        if item_count and status_counts.get(ItemStatus.COMPLETED, 0) == item_count:
             derived = BatchStatus.COMPLETED
-        elif statuses and all(status in terminal for status in statuses):
-            if any(status is ItemStatus.FAILED for status in statuses):
+        elif item_count and terminal_count == item_count:
+            if status_counts.get(ItemStatus.FAILED, 0):
                 derived = BatchStatus.FAILED
-            elif any(status is ItemStatus.CANCELLED for status in statuses):
+            elif status_counts.get(ItemStatus.CANCELLED, 0):
                 derived = BatchStatus.CANCELLED
             else:
                 derived = BatchStatus.COMPLETED
-        elif statuses and all(
-            status
-            in {
-                ItemStatus.BLOCKED,
-                ItemStatus.COMPLETED,
-                ItemStatus.FAILED,
-                ItemStatus.CANCELLED,
-            }
-            for status in statuses
+        elif (
+            item_count
+            and terminal_count + status_counts.get(ItemStatus.BLOCKED, 0) == item_count
         ):
             derived = BatchStatus.BLOCKED
-        elif any(status is ItemStatus.RUNNING for status in statuses):
+        elif status_counts.get(ItemStatus.RUNNING, 0):
             derived = BatchStatus.RUNNING
         else:
             derived = BatchStatus.QUEUED
@@ -3495,8 +3562,18 @@ class WorkflowStore:
         now: float,
     ) -> int:
         rows = connection.execute(
-            f"""
-            {_STAGE_SELECT}
+            """
+            SELECT
+                s.id,
+                s.item_id,
+                i.batch_id,
+                s.name,
+                s.attempt_count,
+                s.lease_owner,
+                s.lease_token,
+                s.lease_generation
+            FROM stages AS s
+            JOIN items AS i ON i.id = s.item_id
             WHERE s.status = ?
               AND s.lease_expires_at <= ?
             ORDER BY s.id

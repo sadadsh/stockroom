@@ -1,11 +1,11 @@
 /**
  * Runtime wiring for the API base URL and per-launch bearer token.
  *
- * On Windows the WebView2 host injects window.__API_BASE__ and
- * window.__STOCKROOM_TOKEN__ before the SPA loads (the token is minted fresh per
- * launch and never persisted, per the security model). For local browser dev we
- * fall back to VITE_API_BASE, then to the loopback default the standalone server
- * uses. The token may be empty in dev if the server was started without one.
+ * The production native WebView2 host keeps the API token outside JavaScript
+ * and adds it to approved same-origin requests. A legacy development host may
+ * still inject the base and token globals. Otherwise the SPA uses its served
+ * HTTP origin, with VITE_API_BASE and the standalone loopback URL retained for
+ * browser development. The token is deliberately optional.
  */
 
 declare global {
@@ -27,6 +27,12 @@ export function apiBase(): string {
   if (injected && injected.trim()) return trimTrailingSlash(injected.trim());
   const fromEnv = import.meta.env.VITE_API_BASE as string | undefined;
   if (fromEnv && fromEnv.trim()) return trimTrailingSlash(fromEnv.trim());
+  if (
+    typeof window !== "undefined" &&
+    (window.location.protocol === "http:" || window.location.protocol === "https:")
+  ) {
+    return trimTrailingSlash(window.location.origin);
+  }
   return DEV_DEFAULT_BASE;
 }
 

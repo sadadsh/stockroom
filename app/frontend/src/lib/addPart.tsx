@@ -5,7 +5,15 @@
  * (no route, no OS window), so opening it never navigates away from wherever the
  * user is. AppShell renders <AddPartModal/> off this; consumers call open()/close().
  */
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { readUiSession, updateUiSession } from "./uiSession";
 
 interface AddPartValue {
   isOpen: boolean;
@@ -16,10 +24,24 @@ interface AddPartValue {
 const AddPartContext = createContext<AddPartValue | null>(null);
 
 export function AddPartProvider({ children }: { children: ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(
+    () => readUiSession().open_surface === "add_part",
+  );
+  const open = useCallback(() => {
+    setIsOpen(true);
+    if (readUiSession().open_surface !== "add_part") {
+      updateUiSession((current) => ({ ...current, open_surface: "add_part" }));
+    }
+  }, []);
+  const close = useCallback(() => {
+    setIsOpen(false);
+    if (readUiSession().open_surface === "add_part") {
+      updateUiSession((current) => ({ ...current, open_surface: null }));
+    }
+  }, []);
   const value = useMemo<AddPartValue>(
-    () => ({ isOpen, open: () => setIsOpen(true), close: () => setIsOpen(false) }),
-    [isOpen],
+    () => ({ isOpen, open, close }),
+    [close, isOpen, open],
   );
   return <AddPartContext.Provider value={value}>{children}</AddPartContext.Provider>;
 }

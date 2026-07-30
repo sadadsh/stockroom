@@ -8,6 +8,7 @@ import { apiBase, apiToken } from "../lib/runtime";
 
 export type CadVariantTool = "kicad" | "altium";
 export type CadVariantArtifactKind = "symbol" | "footprint" | "model";
+export type CadVariantVerificationState = "reverified";
 
 export interface CadVariantArtifact {
   kind: CadVariantArtifactKind;
@@ -20,7 +21,7 @@ export interface CadVariant {
   format: string;
   artifacts: readonly CadVariantArtifact[];
   evidenceDigest: string;
-  validationChecks: number;
+  verificationState: CadVariantVerificationState;
   /**
    * Lower is more trusted. Ranking belongs to backend policy, not provider-name logic in the UI.
    */
@@ -40,6 +41,7 @@ export interface CadVariantPair {
   altiumVariantId: string;
   provider: string;
   trustRank: number;
+  verificationState: CadVariantVerificationState;
   trustLabel: string;
   trustReason?: string;
 }

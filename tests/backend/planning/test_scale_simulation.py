@@ -15,6 +15,7 @@ from stockroom.planning import (
 from stockroom.workflow import StageName, WorkflowStore
 
 
+@pytest.mark.performance_budget
 @pytest.mark.parametrize(
     ("identity_count", "batch_size", "claim_limit", "worker_count"),
     (
@@ -74,9 +75,11 @@ def test_synthetic_scale_reopens_and_settles_exactly_once(
     assert report.elapsed_seconds > 0
     assert report.stage_dispatches_per_second > 0
     assert report.performance_target_seconds == 30.0
-    assert report.performance_target_met is (
-        report.elapsed_seconds <= report.performance_target_seconds
+    assert report.performance_target_met, (
+        f"{identity_count}-identity simulation took {report.elapsed_seconds:.3f}s; "
+        f"budget is {report.performance_target_seconds:.3f}s"
     )
+    assert report.elapsed_seconds <= report.performance_target_seconds
     assert report.optimization_hypothesis
     assert report.next_discriminating_optimization_target
     assert report.database_file_size_bytes > 0

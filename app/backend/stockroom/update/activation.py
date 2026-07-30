@@ -42,6 +42,7 @@ _ACTIVE_ACTIVATIONS: set[tuple[str, int, str]] = set()
 _BLOCKING_REASONS = frozenset(
     {
         "adoption_failed",
+        "adoption_commit_failed",
         "candidate_verification_failed",
         "current_release_verification_failed",
         "drain_failed",
@@ -52,6 +53,9 @@ _BLOCKING_REASONS = frozenset(
         "rehearsal_failed",
         "rollback_failed",
         "rollback_target_incompatible",
+        "rollback_target_unauthorized",
+        "rollback_target_unavailable",
+        "rollback_target_verification_failed",
         "stale_generation",
     }
 )
@@ -76,6 +80,7 @@ class ReleaseActivationPhase(str, Enum):
     ADOPTING = "adopting"
     POST_ADOPTION_HEALTH = "post_adoption_health"
     COMMITTING = "committing"
+    FINALIZING = "finalizing"
     ACTIVE = "active"
     ROLLING_BACK = "rolling_back"
     ROLLED_BACK = "rolled_back"
@@ -142,6 +147,14 @@ class ReleaseRehearsalPort(Protocol):
     """Rehearse schemas, workflows, adapters, and migrations without adoption."""
 
     def rehearse(
+        self,
+        candidate: AcceptedRelease,
+        current: AcceptedRelease,
+        *,
+        generation: int,
+    ) -> None: ...
+
+    def rehearse_rollback(
         self,
         candidate: AcceptedRelease,
         current: AcceptedRelease,
@@ -228,6 +241,17 @@ class ReleaseAdoptionPort(Protocol):
         *,
         generation: int,
     ) -> None: ...
+
+    def commit(
+        self,
+        candidate: AcceptedRelease,
+        current: AcceptedRelease,
+        adoption_receipt: object,
+        *,
+        generation: int,
+    ) -> None:
+        """Finalize irreversible host retirement after the release pointer commits."""
+        ...
 
 
 class _StageFailure(Exception):
@@ -379,15 +403,27 @@ class ReleaseActivator:
             with _ACTIVE_ACTIVATIONS_LOCK:
                 _ACTIVE_ACTIVATIONS.discard(registration_key)
 
-    def _activate(self, candidate: VerifiedReleaseSet) -> ActiveReleaseState:
-        original: ActiveReleaseState
-        accepted_candidate: AcceptedRelease
-        launch_handle: object | None = None
-        drain_receipt: object | None = None
-        adoption_receipt: object | None = None
-        adopted = False
-        failure_reason = "candidate_verification_failed"
+    def rollback_to_previous(self) -> ActiveReleaseState:
+        """Commit the signed rollback target as a fresh active release."""
 
+        if self._role is not ReleaseActivationRole.COORDINATOR:
+            raise ReleaseActivationRoleError(
+                "shadow activator cannot roll back releases"
+            )
+        registration_key = self._registration_key()
+        with _ACTIVE_ACTIVATIONS_LOCK:
+            if registration_key in _ACTIVE_ACTIVATIONS:
+                raise ReleaseActivationBusy(
+                    "coordinator generation already has an activation in progress"
+                )
+            _ACTIVE_ACTIVATIONS.add(registration_key)
+        try:
+            return self._activate_previous()
+        finally:
+            with _ACTIVE_ACTIVATIONS_LOCK:
+                _ACTIVE_ACTIVATIONS.discard(registration_key)
+
+    def _activate(self, candidate: VerifiedReleaseSet) -> ActiveReleaseState:
         try:
             self._transition(
                 ReleaseActivationPhase.VERIFYING,
@@ -429,14 +465,115 @@ class ReleaseActivator:
                 original.current.release_id
             ):
                 raise _StageFailure("rollback_target_incompatible")
+        except CoordinatorConflict:
+            self._set_stale()
+            raise
+        except ReleaseStoreAuthorityError as exc:
+            self._set_stale()
+            raise CoordinatorConflict(
+                "release activation generation fence is stale"
+            ) from exc
+        except _StageFailure as failure:
+            self._set_failed(failure.reason)
+            raise ReleaseActivationFailed(
+                failure.reason,
+                rolled_back=False,
+            ) from failure
+        except BaseException as exc:
+            self._set_failed("candidate_verification_failed")
+            raise ReleaseActivationFailed(
+                "candidate_verification_failed",
+                rolled_back=False,
+            ) from exc
 
+        return self._activate_accepted(
+            accepted_candidate,
+            original,
+            selection_reason="activate",
+            rollback_rehearsal=False,
+        )
+
+    def _activate_previous(self) -> ActiveReleaseState:
+        try:
+            self._transition(
+                ReleaseActivationPhase.VERIFYING,
+                candidate_release_id=None,
+                current_release_id=None,
+                blocking_reason=None,
+            )
+            try:
+                original = self._store.verify_startup(self._control)
+            except ImmutableReleaseStoreError as exc:
+                raise _StageFailure("rollback_target_verification_failed") from exc
+            self._require_active_fence()
+            with self._lock:
+                self._current_release_id = original.current.release_id
+            accepted_candidate = original.previous
+            if accepted_candidate is None:
+                raise _StageFailure("rollback_target_unavailable")
+            current_manifest = original.current.manifest
+            if (
+                current_manifest.rollback_release_id.casefold()
+                != accepted_candidate.release_id.casefold()
+                or not current_manifest.supports_direct_activation_from(
+                    accepted_candidate.release_id
+                )
+            ):
+                raise _StageFailure("rollback_target_unauthorized")
+        except CoordinatorConflict:
+            self._set_stale()
+            raise
+        except ReleaseStoreAuthorityError as exc:
+            self._set_stale()
+            raise CoordinatorConflict(
+                "release activation generation fence is stale"
+            ) from exc
+        except _StageFailure as failure:
+            self._set_failed(failure.reason)
+            raise ReleaseActivationFailed(
+                failure.reason,
+                rolled_back=False,
+            ) from failure
+        except BaseException as exc:
+            self._set_failed("rollback_target_verification_failed")
+            raise ReleaseActivationFailed(
+                "rollback_target_verification_failed",
+                rolled_back=False,
+            ) from exc
+
+        return self._activate_accepted(
+            accepted_candidate,
+            original,
+            selection_reason="rollback",
+            rollback_rehearsal=True,
+        )
+
+    def _activate_accepted(
+        self,
+        accepted_candidate: AcceptedRelease,
+        original: ActiveReleaseState,
+        *,
+        selection_reason: str,
+        rollback_rehearsal: bool,
+    ) -> ActiveReleaseState:
+        launch_handle: object | None = None
+        drain_receipt: object | None = None
+        adoption_receipt: object | None = None
+        adopted = False
+        failure_reason = "rehearsal_failed"
+
+        try:
             self._transition(
                 ReleaseActivationPhase.REHEARSING,
                 candidate_release_id=accepted_candidate.release_id,
                 current_release_id=original.current.release_id,
                 blocking_reason=None,
             )
-            self._call_rehearsal(accepted_candidate, original.current)
+            self._call_rehearsal(
+                accepted_candidate,
+                original.current,
+                rollback=rollback_rehearsal,
+            )
 
             self._transition(
                 ReleaseActivationPhase.LAUNCHING,
@@ -504,7 +641,7 @@ class ReleaseActivator:
                 activated = self._store.select_active(
                     accepted_candidate,
                     previous=original.current,
-                    selection_reason="activate",
+                    selection_reason=selection_reason,
                     control=self._control,
                     fence=self._required_fence(),
                 )
@@ -512,6 +649,18 @@ class ReleaseActivator:
                 raise
             except ImmutableReleaseStoreError as exc:
                 raise _StageFailure("pointer_commit_failed") from exc
+
+            self._transition(
+                ReleaseActivationPhase.FINALIZING,
+                candidate_release_id=accepted_candidate.release_id,
+                current_release_id=accepted_candidate.release_id,
+                blocking_reason=None,
+            )
+            self._call_commit(
+                accepted_candidate,
+                original.current,
+                adoption_receipt,
+            )
 
             self._transition(
                 ReleaseActivationPhase.ACTIVE,
@@ -597,17 +746,26 @@ class ReleaseActivator:
         self,
         candidate: AcceptedRelease,
         current: AcceptedRelease,
+        *,
+        rollback: bool,
     ) -> None:
         rehearsal = self._rehearsal
         if rehearsal is None:
             raise _StageFailure("rehearsal_failed")
         self._require_active_fence()
         try:
-            rehearsal.rehearse(
-                candidate,
-                current,
-                generation=self._generation(),
-            )
+            if rollback:
+                rehearsal.rehearse_rollback(
+                    candidate,
+                    current,
+                    generation=self._generation(),
+                )
+            else:
+                rehearsal.rehearse(
+                    candidate,
+                    current,
+                    generation=self._generation(),
+                )
         except CoordinatorConflict:
             raise
         except BaseException as exc:
@@ -695,6 +853,29 @@ class ReleaseActivator:
             raise _StageFailure("adoption_failed") from exc
         self._require_active_fence()
         return receipt
+
+    def _call_commit(
+        self,
+        candidate: AcceptedRelease,
+        current: AcceptedRelease,
+        adoption_receipt: object,
+    ) -> None:
+        adoption = self._adoption
+        if adoption is None:
+            raise _StageFailure("adoption_commit_failed")
+        self._require_active_fence()
+        try:
+            adoption.commit(
+                candidate,
+                current,
+                adoption_receipt,
+                generation=self._generation(),
+            )
+        except CoordinatorConflict:
+            raise
+        except BaseException as exc:
+            raise _StageFailure("adoption_commit_failed") from exc
+        self._require_active_fence()
 
     def _recover_pre_adoption(
         self,

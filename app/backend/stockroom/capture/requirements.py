@@ -52,6 +52,22 @@ def split_requirement(req: "Requirement") -> tuple[str, str]:
     return tool, kind
 
 
+def capture_requirements(record) -> list[Requirement]:
+    """Every owned CAD requirement for a part, independent of projected references.
+
+    This is the authority list for acquisition and immutable-evidence verification.
+    ``capture_needs`` is intentionally narrower: it is only the current projection's
+    presence view. Keeping both answers explicit prevents a populated ``AssetRef`` from
+    being mistaken for proof that the referenced bytes were validated.
+    """
+
+    return [
+        requirement(tool_key, kind)
+        for tool_key, kind in _capturable()
+        if kind in record.capturable(tool_key)
+    ]
+
+
 def capture_needs(record) -> list[Requirement]:
     """The requirements a part is missing, in registry order (each tool's kinds together).
 
@@ -72,9 +88,8 @@ def capture_needs(record) -> list[Requirement]:
     owner's passives - 136 requirements nothing could ever satisfy.
     """
     needs: list[Requirement] = []
-    for tool_key, kind in _capturable():
-        if kind not in record.capturable(tool_key):
-            continue
+    for owned in capture_requirements(record):
+        tool_key, kind = split_requirement(owned)
         if not asset_present(record.assets_for(tool_key).get(kind)):
-            needs.append(requirement(tool_key, kind))
+            needs.append(owned)
     return needs

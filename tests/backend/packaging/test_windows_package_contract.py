@@ -10,7 +10,9 @@ from PIL import Image
 
 from packaging.package_contract import (
     APPINSTALLER_NAMESPACE,
+    BASE_ASSETS,
     PACKAGE_NAMESPACE,
+    SHELL_TARGET_SIZES,
     PackageConfiguration,
     PackageContractError,
     inventory_tree,
@@ -47,7 +49,24 @@ def render_fixture(root: Path) -> tuple[Path, Path, Path]:
         version_info_path=version_info,
         source_icon=SOURCE_ICON,
     )
+    window_host = package_root / "WindowHost"
+    window_host.mkdir()
+    (window_host / "Stockroom.WindowHost.exe").write_bytes(b"MZwindow-host")
+    (window_host / "Stockroom.WindowHost.dll").write_bytes(b"runtime")
     return package_root, appinstaller, version_info
+
+
+def test_validation_requires_complete_native_window_host(tmp_path: Path) -> None:
+    package_root, appinstaller, _ = render_fixture(tmp_path)
+    (package_root / "WindowHost" / "Stockroom.WindowHost.dll").unlink()
+
+    with pytest.raises(PackageContractError, match="self-contained runtime"):
+        validate_rendered_contract(
+            fixture_configuration(),
+            manifest_path=package_root / "AppxManifest.xml",
+            appinstaller_path=appinstaller,
+            package_root=package_root,
+        )
 
 
 def digest(path: Path) -> str:
@@ -225,6 +244,43 @@ def test_rendered_assets_and_contract_are_byte_reproducible(tmp_path: Path) -> N
             assert image.mode == "RGBA"
             assert image.size == expected_size
 
+    assets = first_root / "Assets"
+    expected_names = set(BASE_ASSETS)
+    for size in SHELL_TARGET_SIZES:
+        base = f"Square44x44Logo.targetsize-{size}"
+        expected_names.update(
+            {
+                f"{base}.png",
+                f"{base}_altform-unplated.png",
+                f"{base}_altform-lightunplated.png",
+            }
+        )
+    assert {path.name for path in assets.iterdir()} == expected_names
+
+    for size in SHELL_TARGET_SIZES:
+        for suffix in (
+            ".png",
+            "_altform-unplated.png",
+            "_altform-lightunplated.png",
+        ):
+            with Image.open(assets / f"Square44x44Logo.targetsize-{size}{suffix}") as image:
+                assert image.mode == "RGBA"
+                assert image.size == (size, size)
+
+
+def test_rendered_contract_rejects_a_changed_shell_asset(tmp_path: Path) -> None:
+    package_root, appinstaller, _ = render_fixture(tmp_path)
+    changed = package_root / "Assets" / "Square44x44Logo.targetsize-32.png"
+    changed.write_bytes(changed.read_bytes() + b"changed")
+
+    with pytest.raises(PackageContractError, match="stale or non-deterministic"):
+        validate_rendered_contract(
+            fixture_configuration(),
+            manifest_path=package_root / "AppxManifest.xml",
+            appinstaller_path=appinstaller,
+            package_root=package_root,
+        )
+
 
 def test_inventory_is_case_insensitive_path_sorted_and_content_only(
     tmp_path: Path,
@@ -285,6 +341,10 @@ def test_windows_build_keeps_sdk_validation_and_round_trip_enabled() -> None:
     assert '"normalize-msix",' in script
     assert "MakeAppx round-trip changed AppxManifest.xml." in script
     assert "MakeAppx round-trip changed Stockroom.exe." in script
+    assert '"--runtime", "win-x64"' in script
+    assert '"--self-contained", "true"' in script
+    assert '"--window-host-root", (Join-Path $stage "WindowHost")' in script
+    assert "MakeAppx round-trip changed the native window host payload." in script
 
 
 def test_windows_build_fails_closed_around_production_signing() -> None:

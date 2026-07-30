@@ -32,6 +32,9 @@ export default {
         t1: "var(--c-t1)",
         t2: "var(--c-t2)",
         t3: "var(--c-t3)",
+        ink: "var(--c-text-primary)",
+        copy: "var(--c-text-secondary)",
+        helper: "var(--c-text-helper)",
         // status
         ok: "var(--c-ok)",
         warn: "var(--c-warn)",
@@ -96,9 +99,18 @@ export default {
         ],
       },
       fontSize: {
-        // The mockup's compact desktop scale, routed through CSS variables (defaults in
-        // styles/index.css) so dev mode can nudge each size live. The line-heights stay bundled
-        // here (the type scale bundles them); only the px size is a token.
+        // Semantic roles are the preferred interface vocabulary. Numeric aliases
+        // remain while older surfaces migrate, but resolve to the same CSS authority.
+        "ui-meta": ["var(--fs-ui-meta)", { lineHeight: "1.4" }],
+        "ui-caption": ["var(--fs-ui-caption)", { lineHeight: "1.45" }],
+        "ui-body": ["var(--fs-ui-body)", { lineHeight: "1.45" }],
+        "ui-label": ["var(--fs-ui-label)", { lineHeight: "1.4" }],
+        "ui-heading": ["var(--fs-ui-heading)", { lineHeight: "1.35" }],
+        "ui-subtitle": ["var(--fs-ui-subtitle)", { lineHeight: "1.3" }],
+        "ui-title": [
+          "var(--fs-ui-title)",
+          { lineHeight: "1.12", letterSpacing: "-0.02em" },
+        ],
         "2xs": ["var(--fs-2xs)", { lineHeight: "1.4" }],
         xs: ["var(--fs-xs)", { lineHeight: "1.45" }],
         sm: ["var(--fs-sm)", { lineHeight: "1.45" }],

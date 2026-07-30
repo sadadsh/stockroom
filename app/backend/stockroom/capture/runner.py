@@ -14,7 +14,10 @@ same-download KiCad + native Altium + STEP set.
 from __future__ import annotations
 
 import inspect
+import json
 import os
+import re
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,6 +39,8 @@ from stockroom.text import counted
 
 # Five parts in a row all blocked is the catalogue having closed the door, not a burst edge.
 _BREAKER_THRESHOLD = 5
+_DURABLE_CAPTURE_ITEM_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z", re.ASCII)
+_DURABLE_CAPTURE_REPORT_MAX_BYTES = 4 * 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +74,9 @@ class HumanRequiredSource:
         self.report_label = (
             routes[0].label
             if len(routes) == 1
-            else adapter.capability.label if adapter is not None else provider_key
+            else adapter.capability.label
+            if adapter is not None
+            else provider_key
         )
         self._routes = routes
         self._provides = frozenset(provides)
@@ -116,9 +123,7 @@ def _provider_route_plan(provider_key: str) -> tuple[ProviderRoutePlan, ...]:
     seen: set[str] = set()
     for route in routes:
         author_key = (
-            str(getattr(route, "evidence_provider_key", "") or provider_key)
-            .strip()
-            .casefold()
+            str(getattr(route, "evidence_provider_key", "") or provider_key).strip().casefold()
         )
         plan = ProviderRoutePlan(
             provider_key=provider_key,
@@ -244,10 +249,18 @@ def coverage(ctx) -> dict:
     and `unsourced` counts parts with a real gap that neither lane can fill. The first two may
     overlap: a part can gain KiCad automatically and still need an assisted native-Altium export.
     """
+    from stockroom.capture.complete import completion_needs
     from stockroom.capture.requirements import Requirement
     from stockroom.capture.vendors import get_adapter
+    from stockroom.capture.verified_cache import record_completion_evidence
+    from stockroom.evidence import EvidenceStore
 
-    direct_sources = build_sources(ctx, paced=False)
+    evidence_store = EvidenceStore(_capture_evidence_root(ctx))
+    direct_sources = build_sources(
+        ctx,
+        paced=False,
+        evidence_store=evidence_store,
+    )
     can_provide = set()
     for source in direct_sources:
         can_provide |= set(source.provides())
@@ -290,9 +303,8 @@ def coverage(ctx) -> dict:
             record = ctx.ops.load_record(path.stem)
         except Exception:  # noqa: BLE001 - a corrupt record is counted, never fatal
             continue
-        from stockroom.capture.requirements import capture_needs
-
-        needs = capture_needs(record)
+        evidence = record_completion_evidence(evidence_store, record)
+        needs = completion_needs(record, evidence)
         if not needs:
             complete += 1
             continue
@@ -417,11 +429,7 @@ def run_guided_capture(
             )
             provider_keys = [
                 *automatic_provider_keys,
-                *(
-                    key
-                    for key in provider_order
-                    if key not in set(automatic_provider_keys)
-                ),
+                *(key for key in provider_order if key not in set(automatic_provider_keys)),
             ]
         else:
             # One click authorizes ordinary controls on exactly the provider the person selected.
@@ -439,6 +447,7 @@ def run_guided_capture(
     from stockroom.capture.browser import SharedPlaywrightRuntime
     from stockroom.capture.guided import GuidedCaptureSource
     from stockroom.capture.vendors import get_adapter
+    from stockroom.capture.verified_cache import record_completion_evidence
     from stockroom.evidence import EvidenceStore
     from stockroom.ingest.pipeline import IngestPipeline
 
@@ -451,6 +460,10 @@ def run_guided_capture(
         )
 
     evidence_store = EvidenceStore(_capture_evidence_root(ctx))
+
+    def completion_evidence_resolver(record):
+        return record_completion_evidence(evidence_store, record)
+
     if collect_all:
         from stockroom.capture.evidence import exact_identity
 
@@ -482,12 +495,8 @@ def run_guided_capture(
         evidence_provider_key = getattr(adapter, "evidence_provider_key", key)
         automatic_source = key in automatic_provider_set
         if collect_all:
-            source_user_driven = (
-                not automatic_source and not adapter.capability.operator_automation
-            )
-            source_operator_authorized = (
-                not automatic_source and not source_user_driven
-            )
+            source_user_driven = not automatic_source and not adapter.capability.operator_automation
+            source_operator_authorized = not automatic_source and not source_user_driven
         else:
             source_user_driven = user_driven or (
                 operator_authorized and not adapter.capability.operator_automation
@@ -559,11 +568,7 @@ def run_guided_capture(
     guided_sources = [make_guided_source(key) for key in provider_keys]
     deferred_sources = []
     if not explicit_provider_capture and not collect_all:
-        deferred_keys = [
-            key
-            for key in _vendor_chain(vendor)
-            if key not in automatic_provider_set
-        ]
+        deferred_keys = [key for key in _vendor_chain(vendor) if key not in automatic_provider_set]
         deferred_sources = [
             HumanRequiredSource(
                 key,
@@ -593,7 +598,10 @@ def run_guided_capture(
 
     if part_ids is None:
         work = iter_incomplete(
-            ctx.profile.library.parts_dir, load_record=load_record, sources=sources
+            ctx.profile.library.parts_dir,
+            load_record=load_record,
+            sources=sources,
+            evidence_resolver=completion_evidence_resolver,
         )
         total = None
     else:
@@ -614,6 +622,7 @@ def run_guided_capture(
             breaker=CircuitBreaker(threshold=_BREAKER_THRESHOLD),
             collect_variants=explicit_provider_capture or collect_all,
             exhaustive=collect_all,
+            evidence_resolver=completion_evidence_resolver,
         )
     finally:
         for source in guided_sources:
@@ -659,6 +668,56 @@ def capture_state_root() -> Path:
     xdg_state = os.environ.get("XDG_STATE_HOME")
     base = Path(xdg_state) if xdg_state else Path.home() / ".local" / "state"
     return base / "stockroom" / "capture"
+
+
+def durable_capture_report_path(item_id: str) -> Path:
+    """Return the machine-local report path for one durable workflow item."""
+
+    if type(item_id) is not str or _DURABLE_CAPTURE_ITEM_ID.fullmatch(item_id) is None:
+        raise ValueError("durable capture item id is not a valid opaque reference")
+    root = capture_state_root() / "Durable Capture Reports"
+    root.mkdir(parents=True, exist_ok=True)
+    return root / f"{item_id}.json"
+
+
+def write_durable_capture_report(item_id: str, report: dict) -> None:
+    """Atomically retain one bounded, already-sanitized capture result."""
+
+    from stockroom.workflow.model import canonical_json
+
+    if type(report) is not dict:
+        raise TypeError("durable capture report must be a JSON object")
+    payload = canonical_json(report).encode("utf-8")
+    if len(payload) > _DURABLE_CAPTURE_REPORT_MAX_BYTES:
+        raise ValueError("durable capture report exceeds the bounded result size")
+    path = durable_capture_report_path(item_id)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def read_durable_capture_report(item_id: str) -> dict | None:
+    """Read a retained report without accepting oversized or non-object data."""
+
+    path = durable_capture_report_path(item_id)
+    if not path.is_file():
+        return None
+    payload = path.read_bytes()
+    if not payload or len(payload) > _DURABLE_CAPTURE_REPORT_MAX_BYTES:
+        raise ValueError("durable capture report has an invalid size")
+    try:
+        report = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("durable capture report is not valid UTF-8 JSON") from exc
+    if type(report) is not dict:
+        raise ValueError("durable capture report is not a JSON object")
+    return report
 
 
 def _capture_downloads(_ctx, provider_key: str) -> Path:

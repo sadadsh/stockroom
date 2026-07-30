@@ -19,10 +19,10 @@ function variant(overrides: Partial<CadVariant> = {}): CadVariant {
       { kind: "model", fileName: "Part.step" },
     ],
     evidenceDigest: "sha256:ul-shared",
-    validationChecks: 12,
+    verificationState: "reverified",
     trustRank: 10,
     trustLabel: "Preferred Source",
-    trustReason: "The provider evidence passed exact validation.",
+    trustReason: "The provider evidence was reverified.",
     ...overrides,
   };
 }
@@ -42,7 +42,7 @@ function inventories(
           provider: "SnapMagic",
           evidenceDigest: "sha256:snap-shared",
           trustRank: 20,
-          trustLabel: "Validated Fallback",
+          trustLabel: "Fallback Source",
         }),
       ],
     },
@@ -67,7 +67,7 @@ function inventories(
           ],
           evidenceDigest: "sha256:snap-shared",
           trustRank: 20,
-          trustLabel: "Validated Fallback",
+          trustLabel: "Fallback Source",
         }),
       ],
     },
@@ -81,7 +81,8 @@ function pairs(): CadVariantPair[] {
       altiumVariantId: "ul-shared",
       provider: "Ultra Librarian",
       trustRank: 0,
-      trustLabel: "Same-Download Validated Pair",
+      verificationState: "reverified",
+      trustLabel: "Same-Download Pair",
       trustReason: "Both projections came from one immutable provider manifest.",
     },
     {
@@ -89,7 +90,8 @@ function pairs(): CadVariantPair[] {
       altiumVariantId: "snap-shared",
       provider: "SnapMagic",
       trustRank: 1,
-      trustLabel: "Same-Download Validated Pair",
+      verificationState: "reverified",
+      trustLabel: "Same-Download Pair",
       trustReason: "Both projections came from one immutable provider manifest.",
     },
   ];
@@ -152,6 +154,9 @@ describe("CadVariantSelector", () => {
       }),
     ).toHaveAttribute("aria-current", "true");
     expect(screen.getByText("4 Retained")).toBeInTheDocument();
+    expect(screen.getAllByText("Reverified")).toHaveLength(4);
+    expect(screen.queryByText("Validated")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Checks?$/)).not.toBeInTheDocument();
   });
 
   it("switches both EDAs with one compare-and-switch request and exposes no single-tool control", async () => {
@@ -188,7 +193,7 @@ describe("CadVariantSelector", () => {
       ),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText(/same-provider, same-download KiCad and Altium pair/i),
+      screen.getByText(/same-provider, same-download KiCad and Altium pair are reverified/i),
     ).toBeInTheDocument();
   });
 
@@ -245,7 +250,7 @@ describe("CadVariantSelector", () => {
     );
 
     expect(
-      screen.getByText("No validated Altium variants are retained for this part."),
+      screen.getByText("No reverified Altium variants are retained for this part."),
     ).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent(
       "The CAD pair changed before this switch completed.",
@@ -273,5 +278,35 @@ describe("CadVariantSelector", () => {
     expect(within(traceParts).getByText("Not Activatable")).toBeInTheDocument();
     expect(screen.getByText("2 Originals")).toBeInTheDocument();
     expect(within(traceParts).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("fails pair activation closed when either variant lacks reverified evidence", () => {
+    const withoutEvidence = inventories();
+    withoutEvidence[1] = {
+      ...withoutEvidence[1],
+      variants: withoutEvidence[1].variants.map((candidate) =>
+        candidate.id === "snap-shared"
+          ? { ...candidate, verificationState: undefined as never }
+          : candidate,
+      ),
+    };
+
+    render(
+      <CadVariantSelector
+        inventories={withoutEvidence}
+        pairs={pairs()}
+        supplementary={[]}
+        onActivatePair={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getAllByText("Verification Evidence Missing").length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getByRole("button", {
+        name: "Use SnapMagic for KiCad and Altium",
+      }),
+    ).toBeDisabled();
   });
 });

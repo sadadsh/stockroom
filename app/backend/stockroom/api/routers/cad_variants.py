@@ -140,9 +140,10 @@ def _descriptor_document(descriptor: CadVariantDescriptor) -> dict:
             for artifact in descriptor.artifacts
         ],
         "evidenceDigest": descriptor.manifest_digest,
-        # One digest/readback check per projected role, the bundle validation report itself,
-        # and one recursively reverified dependency closure per source manifest.
-        "validationChecks": len(descriptor.artifacts) + 1 + len(descriptor.source_manifests),
+        # Descriptors reach this wire only through ``list_cad_variants``, which re-reads
+        # the exact-identity manifest, validation report, dependency closure, role set,
+        # and content-addressed bytes. A made-up check count is not evidence.
+        "verificationState": "reverified",
         "trustRank": trust_rank,
         "trustLabel": trust_label,
         "trustReason": trust_reason,
@@ -216,6 +217,7 @@ def _pair_document(
         "altiumVariantId": altium.variant_key,
         "provider": kicad_provider,
         "trustRank": max(kicad_rank, altium_rank),
+        "verificationState": "reverified",
         "trustLabel": "Same-Download Validated Pair",
         "trustReason": (
             "KiCad and Altium were projected from the exact same immutable provider "

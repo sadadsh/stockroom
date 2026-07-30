@@ -19,6 +19,11 @@ from pydantic import (
     model_validator,
 )
 
+from stockroom.templates import (
+    PassiveTemplateTerminal,
+    PassiveToolTemplateBinding,
+    passive_template_definition,
+)
 from stockroom.workflow.identifiers import (
     authoritative_text,
     derive_component_identity,
@@ -33,23 +38,6 @@ Sha256Digest = Annotated[str, StringConstraints(pattern=r"^sha256:[0-9a-f]{64}$"
 ToolKey = Literal["kicad", "altium"]
 TerminalNumber = Literal["1", "2"]
 TwoPinKind = Literal["resistor", "diode"]
-
-_SUPPORTED_TEMPLATE_PROFILES = {
-    (
-        "resistor",
-        "0603 (1608 Metric)",
-    ): (
-        "shared.passive.resistor.two_pin.v1",
-        "shared.passive.resistor.0603_1608_metric.v1",
-    ),
-    (
-        "diode",
-        "SMA (DO-214AC)",
-    ): (
-        "shared.passive.diode.two_pin.v1",
-        "shared.passive.diode.sma_do_214ac.v1",
-    ),
-}
 
 
 class CanonicalModel(BaseModel):
@@ -408,15 +396,37 @@ class CanonicalPassiveBundle(CanonicalModel):
         return canonical_model_digest(self)
 
 
-def _template_contract_digest(template_id: str, kind: str) -> str:
-    contract = canonical_json(
-        {
-            "kind": kind,
-            "schema_version": 1,
-            "template_id": template_id,
-        }
-    ).encode("utf-8")
-    return digest_text(hashlib.sha256(contract).digest())
+def _passive_terminal(
+    terminal: PassiveTemplateTerminal,
+) -> PassiveTerminal:
+    return PassiveTerminal(
+        number=terminal.number,
+        role=terminal.role,
+        position=PointNm(x_nm=terminal.x_nm, y_nm=terminal.y_nm),
+        rotation_udeg=terminal.rotation_udeg,
+        electrical_type=terminal.electrical_type,
+    )
+
+
+def _tool_template_binding(
+    binding: PassiveToolTemplateBinding,
+) -> ToolTemplateBinding:
+    first, second = binding.terminal_bindings
+    return ToolTemplateBinding(
+        tool=binding.tool,
+        symbol_template_id=binding.symbol_template_id,
+        footprint_template_id=binding.footprint_template_id,
+        terminal_bindings=(
+            TerminalBinding(
+                canonical_terminal=first.canonical_terminal,
+                tool_terminal=first.tool_terminal,
+            ),
+            TerminalBinding(
+                canonical_terminal=second.canonical_terminal,
+                tool_terminal=second.tool_terminal,
+            ),
+        ),
+    )
 
 
 def build_two_pin_passive_bundle(
@@ -433,14 +443,10 @@ def build_two_pin_passive_bundle(
 
     exact_value = _validate_authoritative(value, "value")
     exact_package = _validate_authoritative(package, "package")
-    try:
-        symbol_template_id, footprint_template_id = _SUPPORTED_TEMPLATE_PROFILES[
-            (functional_kind, exact_package)
-        ]
-    except KeyError:
-        raise ValueError(
-            f"unsupported two-pin passive template profile {functional_kind!r}/{exact_package!r}"
-        ) from None
+    profile = passive_template_definition(functional_kind, exact_package)
+    symbol_template, footprint_template = profile.artifacts
+    symbol_template_id = symbol_template.template_id
+    footprint_template_id = footprint_template.template_id
 
     manufacturer = Manufacturer.from_exact_key(authoritative_manufacturer_key)
     identity = ComponentIdentity.from_exact_identity(
@@ -459,77 +465,37 @@ def build_two_pin_passive_bundle(
         component_id=identity.component_id,
         functional_kind=functional_kind,
         body=BodyRectangleNm(
-            min_x_nm=-1_000_000,
-            min_y_nm=-500_000,
-            max_x_nm=1_000_000,
-            max_y_nm=500_000,
+            min_x_nm=profile.body_min_x_nm,
+            min_y_nm=profile.body_min_y_nm,
+            max_x_nm=profile.body_max_x_nm,
+            max_y_nm=profile.body_max_y_nm,
         ),
         terminals=(
-            PassiveTerminal(
-                number="1",
-                role=("cathode" if functional_kind == "diode" else "terminal"),
-                position=PointNm(x_nm=-2_540_000, y_nm=0),
-                rotation_udeg=0,
-            ),
-            PassiveTerminal(
-                number="2",
-                role=("anode" if functional_kind == "diode" else "terminal"),
-                position=PointNm(x_nm=2_540_000, y_nm=0),
-                rotation_udeg=180_000_000,
-            ),
+            _passive_terminal(profile.terminals[0]),
+            _passive_terminal(profile.terminals[1]),
         ),
     )
     shared_templates = (
         SharedTemplate(
             template_id=symbol_template_id,
             kind="symbol",
-            contract_digest=_template_contract_digest(
-                symbol_template_id,
-                "symbol",
-            ),
+            contract_digest=symbol_template.contract_digest,
         ),
         SharedTemplate(
             template_id=footprint_template_id,
             kind="footprint",
-            contract_digest=_template_contract_digest(
-                footprint_template_id,
-                "footprint",
-            ),
+            contract_digest=footprint_template.contract_digest,
         ),
     )
-    kicad_terminal_bindings = (
-        TerminalBinding(canonical_terminal="1", tool_terminal="1"),
-        TerminalBinding(canonical_terminal="2", tool_terminal="2"),
-    )
-    altium_terminal_bindings = (
-        (
-            TerminalBinding(canonical_terminal="1", tool_terminal="C"),
-            TerminalBinding(canonical_terminal="2", tool_terminal="A"),
-        )
-        if functional_kind == "diode"
-        else (
-            TerminalBinding(canonical_terminal="1", tool_terminal="1"),
-            TerminalBinding(canonical_terminal="2", tool_terminal="2"),
-        )
+    tool_bindings = (
+        _tool_template_binding(profile.tool_bindings[0]),
+        _tool_template_binding(profile.tool_bindings[1]),
     )
     artifacts = ArtifactSet(
         component_id=identity.component_id,
         definition_digest=canonical_model_digest(definition),
         shared_templates=shared_templates,
-        tool_bindings=(
-            ToolTemplateBinding(
-                tool="kicad",
-                symbol_template_id=symbol_template_id,
-                footprint_template_id=footprint_template_id,
-                terminal_bindings=kicad_terminal_bindings,
-            ),
-            ToolTemplateBinding(
-                tool="altium",
-                symbol_template_id=symbol_template_id,
-                footprint_template_id=footprint_template_id,
-                terminal_bindings=altium_terminal_bindings,
-            ),
-        ),
+        tool_bindings=tool_bindings,
     )
     verification = Verification(
         component_id=identity.component_id,

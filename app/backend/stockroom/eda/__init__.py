@@ -11,6 +11,7 @@ from importlib import import_module
 
 __all__ = [
     "ArtifactDigest",
+    "AdapterSourceEvidence",
     "DualEdaProjectionResult",
     "EvidenceDigest",
     "KiCadLinkConflict",
@@ -20,6 +21,7 @@ __all__ = [
     "PortableKiCadLinkProjection",
     "PortableLibraryRow",
     "PortableTableArtifact",
+    "PassiveTemplateSourceProof",
     "ProjectionError",
     "ProjectionMismatch",
     "ToolBinding",
@@ -27,6 +29,8 @@ __all__ = [
     "UnsupportedProjection",
     "project_passive_bundle",
     "project_portable_kicad_links",
+    "build_passive_template_source_proof",
+    "render_kicad_template_source_plan",
 ]
 
 _KICAD_LINK_EXPORTS = {
@@ -37,12 +41,19 @@ _KICAD_LINK_EXPORTS = {
     "PortableTableArtifact",
     "project_portable_kicad_links",
 }
-_PASSIVE_EXPORTS = set(__all__) - _KICAD_LINK_EXPORTS
+_TEMPLATE_PROOF_EXPORTS = {
+    "AdapterSourceEvidence",
+    "PassiveTemplateSourceProof",
+    "build_passive_template_source_proof",
+}
+_PASSIVE_EXPORTS = set(__all__) - _KICAD_LINK_EXPORTS - _TEMPLATE_PROOF_EXPORTS
 
 
 def __getattr__(name: str):
     if name in _KICAD_LINK_EXPORTS:
         return getattr(import_module(".kicad_links", __name__), name)
+    if name in _TEMPLATE_PROOF_EXPORTS:
+        return getattr(import_module(".passive_template_proof", __name__), name)
     if name in _PASSIVE_EXPORTS:
         return getattr(import_module(".passive_projection", __name__), name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

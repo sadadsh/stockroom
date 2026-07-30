@@ -38,18 +38,24 @@ from stockroom.kicad.stock import (
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.mutation.placement import place_footprint
 from stockroom.sexp.document import SexpDocument
+from stockroom.templates import representative_passive_template
+from stockroom.workflow.model import canonical_json
 
 ArtifactKind = Literal["symbol", "footprint"]
 ToolKey = Literal["kicad", "altium"]
 
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _SUPPORTED_IDENTITY = ("ON Semiconductor", "S1M")
-_SUPPORTED_PACKAGE = "SMA (DO-214AC)"
-_SUPPORTED_SHARED_TEMPLATES = (
-    "shared.passive.diode.two_pin.v1",
-    "shared.passive.diode.sma_do_214ac.v1",
+_SUPPORTED_PROFILE = representative_passive_template()
+_SUPPORTED_PACKAGE = _SUPPORTED_PROFILE.package
+_SUPPORTED_SHARED_TEMPLATES = tuple(
+    artifact.template_id for artifact in _SUPPORTED_PROFILE.artifacts
 )
-_KICAD_SOURCE_TEMPLATES = ("Device:D", "Diode_SMD:D_SMA")
+_KICAD_TEMPLATE_BINDING = _SUPPORTED_PROFILE.binding_for("kicad")
+_KICAD_SOURCE_TEMPLATES = (
+    _KICAD_TEMPLATE_BINDING.adapter_symbol_reference,
+    _KICAD_TEMPLATE_BINDING.adapter_footprint_reference,
+)
 _ALTIUM_FIXTURE_REFS = ("S1M", "DIOM5227X270N")
 _ALTIUM_PAD_TRAILER = b"\x01\x00\x00\x00\x00\x05\x00\x00\x00\x04|&|0"
 _ROLE_PIN_NAME = {"cathode": "K", "anode": "A"}
@@ -307,27 +313,72 @@ def _supported_bundle(bundle: CanonicalPassiveBundle) -> None:
         bundle.manufacturer.authoritative_key,
         bundle.identity.mpn_canonical,
     )
-    templates = tuple(template.template_id for template in bundle.artifacts.shared_templates)
-    roles = tuple((terminal.number, terminal.role) for terminal in bundle.definition.terminals)
+    templates = tuple(
+        (template.template_id, template.kind, template.contract_digest)
+        for template in bundle.artifacts.shared_templates
+    )
+    body = bundle.definition.body
+    body_contract = (
+        body.min_x_nm,
+        body.min_y_nm,
+        body.max_x_nm,
+        body.max_y_nm,
+    )
+    terminal_contract = tuple(
+        (
+            terminal.number,
+            terminal.role,
+            terminal.position.x_nm,
+            terminal.position.y_nm,
+            terminal.rotation_udeg,
+            terminal.electrical_type,
+        )
+        for terminal in bundle.definition.terminals
+    )
+    expected_templates = tuple(
+        (template.template_id, template.kind, template.contract_digest)
+        for template in _SUPPORTED_PROFILE.artifacts
+    )
+    expected_body = (
+        _SUPPORTED_PROFILE.body_min_x_nm,
+        _SUPPORTED_PROFILE.body_min_y_nm,
+        _SUPPORTED_PROFILE.body_max_x_nm,
+        _SUPPORTED_PROFILE.body_max_y_nm,
+    )
+    expected_terminals = tuple(
+        (
+            terminal.number,
+            terminal.role,
+            terminal.x_nm,
+            terminal.y_nm,
+            terminal.rotation_udeg,
+            terminal.electrical_type,
+        )
+        for terminal in _SUPPORTED_PROFILE.terminals
+    )
     if identity != _SUPPORTED_IDENTITY:
         raise UnsupportedProjection("this slice supports only exact ON Semiconductor/S1M")
     if (
-        bundle.definition.functional_kind != "diode"
+        bundle.definition.functional_kind != _SUPPORTED_PROFILE.functional_kind
         or package != _SUPPORTED_PACKAGE
-        or roles != (("1", "cathode"), ("2", "anode"))
-        or templates != _SUPPORTED_SHARED_TEMPLATES
+        or body_contract != expected_body
+        or terminal_contract != expected_terminals
+        or templates != expected_templates
     ):
         raise UnsupportedProjection(
             "this slice supports only the qualified S1M diode/SMA canonical profile"
         )
     for tool in ("kicad", "altium"):
         binding = _tool_binding(bundle, tool)
+        profile_binding = _SUPPORTED_PROFILE.binding_for(tool)
         if (
             binding.symbol_template_id,
             binding.footprint_template_id,
         ) != _SUPPORTED_SHARED_TEMPLATES:
             raise UnsupportedProjection(f"{tool} does not bind the qualified shared S1M templates")
-        expected_tool_terminals = ("1", "2") if tool == "kicad" else ("C", "A")
+        expected_tool_terminals = tuple(
+            terminal.tool_terminal for terminal in profile_binding.terminal_bindings
+        )
         actual_tool_terminals = tuple(
             terminal.tool_terminal for terminal in binding.terminal_bindings
         )
@@ -335,6 +386,39 @@ def _supported_bundle(bundle: CanonicalPassiveBundle) -> None:
             raise UnsupportedProjection(
                 f"{tool} does not use the qualified S1M native terminal bindings"
             )
+
+
+def render_kicad_template_source_plan(bundle: CanonicalPassiveBundle) -> bytes:
+    """Render the deterministic source contract consumed before native KiCad work.
+
+    This is deliberately not native readback evidence and does not make the
+    component publishable.  It lets the shared template and KiCad adapter seam
+    round-trip without launching KiCad.
+    """
+
+    checked = _validated_bundle(bundle)
+    _supported_bundle(checked)
+    binding = _tool_binding(checked, "kicad")
+    profile_binding = _SUPPORTED_PROFILE.binding_for("kicad")
+    document = {
+        "adapter_revision": profile_binding.adapter_revision,
+        "canonical_bundle_digest": checked.canonical_digest(),
+        "component_id": checked.identity.component_id,
+        "footprint": {
+            "source_reference": profile_binding.adapter_footprint_reference,
+            "template_id": binding.footprint_template_id,
+        },
+        "profile_digest": _SUPPORTED_PROFILE.canonical_digest(),
+        "schema": "stockroom.passive-kicad-template-source/1",
+        "symbol": {
+            "source_reference": profile_binding.adapter_symbol_reference,
+            "template_id": binding.symbol_template_id,
+        },
+        "terminal_bindings": [
+            item.model_dump(mode="json") for item in profile_binding.terminal_bindings
+        ],
+    }
+    return canonical_json(document).encode("utf-8") + b"\n"
 
 
 def _empty_staging_root(staging_directory: Path) -> Path:

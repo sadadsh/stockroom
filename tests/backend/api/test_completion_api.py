@@ -224,6 +224,54 @@ def test_coverage_needs_a_token(anon_client):
     assert anon_client.get("/api/library/completion").status_code == 401
 
 
+def test_durable_completion_includes_present_but_unverified_cad(monkeypatch):
+    from stockroom.api.routers.library import _needs_durable_completion
+    from stockroom.capture.complete import CompletionEvidence
+    from stockroom.capture.requirements import Requirement, split_requirement
+    from stockroom.model.part import AssetRef, Datasheet, PartRecord, Purchase
+
+    record = PartRecord(
+        id="present-not-proven",
+        display_name="Present Not Proven",
+        category="ICs",
+        description="all passport fields and references are populated",
+        mpn="EXACT-123",
+        manufacturer="Example",
+        datasheet=Datasheet(source_url="https://example.test/datasheet.pdf"),
+        purchase=[Purchase(vendor="Example", url="https://example.test/part")],
+    )
+    for owned in Requirement:
+        tool, kind = split_requirement(owned)
+        record.assets_for(tool).set(
+            kind,
+            AssetRef(file="model.step")
+            if kind == "model"
+            else AssetRef(lib="Present", name=record.mpn),
+        )
+    # Durable completion also tracks the separately closable Altium embedded-body
+    # action. Populate that legacy projection fact so this test isolates evidence
+    # authority rather than exercising the embedding gate.
+    record.assets_for("altium").set("model", AssetRef(file="embedded-in.PcbLib"))
+
+    monkeypatch.setattr(
+        "stockroom.capture.verified_cache.record_completion_evidence",
+        lambda _store, _record: CompletionEvidence.unverified(
+            "the active evidence pointer is absent"
+        ),
+    )
+    assert _needs_durable_completion(record, evidence_store=object()) is True
+
+    monkeypatch.setattr(
+        "stockroom.capture.verified_cache.record_completion_evidence",
+        lambda _store, _record: CompletionEvidence(
+            state="verified",
+            manifest_digest="sha256:" + ("a" * 64),
+            reason="the active projection was reverified",
+        ),
+    )
+    assert _needs_durable_completion(record, evidence_store=object()) is False
+
+
 # --- running -------------------------------------------------------------------------------
 
 
@@ -396,6 +444,130 @@ def test_returned_cursor_follows_the_submitted_batch_through_terminal_publicatio
 
     assert "publication_completed" in observed_kinds
     assert cursor == store.latest_event_sequence(batch_id)
+
+
+def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    store, authority = _mount_completion_authority(app_ctx, tmp_path)
+    monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(tmp_path / "Capture State"))
+    monkeypatch.setattr(
+        app_ctx.jobs,
+        "submit_cancellable",
+        lambda *_args, **_kwargs: pytest.fail("durable capture launched a legacy job"),
+    )
+    command = {
+        "part_ids": ["tps62130"],
+        "mode": "assisted",
+        "vendor": "ultralibrarian",
+        "idempotency_key": "capture-tps62130",
+    }
+
+    first = client.post("/api/library/capture/run", json=command)
+    second = client.post("/api/library/capture/run", json=command)
+
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    reference = first.json()
+    assert second.json() == reference
+    assert set(reference) == {
+        "workflow_batch_id",
+        "workflow_item_id",
+        "event_cursor",
+    }
+    assert reference["event_cursor"] == 0
+    batch_id = reference["workflow_batch_id"]
+    item_id = reference["workflow_item_id"]
+    assert len(authority.submissions) == 2
+    submitted, idempotency_key = authority.submissions[0]
+    assert idempotency_key == "capture-tps62130"
+    assert len(submitted) == 1
+    assert dict(submitted[0].payload) == {
+        "part_id": "tps62130",
+        "workflow_kind": "guided_capture",
+        "capture": {
+            "mode": "assisted",
+            "vendor": "ultralibrarian",
+            "background": False,
+            "initial_needs": [
+                "kicad_symbol",
+                "kicad_footprint",
+                "kicad_model",
+                "altium_symbol",
+                "altium_footprint",
+            ],
+        },
+    }
+    assert store.list_items(batch_id)[0].id == item_id
+
+    projected = client.get(f"/api/library/capture/batches/{batch_id}")
+    assert projected.status_code == 200, projected.text
+    assert projected.json() == {
+        "workflow_batch_id": batch_id,
+        "workflow_item_id": item_id,
+        "part_id": "tps62130",
+        "mode": "assisted",
+        "vendor": "ultralibrarian",
+        "background": False,
+        "initial_needs": [
+            "kicad_symbol",
+            "kicad_footprint",
+            "kicad_model",
+            "altium_symbol",
+            "altium_footprint",
+        ],
+        "report": None,
+    }
+    replay = client.get(
+        f"/api/workflows/batches/{batch_id}/events",
+        params={"after_sequence": 0},
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["batch"]["kind"] == "guided_capture"
+
+
+def test_durable_capture_projection_returns_the_retained_terminal_report(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from stockroom.capture.runner import write_durable_capture_report
+
+    _mount_completion_authority(app_ctx, tmp_path)
+    monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(tmp_path / "Capture State"))
+    reference = client.post(
+        "/api/library/capture/run",
+        json={"part_ids": ["tps62130"]},
+    ).json()
+    report = {
+        "items": [
+            {
+                "part_id": "tps62130",
+                "status": "completed",
+                "remaining": [],
+                "completion_evidence": {
+                    "state": "verified",
+                    "manifest_digest": _digest("capture-manifest"),
+                    "reason": "Verified.",
+                },
+            }
+        ],
+        "counts": {"completed": 1},
+        "retained": 0,
+        "collection_complete": None,
+        "stopped": False,
+        "stop_reason": "",
+    }
+    write_durable_capture_report(reference["workflow_item_id"], report)
+
+    projected = client.get(f"/api/library/capture/batches/{reference['workflow_batch_id']}")
+
+    assert projected.status_code == 200, projected.text
+    assert projected.json()["report"] == report
 
 
 @pytest.mark.parametrize(

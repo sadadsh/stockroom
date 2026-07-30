@@ -239,5 +239,7 @@ def test_a_healthy_run_is_unaffected_by_the_breaker():
         breaker=CircuitBreaker(threshold=2),
     )
     assert report.stopped is False
-    # The source made real progress but filled only one of the five required CAD roles.
-    assert report.counts() == {"improved": 5}
+    # A bare local AssetRef is not immutable completion evidence. The breaker
+    # remains uninvolved, but the report must not advertise unverified bytes as
+    # progress toward a trusted dual-EDA package.
+    assert report.counts() == {"unchanged": 5}

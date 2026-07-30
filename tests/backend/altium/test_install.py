@@ -46,6 +46,7 @@ def test_uninstall_uses_the_uninstall_api():
     text = render_install_script(dblib_win=_WIN, marker_win="C:\\w\\m.txt", uninstall=True)
     assert "UninstallLibrary" in text
     assert "ILM.InstallLibrary" not in text
+    assert "If (Not True) And (Not FileExists(Path))" in text
 
 
 def test_the_script_reports_the_list_before_AND_after():
@@ -120,6 +121,21 @@ def test_a_missing_library_is_reported_without_booting_altium(tmp_path):
     res = install_library(tmp_path / "nope.DbLib", driver=drv, workdir=tmp_path)
     assert res.status == "not-found"
     assert drv.runs == 0, "a missing library must not cost an Altium boot or a license seat"
+
+
+def test_a_missing_file_can_still_be_unregistered_from_altium(tmp_path):
+    log = "SR-Before0=C:\\fake\\nope.DbLib\nSR-After0=C:\\stock.IntLib\nDONE\n"
+    drv = _FakeDriver(_Outcome("ok", "", marker_text=log))
+
+    res = install_library(
+        tmp_path / "nope.DbLib",
+        uninstall=True,
+        driver=drv,
+        workdir=tmp_path,
+    )
+
+    assert res.status == "ok"
+    assert drv.runs == 1
 
 
 def test_altium_reporting_success_while_installing_NOTHING_is_not_ok(tmp_path):

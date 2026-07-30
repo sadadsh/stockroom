@@ -21,6 +21,12 @@ from xml.sax.saxutils import escape
 
 from PIL import Image
 
+from packaging.brand_assets import (
+    SHELL_TARGET_SIZES,
+    render_ico_bytes,
+    render_png_bytes,
+)
+
 PACKAGE_NAMESPACE = "http://schemas.microsoft.com/appx/manifest/foundation/windows10"
 UAP_NAMESPACE = "http://schemas.microsoft.com/appx/manifest/uap/windows10"
 RESTRICTED_CAPABILITY_NAMESPACE = (
@@ -34,6 +40,12 @@ VERSION_PATTERN = re.compile(
 )
 PACKAGE_NAME_PATTERN = re.compile(r"[A-Za-z0-9.-]{3,50}")
 PUBLISHER_PATTERN = re.compile(r"[^\x00-\x1f]{3,8192}")
+BASE_ASSETS = {
+    "Square44x44Logo.png": (44, "tile"),
+    "StoreLogo.png": (50, "tile"),
+    "Square150x150Logo.png": (150, "tile"),
+}
+WINDOW_HOST_EXECUTABLE = "WindowHost/Stockroom.WindowHost.exe"
 
 
 class PackageContractError(ValueError):
@@ -215,6 +227,7 @@ def render_contract(
         manifest_path=package_root / "AppxManifest.xml",
         appinstaller_path=appinstaller_path,
         package_root=package_root,
+        require_payload=False,
     )
 
 
@@ -224,12 +237,31 @@ def validate_rendered_contract(
     manifest_path: Path,
     appinstaller_path: Path,
     package_root: Path,
+    require_payload: bool = True,
 ) -> None:
     """Validate both XML documents and their cross-file identity/update contract."""
 
     configuration.validate()
     _validate_manifest(configuration, manifest_path, package_root)
+    if require_payload:
+        _validate_window_host_payload(package_root)
     _validate_appinstaller(configuration, appinstaller_path)
+
+
+def _validate_window_host_payload(package_root: Path) -> None:
+    root = package_root / "WindowHost"
+    executable = package_root / WINDOW_HOST_EXECUTABLE
+    if not root.is_dir() or not executable.is_file():
+        raise PackageContractError(
+            f"package is missing the native window host: {WINDOW_HOST_EXECUTABLE}"
+        )
+    files = tuple(path for path in root.rglob("*") if path.is_file())
+    if any(path.is_symlink() for path in files):
+        raise PackageContractError("native window host payload must not contain symlinks")
+    if len(files) < 2:
+        raise PackageContractError(
+            "native window host payload is incomplete; self-contained runtime files are required"
+        )
 
 
 def inventory_tree(root: Path) -> tuple[dict[str, object], ...]:
@@ -342,21 +374,53 @@ def _render_template(path: Path, values: dict[str, str]) -> str:
 
 
 def _render_assets(source_icon: Path, destination: Path) -> None:
+    if source_icon.read_bytes() != render_ico_bytes():
+        raise PackageContractError(
+            "source icon is stale; run `uv run python packaging/brand_assets.py --write`"
+        )
     destination.mkdir(parents=True, exist_ok=True)
-    with Image.open(source_icon) as icon:
-        base = icon.convert("RGBA")
-        for filename, size in (
-            ("Square44x44Logo.png", 44),
-            ("StoreLogo.png", 50),
-            ("Square150x150Logo.png", 150),
-        ):
-            rendered = base.resize((size, size), Image.Resampling.LANCZOS)
-            rendered.save(
-                destination / filename,
-                format="PNG",
-                compress_level=9,
-                optimize=False,
-            )
+    for filename, (size, variant) in _asset_contract().items():
+        (destination / filename).write_bytes(render_png_bytes(size, variant=variant))
+
+
+def _asset_contract() -> dict[str, tuple[int, str]]:
+    assets = dict(BASE_ASSETS)
+    for size in SHELL_TARGET_SIZES:
+        base = f"Square44x44Logo.targetsize-{size}"
+        assets[f"{base}.png"] = (size, "tile")
+        assets[f"{base}_altform-unplated.png"] = (size, "unplated-dark")
+        assets[f"{base}_altform-lightunplated.png"] = (size, "unplated-light")
+    return assets
+
+
+def _validate_assets(package_root: Path) -> None:
+    assets_root = package_root / "Assets"
+    actual = {
+        path.relative_to(assets_root).as_posix()
+        for path in assets_root.rglob("*")
+        if path.is_file()
+    }
+    expected = set(_asset_contract())
+    if actual != expected:
+        missing = sorted(expected - actual)
+        unexpected = sorted(actual - expected)
+        raise PackageContractError(
+            f"Windows asset inventory changed; missing={missing}, unexpected={unexpected}"
+        )
+
+    for filename, (size, variant) in _asset_contract().items():
+        path = assets_root / filename
+        payload = path.read_bytes()
+        if payload != render_png_bytes(size, variant=variant):
+            raise PackageContractError(f"Windows asset is stale or non-deterministic: {filename}")
+        with Image.open(path) as image:
+            if image.mode != "RGBA" or image.size != (size, size):
+                raise PackageContractError(f"Windows asset shape is invalid: {filename}")
+            red, green, blue, alpha = image.split()
+            if red.tobytes() != green.tobytes() or green.tobytes() != blue.tobytes():
+                raise PackageContractError(f"Windows asset is not grayscale: {filename}")
+            if alpha.getpixel((0, 0)) != 0 or alpha.getbbox() is None:
+                raise PackageContractError(f"Windows asset transparency is invalid: {filename}")
 
 
 def _validate_manifest(
@@ -425,6 +489,7 @@ def _validate_manifest(
                 # Rendering occurs before the deterministic executable is copied.
                 continue
             raise PackageContractError(f"AppxManifest asset is missing: {relative}")
+    _validate_assets(package_root)
 
 
 def _validate_appinstaller(

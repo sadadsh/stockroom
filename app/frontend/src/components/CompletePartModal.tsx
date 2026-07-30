@@ -12,6 +12,7 @@ import { motion } from "motion/react";
 import { assetPresent, assetsFor } from "../lib/edaTarget";
 import type {
   CadSource,
+  CompletionEvidence,
   PartDetail,
   ProviderOutcome,
   ProviderOutcomeStatus,
@@ -19,6 +20,7 @@ import type {
 } from "../api/types";
 import { useCadSourceQuery } from "../api/queries";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
+import { useCapture } from "../lib/capture";
 import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { Button } from "./primitives";
@@ -267,6 +269,15 @@ function needsSubline(_hasKicad: boolean, _hasAltium: boolean, vendor: string): 
   );
 }
 
+function shortManifestDigest(value: string): string {
+  const digest = value.trim();
+  return digest.length > 20 ? `${digest.slice(0, 20)}...` : digest;
+}
+
+function evidenceReason(evidence: CompletionEvidence | null): string {
+  return evidence?.reason.trim() ?? "";
+}
+
 const ROUTE_STATUS: Record<ProviderOutcomeStatus, { label: string; tone: string }> = {
   activated: { label: "Activated", tone: "text-[var(--c-ok-text)]" },
   "succeeded-retained": { label: "Retained", tone: "text-[var(--c-ok-text)]" },
@@ -371,7 +382,7 @@ function cadLabel(status: GuidedStatus): string {
     case "attaching":
       return "Attaching...";
     case "done":
-      return "Files Complete";
+      return "Files Reverified";
     case "timed-out":
     case "unavailable":
       return "Try Again";
@@ -453,6 +464,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
   }, []);
   const cadNeeds = useMemo<Requirement[]>(() => cadSource.data?.needs ?? [], [cadSource.data]);
   const download = useGuidedCapture(detail.id, cadNeeds, detail.derived.display_name);
+  const capture = useCapture();
   const { toast } = useToast();
   // Resolve the five per-requirement toast strings through the copy layer at the top (hooks run
   // unconditionally, fixed order), keeping REQ_TOAST's prose as the fallbacks. A ref carries the
@@ -473,9 +485,26 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
   const dialogLabel = useText("modal.completePart.aria", "Complete this part");
   const closeLabel = useText("modal.completePart.close", "Close");
   const needs: Requirement[] = download.needs;
+  const activeEvidenceReported =
+    capture.active.partId === detail.id && capture.active.completionEvidenceReported;
+  const completionEvidence = activeEvidenceReported
+    ? capture.active.completionEvidence
+    : (cadSource.data?.completion_evidence ?? null);
+  const verifiedDigest =
+    completionEvidence?.state === "verified"
+      ? /^sha256:[0-9a-f]{64}$/.test(completionEvidence.manifest_digest?.trim() ?? "")
+        ? completionEvidence.manifest_digest!.trim()
+        : null
+      : null;
+  const completionVerified = verifiedDigest !== null;
+  const completionNotRequired = completionEvidence?.state === "not-required";
+  const completionProven = completionVerified || completionNotRequired;
   const hasExactIdentity = Boolean(detail.manufacturer.trim() && detail.mpn.trim());
   const showCad = needs.length > 0 || hasExactIdentity;
-  const isDone = download.status === "done" || (cadSource.data !== undefined && needs.length === 0);
+  // `needs: []` is only a projection. Completion belongs to explicit backend evidence: either a
+  // non-empty immutable manifest that was reverified, or an honest policy verdict that CAD is not
+  // required. Missing/unverified evidence remains incomplete even when every list is empty.
+  const isDone = completionProven;
   const collectionPartial = download.collectionComplete === false;
   const cadBusy =
     download.status === "resolving" ||
@@ -569,6 +598,34 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
   const doneCount =
     requirements.filter((r) => r.present).length + needs.filter((n) => download.received[n]).length;
   const total = requirements.length + needs.length;
+  const completionTitle = completionVerified
+    ? "Files Reverified"
+    : completionNotRequired
+      ? "CAD Files Not Required"
+      : download.status === "error" && needs.length === 0
+        ? "Completion Not Verified"
+        : "Automatic Completion";
+  const completionSubline = completionVerified
+    ? `Reverified from ${shortManifestDigest(verifiedDigest)}.${
+        evidenceReason(completionEvidence) ? ` ${evidenceReason(completionEvidence)}` : ""
+      }`
+    : completionNotRequired
+      ? evidenceReason(completionEvidence) || "This part has no required CAD deliverables."
+      : completionEvidence?.state === "unverified"
+        ? evidenceReason(completionEvidence) ||
+          "The last completion attempt did not produce verified evidence."
+        : needs.length === 0
+          ? "No completion evidence is recorded. Run verification before treating this part as complete."
+          : needsSubline(
+              kicadRows.length > 0 || sharedRows.length > 0,
+              altiumRows.length > 0,
+              chosen?.label ?? "a model library",
+            );
+  const showDownloadMessage =
+    Boolean(download.message) &&
+    (!isDone ||
+      download.providerOutcomes.length > 0 ||
+      download.collectionComplete !== null);
 
   const statusTone = collectionPartial
     ? "text-[var(--c-warn-text)]"
@@ -631,6 +688,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
             <section className="mb-5" data-dev-id="complete.cad">
               <Eyebrow>Files</Eyebrow>
               <div
+                data-completion-evidence={completionEvidence?.state ?? "missing"}
                 className={
                   "rounded-control border p-4 shadow-file transition-colors " +
                   (collectionPartial
@@ -652,22 +710,27 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                     </span>
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-t1">
-                        {isDone ? (
-                          <Text id="modal.completePart.cad-done-title">Files Complete</Text>
+                        {completionVerified ? (
+                          <Text id="modal.completePart.cad-verified-title">
+                            {completionTitle}
+                          </Text>
+                        ) : completionNotRequired ? (
+                          <Text id="modal.completePart.cad-not-required-title">
+                            {completionTitle}
+                          </Text>
+                        ) : download.status === "error" && needs.length === 0 ? (
+                          <Text id="modal.completePart.cad-unverified-title">
+                            {completionTitle}
+                          </Text>
                         ) : (
                           <Text id="modal.completePart.cad-title">Automatic Completion</Text>
                         )}
                       </div>
                       <div className="mt-0.5 text-2xs leading-snug text-t2">
-                        {isDone
-                          ? collectionPartial
-                            ? "The active KiCad and Altium files are complete. Exhaustive source collection still needs attention."
-                            : "Every format this part needed is attached."
-                          : needsSubline(
-                              kicadRows.length > 0 || sharedRows.length > 0,
-                              altiumRows.length > 0,
-                              chosen?.label ?? "a model library",
-                            )}
+                        {completionSubline}
+                        {isDone && collectionPartial
+                          ? " Exhaustive source collection still needs attention."
+                          : ""}
                       </div>
                     </div>
                   </div>
@@ -713,7 +776,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                   </div>
                 ) : null}
 
-                {download.message ? (
+                {showDownloadMessage ? (
                   <p className={"mt-3 text-xs " + statusTone}>{download.message}</p>
                 ) : null}
 
@@ -726,7 +789,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                   data-dev-id="complete.cad-actions"
                   className="mt-3 flex flex-wrap items-center gap-2"
                 >
-                  {needs.length > 0 && !isDone ? (
+                  {!isDone && (needs.length > 0 || hasExactIdentity) ? (
                     <Button
                       variant="accent"
                       small

@@ -46,6 +46,7 @@ package only for a genuinely new domain.
 | `kicad/` | KiCad domain logic: symbols, footprints, boards, netlists, the CLI wrapper. |
 | `ingest/` | Turning verified provider/download evidence into staged, complete-to-add candidates. |
 | `enrich/` | Filling a part's data from distributor APIs + scraped pages (the pipeline, per-field sourcing, passives). |
+| `templates/` | Versioned tool-neutral shared-template contracts and explicit per-EDA bindings. Template declarations never substitute for native verification. |
 | `scrape/` | Fetching + extracting distributor/vendor pages (`extract/sites/` is one module per site). |
 | `projects/` | Project-level analysis: BOM, fill, checks, buildability. |
 | `altium/` | The Altium DbLib emitter + status. |

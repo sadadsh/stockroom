@@ -5,16 +5,20 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from stockroom.cad_variants import resolve_cad_variant
 from stockroom.capture.evidence import exact_identity
 from stockroom.capture.requirements import Requirement
 from stockroom.capture.verified_cache import (
     VerifiedEvidenceSource,
     active_pair_is_verified,
+    record_completion_evidence,
 )
 from stockroom.evidence import EvidenceArtifact, EvidenceStore
 from stockroom.model.cad_variant import CadVariantSelections
-from stockroom.model.part import AssetRef, PartRecord
+from stockroom.model.part import AssetRef, PartRecord, RequirementOverride
+from stockroom.model.part_class import PartClass
 from stockroom.planning import ALTIUM_CAD_OPERATION, KICAD_CAD_OPERATION
 
 
@@ -274,6 +278,11 @@ def test_active_pair_requires_resolvable_same_evidence_pointers(tmp_path: Path) 
     digest = _complete_pair(store, record)
     _select_pair(store, record, digest=digest)
 
+    evidence = record_completion_evidence(store, record)
+
+    assert evidence.state == "verified"
+    assert evidence.manifest_digest == digest
+    assert "reverified" in evidence.reason
     assert active_pair_is_verified(store, record) is True
 
 
@@ -285,6 +294,11 @@ def test_complete_looking_assets_without_active_pointers_are_not_preserved(
     store = EvidenceStore((tmp_path / "Evidence").resolve())
     _complete_pair(store, record)
 
+    evidence = record_completion_evidence(store, record)
+
+    assert evidence.state == "unverified"
+    assert evidence.manifest_digest is None
+    assert "pointer is absent" in evidence.reason
     assert active_pair_is_verified(store, record) is False
 
 
@@ -314,6 +328,10 @@ def test_split_active_pointers_from_different_manifests_are_not_one_pair(
         }
     )
 
+    evidence = record_completion_evidence(store, record)
+
+    assert evidence.state == "unverified"
+    assert "do not share one evidence set" in evidence.reason
     assert active_pair_is_verified(store, record) is False
 
 
@@ -327,4 +345,83 @@ def test_tampered_active_evidence_is_not_preserved(tmp_path: Path) -> None:
     symbol = store.list_role_variants(identity=identity, role="symbol")[0]
     store.object_path(symbol.artifact_digest).write_bytes(b"tampered")
 
+    evidence = record_completion_evidence(store, record)
+
+    assert evidence.state == "unverified"
+    assert "could not be reverified" in evidence.reason
     assert active_pair_is_verified(store, record) is False
+
+
+def test_active_pointers_cannot_verify_absent_projected_references(tmp_path: Path) -> None:
+    record = _record()
+    store = EvidenceStore((tmp_path / "Evidence").resolve())
+    digest = _complete_pair(store, record)
+    _select_pair(store, record, digest=digest)
+
+    evidence = record_completion_evidence(store, record)
+
+    assert evidence.state == "unverified"
+    assert "projected references are absent" in evidence.reason
+
+
+def test_pointer_for_another_exact_identity_cannot_verify_this_record(
+    tmp_path: Path,
+) -> None:
+    first = _record()
+    store = EvidenceStore((tmp_path / "Evidence").resolve())
+    digest = _complete_pair(store, first)
+    _select_pair(store, first, digest=digest)
+    other = _record()
+    other.mpn = "TPS62131RGTR"
+    _complete_record(other)
+    other.cad_variants = first.cad_variants
+
+    evidence = record_completion_evidence(store, other)
+
+    assert evidence.state == "unverified"
+    assert "could not be reverified" in evidence.reason
+
+
+def test_one_owned_tool_can_be_verified_without_fabricating_a_pair(tmp_path: Path) -> None:
+    record = _record()
+    record.requires_override = RequirementOverride(
+        needs=(),
+        tools=("altium",),
+        reason="this exact part is intentionally KiCad-only",
+    )
+    _complete_record(record)
+    store = EvidenceStore((tmp_path / "Evidence").resolve())
+    digest = _complete_pair(store, record)
+    identity = exact_identity(record)
+    record.cad_variants = CadVariantSelections(
+        active={
+            "kicad": resolve_cad_variant(
+                store,
+                identity=identity,
+                tool="kicad",
+                manifest_digest=digest,
+            ).pointer,
+        }
+    )
+
+    evidence = record_completion_evidence(store, record)
+
+    assert evidence.state == "verified"
+    assert evidence.manifest_digest == digest
+    assert active_pair_is_verified(store, record) is False
+
+
+@pytest.mark.parametrize("part_class", [PartClass.PASSIVE, PartClass.VIRTUAL])
+def test_classes_without_owned_cad_are_explicitly_not_required(
+    tmp_path: Path,
+    part_class: PartClass,
+) -> None:
+    record = _record()
+    record.part_class = part_class
+    store = EvidenceStore((tmp_path / "Evidence").resolve())
+
+    evidence = record_completion_evidence(store, record)
+
+    assert evidence.state == "not-required"
+    assert evidence.manifest_digest is None
+    assert evidence.reason == "this part class has no owned CAD requirements"

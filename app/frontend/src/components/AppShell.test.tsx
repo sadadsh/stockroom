@@ -48,6 +48,7 @@ function AddPartProbe() {
 }
 
 function renderShell(initial: "components" | "stm" | "settings" = "components") {
+  window.history.replaceState({}, "", `/#route=${initial}`);
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });

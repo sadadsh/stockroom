@@ -6,8 +6,8 @@ import { DEV_TOKEN_BY_VAR } from "./devTokens";
 // className, so these tests pin the entry count, the resolver's dedupe/ignore behaviour,
 // and the invariant that every mapped cssVar is a real DEV_TOKEN.
 describe("classTokens resolver", () => {
-  it("has exactly 46 className -> cssVar entries", () => {
-    expect(Object.keys(CLASS_TO_VAR)).toHaveLength(46);
+  it("has exactly 53 className -> cssVar entries", () => {
+    expect(Object.keys(CLASS_TO_VAR)).toHaveLength(53);
   });
 
   it("resolves known classes in order, deduped, ignoring unknowns", () => {
