@@ -460,7 +460,7 @@ function Build-WindowHost {
     $publishRoot = Join-Path $buildRoot "Publish"
     Push-Location $RepositoryRoot
     try {
-        Invoke-Checked -FilePath $DotNetPath -Arguments @(
+        $null = Invoke-Checked -FilePath $DotNetPath -Arguments @(
             "publish", $WindowHostProject,
             "--configuration", "Release",
             "--runtime", "win-x64",
