@@ -13,7 +13,12 @@ from fastapi.testclient import TestClient
 
 from stockroom.api.app import create_app
 from stockroom.api.serve import pick_free_port
-from stockroom.host.run import _install_injected_index, _serve_in_thread, run_windowed
+from stockroom.host.run import (
+    _install_injected_index,
+    _mount_development_source_convergence,
+    _serve_in_thread,
+    run_windowed,
+)
 
 
 def test_embedded_server_starts_without_console_streams(monkeypatch):
@@ -127,6 +132,108 @@ def test_run_windowed_returns_true_when_a_restart_is_requested(app_ctx):
 
 def test_run_windowed_returns_false_on_a_normal_close(app_ctx):
     assert run_windowed(ctx=app_ctx, open_window=lambda base_url, token: None) is False
+
+
+def test_development_source_convergence_reloads_frontend_and_restarts_backend(
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    from stockroom.host import run as run_mod
+
+    events: list[object] = []
+
+    class _Repo:
+        def head(self):
+            return "a" * 40
+
+        def current_branch(self):
+            return "main"
+
+    ctx = SimpleNamespace(uv_sync=lambda: events.append("sync"))
+    config = object()
+    monkeypatch.setattr(
+        run_mod,
+        "_reload_active_window",
+        lambda base_url, *, config: events.append(("reload", base_url, config)),
+    )
+
+    convergence = _mount_development_source_convergence(
+        ctx,
+        _Repo(),
+        base_url="http://127.0.0.1:5123",
+        host_config=config,
+        request_restart=lambda: events.append("restart"),
+    )
+
+    assert ctx.update_convergence is convergence
+    assert ctx.app_updater.activate_current(frontend_only=True).frontend_reload_requested
+    assert ctx.app_updater.activate_current(frontend_only=False).restart_requested
+    assert events == [
+        "sync",
+        ("reload", "http://127.0.0.1:5123", config),
+        "sync",
+        "restart",
+    ]
+
+
+def test_windows_development_authority_mounts_continuous_convergence(
+    app_ctx,
+    monkeypatch,
+    tmp_path,
+):
+    from stockroom.host import run as run_mod
+
+    events: list[str] = []
+
+    class _Authority:
+        def close(self):
+            events.append("authority-closed")
+
+    class _Loop:
+        def set(self):
+            events.append("convergence-stopped")
+
+        def join(self, timeout=None):
+            events.append("convergence-joined")
+
+    class _Convergence:
+        def start(self):
+            events.append("convergence-started")
+            return _Loop()
+
+    monkeypatch.setattr(
+        run_mod,
+        "_start_development_service_authority",
+        lambda *args, **kwargs: _Authority(),
+    )
+
+    def mount(*args, **kwargs):
+        events.append("convergence-mounted")
+        convergence = _Convergence()
+        setattr(app_ctx, "update_convergence", convergence)
+        return convergence
+
+    monkeypatch.setattr(
+        run_mod,
+        "_mount_development_source_convergence",
+        mount,
+    )
+
+    run_windowed(
+        ctx=app_ctx,
+        open_window=lambda _base_url, _token: events.append("window-opened"),
+        source_service_state_root=tmp_path,
+    )
+
+    assert events == [
+        "convergence-mounted",
+        "convergence-started",
+        "window-opened",
+        "convergence-stopped",
+        "convergence-joined",
+        "authority-closed",
+    ]
 
 
 def test_run_windowed_leaves_an_injected_context_open(app_ctx):

@@ -376,6 +376,44 @@ def _start_development_service_authority(
     )
 
 
+def _mount_development_source_convergence(
+    ctx: AppContext,
+    app_repo,
+    *,
+    base_url: str,
+    host_config,
+    request_restart: Callable[[], None],
+):
+    """Continuously adopt ``main`` while the real Windows service authority owns work.
+
+    The Windows source host already has one long-lived workflow/service authority, so it
+    must not start the candidate-backend handoff used by lightweight development embeds.
+    It still needs the same continuous Git delivery contract: frontend-only revisions
+    reload the active WebView, while backend revisions close cleanly for the stable
+    launcher to restart on the newly pulled source.
+    """
+
+    from stockroom.api.updater import AppUpdater
+    from stockroom.update import UpdateConvergenceService
+
+    updater = AppUpdater(
+        app_repo,
+        uv_runner=ctx.uv_sync,
+        restart=request_restart,
+        frontend_reload=lambda: _reload_active_window(
+            base_url,
+            config=host_config,
+        ),
+    )
+    setattr(ctx, "app_updater", updater)
+    convergence = UpdateConvergenceService(
+        updater,
+        running_revision=app_repo.head(),
+    )
+    setattr(ctx, "update_convergence", convergence)
+    return convergence
+
+
 def run_windowed(
     ctx: AppContext | None = None,
     libraries_root: Path | None = None,
@@ -639,6 +677,21 @@ def run_windowed(
                     name="stockroom-checkout-inventory",
                     daemon=True,
                 ).start()
+        elif (
+            update_mode is not HostUpdateMode.PRODUCTION
+            and app_repo is not None
+            and development_service_authority is not None
+        ):
+            # The canonical Windows source host owns real workflows through its
+            # coordinator, but must still converge to pushed main revisions. Keep
+            # that updater alongside the authority instead of silently omitting it.
+            _mount_development_source_convergence(
+                ctx,
+                app_repo,
+                base_url=base_url,
+                host_config=host_config,
+                request_restart=_request_restart,
+            )
         convergence = getattr(ctx, "update_convergence", None)
         if convergence is not None:
             update_convergence_stop = convergence.start()
