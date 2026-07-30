@@ -798,9 +798,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                       onClick={() =>
                         void download.start(
                           vendorKey || undefined,
-                          download.status === "error" &&
-                            download.providerOutcomes.length === 0 &&
-                            vendorKey
+                          download.status === "error" && vendorKey
                             ? "assisted"
                             : "automatic",
                         )

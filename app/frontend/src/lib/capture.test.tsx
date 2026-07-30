@@ -157,6 +157,87 @@ describe("CaptureProvider store", () => {
     expect(readUiSession().selected_ids.workflow_batch).toBeNull();
   });
 
+  it("turns a blocked automatic handoff into an actionable partial result", async () => {
+    mockSource();
+    vi.spyOn(api, "runCapture").mockResolvedValue({
+      workflow_batch_id: "batch-provider-handoff",
+      workflow_item_id: "item-provider-handoff",
+      event_cursor: 0,
+    });
+    vi.spyOn(api, "workflowEvents").mockResolvedValue({
+      schema_version: 1,
+      batch: {
+        id: "batch-provider-handoff",
+        kind: "guided_capture",
+        status: "blocked",
+        created_at: 1,
+        updated_at: 2,
+        total_items: 1,
+        item_counts: { blocked: 1 },
+        cancellation: null,
+        actions: {
+          can_pause: true,
+          can_resume: false,
+          can_retry: false,
+          can_cancel: true,
+        },
+      },
+      events: [],
+      cursor: {
+        after_sequence: 0,
+        next_sequence: 1,
+        limit: 200,
+        has_more: false,
+      },
+    });
+    vi.spyOn(api, "captureWorkflow").mockResolvedValue({
+      workflow_batch_id: "batch-provider-handoff",
+      workflow_item_id: "item-provider-handoff",
+      part_id: "p1",
+      mode: "automatic",
+      vendor: "ultralibrarian",
+      background: false,
+      initial_needs: ["kicad_symbol"],
+      report: terminalCompletion({
+        status: "unchanged",
+        needed: ["kicad_symbol"],
+        satisfied: [],
+        remaining: ["kicad_symbol"],
+        provider_outcomes: [
+          {
+            route_id: "ultralibrarian:ultralibrarian",
+            provider_key: "ultralibrarian",
+            author_key: "ultralibrarian",
+            label: "Ultra Librarian",
+            status: "requires-human",
+            attempted: false,
+            retained: 0,
+            activated: false,
+            reason: "A person-driven provider handoff is required.",
+          },
+        ],
+        collection_complete: false,
+        completion_evidence: {
+          state: "unverified",
+          manifest_digest: null,
+          reason: "No complete shared CAD package was verified.",
+        },
+      })[0].data.result,
+    } as never);
+    const { result } = renderHook(() => useCapture(), {
+      wrapper: wrap(new QueryClient()),
+    });
+
+    await act(async () => {
+      await result.current.start("p1", "Part One", ["kicad_symbol"], "ultralibrarian");
+    });
+
+    expect(result.current.active.status).toBe("error");
+    expect(result.current.active.message).toContain("Choose Open Provider");
+    expect(result.current.active.providerOutcomes[0]?.status).toBe("requires-human");
+    expect(readUiSession().selected_ids.workflow_batch).toBeNull();
+  });
+
   it("single-flights the same capture command and submits one idempotent durable request", async () => {
     mockSource();
     let release: (() => void) | null = null;

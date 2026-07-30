@@ -707,7 +707,7 @@ describe("CompletePartModal - vendor choice", () => {
       });
     vi.spyOn(api, "workflowEvents")
       .mockResolvedValueOnce(
-        durableCapturePage("automatic-batch", "completed"),
+        durableCapturePage("automatic-batch", "blocked"),
       )
       .mockResolvedValueOnce(
         durableCapturePage("assisted-batch", "completed"),
@@ -735,6 +735,20 @@ describe("CompletePartModal - vendor choice", () => {
               sources: [],
               notes: ["SnapMagic: provider interaction required"],
               error: "",
+              provider_outcomes: [
+                {
+                  route_id: "snapmagic:snapmagic",
+                  provider_key: "snapmagic",
+                  author_key: "snapmagic",
+                  label: "SnapMagic",
+                  status: "requires-human",
+                  attempted: false,
+                  retained: 0,
+                  activated: false,
+                  reason: "A person-driven provider handoff is required.",
+                },
+              ],
+              collection_complete: false,
               completion_evidence: {
                 state: "unverified",
                 manifest_digest: null,
@@ -743,6 +757,7 @@ describe("CompletePartModal - vendor choice", () => {
             },
           ],
           counts: { unchanged: 1 },
+          collection_complete: false,
           stopped: false,
           stop_reason: "",
         },
