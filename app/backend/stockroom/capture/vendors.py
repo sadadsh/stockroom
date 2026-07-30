@@ -1292,7 +1292,12 @@ class DigiKeyUltraLibrarianAdapter:
         },
         browser_access="user_driven",
         operator_automation=False,
-        browser_engine="cloak",
+        # Measured again against the live TPS2121RUXR product and CAD-model pages on
+        # 2026-07-30. DigiKey's Cloudflare login challenge repeatedly rejected the visible
+        # CloakBrowser session after a person completed the checkbox, while Camoufox reached the
+        # exact /models/9859001 Ultra Librarian surface without a challenge. Keep the provider
+        # page person-controlled; this selects the browser session, not CAPTCHA automation.
+        browser_engine="camoufox",
         reuse_page_between_formats=True,
     )
 
@@ -2192,7 +2197,7 @@ class DigiKeySnapMagicRouteAdapter(_DigiKeyProviderRouteAdapter):
             "altium": "Altium Designer",
         },
         browser_access="machine_allowed",
-        browser_engine="cloak",
+        browser_engine="camoufox",
         reuse_page_between_formats=True,
     )
 
@@ -2216,7 +2221,7 @@ class DigiKeyTracePartsRouteAdapter(_DigiKeyProviderRouteAdapter):
         machine_format_labels={"model": "STEP AP214"},
         user_format_labels={"model": "STEP AP214"},
         browser_access="machine_allowed",
-        browser_engine="cloak",
+        browser_engine="camoufox",
         reuse_page_between_formats=True,
     )
 
@@ -2270,7 +2275,7 @@ class DigiKeyManufacturerProvidedRouteAdapter(
         user_format_labels={"model": "3D Model"},
         browser_access="user_driven",
         operator_automation=False,
-        browser_engine="cloak",
+        browser_engine="camoufox",
         reuse_page_between_formats=True,
     )
 
@@ -2294,7 +2299,7 @@ class DigiKeyCadenasRouteAdapter(_DigiKeyObservedSupplementaryRouteAdapter):
         user_format_labels={"model": "3D Model"},
         browser_access="user_driven",
         operator_automation=False,
-        browser_engine="cloak",
+        browser_engine="camoufox",
         reuse_page_between_formats=True,
     )
 

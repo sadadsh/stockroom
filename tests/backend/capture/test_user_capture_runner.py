@@ -175,7 +175,7 @@ def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_expl
 
     digikey = constructed[-1]
     assert digikey["vendor"] == "digikey"
-    assert digikey["engine"] == "cloak"
+    assert digikey["engine"] == "camoufox"
     assert digikey["convert_altium"] is runner._convert_ul_altium_package
     assert digikey["user_driven"] is True
     assert digikey["operator_authorized"] is False

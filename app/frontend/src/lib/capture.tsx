@@ -205,7 +205,9 @@ function durableMessage(
     return "Completion is paused. Resume it from Library Completion when you are ready.";
   }
   if (batch.status === "blocked") {
-    return "Automatic lookup finished without a complete CAD package. Choose Open Provider to continue in the selected provider window, or Collect All Sources to try every eligible provider.";
+    return `Automatic lookup finished without a complete CAD package. Open the ${
+      vendor || "selected"
+    } provider browser now, or choose Collect All Sources to try every eligible provider.`;
   }
   if (batch.status === "cancelled") return "Completion was cancelled before publication.";
   if (batch.status === "failed") {
@@ -228,7 +230,11 @@ function durableMessage(
   }
   return latestStage
     ? (WORKFLOW_STAGE_MESSAGE[latestStage] ?? "Completing this part.")
-    : "Queued for durable completion. You can close this window without losing progress.";
+    : mode === "assisted"
+      ? `Starting the ${vendor || "selected"} provider browser. First launch normally takes 10 to 20 seconds. It opens in a separate window and keeps its login on this PC.`
+      : mode === "collect-all"
+        ? "Preparing the next visible provider route. Stockroom keeps every verified file as each route finishes."
+        : "Completion is active. Stockroom is checking exact identity, saved evidence, and network sources in order.";
 }
 
 function resultFromProjection(
@@ -701,7 +707,12 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         setState((current) => ({
           ...current,
           status: "receiving",
-          message: "Durable completion started. You can close this window without losing progress.",
+          message:
+            mode === "assisted"
+              ? `Starting the ${sourceKey || "selected"} provider browser. First launch normally takes 10 to 20 seconds. It opens separately and keeps its login on this PC.`
+              : mode === "collect-all"
+                ? "Source collection started. Stockroom will open each provider route in order."
+                : "Completion started. Stockroom is checking exact identity, saved evidence, and network sources in order.",
         }));
         await followDurable({
           batchId,

@@ -255,8 +255,8 @@ function VendorPicker({
       </div>
       <p className="mt-1.5 text-2xs leading-snug text-t3">
         Verified evidence and automatic routes run first. This preference only orders assisted
-        windows. If assistance is needed, Open Provider is the login handoff: it launches the
-        provider window and reuses Stockroom&apos;s provider profile on later parts.
+        windows. If assistance is needed, Open Provider Browser is the login handoff: it launches
+        the provider window and reuses Stockroom&apos;s provider profile on later parts.
       </p>
     </div>
   );
@@ -288,6 +288,29 @@ const ROUTE_STATUS: Record<ProviderOutcomeStatus, { label: string; tone: string 
   cancelled: { label: "Cancelled", tone: "text-[var(--c-warn-text)]" },
   "not-attempted": { label: "Not Attempted", tone: "text-[var(--c-warn-text)]" },
 };
+
+function routeStatus(outcome: ProviderOutcome): { label: string; tone: string } {
+  const base = ROUTE_STATUS[outcome.status];
+  const reason = (outcome.reason || "").toLocaleLowerCase();
+  if (outcome.status === "requires-human") {
+    if (/(cloudflare|captcha|challenge|security|verification)/.test(reason)) {
+      return { ...base, label: "Security Check Required" };
+    }
+    if (/(sign in|log in|login|account|credentials)/.test(reason)) {
+      return { ...base, label: "Sign In Required" };
+    }
+    if (/(choose|select|start).*(download|export)/.test(reason)) {
+      return { ...base, label: "Download Choice Required" };
+    }
+  }
+  if (
+    outcome.status === "blocked" &&
+    /(cloudflare|captcha|challenge|security|verification)/.test(reason)
+  ) {
+    return { ...base, label: "Security Check Blocked" };
+  }
+  return base;
+}
 
 function routeReason(outcome: ProviderOutcome): string {
   if (outcome.reason) return outcome.reason;
@@ -354,7 +377,7 @@ function ProviderRouteOutcomes({
       </div>
       <div className="mt-2 flex flex-col divide-y divide-line">
         {outcomes.map((outcome) => {
-          const status = ROUTE_STATUS[outcome.status];
+          const status = routeStatus(outcome);
           return (
             <div
               key={outcome.route_id}
@@ -378,7 +401,7 @@ function cadLabel(status: GuidedStatus): string {
       return "Looking Up...";
     case "window-open":
     case "receiving":
-      return "Waiting For Files...";
+      return "Working...";
     case "attaching":
       return "Attaching...";
     case "done":
@@ -387,7 +410,7 @@ function cadLabel(status: GuidedStatus): string {
     case "unavailable":
       return "Try Again";
     case "error":
-      return "Open Provider";
+      return "Open Provider Browser";
     default:
       return "Get Files";
   }
@@ -511,6 +534,19 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
     download.status === "window-open" ||
     download.status === "receiving" ||
     download.status === "attaching";
+  const [captureElapsed, setCaptureElapsed] = useState(0);
+  useEffect(() => {
+    if (!cadBusy) {
+      setCaptureElapsed(0);
+      return;
+    }
+    const startedAt = Date.now();
+    setCaptureElapsed(0);
+    const timer = window.setInterval(() => {
+      setCaptureElapsed(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    }, 1_000);
+    return () => window.clearInterval(timer);
+  }, [cadBusy]);
   // "Keep Working" only makes sense while a capture is actually in flight through the host.
   const canBackground = cadBusy;
 
@@ -784,6 +820,34 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                   outcomes={download.providerOutcomes}
                   collectionComplete={download.collectionComplete}
                 />
+
+                {cadBusy ? (
+                  <div
+                    className="mt-3 rounded-control border border-line bg-field px-3 py-2"
+                    data-dev-id="complete.cad-live-status"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold text-t1">Provider Work Is Active</span>
+                      <span className="tnum font-mono text-2xs text-t3">
+                        {captureElapsed < 1 ? "Starting" : `${captureElapsed}s`}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-2xs leading-snug text-t2">
+                      The provider browser opens in a separate window. Complete only its sign-in
+                      or security check; Stockroom handles supported navigation, captures the
+                      downloads, and returns here automatically.
+                    </p>
+                    {vendorKey === "digikey" ? (
+                      <p className="mt-1 text-2xs leading-snug text-[var(--c-warn-text)]">
+                        If DigiKey repeats the same security check, close that provider window.
+                        Stockroom will mark DigiKey blocked so you can continue with Ultra
+                        Librarian instead of retrying the loop.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div
                   data-dev-id="complete.cad-actions"

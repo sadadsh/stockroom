@@ -365,7 +365,7 @@ describe("CompletePartModal - automatic capture", () => {
                     attempted: true,
                     retained: 0,
                     activated: false,
-                    reason: "Sign in is required.",
+                    reason: "DigiKey security verification is still open.",
                   },
                   {
                     route_id: "digikey:digikey-traceparts",
@@ -410,7 +410,9 @@ describe("CompletePartModal - automatic capture", () => {
     expect(screen.getByText("DigiKey / SnapMagic")).toBeInTheDocument();
     expect(screen.getByText("DigiKey / TraceParts")).toBeInTheDocument();
     expect(screen.getByText("Unavailable")).toHaveClass("text-t2");
-    expect(screen.getByText("Needs Your Input")).toHaveClass("text-[var(--c-warn-text)]");
+    expect(screen.getByText("Security Check Required")).toHaveClass(
+      "text-[var(--c-warn-text)]",
+    );
     expect(screen.getByText("Not Attempted")).toHaveClass("text-[var(--c-warn-text)]");
     expect(screen.getByText("No exact deliverable was offered.")).toHaveClass("text-t2");
   });
@@ -660,7 +662,7 @@ describe("CompletePartModal - vendor choice", () => {
     expect(
       screen.getByText(/verified evidence and automatic routes run first/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/open provider is the login handoff/i)).toBeInTheDocument();
+    expect(screen.getByText(/open provider browser is the login handoff/i)).toBeInTheDocument();
     expect(screen.getByText(/reuses stockroom's provider profile/i)).toBeInTheDocument();
   });
 
@@ -689,6 +691,27 @@ describe("CompletePartModal - vendor choice", () => {
         mode: "automatic",
       }),
     );
+  });
+
+  it("shows elapsed provider work and the DigiKey loop escape while a browser starts", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol"]);
+    vi.spyOn(api, "runCapture").mockImplementation(
+      () =>
+        new Promise(() => {
+          // Keep submission pending so the modal remains in its honest browser-starting state.
+        }),
+    );
+    RENDER();
+    await screen.findByText("Preferred Source");
+
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
+
+    expect(await screen.findByText("Provider Work Is Active")).toBeInTheDocument();
+    expect(screen.getByText("Starting")).toBeInTheDocument();
+    expect(screen.getByText(/provider browser opens in a separate window/i)).toBeInTheDocument();
+    expect(screen.getByText(/if digikey repeats the same security check/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Looking Up..." })).toBeDisabled();
   });
 
   it("turns an incomplete automatic result into an assisted Open Provider retry", async () => {
@@ -803,7 +826,7 @@ describe("CompletePartModal - vendor choice", () => {
     await user.click(vendorButton(/SnapMagic/));
 
     await user.click(screen.getByRole("button", { name: "Get Files" }));
-    const openProvider = await screen.findByRole("button", { name: "Open Provider" });
+    const openProvider = await screen.findByRole("button", { name: "Open Provider Browser" });
     expect(run).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
