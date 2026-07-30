@@ -96,7 +96,7 @@ describe("RunningVersionIndicator", () => {
         failed={false}
       />,
     );
-    expect(screen.getByRole("status")).toHaveTextContent("abcdef1Unknown");
+    expect(screen.getByRole("status")).toHaveTextContent("abcdef1Retrying…");
     expect(screen.queryByText("Current")).not.toBeInTheDocument();
   });
 });

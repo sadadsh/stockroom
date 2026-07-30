@@ -298,6 +298,10 @@ export function Rail() {
                 <span>Updating...</span>
               ) : updateView.standing === "checking" ? (
                 <Text id="nav.update-checking">Checking...</Text>
+              ) : updateView.standing === "retrying" ? (
+                <span>Retrying...</span>
+              ) : updateView.standing === "blocked" ? (
+                <span>Update Blocked</span>
               ) : (
                 <Text id="nav.update-unknown">Update Unknown</Text>
               )}

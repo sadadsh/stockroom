@@ -45,7 +45,12 @@ import { Badge, Button, Card, Dot, Eyebrow, PanelTitle } from "../components/pri
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "../components/Icon";
-import { deriveUpdateStanding, shortRevision, updateTargetRevision } from "../lib/updateStanding";
+import {
+  deriveUpdateStanding,
+  shortRevision,
+  updateTargetRevision,
+  type UpdateStanding,
+} from "../lib/updateStanding";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -253,7 +258,7 @@ export function SettingsPage() {
     general:
       updateStanding.standing === "available"
         ? "neutral"
-        : updateStanding.standing === "unknown"
+        : ["retrying", "blocked", "unknown"].includes(updateStanding.standing)
           ? "warn"
           : null,
     library: unmet.some((st) => st.group === "library") ? "warn" : null,
@@ -480,6 +485,10 @@ export function SettingsPage() {
                       <span>Updating...</span>
                     ) : updateStanding.standing === "checking" ? (
                       <Text id="settings.summary.update-checking">Checking...</Text>
+                    ) : updateStanding.standing === "retrying" ? (
+                      <span>Retrying...</span>
+                    ) : updateStanding.standing === "blocked" ? (
+                      <span>Update Blocked</span>
                     ) : (
                       <Text id="settings.summary.update-unknown">Update Unknown</Text>
                     )
@@ -734,7 +743,7 @@ function MachineSetupBand({
   loading: boolean;
   steps: SetupStep[];
   onJump: (step: SetupStep) => void;
-  updateStanding: "checking" | "current" | "available" | "updating" | "unknown";
+  updateStanding: UpdateStanding;
   updateBehind: number;
   updateState?: string;
   onOpenUpdates: () => void;
@@ -755,6 +764,10 @@ function MachineSetupBand({
             <span className="text-sm font-semibold text-t1">Automatic Convergence</span>
             {updateState === "offline" ? (
               <Badge tone="warn">Offline</Badge>
+            ) : updateStanding === "retrying" ? (
+              <Badge tone="warn">Retrying</Badge>
+            ) : updateStanding === "blocked" ? (
+              <Badge tone="err">Blocked</Badge>
             ) : updateStanding === "updating" ? (
               <Badge tone="neutral">Updating</Badge>
             ) : updateStanding === "available" ? (
@@ -1838,6 +1851,10 @@ function UpdateSection() {
                 </span>
               ) : standing.standing === "updating" ? (
                 <span className="text-acc">Adopting the verified release automatically...</span>
+              ) : standing.standing === "retrying" ? (
+                <span className="text-warn">Remote check incomplete; retrying automatically...</span>
+              ) : standing.standing === "blocked" ? (
+                <span className="text-err">Automatic convergence needs attention</span>
               ) : (
                 <span className="text-warn">
                   {check.data?.state === "offline"
@@ -1855,7 +1872,7 @@ function UpdateSection() {
               )
             }
           />
-          {standing.standing === "unknown" && standing.detail ? (
+          {["retrying", "blocked", "unknown"].includes(standing.standing) && standing.detail ? (
             <StatusRow label="Check Detail" value={standing.detail} />
           ) : null}
         </>

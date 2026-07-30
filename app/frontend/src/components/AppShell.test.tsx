@@ -110,7 +110,7 @@ describe("AppShell status bar", () => {
     ).toHaveTextContent("1111111→2222222Update Available");
   });
 
-  it("reports Unknown instead of Current when the remote cannot be proven", async () => {
+  it("reports Retrying instead of Current when the remote check is interrupted", async () => {
     mockApi.checkUpdate.mockResolvedValue({
       update_available: false,
       state: "offline",
@@ -119,7 +119,7 @@ describe("AppShell status bar", () => {
     } as never);
     renderShell();
     const status = await screen.findByRole("status", {
-      name: "running revision 1234567, Unknown",
+      name: "running revision 1234567, Retrying…",
     });
     expect(status).toBeInTheDocument();
     expect(status).not.toHaveTextContent("Current");

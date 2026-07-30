@@ -106,7 +106,7 @@ describe("Rail", () => {
     updateState.state = "offline";
     updateState.target_revision = "";
     rerender(<Rail />);
-    expect(screen.getByText("Update Unknown")).toBeInTheDocument();
+    expect(screen.getByText("Retrying...")).toBeInTheDocument();
     expect(screen.queryByText("Current")).toBeNull();
   });
 

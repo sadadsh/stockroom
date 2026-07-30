@@ -1,6 +1,13 @@
 import type { UpdateCheck } from "../api/types";
 
-export type UpdateStanding = "checking" | "current" | "available" | "updating" | "unknown";
+export type UpdateStanding =
+  | "checking"
+  | "current"
+  | "available"
+  | "updating"
+  | "retrying"
+  | "blocked"
+  | "unknown";
 export type UpdateIdentityKind = "revision" | "version" | "release";
 
 export interface UpdateIdentityView {
@@ -42,12 +49,32 @@ export function deriveUpdateStanding({
       detail: "Checking the application remote for the latest revision.",
     };
   }
-  if (failed || !data) {
+  if (!data) {
     return {
-      standing: "unknown",
+      standing: failed ? "retrying" : "unknown",
       currentRevision,
       targetRevision: "",
-      detail: "The latest application revision could not be verified.",
+      detail: failed
+        ? "The remote check failed; Stockroom will retry automatically."
+        : "The latest application revision could not be verified.",
+    };
+  }
+  if (failed || ["offline", "unverified"].includes(data.state ?? "")) {
+    return {
+      standing: "retrying",
+      currentRevision,
+      targetRevision,
+      detail:
+        data.detail ||
+        "The remote check did not complete; Stockroom will retry automatically.",
+    };
+  }
+  if (["blocked", "diverged", "failed", "rolled_back", "no_remote"].includes(data.state ?? "")) {
+    return {
+      standing: "blocked",
+      currentRevision,
+      targetRevision,
+      detail: data.detail || "Automatic application convergence needs attention.",
     };
   }
   if (

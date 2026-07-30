@@ -11,6 +11,8 @@ const STANDING_LABEL = {
   current: "Current",
   available: "Update Available",
   updating: "Updating…",
+  retrying: "Retrying…",
+  blocked: "Blocked",
   unknown: "Unknown",
 } as const;
 
@@ -19,6 +21,8 @@ const STANDING_TONE = {
   current: "text-ok",
   available: "text-warn",
   updating: "text-acc",
+  retrying: "text-warn",
+  blocked: "text-err",
   unknown: "text-t3",
 } as const;
 
