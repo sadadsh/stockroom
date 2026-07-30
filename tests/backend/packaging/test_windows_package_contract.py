@@ -357,6 +357,20 @@ def test_windows_build_fails_closed_around_production_signing() -> None:
     assert '"verify", "/pa", "/all", (Join-Path $FirstStage "Stockroom.exe")' in script
     assert '"verify", "/pa", "/all", $FinalPackage' in script
     assert "Fixture mode refuses a signing certificate." in script
+
+
+def test_pyinstaller_build_uses_a_neutral_working_directory() -> None:
+    script = BUILD_SCRIPT.read_text(encoding="utf-8")
+    start = script.index("function Build-Executable")
+    end = script.index("function Build-WindowHost", start)
+    function = script[start:end]
+
+    assert '"--project", $RepositoryRoot' in function
+    assert '"--directory", $buildRoot' in function
+    assert function.index('"--project", $RepositoryRoot') < function.index('"pyinstaller"')
+    assert function.index('"--directory", $buildRoot') < function.index('"pyinstaller"')
+
+
 def test_window_host_publish_returns_only_its_publish_root():
     script = BUILD_SCRIPT.read_text(encoding="utf-8")
     start = script.index("function Build-WindowHost")
