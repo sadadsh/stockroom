@@ -425,7 +425,11 @@ function Build-Executable {
         }
 
         Invoke-Checked -FilePath $UvPath -Arguments @(
-            "run", "--frozen", "pyinstaller",
+            "run",
+            "--project", $RepositoryRoot,
+            "--directory", $buildRoot,
+            "--frozen",
+            "pyinstaller",
             $SpecPath,
             "--noconfirm",
             "--clean",
