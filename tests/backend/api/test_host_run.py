@@ -4,12 +4,38 @@ the window closes. The window is injected here so the whole seam is integration-
 on Linux with a REAL uvicorn server (token guard enforced, clean shutdown); only the
 actual WebView2 window is Windows-verified."""
 
+import sys
+
 import httpx
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from stockroom.api.app import create_app
-from stockroom.host.run import _install_injected_index, run_windowed
+from stockroom.api.serve import pick_free_port
+from stockroom.host.run import _install_injected_index, _serve_in_thread, run_windowed
+
+
+def test_embedded_server_starts_without_console_streams(monkeypatch):
+    app = FastAPI()
+
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
+
+    port = pick_free_port()
+    monkeypatch.setattr(sys, "stdout", None)
+    monkeypatch.setattr(sys, "stderr", None)
+    server, thread = _serve_in_thread(app, port)
+    try:
+        response = httpx.get(f"http://127.0.0.1:{port}/health")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
+
+    assert not thread.is_alive()
 
 
 def test_run_windowed_serves_a_live_token_guarded_api_then_shuts_down(app_ctx):

@@ -38,7 +38,19 @@ def _serve_in_thread(app, port: int, timeout: float = 15.0):
     uvicorn skips signal-handler install off the main thread, so this is safe."""
     import uvicorn
 
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+    # PyInstaller's windowed executable intentionally has no stdout/stderr.
+    # Uvicorn's default logging formatter probes ``sys.stdout.isatty()`` while
+    # configuring itself, which crashes a real double-click launch before the
+    # native window can appear. The stable host owns its own diagnostics, so
+    # keep uvicorn's console/access logging disabled at this embedded boundary.
+    config = uvicorn.Config(
+        app,
+        host="127.0.0.1",
+        port=port,
+        log_level="warning",
+        log_config=None,
+        access_log=False,
+    )
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True, name="stockroom-api")
     thread.start()
