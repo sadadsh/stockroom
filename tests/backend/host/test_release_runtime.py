@@ -16,6 +16,8 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
+pytestmark = pytest.mark.global_windows_mutex
+
 from stockroom.api.serve import pick_free_port
 from stockroom.host.proxy import SwitchableBackendProxy
 from stockroom.host.release_runtime import (
@@ -25,6 +27,7 @@ from stockroom.host.release_runtime import (
     HostReleaseRouteError,
     HostUpdateMode,
     ProductionUpdateRuntime,
+    _numeric_version,
     create_production_update_runtime,
     host_update_mode,
 )
@@ -340,12 +343,47 @@ def _local_app(
     return app
 
 
+class _WindowReplacement:
+    def __init__(self, *, fail_commit: bool = False) -> None:
+        self.fail_commit = fail_commit
+        self.events: list[tuple[str, object]] = []
+        self.pointer = lambda: ""
+
+    def begin(self, target_release: AcceptedRelease) -> object:
+        receipt = object()
+        self.events.append(("begin", target_release.release_id))
+        return receipt
+
+    def commit(self, adoption: object) -> object:
+        self.events.append(("commit", self.pointer()))
+        if self.fail_commit:
+            raise RuntimeError("injected replacement commit failure")
+        return adoption
+
+    def rollback(self, adoption: object) -> None:
+        self.events.append(("rollback", self.pointer()))
+
+    def start_initial(self, release: AcceptedRelease | None = None) -> object:
+        self.events.append(
+            ("start", None if release is None else release.release_id)
+        )
+        return object()
+
+    def wait_until_closed(self) -> int:
+        self.events.append(("wait", None))
+        return 0
+
+    def close(self) -> None:
+        self.events.append(("close", None))
+
+
 def _runtime(
     tmp_path: Path,
     *,
     candidate_mode: str,
     slow_started: threading.Event | None = None,
     release_slow: threading.Event | None = None,
+    window_replacement=None,
 ):
     releases = tmp_path / "Releases"
     current = _release(
@@ -388,6 +426,7 @@ def _runtime(
         token="host-token",
         local_release_id=current.release_id,
         reload_window=reload_window,
+        window_replacement=window_replacement,
         startup_timeout_seconds=0.75,
         post_adoption_probes=2,
         probe_interval_seconds=0.02,
@@ -547,6 +586,129 @@ def test_post_adoption_failure_rolls_back_exact_route_without_closing_window(
         _close(server, server_thread, boundary, control, fence)
 
 
+def test_two_phase_window_replacement_commits_only_after_durable_release_pointer(
+    tmp_path: Path,
+) -> None:
+    replacement = _WindowReplacement()
+    runtime = _runtime(
+        tmp_path,
+        candidate_mode="ok",
+        window_replacement=replacement,
+    )
+    (
+        _current,
+        candidate,
+        control,
+        fence,
+        store,
+        _proxy,
+        _stable_url,
+        server,
+        server_thread,
+        _window,
+        observed_window,
+        boundary,
+        activator,
+    ) = runtime
+    replacement.pointer = lambda: store.verify_startup(control).current.release_id
+    try:
+        state = activator.activate(candidate)
+        assert state.current.release_id == candidate.release_id
+        assert replacement.events == [
+            ("begin", candidate.release_id),
+            ("commit", candidate.release_id),
+        ]
+        assert observed_window == []
+    finally:
+        _close(server, server_thread, boundary, control, fence)
+    assert replacement.events[-1] == ("close", None)
+
+
+def test_window_commit_failure_remains_reversible_and_restores_prior_release(
+    tmp_path: Path,
+) -> None:
+    replacement = _WindowReplacement(fail_commit=True)
+    runtime = _runtime(
+        tmp_path,
+        candidate_mode="ok",
+        window_replacement=replacement,
+    )
+    (
+        current,
+        candidate,
+        control,
+        fence,
+        store,
+        _proxy,
+        stable_url,
+        server,
+        server_thread,
+        _window,
+        observed_window,
+        boundary,
+        activator,
+    ) = runtime
+    replacement.pointer = lambda: store.verify_startup(control).current.release_id
+    try:
+        with pytest.raises(ReleaseActivationFailed) as failure:
+            activator.activate(candidate)
+        assert failure.value.reason == "adoption_commit_failed"
+        assert failure.value.rolled_back
+        assert replacement.events == [
+            ("begin", candidate.release_id),
+            ("commit", candidate.release_id),
+            # The route/window rollback happens before the durable release
+            # pointer is restored, so the trial must remain reversible here.
+            ("rollback", candidate.release_id),
+        ]
+        assert store.verify_startup(control).current.release_id == current.release_id
+        assert httpx.get(f"{stable_url}/version").json() == {
+            "release_id": current.release_id
+        }
+        assert observed_window == []
+    finally:
+        _close(server, server_thread, boundary, control, fence)
+
+
+def test_post_adoption_health_failure_rolls_back_replacement_without_commit(
+    tmp_path: Path,
+) -> None:
+    replacement = _WindowReplacement()
+    runtime = _runtime(
+        tmp_path,
+        candidate_mode="post_fail",
+        window_replacement=replacement,
+    )
+    (
+        current,
+        candidate,
+        control,
+        fence,
+        store,
+        _proxy,
+        _stable_url,
+        server,
+        server_thread,
+        _window,
+        _observed_window,
+        boundary,
+        activator,
+    ) = runtime
+    replacement.pointer = lambda: store.verify_startup(control).current.release_id
+    try:
+        with pytest.raises(ReleaseActivationFailed) as failure:
+            activator.activate(candidate)
+        assert failure.value.reason == "post_adoption_health_failed"
+        assert failure.value.rolled_back
+        assert replacement.events == [
+            ("begin", candidate.release_id),
+            ("rollback", current.release_id),
+        ]
+        assert store.verify_startup(control).current.release_id == current.release_id
+    finally:
+        _close(server, server_thread, boundary, control, fence)
+
+
 def test_tuf_broker_runtime_activates_real_worker_and_exposes_sanitized_state(
     tmp_path: Path,
 ) -> None:
@@ -590,7 +752,7 @@ def test_tuf_broker_runtime_activates_real_worker_and_exposes_sanitized_state(
         ):
             time.sleep(0.01)
         status = runtime.status()
-        assert status["current_release_id"] == candidate.release_id
+        assert status["current_release_id"] == candidate.release_id, status
         assert status["current_revision"] == candidate.release_id
         assert status["target_revision"] == candidate.release_id
         assert status["state"] == "up_to_date"
@@ -1197,3 +1359,39 @@ def test_frozen_v1_host_rejects_v2_candidate_that_requires_v2_broker(
             cast(AcceptedRelease, current),
             generation=1,
         )
+
+
+def test_frozen_v1_host_accepts_v2_candidate_supported_by_v1_broker(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import stockroom.host.release_runtime as release_runtime
+
+    releases = tmp_path / "Releases"
+    current = _release(
+        releases,
+        "release-1.0.0.0",
+        rollback_release_id="release-bootstrap",
+        mode="ok",
+        minimum_host_version="1.0.0.0",
+    )
+    candidate = _release(
+        releases,
+        "release-2.0.0.0",
+        rollback_release_id=current.release_id,
+        compatible_from_release_ids=(current.release_id,),
+        mode="ok",
+        minimum_host_version="1.0.0.0",
+    )
+    monkeypatch.setattr(release_runtime, "__version__", "1.0.0.0")
+
+    HostManifestRehearsal().rehearse(
+        cast(AcceptedRelease, candidate),
+        cast(AcceptedRelease, current),
+        generation=1,
+    )
+
+
+def test_numeric_host_versions_pad_missing_windows_components() -> None:
+    assert _numeric_version("0.1.0") == _numeric_version("0.1.0.0")
+    assert _numeric_version("1.2") < _numeric_version("1.2.0.1")

@@ -1,12 +1,21 @@
 /**
  * The full-screen modular search (north-star search.html): a big query field, a live
- * active-filter chip bar, a facet rail GENERATED from the parts' own parametric facets, and a
- * schema-driven results table. Nothing about the parameters is hardcoded - the rail's ranges +
- * checkboxes and the table's columns all come from /facets/parametric and the rows' specs, so a
- * category that grows a new spec gains a filter and a column here on its own. Opens over the app
+ * active-filter chip bar, a facet rail generated from the parts' own parametric facets, and an
+ * evidence-first results table. Identity, match evidence, package, lifecycle, and dual-EDA status
+ * keep stable roles; up to two populated category parameters join them when room permits. Opens
  * (Ctrl+K or the Components search field), closes on Esc; ↑/↓ move the selection, ↵ opens a part.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  observeElementRect,
+  useVirtualizer,
+} from "@tanstack/react-virtual";
 import type { ParametricFacet, SearchRow } from "../api/types";
 import { useFacetsQuery, useParametricFacets, useSearchQuery } from "../api/queries";
 import {
@@ -41,6 +50,12 @@ import { SearchIcon } from "./icons";
 import { Icon } from "./Icon";
 import { PanelTitle } from "./primitives";
 import { RowThumbnail } from "./PartsList";
+import {
+  readUiSession,
+  updateUiSession,
+  type SearchSortState,
+} from "../lib/uiSession";
+import { SEARCH_FACET_RAIL_WIDTH } from "../lib/libraryLayout";
 
 // --- small inline glyphs (the artifact's own set) ---------------------------
 // Each helper keeps its wrapper + className passthrough so every call site is unchanged, but now
@@ -62,23 +77,41 @@ interface Props {
 }
 
 type SortKey = { kind: "name" } | { kind: "stock" } | { kind: "unit" } | { kind: "spec"; key: string; numeric: boolean };
+const SEARCH_QUERY_DEBOUNCE_MS = 120;
 
 export function SearchOverlay({ onClose, onOpenPart }: Props) {
-  const [q, setQ] = useState("");
-  const [filters, setFilters] = useState<SearchFilters>(emptyFilters());
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
-    key: { kind: "name" },
-    dir: "asc",
-  });
-  const [active, setActive] = useState(0);
+  const [q, setQ] = useState(() => readUiSession().search_filters.query);
+  const [filters, setFilters] = useState<SearchFilters>(() =>
+    filtersFromSession(),
+  );
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>(() =>
+    sortFromSession(readUiSession().search_sort),
+  );
+  const [activeId, setActiveId] = useState<string | null>(
+    () => readUiSession().search_results.active_part_id,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
+  const [resultsScrollElement, setResultsScrollElement] =
+    useState<HTMLDivElement | null>(null);
+  const restoredResultsOffset = useRef(
+    readUiSession().search_results.offset_px,
+  ).current;
 
   const category = filters.category;
   const spec = useMemo(() => toSpecParams(filters), [filters]);
+  const debouncedQuery = useDebouncedValue(q, SEARCH_QUERY_DEBOUNCE_MS);
   const categoryFacets = useFacetsQuery();
   // pass the live spec selections so the rail's counts narrow as you pick (faceted search)
-  const paramFacets = useParametricFacets({ q, category, spec });
-  const searchResults = useSearchQuery({ q, category, spec });
+  const paramFacets = useParametricFacets({
+    q: debouncedQuery,
+    category,
+    spec,
+  });
+  const searchResults = useSearchQuery({
+    q: debouncedQuery,
+    category,
+    spec,
+  });
 
   const facets = paramFacets.data?.facets ?? [];
   const serverRows = searchResults.data?.parts ?? [];
@@ -90,19 +123,108 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
     [facets, priceFacet],
   );
   const sections = useMemo(() => sectionedRail(railFacets, category), [railFacets, category]);
-  const columns = useMemo(() => deriveColumns(facets, category, 4), [facets, category]);
+  const candidateColumns = useMemo(
+    () =>
+      deriveColumns(facets, category, 2).filter(
+        (column) => !isFixedEvidenceColumn(column),
+      ),
+    [facets, category],
+  );
   const chips = useMemo(() => activeChips(filters, railFacets), [filters, railFacets]);
 
   const rows = useMemo(
-    () => sortRows(applyClientFilters(serverRows, filters), sort, columns),
-    [serverRows, filters, sort, columns],
+    () => sortRows(applyClientFilters(serverRows, filters), sort, candidateColumns),
+    [serverRows, filters, sort, candidateColumns],
   );
+  // An all-empty parameter column is not a column; it is unused canvas filled with em dashes.
+  const columns = useMemo(
+    () =>
+      candidateColumns.filter((column) =>
+        rows.some((row) => resultSpecValue(row, column) !== ""),
+      ),
+    [candidateColumns, rows],
+  );
+  const active = useMemo(() => {
+    const index = activeId
+      ? rows.findIndex((row) => row.id === activeId)
+      : -1;
+    return index >= 0 ? index : rows.length > 0 ? 0 : -1;
+  }, [activeId, rows]);
+  const activePartId = active >= 0 ? rows[active]?.id ?? null : null;
+  const activeIdRef = useRef(activePartId);
+  activeIdRef.current = activePartId;
 
-  // Focus the field on open; keep the keyboard selection in range as the row set changes.
+  // Focus the field on open. Selection is identity-based rather than
+  // index-based, so a client-side sort cannot silently select another part.
   useEffect(() => inputRef.current?.focus(), []);
   useEffect(() => {
-    setActive((i) => Math.min(i, Math.max(0, rows.length - 1)));
-  }, [rows.length]);
+    if (searchResults.isLoading) return;
+    if (activePartId !== activeId) setActiveId(activePartId);
+  }, [activeId, activePartId, searchResults.isLoading]);
+
+  // Persist the parametric state in its normalized wire form. Dynamic facet
+  // bags become bounded key/value arrays, so neither the frontend nor backend
+  // accepts hidden arbitrary fields.
+  useEffect(() => {
+    const current = readUiSession();
+    const nextFilters = filtersToSession(q, filters);
+    const nextSort = sortToSession(sort);
+    if (
+      JSON.stringify(current.search_filters) === JSON.stringify(nextFilters) &&
+      JSON.stringify(current.search_sort) === JSON.stringify(nextSort) &&
+      current.search_results.active_part_id === activePartId
+    ) {
+      return;
+    }
+    updateUiSession((snapshot) => ({
+      ...snapshot,
+      search_filters: nextFilters,
+      search_sort: nextSort,
+      search_results: {
+        ...snapshot.search_results,
+        active_part_id: activePartId,
+      },
+    }));
+  }, [activePartId, filters, q, sort]);
+
+  useEffect(() => {
+    const element = resultsScrollElement;
+    if (!element) return;
+    if (element.scrollTop !== restoredResultsOffset) {
+      element.scrollTop = restoredResultsOffset;
+    }
+    let pending: number | null = null;
+    const checkpoint = () => {
+      pending = null;
+      const current = readUiSession();
+      const offset = Math.max(0, Math.round(element.scrollTop));
+      const anchor = activeIdRef.current;
+      if (
+        current.search_results.offset_px === offset &&
+        current.search_results.anchor_part_id === anchor
+      ) {
+        return;
+      }
+      updateUiSession((snapshot) => ({
+        ...snapshot,
+        search_results: {
+          ...snapshot.search_results,
+          anchor_part_id: anchor,
+          offset_px: offset,
+        },
+      }));
+    };
+    const onScroll = () => {
+      if (pending !== null) window.clearTimeout(pending);
+      pending = window.setTimeout(checkpoint, 40);
+    };
+    element.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      element.removeEventListener("scroll", onScroll);
+      if (pending !== null) window.clearTimeout(pending);
+      checkpoint();
+    };
+  }, [restoredResultsOffset, resultsScrollElement]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -111,10 +233,26 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
         onClose();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        setActive((i) => Math.min(i + 1, rows.length - 1));
+        const next = Math.min(Math.max(active, 0) + 1, rows.length - 1);
+        setActiveId(rows[next]?.id ?? null);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setActive((i) => Math.max(i - 1, 0));
+        const next = Math.max(active - 1, 0);
+        setActiveId(rows[next]?.id ?? null);
+      } else if (e.key === "PageDown") {
+        e.preventDefault();
+        const next = Math.min(Math.max(active, 0) + 10, rows.length - 1);
+        setActiveId(rows[next]?.id ?? null);
+      } else if (e.key === "PageUp") {
+        e.preventDefault();
+        const next = Math.max(active - 10, 0);
+        setActiveId(rows[next]?.id ?? null);
+      } else if (e.key === "Home" && rows.length > 0) {
+        e.preventDefault();
+        setActiveId(rows[0].id);
+      } else if (e.key === "End" && rows.length > 0) {
+        e.preventDefault();
+        setActiveId(rows[rows.length - 1].id);
       } else if (e.key === "Enter" && rows[active]) {
         e.preventDefault();
         onOpenPart(rows[active].id, rows[active].category);
@@ -127,7 +265,6 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   const categories = categoryFacets.data
     ? Object.entries(categoryFacets.data.by_category).sort((a, b) => a[0].localeCompare(b[0]))
     : [];
-  const total = serverRows.length;
   const shown = rows.length;
 
   return (
@@ -142,9 +279,11 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
           the same band + hairline family as every other panel header so the overlay reads as a
           docked workspace, not a floating spotlight */}
       <div className="flex h-[38px] flex-none items-center gap-3 border-b border-line bg-band px-3.5">
-        <span className="flex-none text-xs font-semibold text-t2">Parametric Search</span>
+        <span className="hidden flex-none text-xs font-semibold text-t2 sm:inline">
+          Parametric Search
+        </span>
         <div
-          className="flex h-[26px] min-w-0 max-w-[620px] flex-1 items-center gap-2 rounded-control border border-line bg-field px-2.5 focus-within:border-acc"
+          className="flex h-[26px] min-w-0 flex-1 items-center gap-2 rounded-control border border-line bg-field px-2.5 focus-within:border-acc"
           data-dev-id="search.query"
         >
           <SearchIcon className="h-3.5 w-3.5 flex-none text-t3" />
@@ -224,7 +363,12 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
       </div>
 
       {/* main: the schema-driven facet rail + the results grid, border-split docked panes */}
-      <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr]">
+      <div
+        className="grid min-h-0 flex-1"
+        style={{
+          gridTemplateColumns: `${SEARCH_FACET_RAIL_WIDTH} minmax(0, 1fr)`,
+        }}
+      >
         <FacetRail
           categories={categories}
           category={category}
@@ -238,17 +382,22 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
         />
 
         <div className="flex min-h-0 min-w-0 flex-col border-l border-line">
-          <PanelTitle right={shown === total ? `${total}` : `${shown} of ${total}`}>
-            Results
-          </PanelTitle>
-          <div className="min-h-0 flex-1 overflow-auto" data-dev-id="search.results">
+          <PanelTitle>Results</PanelTitle>
+          <div
+            ref={setResultsScrollElement}
+            className="min-h-0 flex-1 overflow-auto"
+            data-dev-id="search.results"
+          >
             <ResultsTable
               rows={rows}
               columns={columns}
+              query={q}
               active={active}
-              onHover={setActive}
+              onHover={(index) => setActiveId(rows[index]?.id ?? null)}
               onOpen={onOpenPart}
               loading={searchResults.isLoading}
+              scrollElement={resultsScrollElement}
+              initialOffset={restoredResultsOffset}
             />
           </div>
         </div>
@@ -262,12 +411,70 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
         <KbdHint keys={["↑", "↓"]} label="Navigate" />
         <KbdHint keys={["↵"]} label="Open Part" />
         <KbdHint keys={["Esc"]} label="Close" />
-        <span className="ml-auto tabular-nums">
-          {shown === total ? `${total} shown` : `Showing ${shown} of ${total}`}
-        </span>
       </div>
     </div>
   );
+}
+
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setSettled(value), delay);
+    return () => window.clearTimeout(timeout);
+  }, [delay, value]);
+  return settled;
+}
+
+function filtersFromSession(): SearchFilters {
+  const saved = readUiSession().search_filters;
+  return {
+    category: saved.category,
+    inStock: saved.in_stock,
+    options: Object.fromEntries(saved.options.map((item) => [item.key, [...item.values]])),
+    ranges: Object.fromEntries(
+      saved.ranges.map((item) => [item.key, { min: item.min, max: item.max }]),
+    ),
+  };
+}
+
+function filtersToSession(q: string, filters: SearchFilters) {
+  return {
+    query: q,
+    category: filters.category,
+    in_stock: filters.inStock,
+    options: Object.entries(filters.options)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, values]) => ({ key, values: [...values] })),
+    ranges: Object.entries(filters.ranges)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, range]) => ({ key, min: range.min, max: range.max })),
+  };
+}
+
+function sortFromSession(
+  saved: SearchSortState,
+): { key: SortKey; dir: "asc" | "desc" } {
+  if (saved.kind === "spec") {
+    return {
+      key: { kind: "spec", key: saved.key, numeric: saved.numeric },
+      dir: saved.direction,
+    };
+  }
+  return { key: { kind: saved.kind }, dir: saved.direction };
+}
+
+function sortToSession(sort: {
+  key: SortKey;
+  dir: "asc" | "desc";
+}): SearchSortState {
+  return sort.key.kind === "spec"
+    ? {
+        kind: "spec",
+        key: sort.key.key,
+        numeric: sort.key.numeric,
+        direction: sort.dir,
+      }
+    : { kind: sort.key.kind, direction: sort.dir };
 }
 
 function KbdHint({ keys, label }: { keys: string[]; label: string }) {
@@ -519,6 +726,7 @@ function FacetRail({
       <div className="flex-none border-t border-line px-3 py-2">
         <button
           type="button"
+          aria-pressed={filters.inStock}
           onClick={() => setFilters((f) => ({ ...f, inStock: !f.inStock }))}
           className={
             "flex w-full items-center gap-2.5 py-[3px] text-left text-sm font-medium " +
@@ -545,11 +753,11 @@ function FacetRail({
 
 function RailSection({ label, fromSpecs }: { label: string; fromSpecs?: boolean }) {
   return (
-    <div className="flex items-center gap-2 pb-0.5 pt-5 text-2xs font-bold uppercase tracking-[0.07em] text-t3 first:pt-0.5">
+    <div className="flex items-center gap-2 pb-0.5 pt-5 text-ui-caption font-semibold text-copy first:pt-0.5">
       {label}
       {fromSpecs ? (
         <span
-          className="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-control bg-acc-soft px-1.5 py-0.5 text-2xs font-semibold normal-case tracking-normal text-t2"
+          className="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-control bg-acc-soft px-1.5 py-0.5 text-ui-meta font-semibold text-copy"
           title="These filters are generated from the category's part specs"
         >
           <Spark className="h-2.5 w-2.5" />
@@ -674,7 +882,31 @@ function RangeFacet({
   const lo = sel?.min ?? fmin;
   const hi = sel?.max ?? fmax;
   const unit = normalizeUnit(facet.unit);
-  const scale = useMemo(() => makeScale(fmin, fmax), [fmin, fmax]);
+  // Keep the hook count stable as live facet data changes. A degenerate range
+  // has no truthful slider scale, so it becomes a read-only value below.
+  const scale = useMemo(
+    () =>
+      Number.isFinite(fmin) && Number.isFinite(fmax) && fmin < fmax
+        ? makeScale(fmin, fmax)
+        : null,
+    [fmin, fmax],
+  );
+  if (!Number.isFinite(fmin) || !Number.isFinite(fmax) || fmin > fmax) return null;
+  if (fmin === fmax) {
+    return (
+      <FacetGroup title={facet.label} unit={unit} first={first}>
+        <div
+          data-dev-id="search.single-value-facet"
+          className="flex items-baseline justify-between py-1 text-xs"
+        >
+          <span className="text-t3">Only value</span>
+          <span className="font-mono font-medium text-t1">
+            {formatMagnitude(fmin, unit)}
+          </span>
+        </div>
+      </FacetGroup>
+    );
+  }
   return (
     <FacetGroup title={facet.label} unit={unit} first={first}>
       <div className="mb-2 flex justify-between font-mono text-xs text-t2">
@@ -682,7 +914,7 @@ function RangeFacet({
         <span>{formatMagnitude(hi, unit)}</span>
       </div>
       <RangeSlider
-        scale={scale}
+        scale={scale!}
         lo={lo}
         hi={hi}
         onChange={(nlo, nhi) =>
@@ -693,7 +925,7 @@ function RangeFacet({
         }
       />
       <div className="mt-2 flex justify-between px-1.5 font-mono text-2xs text-t3">
-        {scale.ticks.map((t, i) => (
+        {scale!.ticks.map((t, i) => (
           <span key={i}>{formatMagnitude(t, unit)}</span>
         ))}
       </div>
@@ -792,21 +1024,147 @@ function RangeSlider({
 
 // --- results table ---------------------------------------------------------
 
+export const SEARCH_RESULTS_VIRTUALIZATION_THRESHOLD = 100;
+const SEARCH_RESULT_ROW_HEIGHT = 51;
+const SEARCH_RESULTS_HEADER_HEIGHT = 33;
+const SEARCH_RESULTS_OVERSCAN = 8;
+const SEARCH_RESULTS_INITIAL_RECT = { width: 1024, height: 640 };
+const PACKAGE_KEYS = ["Package", "Package / Case", "Case", "Footprint"];
+const LIFECYCLE_KEYS = ["Lifecycle", "Part Status"];
+
+function normalizedLabel(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function firstSpec(
+  specs: SearchRow["specs"],
+  keys: readonly string[],
+): string {
+  const wanted = new Set(keys.map(normalizedLabel));
+  for (const [key, raw] of Object.entries(specs)) {
+    if (!wanted.has(normalizedLabel(key)) || raw == null || raw === "") continue;
+    return prettifyValue(String(raw));
+  }
+  return "";
+}
+
+function isFixedEvidenceColumn(column: SpecColumn): boolean {
+  const keys = column.keys ?? [column.key];
+  const fixed = new Set(
+    [...PACKAGE_KEYS, ...LIFECYCLE_KEYS].map(normalizedLabel),
+  );
+  return (
+    fixed.has(normalizedLabel(column.label)) ||
+    keys.some((key) => fixed.has(normalizedLabel(key)))
+  );
+}
+
+function resultSpecValue(row: SearchRow, column: SpecColumn): string {
+  const value = column.keys
+    ? rowMergedValue(row.specs, column.keys)
+    : column.key === VALUE_COLUMN_KEY
+      ? rowPrimaryValue(row.category, row.specs)
+      : cellValue(row.specs, column.key);
+  return value === "—" ? "" : value;
+}
+
+export function searchEvidenceColumns(rows: SearchRow[]): {
+  package: boolean;
+  lifecycle: boolean;
+} {
+  return {
+    package: rows.some((row) => firstSpec(row.specs, PACKAGE_KEYS) !== ""),
+    lifecycle: rows.some((row) => firstSpec(row.specs, LIFECYCLE_KEYS) !== ""),
+  };
+}
+
+export function searchMatchEvidence(
+  row: SearchRow,
+  query: string,
+): { match: string; evidence: string } {
+  const exactMpn =
+    query.trim() !== "" &&
+    row.mpn.trim().toLowerCase() === query.trim().toLowerCase();
+  const missing = row.missing
+    .map((item) =>
+      item
+        .replace(/^kicad[_\s-]*/i, "KiCad ")
+        .replace(/^altium[_\s-]*/i, "Altium ")
+        .replace(/[_-]+/g, " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    )
+    .filter(Boolean);
+  return {
+    match: exactMpn ? "Exact MPN" : query.trim() ? "Catalog Match" : "Catalog Record",
+    evidence: row.is_complete
+      ? "Record Evidence Complete"
+      : missing.length > 0
+        ? `Needs ${missing.join(", ")}`
+        : "Evidence Incomplete",
+  };
+}
+
 function ResultsTable({
   rows,
   columns,
+  query,
   active,
   onHover,
   onOpen,
   loading,
+  scrollElement,
+  initialOffset,
 }: {
   rows: SearchRow[];
   columns: SpecColumn[];
+  query: string;
   active: number;
   onHover: (i: number) => void;
   onOpen: (id: string, category: string) => void;
   loading: boolean;
+  scrollElement: HTMLDivElement | null;
+  initialOffset: number;
 }) {
+  const virtualized = rows.length > SEARCH_RESULTS_VIRTUALIZATION_THRESHOLD;
+  const getItemKey = useCallback(
+    (index: number) => rows[index]?.id ?? index,
+    [rows],
+  );
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    enabled: virtualized,
+    getScrollElement: () => scrollElement,
+    getItemKey,
+    estimateSize: () => SEARCH_RESULT_ROW_HEIGHT,
+    overscan: SEARCH_RESULTS_OVERSCAN,
+    initialRect: SEARCH_RESULTS_INITIAL_RECT,
+    initialOffset,
+    scrollMargin: SEARCH_RESULTS_HEADER_HEIGHT,
+    scrollPaddingStart: SEARCH_RESULTS_HEADER_HEIGHT,
+    observeElementRect: (instance, callback) =>
+      observeElementRect(instance, (rect) =>
+        callback(
+          rect.height > 0 ? rect : SEARCH_RESULTS_INITIAL_RECT,
+        ),
+      ),
+  });
+  const virtualItems = virtualizer.getVirtualItems();
+
+  // Keyboard selection can jump directly to an unmounted result. The stable
+  // id has already been resolved to an index by the parent; make that index
+  // visible without mounting any intervening rows.
+  useEffect(() => {
+    if (
+      !virtualized ||
+      active < 0 ||
+      !scrollElement ||
+      typeof scrollElement.scrollTo !== "function"
+    ) {
+      return;
+    }
+    virtualizer.scrollToIndex(active, { align: "auto" });
+  }, [active, scrollElement, virtualized, virtualizer]);
+
   if (loading && rows.length === 0) {
     return <div className="px-4 py-10 text-center text-sm text-t3">Searching…</div>;
   }
@@ -817,87 +1175,218 @@ function ResultsTable({
       </div>
     );
   }
-  const th = "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-band px-3 py-2 text-left text-2xs font-bold uppercase tracking-[0.06em] text-t3";
-  const td = "whitespace-nowrap px-3 py-2.5 text-sm";
+  const presence = searchEvidenceColumns(rows);
+  const th =
+    "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-band px-3 py-2 text-left text-ui-caption font-semibold text-copy";
+  const td = "whitespace-nowrap px-3 py-2.5 text-ui-body";
+  const rendered = virtualized
+    ? virtualItems
+    : rows.map((row, index) => ({
+        index,
+        key: row.id,
+        start: index * SEARCH_RESULT_ROW_HEIGHT,
+        end: (index + 1) * SEARCH_RESULT_ROW_HEIGHT,
+        size: SEARCH_RESULT_ROW_HEIGHT,
+        lane: 0,
+      }));
+  const firstVirtual = virtualized ? virtualItems[0] : undefined;
+  const lastVirtual = virtualized
+    ? virtualItems[virtualItems.length - 1]
+    : undefined;
+  const paddingTop = firstVirtual
+    ? Math.max(0, firstVirtual.start - SEARCH_RESULTS_HEADER_HEIGHT)
+    : 0;
+  const paddingBottom = lastVirtual
+    ? Math.max(0, virtualizer.getTotalSize() - lastVirtual.end)
+    : 0;
+  const columnCount =
+    columns.length + 3 + Number(presence.package) + Number(presence.lifecycle);
   return (
-    <table className="w-max min-w-full border-collapse" data-dev-id="search.results-table">
+    <table
+      className="w-max min-w-full border-collapse"
+      data-dev-id="search.results-table"
+      data-virtualized={virtualized ? "true" : "false"}
+      aria-rowcount={rows.length + 1}
+    >
       <thead>
         <tr>
-          <th className={th + " w-[204px]"}>Part</th>
+          <th className={th + " min-w-[240px]"}>Identity</th>
+          <th className={th + " min-w-[190px]"}>Match &amp; Evidence</th>
           {columns.map((c) => (
-            <th key={c.key} className={th + (c.numeric ? " text-right" : "")}>
+            <th
+              key={c.key}
+              className={
+                th +
+                " hidden min-[1320px]:table-cell" +
+                (c.numeric ? " text-right" : "")
+              }
+            >
               {c.label}
             </th>
           ))}
-          <th className={th}>Mfr</th>
-          <th className={th + " text-right"}>In Stock</th>
-          <th className={th + " text-right"}>Unit</th>
-          <th className={th}>Lifecycle</th>
+          {presence.package ? <th className={th}>Package</th> : null}
+          {presence.lifecycle ? <th className={th}>Lifecycle</th> : null}
+          <th className={th + " min-w-[150px]"}>Dual-EDA</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((row, i) => (
-          <tr
-            key={row.id}
-            data-dev-id="search.results-row"
-            aria-selected={i === active}
-            onMouseEnter={() => onHover(i)}
-            onClick={() => onOpen(row.id, row.category)}
-            className={
-              "cursor-pointer border-t border-line first:border-t-0 " +
-              (i === active
-                ? "bg-[color-mix(in_srgb,var(--c-acc)_8%,var(--c-surface))] shadow-[inset_2.5px_0_0_var(--c-acc)]"
-                : "hover:bg-raise2")
-            }
-          >
-            <td className={td}>
-              <div className="flex items-center gap-2.5">
-                <RowThumbnail category={row.category} />
-                <div className="min-w-0 max-w-[152px]">
-                  <div className="truncate font-semibold text-t1">{row.display_name}</div>
-                  <div className="tnum truncate font-mono text-xs text-t2">{row.mpn}</div>
-                </div>
-              </div>
-            </td>
-            {columns.map((c) => (
-              <td
-                key={c.key}
-                className={
-                  td +
-                  (c.numeric ? " text-right font-mono text-t1" : " font-mono text-xs text-t2")
-                }
-              >
-                {c.keys
-                  ? rowMergedValue(row.specs, c.keys)
-                  : c.key === VALUE_COLUMN_KEY
-                    ? rowPrimaryValue(row.category, row.specs)
-                    : cellValue(row.specs, c.key)}
-              </td>
-            ))}
-            <td className={td + " text-t2"}>{row.manufacturer || "—"}</td>
-            <td className={td + " tnum text-right font-mono text-t1"}>
-              {row.stock == null ? "—" : row.stock.toLocaleString()}
-            </td>
-            <td className={td + " tnum text-right font-mono text-t1"}>
-              {row.unit_price == null ? "—" : formatUnit(row.unit_price, row.currency)}
-            </td>
-            <td className={td}>
-              <Lifecycle specs={row.specs} />
-            </td>
+        {paddingTop > 0 ? (
+          <tr aria-hidden data-virtual-spacer="top" style={{ height: paddingTop }}>
+            <td colSpan={columnCount} className="p-0" />
           </tr>
-        ))}
+        ) : null}
+        {rendered.map((virtualRow) => {
+          const row = rows[virtualRow.index];
+          return row ? (
+            <SearchResultRow
+              key={virtualRow.key}
+              row={row}
+              index={virtualRow.index}
+              active={virtualRow.index === active}
+              columns={columns}
+              query={query}
+              showPackage={presence.package}
+              showLifecycle={presence.lifecycle}
+              td={td}
+              virtualized={virtualized}
+              onHover={onHover}
+              onOpen={onOpen}
+            />
+          ) : null;
+        })}
+        {paddingBottom > 0 ? (
+          <tr
+            aria-hidden
+            data-virtual-spacer="bottom"
+            style={{ height: paddingBottom }}
+          >
+            <td colSpan={columnCount} className="p-0" />
+          </tr>
+        ) : null}
       </tbody>
     </table>
   );
 }
 
+function SearchResultRow({
+  row,
+  index,
+  active,
+  columns,
+  query,
+  showPackage,
+  showLifecycle,
+  td,
+  virtualized,
+  onHover,
+  onOpen,
+}: {
+  row: SearchRow;
+  index: number;
+  active: boolean;
+  columns: SpecColumn[];
+  query: string;
+  showPackage: boolean;
+  showLifecycle: boolean;
+  td: string;
+  virtualized: boolean;
+  onHover: (index: number) => void;
+  onOpen: (id: string, category: string) => void;
+}) {
+  const evidence = searchMatchEvidence(row, query);
+  const packageValue = firstSpec(row.specs, PACKAGE_KEYS);
+  return (
+    <tr
+      data-dev-id="search.results-row"
+      data-part-id={row.id}
+      aria-rowindex={index + 2}
+      aria-selected={active}
+      tabIndex={active ? 0 : -1}
+      onMouseEnter={() => onHover(index)}
+      onFocus={() => onHover(index)}
+      onClick={() => onOpen(row.id, row.category)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onOpen(row.id, row.category);
+      }}
+      style={virtualized ? { height: SEARCH_RESULT_ROW_HEIGHT } : undefined}
+      className={
+        "cursor-pointer border-t border-line first:border-t-0 " +
+        (active
+          ? "bg-[color-mix(in_srgb,var(--c-acc)_8%,var(--c-surface))] shadow-[inset_2.5px_0_0_var(--c-acc)]"
+          : "hover:bg-raise2")
+      }
+    >
+      <td className={td}>
+        <div className="flex items-center gap-2.5">
+          <RowThumbnail category={row.category} />
+          <div className="min-w-0 max-w-[190px]">
+            <div className="truncate font-semibold text-ink">
+              {row.display_name}
+            </div>
+            <div className="tnum truncate font-mono text-ui-caption text-copy">
+              {[row.manufacturer, row.mpn].filter(Boolean).join(" · ") || "Identity missing"}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td className={td}>
+        <div className="font-semibold text-ink">{evidence.match}</div>
+        <div
+          className={
+            "max-w-[230px] truncate text-ui-caption " +
+            (row.is_complete ? "text-ok" : "text-warn")
+          }
+          title={evidence.evidence}
+        >
+          {evidence.evidence}
+        </div>
+      </td>
+      {columns.map((column) => (
+        <td
+          key={column.key}
+          className={
+            td +
+            " hidden min-[1320px]:table-cell" +
+            (column.numeric
+              ? " text-right font-mono text-ink"
+              : " font-mono text-ui-caption text-copy")
+          }
+        >
+          {resultSpecValue(row, column) || "—"}
+        </td>
+      ))}
+      {showPackage ? (
+        <td className={td + " font-mono text-ui-caption text-copy"}>
+          {packageValue || "—"}
+        </td>
+      ) : null}
+      {showLifecycle ? (
+        <td className={td}>
+          <Lifecycle specs={row.specs} />
+        </td>
+      ) : null}
+      <td
+        className={td}
+        title="Search results do not carry per-tool verification evidence. Open the record for the authoritative KiCad and Altium verdicts."
+      >
+        <div className="font-semibold text-ink">KiCad + Altium</div>
+        <div className="text-ui-caption text-warn">
+          {row.is_complete ? "Open To Verify" : "Needs Evidence"}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function Lifecycle({ specs }: { specs: Record<string, string | number | boolean> }) {
-  const raw = String(specs["Lifecycle"] ?? specs["Part Status"] ?? "").trim();
+  const raw = firstSpec(specs, LIFECYCLE_KEYS);
   if (!raw) return <span className="text-t3">—</span>;
   const isActive = /active/i.test(raw);
   return (
     <span
-      className="inline-flex rounded-control px-2 py-0.5 text-xs font-semibold"
+      className="inline-flex rounded-control px-2 py-0.5 text-ui-caption font-semibold"
       style={
         isActive
           ? { color: "var(--c-ok)", background: "color-mix(in srgb, var(--c-ok) 16%, transparent)" }
@@ -907,9 +1396,4 @@ function Lifecycle({ specs }: { specs: Record<string, string | number | boolean>
       {isActive ? "Active" : raw}
     </span>
   );
-}
-
-function formatUnit(price: number, currency: string): string {
-  const symbol = currency === "USD" || !currency ? "$" : `${currency} `;
-  return `${symbol}${price.toFixed(price < 0.1 ? 3 : 2)}`;
 }

@@ -378,6 +378,26 @@ def activity(limit: int = 40) -> list[dict]:
     return rows
 
 
+_STATE_SENTENCE_MAX_CHARS = 180
+
+
+def _state_sentence(evidence: str) -> str:
+    """Return one bounded sentence for the scan-first workstream view.
+
+    The complete evidence remains in the disclosure. This summary only keeps the first
+    sentence above the fold, and bounds unusually long source prose without deleting it.
+    """
+
+    normalized = re.sub(r"\s+", " ", evidence).strip()
+    if not normalized:
+        return "No current evidence has been recorded."
+    sentence = re.split(r"(?<=[.!?])\s+", normalized, maxsplit=1)[0]
+    if len(sentence) <= _STATE_SENTENCE_MAX_CHARS:
+        return sentence
+    clipped = sentence[: _STATE_SENTENCE_MAX_CHARS - 1].rsplit(" ", 1)[0]
+    return clipped.rstrip(" ,;:") + "…"
+
+
 def _render_active_work(board: dict, e) -> list[str]:
     status_labels = {
         "active": "Active",
@@ -399,16 +419,21 @@ def _render_active_work(board: dict, e) -> list[str]:
         f'<p class="awpolicy">{e(board["refresh_policy"])}</p>',
         '<div class="awgrid">',
     ]
-    for stream in board["workstreams"]:
+    for index, stream in enumerate(board["workstreams"]):
         status = stream["status"]
         blocker = stream.get("blocker", "").strip()
+        title_id = f"active-workstream-{index}-title"
         rows += [
-            f'<article class="workstream ws-{e(status)}">',
+            f'<article class="workstream ws-{e(status)}" aria-labelledby="{title_id}">',
             '<div class="wstop">',
-            f'<h3>{e(stream["name"])}</h3>',
-            f'<span class="tag t-{e(status)}">{e(status_labels[status])}</span>',
+            f'<h3 id="{title_id}">{e(stream["name"])}</h3>',
+            f'<span class="tag t-{e(status)}" aria-label="Status: '
+            f'{e(status_labels[status])}">{e(status_labels[status])}</span>',
             "</div>",
+            f'<p class="awstate">{e(_state_sentence(stream["evidence"]))}</p>',
             f'<p class="awowner"><span>Owner</span>{e(stream["owner"])}</p>',
+            '<details class="awdetails">',
+            "<summary>Full Evidence, Blocker, And Next Step</summary>",
             "<dl>",
             f'<div><dt>Current evidence</dt><dd>{e(stream["evidence"])}</dd></div>',
         ]
@@ -417,6 +442,7 @@ def _render_active_work(board: dict, e) -> list[str]:
         rows += [
             f'<div><dt>Next action</dt><dd>{e(stream["next_action"])}</dd></div>',
             "</dl>",
+            "</details>",
             "</article>",
         ]
     rows += ["</div>", "</section>"]
@@ -438,6 +464,10 @@ def render_html(plan: dict) -> str:
         )
 
     p: list[str] = [
+        "<!doctype html>",
+        '<html lang="en">',
+        "<head>",
+        '<meta charset="utf-8">',
         "<title>Stockroom Rebuild Progress</title>",
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
         # The page is a STATIC file regenerated as work lands, so a refresh is the only way it can
@@ -445,6 +475,8 @@ def render_html(plan: dict) -> str:
         '<meta http-equiv="refresh" content="60">',
         '<meta name="color-scheme" content="light dark">',
         STYLE,
+        "</head>",
+        "<body>",
         '<div class="wrap">',
         '<header>',
         f"<h1>{e(plan['title'])}</h1>",
@@ -619,6 +651,8 @@ def render_html(plan: dict) -> str:
         f'<footer>Generated from <code>{e(PLAN.relative_to(ROOT).as_posix())}</code> by '
         f'<code>scripts/progress.py</code>. A box is only ticked with evidence.</footer>',
         "</div>",
+        "</body>",
+        "</html>",
     ]
     return "\n".join(p) + "\n"
 
@@ -705,7 +739,7 @@ STYLE = """<style>
   font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 .awobjective p{margin:3px 0 0;font-size:15px;line-height:1.45}
 .awpolicy{margin:8px 0 0;color:var(--dim);font-size:11.5px}
-.awgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+.awgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:14px}
 .workstream{padding:12px 13px;border:1px solid var(--line);border-left:3px solid var(--todo);
   border-radius:var(--r-card);background:var(--bg)}
 .workstream.ws-active{border-left-color:var(--doing)}
@@ -713,12 +747,20 @@ STYLE = """<style>
 .workstream.ws-verification{border-left-color:var(--accent)}
 .workstream.ws-completed{border-left-color:var(--done)}
 .wstop{display:flex;align-items:flex-start;gap:8px}.wstop h3{flex:1;font-size:14px;line-height:1.35}
+.awstate{max-width:72ch;margin:8px 0 0;font-size:13px;line-height:1.5;color:var(--ink)}
 .awowner{margin:7px 0 0;color:var(--dim);font-size:11.5px}
 .awowner span{display:inline;margin-right:5px}
-.workstream dl{margin:10px 0 0}.workstream dl div{margin-top:8px}
+.awdetails{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.awdetails summary{display:flex;align-items:center;width:max-content;max-width:100%;
+  color:var(--accent);font-size:11.5px;font-weight:600}
+.awdetails summary::before{content:"▸";display:inline-block;margin-right:6px;
+  transition:transform .12s}
+.awdetails[open] summary::before{transform:rotate(90deg)}
+.awdetails summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.workstream dl{margin:8px 0 0}.workstream dl div{margin-top:8px}
 .workstream dt{color:var(--dim);font-size:10px;font-weight:700;letter-spacing:.06em;
   text-transform:uppercase}
-.workstream dd{margin:2px 0 0;font-size:12px;line-height:1.45}
+.workstream dd{max-width:72ch;margin:2px 0 0;font-size:12px;line-height:1.5}
 .tag.t-active{color:var(--doing);border-color:var(--doing)}
 .tag.t-verification{color:var(--accent);border-color:var(--accent)}
 .tag.t-pending{color:var(--dim)}.tag.t-completed{color:var(--done);border-color:var(--done)}
@@ -726,7 +768,7 @@ STYLE = """<style>
 .outcomehead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
   border-bottom:1px solid var(--line);padding-bottom:8px}
 .outcomehead span{font-size:11.5px;color:var(--dim)}
-.outcomegrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.outcomegrid{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:10px}
 .outcome{padding:13px 14px;background:var(--card);border:1px solid var(--line);
   border-left:3px solid var(--todo);border-radius:var(--r-card)}
 .outcome.o-met{border-left-color:var(--done)}.outcome.o-partial{border-left-color:var(--doing)}
@@ -734,6 +776,7 @@ STYLE = """<style>
 .outcome.o-deferred{border-left-color:var(--dim)}
 .otop{display:flex;gap:8px;align-items:flex-start}.otop h3{font-size:14px;line-height:1.3;flex:1}
 .measure{margin:8px 0 0;font:600 13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.outcome .why,.outcome details{max-width:72ch}
 .outcome details{margin-top:9px;color:var(--dim);font-size:11.5px}
 .outcome details summary{color:var(--accent)}.outcome ul{margin:5px 0 0;padding-left:18px}
 .outcome li{margin:3px 0}
@@ -770,7 +813,7 @@ STYLE = """<style>
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);-webkit-text-size-adjust:100%;
   font:15px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
-.wrap{max-width:880px;margin:0 auto;padding:28px 16px 64px}
+.wrap{max-width:880px;margin:0 auto;padding:28px 16px 64px;overflow-wrap:anywhere}
 header{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 14px;
   border-bottom:1px solid var(--line);margin-bottom:8px}
 h1{font-size:21px;letter-spacing:-.02em;margin:0 0 4px;line-height:1.25}
@@ -796,6 +839,7 @@ code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent)
 .reqs li{margin:7px 0;color:var(--dim);font-size:13px}
 .wave{margin:26px 0 0}
 .whead{display:flex;align-items:center;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.whead h2{white-space:normal}
 .whead .row{flex:1}
 .why{color:var(--dim);font-size:12.5px;margin:8px 0 0}
 .item{margin:12px 0;padding:14px 16px;background:var(--card);border:1px solid var(--line);
@@ -835,6 +879,7 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
   .wrap{padding:18px 12px 48px} h1{font-size:18px} .frac{display:none}
   .whead{flex-wrap:wrap} h2{width:100%}
   .awhead{display:block}.awhead time{display:block;margin-top:7px;white-space:normal}
+  .activework{padding:12px}.workstream{padding:11px 12px}
   .awgrid,.outcomegrid{grid-template-columns:1fr}.engineering{grid-template-columns:1fr}
 }
 
@@ -858,7 +903,8 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
 .ameta code{font-size:11px}
 @media(max-width:640px){
   .act{grid-template-columns:56px 1fr;grid-template-areas:"k s" ". m"}
-  .akind{grid-area:k}.asub{grid-area:s}.ameta{grid-area:m;margin-top:2px}
+  .akind{grid-area:k}.asub{grid-area:s}.ameta{grid-area:m;margin-top:2px;
+    white-space:normal;flex-wrap:wrap}
 }
 
 .k-data .akind{background:rgba(150,120,200,.16);color:#a98fd6}
@@ -868,7 +914,7 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
 .more summary::-webkit-details-marker{display:none}
 /* An explicit affordance: the default marker is suppressed by the reset, so without this the
    toggle rendered as plain grey text and read as a caption rather than a control. */
-.more summary::before{content:"\25B8";display:inline-block;margin-right:6px;transition:transform .12s}
+.more summary::before{content:"▸";display:inline-block;margin-right:6px;transition:transform .12s}
 .more[open] summary::before{transform:rotate(90deg)}
 .more summary:hover{color:var(--fg)}
 .more .acts{margin-top:2px}
@@ -876,7 +922,7 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
 .proj{margin:26px 0 8px}
 .phead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-bottom:8px;
   border-bottom:2px solid var(--line)}
-.phead h2{margin:0;font-size:19px;letter-spacing:-.01em}
+.phead h2{min-width:0;margin:0;font-size:19px;letter-spacing:-.01em;white-space:normal}
 .phead .row{flex:1;min-width:220px}
 </style>"""
 

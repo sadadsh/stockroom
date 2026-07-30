@@ -28,6 +28,14 @@ def test_inject_script_escapes_special_characters():
     assert json.loads(base) == "http://127.0.0.1:5123"
 
 
+def test_native_request_auth_bootstrap_never_serializes_the_token_global():
+    js = inject_script("http://127.0.0.1:5123", None, ui={"theme": "dark"})
+
+    assert "__API_BASE__" in js
+    assert "__STOCKROOM_UI__" in js
+    assert "__STOCKROOM_TOKEN__" not in js
+
+
 def test_should_inject_only_on_the_loopback_spa_origin():
     base = "http://127.0.0.1:5123"
     assert should_inject("http://127.0.0.1:5123/", base) is True

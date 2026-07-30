@@ -97,6 +97,30 @@ def test_system_info_requires_a_token(anon_client):
     assert r.status_code == 401
 
 
+def test_system_identity_is_authenticated_and_names_the_active_release(
+    client,
+    anon_client,
+    app_ctx,
+):
+    app_ctx.release_id = "release-candidate"
+    app_ctx.service_generation = 7
+    app_ctx.service_mode = "shadow"
+
+    assert anon_client.get("/api/system/identity").status_code == 401
+    response = client.get("/api/system/identity")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "release_id": "release-candidate",
+        "build_release_id": "development-source",
+        "package_version": "0.1.0",
+        "protocol_version": 1,
+        "source_revision": "",
+        "service_generation": 7,
+        "service_mode": "shadow",
+    }
+
+
 def test_system_info_reports_active_profile_and_count(client):
     r = client.get("/api/system/info")
     assert r.status_code == 200

@@ -381,6 +381,27 @@ describe("summaryReadiness", () => {
     });
   });
 
+  it("rejects an inconsistent ready claim unless coverage and trust both pass", () => {
+    const part = summary({
+      eda_readiness: {
+        altium: {
+          required: ["symbol", "footprint"],
+          missing: [],
+          coverage_complete: true,
+          trust: "unknown",
+          ready: true,
+        },
+      },
+    });
+
+    expect(summaryReadiness(part, "altium")).toEqual({
+      ready: false,
+      coverageComplete: true,
+      trust: "unknown",
+      missing: [],
+    });
+  });
+
   it("fails closed without fabricating a missing-kind diagnosis for a stale tool row", () => {
     expect(summaryReadiness(summary({ eda_readiness: {} }), "altium")).toEqual({
       ready: false,

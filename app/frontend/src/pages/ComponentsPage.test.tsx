@@ -11,6 +11,7 @@ import { ToastProvider } from "../lib/toast";
 import { RouterProvider } from "../lib/router";
 import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { CaptureProvider } from "../lib/capture";
+import { defaultUiSession, resetUiSessionForTests } from "../lib/uiSession";
 import { ComponentsPage } from "./ComponentsPage";
 
 // Mock the typed client so the page renders against fixtures, not a live server.
@@ -134,6 +135,42 @@ function wrap(ui: ReactNode) {
 }
 
 describe("ComponentsPage", () => {
+  it("restores the injected filters, stable selection, and picker scroll", async () => {
+    const session = defaultUiSession();
+    session.component_filters = {
+      query: "LM",
+      category: "ICs",
+      complete_only: true,
+      duplicates_only: false,
+    };
+    session.selected_ids.component = "lm358";
+    session.component_list_anchor = { part_id: "lm358", offset_px: 37 };
+    resetUiSessionForTests(session);
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: { "Texas Instruments": 1 },
+      complete: 1,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockResolvedValue(DETAIL);
+
+    wrap(<ComponentsPage />);
+
+    await screen.findByRole("heading", { name: "LM358" });
+    expect(mockApi.listParts).toHaveBeenCalledWith({
+      q: "LM",
+      category: "ICs",
+      completeOnly: true,
+    });
+    const row = document.querySelector('[data-part-id="lm358"]');
+    expect(row).toHaveAttribute("aria-current", "true");
+    const scroller = document.querySelector<HTMLElement>(
+      '[data-dev-id="components.list-scroll"]',
+    );
+    await waitFor(() => expect(scroller?.scrollTop).toBe(37));
+  });
+
   it("lists parts, shows the count, and auto-selects the first part's detail", async () => {
     mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
     mockApi.facets.mockResolvedValue({
@@ -198,6 +235,76 @@ describe("ComponentsPage", () => {
     expect(mockApi.partDetail).toHaveBeenLastCalledWith("tl072");
   });
 
+  it("keeps 1,000 rows bounded and fetches one detail per keyboard selection", async () => {
+    const fixture: PartSummary[] = Array.from(
+      { length: 1_000 },
+      (_, index) => ({
+        id: `part-${String(index).padStart(4, "0")}`,
+        display_name: `Part ${String(index).padStart(4, "0")}`,
+        category: `Category ${String(Math.floor(index / 100)).padStart(2, "0")}`,
+        mpn: `MPN-${index}`,
+        manufacturer: "Fixture",
+        is_complete: true,
+        missing: [],
+        eda_readiness: {},
+      }),
+    );
+    mockApi.listParts.mockResolvedValue({
+      parts: fixture,
+      count: fixture.length,
+    });
+    mockApi.facets.mockResolvedValue({
+      by_category: Object.fromEntries(
+        Array.from({ length: 10 }, (_, index) => [
+          `Category ${String(index).padStart(2, "0")}`,
+          100,
+        ]),
+      ),
+      by_manufacturer: { Fixture: fixture.length },
+      complete: fixture.length,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockImplementation(async (id) =>
+      makePartDetail({
+        id,
+        mpn: `MPN-${Number(id.slice(-4))}`,
+        manufacturer: "Fixture",
+        derived: {
+          display_name: `Part ${id.slice(-4)}`,
+          description: `Detail ${id}`,
+        },
+      }),
+    );
+
+    wrap(<ComponentsPage />);
+
+    const first = await screen.findByRole("button", {
+      name: /Part 0000/,
+    });
+    await screen.findAllByText("Detail part-0000");
+    const list = document.querySelector('[data-dev-id="components.list"]');
+    expect(list).toHaveAttribute("data-virtualized", "true");
+    expect(
+      list!.querySelectorAll('[data-dev-id="components.row"]').length,
+    ).toBeLessThanOrEqual(40);
+    expect(mockApi.listParts).toHaveBeenCalledTimes(1);
+    expect(mockApi.partDetail).toHaveBeenCalledTimes(1);
+
+    first.focus();
+    await userEvent.keyboard("{ArrowDown}");
+    const second = await screen.findByRole("button", {
+      name: /Part 0001/,
+    });
+    await waitFor(() =>
+      expect(second).toHaveAttribute("aria-current", "true"),
+    );
+    await screen.findAllByText("Detail part-0001");
+
+    expect(mockApi.listParts).toHaveBeenCalledTimes(1);
+    expect(mockApi.partDetail).toHaveBeenCalledTimes(2);
+    expect(mockApi.partDetail).toHaveBeenLastCalledWith("part-0001");
+  });
+
   it("badges MPN duplicates and the Duplicates filter narrows to just them (D2)", async () => {
     const dupA: PartSummary = { id: "a", display_name: "Cap A", category: "Passives", mpn: "C1", manufacturer: "X", is_complete: true, missing: [], eda_readiness: {} };
     const dupB: PartSummary = { id: "b", display_name: "Cap B", category: "Passives", mpn: "C1", manufacturer: "Y", is_complete: true, missing: [], eda_readiness: {} };
@@ -255,7 +362,7 @@ describe("ComponentsPage", () => {
 
     // Manufacturer is an EDA handoff field, and the handoff moved to its own tab (owner's choice,
     // 2026-07-26). Open it first; the edit-and-toast behaviour under test is unchanged.
-    await user.click(await screen.findByRole("tab", { name: "Representations" }));
+    await user.click(await screen.findByRole("tab", { name: "Readiness" }));
     const field = await screen.findByRole("button", { name: "Edit Manufacturer" });
     await user.click(field);
     const input = screen.getByLabelText("Manufacturer");
@@ -304,7 +411,8 @@ describe("ComponentsPage", () => {
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete Part?" }));
+    await user.click(await screen.findByRole("button", { name: "More Actions" }));
+    await user.click(screen.getByRole("button", { name: "Delete Part" }));
     const dialog = await screen.findByRole("dialog");
     // Nothing deleted until the dialog's own confirm is clicked.
     expect(mockApi.deletePart).not.toHaveBeenCalled();
@@ -330,7 +438,8 @@ describe("ComponentsPage", () => {
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete Part?" }));
+    await user.click(await screen.findByRole("button", { name: "More Actions" }));
+    await user.click(screen.getByRole("button", { name: "Delete Part" }));
     await user.click(
       within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }),
     );
@@ -368,7 +477,8 @@ describe("ComponentsPage", () => {
     await screen.findAllByText("Dual Operational Amplifier");
     expect(mockApi.partDetail).toHaveBeenCalledTimes(1);
 
-    await user.click(await screen.findByRole("button", { name: "Delete Part?" }));
+    await user.click(await screen.findByRole("button", { name: "More Actions" }));
+    await user.click(screen.getByRole("button", { name: "Delete Part" }));
     await user.click(
       within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }),
     );
@@ -414,7 +524,7 @@ describe("ComponentsPage", () => {
     const user = userEvent.setup();
 
     // Enrich now lives in the part workbench's Enrich tab, so open it first.
-    await user.click(await screen.findByRole("tab", { name: "Sources" }));
+    await user.click(await screen.findByRole("tab", { name: "Evidence" }));
     await user.click(
       await screen.findByRole("button", { name: "Enrich From Distributor" }),
     );
@@ -458,7 +568,7 @@ describe("ComponentsPage", () => {
     const user = userEvent.setup();
 
     // Enrich now lives in the part workbench's Enrich tab, so open it first.
-    await user.click(await screen.findByRole("tab", { name: "Sources" }));
+    await user.click(await screen.findByRole("tab", { name: "Evidence" }));
     await user.click(
       await screen.findByRole("button", { name: "Enrich From Distributor" }),
     );
@@ -504,7 +614,7 @@ describe("ComponentsPage", () => {
     const user = userEvent.setup();
 
     // Enrich now lives in the part workbench's Enrich tab, so open it first.
-    await user.click(await screen.findByRole("tab", { name: "Sources" }));
+    await user.click(await screen.findByRole("tab", { name: "Evidence" }));
     await user.click(
       await screen.findByRole("button", { name: "Enrich From Distributor" }),
     );
@@ -527,9 +637,14 @@ describe("ComponentsPage", () => {
       incomplete: 0,
     });
 
-    wrap(<ComponentsPage />);
+    const view = wrap(<ComponentsPage />);
 
     expect(await screen.findByText("No Components Yet")).toBeInTheDocument();
+    expect(screen.getAllByText("No Components Yet")).toHaveLength(1);
+    expect(screen.queryByText("Select a part to see its details.")).not.toBeInTheDocument();
+    const action = screen.getByRole("button", { name: "Add Parts" });
+    await userEvent.click(action);
+    expect(view.state.addPartOpen).toBe(true);
   });
 
   it("shows an honest retry surface when the server is unreachable", async () => {

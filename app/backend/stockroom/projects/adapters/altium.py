@@ -10,6 +10,7 @@ from stockroom.altium.project_validation import validate_altium_project
 from stockroom.altium.project_visuals import render_altium_project
 from stockroom.altium.schdoc import read_schdoc_components
 from stockroom.model.project import ProjectRecord
+from stockroom.projects.matching import AltiumProjectMatchStrategy
 from stockroom.projects.placement_geometry import altium_board_geometry
 from stockroom.projects.project_visuals import ProjectVisualBundle
 
@@ -39,6 +40,7 @@ def _listed_documents(descriptor: Path) -> list[str]:
 class AltiumProjectAdapter:
     key = "altium"
     label = "Altium Designer"
+    matching = AltiumProjectMatchStrategy()
 
     def __init__(self, driver: AltiumDriver | None = None) -> None:
         self.driver = driver or AltiumDriver()

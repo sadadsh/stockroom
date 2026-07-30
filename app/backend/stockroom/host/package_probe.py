@@ -102,6 +102,7 @@ def run_managed_host_probe(receipt_path: Path) -> None:
             update_status != 200
             or update.get("channel") != "production"
             or update.get("current_release_id") != health["release_id"]
+            or update.get("check_interval_seconds") != 60
         ):
             raise ManagedHostProbeError(
                 "packaged signed-release convergence is not mounted"
@@ -118,6 +119,7 @@ def run_managed_host_probe(receipt_path: Path) -> None:
                 "service_generation": service_generation,
                 "service_mode": health["service_mode"],
                 "update_channel": update["channel"],
+                "update_check_interval_seconds": update["check_interval_seconds"],
             }
         )
 

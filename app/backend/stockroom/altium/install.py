@@ -100,6 +100,7 @@ def render_install_script(
         marker=delphi_quote(marker_win),
         action="UninstallLibrary" if uninstall else "InstallLibrary",
         verb=delphi_quote("uninstall" if uninstall else "install"),
+        uninstall="True" if uninstall else "False",
     )
 
 
@@ -122,7 +123,8 @@ Begin
     L := TStringList.Create;
     Try
         Try
-            If Not FileExists(Path) Then L.Add('FAIL: the .DbLib is not readable: ' + Path)
+            If (Not {uninstall}) And (Not FileExists(Path)) Then
+                L.Add('FAIL: the .DbLib is not readable: ' + Path)
             Else
             Begin
                 ILM := IntegratedLibraryManager;
@@ -165,7 +167,9 @@ def install_library(
     """
     drv = driver or AltiumDriver()
     dblib = Path(dblib)
-    if not dblib.exists():
+    # Altium can retain a registration after its file has disappeared. Installation requires a
+    # readable source file, but removing a stale registration must still reach UninstallLibrary.
+    if not uninstall and not dblib.exists():
         return InstallResult("not-found", f"There is no database library at {dblib.as_posix()}.")
 
     work = Path(workdir) if workdir else drv.host.windows_temp() / "stockroom-install"

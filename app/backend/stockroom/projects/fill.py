@@ -36,7 +36,6 @@ from typing import Iterable
 from stockroom.component_value import parse_component_value, same_component_value
 from stockroom.kicad.schematic import Schematic
 from stockroom.library_core import symbol_name_ref
-from stockroom.model.category import category_nickname
 from stockroom.projects import binding
 from stockroom.sexp.document import SexpDocument, SexpNode
 
@@ -94,24 +93,6 @@ def _is_blank(val) -> bool:
 # -- shared library match index (from Stockroom PartRecords) -------------------
 
 
-def _lib_id(ref) -> str:
-    """The `<lib>:<name>` reference a record's `AssetRef` actually holds, or "" when it does not hold
-    a container-plus-entry reference (a file-shaped asset such as a 3D model, or an empty slot).
-
-    Never re-derived from the part's category: a passive's symbol and footprint are KiCad STOCK
-    references (`Device:R`, `Resistor_SMD:R_0402_1005Metric`) that live in the installed KiCad
-    libraries, NOT in Stockroom's `SR-<slug>` category libraries, so qualifying them with the category
-    nickname produced a reference KiCad cannot resolve at all. Building the reference here from the
-    ref's own `lib` + `name` also makes a bogus `":name"` structurally impossible, which is what the
-    old nickname-dropping guard existed to prevent.
-    """
-    if ref is None:
-        return ""
-    lib = (ref.lib or "").strip()
-    name = (ref.name or "").strip()
-    return f"{lib}:{name}" if lib and name else ""
-
-
 # The spec rows a passive's value can live under, most specific first. These are the exact Title Case
 # labels `PassiveSpec.to_specs` emits, so the reader and the writer cannot drift apart.
 _VALUE_SPEC_KEYS: tuple[str, ...] = ("Resistance", "Capacitance", "Inductance", "Value")
@@ -163,30 +144,15 @@ def library_match_records(parts: Iterable, tool: str = "kicad") -> list[dict]:
         only; uniqueness alone is naive, because a library holding exactly one resistor makes the
         stock name `R` unique and would restore the wrong-part match.
     """
+    # Local import avoids the existing adapter -> KiCad placement reader ->
+    # fill module cycle. The adapter owns native identity; this function owns
+    # only shared record flattening and library-wide uniqueness.
+    from stockroom.projects.adapters import get_adapter
+
+    strategy = get_adapter(tool).matching
     out: list[dict] = []
     for p in parts:
-        try:
-            nickname = category_nickname(p.category) if tool == "kicad" else ""
-        except ValueError:
-            # A category outside the fixed taxonomy has no Stockroom library, so this part cannot own
-            # its symbol and forfeits the symbol tier (it still matches by MPN and still fills every
-            # identity field, and its stored references are still written verbatim, because they do
-            # not depend on the category). A corrupt category is a library-side problem the doctor
-            # surfaces; it must not silently discard the part nor crash the Prepare.
-            nickname = ""
-        assets = p.assets_for(tool)
-        symbol = assets.symbol
-        footprint = assets.footprint
-        if tool == "altium":
-            # Altium placements expose a Library Ref name, not a portable library path.
-            # The adapter prefixes that name with ``altium:`` so it cannot collide with
-            # KiCad's ``<nickname>:<name>`` identity. Footprint models likewise expose
-            # their model name only.
-            symbol_lib_id = f"altium:{symbol.name}" if symbol and symbol.name else ""
-            footprint_lib_id = (footprint.name if footprint else "") or ""
-        else:
-            symbol_lib_id = _lib_id(symbol)
-            footprint_lib_id = _lib_id(footprint)
+        native = strategy.normalize_part(p)
         datasheet = getattr(p, "datasheet", None)
         # The schematic Datasheet property holds a URL or a local file path; prefer the source URL,
         # falling back to the on-disk file name (what the complete-to-add gate actually requires) so
@@ -196,31 +162,22 @@ def library_match_records(parts: Iterable, tool: str = "kicad") -> list[dict]:
             ds = (datasheet.source_url or datasheet.file or "").strip()
         out.append({
             "id": p.id,
-            "name": (symbol.name if symbol else "") or "",
+            "name": native.symbol_name,
             "mpn": (p.mpn or "").strip(),
             "manufacturer": (p.manufacturer or "").strip(),
             "datasheet": ds,
             "description": (p.description or "").strip(),
-            "symbol_lib_id": symbol_lib_id,
-            "footprint_lib_id": footprint_lib_id,
+            "symbol_lib_id": native.symbol_ref,
+            "footprint_lib_id": native.footprint_ref,
             # A record has no dedicated value field: a passive's value is a display spec row that
             # `PassiveSpec.to_specs` writes ("Resistance": "10 kOhm"), so the candidate tier reads it
             # from there. "Value" is accepted last for a record whose specs came from a vendor pull.
             "value": _value_spec(getattr(p, "specs", None)),
             "package": _eia_case((getattr(p, "specs", None) or {}).get("Package", "")),
             "specs": _discriminating_specs(getattr(p, "specs", None)),
-            # Ownership on its own; uniqueness is folded in below, once the whole index is known.
-            # KiCad's Stockroom category library establishes ownership. Altium's
-            # Library Ref alone does not: generic RES/CAP symbols can be shared by
-            # thousands of parts, so Altium identification comes from MPN, a placed
-            # Stockroom ID, or an explicit assignment, never symbol-name coincidence.
-            "symbol_is_identity": bool(
-                tool == "kicad"
-                and nickname
-                and symbol
-                and (symbol.lib or "").strip() == nickname
-            ),
-            "nickname": nickname,
+            # Adapter-owned native ownership; shared uniqueness is folded in below.
+            "symbol_is_identity": native.symbol_is_identity,
+            "nickname": native.nickname,
             "category": p.category,
             "passive": bool(getattr(p, "passive", False)),
             "display_name": p.display_name,

@@ -35,7 +35,9 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 258 after network-only ingest removed ZIP browsing, inspect progress, and the global
 // file-drop overlay; none of those retired local-file controls remains addressable.
 // 259 with the source-collection outcome ledger exposed to the dev-mode inspector.
-const EXPECTED_ENTRIES = 259;
+// 256 after the unified inspection instrument replaced eight legacy asset-card ids with four
+// direct instrument/stage/expand/status ids.
+const EXPECTED_ENTRIES = 256;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

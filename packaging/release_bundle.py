@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 from collections.abc import Sequence
 from datetime import datetime, timezone
@@ -26,6 +27,10 @@ from stockroom.update.trusted_repository import verify_local_release_set
 _FIXTURE_ROOT_SEED = hashlib.sha256(
     b"Stockroom deterministic fixture TUF root; never production"
 ).digest()
+_HOST_VERSION_PATTERN = re.compile(
+    r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\."
+    r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+)
 
 
 class ReleaseBundleError(ValueError):
@@ -62,6 +67,25 @@ def _validated_base_uri(value: str) -> str:
             "feed base URI must be HTTPS without credentials, query, or fragment"
         )
     return value.rstrip("/")
+
+
+def _validated_host_version(value: str, *, package_version: str) -> str:
+    if not isinstance(value, str) or _HOST_VERSION_PATTERN.fullmatch(value) is None:
+        raise ReleaseBundleError(
+            "minimum host version must be a canonical four-part numeric version"
+        )
+    if (
+        not isinstance(package_version, str)
+        or _HOST_VERSION_PATTERN.fullmatch(package_version) is None
+    ):
+        raise ReleaseBundleError("package version must be a canonical four-part numeric version")
+    host_floor = tuple(int(part) for part in value.split("."))
+    packaged_host = tuple(int(part) for part in package_version.split("."))
+    if host_floor > packaged_host:
+        raise ReleaseBundleError(
+            "minimum host version cannot exceed the packaged host version"
+        )
+    return value
 
 
 def _validate_root(data: bytes) -> bytes:
@@ -183,8 +207,10 @@ def build_release_bundle(
     *,
     mode: str,
     executable: Path,
+    window_host_root: Path,
     bundle_root: Path,
     version: str,
+    minimum_host_version: str,
     feed_base_uri: str,
     source_revision: str,
     source_date_epoch: int,
@@ -199,10 +225,30 @@ def build_release_bundle(
     executable = Path(executable).resolve(strict=True)
     if executable.suffix.casefold() != ".exe":
         raise ReleaseBundleError("managed host must be a Windows executable")
+    window_host_root = Path(window_host_root).resolve(strict=True)
+    if not window_host_root.is_dir():
+        raise ReleaseBundleError("window host publish root must be a directory")
+    window_host_executable = window_host_root / "Stockroom.WindowHost.exe"
+    if not window_host_executable.is_file():
+        raise ReleaseBundleError(
+            "window host publish root is missing Stockroom.WindowHost.exe"
+        )
+    window_host_files = tuple(
+        sorted(
+            (path for path in window_host_root.rglob("*") if path.is_file()),
+            key=lambda path: path.relative_to(window_host_root).as_posix().casefold(),
+        )
+    )
+    if any(path.is_symlink() for path in window_host_files):
+        raise ReleaseBundleError("window host publish root must not contain symlinks")
     if source_date_epoch < 315532800 or source_date_epoch > 2147483647:
         raise ReleaseBundleError("source date epoch is outside the reproducible range")
     if type(protocol_version) is not int or protocol_version <= 0:
         raise ReleaseBundleError("protocol version must be a positive integer")
+    host_version_floor = _validated_host_version(
+        minimum_host_version,
+        package_version=version,
+    )
     feed = _validated_base_uri(feed_base_uri)
     release_id = f"release-{version}"
     bundle_root = Path(bundle_root).resolve()
@@ -247,6 +293,31 @@ def build_release_bundle(
         usedforsecurity=False,
     ).hexdigest()
     backend_sha256 = _sha256(backend_bytes)
+    window_host_members: list[dict[str, object]] = []
+    for source in window_host_files:
+        relative = source.relative_to(window_host_root)
+        destination = release_root / "WindowHost" / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+        data = destination.read_bytes()
+        canonical_path = f"WindowHost/{relative.as_posix()}"
+        window_host_members.append(
+            {
+                "kind": (
+                    "window-host"
+                    if canonical_path == "WindowHost/Stockroom.WindowHost.exe"
+                    else "window-host-runtime"
+                ),
+                "path": canonical_path,
+                "sha256": _sha256(data),
+                "size": len(data),
+            }
+        )
+    window_host_sha256 = next(
+        str(member["sha256"])
+        for member in window_host_members
+        if member["kind"] == "window-host"
+    )
 
     sbom_bytes = _spdx_document(
         executable_name=backend_name,
@@ -260,6 +331,7 @@ def build_release_bundle(
     sbom_path.parent.mkdir(parents=True)
     sbom_path.write_bytes(sbom_bytes)
     members = [
+        *window_host_members,
         {
             "kind": "backend",
             "path": f"Backend/{backend_name}",
@@ -285,7 +357,7 @@ def build_release_bundle(
             "catalog": {"from": 1, "to": 1},
             "control": {"from": 1, "to": 1},
         },
-        "minimum_host_version": version,
+        "minimum_host_version": host_version_floor,
         "package_version": version,
         "protocol_version": protocol_version,
         "release_id": release_id,
@@ -326,9 +398,11 @@ def build_release_bundle(
         "backend_sha256": backend_sha256,
         "compatible_from_release_ids": ",".join(compatible_predecessors),
         "manifest_sha256": manifest_sha256,
+        "minimum_host_version": host_version_floor,
         "release_id": release_id,
         "rollback_release_id": rollback_release_id,
         "root_sha256": _sha256(root_bytes),
+        "window_host_sha256": window_host_sha256,
     }
 
 
@@ -336,8 +410,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", required=True, choices=("Fixture", "Production"))
     parser.add_argument("--executable", required=True, type=Path)
+    parser.add_argument("--window-host-root", required=True, type=Path)
     parser.add_argument("--bundle-root", required=True, type=Path)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--minimum-host-version", required=True)
     parser.add_argument("--feed-base-uri", required=True)
     parser.add_argument("--source-revision", required=True)
     parser.add_argument("--source-date-epoch", required=True, type=int)
@@ -356,8 +432,10 @@ def main() -> int:
     result = build_release_bundle(
         mode=args.mode,
         executable=args.executable,
+        window_host_root=args.window_host_root,
         bundle_root=args.bundle_root,
         version=args.version,
+        minimum_host_version=args.minimum_host_version,
         feed_base_uri=args.feed_base_uri,
         source_revision=args.source_revision,
         source_date_epoch=args.source_date_epoch,

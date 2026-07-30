@@ -1,6 +1,7 @@
 from stockroom.capture.requirements import (
     Requirement,
     capture_needs,
+    capture_requirements,
     requirement,
     split_requirement,
 )
@@ -80,6 +81,16 @@ def test_a_full_kicad_set_does_not_mark_altium_satisfied():
     assert capture_needs(rec) == [Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT]
 
 
+def test_owned_requirements_do_not_disappear_when_bare_references_are_present():
+    rec = _rec()
+    for owned in capture_requirements(rec):
+        tool, kind = split_requirement(owned)
+        rec.assets_for(tool).set(kind, AssetRef(lib="looks-present", name="not-evidence"))
+
+    assert capture_needs(rec) == []
+    assert capture_requirements(rec) == list(Requirement)
+
+
 def test_a_ref_with_a_blank_name_is_not_satisfied():
     rec = _rec()
     rec.assets_for("altium").symbol = AssetRef(lib="a.SchLib", name="")
@@ -104,6 +115,7 @@ def test_a_passive_needs_no_files_for_any_tool():
     """
     rec = _rec(part_class=PartClass.PASSIVE)
     assert capture_needs(rec) == []
+    assert capture_requirements(rec) == []
 
 
 def test_a_passive_needs_nothing_even_when_it_carries_stock_kicad_references():

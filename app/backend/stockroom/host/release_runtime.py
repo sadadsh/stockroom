@@ -25,7 +25,7 @@ import urllib.request
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Protocol
 
 from stockroom import __protocol_version__, __version__
 from stockroom.host.proxy import (
@@ -74,6 +74,7 @@ from stockroom.update import (
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 _MAX_HEALTH_BYTES = 64 * 1024
 _MISSING_CONTEXT_ATTRIBUTE = object()
+PRODUCTION_UPDATE_CHECK_INTERVAL_SECONDS = 60.0
 
 
 class HostReleaseBoundaryError(RuntimeError):
@@ -141,6 +142,23 @@ class HostAdoptionReceipt:
     candidate_service_generation: int
     current_service_generation: int
     proxy: BackendAdoptionReceipt
+    window: object | None = None
+
+
+class HostWindowReplacement(Protocol):
+    """Two-phase native window replacement owned by the stable host."""
+
+    def begin(self, target_release: AcceptedRelease) -> object: ...
+
+    def commit(self, adoption: object) -> object: ...
+
+    def rollback(self, adoption: object) -> None: ...
+
+    def start_initial(self, release: AcceptedRelease | None = None) -> object: ...
+
+    def wait_until_closed(self) -> int: ...
+
+    def close(self) -> None: ...
 
 
 def _positive_finite(value: float, name: str) -> float:
@@ -195,7 +213,11 @@ def _backend_command(candidate: AcceptedRelease, port: int) -> list[str]:
 def _numeric_version(value: str) -> tuple[int, ...]:
     if re.fullmatch(r"\d+(?:\.\d+)*", value) is None:
         raise HostReleaseCompatibilityError("release host version requirement is not canonical")
-    return tuple(int(part) for part in value.split("."))
+    parts = tuple(int(part) for part in value.split("."))
+    # Packaged identities use Windows' four-part version form while source
+    # builds historically use three parts. Compare the same semantic version
+    # equally across both hosts instead of treating one trailing zero as newer.
+    return parts + (0,) * max(0, 4 - len(parts))
 
 
 def _strict_health_document(data: bytes) -> dict[str, object]:
@@ -274,6 +296,57 @@ class HostManifestRehearsal:
         # bundle fails in rehearsal rather than at the live handoff boundary.
         _backend_command(candidate, 1)
 
+    def rehearse_rollback(
+        self,
+        candidate: AcceptedRelease,
+        current: AcceptedRelease,
+        *,
+        generation: int,
+    ) -> None:
+        """Prove an older signed release can safely run the current data."""
+
+        if type(generation) is not int or generation <= 0:
+            raise HostReleaseCompatibilityError("service generation is invalid")
+        manifest = candidate.manifest
+        active = current.manifest
+        if (
+            active.rollback_release_id.casefold() != candidate.release_id.casefold()
+            or not active.supports_direct_activation_from(candidate.release_id)
+        ):
+            raise HostReleaseCompatibilityError(
+                "active release does not authorize this rollback target"
+            )
+        if _numeric_version(manifest.minimum_host_version) > _numeric_version(__version__):
+            raise HostReleaseCompatibilityError("rollback target requires a newer stable host")
+        if manifest.protocol_version != active.protocol_version:
+            raise HostReleaseCompatibilityError("rollback service protocol is incompatible")
+        if manifest.protocol_version != __protocol_version__:
+            raise HostReleaseCompatibilityError(
+                "rollback service protocol is incompatible with the stable host"
+            )
+        if not (
+            manifest.api_compatibility.minimum
+            <= active.protocol_version
+            <= manifest.api_compatibility.maximum
+        ):
+            raise HostReleaseCompatibilityError(
+                "rollback API range excludes the running host protocol"
+            )
+        for name in ("catalog", "control"):
+            active_schema = getattr(active.migration, name).target
+            compatibility = getattr(manifest.schema_compatibility, name)
+            if not compatibility.minimum <= active_schema <= compatibility.maximum:
+                raise HostReleaseCompatibilityError(
+                    "rollback target cannot read the active schemas"
+                )
+        for name, version in active.workflow_code_versions.items():
+            rollback_version = manifest.workflow_code_versions.get(name)
+            if rollback_version is None or rollback_version < version:
+                raise HostReleaseCompatibilityError(
+                    "rollback target cannot resume active workflow versions"
+                )
+        _backend_command(candidate, 1)
+
 
 class HostReleaseBoundary:
     """Concrete launch, health, drain, and adoption ports for ``ReleaseActivator``."""
@@ -286,6 +359,7 @@ class HostReleaseBoundary:
         token: str,
         local_release_id: str,
         reload_window: Callable[[str], None],
+        window_replacement: HostWindowReplacement | None = None,
         local_service_authority: ContextServiceAuthority | None = None,
         workflow_database: Path | None = None,
         control_database: Path | None = None,
@@ -306,6 +380,7 @@ class HostReleaseBoundary:
             raise ValueError("local_release_id must not be empty")
         if not callable(reload_window):
             raise TypeError("reload_window must be callable")
+        self._validate_window_replacement(window_replacement)
         if type(post_adoption_probes) is not int or post_adoption_probes <= 0:
             raise ValueError("post_adoption_probes must be a positive integer")
 
@@ -314,6 +389,7 @@ class HostReleaseBoundary:
         self._token = token
         self._local_release_id = local_release_id
         self._reload_window = reload_window
+        self._window_replacement = window_replacement
         self._local_service_authority = local_service_authority
         if local_service_authority is not None:
             service_database = local_service_authority.database
@@ -351,6 +427,42 @@ class HostReleaseBoundary:
         self._workers: dict[str, HostBackendProcess] = {}
         self._active_release_id = local_release_id
         self._closed = False
+
+    @staticmethod
+    def _validate_window_replacement(
+        window_replacement: HostWindowReplacement | None,
+    ) -> None:
+        if window_replacement is not None and any(
+            not callable(getattr(window_replacement, method, None))
+            for method in (
+                "begin",
+                "commit",
+                "rollback",
+                "start_initial",
+                "wait_until_closed",
+                "close",
+            )
+        ):
+            raise TypeError("window_replacement must implement the native host boundary")
+
+    def attach_window_replacement(
+        self,
+        window_replacement: HostWindowReplacement,
+    ) -> None:
+        """Attach the native window runtime after startup route recovery.
+
+        The durable release pointer may select a downloaded release before the
+        first window exists. Startup first restores that backend route without
+        pretending there is an old window to replace, then this one-time seam
+        binds the selected release's initial native window.
+        """
+
+        self._validate_window_replacement(window_replacement)
+        with self._lock:
+            self._ensure_open()
+            if self._window_replacement is not None:
+                raise HostReleaseBoundaryError("window replacement is already attached")
+            self._window_replacement = window_replacement
 
     @property
     def active_release_id(self) -> str:
@@ -936,8 +1048,13 @@ class HostReleaseBoundary:
                         "route adoption failed and prior service authority could not be restored"
                     ) from restore_error
             raise HostReleaseRouteError("candidate route could not be adopted") from adoption_error
+        window_receipt: object | None = None
         try:
-            self._reload_window(self._public_base_url)
+            replacement = self._window_replacement
+            if replacement is None:
+                self._reload_window(self._public_base_url)
+            else:
+                window_receipt = replacement.begin(candidate)
         except BaseException as exc:
             try:
                 rollback_drain = self._proxy.drain_adoption(
@@ -965,7 +1082,51 @@ class HostReleaseBoundary:
             candidate_service_generation=candidate_service_generation,
             current_service_generation=current_service_generation,
             proxy=proxy_receipt,
+            window=window_receipt,
         )
+
+    def commit(
+        self,
+        candidate: AcceptedRelease,
+        current: AcceptedRelease,
+        adoption_receipt: object,
+        *,
+        generation: int,
+    ) -> None:
+        """Validate the post-pointer host boundary before old-release retirement.
+
+        The legacy in-process window has no separate process to retire.  The
+        replacement-window adapter will use this exact post-pointer hook to
+        make candidate ownership durable and then retire the hidden old host.
+        """
+
+        if type(adoption_receipt) is not HostAdoptionReceipt:
+            raise HostReleaseRouteError("adoption receipt is invalid")
+        if (
+            adoption_receipt.candidate_release_id != candidate.release_id
+            or adoption_receipt.current_release_id != current.release_id
+            or adoption_receipt.generation != generation
+        ):
+            raise HostReleaseRouteError("adoption receipt generation is stale")
+        with self._lock:
+            if self._active_release_id != candidate.release_id:
+                raise HostReleaseRouteError(
+                    "active host route does not match the committed release"
+                )
+        replacement = self._window_replacement
+        if replacement is not None:
+            if adoption_receipt.window is None:
+                raise HostReleaseRouteError(
+                    "window adoption receipt is missing from the committed release"
+                )
+            try:
+                replacement.commit(adoption_receipt.window)
+            except BaseException as exc:
+                raise HostReleaseRouteError(
+                    "replacement window could not commit after the release pointer"
+                ) from exc
+        elif adoption_receipt.window is not None:
+            raise HostReleaseRouteError("unexpected window adoption receipt")
 
     def rollback(
         self,
@@ -999,7 +1160,20 @@ class HostReleaseBoundary:
             adoption_receipt.proxy,
             rollback_drain,
         )
-        self._reload_window(self._public_base_url)
+        replacement = self._window_replacement
+        if replacement is None:
+            self._reload_window(self._public_base_url)
+        else:
+            if adoption_receipt.window is None:
+                raise HostReleaseRouteError(
+                    "window adoption receipt is missing from rollback"
+                )
+            try:
+                replacement.rollback(adoption_receipt.window)
+            except BaseException as exc:
+                raise HostReleaseRouteError(
+                    "replacement window rollback could not restore the old host"
+                ) from exc
         with self._lock:
             self._active_release_id = current.release_id
 
@@ -1014,6 +1188,12 @@ class HostReleaseBoundary:
             self._workers.clear()
             active_release_id = self._active_release_id
         first_error: BaseException | None = None
+        replacement = self._window_replacement
+        if replacement is not None:
+            try:
+                replacement.close()
+            except BaseException as exc:
+                first_error = first_error or exc
         authority = self._local_service_authority
         if authority is not None:
             if active_release_id == self._local_release_id:
@@ -1102,7 +1282,8 @@ class ProductionUpdateRuntime:
         *,
         initial_state: ActiveReleaseState,
         status_path: Path,
-        refresh_interval_seconds: float = 15 * 60,
+        window_replacement: HostWindowReplacement | None = None,
+        refresh_interval_seconds: float = PRODUCTION_UPDATE_CHECK_INTERVAL_SECONDS,
         attempt_deadline_seconds: float = 10 * 60,
         minimum_retry_backoff_seconds: float = 5.0,
         maximum_retry_backoff_seconds: float = 5 * 60,
@@ -1111,6 +1292,8 @@ class ProductionUpdateRuntime:
         self._fence = fence
         self._store = store
         self._boundary = boundary
+        self._initial_release = initial_state.current
+        self._window_replacement = window_replacement
         self._status_path = Path(status_path)
         self._refresh_interval = _positive_finite(
             refresh_interval_seconds,
@@ -1165,6 +1348,15 @@ class ProductionUpdateRuntime:
             if self._started:
                 raise HostReleaseBoundaryError("production update runtime is already started")
             self._started = True
+        replacement = self._window_replacement
+        try:
+            if replacement is not None:
+                replacement.start_initial(self._initial_release)
+        except BaseException:
+            with self._condition:
+                self._started = False
+            raise
+        with self._condition:
             thread = threading.Thread(
                 target=self._activate_loop,
                 name=f"stockroom-release-activation-{self._fence.generation}",
@@ -1181,6 +1373,16 @@ class ProductionUpdateRuntime:
             thread.join(timeout=5.0)
             raise
         self._write_status()
+
+    @property
+    def owns_native_window(self) -> bool:
+        return self._window_replacement is not None
+
+    def wait_until_window_closed(self) -> int:
+        replacement = self._window_replacement
+        if replacement is None:
+            raise HostReleaseBoundaryError("production native window is unavailable")
+        return replacement.wait_until_closed()
 
     def _activate_loop(self) -> None:
         while True:
@@ -1369,6 +1571,13 @@ class UnavailableProductionUpdateRuntime:
     def start(self) -> None:
         return
 
+    @property
+    def owns_native_window(self) -> bool:
+        return False
+
+    def wait_until_window_closed(self) -> int:
+        raise HostReleaseBoundaryError("production native window is unavailable")
+
     def close(self) -> None:
         return
 
@@ -1378,7 +1587,7 @@ class UnavailableProductionUpdateRuntime:
             "automatic_on_launch": True,
             "blocking_reason": self._blocker,
             "channel": "production",
-            "check_interval_seconds": 15 * 60,
+            "check_interval_seconds": PRODUCTION_UPDATE_CHECK_INTERVAL_SECONDS,
             "convergence_phase": "blocked",
             "current_release_id": self._release_id,
             "current_revision": self._release_id,
@@ -1620,6 +1829,7 @@ def create_production_update_runtime(
     update_fence = update_control.acquire()
     service_authority: ContextServiceAuthority | None = None
     boundary: HostReleaseBoundary | None = None
+    window_replacement = None
     restore_context = _context_release_identity_restorer(context)
     try:
         store = ImmutableReleaseStore(
@@ -1724,6 +1934,16 @@ def create_production_update_runtime(
             state_directory=state_directory / "TUF",
             staging_directory=releases_directory,
         )
+        from stockroom.host.window_runtime import ProductionWindowReplacement
+
+        config = getattr(context, "config", None)
+        window_replacement = ProductionWindowReplacement(
+            active.current,
+            public_base_url=public_base_url,
+            api_credential=token,
+            config=config,
+        )
+        boundary.attach_window_replacement(window_replacement)
         return ProductionUpdateRuntime(
             update_control,
             update_fence,
@@ -1732,6 +1952,7 @@ def create_production_update_runtime(
             boundary,
             initial_state=active,
             status_path=status_path,
+            window_replacement=window_replacement,
         )
     except BaseException:
         if boundary is not None:
@@ -1768,8 +1989,10 @@ __all__ = [
     "HostManifestRehearsal",
     "HostReleaseProcessError",
     "HostReleaseRouteError",
+    "HostWindowReplacement",
     "HostUpdateMode",
     "ProductionUpdateConfigurationError",
+    "PRODUCTION_UPDATE_CHECK_INTERVAL_SECONDS",
     "ProductionUpdateRuntime",
     "UnavailableProductionUpdateRuntime",
     "create_production_update_runtime",

@@ -21,6 +21,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Callable
+from urllib.parse import urlsplit, urlunsplit
 
 from stockroom.api.context import AppContext
 from stockroom.launcher.exit_codes import EXIT_RESTART
@@ -70,12 +71,78 @@ def _close_active_window() -> None:
         win.destroy()
 
 
-def _reload_active_window(base_url: str, timeout: float = 30.0) -> None:
+def _same_origin_reload_url(base_url: str, current_url: str | None) -> str:
+    """Retarget the active SPA route onto ``base_url`` without preserving remote URLs."""
+
+    if not current_url:
+        return base_url
+    base = urlsplit(base_url)
+    current = urlsplit(current_url)
+    if (
+        current.scheme.casefold() != base.scheme.casefold()
+        or current.netloc.casefold() != base.netloc.casefold()
+    ):
+        return base_url
+    return urlunsplit(
+        (
+            base.scheme,
+            base.netloc,
+            current.path or "/",
+            current.query,
+            current.fragment,
+        )
+    )
+
+
+def _persist_active_window_session(win, config=None) -> bool:
+    """Synchronously capture the renderer's last-keystroke state, when supported.
+
+    The export hook is deliberately synchronous: navigation cannot race an async
+    PUT whose renderer is about to be destroyed.  Old frontend bundles have no
+    hook and remain reloadable.  Once a bundle exposes the hook, a malformed or
+    failed export aborts navigation rather than silently losing the user's work.
+    """
+
+    evaluate = getattr(win, "evaluate_js", None)
+    if evaluate is None:
+        return False
+    try:
+        exported = evaluate(
+            "(function () {"
+            "var f = window.__STOCKROOM_EXPORT_UI_SESSION__;"
+            "return typeof f === 'function' ? f() : null;"
+            "})()"
+        )
+    except Exception:
+        raise RuntimeError("the active UI session could not be exported") from None
+    if exported is None:
+        return False
+    from stockroom.store.ui_session import persist_export_envelope
+
+    try:
+        persist_export_envelope(exported, config)
+    except Exception:
+        raise RuntimeError("the active UI session export was invalid") from None
+    return True
+
+
+def _reload_active_window(
+    base_url: str,
+    timeout: float = 30.0,
+    *,
+    config=None,
+) -> None:
     """Adopt a replaced frontend bundle and wait for the existing window to load it."""
     from stockroom.host.window import active_window
 
     win = active_window()
     if win is not None:
+        _persist_active_window_session(win, config)
+        try:
+            current_url = win.get_current_url()
+        except Exception:  # noqa: BLE001 - an unreadable route falls back to the app root
+            current_url = None
+        target_url = _same_origin_reload_url(base_url, current_url)
         loaded = threading.Event()
 
         def _loaded() -> None:
@@ -86,7 +153,7 @@ def _reload_active_window(base_url: str, timeout: float = 30.0) -> None:
             raise RuntimeError("the active window has no load-completion event")
         event += _loaded
         try:
-            win.load_url(base_url)
+            win.load_url(target_url)
             if not loaded.wait(timeout):
                 raise RuntimeError("the active window did not load before the deadline")
         finally:
@@ -110,13 +177,22 @@ def _prepare_release_candidate(root: Path) -> None:
         raise RuntimeError("candidate dependency preparation failed")
 
 
-def _install_injected_index(app, base_url: str, token: str) -> None:
-    """Insert a route that serves index.html with window.__API_BASE__ + __STOCKROOM_TOKEN__
-    already injected, taking precedence over the SPA static mount, so the SPA is authenticated
-    from its very first byte. Without this the token arrives only via the window's on-loaded
-    evaluate_js, which lands AFTER the SPA's initial queries fire, so a no-retry query like
-    onboarding 401s once and never recovers (hiding the first-run setup screen). No-op if the
-    built frontend is absent."""
+def _install_injected_index(
+    app,
+    base_url: str,
+    token: str,
+    config=None,
+    *,
+    expose_token_to_renderer: bool = True,
+) -> None:
+    """Serve the exact UI/session bootstrap ahead of the static SPA mount.
+
+    The legacy pywebview host needs ``expose_token_to_renderer=True`` so its
+    first queries authenticate before the asynchronous loaded callback. The
+    native WebView2 host passes ``False`` and synchronously adds the token to
+    approved same-origin requests; that path must never serialize the secret
+    into the HTML/JavaScript document. No-op when the built frontend is absent.
+    """
     from stockroom.api.app import _FRONTEND_DIST
     from stockroom.host.window import inject_script
 
@@ -131,17 +207,41 @@ def _install_injected_index(app, base_url: str, token: str) -> None:
         # itself after a self-update, and a reload must not resurrect the theme that was saved when
         # the process booted. The index.html text stays cached; only the small config is re-read.
         from stockroom.store.machine_config import MachineConfig
+        from stockroom.store.ui_session import (
+            bootstrap_script,
+            default_snapshot,
+            load_snapshot,
+        )
 
         try:
             # Rendering index.html is a read. In particular, a managed shadow may
             # serve pre-adoption health/UI probes before it owns authority, so this
             # path must never trigger legacy credential migration.
-            ui = MachineConfig.load(migrate_credentials=False).ui
+            path = getattr(config, "source_path", None)
+            ui = MachineConfig.load(
+                path,
+                migrate_credentials=False,
+            ).ui
         except Exception:  # noqa: BLE001 - an unreadable config must never block the window opening
             ui = {}
+        try:
+            session = load_snapshot(config)
+        except Exception:  # noqa: BLE001 - corrupt/dangling state is never injected
+            session = default_snapshot()
         html = index.read_text(encoding="utf-8")
         return html.replace(
-            "<head>", "<head>\n<script>" + inject_script(base_url, token, ui=ui) + "</script>", 1
+            "<head>",
+            (
+                "<head>\n<script>"
+                + inject_script(
+                    base_url,
+                    token if expose_token_to_renderer else None,
+                    ui=ui,
+                )
+                + bootstrap_script(session)
+                + "</script>"
+            ),
+            1,
         )
 
     async def _index(_request):
@@ -315,6 +415,7 @@ def run_windowed(
         else:
             ctx = build_context(libraries_root, kicad_dir=kicad_dir)
     assert ctx is not None
+    host_config = getattr(ctx, "config", None)
     setattr(ctx, "host_update_mode", update_mode.value)
     background_sync_stop: threading.Event | None = None
     update_convergence_stop = None
@@ -335,6 +436,11 @@ def run_windowed(
         restart_requested = {"value": False}
 
         def _request_restart() -> None:
+            from stockroom.host.window import active_window
+
+            win = active_window()
+            if win is not None:
+                _persist_active_window_session(win, host_config)
             restart_requested["value"] = True
             _close_active_window()
 
@@ -378,7 +484,12 @@ def run_windowed(
         backend_proxy = SwitchableBackendProxy(app)
         port = pick_free_port()
         base_url = f"http://127.0.0.1:{port}"
-        _install_injected_index(app, base_url, ctx.token)  # auth from the first byte
+        _install_injected_index(
+            app,
+            base_url,
+            ctx.token,
+            host_config,
+        )  # auth + continuity from the first byte
         if update_mode is HostUpdateMode.PRODUCTION:
             try:
                 production_update_runtime = create_production_update_runtime(
@@ -386,7 +497,10 @@ def run_windowed(
                     context=ctx,
                     public_base_url=base_url,
                     token=ctx.token,
-                    reload_window=_reload_active_window,
+                    reload_window=lambda url: _reload_active_window(
+                        url,
+                        config=host_config,
+                    ),
                     data_root=production_state_root,
                 )
             except Exception:  # noqa: BLE001 - keep the signed built-in UI observable
@@ -441,7 +555,7 @@ def run_windowed(
 
             def _adopt_backend(target_base_url: str) -> None:
                 backend_proxy.switch(None if target_base_url == base_url else target_base_url)
-                _reload_active_window(base_url)
+                _reload_active_window(base_url, config=host_config)
 
             handoff = SeamlessBackendHandoff(
                 release_store,
@@ -513,9 +627,19 @@ def run_windowed(
         convergence = getattr(ctx, "update_convergence", None)
         if convergence is not None:
             update_convergence_stop = convergence.start()
-        opener = open_window or _open_window
         try:
-            opener(base_url, ctx.token)  # stable origin; blocks until the window closes
+            if (
+                production_update_runtime is not None
+                and production_update_runtime.owns_native_window
+            ):
+                # The stable broker remains alive while release-owned WPF/WebView2
+                # windows replace one another. Only the currently active visible
+                # child can end this wait; retiring an old window during an update
+                # must never tear down the broker or service authority.
+                production_update_runtime.wait_until_window_closed()
+            else:
+                opener = open_window or _open_window
+                opener(base_url, ctx.token)  # degraded/source compatibility window
         finally:
             try:
                 if production_update_runtime is not None:

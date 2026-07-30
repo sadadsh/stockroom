@@ -321,4 +321,124 @@ def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
     ]
     assert complete_options[0]["exhaustive"] is True
     assert complete_options[0]["collect_variants"] is True
+    assert callable(complete_options[0]["evidence_resolver"])
     assert all(source.closed for source in source_batches[0] if hasattr(source, "closed"))
+
+
+def test_runner_uses_one_immutable_evidence_resolver_for_selection_and_completion(
+    monkeypatch,
+    tmp_path,
+):
+    import stockroom.evidence as evidence_module
+    from stockroom.capture import verified_cache
+
+    evidence_store = object()
+    observed: dict[str, object] = {}
+
+    class Source:
+        key = "verified-cache"
+
+    class Report:
+        items = ()
+
+        def of(self, *_statuses):
+            return False
+
+        def to_dict(self):
+            return {"items": [], "counts": {}}
+
+    def select(_parts_dir, *, load_record, sources, evidence_resolver):
+        observed["selection_resolver"] = evidence_resolver
+        observed["selection_evidence"] = evidence_resolver(load_record("part-a"))
+        assert [source.key for source in sources] == ["verified-cache"]
+        return iter(("part-a",))
+
+    def complete(work, *, evidence_resolver, **_options):
+        observed["completion_resolver"] = evidence_resolver
+        observed["completion_evidence"] = evidence_resolver(record)
+        assert list(work) == ["part-a"]
+        return Report()
+
+    record = SimpleNamespace(id="part-a")
+    ctx = SimpleNamespace(
+        ops=SimpleNamespace(load_record=lambda _part_id: record),
+        jobs=SimpleNamespace(run_write=lambda fn: fn()),
+        rebuild_index=lambda: None,
+        auto_push=lambda: None,
+        profile=SimpleNamespace(
+            library=SimpleNamespace(parts_dir=tmp_path / "parts"),
+        ),
+        repo=object(),
+        cli=object(),
+        config=SimpleNamespace(),
+    )
+
+    monkeypatch.setattr(evidence_module, "EvidenceStore", lambda _root: evidence_store)
+    monkeypatch.setattr(
+        verified_cache,
+        "record_completion_evidence",
+        lambda store, current: ("verified-by", store, current.id),
+    )
+    monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
+    monkeypatch.setattr(runner, "_automatic_provider_keys", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(runner, "_vendor_chain", lambda _vendor: [])
+    monkeypatch.setattr(runner, "build_sources", lambda *_args, **_kwargs: [Source()])
+    monkeypatch.setattr(runner, "iter_incomplete", select)
+    monkeypatch.setattr(runner, "complete_library", complete)
+
+    assert runner.run_guided_capture(ctx) == {"items": [], "counts": {}}
+    assert observed["selection_resolver"] is observed["completion_resolver"]
+    assert observed["selection_evidence"] == (
+        "verified-by",
+        evidence_store,
+        "part-a",
+    )
+    assert observed["completion_evidence"] == observed["selection_evidence"]
+
+
+def test_coverage_does_not_bless_populated_bare_cad_references(
+    monkeypatch,
+    tmp_path,
+):
+    from stockroom.capture.requirements import Requirement, split_requirement
+    from stockroom.model.part import AssetRef, PartRecord
+
+    record = PartRecord(
+        id="bare-cad",
+        display_name="Bare CAD",
+        category="ICs",
+        description="references without immutable evidence",
+        manufacturer="Example",
+        mpn="EXACT-123",
+    )
+    for owned in Requirement:
+        tool, kind = split_requirement(owned)
+        record.assets_for(tool).set(
+            kind,
+            AssetRef(file="model.step")
+            if kind == "model"
+            else AssetRef(lib="Present", name=record.mpn),
+        )
+
+    parts = tmp_path / "parts"
+    parts.mkdir()
+    (parts / "bare-cad.json").write_text("{}\n", encoding="utf-8")
+    ctx = SimpleNamespace(
+        profile=SimpleNamespace(library=SimpleNamespace(parts_dir=parts)),
+        ops=SimpleNamespace(load_record=lambda _part_id: record),
+        config=SimpleNamespace(),
+        repo=object(),
+        cli=object(),
+    )
+
+    monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
+    monkeypatch.setattr(runner, "_automatic_provider_keys", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(runner, "_vendor_chain", lambda _vendor: [])
+
+    report = runner.coverage(ctx)
+
+    assert report["total"] == 1
+    assert report["complete"] == 0
+    assert report["needs_files"] == 1
+    assert report["unsourced"] == 0
+    assert set(report["by_requirement"]) == {requirement.value for requirement in Requirement}

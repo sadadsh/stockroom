@@ -10,6 +10,7 @@ from stockroom.kicad.cli import KiCadCli
 from stockroom.model.project import ProjectRecord
 from stockroom.projects.checks import project_checks
 from stockroom.projects.fill import read_components
+from stockroom.projects.matching import KiCadProjectMatchStrategy
 from stockroom.projects.placement_geometry import kicad_board_geometry
 from stockroom.projects.project_visuals import ProjectVisualBundle, render_kicad_project
 from stockroom.sexp.document import SexpDocument
@@ -25,6 +26,7 @@ from .models import (
 class KiCadProjectAdapter:
     key = "kicad"
     label = "KiCad"
+    matching = KiCadProjectMatchStrategy()
 
     def __init__(self, cli: KiCadCli | None = None) -> None:
         self.cli = cli or KiCadCli()

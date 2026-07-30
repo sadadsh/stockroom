@@ -21,6 +21,100 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-07-29 — Windows App Identity Asset Audit
+
+- Capture layer: deterministic canonical asset contact sheet.
+- Evidence:
+  `work/Windows App Identity Audit/Canonical Icon Sizes And Shell Variants.png`,
+  1,400 × 1,050, SHA-256 `e643e9f00973`.
+- Surfaces: tiled Stockroom mark at 512, 256, 128, 96, 80, 72, 64, 60,
+  48, 40, 36, 32, 30, 24, 20, and 16 px; transparent dark-surface and
+  light-surface unplated shell variants at 96, 64, 48, 32, 24, and 16 px.
+- Intended claim: the approved mirrored `S` is the box's exact top-panel joint,
+  all cube edges and junctions connect at every generated Windows size, the
+  mark remains grayscale, and shell variants preserve contrast without a
+  platform-added plate.
+- Acceptance result: pass at the asset layer. The box silhouette remains clear
+  at 16 px; the `S` becomes secondary detail at that size instead of breaking
+  the outline. Real EXE/titlebar/taskbar/Start/Apps inspection remains required
+  after package construction.
+
+### 2026-07-29 — Served Progress HTML Audit
+
+- Capture layer: Codex in-app browser through the private Tailscale HTTPS route.
+- Evidence: `work/Progress HTML Visual Audit/Desktop Current State.png`,
+  1,265 × 712, SHA-256 `b0d78022cbb5`.
+- Intended claim: the generated punch-list page is reachable, identifies
+  product scope and current work before historical counters, and exposes
+  evidence and blockers without relying on an aggregate readiness percentage.
+- Acceptance result: functional pass. The follow-up DOM verification reports
+  `document.characterSet = UTF-8`, no mojibake, and correctly marks Windows
+  Package And Release Lifecycle as Active after its internal hot-adoption gap
+  was found. VA-044 records the non-blocking scanability debt visible in the
+  capture.
+
+### 2026-07-30 — Served Progress HTML Scanability Follow-Up
+
+- Capture layer: Chrome Browser through the private Tailscale HTTPS route, with
+  deterministic responsive and preferred-colour-scheme overrides.
+- Before evidence:
+  `work/Progress HTML Visual Audit/Desktop Current State.png`, 1,265 × 712,
+  SHA-256 `b0d78022cbb5`.
+- After evidence:
+  `work/Progress HTML Visual Audit/Desktop Dark Scanability After.png`,
+  1,250 × 704, SHA-256 `91ded8f10580`;
+  `Desktop Light Scanability After.png`, 1,250 × 704, SHA-256
+  `91b71996b0ec`; `Phone Dark Scanability After.png`, 375 × 812, SHA-256
+  `3d4f5650125e`; and `Phone Light Scanability After.png`, 375 × 812,
+  SHA-256 `55f3705f5a4f`.
+- Intended claim: each current-work card leads with one bounded state sentence,
+  while its exact evidence, blocker, and next action remain in one explicit
+  native disclosure. Long status prose uses a readable one-column measure at
+  desktop and phone widths.
+- Acceptance result: pass in both themes. The desktop page reports one 814 px
+  workstream column; the phone page reports one 325 px column. All six state
+  sentences, six disclosures, 11 owner-outcome gates, and 20 engineering items
+  remain in the DOM. The first disclosure opened with Enter, closed with Space,
+  retained focus on `SUMMARY`, and exposed the complete evidence string. With
+  that long SHA-bearing evidence expanded, phone document/client width remained
+  375/375 px; desktop document/client width remained 1,250/1,250 px.
+  `document.characterSet` remains `UTF-8`. No content was removed and no new
+  visual finding was opened.
+
+### 2026-07-29 — Exact-Current Native Library UX Audit
+
+- Capture layer: current source revision in the real pywebview/WebView2 host,
+  with task-owned configuration, service state, and library copies. Durable
+  frames are WebView2 CDP captures; the native titlebar and approved box mark
+  were also observed through Computer Use.
+- Evidence:
+  `work/Native Current Acceptance/Screenshots/Empty Library Dark.png`
+  (`d95161202089`), `Empty Library Light.png` (`8c6de370703f`),
+  `Add Part Dark.png` (`68a9368a0e1a`), `Add Part Light.png`
+  (`27b0b17c4f58`), `Dual EDA Readiness Dark.png` (`69e5844ff78e`),
+  `Dual EDA Readiness Light.png` (`f09f10cbf417`),
+  `Single Value Facet Dark.png` (`b3b3f66b5ad0`), and
+  `Single Value Facet Light.png` (`62a32dbd9549`). Every frame is
+  1,384 × 861.
+- Intended claims: an empty library has one working intake state; Add Parts
+  describes one shared KiCad + Altium + STEP package; local files cannot imply
+  verified CAD readiness; and a degenerate numeric facet is one static value,
+  not a fake range.
+- Acceptance result: pass in both themes. Empty Components has one
+  `No Components Yet` state, one working `Add Parts` action, and no impossible
+  selection instruction. The populated canary visibly reports
+  `KiCad Unverified · Altium Unverified` despite linked Symbol, Footprint, and
+  3D files. The one-value `channels` fixture renders `Only value 6`, exposes no
+  range control, and keeps the value in the result column. Root width/height
+  equals client width/height at 1,384 × 861 and the WebView console is empty.
+- Audit: the first native boot found and corrected a real syntax regression in
+  the shared passive-template path. The network audit then found an implicit
+  `/favicon.ico` 404; the deterministic approved icon is now generated into
+  the frontend public assets as well as the host, and a fresh WebView reports
+  no response with status 400 or higher. Existing VA-002, VA-004, and VA-014
+  still describe the visible automation, whitespace, and low-emphasis-text
+  debt; no duplicate finding was opened.
+
 ### 2026-07-29 — Altium Fresh-Session Placement Proof
 
 - Capture layer: Computer Use point-in-time Windows capture.
@@ -64,22 +158,19 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 | ID | Priority | Surfaces | Finding | Acceptance condition |
 | --- | --- | --- | --- | --- |
-| VA-001 | P0 | Components | `CAD Complete` appears beside missing-data warnings and says nothing about KiCad versus Altium. The new Representations route now exposes both tools and their exact assets/evidence, but the old completion claim still exists elsewhere. | Completion is impossible until immutable artifacts and both KiCad and Altium bindings pass digest-bound inspection; the UI names both results and the blocking evidence. |
+| VA-001 | P0 | Components | Source correction and exact-current native verification have landed: the compact state names KiCad and Altium separately and fails closed to `Unverified`; a canary with linked Symbol, Footprint, and 3D files remains `KiCad Unverified · Altium Unverified` in real WebView2 in both themes. The remaining proof is the positive completed state against immutable dual-EDA inspection evidence. | Completion is impossible until immutable artifacts and both KiCad and Altium bindings pass digest-bound inspection; the UI names both results and the blocking evidence. |
 | VA-002 | P1 | Components, empty state | The primary path is still manual `Add Parts`; there is no visible durable intake, batch progress, fallback, recovery, or compact decision path. | One control accepts 1–1,000 identities, persists immediately, and shows incremental stage, retry/fallback, resume, and only genuinely blocked decisions without asking for field entry. |
-| VA-003 | P1 | Search | Single-valued facets render as fake ranges: capacitance `100 nF–100 nF`, resistance `10 kΩ–10 kΩ`, and current `3 A–3 A`. The sliders imply a choice that does not exist. | Degenerate ranges become a value facet or disappear; a range control renders only when distinct useful bounds exist. |
 | VA-004 | P1 | Components, Search | Fixed panes and very wide bands leave most of the window empty while useful content is compressed into the left/top. Search query occupies less than half its bar and Components reserves a full empty Sourcing column. Settings was removed from this finding by VA-027. | Layout reallocates space according to content and window width, keeps the focal workflow dominant, and has explicit useful empty states at 1,024, 1,384, and 1,600 CSS pixels. |
-| VA-005 | P1 | Components empty state | Two competing empty states are shown at once: `No Components Yet` in the list and `Select a part` in the detail pane, even though selection is impossible. | An empty library has one coherent intake/onboarding state; selection guidance appears only when selectable entries exist. |
 | VA-006 | P2 | Components, Search, Settings | The shipped UI violates its own design rules with nested bordered cards, boxed values, and repeated uppercase micro-labels (`TOP SPECIFICATIONS`, `ELECTRICAL`, table headers). | Each region has one elevation level, non-informative borders/boxes are removed, and labels use the approved quiet hierarchy and casing. |
 | VA-007 | P2 | Components | One selected entry is named three different ways: `100nF 0402`, `100 nF Capacitor`, and `100 nF 16V X7R 0402`. | Canonical display name and supporting description have defined roles and remain consistent across list, header, search, and EDA projections. |
 | VA-008 | P2 | Components | Warning triangles sit at the far edge of rows without an adjacent reason, severity, or next system action. | Every warning exposes a concise reason and what Stockroom is doing next; keyboard and pointer users can reach the same explanation. |
 | VA-010 | P2 | Search | The results table spends large horizontal spans on missing values and repeats result counts while the high-value identity/evidence fields are weak. | Columns prioritize exact manufacturer/MPN, match confidence/evidence, lifecycle, package, and dual-EDA readiness; empty columns collapse or move behind details. |
-| VA-011 | P2 | Components | The 3D preview uses decorative copper/gold color while the approved visual language says previews are neutral unless color carries data. | Preview defaults to neutral materials and uses color only for an explicit semantic or source-authentic mode. |
 | VA-012 | P2 | Components | The open-part tabs now read `Overview`, `Representations`, `Sources`, and `Activity`, and a cross-EDA asset matrix replaces Handoff as the route's lead. Remaining Library/Add/health navigation still exposes legacy/manual implementation boundaries. | Navigation is organized around entry truth, evidence, dual-EDA readiness, and activity/decisions; internal stages remain observable without becoming manual chores. |
 | VA-013 | P2 | Components | An empty Sourcing pane permanently consumes a major column and offers only a remote `Refresh` action. | Empty sourcing collapses into evidence/activity or shows active automatic acquisition and fallback; it does not reserve a full pane for no data. |
 | VA-014 | P2 | Native Components, Native Settings | Typography mixed responsive tokens, an unrelated 13 px body inheritance, and literal 9/10 px overrides, producing unexplained size differences. The installed exact-MPN captures again show faint helper text in both themes and low-contrast amber warning copy in light mode. The owner explicitly requested a smaller scale on 2026-07-28, so the remaining issue is consistency and DPI/contrast confidence rather than making type larger. | One compact semantic token scale owns all interface text with no one-off pixel sizes; the hierarchy remains legible at supported Windows scale factors and passes contrast checks in both themes. |
-| VA-017 | P1 | Components, Symbol and Footprint previews | Symbol, Footprint, and 3D now share a clear stage-centred eye-and-Expand overlay instead of ambiguous footer eyes. Expanded SVGs have explicit zoom, Fit, keyboard navigation, double-click Fit, and SVG export, but still lack pin/pad selection, layers, orientation, measurement, validation, comparison, provenance, and linked cross-projection inspection. | Symbol, Footprint, and 3D share one Inspection stage and selection model. Symbol pins map to footprint pads and 3D leads; each projection exposes appropriate overlays, checks, comparison, and contextual actions with keyboard parity. |
+| VA-017 | P1 | Components, Symbol and Footprint previews | Symbol, Footprint, and 3D now occupy one full-height Inspection stage with one projection selector and one expansion command. SVG zoom state and the live 3D renderer survive compact/expanded presentation changes. Remaining: pin/pad/lead selection, layers, orientation, measurement, validation, comparison, provenance, and linked cross-projection inspection. | Symbol, Footprint, and 3D share one Inspection stage and selection model. Symbol pins map to footprint pads and 3D leads; each projection exposes appropriate overlays, checks, comparison, and contextual actions with keyboard parity. |
 | VA-018 | P1 | Components | Consequential actions follow no stable placement rule: Add Parts, Refresh, row stars, asset eyes, CAD Complete, pane chevrons, top workflow tabs, and the lone bottom delete icon are distributed by implementation location rather than action scope. | Component-wide, projection, field, background-job, candidate, and destructive actions each follow the placement rules in `Component Inspection Workspace.md`; no unlabeled icon is the sole explanation of a consequential action. |
-| VA-019 | P1 | Components, 3D preview | Compact is now a passive auto-rotating specimen with one Inspect transition; the expanded bottom dock exposes Layers, Appearance, Placement, Motion, and View coherently. A clickable/drag-capable grayscale view cube follows the active camera, and conservative placement checks expose Source/Model/Auto. Remaining: issues do not focus geometry, and compact/expanded presentation mounts separate renderer state. | Issues focus the relevant geometry, and compact and expanded presentation share one renderer/state so a camera, layer, or selection change survives the presentation transition. |
+| VA-019 | P1 | Components, 3D preview | Compact and expanded presentation now share the same mounted renderer/state, the default camera frames the whole decoded subject, Fit and 0/F restore that frame, and readiness appears only after non-empty geometry paints a frame. Remaining: issues do not yet focus their relevant geometry. | Issues focus the relevant geometry, and compact and expanded presentation share one renderer/state so a camera, layer, or selection change survives the presentation transition. |
 | VA-032 | P1 | Native acquisition, all surfaces | A managed `chrome-headless-shell.exe` launch raised a Windows Firewall public/private-network prompt over Stockroom even though acquisition needs outbound HTTPS and local process transport, not inbound LAN access. The security dialog obscured and disabled the primary app until dismissed. | Acquisition does not request inbound public/private firewall access. Any unavoidable browser/runtime setup happens only after an explicit acquisition action, explains why, and never presents a raw publisher-unknown system prompt as part of normal app startup. |
 | VA-033 | P1 | Altium Components, profile switching | Two Stockroom-managed DbLib paths appear as identical `Stockroom.DbLib - Parts` choices, so the active profile cannot be identified from Altium's selector and a profile switch can leave a stale library selectable. | Automatic convergence keeps exactly one Stockroom-receipted DbLib installed. It installs and verifies the new active target before removing only obsolete receipt-owned targets, never touches arbitrary user libraries, and fails closed without abandoning the last working target. The isolated native embed acceptance run then removed the exact receipted proof DbLib and the exact prior UL-canary DbLib; Altium's measured final list contains only its built-in Simulation Generic Components library and zero Stockroom test registrations. |
 | VA-043 | P1 | Live DigiKey assisted capture and security handoff | The redesigned closed-shadow HUD is verified in isolated Chromium at desktop and 320 × 600 bounds, but the new compact route, Session Memory, sticky outcomes, and paused-gate presentation have not yet been re-captured on DigiKey's live model, cookie, consent, sign-in, and guest-limit surfaces. | A visible managed DigiKey run captures assisted and paused states in light and dark at supported Windows scale factors. Exact provider/author/MPN, required formats, receipt count, Session Memory, Resume/Use Another/Close, collapse/move/focus, and the one human gate remain readable without obscuring the active provider control. Session Memory appears only with DigiKey's isolated persistent profile. |
@@ -88,8 +179,11 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 | ID | Priority | Surfaces | Finding | Resolution evidence |
 | --- | --- | --- | --- | --- |
+| VA-003 | P1 | Search | An equal minimum/maximum rendered a slider with duplicate endpoints and implied a selectable range that did not exist. | Equal bounds now render one static `Only value` fact and no range input; invalid bounds disappear. Exact-current WebView2 frames in both themes show `channels · Only value · 6`, one result value, zero slider/tick controls, no overflow, and an empty console. |
+| VA-005 | P1 | Components empty state | An empty library rendered competing `No Components Yet` and `Select a part` instructions across separate panes, even though no selection was possible. | The current source host replaces both panes with one centered intake state and one working `Add Parts` action. Exact-current WebView2 frames in both themes contain no selection instruction; activating Add Parts opens the shared network intake modal. |
 | VA-015 | P1 | Native navigation rail, all destinations | In auto-collapsed mode, `focus-within` treated a pointer click as keyboard intent and held the 190 px peek open over a 52 px layout slot. It covered the first 138 px of Components, STM Viewer, and Settings until another click moved focus. | Replaced the width and label reveal with `:has(:focus-visible)`. Real WebView2 pointer navigation leaves the rail at 52 px and the destination at x=52; keyboard focus still reveals it and leaving the rail closes it. Verified in both themes on 2026-07-28. |
 | VA-016 | P2 | Native navigation rail, pinned and collapsed | The rail used separate flex/padding arrangements: collapsed centers were nav/about 25.5 px, Update 16 px, Theme 20.5 px; pinned centers were nav/about 30.5 px and Update 31 px. Pinning visibly shifted the column. | Rebuilt every destination and utility as the same `35px minmax(0,1fr)` row grid with the same 8 px panel inset. Real WebView2 measurements are 25.5 px for Components, STM Viewer, Settings, About, Update, and Theme in both pinned and collapsed states. |
+| VA-011 | P2 | Components | The 3D preview used decorative copper/gold color while the approved visual language requires neutral previews unless color carries data. | Studio is now the neutral default and `Source Color` is an explicit authored-material mode. Source/Vite browser captures at 1384×861 in both themes show the neutral whole-object frame and truthful `Visible model · Whole object framed` state. |
 | VA-020 | P0 | Components, 3D preview | STEP-native Z-up positions were passed to a glTF/Three Y-up viewer without basis normalization, standing board-mounted parts on their side. Placement controls could not repair a coordinate system that was already wrong. | Added one non-destructive −90° X parent to each converted STEP scene, recorded basis metadata, and bumped the GLB cache to `c5`. The real WebView2 0603 now lies flat and aligns with its production footprint pads in both themes; converter structure is regression-tested. |
 | VA-021 | P0 | Components, workbench tabs | Selecting a non-Overview tab left the entire Overview grid visible above the selected panel. Tailwind `grid` overrode the browser's `[hidden]` display rule, so two mutually exclusive routes occupied the screen at once. | Inactive workbench panels now receive an authoritative inline `display:none` while retaining `hidden` for accessibility. A regression test switches routes and asserts both layout states; real WebView2 dark/light Representations captures contain only the selected route. |
 | VA-022 | P1 | Components, Representations | The first cross-EDA matrix expanded every representation into a full table row and made the selected route substantially taller than the former Handoff card, violating the fixed-workstation intent. | Replaced it with two compact EDA rows in an equal Design Tool / Symbol / Footprint / 3D Model grid. The route itself is non-scrolling; only its cards own overflow. Real WebView2 reports viewport/document/body = 861/861/861 px and panel client/scroll = 717/717 px in both themes. |
@@ -112,6 +206,7 @@ and `P2` meaningful fit, finish, or clarity debt.
 | VA-039 | P0 | Projects, Assemble | The first guided bench persisted events, but it bypassed Stockroom's durable Altium bindings, counted only `Done` toward progress even though skipped/reworked placements can close a run, left the operator on the completed row, and used a dark-only translucent work card. | The bench now consumes the same linked library identity for KiCad and Altium, measures resolved work as Done + Skipped + Reworked, requires a matching reel scan when an MPN exists, saves on Enter, advances to the next pending placement, and keeps the verified reel loaded when the next reference uses the same MPN. Token-based surfaces render correctly in both themes. A real Altium-backed WebView2 run saved R1, advanced to R2, retained the verified reel, updated to `1/3 resolved · 33.3%`, and emitted no console errors or page overflow. Paired placement normalization now has one exact reference/board/X/Y/rotation/side/footprint shape and KiCad's native exporter is qualified. Highlighting remains hidden because both the AD26 PCB-object API and Pick and Place OutJob paths raised a native dialog on a real installed example while preserving source bytes. Remaining: qualify Altium native geometry, then add paired coordinate/polarity highlighting, inventory reservation/reversal, and repository publication of the sealed receipt. |
 | VA-041 | P1 | Native provider capture HUD | The production provider HUD forced a dark palette, so its nominal light and dark real-page captures were byte-for-byte identical. It also used an em dash in instructional copy despite the product voice contract. | The closed-shadow HUD now uses one light-first variable palette with a complete `prefers-color-scheme: dark` override, retains forced-colors and reduced-motion behavior, and uses plain two-sentence sign-in guidance. Real CloakBrowser Chromium captures on the live DigiKey TPD6E05U06RVZR model page differ by theme while preserving the same 360 × 532 px bounds, exact identity, five required-file labels, live count, and three explicit outcomes. The panel remains movable and collapsible by pointer or keyboard; DigiKey's cookie banner and guest-limit notice are provider-owned state, not Stockroom chrome. |
 | VA-042 | P1 | Projects, all tools | The rebuilt cross-EDA functionality initially retained its own dashboard/table composition instead of the Components/Library selection and inspection philosophy, so project choice and BOM work felt like a separate product. | Projects now uses the same 320 px searchable picker, compact selected-item title strip, shared tabs, bounded workbench, selectable list rows, and contextual inspector grammar as Components. BOM resolution moved beside the selected line; Design, Assemble, Changes, and Releases share the same hierarchy. A source contract forbids EDA-specific workbench branches, and KiCad/Altium fixtures prove the same five-tool shell. Real WebView2 captures at 1,384 × 861 in both themes have no page overflow or console errors. |
+| VA-044 | P2 | Served progress HTML, Codex Active Work | Long evidence and blocker prose was forced into two dense columns at a 1,265 px viewport, producing a small, report-like text wall before the owner outcome gates. | Six workstream cards now lead with one bounded state sentence in a single readable column. Exact evidence, blocker, and next action remain inside a native disclosure with visible keyboard focus; Enter and Space both toggle it. Dark/light desktop and phone captures preserve every card and outcome, UTF-8, and zero horizontal overflow even when long SHA-bearing evidence is expanded. |
 
 ## Evidence Reviewed
 
@@ -272,3 +367,13 @@ Capture root:
 | `work/Final Library Visual Audit/Shared Pair Selector Light.png` | Playwright Chromium / isolated FastAPI fixture | Shared KiCad + Altium pair selector / light | 1384×861 | `5165c6dda828` | Theme-parity atomic-selection pass with four retained variants, one active whole pair, one whole-pair fallback action, and the same STEP association in both EDA rows. Critique: compact evidence and lower handoff detail still demand deliberate reading, but provider/source divergence is not possible from this surface. |
 | `work/Final Library Visual Audit/Complete Part Source Ledger Dark.png` | Playwright Chromium / isolated FastAPI fixture | Complete Part terminal provider ledger / dark | 1384×861 | `bd033ac0e6c1` | Terminal-ledger pass: cache, Ultra Librarian, SnapMagic, TraceParts, manufacturer, and SamacSys routes are all visible and settled as Activated, Retained, or Unavailable with explicit reasons; unavailable is correctly defined as checked with no exact deliverable. The detail checklist and anchored Done action remain visible. Critique: the audit intentionally scrolls past the beginning of the success paragraph to fit the complete ledger, and the reason tier is visually quiet. |
 | `work/Final Library Visual Audit/Complete Part Source Ledger Light.png` | Playwright Chromium / isolated FastAPI fixture | Complete Part terminal provider ledger / light | 1384×861 | `1540fd8628af` | Theme-parity terminal pass: all six routes, their reasons, the complete state, four completed data fields, retryable Collect All Sources action, and Done control remain simultaneously inspectable. Critique: the scrolled success paragraph is partially hidden and secondary reasons are faint, but no route or outcome is hidden or color-only. |
+| `work/Native Current Acceptance/Screenshots/Empty Library Dark.png` | pywebview / WebView2, current source | Empty Components / dark | 1384×861 | `d95161202089` | VA-005 resolution authority: one centered `No Components Yet` state, one Add Parts action, and no impossible selection prompt. VA-002/VA-004/VA-014 remain visible in the manual intake, unused canvas, and quiet helper tier. |
+| `work/Native Current Acceptance/Screenshots/Empty Library Light.png` | pywebview / WebView2, current source | Empty Components / light | 1384×861 | `8c6de370703f` | Theme-parity VA-005 authority with identical geometry and action priority. The hint remains faint, so VA-014 is unchanged. |
+| `work/Native Current Acceptance/Screenshots/Add Part Dark.png` | pywebview / WebView2, current source | Shared network intake / dark | 1384×861 | `68a9368a0e1a` | The working empty-state action opens one network intake that resolves identity and evidence before one KiCad + Altium + STEP package. The modal is bounded; the quiet workflow/helper tier keeps VA-002/VA-014 open. |
+| `work/Native Current Acceptance/Screenshots/Add Part Light.png` | pywebview / WebView2, current source | Shared network intake / light | 1384×861 | `27b0b17c4f58` | Theme-parity intake authority. Exact capability text remains readable and the modal geometry is unchanged; muted secondary copy remains tracked by VA-014. |
+| `work/Native Current Acceptance/Screenshots/Dual EDA Readiness Dark.png` | pywebview / WebView2, current source | Linked but unverified canary / dark | 1384×861 | `69e5844ff78e` | VA-001 negative-path authority: linked 3D, Symbol, and Footprint previews cannot grant completion; the compact state separately names KiCad Unverified and Altium Unverified. Large unused workbench space reconfirms VA-004/VA-013. |
+| `work/Native Current Acceptance/Screenshots/Dual EDA Readiness Light.png` | pywebview / WebView2, current source | Linked but unverified canary / light | 1384×861 | `f09f10cbf417` | Theme-parity negative-path authority with identical readiness truth and projection geometry. Low-emphasis evidence remains under VA-014. |
+| `work/Native Current Acceptance/Screenshots/Single Value Facet Dark.png` | pywebview / WebView2, current source | One-value parametric facet / dark | 1384×861 | `b3b3f66b5ad0` | VA-003 resolution authority: `channels` renders `Only value 6`, the result table carries one value, and no range slider, endpoints, or ticks exist. No document overflow or console error. |
+| `work/Native Current Acceptance/Screenshots/Single Value Facet Light.png` | pywebview / WebView2, current source | One-value parametric facet / light | 1384×861 | `62a32dbd9549` | Theme-parity VA-003 authority with the same static fact and result semantics. The broad empty result canvas and faint generated-filter helper remain covered by VA-004/VA-014. |
+| `work/VA Inspection Smoke/Inspection Dark 1384.png` | Chrome / source Vite + isolated API | Unified component inspection / dark | 1384×861 | `62e2c9c7f332` | VA-011 resolved; VA-017/VA-019 partial. One full-height neutral 3D stage, whole-object frame, truthful painted-geometry status, and no document overflow. |
+| `work/VA Inspection Smoke/Inspection Light 1384.png` | Chrome / source Vite + isolated API | Unified component inspection / light | 1384×861 | `7f7b7eb14a6c` | Theme-parity source proof with identical 292×465 inspector geometry, 290×425 stage, selected 3D projection, whole-object frame, and no document overflow. |

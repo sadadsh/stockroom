@@ -21,11 +21,20 @@ import type { LandPattern } from "../api/client";
 import { ApiError } from "../api/client";
 import { Icon } from "./Icon";
 
+export type ModelVisibility = "checking" | "visible" | "unavailable";
+
 function startsWithMotion(): boolean {
   return !(
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
   );
+}
+
+function usableLandPattern(land: LandPattern | null | undefined): LandPattern | null {
+  // The 3D model is independently useful. Older caches and partial test/provider
+  // responses can have a land-pattern object without the arrays required by the
+  // overlay renderer; treat that as no overlay instead of taking down the preview.
+  return land && Array.isArray(land.pads) ? land : null;
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -45,6 +54,7 @@ export function Glb3DView({
   showViews = false,
   showShading = false,
   compact = false,
+  onVisibilityChange,
 }: {
   data: ArrayBuffer | undefined;
   isLoading: boolean;
@@ -64,7 +74,7 @@ export function Glb3DView({
    */
   showViews?: boolean;
   /**
-   * Whether the SHADING controls (Realistic / Studio / X-Ray) appear here.
+   * Whether the SHADING controls (Source Color / Studio / X-Ray) appear here.
    *
    * Off for the inline detail tile for the same reason the views are, and by the owner's reading of
    * the result: *"the new ui u developed looks so uneven in some parts, like the buttons in 3d model
@@ -78,6 +88,11 @@ export function Glb3DView({
   /** Narrow host (the detail tile): a passive, auto-rotating specimen with no embedded controls.
    *  All deliberate inspection controls live in the expanded viewer where they have room. */
   compact?: boolean;
+  /**
+   * Reports rendered truth, not file presence. `visible` is emitted only after
+   * Three.js has parsed non-empty geometry and computed its first complete frame.
+   */
+  onVisibilityChange?: (state: ModelVisibility) => void;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   // Bind a parse/WebGL failure to the bytes that caused it. A plain boolean survived a part
@@ -89,7 +104,9 @@ export function Glb3DView({
   // control can show the CURRENT answer rather than just issuing commands into the scene.
   const [view, setView] = useState<ViewMode | null>("iso");
   const [showLand, setShowLand] = useState(DEFAULT_LAYERS.pads);
-  const [renderMode, setRenderMode] = useState<RenderMode>("realistic");
+  // Technical/studio is the neutral inspection default. Source-authored colour is
+  // still available as an explicit mode; it is not silently used as decoration.
+  const [renderMode, setRenderMode] = useState<RenderMode>("studio");
   // The idle spin. Owner 2026-07-26 asked for "an option to stop rotation" - and the same switch closes
   // a logged accessibility defect, since the perpetual rotation ignored prefers-reduced-motion while
   // the 300ms view tween honoured it. `setSpin` returns the state actually in force, which is false
@@ -103,6 +120,9 @@ export function Glb3DView({
   const [selectedPlacementSource, setSelectedPlacementSource] = useState<"kicad" | "model">(
     "model",
   );
+  const renderableLand = usableLandPattern(land);
+  const landRef = useRef<LandPattern | null>(renderableLand);
+  landRef.current = renderableLand;
   // The scene is imported asynchronously. Keep one current snapshot so the handle receives the
   // state visible in React at the moment it becomes available, rather than the values captured by
   // an older render that began the import.
@@ -126,6 +146,10 @@ export function Glb3DView({
   };
 
   useEffect(() => {
+    onVisibilityChange?.(isError || (!isLoading && !data) ? "unavailable" : "checking");
+  }, [data, isError, isLoading, onVisibilityChange]);
+
+  useEffect(() => {
     const container = mountRef.current;
     if (!data || !container) return;
     let disposed = false;
@@ -138,7 +162,13 @@ export function Glb3DView({
           onError: () => {
             // GLTFLoader rejected the GLB asynchronously: show an honest message rather
             // than a blank canvas.
-            if (!disposed) setFailedData(data);
+            if (!disposed) {
+              setFailedData(data);
+              onVisibilityChange?.("unavailable");
+            }
+          },
+          onReady: () => {
+            if (!disposed) onVisibilityChange?.("visible");
           },
           onViewChange: (nextView) => {
             if (!disposed) setView(nextView);
@@ -156,7 +186,8 @@ export function Glb3DView({
         // Build whenever the data exists, not only when the Pads toggle happens to be on: the
         // board and the pads are two independently switchable layers of ONE land pattern, and
         // gating construction on one of them made the other unreachable.
-        if (land) handle.setLandPattern(land);
+        const currentLand = landRef.current;
+        if (currentLand) handle.setLandPattern(currentLand);
         handle.setRenderMode(state.renderMode);
         handle.setLayers({
           model: state.showModel,
@@ -168,7 +199,10 @@ export function Glb3DView({
         if (state.view) handle.setView(state.view);
       } catch {
         // no WebGL context (or three failed to load): degrade honestly.
-        if (!disposed) setFailedData(data);
+        if (!disposed) {
+          setFailedData(data);
+          onVisibilityChange?.("unavailable");
+        }
       }
     })();
     return () => {
@@ -176,14 +210,14 @@ export function Glb3DView({
       sceneRef.current = null;
       handle?.dispose();
     };
-  }, [data]);
+  }, [data, onVisibilityChange]);
 
   // Land data is a separate query from the GLB. It frequently resolves after the renderer has
   // mounted, so it needs its own synchronization path; tying it to the data-only mount effect left
   // the board and pads absent forever for exactly that ordinary arrival order.
   useEffect(() => {
-    sceneRef.current?.setLandPattern(land ?? null);
-  }, [land]);
+    sceneRef.current?.setLandPattern(renderableLand);
+  }, [renderableLand]);
 
   if (isLoading) {
     return <Centered>Loading 3D model...</Centered>;
@@ -212,7 +246,24 @@ export function Glb3DView({
     // The full inspection bar deliberately spends space on visible grouping and credible targets.
     // Compact is a passive auto-rotating specimen; opening the inspection modal is its one action.
     <div className="relative flex h-full w-full flex-col">
-      <div ref={mountRef} className="relative min-h-0 w-full flex-1" data-testid="model-canvas" />
+      <div
+        ref={mountRef}
+        data-testid="model-canvas"
+        tabIndex={compact ? -1 : 0}
+        role={compact ? undefined : "application"}
+        aria-label={
+          compact
+            ? undefined
+            : "3D model inspection canvas. Drag to orbit, scroll to zoom, and press 0 or F to fit."
+        }
+        onKeyDown={(event) => {
+          if (event.key === "0" || event.key.toLowerCase() === "f") {
+            event.preventDefault();
+            sceneRef.current?.fit();
+          }
+        }}
+        className="relative min-h-0 w-full flex-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc"
+      />
       {!compact && showViews ? <div aria-hidden="true" className="h-[82px] flex-none" /> : null}
       {!compact ? (
       <div
@@ -259,7 +310,7 @@ export function Glb3DView({
               sceneRef.current?.setLayers({ model: next });
             }}
           />
-          {land && land.pads.length > 0 ? (
+          {renderableLand && renderableLand.pads.length > 0 ? (
             <>
               <LayerToggle
                 devId="detail.model-board"
@@ -323,7 +374,7 @@ export function Glb3DView({
           </div>
         </div>
         ) : null}
-        {showViews && !compact && land?.model_placement ? (
+        {showViews && !compact && renderableLand?.model_placement ? (
           <PlacementControls
             active={placementMode}
             assessment={placementAssessment}
@@ -370,13 +421,23 @@ export function Glb3DView({
             aria-label="Camera view"
           >
             <ControlLabel>View</ControlLabel>
-            <ViewControls
-              active={view}
-              onPick={(mode) => {
-                setView(mode);
-                sceneRef.current?.setView(mode);
-              }}
-            />
+            <div className="flex items-center gap-1">
+              <ViewControls
+                active={view}
+                onPick={(mode) => {
+                  setView(mode);
+                  sceneRef.current?.setView(mode);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => sceneRef.current?.fit()}
+                title="Frame the whole visible model (0 or F)"
+                className="inline-flex min-h-[32px] items-center rounded-control border border-line2 bg-field px-2.5 text-xs font-semibold text-t2 transition-[transform,background-color,color] active:scale-[0.97] hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+              >
+                Fit
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -491,8 +552,8 @@ function PlacementControls({
 const SHADING: { mode: RenderMode; label: string; hint: string; devId: string; icon: string }[] = [
   {
     mode: "realistic",
-    label: "Realistic",
-    hint: "The model's own colours, physically lit with ambient occlusion",
+    label: "Source Color",
+    hint: "The model's source-authored materials, physically lit with ambient occlusion",
     devId: "detail.model-shade-realistic",
     icon: "view.shade-realistic",
   },

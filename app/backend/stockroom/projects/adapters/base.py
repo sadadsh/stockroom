@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Protocol
 
 from stockroom.model.project import ProjectRecord
+from stockroom.projects.matching import ProjectMatchStrategy
 from stockroom.projects.project_visuals import ProjectVisualBundle
 
 from .models import (
@@ -26,6 +27,9 @@ class ProjectAdapter(Protocol):
 
     key: str
     label: str
+
+    @property
+    def matching(self) -> ProjectMatchStrategy: ...
 
     def detect(self, candidate: Path) -> list[DetectedProject]: ...
 

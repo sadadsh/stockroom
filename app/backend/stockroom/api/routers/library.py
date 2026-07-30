@@ -5,6 +5,7 @@ at thousands of parts (spec section 2.2); part detail loads the canonical record
 from __future__ import annotations
 
 import json
+import re
 import threading
 from types import MappingProxyType
 
@@ -42,6 +43,23 @@ _AUTOMATIC_CAPTURE_INSTRUCTION = (
 )
 _COMPLETION_MAX_BATCH = 1000
 _COMPLETION_BODY_FIELDS = frozenset({"part_ids", "limit", "idempotency_key"})
+_CAPTURE_BODY_FIELDS = frozenset(
+    {"part_ids", "limit", "idempotency_key", "mode", "vendor", "background"}
+)
+_CAPTURE_MODES = frozenset({"automatic", "assisted", "collect-all"})
+_CAPTURE_REQUIREMENTS = frozenset(
+    {
+        "kicad_symbol",
+        "kicad_footprint",
+        "kicad_model",
+        "altium_symbol",
+        "altium_footprint",
+    }
+)
+_OPAQUE_WORKFLOW_REFERENCE = re.compile(
+    r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z",
+    re.ASCII,
+)
 
 
 def _completion_request(
@@ -69,9 +87,7 @@ def _completion_request(
                 raise ValueError(f"invalid part identifier: {raw_part_id!r}")
             part_ids.append(raw_part_id)
         if len(part_ids) > _COMPLETION_MAX_BATCH:
-            raise ValueError(
-                f"part_ids must contain at most {_COMPLETION_MAX_BATCH} identifiers"
-            )
+            raise ValueError(f"part_ids must contain at most {_COMPLETION_MAX_BATCH} identifiers")
         if len(set(part_ids)) != len(part_ids):
             raise ValueError("part_ids must not contain duplicates")
 
@@ -84,9 +100,7 @@ def _completion_request(
         limit = raw_limit
 
     body_key = payload.get("idempotency_key")
-    if body_key is not None and (
-        type(body_key) is not str or not body_key.strip()
-    ):
+    if body_key is not None and (type(body_key) is not str or not body_key.strip()):
         raise ValueError("idempotency_key must be a non-empty string")
     header_key = request.headers.get("Idempotency-Key")
     if header_key is not None and not header_key.strip():
@@ -115,8 +129,27 @@ def _current_completion_record(ctx, part_id: str) -> PartRecord:
     return record
 
 
-def _needs_durable_completion(record: PartRecord) -> bool:
-    return bool(record.missing_fields()) or any(record.missing_assets_by_tool().values())
+def _completion_evidence_store():
+    """The machine-local immutable evidence authority shared by completion reads."""
+
+    from stockroom.capture.runner import capture_state_root
+    from stockroom.evidence import EvidenceStore
+
+    return EvidenceStore((capture_state_root() / "Evidence").resolve())
+
+
+def _needs_durable_completion(record: PartRecord, *, evidence_store=None) -> bool:
+    from stockroom.capture.verified_cache import record_completion_evidence
+
+    evidence = record_completion_evidence(
+        evidence_store or _completion_evidence_store(),
+        record,
+    )
+    return (
+        bool(record.missing_fields())
+        or any(record.missing_assets_by_tool().values())
+        or evidence.state == "unverified"
+    )
 
 
 def _durable_completion_records(
@@ -133,12 +166,13 @@ def _durable_completion_records(
         return requested[:limit]
 
     records: list[PartRecord] = []
+    evidence_store = _completion_evidence_store()
     for path in sorted(ctx.profile.library.parts_dir.glob("*.json")):
         part_id = path.stem
         if not is_valid_part_id(part_id):
             raise ApiError(409, f"Part file has an invalid identifier: {part_id!r}.")
         record = _current_completion_record(ctx, part_id)
-        if not _needs_durable_completion(record):
+        if not _needs_durable_completion(record, evidence_store=evidence_store):
             continue
         records.append(record)
         if len(records) == limit:
@@ -162,6 +196,157 @@ def _completion_identities(records: list[PartRecord]) -> list[IntakeIdentity]:
             )
         )
     return identities
+
+
+def _capture_command(
+    request: Request,
+    body: dict | None,
+) -> tuple[list[str] | None, int, bool, str, str | None, bool, str | None]:
+    """Validate the guided-capture command without permissive coercion."""
+
+    payload = {} if body is None else body
+    unexpected = sorted(str(key) for key in payload if key not in _CAPTURE_BODY_FIELDS)
+    if unexpected:
+        raise ValueError("unknown capture fields: " + ", ".join(unexpected))
+
+    raw_part_ids = payload.get("part_ids")
+    if raw_part_ids is None:
+        part_ids = None
+    elif type(raw_part_ids) is not list or not raw_part_ids:
+        raise ValueError("part_ids must be a non-empty list of part identifiers")
+    else:
+        part_ids = []
+        for raw_part_id in raw_part_ids:
+            if (
+                type(raw_part_id) is not str
+                or raw_part_id != raw_part_id.strip()
+                or not is_valid_part_id(raw_part_id)
+            ):
+                raise ValueError("part_ids must contain exact canonical part identifiers")
+            part_ids.append(raw_part_id)
+        if len(part_ids) > _COMPLETION_MAX_BATCH:
+            raise ValueError(f"part_ids must contain at most {_COMPLETION_MAX_BATCH} identifiers")
+        if len(set(part_ids)) != len(part_ids):
+            raise ValueError("part_ids must not contain duplicates")
+
+    limit_supplied = payload.get("limit") is not None
+    raw_limit = payload.get("limit")
+    if raw_limit is None:
+        limit = _COMPLETION_MAX_BATCH
+    elif type(raw_limit) is not int or not 1 <= raw_limit <= _COMPLETION_MAX_BATCH:
+        raise ValueError(f"limit must be an integer between 1 and {_COMPLETION_MAX_BATCH}")
+    else:
+        limit = raw_limit
+
+    mode = payload.get("mode", "automatic")
+    if mode not in _CAPTURE_MODES:
+        raise ValueError("capture mode must be 'automatic', 'assisted', or 'collect-all'")
+    background = payload.get("background", False)
+    if type(background) is not bool:
+        raise ValueError("background must be a boolean")
+
+    requested_vendor = payload.get("vendor")
+    vendor = (
+        requested_vendor.strip().lower()
+        if isinstance(requested_vendor, str) and requested_vendor.strip()
+        else None
+    )
+    if requested_vendor is not None and vendor is None:
+        raise ValueError("vendor must be a non-empty provider key")
+
+    body_key = payload.get("idempotency_key")
+    if body_key is not None and (type(body_key) is not str or not body_key.strip()):
+        raise ValueError("idempotency_key must be a non-empty string")
+    header_key = request.headers.get("Idempotency-Key")
+    if header_key is not None and not header_key.strip():
+        raise ValueError("Idempotency-Key must not be blank")
+    if body_key is not None and header_key is not None and body_key != header_key:
+        raise ValueError("body and header idempotency keys must match")
+    return (
+        part_ids,
+        limit,
+        limit_supplied,
+        mode,
+        vendor,
+        background,
+        header_key if header_key is not None else body_key,
+    )
+
+
+def _capture_identities(
+    records: list[PartRecord],
+    *,
+    mode: str,
+    vendor: str | None,
+    background: bool,
+) -> list[IntakeIdentity]:
+    from stockroom.capture.complete import completion_needs
+    from stockroom.capture.verified_cache import record_completion_evidence
+
+    evidence_store = _completion_evidence_store()
+    identities: list[IntakeIdentity] = []
+    for record in records:
+        if not record.mpn.strip():
+            raise ApiError(
+                422,
+                f"Part {record.id!r} needs an MPN before durable capture can start.",
+            )
+        evidence = record_completion_evidence(evidence_store, record)
+        identities.append(
+            IntakeIdentity(
+                manufacturer=record.manufacturer,
+                mpn=record.mpn,
+                payload=MappingProxyType(
+                    {
+                        "part_id": record.id,
+                        "workflow_kind": "guided_capture",
+                        "capture": {
+                            "mode": mode,
+                            "vendor": vendor,
+                            "background": background,
+                            "initial_needs": [
+                                requirement.value
+                                for requirement in completion_needs(record, evidence)
+                            ],
+                        },
+                    }
+                ),
+            )
+        )
+    return identities
+
+
+def _capture_item_projection(item) -> dict:
+    payload = item.payload
+    if not isinstance(payload, dict) or payload.get("workflow_kind") != "guided_capture":
+        raise ApiError(404, "No guided capture owns this workflow batch.")
+    part_id = payload.get("part_id")
+    capture = payload.get("capture")
+    if type(part_id) is not str or not is_valid_part_id(part_id) or not isinstance(capture, dict):
+        raise ApiError(409, "The durable capture request is corrupt.")
+    mode = capture.get("mode")
+    vendor = capture.get("vendor")
+    background = capture.get("background")
+    initial_needs = capture.get("initial_needs")
+    if (
+        mode not in _CAPTURE_MODES
+        or (vendor is not None and type(vendor) is not str)
+        or type(background) is not bool
+        or type(initial_needs) is not list
+        or any(
+            type(requirement) is not str or requirement not in _CAPTURE_REQUIREMENTS
+            for requirement in initial_needs
+        )
+    ):
+        raise ApiError(409, "The durable capture request is corrupt.")
+    return {
+        "workflow_item_id": item.id,
+        "part_id": part_id,
+        "mode": mode,
+        "vendor": vendor,
+        "background": background,
+        "initial_needs": initial_needs,
+    }
 
 
 # Single-flight guard for POST /rescan: two concurrent rescans would double the API quota
@@ -257,7 +442,9 @@ def build_refresh_adapters(ctx) -> list:
     from stockroom.enrich.mouser_scrape import MouserScrapeAdapter
 
     adapters: list = []
-    api_fallback = MouserAdapter(api_key=ctx.config.mouser_api_key) if ctx.config.mouser_api_key else None
+    api_fallback = (
+        MouserAdapter(api_key=ctx.config.mouser_api_key) if ctx.config.mouser_api_key else None
+    )
     if api_fallback is not None:
         setattr(api_fallback, "vendor", "Mouser")
     mouser = MouserScrapeAdapter(
@@ -268,7 +455,9 @@ def build_refresh_adapters(ctx) -> list:
     mouser.vendor = "Mouser"
     if mouser.enabled:  # the crawler (fetcher + Camoufox) OR the API fallback is available
         adapters.append(mouser)
-    if getattr(ctx.config, "digikey_client_id", "") and getattr(ctx.config, "digikey_client_secret", ""):
+    if getattr(ctx.config, "digikey_client_id", "") and getattr(
+        ctx.config, "digikey_client_secret", ""
+    ):
         from stockroom.enrich.digikey_api import DigiKeyAdapter
 
         a = DigiKeyAdapter(ctx.config.digikey_client_id, ctx.config.digikey_client_secret)
@@ -301,11 +490,14 @@ def library_router(require_token) -> APIRouter:
         constraints = parse_spec_filters(spec)
         if constraints:
             rows = [
-                row for row in rows
+                row
+                for row in rows
                 if matches_spec_filters(ctx.ops.load_record(row.id), constraints)
             ]
-        return {"parts": [PartSummary.from_row(row).model_dump() for row in rows],
-                "count": len(rows)}
+        return {
+            "parts": [PartSummary.from_row(row).model_dump() for row in rows],
+            "count": len(rows),
+        }
 
     @r.get("/search")
     def search(
@@ -494,10 +686,15 @@ def library_router(require_token) -> APIRouter:
         row = ctx.index.get(part_id)
         if row is None:
             raise FileNotFoundError(f"no such part: {part_id}")
-        from stockroom.capture.requirements import capture_needs
+        from stockroom.capture.complete import completion_needs
+        from stockroom.capture.verified_cache import record_completion_evidence
 
         record = ctx.ops.load_record(part_id)
-        needs = [req.value for req in capture_needs(record)]
+        completion_evidence = record_completion_evidence(
+            _completion_evidence_store(),
+            record,
+        )
+        needs = [req.value for req in completion_needs(record, completion_evidence)]
         # EVERY vendor the owner named, in their trust order, not just the one that aggregates.
         # Owner, 2026-07-27: *"yes rebuild guided capture, digikey UL snapmagic and samacsys"*.
         # DigiKey leads only because its product page gathers the other three in one place, which
@@ -507,8 +704,9 @@ def library_router(require_token) -> APIRouter:
         # searches for the empty string.
         from stockroom.enrich.cad_sources import resolve_cad_sources
 
-        digikey = next((a for a in build_refresh_adapters(ctx)
-                        if getattr(a, "vendor", "") == "DigiKey"), None)
+        digikey = next(
+            (a for a in build_refresh_adapters(ctx) if getattr(a, "vendor", "") == "DigiKey"), None
+        )
         sources = resolve_cad_sources(record.mpn, digikey)
         from stockroom.capture.vendors import all_adapters
 
@@ -519,6 +717,7 @@ def library_router(require_token) -> APIRouter:
         return {
             "mpn": record.mpn,
             "needs": needs,
+            "completion_evidence": completion_evidence.to_dict(),
             "sources": [
                 {
                     "key": s.key,
@@ -527,8 +726,7 @@ def library_router(require_token) -> APIRouter:
                     "tools": list(s.tools),
                     "aggregator": s.aggregator,
                     "instruction": (
-                        f"{_AUTOMATIC_CAPTURE_INSTRUCTION} "
-                        f"{implemented_capture[s.key].instruction}"
+                        f"{_AUTOMATIC_CAPTURE_INSTRUCTION} {implemented_capture[s.key].instruction}"
                         if s.key in implemented_capture
                         else s.instruction
                     ),
@@ -584,7 +782,9 @@ def library_router(require_token) -> APIRouter:
 
             # the endpoint builds the adapters (via the patchable build_refresh_adapters) and
             # INJECTS them, so the engine has no api dependency.
-            return RescanEngine(ctx, adapters=build_refresh_adapters(ctx)).run(progress, force=force)
+            return RescanEngine(ctx, adapters=build_refresh_adapters(ctx)).run(
+                progress, force=force
+            )
 
         # Single-flight: check-and-submit happens under one lock so two concurrent POSTs can
         # never both submit a rescan job.
@@ -684,9 +884,7 @@ def library_router(require_token) -> APIRouter:
             "footprint": _footprint_text_at(ctx, a, before) != _footprint_text_at(ctx, b, after),
             # Any tool's 3D model: the record keys these as `eda.<tool>.model.*`, so this
             # stays correct when a second tool grows its own model slot.
-            "model": any(
-                f["key"].startswith("eda.") and ".model." in f["key"] for f in fields
-            ),
+            "model": any(f["key"].startswith("eda.") and ".model." in f["key"] for f in fields),
             "datasheet": any(f["key"].startswith("datasheet.") for f in fields),
         }
         return {"a": a, "b": b, "fields": fields, "assets": assets}
@@ -802,56 +1000,35 @@ def library_router(require_token) -> APIRouter:
 
     @r.post("/capture/run")
     def capture_run(request: Request, body: dict | None = None) -> dict:
-        """Automatically acquire missing CAD, or explicitly open the assisted fallback.
+        """Submit guided capture to the durable owner, with a standalone dev fallback.
 
-        Automatic mode is the bounded batch-safe default. Assisted mode is one component plus one
-        selected provider. Collect-all is one exact-MPN component and exhausts direct evidence,
-        every policy-permitted automatic provider, and then every remaining provider sequentially.
-        Only a real CAPTCHA, MFA, passkey, security check, or person-only provider control is
-        handed back to the person.
+        The mounted coordinator owns the whole completion graph: exact identity,
+        metadata, datasheet, shared KiCad/Altium/STEP acquisition, validation, and
+        atomic publication. The process-local job exists only when source
+        development deliberately runs without that authority.
         """
         from stockroom.capture.runner import run_guided_capture
         from stockroom.capture.vendors import get_adapter
 
         ctx = request.app.state.ctx
-        payload = body or {}
-        mode = payload.get("mode", "automatic")
-        if mode not in {"automatic", "assisted", "collect-all"}:
-            raise ValueError(
-                "capture mode must be 'automatic', 'assisted', or 'collect-all'"
-            )
-        background = payload.get("background", False)
-        if type(background) is not bool:
-            raise ValueError("background must be a boolean")
-        raw_part_ids = payload.get("part_ids")
-        if raw_part_ids is None:
-            part_ids = None
-        elif not isinstance(raw_part_ids, list) or any(
-            not isinstance(part_id, str) or not part_id.strip() or part_id != part_id.strip()
-            for part_id in raw_part_ids
-        ):
-            raise ValueError("part_ids must be a list of non-empty part identifiers")
-        else:
-            part_ids = raw_part_ids or None
-
-        requested_vendor = payload.get("vendor")
-        vendor = (
-            requested_vendor.strip().lower()
-            if isinstance(requested_vendor, str) and requested_vendor.strip()
-            else None
-        )
-        if requested_vendor is not None and vendor is None:
-            raise ValueError("vendor must be a non-empty provider key")
+        (
+            part_ids,
+            limit,
+            limit_supplied,
+            mode,
+            vendor,
+            background,
+            idempotency_key,
+        ) = _capture_command(request, body)
         if vendor is not None and get_adapter(vendor) is None:
             raise ValueError(f"no network capture adapter for provider {vendor!r}")
-        limit = payload.get("limit")
 
         if mode == "assisted":
             if part_ids is None or len(part_ids) != 1:
                 raise ValueError("assisted capture requires exactly one selected part")
             if vendor is None:
                 raise ValueError("assisted capture requires one selected provider")
-            if limit is not None:
+            if limit_supplied:
                 raise ValueError(
                     "assisted capture does not accept a batch limit; select exactly one part"
                 )
@@ -867,7 +1044,7 @@ def library_router(require_token) -> APIRouter:
         if mode == "collect-all":
             if part_ids is None or len(part_ids) != 1:
                 raise ValueError("collect-all capture requires exactly one selected part")
-            if limit is not None:
+            if limit_supplied:
                 raise ValueError(
                     "collect-all capture does not accept a batch limit; select exactly one part"
                 )
@@ -875,18 +1052,54 @@ def library_router(require_token) -> APIRouter:
                 raise ValueError(
                     "collect-all capture requires visible sequential provider handoffs"
                 )
-        if part_ids is not None and len(part_ids) == 1 and ctx.index.get(part_ids[0]) is None:
-            raise FileNotFoundError(f"no such part: {part_ids[0]}")
+        records = (
+            [_current_completion_record(ctx, part_id) for part_id in part_ids]
+            if part_ids is not None
+            else None
+        )
         if mode == "collect-all":
             from stockroom.capture.evidence import exact_identity
 
-            assert part_ids is not None
+            assert records is not None
             try:
-                exact_identity(ctx.ops.load_record(part_ids[0]))
+                exact_identity(records[0])
             except (TypeError, ValueError) as exc:
                 raise ValueError(
                     "collect-all capture requires one exact manufacturer and MPN"
                 ) from exc
+
+        coordinator = ctx.workflow_coordinator
+        if coordinator is not None:
+            selected = (
+                records[:limit]
+                if records is not None
+                else _durable_completion_records(ctx, None, limit)
+            )
+            if not selected:
+                raise ApiError(409, "No current parts need completion.")
+            batch = coordinator.submit_batch(
+                _capture_identities(
+                    selected,
+                    mode=mode,
+                    vendor=vendor,
+                    background=background,
+                ),
+                idempotency_key=idempotency_key,
+            )
+            items = coordinator.list_items(batch.id)
+            response = {
+                "workflow_batch_id": batch.id,
+                "event_cursor": 0,
+            }
+            if len(items) == 1:
+                response["workflow_item_id"] = items[0].id
+            return response
+
+        if idempotency_key is not None:
+            raise ApiError(
+                503,
+                "Idempotent capture requires the durable workflow coordinator.",
+            )
 
         def work(progress, should_stop):
             return run_guided_capture(
@@ -895,13 +1108,39 @@ def library_router(require_token) -> APIRouter:
                 vendor=vendor,
                 progress=progress,
                 should_stop=should_stop,
-                limit=(int(limit) if limit else None),
+                limit=limit,
                 headless=background,
                 operator_authorized=mode == "assisted",
                 collect_all=mode == "collect-all",
             )
 
         return {"job_id": ctx.jobs.submit_cancellable(work)}
+
+    @r.get("/capture/batches/{batch_id}")
+    def capture_batch(request: Request, batch_id: str) -> dict:
+        """Project one durable guided-capture request and its safe terminal report."""
+
+        from stockroom.capture.runner import read_durable_capture_report
+
+        if _OPAQUE_WORKFLOW_REFERENCE.fullmatch(batch_id) is None:
+            raise ApiError(400, "batch_id is not a valid opaque workflow identifier")
+        coordinator = request.app.state.ctx.workflow_coordinator
+        if coordinator is None:
+            raise ApiError(503, "The durable workflow coordinator is not mounted.")
+        coordinator.get_batch(batch_id)
+        items = coordinator.list_items(batch_id)
+        if len(items) != 1:
+            raise ApiError(409, "Guided capture requires one durable workflow item.")
+        projection = _capture_item_projection(items[0])
+        try:
+            report = read_durable_capture_report(items[0].id)
+        except ValueError as exc:
+            raise ApiError(409, str(exc)) from exc
+        return {
+            "workflow_batch_id": batch_id,
+            **projection,
+            "report": report,
+        }
 
     @r.get("/capture/vendors")
     def capture_vendors() -> dict:
@@ -920,9 +1159,7 @@ def library_router(require_token) -> APIRouter:
                     "tools": list(a.capability.tools),
                     "needs_login": a.capability.needs_login,
                     "aggregator": a.capability.aggregator,
-                    "instruction": (
-                        f"{_AUTOMATIC_CAPTURE_INSTRUCTION} {a.capability.instruction}"
-                    ),
+                    "instruction": (f"{_AUTOMATIC_CAPTURE_INSTRUCTION} {a.capability.instruction}"),
                     "one_download_for_all_formats": not a.capability.formats_exclusive,
                 }
                 for a in all_adapters()
@@ -995,15 +1232,17 @@ def library_router(require_token) -> APIRouter:
             from datetime import datetime, timezone
 
             def on_part(done: int, total: int, part_id: str) -> None:
-                progress({
-                    "pct": int(done * 100 / total) if total else 100,
-                    "message": f"re-deriving {part_id}",
-                })
+                progress(
+                    {
+                        "pct": int(done * 100 / total) if total else 100,
+                        "message": f"re-deriving {part_id}",
+                    }
+                )
 
             report = ctx.ops.rederive_library(
-                now_iso=datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
-                    "+00:00", "Z"
-                ),
+                now_iso=datetime.now(timezone.utc)
+                .isoformat(timespec="seconds")
+                .replace("+00:00", "Z"),
                 scheme=scheme,
                 dry_run=dry_run,
                 progress=on_part,

@@ -4,6 +4,7 @@ param(
     [string]$Mode = "Fixture",
 
     [string]$Version = "0.1.0.0",
+    [string]$MinimumHostVersion = "0.1.0.0",
     [int]$ProtocolVersion = 1,
     [string]$Publisher = "",
     [string]$FeedBaseUri = "",
@@ -30,13 +31,40 @@ $ErrorActionPreference = "Stop"
 $RepositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $PackagingRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $BrandAssetsTool = Join-Path $PackagingRoot "brand_assets.py"
-$ContractTool = Join-Path $PackagingRoot "package_contract.py"
+$ContractModule = "packaging.package_contract"
 $ReleaseBundleTool = Join-Path $PackagingRoot "release_bundle.py"
 $ReleaseFeedModule = "packaging.release_feed"
 $WorkerProbeTool = Join-Path $PackagingRoot "package_worker_probe.py"
 $CoordinatorProbeTool = Join-Path $PackagingRoot "coordinator_availability_probe.py"
 $SpecPath = Join-Path $PackagingRoot "stockroom.spec"
 $SourceIcon = Join-Path $RepositoryRoot "app\backend\stockroom\host\assets\stockroom.ico"
+$WindowHostProject = Join-Path $RepositoryRoot "app\desktop\Stockroom.WindowHost\Stockroom.WindowHost.csproj"
+$WorkspaceDotNetPath = [IO.Path]::GetFullPath(
+    (Join-Path $RepositoryRoot "..\..\System\Capabilities\Bin\dotnet-sdk.cmd")
+)
+$DotNetPath = if (Test-Path -LiteralPath $WorkspaceDotNetPath -PathType Leaf) {
+    $WorkspaceDotNetPath
+}
+else {
+    (Get-Command dotnet -CommandType Application -ErrorAction Stop).Source
+}
+Push-Location $RepositoryRoot
+try {
+    $DotNetSdkVersion = (& $DotNetPath --version).Trim()
+}
+finally {
+    Pop-Location
+}
+$PinnedDotNetSdkVersion = (
+    Get-Content -Raw -LiteralPath (Join-Path $RepositoryRoot "global.json") |
+        ConvertFrom-Json
+).sdk.version
+if (
+    $LASTEXITCODE -ne 0 -or
+    $DotNetSdkVersion -cne $PinnedDotNetSdkVersion
+) {
+    throw "The native window host build requires pinned .NET SDK $PinnedDotNetSdkVersion."
+}
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $RepositoryRoot "work\Windows Package Proof"
@@ -110,6 +138,22 @@ if ($SourceDateEpoch -lt 315532800 -or $SourceDateEpoch -gt 2147483647) {
 }
 if ($ProtocolVersion -le 0) {
     throw "ProtocolVersion must be a positive integer."
+}
+if ($Version -notmatch '^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$') {
+    throw "Version must be a canonical four-part numeric version."
+}
+if ($MinimumHostVersion -notmatch '^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$') {
+    throw "MinimumHostVersion must be a canonical four-part numeric version."
+}
+$VersionParts = @($Version.Split(".") | ForEach-Object { [uint64]$_ })
+$MinimumHostVersionParts = @($MinimumHostVersion.Split(".") | ForEach-Object { [uint64]$_ })
+for ($VersionPartIndex = 0; $VersionPartIndex -lt 4; $VersionPartIndex++) {
+    if ($MinimumHostVersionParts[$VersionPartIndex] -gt $VersionParts[$VersionPartIndex]) {
+        throw "MinimumHostVersion cannot exceed Version."
+    }
+    if ($MinimumHostVersionParts[$VersionPartIndex] -lt $VersionParts[$VersionPartIndex]) {
+        break
+    }
 }
 if ($TufMetadataVersion -le 0) {
     throw "TufMetadataVersion must be a positive integer."
@@ -334,7 +378,7 @@ $BuildIdentity = [ordered]@{
 )
 
 $contractArguments = @(
-    "run", "--frozen", "python", $ContractTool, "render",
+    "run", "--frozen", "python", "-m", $ContractModule, "render",
     "--mode", $Mode,
     "--publisher", $Publisher,
     "--version", $Version,
@@ -409,16 +453,54 @@ function Build-Executable {
     return $executable
 }
 
+function Build-WindowHost {
+    param([Parameter(Mandatory)][string]$Name)
+
+    $buildRoot = Initialize-OutputDirectory -Path (Join-Path $WorkRoot $Name)
+    $publishRoot = Join-Path $buildRoot "Publish"
+    Push-Location $RepositoryRoot
+    try {
+        Invoke-Checked -FilePath $DotNetPath -Arguments @(
+            "publish", $WindowHostProject,
+            "--configuration", "Release",
+            "--runtime", "win-x64",
+            "--self-contained", "true",
+            "--output", $publishRoot,
+            "--disable-build-servers",
+            "-p:RestoreLockedMode=true",
+            "-p:ContinuousIntegrationBuild=true",
+            "-p:Deterministic=true",
+            "-p:BaseOutputPath=$(Join-Path $buildRoot 'Bin')\",
+            "-p:BaseIntermediateOutputPath=$(Join-Path $buildRoot 'Obj')\",
+            "-p:MSBuildProjectExtensionsPath=$(Join-Path $buildRoot 'Obj')\"
+        )
+    }
+    finally {
+        Pop-Location
+    }
+    $host = Join-Path $publishRoot "Stockroom.WindowHost.exe"
+    if (-not (Test-Path -LiteralPath $host -PathType Leaf)) {
+        throw "dotnet publish did not produce Stockroom.WindowHost.exe."
+    }
+    return $publishRoot
+}
+
 $FirstExecutable = Build-Executable -Name "Build 1"
+$FirstWindowHost = Build-WindowHost -Name "Window Host Build 1"
 $FirstExecutableHash = Get-Sha256 -Path $FirstExecutable
 $SecondExecutable = $null
 $SecondExecutableHash = $null
 
 if (-not $SkipReproducibilityProof) {
     $SecondExecutable = Build-Executable -Name "Build 2"
+    $SecondWindowHost = Build-WindowHost -Name "Window Host Build 2"
     $SecondExecutableHash = Get-Sha256 -Path $SecondExecutable
     if ($FirstExecutableHash -cne $SecondExecutableHash) {
         throw "PyInstaller reproducibility failed: the two Stockroom.exe digests differ."
+    }
+    if ((Get-DirectoryFingerprint -Root $FirstWindowHost) -cne
+        (Get-DirectoryFingerprint -Root $SecondWindowHost)) {
+        throw "Native window host reproducibility failed: publish trees differ."
     }
 }
 
@@ -450,13 +532,15 @@ function Initialize-PackageStage {
     param(
         [Parameter(Mandatory)][string]$Name,
         [Parameter(Mandatory)][string]$Executable,
+        [Parameter(Mandatory)][string]$WindowHostRoot,
         [Parameter(Mandatory)][string]$AppInstallerPath
     )
 
     $stage = Initialize-OutputDirectory -Path (Join-Path $WorkRoot $Name)
     Copy-Item -LiteralPath $Executable -Destination (Join-Path $stage "Stockroom.exe")
+    Copy-Item -LiteralPath $WindowHostRoot -Destination (Join-Path $stage "WindowHost") -Recurse
     $renderArguments = @(
-        "run", "--frozen", "python", $ContractTool, "render",
+        "run", "--frozen", "python", "-m", $ContractModule, "render",
         "--mode", $Mode,
         "--publisher", $Publisher,
         "--version", $Version,
@@ -476,8 +560,10 @@ function Initialize-PackageStage {
         "run", "--frozen", "python", $ReleaseBundleTool,
         "--mode", $Mode,
         "--executable", (Join-Path $stage "Stockroom.exe"),
+        "--window-host-root", (Join-Path $stage "WindowHost"),
         "--bundle-root", (Join-Path $stage "Update"),
         "--version", $Version,
+        "--minimum-host-version", $MinimumHostVersion,
         "--protocol-version", [string]$ProtocolVersion,
         "--feed-base-uri", $FeedBaseUri,
         "--source-revision", $GitRevision,
@@ -503,11 +589,12 @@ $FinalAppInstaller = Join-Path $ArtifactsRoot $AppInstallerFileName
 $FirstStage = Initialize-PackageStage `
     -Name "Package 1" `
     -Executable $FirstExecutable `
+    -WindowHostRoot $FirstWindowHost `
     -AppInstallerPath $FinalAppInstaller
 
 $PayloadInventory = Join-Path $ArtifactsRoot "Payload Manifest.json"
 Invoke-Checked -FilePath $UvPath -Arguments @(
-    "run", "--frozen", "python", $ContractTool, "inventory",
+    "run", "--frozen", "python", "-m", $ContractModule, "inventory",
     "--root", $FirstStage,
     "--output", $PayloadInventory
 )
@@ -522,7 +609,7 @@ Invoke-Checked -FilePath $MakeAppx -Arguments @(
     "/o"
 )
 Invoke-Checked -FilePath $UvPath -Arguments @(
-    "run", "--frozen", "python", $ContractTool, "normalize-msix",
+    "run", "--frozen", "python", "-m", $ContractModule, "normalize-msix",
     "--path", $FinalPackage,
     "--source-date-epoch", [string]$SourceDateEpoch
 )
@@ -569,6 +656,7 @@ if (-not $SkipReproducibilityProof -and $Mode -eq "Fixture") {
     $SecondStage = Initialize-PackageStage `
         -Name "Package 2" `
         -Executable $SecondExecutable `
+        -WindowHostRoot $SecondWindowHost `
         -AppInstallerPath $SecondAppInstaller
     $secondPackage = Join-Path $WorkRoot $PackageFileName
     Invoke-Checked -FilePath $MakeAppx -Arguments @(
@@ -580,7 +668,7 @@ if (-not $SkipReproducibilityProof -and $Mode -eq "Fixture") {
         "/o"
     )
     Invoke-Checked -FilePath $UvPath -Arguments @(
-        "run", "--frozen", "python", $ContractTool, "normalize-msix",
+        "run", "--frozen", "python", "-m", $ContractModule, "normalize-msix",
         "--path", $secondPackage,
         "--source-date-epoch", [string]$SourceDateEpoch
     )
@@ -614,9 +702,13 @@ if ((Get-DirectoryFingerprint -Root (Join-Path $FirstStage "Update")) -cne
     (Get-DirectoryFingerprint -Root (Join-Path $UnpackedRoot "Update"))) {
     throw "MakeAppx round-trip changed the immutable update bundle."
 }
+if ((Get-DirectoryFingerprint -Root (Join-Path $FirstStage "WindowHost")) -cne
+    (Get-DirectoryFingerprint -Root (Join-Path $UnpackedRoot "WindowHost"))) {
+    throw "MakeAppx round-trip changed the native window host payload."
+}
 
 $validateArguments = @(
-    "run", "--frozen", "python", $ContractTool, "validate",
+    "run", "--frozen", "python", "-m", $ContractModule, "validate",
     "--mode", $Mode,
     "--publisher", $Publisher,
     "--version", $Version,
@@ -680,6 +772,7 @@ if (
     $ProbeReceipt.coordinator_state -cne "running" -or
     -not $ProbeReceipt.frontend_injected -or
     $ProbeReceipt.update_channel -cne "production" -or
+    [double]$ProbeReceipt.update_check_interval_seconds -ne 60 -or
     [int]$ProbeReceipt.service_generation -le 0
 ) {
     throw "The packaged managed host launch receipt is incomplete or invalid."
@@ -812,9 +905,10 @@ if ($BundleEvidence.backend_sha256 -cne $FinalExecutableHash) {
 $ExpectedCompatibleReleases = $CompatibleFromReleaseIds -join ","
 if (
     $BundleEvidence.rollback_release_id -cne $RollbackReleaseId -or
-    $BundleEvidence.compatible_from_release_ids -cne $ExpectedCompatibleReleases
+    $BundleEvidence.compatible_from_release_ids -cne $ExpectedCompatibleReleases -or
+    $BundleEvidence.minimum_host_version -cne $MinimumHostVersion
 ) {
-    throw "The immutable release compatibility contract differs from the requested predecessors."
+    throw "The immutable release compatibility contract differs from the requested host floor or predecessors."
 }
 
 $Evidence = [ordered]@{
@@ -831,6 +925,7 @@ $Evidence = [ordered]@{
         package_name = if ($Mode -eq "Fixture") { "Stockroom.Desktop.Development" } else { "Stockroom.Desktop" }
         publisher = $Publisher
         version = $Version
+        minimum_host_version = $MinimumHostVersion
         protocol_version = $ProtocolVersion
         tuf_metadata_version = $TufMetadataVersion
         architecture = "x64"
@@ -897,6 +992,7 @@ $Evidence = [ordered]@{
     managed_runtime = [ordered]@{
         release_id = $BundleEvidence.release_id
         host_package_version = $ProbeReceipt.host_package_version
+        minimum_host_version = $BundleEvidence.minimum_host_version
         host_protocol_version = [int]$ProbeReceipt.host_protocol_version
         release_manifest_sha256 = $BundleEvidence.manifest_sha256
         pinned_tuf_root_sha256 = $BundleEvidence.root_sha256
@@ -908,6 +1004,7 @@ $Evidence = [ordered]@{
         service_mode = $ProbeReceipt.service_mode
         coordinator_state = $ProbeReceipt.coordinator_state
         update_channel = $ProbeReceipt.update_channel
+        update_check_interval_seconds = [double]$ProbeReceipt.update_check_interval_seconds
         frontend_injected = [bool]$ProbeReceipt.frontend_injected
         worker_handoff_receipt_schema = $WorkerProbeReceipt.schema
         worker_candidate_generation = [int]$WorkerProbeReceipt.candidate_generation

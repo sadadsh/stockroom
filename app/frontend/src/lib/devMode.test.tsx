@@ -119,12 +119,12 @@ describe("dev mode", () => {
     render(<Harness />);
     toggleDevMode();
 
-    const smValue = screen.getByLabelText("SM value");
-    fireEvent.change(smValue, { target: { value: "20" } });
-    expect(document.documentElement.style.getPropertyValue("--fs-sm")).toBe("20px");
+    const bodyValue = screen.getByLabelText("Body value");
+    fireEvent.change(bodyValue, { target: { value: "20" } });
+    expect(document.documentElement.style.getPropertyValue("--fs-ui-body")).toBe("20px");
 
     fireEvent.click(screen.getByLabelText("Reset to default"));
-    expect(document.documentElement.style.getPropertyValue("--fs-sm")).toBe("");
+    expect(document.documentElement.style.getPropertyValue("--fs-ui-body")).toBe("");
   });
 
   it("nudges the unitless icon stroke live (no px unit appended)", () => {

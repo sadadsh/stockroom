@@ -41,7 +41,11 @@ from pathlib import Path
 from typing import Literal, Protocol
 from urllib.parse import urlsplit, urlunsplit
 
-from stockroom.capture.requirements import Requirement, capture_needs
+from stockroom.capture.requirements import (
+    Requirement,
+    capture_needs,
+    capture_requirements,
+)
 
 ProviderOutcomeStatus = Literal[
     "succeeded-retained",
@@ -53,6 +57,7 @@ ProviderOutcomeStatus = Literal[
     "cancelled",
     "not-attempted",
 ]
+CompletionEvidenceState = Literal["verified", "not-required", "unverified"]
 _PROVIDER_OUTCOME_STATUSES = frozenset(
     {
         "succeeded-retained",
@@ -65,6 +70,8 @@ _PROVIDER_OUTCOME_STATUSES = frozenset(
         "not-attempted",
     }
 )
+_COMPLETION_EVIDENCE_STATES = frozenset({"verified", "not-required", "unverified"})
+_SHA256_DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _PROVIDER_KEY = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\Z")
 _PROVIDER_ROUTE_ID = re.compile(
     r"[a-z0-9][a-z0-9._-]{0,127}:[a-z0-9][a-z0-9._-]{0,127}\Z"
@@ -104,6 +111,57 @@ def sanitize_provider_reason(value: object, *, limit: int = 400) -> str:
     if len(text) > limit:
         return text[: limit - 1].rstrip() + "…"
     return text
+
+
+@dataclass(frozen=True, slots=True)
+class CompletionEvidence:
+    """Observed authority for one part's active CAD projection.
+
+    Presence and verification are deliberately different facts. ``verified`` binds
+    the active references to one re-resolved immutable manifest; ``not-required`` is
+    the explicit terminal state for a class that owns no CAD; ``unverified`` is the
+    fail-closed state for every missing, stale, split, or corrupt evidence path.
+    """
+
+    state: CompletionEvidenceState
+    manifest_digest: str | None = None
+    reason: str = ""
+
+    def __post_init__(self) -> None:
+        if self.state not in _COMPLETION_EVIDENCE_STATES:
+            raise ValueError("completion evidence state is not supported")
+        if self.state == "verified":
+            if (
+                type(self.manifest_digest) is not str
+                or _SHA256_DIGEST.fullmatch(self.manifest_digest) is None
+            ):
+                raise ValueError("verified completion evidence requires a canonical digest")
+        elif self.manifest_digest is not None:
+            raise ValueError(
+                "only verified completion evidence may carry a manifest digest"
+            )
+        reason = sanitize_provider_reason(self.reason)
+        if self.state != "verified" and not reason:
+            raise ValueError("non-verified completion evidence requires a reason")
+        object.__setattr__(self, "reason", reason)
+
+    @classmethod
+    def not_required(cls, reason: str) -> "CompletionEvidence":
+        return cls(state="not-required", reason=reason)
+
+    @classmethod
+    def unverified(cls, reason: str) -> "CompletionEvidence":
+        return cls(state="unverified", reason=reason)
+
+    def to_dict(self) -> dict:
+        return {
+            "state": self.state,
+            "manifest_digest": self.manifest_digest,
+            "reason": self.reason,
+        }
+
+
+CompletionEvidenceResolver = Callable[[object], CompletionEvidence]
 
 
 @dataclass(frozen=True, slots=True)
@@ -338,6 +396,11 @@ class CompletionItem:
     # already-complete active pair while one provider route is blocked or errors.
     provider_outcomes: list[ProviderOutcome] = field(default_factory=list)
     collection_complete: bool | None = None
+    completion_evidence: CompletionEvidence = field(
+        default_factory=lambda: CompletionEvidence.unverified(
+            "the record has not been evaluated for immutable CAD evidence"
+        )
+    )
 
     def to_dict(self) -> dict:
         return {
@@ -355,6 +418,7 @@ class CompletionItem:
             "error": self.error,
             "provider_outcomes": [outcome.to_dict() for outcome in self.provider_outcomes],
             "collection_complete": self.collection_complete,
+            "completion_evidence": self.completion_evidence.to_dict(),
         }
 
 
@@ -393,7 +457,76 @@ class CompletionReport:
         }
 
 
-def sourceable_needs(record, sources: Iterable[AssetSource]) -> list[Requirement]:
+def observe_completion_evidence(
+    record,
+    evidence_resolver: CompletionEvidenceResolver | None = None,
+) -> CompletionEvidence:
+    """Resolve completion authority and convert every invalid path to ``unverified``.
+
+    A class with no owned CAD is terminal by schema and needs no evidence-store I/O.
+    Every class that does own CAD requires an explicit resolver; an omitted, broken,
+    or contradictory resolver fails closed rather than falling back to references.
+    """
+
+    requirements = capture_requirements(record)
+    if not requirements:
+        return CompletionEvidence.not_required(
+            "this part class has no owned CAD requirements"
+        )
+    if evidence_resolver is None:
+        return CompletionEvidence.unverified(
+            "immutable CAD evidence was not evaluated"
+        )
+    try:
+        observed = evidence_resolver(record)
+    except Exception as exc:  # noqa: BLE001 - evidence authority always fails closed
+        detail = sanitize_provider_reason(exc)
+        suffix = f": {detail}" if detail else ""
+        return CompletionEvidence.unverified(
+            f"immutable CAD evidence verification failed ({type(exc).__name__}){suffix}"
+        )
+    if not isinstance(observed, CompletionEvidence):
+        return CompletionEvidence.unverified(
+            "immutable CAD evidence resolver returned an invalid result"
+        )
+    if observed.state == "not-required":
+        return CompletionEvidence.unverified(
+            "the part owns CAD requirements, so evidence cannot be not-required"
+        )
+    missing = capture_needs(record)
+    if observed.state == "verified" and missing:
+        return CompletionEvidence.unverified(
+            "immutable CAD evidence resolved, but required projected references are absent: "
+            + ", ".join(requirement.value for requirement in missing)
+        )
+    return observed
+
+
+def completion_needs(
+    record,
+    evidence: CompletionEvidence,
+) -> list[Requirement]:
+    """Requirements still blocking terminal completion.
+
+    Projection presence remains available through ``capture_needs``. Completion is
+    stricter: until immutable evidence is verified, every owned requirement remains
+    outstanding, including references that merely look populated.
+    """
+
+    requirements = capture_requirements(record)
+    if not requirements:
+        return []
+    if evidence.state == "verified" and not capture_needs(record):
+        return []
+    return requirements
+
+
+def sourceable_needs(
+    record,
+    sources: Iterable[AssetSource],
+    *,
+    evidence_resolver: CompletionEvidenceResolver | None = None,
+) -> list[Requirement]:
     """What this part is missing AND some registered source could actually supply.
 
     The filter matters: a gap nothing can fill is not work. Listing an Altium gap as
@@ -405,7 +538,8 @@ def sourceable_needs(record, sources: Iterable[AssetSource]) -> list[Requirement
     can: set[Requirement] = set()
     for source in sources:
         can |= set(source.provides())
-    return [need for need in capture_needs(record) if need in can]
+    evidence = observe_completion_evidence(record, evidence_resolver)
+    return [need for need in completion_needs(record, evidence) if need in can]
 
 
 def complete_part(
@@ -415,6 +549,7 @@ def complete_part(
     sources,
     collect_variants: bool = False,
     exhaustive: bool = False,
+    evidence_resolver: CompletionEvidenceResolver | None = None,
 ) -> CompletionItem:
     """Fill one part's gaps, cheapest source first, and report honestly what landed.
 
@@ -436,11 +571,12 @@ def complete_part(
     item.mpn = getattr(record, "mpn", "") or ""
     item.display_name = getattr(record, "display_name", "") or ""
     item.category = getattr(record, "category", "") or ""
+    item.completion_evidence = observe_completion_evidence(record, evidence_resolver)
 
-    # Report every real CAD gap, not only the subset today's sources claim they can fill.
-    # Otherwise a source can satisfy the sourceable subset and make the item read "completed"
-    # while an unsupported Altium/model requirement remains on the record.
-    needs = list(capture_needs(record))
+    # Report every evidence-blocked CAD requirement, not only missing references or the
+    # subset today's sources claim they can fill. A populated bare AssetRef remains work
+    # until one immutable manifest is re-resolved for the active projection.
+    needs = completion_needs(record, item.completion_evidence)
     item.needed = [n.value for n in needs]
     if not needs and not collect_variants and not exhaustive:
         item.status = "already-complete"
@@ -546,7 +682,11 @@ def complete_part(
         # failure this project has paid for more than once.
         try:
             record = load_record(part_id)
-            still = set(capture_needs(record))
+            item.completion_evidence = observe_completion_evidence(
+                record,
+                evidence_resolver,
+            )
+            still = set(completion_needs(record, item.completion_evidence))
         except Exception as exc:  # noqa: BLE001
             errors.append(f"reload after {source.key}: {exc}")
             continue
@@ -620,6 +760,7 @@ def complete_library(
     breaker=None,
     collect_variants: bool = False,
     exhaustive: bool = False,
+    evidence_resolver: CompletionEvidenceResolver | None = None,
 ) -> CompletionReport:
     """Complete many parts, streaming.
 
@@ -646,6 +787,7 @@ def complete_library(
             sources=sources,
             collect_variants=collect_variants,
             exhaustive=exhaustive,
+            evidence_resolver=evidence_resolver,
         )
         report.items.append(item)
         if breaker is not None:
@@ -673,6 +815,7 @@ def complete_library(
                         outcome.to_dict() for outcome in item.provider_outcomes
                     ],
                     "collection_complete": item.collection_complete,
+                    "completion_evidence": item.completion_evidence.to_dict(),
                     "message": (
                         f"{item.mpn or item.part_id}"
                         + (f" ({done + 1} of {total})" if total else "")
@@ -690,7 +833,13 @@ def complete_library(
     return report
 
 
-def iter_incomplete(parts_dir, *, load_record, sources) -> Iterator[str]:
+def iter_incomplete(
+    parts_dir,
+    *,
+    load_record,
+    sources,
+    evidence_resolver: CompletionEvidenceResolver | None = None,
+) -> Iterator[str]:
     """The ids of parts some registered source could still help, yielded lazily.
 
     Globs the parts directory rather than reading the derived SQLite index, for the same
@@ -707,5 +856,9 @@ def iter_incomplete(parts_dir, *, load_record, sources) -> Iterator[str]:
             record = load_record(part_id)
         except Exception:  # noqa: BLE001 - a bad record is skipped, the library still works
             continue
-        if sourceable_needs(record, sources):
+        if sourceable_needs(
+            record,
+            sources,
+            evidence_resolver=evidence_resolver,
+        ):
             yield part_id

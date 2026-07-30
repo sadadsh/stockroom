@@ -12,7 +12,9 @@ from stockroom.altium.convergence import (
     AltiumLibraryConvergenceService,
     PersistenceVerification,
     converge_altium_library,
+    render_installed_libraries_probe_script,
     render_persistence_probe_script,
+    verify_libraries_absent,
     verify_persistent_library,
 )
 from stockroom.altium.install import InstallResult
@@ -116,6 +118,42 @@ def test_fresh_session_probe_cannot_install_the_library_it_is_measuring():
     assert "FindComponentSymbol" in script
     assert "FindModelLibraryPath" in script
     assert "GetComponentPlacementParameters" in script
+
+
+def test_fresh_installed_list_probe_is_read_only():
+    script = render_installed_libraries_probe_script(marker_win="C:\\temp\\probe.txt")
+
+    assert "InstalledLibraryPath" in script
+    assert "InstallLibrary" not in script
+    assert "UninstallLibrary" not in script
+
+
+def test_fresh_installed_list_probe_proves_receipted_paths_are_absent(tmp_path):
+    target = tmp_path / "Old.DbLib"
+    driver = _Driver(
+        tmp_path,
+        _Outcome("ok", marker_text="SR-Installed0=C:\\user\\User.IntLib\nDONE\n"),
+    )
+
+    result = verify_libraries_absent((target,), driver=driver, workdir=tmp_path / "work")
+
+    assert result.ok
+    assert result.installed_paths == ("C:\\user\\User.IntLib",)
+    assert driver.runs == 1
+
+
+def test_fresh_installed_list_probe_rejects_a_remaining_receipted_path(tmp_path):
+    target = tmp_path / "Old.DbLib"
+    driver = _Driver(
+        tmp_path,
+        _Outcome("ok", marker_text="SR-Installed0=C:\\fake\\Old.DbLib\nDONE\n"),
+    )
+
+    result = verify_libraries_absent((target,), driver=driver, workdir=tmp_path / "work")
+
+    assert result.status == "still-installed"
+    assert not result.ok
+    assert str(target) in result.detail
 
 
 def test_fresh_session_verification_requires_persistence_and_a_complete_real_part(tmp_path):
@@ -341,6 +379,112 @@ def test_profile_switch_removes_only_receipted_dblib_and_can_switch_back(tmp_pat
     ]
     payload = json.loads(receipt.read_text(encoding="utf-8"))
     assert [Path(item["dblib"]) for item in payload["libraries"]] == [old]
+
+
+def test_empty_profile_removes_only_receipted_dblibs_and_clears_retry_authority(tmp_path):
+    driver = _Driver(tmp_path)
+    receipt = tmp_path / "receipts.json"
+    old = _dblib(tmp_path / "Old")
+    user_library = _dblib(tmp_path / "User")
+    converge_altium_library(
+        old,
+        receipt_path=receipt,
+        driver=driver,
+        installer=lambda *_args, **_kwargs: InstallResult("ok", "installed"),
+        verifier=lambda path, **_kwargs: _placeable(installed_paths=(str(path),)),
+    )
+    calls: list[tuple[str, Path]] = []
+
+    def installer(path, *, uninstall=False, **_kwargs):
+        target = Path(path)
+        calls.append(("uninstall" if uninstall else "install", target))
+        return InstallResult("ok", "removed")
+
+    result = converge_altium_library(
+        None,
+        receipt_path=receipt,
+        driver=driver,
+        installer=installer,
+        absence_verifier=lambda *_args, **_kwargs: PersistenceVerification(
+            "ok",
+            "receipted paths absent",
+            installed_paths=(str(user_library),),
+        ),
+    )
+
+    assert result.status == "no-library"
+    assert result.ok
+    assert calls == [("uninstall", old)]
+    assert ("uninstall", user_library) not in calls
+    assert json.loads(receipt.read_text(encoding="utf-8"))["libraries"] == []
+
+
+def test_empty_profile_cleanup_failure_preserves_the_receipt_for_retry(tmp_path):
+    driver = _Driver(tmp_path)
+    receipt = tmp_path / "receipts.json"
+    old = _dblib(tmp_path / "Old")
+    converge_altium_library(
+        old,
+        receipt_path=receipt,
+        driver=driver,
+        installer=lambda *_args, **_kwargs: InstallResult("ok", "installed"),
+        verifier=lambda path, **_kwargs: _placeable(installed_paths=(str(path),)),
+    )
+    previous_receipt = receipt.read_bytes()
+
+    result = converge_altium_library(
+        None,
+        receipt_path=receipt,
+        driver=driver,
+        installer=lambda *_args, **_kwargs: InstallResult(
+            "not-installed",
+            "Altium still lists the old profile",
+        ),
+        absence_verifier=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("absence verification must wait for successful cleanup")
+        ),
+    )
+
+    assert result.status == "cleanup-failed"
+    assert not result.ok
+    assert receipt.read_bytes() == previous_receipt
+
+
+def test_empty_profile_receipt_replace_failure_preserves_retry_authority(tmp_path, monkeypatch):
+    from stockroom.altium import convergence as convergence_mod
+
+    driver = _Driver(tmp_path)
+    receipt = tmp_path / "receipts.json"
+    old = _dblib(tmp_path / "Old")
+    converge_altium_library(
+        old,
+        receipt_path=receipt,
+        driver=driver,
+        installer=lambda *_args, **_kwargs: InstallResult("ok", "installed"),
+        verifier=lambda path, **_kwargs: _placeable(installed_paths=(str(path),)),
+    )
+    previous_receipt = receipt.read_bytes()
+    monkeypatch.setattr(
+        convergence_mod.os,
+        "replace",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    result = converge_altium_library(
+        None,
+        receipt_path=receipt,
+        driver=driver,
+        installer=lambda *_args, **_kwargs: InstallResult("ok", "removed"),
+        absence_verifier=lambda *_args, **_kwargs: PersistenceVerification(
+            "ok",
+            "receipted paths absent",
+        ),
+    )
+
+    assert result.status == "receipt-failed"
+    assert not result.ok
+    assert receipt.read_bytes() == previous_receipt
+    assert not tuple(receipt.parent.glob(f".{receipt.name}.*.tmp"))
 
 
 def test_matching_target_receipt_cannot_hide_an_obsolete_receipted_duplicate(tmp_path):

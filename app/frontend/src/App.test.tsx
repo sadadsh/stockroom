@@ -88,7 +88,7 @@ describe("App shell", () => {
     expect(
       screen.queryByRole("tab", { name: /BOM Coverage|Duplicates|Doctor/ }),
     ).toBeNull();
-    expect(screen.getByRole("tab", { name: "Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Identity" })).toBeInTheDocument();
   });
 
   it("reaches Add Parts as a full-screen wizard from the Parts toolbar", async () => {
@@ -120,6 +120,9 @@ describe("App shell", () => {
 
     // Add Parts is a primary button on the Parts page now, not a tab.
     expect(screen.queryByRole("tab", { name: "Add Parts" })).toBeNull();
+    // Wait for the empty-library query to settle. The page deliberately replaces
+    // its transient loading workstation with one coherent intake state.
+    await screen.findByText("No Components Yet");
     await user.click(screen.getByRole("button", { name: "Add Parts" }));
 
     // It opens the Add A Part modal (an in-window dialog) with the flow's own
@@ -132,6 +135,7 @@ describe("App shell", () => {
   });
 
   it("renders the STM Viewer page for the stm route", async () => {
+    window.history.replaceState({}, "", "/#route=stm");
     mockApi.getStmStatus.mockResolvedValue({
       built: true,
       building: false,

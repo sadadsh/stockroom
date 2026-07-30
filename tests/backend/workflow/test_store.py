@@ -910,8 +910,27 @@ def test_sqlite_durability_settings_migration_and_json_storage(tmp_path):
         payload_columns = connection.execute(
             "SELECT payload_json FROM events ORDER BY sequence"
         ).fetchall()
-    assert migrations == [(1,), (2,), (3,), (4,)]
+    assert migrations == [(1,), (2,), (3,), (4,), (5,)]
     assert all(json.loads(row[0]) is not None for row in payload_columns)
+
+
+def test_stage_lease_expiry_probe_uses_its_exact_migration_index(tmp_path):
+    store = WorkflowStore(tmp_path / "workflow.sqlite3")
+
+    with sqlite3.connect(store.database) as connection:
+        plan = connection.execute(
+            """
+            EXPLAIN QUERY PLAN
+            SELECT s.id
+            FROM stages AS s
+            JOIN items AS i ON i.id = s.item_id
+            WHERE s.status = 'running'
+              AND s.lease_expires_at <= 10
+            ORDER BY s.id
+            """
+        ).fetchall()
+
+    assert any("idx_stages_lease_expiry" in str(row[3]) for row in plan)
 
 
 def test_v2_migration_requeues_running_stage_before_adding_lease_fence(tmp_path):

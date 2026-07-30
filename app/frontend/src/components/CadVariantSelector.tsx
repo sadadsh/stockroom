@@ -1,5 +1,5 @@
 /**
- * A controlled selector for immutable, validated CAD variants.
+ * A controlled selector for immutable, reverified CAD variants.
  *
  * Every provider variant remains visible, while only an exact same-download cross-EDA pair can be
  * activated. Switching the pair never deletes retained evidence or fetches it again.
@@ -75,6 +75,18 @@ function orderedArtifacts(artifacts: readonly CadVariantArtifact[]): CadVariantA
   );
 }
 
+function inventoryVariant(
+  inventories: readonly CadVariantInventory[],
+  tool: CadVariantTool,
+  variantId: string,
+): CadVariant | null {
+  return (
+    inventories
+      .find((inventory) => inventory.tool === tool)
+      ?.variants.find((variant) => variant.id === variantId) ?? null
+  );
+}
+
 function shortDigest(value: string): string {
   const digest = value.trim();
   return digest.length > 12 ? `${digest.slice(0, 12)}...` : digest;
@@ -127,8 +139,9 @@ export function CadVariantSelector({
           </div>
           <p className="mt-1 text-2xs text-t2">
             <Text id="detail.cad-variants.help">
-              Review every retained provider variant. Activation is available only for an exact
-              same-provider, same-download KiCad and Altium pair, and one switch updates both.
+              Review every retained provider variant. Activation is available only when both
+              sides of an exact same-provider, same-download KiCad and Altium pair are reverified,
+              and one switch updates both.
             </Text>
           </p>
         </div>
@@ -213,6 +226,20 @@ function PairInventory({
       {ordered.length ? (
         <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
           {ordered.map((pair) => {
+            const kicadVariant = inventoryVariant(
+              inventories,
+              "kicad",
+              pair.kicadVariantId,
+            );
+            const altiumVariant = inventoryVariant(
+              inventories,
+              "altium",
+              pair.altiumVariantId,
+            );
+            const pairReverified =
+              pair.verificationState === "reverified" &&
+              kicadVariant?.verificationState === "reverified" &&
+              altiumVariant?.verificationState === "reverified";
             const active =
               pair.kicadVariantId === kicad?.activeVariantId &&
               pair.altiumVariantId === altium?.activeVariantId;
@@ -244,10 +271,15 @@ function PairInventory({
                   </Badge>
                 </div>
                 <div className="mt-2 flex min-w-0 items-center gap-1.5 text-2xs text-t2">
-                  <Dot tone="ok" />
-                  <span className="font-medium text-ok">{pair.trustLabel}</span>
-                  <span className="min-w-0 truncate text-t3" title={pair.trustReason}>
-                    {pair.trustReason}
+                  <Dot tone={pairReverified ? "ok" : "warn"} />
+                  <span
+                    className={
+                      "font-medium " + (pairReverified ? "text-ok" : "text-warn")
+                    }
+                  >
+                    {pairReverified
+                      ? "Reverified Same-Download Pair"
+                      : "Verification Evidence Missing"}
                   </span>
                 </div>
                 {!active ? (
@@ -255,7 +287,7 @@ function PairInventory({
                     <Button
                       type="button"
                       small
-                      disabled={switching || activating !== null}
+                      disabled={!pairReverified || switching || activating !== null}
                       aria-busy={switching || undefined}
                       aria-label={`Use ${pair.provider} for KiCad and Altium`}
                       onClick={() =>
@@ -329,7 +361,7 @@ function SupplementaryInventory({
             </div>
             <p className="mt-1 text-2xs text-t2">
               Original files from {manifest.surface}. They do not satisfy Symbol, Footprint, or 3D
-              Model coverage until a validated CAD pipeline projects them.
+              Model coverage until a reverified CAD pipeline projects them.
             </p>
             <ul className="mt-2 divide-y divide-line border-t border-line">
               {manifest.artifacts.map((artifact) => (
@@ -423,7 +455,7 @@ function ToolInventory({
         </div>
       ) : (
         <div className="rounded-card border border-dashed border-line px-3 py-3 text-2xs text-t2">
-          No validated {toolLabel} variants are retained for this part.
+          No reverified {toolLabel} variants are retained for this part.
         </div>
       )}
     </section>
@@ -449,6 +481,7 @@ function VariantRow({
     ...new Set(artifacts.map((artifact) => ARTIFACT_LABELS[artifact.kind])),
   ].join(", ");
   const fileSummary = artifacts.map((artifact) => artifact.fileName).join(", ");
+  const reverified = variant.verificationState === "reverified";
 
   return (
     <article
@@ -506,19 +539,18 @@ function VariantRow({
         </dl>
 
         <div className="mt-2 flex min-w-0 items-center gap-1.5 text-2xs text-t2">
-          <Dot tone="ok" />
-          <span className="font-medium text-ok">Validated</span>
-          <span aria-hidden className="text-t3">
-            ·
-          </span>
-          <span className="tabular-nums">
-            {variant.validationChecks} {variant.validationChecks === 1 ? "Check" : "Checks"}
+          <Dot tone={reverified ? "ok" : "warn"} />
+          <span className={"font-medium " + (reverified ? "text-ok" : "text-warn")}>
+            {reverified ? "Reverified" : "Verification Evidence Missing"}
           </span>
           <span aria-hidden className="text-t3">
             ·
           </span>
-          <span className="min-w-0 truncate" title={variant.trustReason}>
-            {variant.trustLabel}
+          <span
+            className="min-w-0 truncate font-mono"
+            title={variant.evidenceDigest}
+          >
+            {shortDigest(variant.evidenceDigest) || "Manifest Not Recorded"}
           </span>
         </div>
       </div>

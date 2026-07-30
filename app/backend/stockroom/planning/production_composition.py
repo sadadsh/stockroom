@@ -31,7 +31,8 @@ import subprocess
 import tempfile
 import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
@@ -40,7 +41,11 @@ from typing import Protocol, cast
 from stockroom.altium.dblib import render_dblib
 from stockroom.cad_variants import resolve_cad_variant, same_cad_evidence_set
 from stockroom.capture.evidence import record_installed_kicad_role_evidence
-from stockroom.capture.runner import capture_state_root, run_guided_capture
+from stockroom.capture.runner import (
+    capture_state_root,
+    run_guided_capture,
+    write_durable_capture_report,
+)
 from stockroom.catalog import (
     CATALOG_APPLICATION_ID,
     CATALOG_FILENAME,
@@ -73,7 +78,7 @@ from stockroom.publish import (
 from stockroom.store.machine_config import MachineConfig
 from stockroom.store.profile import Profile
 from stockroom.vcs import GitRepo
-from stockroom.workflow import StageName, WorkflowStore
+from stockroom.workflow import StageContext, StageName, WorkflowStore
 from stockroom.workflow.identifiers import (
     authoritative_text,
     derive_component_identity,
@@ -126,7 +131,7 @@ _DATASHEET_PROVIDER = "manufacturer_datasheet"
 _ACQUISITION_PROVIDER = "stockroom_acquisition"
 _RECORD_ADAPTER_VERSION = "part-record-v4"
 _DATASHEET_ADAPTER_VERSION = "exact-pdf-v1"
-_ACQUISITION_ADAPTER_VERSION = "verified-cow-capture-v1"
+_ACQUISITION_ADAPTER_VERSION = "verified-cow-capture-v2"
 _PRODUCTION_METADATA_KEY = "production_publication"
 _PORTABLE_TABLE_DIRECTORY = "Stockroom-Portable-KiCad-Tables"
 _PORTABLE_SYMBOL_TABLE = "Stockroom-Portable-Symbol-Libraries.kicad-table"
@@ -496,6 +501,49 @@ def _seed_copy_on_write_context(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _CaptureRequest:
+    mode: str = "automatic"
+    vendor: str | None = None
+    background: bool = False
+    report_item_id: str | None = None
+
+
+_DEFAULT_CAPTURE_REQUEST = _CaptureRequest()
+_CAPTURE_PROVIDER_KEY = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\Z", re.ASCII)
+
+
+def _capture_request(item_id: str, payload: object) -> _CaptureRequest:
+    """Decode only the allowlisted durable capture options from an item payload."""
+
+    if not isinstance(payload, Mapping) or payload.get("workflow_kind") is None:
+        return _DEFAULT_CAPTURE_REQUEST
+    if payload.get("workflow_kind") != "guided_capture":
+        raise ProductionWorkflowError("workflow item has an unsupported workflow kind")
+    capture = _mapping(payload.get("capture"), "guided capture request")
+    mode = capture.get("mode")
+    if mode not in {"automatic", "assisted", "collect-all"}:
+        raise ProductionWorkflowError("guided capture mode is not supported")
+    vendor = capture.get("vendor")
+    if vendor is not None and (
+        type(vendor) is not str or _CAPTURE_PROVIDER_KEY.fullmatch(vendor) is None
+    ):
+        raise ProductionWorkflowError("guided capture provider key is not canonical")
+    if mode == "assisted" and vendor is None:
+        raise ProductionWorkflowError("assisted guided capture requires one provider")
+    background = capture.get("background")
+    if type(background) is not bool:
+        raise ProductionWorkflowError("guided capture background flag must be a boolean")
+    if mode == "collect-all" and background:
+        raise ProductionWorkflowError("collect-all guided capture must remain visible")
+    return _CaptureRequest(
+        mode=cast(str, mode),
+        vendor=vendor,
+        background=background,
+        report_item_id=item_id,
+    )
+
+
 @dataclass(slots=True)
 class StockroomAcquisitionProviderAdapter:
     """Use verified evidence first, then the real acquisition ladder in COW staging."""
@@ -508,14 +556,49 @@ class StockroomAcquisitionProviderAdapter:
         {KICAD_CAD_OPERATION, ALTIUM_CAD_OPERATION}
     )
     _lock: threading.Lock = field(init=False, repr=False)
-    _last_acquisition: dict[ExactPartIdentity, float] = field(
+    _scope_guard: threading.Lock = field(init=False, repr=False)
+    _scope_locks: dict[ExactPartIdentity, threading.Lock] = field(init=False, repr=False)
+    _active_capture: dict[ExactPartIdentity, _CaptureRequest] = field(init=False, repr=False)
+    _last_acquisition: dict[tuple[ExactPartIdentity, _CaptureRequest], float] = field(
         init=False,
         repr=False,
     )
 
     def __post_init__(self) -> None:
         self._lock = threading.Lock()
-        self._last_acquisition: dict[ExactPartIdentity, float] = {}
+        self._scope_guard = threading.Lock()
+        self._scope_locks = {}
+        self._active_capture = {}
+        self._last_acquisition = {}
+
+    @contextmanager
+    def capture_scope(
+        self,
+        context: StageContext,
+        identity: ExactPartIdentity,
+    ) -> Iterator[None]:
+        """Bind one durable item's capture contract across provider worker threads."""
+
+        request = _capture_request(context.item.id, context.item.payload)
+        with self._scope_guard:
+            identity_lock = self._scope_locks.setdefault(identity, threading.Lock())
+        identity_lock.acquire()
+        try:
+            with self._scope_guard:
+                if identity in self._active_capture:
+                    raise ProductionWorkflowError(
+                        "the exact identity already owns a guided capture scope"
+                    )
+                self._active_capture[identity] = request
+            yield
+        finally:
+            with self._scope_guard:
+                self._active_capture.pop(identity, None)
+            identity_lock.release()
+
+    def _capture_options(self, identity: ExactPartIdentity) -> _CaptureRequest:
+        with self._scope_guard:
+            return self._active_capture.get(identity, _DEFAULT_CAPTURE_REQUEST)
 
     def _selection(self, identity: ExactPartIdentity) -> ProductionCadBundle | None:
         workspace = (
@@ -534,12 +617,17 @@ class StockroomAcquisitionProviderAdapter:
         )
         return selected if isinstance(selected, ProductionCadBundle) else None
 
-    def _acquire(self, identity: ExactPartIdentity) -> None:
+    def _acquire(
+        self,
+        identity: ExactPartIdentity,
+        request: _CaptureRequest,
+    ) -> None:
         now = time.monotonic()
-        last = self._last_acquisition.get(identity)
+        acquisition_key = (identity, request)
+        last = self._last_acquisition.get(acquisition_key)
         if last is not None and now - last < 30.0:
             return
-        self._last_acquisition[identity] = now
+        self._last_acquisition[acquisition_key] = now
         self.staging_root.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(
             prefix=".Acquisition-",
@@ -551,13 +639,16 @@ class StockroomAcquisitionProviderAdapter:
                 Path(temporary) / "Repository",
             )
             part_id = make_part_id(identity.mpn_canonical)
-            run_guided_capture(
+            report = run_guided_capture(
                 isolated,
                 part_ids=(part_id,),
-                headless=False,
-                user_driven=False,
-                operator_authorized=False,
+                vendor=request.vendor,
+                headless=request.background,
+                operator_authorized=request.mode == "assisted",
+                collect_all=request.mode == "collect-all",
             )
+            if request.report_item_id is not None:
+                write_durable_capture_report(request.report_item_id, report)
             record = isolated.ops.load_record(part_id)
             try:
                 record_installed_kicad_role_evidence(
@@ -646,9 +737,10 @@ class StockroomAcquisitionProviderAdapter:
             return AdapterOutcome.failure(FailureClassification.UNSUPPORTED_FORMAT)
         with self._lock:
             try:
+                request = self._capture_options(identity)
                 bundle = self._selection(identity)
-                if bundle is None:
-                    self._acquire(identity)
+                if bundle is None or request.mode == "collect-all":
+                    self._acquire(identity, request)
                     bundle = self._selection(identity)
                 if bundle is None:
                     return AdapterOutcome.failure(FailureClassification.NOT_FOUND_EXACT)
@@ -1949,6 +2041,7 @@ def build_production_provider_components(
     ProviderPlanner,
     ProviderExecutionRuntime,
     tuple[ProviderPolicyInput, ...],
+    StockroomAcquisitionProviderAdapter,
 ]:
     """Compose a complete executable ordinary-part provider policy."""
 
@@ -2049,7 +2142,7 @@ def build_production_provider_components(
         planner,
         evidence_verifier=evidence_store,
     )
-    return planner, runtime, policy_inputs
+    return planner, runtime, policy_inputs, acquisition_adapter
 
 
 def build_production_workflow_registry_for_context(
@@ -2105,7 +2198,7 @@ def build_production_workflow_registry_for_context(
         if directory.is_symlink():
             raise ProductionWorkflowError("production state directories cannot be links")
 
-    planner, provider_runtime, policies = build_production_provider_components(
+    planner, provider_runtime, policies, acquisition_adapter = build_production_provider_components(
         context,
         evidence_store=evidence_store,
         staging_root=staging_root,
@@ -2138,6 +2231,7 @@ def build_production_workflow_registry_for_context(
         semantic_adapters=semantic_adapters,
         publication_adapter=publication_adapter,
         publisher=publisher,
+        provider_stage_scope=acquisition_adapter.capture_scope,
     )
 
 

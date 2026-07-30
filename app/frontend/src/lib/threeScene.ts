@@ -92,6 +92,12 @@ export type PlacementMode = "auto" | "kicad" | "model";
 
 export interface ModelSceneOptions {
   onError?: () => void;
+  /**
+   * Fires only after the GLB has produced non-empty renderable geometry and the
+   * first whole-object frame has been computed. Bytes on disk are not enough
+   * to call a model visible.
+   */
+  onReady?: () => void;
   onViewChange?: (mode: ViewMode | null) => void;
   onPlacementAssessment?: (
     assessment: PlacementAssessment,
@@ -150,6 +156,8 @@ export interface LandPatternInput {
 
 export interface ModelSceneHandle {
   dispose: () => void;
+  /** Reframe every visible subject layer without changing the current view direction. */
+  fit: () => void;
   /** Swap the shading model. Rebuilds materials and arms/disarms the post-processing chain. */
   setRenderMode: (mode: RenderMode) => void;
   /** Show or hide the model / pads / board independently. */
@@ -275,7 +283,7 @@ export function mountModelScene(
   glb: ArrayBuffer,
   options: ModelSceneOptions = {},
 ): ModelSceneHandle {
-  const { onError, onViewChange, onPlacementAssessment } = options;
+  const { onError, onReady, onViewChange, onPlacementAssessment } = options;
   const width = container.clientWidth || 640;
   const height = container.clientHeight || 460;
 
@@ -484,6 +492,7 @@ export function mountModelScene(
   // so at load the PCB chip read "on" while no board existed at all, and turning PCB on did nothing.
   const layers: LayerVisibility = { ...DEFAULT_LAYERS };
   let disposed = false;
+  let reportReadyAfterFrame = false;
 
   const loader = new GLTFLoader();
   const root = new THREE.Group();
@@ -568,12 +577,24 @@ export function mountModelScene(
       studioMaterial = neutral;
       applyRenderMode(renderMode);
       refreshModelFrame();
+      const visibleModel =
+        modelMeshes.some((mesh) => mesh.visible && !!mesh.geometry) &&
+        !!modelSize &&
+        modelSize.toArray().every(Number.isFinite) &&
+        modelSize.lengthSq() > 0;
+      if (!visibleModel) {
+        onError?.();
+        return;
+      }
       if (viewMode !== "iso") setView(viewMode);
       // The component's height is only knowable HERE, and the board's thickness is derived from it.
       // Any land pattern handed in before this point was built against the unknown-height fallback
       // and against a `modelBaseY` of 0, so rebuild it now that both are real. Fires at most once
       // (this callback runs once), and setLandPattern re-fits the camera itself.
       if (lastLand) setLandPattern(lastLand);
+      // Do not report "visible" merely because parsing succeeded. The render
+      // loop promotes this after it has drawn the non-empty scene once.
+      reportReadyAfterFrame = true;
     },
     () => {
       // GLTFLoader rejected the GLB (a format three does not accept, or a truncated
@@ -612,6 +633,10 @@ export function mountModelScene(
     // Drawn outside the composer so AO never treats the control as scene geometry. The gizmo owns
     // its viewport/scissor restoration and hit testing, including face, edge, corner and drag input.
     viewGizmo?.render();
+    if (reportReadyAfterFrame) {
+      reportReadyAfterFrame = false;
+      onReady?.();
+    }
     raf = requestAnimationFrame(tick);
   };
   // Mounted after the loop is armed so the first frame already carries it. The parent is the
@@ -1382,6 +1407,7 @@ export function mountModelScene(
       disposed = true;
       disposeScene();
     },
+    fit: () => refitCamera(),
     setView,
     /** Turn the idle spin on or off. Returns the state actually in force, which is false whenever the
      *  OS asks for reduced motion no matter what was requested. */

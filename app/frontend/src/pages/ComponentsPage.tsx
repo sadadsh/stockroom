@@ -7,7 +7,7 @@
  * Honest degradation: a connection error shows a retry surface (not a crash), and
  * a genuinely empty library shows an empty state that names how to add parts.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   usePartsQuery,
   useFacetsQuery,
@@ -32,16 +32,30 @@ import { SearchOverlay } from "../components/SearchOverlay";
 import { AddPartIcon } from "../components/icons";
 import { Button, PanelTitle } from "../components/primitives";
 import { Text } from "../lib/copy";
+import { readUiSession, updateUiSession } from "../lib/uiSession";
+import { COMPONENT_PICKER_WIDTH } from "../lib/libraryLayout";
 
 export function ComponentsPage() {
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<string | null>(null);
-  const [completeOnly, setCompleteOnly] = useState(false);
-  const [duplicatesOnly, setDuplicatesOnly] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState(() => readUiSession().component_filters.query);
+  const [category, setCategory] = useState<string | null>(
+    () => readUiSession().component_filters.category,
+  );
+  const [completeOnly, setCompleteOnly] = useState(
+    () => readUiSession().component_filters.complete_only,
+  );
+  const [duplicatesOnly, setDuplicatesOnly] = useState(
+    () => readUiSession().component_filters.duplicates_only,
+  );
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => readUiSession().selected_ids.component,
+  );
+  const [searchOpen, setSearchOpen] = useState(
+    () => readUiSession().open_surface === "search",
+  );
   const [listScrollElement, setListScrollElement] =
     useState<HTMLDivElement | null>(null);
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
 
   const partsQuery = usePartsQuery({ q: search, category, completeOnly });
   const facetsQuery = useFacetsQuery();
@@ -55,6 +69,77 @@ export function ComponentsPage() {
   const { toast } = useToast();
   const { open: openAddPart } = useAddPart();
   const { reopenPartId } = useCapture();
+
+  // Persist the exact primary Library view as one bounded document. This runs
+  // only when a value changed, so mounting from an injected snapshot does not
+  // generate a write that merely echoes what the host just restored.
+  useEffect(() => {
+    const current = readUiSession();
+    const nextSurface = searchOpen
+      ? "search"
+      : current.open_surface === "search"
+        ? null
+        : current.open_surface;
+    if (
+      current.component_filters.query === search &&
+      current.component_filters.category === category &&
+      current.component_filters.complete_only === completeOnly &&
+      current.component_filters.duplicates_only === duplicatesOnly &&
+      current.selected_ids.component === selectedId &&
+      current.open_surface === nextSurface
+    ) {
+      return;
+    }
+    updateUiSession((snapshot) => ({
+      ...snapshot,
+      selected_ids: { ...snapshot.selected_ids, component: selectedId },
+      component_filters: {
+        query: search,
+        category,
+        complete_only: completeOnly,
+        duplicates_only: duplicatesOnly,
+      },
+      open_surface: nextSurface,
+    }));
+  }, [category, completeOnly, duplicatesOnly, search, searchOpen, selectedId]);
+
+  // Restore and continuously checkpoint the picker scroll. The stable selected
+  // part accompanies the pixel offset, so a future projection can re-anchor
+  // after insertions instead of treating the number as an identity.
+  useEffect(() => {
+    if (!listScrollElement) return;
+    const restored = readUiSession().component_list_anchor.offset_px;
+    if (listScrollElement.scrollTop !== restored) listScrollElement.scrollTop = restored;
+    let pending: number | null = null;
+    const checkpoint = () => {
+      pending = null;
+      const offset = Math.max(0, Math.round(listScrollElement.scrollTop));
+      const current = readUiSession();
+      if (
+        current.component_list_anchor.offset_px === offset &&
+        current.component_list_anchor.part_id === selectedIdRef.current
+      ) {
+        return;
+      }
+      updateUiSession((snapshot) => ({
+        ...snapshot,
+        component_list_anchor: {
+          part_id: selectedIdRef.current,
+          offset_px: offset,
+        },
+      }));
+    };
+    const onScroll = () => {
+      if (pending !== null) window.clearTimeout(pending);
+      pending = window.setTimeout(checkpoint, 40);
+    };
+    listScrollElement.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      listScrollElement.removeEventListener("scroll", onScroll);
+      if (pending !== null) window.clearTimeout(pending);
+      checkpoint();
+    };
+  }, [listScrollElement]);
 
   // The background capture pill asks to reopen its part: select it here so the detail (and its
   // Complete-Part modal) come up. DetailPanel finishes the handoff by opening the modal.
@@ -220,6 +305,45 @@ export function ComponentsPage() {
   }
 
   const selectedSummary = parts.find((p) => p.id === selectedId) ?? null;
+  const hasSearchOrFilter = !!search || !!category || completeOnly || duplicatesOnly;
+  const emptyLibrary =
+    !partsQuery.isLoading &&
+    !partsQuery.error &&
+    allParts.length === 0 &&
+    !hasSearchOrFilter;
+
+  if (emptyLibrary) {
+    return (
+      <div data-dev-id="components.root" className="flex min-h-0 flex-1">
+        <div
+          data-dev-id="components.empty"
+          className="flex flex-1 items-center justify-center p-6"
+        >
+          <div className="flex max-w-md flex-col items-center text-center">
+            <span className="mb-3 text-t3">
+              <AddPartIcon />
+            </span>
+            <h1 className="text-base font-semibold text-t1">
+              <Text id="components.empty-title">No Components Yet</Text>
+            </h1>
+            <p className="mt-1.5 text-sm leading-relaxed text-t3">
+              Add a manufacturer part number. Stockroom will keep its KiCad,
+              Altium, STEP, source, and verification evidence together.
+            </p>
+            <Button
+              variant="accent"
+              data-dev-id="components.add-parts"
+              icon={<AddPartIcon />}
+              onClick={openAddPart}
+              className="mt-4"
+            >
+              <Text id="components.add-parts">Add Parts</Text>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // north-star .app: rail | list | detail, each column self-heading - no full-width page
   // header band (the active rail item + the rail's library readout carry that).
@@ -227,7 +351,11 @@ export function ComponentsPage() {
     <div data-dev-id="components.root" className="flex min-h-0 flex-1">
         {/* picker: a docked panel - an Altium title strip, then the padded body. The rail's
             right border and the detail pane's left border frame this column, so it needs none. */}
-        <div data-dev-id="components.picker" className="flex w-[320px] flex-none flex-col">
+        <div
+          data-dev-id="components.picker"
+          className="flex flex-none flex-col"
+          style={{ width: COMPONENT_PICKER_WIDTH }}
+        >
           <PanelTitle
             data-dev-id="components.list-title"
             right={parts.length ? parts.length.toLocaleString() : undefined}
@@ -272,7 +400,7 @@ export function ComponentsPage() {
               onSelect={setSelectedId}
               scrollElement={listScrollElement}
               onRetry={() => partsQuery.refetch()}
-              hasSearchOrFilter={!!search || !!category || completeOnly || duplicatesOnly}
+              hasSearchOrFilter={hasSearchOrFilter}
               onClearFilters={() => {
                 setSearch("");
                 setCategory(null);
@@ -293,6 +421,7 @@ export function ComponentsPage() {
               error={detailQuery.error}
               missing={selectedSummary?.missing ?? []}
               isComplete={selectedSummary?.is_complete ?? false}
+              edaReadiness={selectedSummary?.eda_readiness}
               onEditField={handleEditField}
               onMoveCategory={handleMoveCategory}
               categories={categories}

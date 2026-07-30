@@ -27,7 +27,10 @@ from stockroom.service import (
     secure_windows_mutex_factory,
 )
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="real Windows mutex tests")
+pytestmark = [
+    pytest.mark.skipif(os.name != "nt", reason="real Windows mutex tests"),
+    pytest.mark.global_windows_mutex,
+]
 
 
 def _owner_process(

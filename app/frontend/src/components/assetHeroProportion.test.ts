@@ -1,17 +1,14 @@
 /**
- * The 3D hero must not be the largest thing on the sheet when it has nothing to show.
+ * The unified inspection stage must keep empty or unavailable projections from
+ * becoming larger than real geometry.
  *
- * MEASURED in the real window (2026-07-25): with no model attached, the "No 3D Model" placeholder
- * rendered ~420px tall directly above 142px Symbol and Footprint tiles, because its sizing was the
- * unconditional `min-h-[300px] flex-1`. A featureless placeholder was therefore the most prominent
- * element in the specimen column, which is the owner's "grotesquely out of proportion" complaint.
- *
- * This is a source-contract gate rather than a render test because the sizing is a Tailwind class
- * chain: jsdom applies no CSS, so a rendered height assertion here would pass no matter what.
+ * This remains a source-contract gate because jsdom does not apply Tailwind
+ * layout. The current architecture gives Symbol, Footprint, 3D, and the empty
+ * state one bounded stage instead of differently sized asset cards.
  */
 import { describe, expect, it } from "vitest";
 
-const RAW = import.meta.glob("./DetailPanel.tsx", {
+const RAW = import.meta.glob("./ComponentInspectionStage.tsx", {
   query: "?raw",
   import: "default",
   eager: true,
@@ -19,31 +16,18 @@ const RAW = import.meta.glob("./DetailPanel.tsx", {
 
 const source = Object.values(RAW)[0];
 
-describe("3D hero proportion", () => {
-  it("takes the hero treatment only when a model is actually present", () => {
-    const hero = /devId="detail.asset-hero"[\s\S]*?className=\{([\s\S]*?)\}\n/.exec(source);
-    expect(hero, "could not find the hero tile's className").toBeTruthy();
-    const cls = hero![1];
-    // it must BRANCH on hasModel rather than always claiming the space
-    expect(cls).toMatch(/hasModel\s*\?/);
-    // and the empty branch must not keep the growth classes
-    const emptyBranch = cls.split(":")[1] ?? "";
-    expect(emptyBranch).not.toMatch(/flex-1/);
-    expect(emptyBranch).not.toMatch(/min-h-\[300px\]/);
+describe("inspection stage proportion", () => {
+  it("uses one bounded stage for every projection and the empty state", () => {
+    expect(source).toContain("h-[clamp(340px,54vh,560px)]");
+    expect(source).toContain('data-testid="inspection-stage"');
+    expect(source).toContain("<Centered>No visual representations are linked.</Centered>");
+    expect(source).not.toContain("min-h-[300px] flex-1");
   });
 
-  it("sizes the empty hero as a PEER of the sibling tiles, not larger", () => {
-    // Symbol and Footprint are a fixed h-[142px]; an empty hero claiming more would be back to
-    // making the placeholder the loudest element.
-    const sibling = /devId="detail.asset-symbol"[\s\S]*?className="([^"]*)"/.exec(source);
-    expect(sibling, "could not find the symbol tile's className").toBeTruthy();
-    const siblingHeight = /h-\[(\d+)px\]/.exec(sibling![1])?.[1];
-    expect(siblingHeight).toBeTruthy();
-
-    const hero = /devId="detail.asset-hero"[\s\S]*?className=\{([\s\S]*?)\}\n/.exec(source);
-    const emptyBranch = (hero![1].split(":")[1] ?? "");
-    const heroEmptyHeight = /h-\[(\d+)px\]/.exec(emptyBranch)?.[1];
-    expect(heroEmptyHeight, "the empty hero has no explicit height").toBeTruthy();
-    expect(Number(heroEmptyHeight)).toBeLessThanOrEqual(Number(siblingHeight));
+  it("expands the same mounted instrument instead of creating a second hero", () => {
+    expect(source).toContain("Keep the same stage element and projection children mounted");
+    expect(source).toContain('? "fixed inset-3 z-[110] border-line2 shadow-pop"');
+    expect(source).toContain(': "h-full w-full border-line"');
+    expect(source).not.toContain("AssetTile");
   });
 });

@@ -131,6 +131,8 @@ def test_old_done_boolean_remains_readable_but_explicit_lifecycle_wins() -> None
 def test_render_refuses_to_present_the_raw_counter_as_product_readiness(monkeypatch) -> None:
     monkeypatch.setattr(progress, "activity", lambda: [])
     rendered = progress.render_html(_plan())
+    assert rendered.startswith('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">')
+    assert rendered.endswith("</body>\n</html>\n")
     assert "Product readiness has no aggregate percentage" in rendered
     assert "Codex Active Work" in rendered
     assert "Manual checkpoint snapshot" in rendered
@@ -151,6 +153,111 @@ def test_render_refuses_to_present_the_raw_counter_as_product_readiness(monkeypa
     assert "not product readiness" in rendered
     assert "Off Main" in rendered
     assert "Invalidated" in rendered
+
+
+def test_active_work_is_scan_first_with_complete_native_disclosures(monkeypatch) -> None:
+    monkeypatch.setattr(progress, "activity", lambda: [])
+
+    rendered = progress.render_html(_plan())
+    first_card = rendered.split('<article class="workstream', 1)[1].split("</article>", 1)[0]
+
+    assert rendered.count('<article class="workstream') == 3
+    assert rendered.count('<details class="awdetails">') == 3
+    assert rendered.count("<summary>Full Evidence, Blocker, And Next Step</summary>") == 3
+    assert '<p class="awstate">The durable store exists in isolation.</p>' in first_card
+    assert (
+        first_card.index('<p class="awstate">')
+        < first_card.index('<p class="awowner">')
+        < first_card.index('<details class="awdetails">')
+    )
+    assert "<dt>Current evidence</dt><dd>The durable store exists in isolation.</dd>" in first_card
+    assert "<dt>Next action</dt><dd>Finish the migration fence.</dd>" in first_card
+
+
+def test_active_work_disclosures_have_keyboard_and_name_contracts(monkeypatch) -> None:
+    monkeypatch.setattr(progress, "activity", lambda: [])
+
+    rendered = progress.render_html(_plan())
+
+    assert (
+        '<article class="workstream ws-active" '
+        'aria-labelledby="active-workstream-0-title">'
+    ) in rendered
+    assert '<h3 id="active-workstream-0-title">Workflow Kernel</h3>' in rendered
+    assert 'aria-label="Status: Active">Active</span>' in rendered
+    assert '<details class="awdetails">' in rendered
+    assert '<details class="awdetails" open>' not in rendered
+    assert ".awdetails summary:focus-visible{outline:2px solid var(--accent)" in rendered
+
+
+def test_progress_cards_use_readable_single_columns_at_desktop_and_phone(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(progress, "activity", lambda: [])
+
+    rendered = progress.render_html(_plan())
+
+    assert (
+        ".awgrid{display:grid;grid-template-columns:minmax(0,1fr);"
+        "gap:10px;margin-top:14px}"
+    ) in rendered
+    assert (
+        ".outcomegrid{display:grid;grid-template-columns:minmax(0,1fr);"
+        "gap:10px;margin-top:10px}"
+    ) in rendered
+    assert "grid-template-columns:repeat(2,minmax(0,1fr))" not in rendered
+    assert ".awstate{max-width:72ch" in rendered
+    assert ".workstream dd{max-width:72ch" in rendered
+    assert "overflow-wrap:anywhere" in rendered
+    assert ".whead h2{white-space:normal}" in rendered
+    assert ".phead h2{min-width:0" in rendered
+    assert "@media (max-width:520px)" in rendered
+    assert ".activework{padding:12px}.workstream{padding:11px 12px}" in rendered
+
+
+def test_active_work_preserves_utf8_and_escapes_summary_and_full_evidence(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(progress, "activity", lambda: [])
+    plan = _plan()
+    stream = plan["active_work"]["workstreams"][0]
+    stream["name"] = 'KiCad <check> & "review"'
+    stream["owner"] = "Codex · café"
+    stream["evidence"] = (
+        "KiCad ↔ Altium · café is safe. Full <evidence> & exact bytes remain available."
+    )
+    stream["blocker"] = "<script>alert('no')</script>"
+    stream["next_action"] = 'Verify "A&B".'
+
+    rendered = progress.render_html(plan)
+
+    assert '<meta charset="utf-8">' in rendered
+    assert "KiCad ↔ Altium · café is safe." in rendered
+    assert "KiCad &lt;check&gt; &amp; &quot;review&quot;" in rendered
+    assert (
+        "<dd>KiCad ↔ Altium · café is safe. Full &lt;evidence&gt; &amp; exact bytes "
+        "remain available.</dd>"
+    ) in rendered
+    assert "&lt;script&gt;alert(&#x27;no&#x27;)&lt;/script&gt;" in rendered
+    assert "<script>" not in rendered
+    assert rendered.encode("utf-8").decode("utf-8") == rendered
+
+
+def test_active_work_summary_is_bounded_without_hiding_source_evidence(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(progress, "activity", lambda: [])
+    plan = _plan()
+    evidence = " ".join(["measured"] * 45) + ". A second exact sentence remains."
+    plan["active_work"]["workstreams"][0]["evidence"] = evidence
+
+    rendered = progress.render_html(plan)
+    summary = progress._state_sentence(evidence)
+
+    assert len(summary) <= progress._STATE_SENTENCE_MAX_CHARS
+    assert summary.endswith("…")
+    assert f'<p class="awstate">{summary}</p>' in rendered
+    assert f"<dd>{evidence}</dd>" in rendered
 
 
 def test_check_validates_outcomes_and_explicit_step_state(capsys) -> None:

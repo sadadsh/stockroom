@@ -545,6 +545,9 @@ export interface CadSourceResponse {
   mpn: string;
   // The requirements this part is missing, so the guided checklist knows what to fill.
   needs: Requirement[];
+  // Persistent completion authority for the current record projection. Optional only so an old
+  // or malformed server fails closed in the UI instead of becoming implicitly complete.
+  completion_evidence?: CompletionEvidence | null;
   // Every vendor this part can be fetched from, in the owner's trust order. EMPTY when the part
   // has no MPN: sending someone to a search for "" is worse than telling them there is nowhere.
   sources: CadSource[];
@@ -2376,6 +2379,7 @@ export interface WorkflowBatchActions {
 
 export interface WorkflowBatchSummary {
   id: string;
+  kind: "completion" | "guided_capture";
   status: WorkflowBatchStatus;
   created_at: number;
   updated_at: number;
@@ -2442,10 +2446,18 @@ export interface WorkflowControlResult {
 }
 
 export interface CompletionRunRef {
-  /** Durable vNext authority. Preferred whenever the persistent owner supplies it. */
+  /** Durable vNext authority. The desktop UI accepts only this reconnectable reference. */
   workflow_batch_id?: string;
+  workflow_item_id?: string;
   event_cursor?: number;
-  /** Explicitly bounded compatibility transport during cutover. */
+  /**
+   * Explicit standalone API compatibility transport.
+   *
+   * The desktop UI must fail closed when an older or deliberately standalone
+   * runtime returns this process-local reference. It is represented here only
+   * so the client can diagnose that runtime honestly; it is never persisted or
+   * followed by the Library completion surfaces.
+   */
   job_id?: string;
 }
 
@@ -2516,6 +2528,22 @@ export interface ProviderOutcome {
   reason: string;
 }
 
+export type CompletionEvidenceState = "verified" | "not-required" | "unverified";
+
+/**
+ * The backend's terminal proof for one completion item.
+ *
+ * The field is optional on CompletionItem only so an older or malformed response can be handled
+ * honestly at runtime. Absence never inherits success from `needs: []` or `remaining: []`.
+ * `verified` is accepted only with a canonical immutable manifest digest; `not-required` is a
+ * distinct policy outcome and carries no fabricated file evidence.
+ */
+export interface CompletionEvidence {
+  state: CompletionEvidenceState;
+  manifest_digest: string | null;
+  reason: string;
+}
+
 export interface CompletionItem {
   part_id: string;
   mpn: string;
@@ -2544,6 +2572,9 @@ export interface CompletionItem {
   // Null for ordinary missing-only completion. In collect-all mode this is false whenever any
   // planned route is blocked, errors, or lacks a terminal availability verdict.
   collection_complete?: boolean | null;
+  // Required by the current backend contract. Optional here is deliberate defensive decoding:
+  // a missing field must fail closed instead of making an old server look complete.
+  completion_evidence?: CompletionEvidence | null;
 }
 
 export interface CompletionResult {
@@ -2555,6 +2586,17 @@ export interface CompletionResult {
   // Why it stopped when the user did not ask it to -- empty otherwise. A stop with no reason
   // is indistinguishable from a crash.
   stop_reason: string;
+}
+
+export interface CaptureWorkflowSession {
+  workflow_batch_id: string;
+  workflow_item_id: string;
+  part_id: string;
+  mode: "automatic" | "assisted" | "collect-all";
+  vendor: string | null;
+  background: boolean;
+  initial_needs: Requirement[];
+  report: CompletionResult | null;
 }
 
 // A progress frame from a completion run's SSE stream.

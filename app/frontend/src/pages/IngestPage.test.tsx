@@ -9,6 +9,7 @@ import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { CaptureProvider, useCapture } from "../lib/capture";
 import { ThemeProvider } from "../lib/theme";
 import { ToastProvider } from "../lib/toast";
+import { defaultUiSession, readUiSession, resetUiSessionForTests } from "../lib/uiSession";
 import { makePartDetail } from "../test/partFixture";
 import { IngestPage } from "./IngestPage";
 
@@ -113,7 +114,86 @@ beforeEach(() => {
   } as never);
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("IngestPage network-only Add A Part", () => {
+  it("restores a server-staged network draft without putting raw fields in the session", async () => {
+    const session = defaultUiSession();
+    session.open_surface = "add_part";
+    session.intake_draft_ref = {
+      draft_id: "4f204a7e-e610-4a75-b575-569bca2b3470",
+      revision: 2,
+    };
+    resetUiSessionForTests(session);
+    const storedDraft = {
+      schema: "stockroom.intake-draft",
+      version: 1,
+      draft_id: session.intake_draft_ref.draft_id,
+      revision: 2,
+      network_input: { kind: "mpn", value: "TPD6E05U06RVZR" },
+      review: {
+        lookup_input: { kind: "mpn", value: "TPD6E05U06RVZR" },
+        enrichment_result: {
+          ...EMPTY_RESULT,
+          category: "ESD Protection",
+          mpn: sourced("TPD6E05U06RVZR", "digikey"),
+          manufacturer: sourced("Texas Instruments", "digikey"),
+          description: sourced("Six-channel ESD protection array", "digikey"),
+          datasheet_url: sourced(
+            "https://www.ti.com/lit/ds/symlink/tpd6e05u06.pdf",
+            "digikey",
+          ),
+        },
+        candidates: [
+          {
+            client_id: "candidate-7",
+            vendor: "digikey",
+            display_name: "TPD6E05U06RVZR",
+            entry_name: "TPD6E05U06RVZR",
+            category: "ESD Protection",
+            mpn: "TPD6E05U06RVZR",
+            manufacturer: "Texas Instruments",
+            description: "Six-channel ESD protection array",
+            tags: ["esd"],
+            purchase: [],
+            gaps: [],
+            specs: [],
+            alternates: [],
+            enrichment: [],
+            datasheet_url: "https://www.ti.com/lit/ds/symlink/tpd6e05u06.pdf",
+            conflicts: [],
+          },
+        ],
+      },
+    };
+    const fetchDraft = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(storedDraft), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    expect(readUiSession().intake_draft_ref).toEqual(session.intake_draft_ref);
+    wrapper(<IngestPage />);
+    expect(readUiSession().intake_draft_ref).toEqual(session.intake_draft_ref);
+
+    await waitFor(() =>
+      expect(fetchDraft).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "/api/intake-drafts/4f204a7e-e610-4a75-b575-569bca2b3470?revision=2",
+        ),
+        expect.objectContaining({ method: "GET" }),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: /product link or part number/i }))
+        .toHaveValue("TPD6E05U06RVZR"),
+    );
+    expect(await screen.findByText("Texas Instruments")).toBeInTheDocument();
+  });
+
   it("exposes one identity-to-coherent-network path and no local-file control", () => {
     wrapper(<IngestPage />);
 

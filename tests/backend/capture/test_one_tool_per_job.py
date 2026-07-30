@@ -31,6 +31,7 @@ with a reason, and the reason is then reviewable.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
@@ -49,6 +50,10 @@ _LAUNCHERS = {
     ),
     "app/backend/stockroom/scrape/fetch/browser.py": (
         "The scrape Chromium tier, same interface and same story as the Camoufox one."
+    ),
+    "app/backend/stockroom/host/window_runtime.py": (
+        "The release-owned native application window. It launches the packaged WebView2 host for "
+        "Stockroom's own UI and never performs provider browsing or downloads."
     ),
     "scripts/capturerec.py": (
         "Launches HEADED for a human to drive, and must NOT save downloads into the library the "
@@ -78,24 +83,42 @@ def _python_files():
             yield path
 
 
-def _launcher_modules() -> set[str]:
+def _launcher_modules_from(sources: Iterable[tuple[str, str]]) -> set[str]:
+    """Detect launcher modules from injected ``(path, source)`` pairs."""
+
     found = set()
-    for path in _python_files():
-        text = path.read_text(encoding="utf-8", errors="replace")
+    for path, text in sources:
         # Ignore the registry in THIS file and any line that is a comment.
         for line in text.splitlines():
             stripped = line.strip()
             if stripped.startswith("#"):
                 continue
             if _LAUNCH.search(stripped):
-                found.add(path.relative_to(REPO).as_posix())
+                found.add(path)
                 break
     return found
 
 
+def _launcher_modules() -> set[str]:
+    return _launcher_modules_from(
+        (
+            path.relative_to(REPO).as_posix(),
+            path.read_text(encoding="utf-8", errors="replace"),
+        )
+        for path in _python_files()
+    )
+
+
+def _unregistered_launchers(
+    found: set[str],
+    allowed: Iterable[str],
+) -> list[str]:
+    return sorted(found - set(allowed))
+
+
 def test_no_unregistered_module_launches_a_browser():
     found = _launcher_modules()
-    unregistered = sorted(found - set(_LAUNCHERS))
+    unregistered = _unregistered_launchers(found, _LAUNCHERS)
     assert not unregistered, (
         "these modules launch a browser without being registered as owning that job: "
         f"{unregistered}.\nExtend `capture/browser.py` instead - a different engine or target is "
@@ -121,6 +144,34 @@ def test_the_detector_can_actually_see_launchers():
     found = _launcher_modules()
     assert found, "the launch detector found NO browser launchers at all; the pattern is broken"
     assert "app/backend/stockroom/capture/browser.py" in found, found
+
+
+def test_launcher_detector_rejects_each_independent_known_bad_shape() -> None:
+    known_bad = (
+        ("rogue/basic.py", "browser.launch(headless=True)"),
+        (
+            "rogue/persistent.py",
+            "browser.launch_persistent_context('profile')",
+        ),
+        ("rogue/async_camoufox.py", "session = AsyncCamoufox(headless=True)"),
+        ("rogue/camoufox.py", "session = Camoufox(headless=True)"),
+    )
+
+    found = _launcher_modules_from(known_bad)
+
+    assert found == {path for path, _source in known_bad}
+    assert _unregistered_launchers(found, ()) == sorted(found)
+
+
+def test_launcher_detector_ignores_comment_only_controls() -> None:
+    found = _launcher_modules_from(
+        (
+            ("clean/comments.py", "# browser.launch()\n# Camoufox()"),
+            ("clean/no-launch.py", "def connect():\n    return 'existing session'"),
+        )
+    )
+
+    assert found == set()
 
 
 def test_every_exception_states_why_it_is_not_a_mode():
@@ -149,6 +200,10 @@ _TOOLS = {
     "altium_place_verify.py": "Resolve, place and read back a component in real Altium.",
     "altium_probe.py": "Inspect Altium binary libraries from outside Altium.",
     "bake_stm_index.py": "Build the STM part index used by the stm viewer.",
+    "catalog_search_benchmark.py": (
+        "Benchmark the production LibraryIndex search projection over a deterministic local "
+        "catalog."
+    ),
     "capturerec.py": "THE recorder: a human drives a vendor page, this writes down the workflow.",
     "cad_capture_canary.py": (
         "Prove one live CAD route through Stockroom's broker, evidence store, and API."

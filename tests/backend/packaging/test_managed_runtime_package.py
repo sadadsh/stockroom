@@ -53,12 +53,21 @@ def _files(root: Path) -> dict[str, bytes]:
     }
 
 
+def _window_host_publish(root: Path) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "Stockroom.WindowHost.exe").write_bytes(b"MZwindow-host")
+    (root / "Stockroom.WindowHost.dll").write_bytes(b"window-host-runtime")
+    return root
+
+
 def _build_fixture(executable: Path, bundle: Path) -> dict[str, str]:
     return build_release_bundle(
         mode="Fixture",
         executable=executable,
+        window_host_root=_window_host_publish(executable.parent / "Window Host Publish"),
         bundle_root=bundle,
         version="1.2.3.4",
+        minimum_host_version="1.0.0.0",
         feed_base_uri="https://updates.example.invalid/stockroom/x64",
         source_revision="0123456789012345678901234567890123456789",
         source_date_epoch=1704067200,
@@ -89,11 +98,20 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
         ).read_bytes()
     )
     assert manifest.manifest_version == 2
-    assert manifest.minimum_host_version == "1.2.3.4"
+    assert manifest.minimum_host_version == "1.0.0.0"
+    assert first_evidence["minimum_host_version"] == "1.0.0.0"
     assert manifest.package_version == "1.2.3.4"
     assert manifest.protocol_version == 1
     assert manifest.supports_direct_activation_from("release-bootstrap")
-    assert {member.kind for member in manifest.members} == {"backend", "sbom"}
+    assert {member.kind for member in manifest.members} == {
+        "backend",
+        "sbom",
+        "window-host",
+        "window-host-runtime",
+    }
+    window_host = [member for member in manifest.members if member.kind == "window-host"]
+    assert len(window_host) == 1
+    assert window_host[0].path == "WindowHost/Stockroom.WindowHost.exe"
     assert next(member for member in manifest.members if member.kind == "backend").path == (
         "Backend/Stockroom Worker.exe"
     )
@@ -109,9 +127,41 @@ def test_production_bundle_requires_a_valid_offline_root(tmp_path: Path) -> None
         build_release_bundle(
             mode="Production",
             executable=executable,
+            window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
             bundle_root=tmp_path / "Production",
             version="1.2.3.4",
+            minimum_host_version="1.0.0.0",
             feed_base_uri="https://updates.stockroom.test/x64",
+            source_revision="0123456789012345678901234567890123456789",
+            source_date_epoch=1704067200,
+            tuf_root_path=None,
+        )
+
+
+@pytest.mark.parametrize(
+    ("minimum_host_version", "message"),
+    [
+        ("1.2", "canonical four-part numeric version"),
+        ("1.2.3.5", "cannot exceed the packaged host version"),
+    ],
+)
+def test_release_bundle_rejects_an_invalid_host_abi_floor(
+    tmp_path: Path,
+    minimum_host_version: str,
+    message: str,
+) -> None:
+    executable = tmp_path / "Stockroom.exe"
+    executable.write_bytes(b"MZhost-floor")
+
+    with pytest.raises(ReleaseBundleError, match=message):
+        build_release_bundle(
+            mode="Fixture",
+            executable=executable,
+            window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
+            bundle_root=tmp_path / "Update",
+            version="1.2.3.4",
+            minimum_host_version=minimum_host_version,
+            feed_base_uri="https://updates.example.invalid/stockroom/x64",
             source_revision="0123456789012345678901234567890123456789",
             source_date_epoch=1704067200,
             tuf_root_path=None,
@@ -127,8 +177,10 @@ def test_fixture_release_bundle_authors_explicit_predecessor_chain(
     evidence = build_release_bundle(
         mode="Fixture",
         executable=executable,
+        window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
         bundle_root=bundle,
         version="2.0.0.0",
+        minimum_host_version="1.0.0.0",
         feed_base_uri="https://updates.example.invalid/stockroom/x64",
         source_revision="0123456789012345678901234567890123456789",
         source_date_epoch=1704067200,
@@ -266,8 +318,10 @@ def test_production_feed_requires_and_uses_root_authorized_online_keys(
     bundle_evidence = build_release_bundle(
         mode="Production",
         executable=executable,
+        window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
         bundle_root=bundle,
         version="7.8.9.10",
+        minimum_host_version="7.0.0.0",
         feed_base_uri="https://updates.stockroom.test/x64",
         source_revision="0123456789012345678901234567890123456789",
         source_date_epoch=1704067200,
@@ -430,6 +484,10 @@ class _ActivationBoundary:
         assert self.live_release_id == candidate.release_id
         self.live_release_id = current.release_id
 
+    def commit(self, candidate, current, adoption_receipt, *, generation: int) -> None:
+        del current, adoption_receipt, generation
+        assert self.live_release_id == candidate.release_id
+
 
 def test_persisted_v1_release_activates_packaged_v2_in_shared_data_root(
     tmp_path: Path,
@@ -445,8 +503,10 @@ def test_persisted_v1_release_activates_packaged_v2_in_shared_data_root(
     build_release_bundle(
         mode="Fixture",
         executable=executable,
+        window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
         bundle_root=v1_bundle,
         version="1.0.0.0",
+        minimum_host_version="1.0.0.0",
         feed_base_uri="https://updates.example.invalid/stockroom/x64",
         source_revision="0123456789012345678901234567890123456789",
         source_date_epoch=1704067200,
@@ -455,8 +515,10 @@ def test_persisted_v1_release_activates_packaged_v2_in_shared_data_root(
     build_release_bundle(
         mode="Fixture",
         executable=executable,
+        window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
         bundle_root=v2_bundle,
         version="2.0.0.0",
+        minimum_host_version="1.0.0.0",
         feed_base_uri="https://updates.example.invalid/stockroom/x64",
         source_revision="0123456789012345678901234567890123456789",
         source_date_epoch=1704067200,
@@ -568,6 +630,10 @@ def test_frozen_entry_and_spec_are_the_full_managed_runtime_contract() -> None:
     assert '$probeStart.EnvironmentVariables["STOCKROOM_CONFIG_DIR"]' in build
     assert "STOCKROOM_BUILD_IDENTITY" in spec
     assert "stockroom-build-identity.json" in build
+    assert '"--minimum-host-version", $MinimumHostVersion' in build
+    assert "minimum_host_version = $MinimumHostVersion" in build
+    assert "update_check_interval_seconds" in build
+    assert "[double]$ProbeReceipt.update_check_interval_seconds -ne 60" in build
 
 
 def test_frozen_port_worker_failure_is_noninteractive(

@@ -33,10 +33,23 @@ jobs:
           version: "0.11.16"
           python-version: "3.12.13"
           enable-cache: false
+      - name: Install Pinned .NET SDK
+        if: runner.os == 'Windows'
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: "10.0.302"
       - name: Sync
         run: uv sync --frozen
       - name: Type check backend
         run: uv run ty check app/backend/stockroom
+      - name: Run Native Window Host Suite
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $project = "tests/native/Stockroom.WindowHost.Tests/Stockroom.WindowHost.Tests.csproj"
+          dotnet restore $project --locked-mode --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test $project --configuration Release --no-restore --nologo
       - name: Provision render browsers (Playwright Chromium + Camoufox)
         # Linux only. The scrape engine renders through Playwright Chromium (BrowserFetcher) and
         # the genuine-fingerprint Camoufox Firefox (CamoufoxFetcher, which defeats Akamai +

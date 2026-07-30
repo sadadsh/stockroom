@@ -306,31 +306,21 @@ export function PanelTitle({
   );
 }
 
-// A small uppercase section eyebrow: the mockup's .sec / .srcsub label.
+// A quiet metadata label for packed property grids.
 /**
- * The DENSE eyebrow: the small uppercase group label used inside a property grid or a packed
- * column (SPECIFICATIONS, VOLUME PRICING, TRADE AND COMPLIANCE, CAD).
+ * The dense metadata role used inside a property grid or a packed column.
  *
  * Exported as a class string, not only as a component, because these labels land on a `span`, a
  * `div` and a `dt` depending on where they sit, and a polymorphic component would buy nothing but
  * type gymnastics. The point is that the DECISION lives in one place: DetailPanel previously carried
- * ten hand-written variants of this string with FOUR different letter-spacings, so no two eyebrows
- * in the app matched (punch 14). 0.07em is the canonical tracking - the plurality of the old
- * strings, and the right amount of air for 10px uppercase.
+ * ten hand-written variants of this string with four different sizes and tracking values.
  *
  * Deliberately TYPE ONLY: no background, no border, no sticky. The spec group header used to carry
  * a filled sticky bar while its siblings were bare, which is exactly the "box behind the header"
  * the owner asked to remove. Separation comes from spacing.
  */
-// SMALL-CAPS, not `uppercase` (owner's decision, 2026-07-26, from previews). `text-transform:
-// uppercase` rewrites the characters, and UNITS ARE CASE-BEARING: a spec label reading
-// "Peak Pulse Current (10/1000ms)" was rendered "(10/1000Ms)", and the same transform turns mA
-// into MA and mV into MV. That is a label stating something false, not a styling preference.
-//
-// `font-variant: small-caps` gives the same dense capital register while leaving the actual
-// characters alone, so lowercase units survive with no per-label exception list to maintain.
 export const EYEBROW_DENSE =
-  "text-2xs font-semibold [font-variant:small-caps] tracking-[0.07em] text-t3";
+  "text-ui-meta font-medium text-helper";
 
 export function Eyebrow({
   dense = false,

@@ -19,11 +19,17 @@ from stockroom.cad_variants import (
     same_cad_evidence_set,
 )
 from stockroom.capture.complete import (
+    CompletionEvidence,
     SourceOutcome,
     provider_outcome_from_source,
 )
 from stockroom.capture.evidence import exact_identity
-from stockroom.capture.requirements import Requirement, capture_needs
+from stockroom.capture.requirements import (
+    Requirement,
+    capture_needs,
+    capture_requirements,
+    split_requirement,
+)
 
 _KICAD_REQUIREMENTS = (
     Requirement.KICAD_SYMBOL,
@@ -37,39 +43,112 @@ _PAIR_REQUIREMENTS = (
 )
 
 
-def active_pair_is_verified(store, record: object) -> bool:
-    """Whether the materialized record points at one reverified same-evidence CAD pair."""
+def _required_tools(record: object) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            split_requirement(requirement)[0]
+            for requirement in capture_requirements(record)
+        )
+    )
 
-    if capture_needs(record):
-        return False
+
+def _unverified(reason: str) -> CompletionEvidence:
+    return CompletionEvidence.unverified(reason)
+
+
+def record_completion_evidence(store, record: object) -> CompletionEvidence:
+    """Reverify the exact active projection against immutable local evidence.
+
+    The part-class/override requirement registry decides which tools are owned.
+    Every owned tool must have all required projected references, an active whole-
+    bundle pointer, and a freshly resolved exact-identity CAS manifest. When more
+    than one tool is owned, every projection must share one evidence lineage.
+    """
+
+    requirements = capture_requirements(record)
+    if not requirements:
+        return CompletionEvidence.not_required(
+            "this part class has no owned CAD requirements"
+        )
+    missing = capture_needs(record)
+    if missing:
+        return _unverified(
+            "required projected references are absent: "
+            + ", ".join(requirement.value for requirement in missing)
+        )
+
     selections = getattr(record, "cad_variants", None)
     selection_for = getattr(selections, "selection_for", None)
     if not callable(selection_for):
-        return False
-    kicad_pointer = selection_for("kicad")
-    altium_pointer = selection_for("altium")
-    if kicad_pointer is None or altium_pointer is None:
-        return False
+        return _unverified("the record has no active CAD variant selections")
+
     try:
         identity = exact_identity(record)
-        kicad = resolve_cad_variant(
-            store,
-            identity=identity,
-            tool="kicad",
-            manifest_digest=kicad_pointer.manifest_digest,
+    except (TypeError, ValueError) as exc:
+        return _unverified(
+            f"the record does not have exact CAD identity ({type(exc).__name__})"
         )
-        altium = resolve_cad_variant(
-            store,
-            identity=identity,
-            tool="altium",
-            manifest_digest=altium_pointer.manifest_digest,
-        )
-    except Exception:  # noqa: BLE001 - a stale/tampered pointer is not an active verified pair
-        return False
+
+    resolved: dict[str, ResolvedCadVariant] = {}
+    for tool in _required_tools(record):
+        pointer = selection_for(tool)
+        if pointer is None:
+            return _unverified(f"the active {tool} evidence pointer is absent")
+        try:
+            variant = resolve_cad_variant(
+                store,
+                identity=identity,
+                tool=tool,
+                manifest_digest=pointer.manifest_digest,
+            )
+        except Exception as exc:  # noqa: BLE001 - stale/tampered evidence fails closed
+            return _unverified(
+                f"the active {tool} evidence could not be reverified "
+                f"({type(exc).__name__})"
+            )
+        if variant.pointer != pointer:
+            return _unverified(
+                f"the active {tool} pointer does not match the reverified manifest"
+            )
+        resolved[tool] = variant
+
+    if set(resolved) == {"kicad", "altium"}:
+        if not same_cad_evidence_set(
+            resolved["kicad"].descriptor,
+            resolved["altium"].descriptor,
+        ):
+            return _unverified(
+                "the active KiCad and Altium pointers do not share one evidence set"
+            )
+    elif len(resolved) > 1:
+        descriptors = tuple(item.descriptor for item in resolved.values())
+        first = descriptors[0]
+        if any(
+            descriptor.manifest_digest != first.manifest_digest
+            or descriptor.provider != first.provider
+            or descriptor.adapter_version != first.adapter_version
+            or descriptor.operation != first.operation
+            or descriptor.source_manifests != first.source_manifests
+            for descriptor in descriptors[1:]
+        ):
+            return _unverified(
+                "the active CAD pointers do not share one immutable evidence set"
+            )
+
+    manifest_digest = next(iter(resolved.values())).descriptor.manifest_digest
+    return CompletionEvidence(
+        state="verified",
+        manifest_digest=manifest_digest,
+        reason="the active CAD projection was reverified from immutable evidence",
+    )
+
+
+def active_pair_is_verified(store, record: object) -> bool:
+    """Whether both owned EDA tools point at one reverified evidence set."""
+
     return (
-        kicad.pointer == kicad_pointer
-        and altium.pointer == altium_pointer
-        and same_cad_evidence_set(kicad.descriptor, altium.descriptor)
+        set(_required_tools(record)) == {"kicad", "altium"}
+        and record_completion_evidence(store, record).state == "verified"
     )
 
 
@@ -201,4 +280,8 @@ class VerifiedEvidenceSource:
         return SourceOutcome(skipped="no complete exact CAD evidence is retained")
 
 
-__all__ = ["VerifiedEvidenceSource", "active_pair_is_verified"]
+__all__ = [
+    "VerifiedEvidenceSource",
+    "active_pair_is_verified",
+    "record_completion_evidence",
+]
