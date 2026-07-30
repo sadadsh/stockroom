@@ -170,7 +170,12 @@ function delay(milliseconds: number): Promise<void> {
 }
 
 function terminalWorkflow(batch: WorkflowBatchSummary): boolean {
-  return ["completed", "failed", "cancelled"].includes(batch.status);
+  // A blocked guided-capture batch has finished every automatic stage it can
+  // perform without a person-driven provider handoff.  Leaving it non-terminal
+  // traps the modal in `window-open` forever even though no provider window was
+  // opened, which disables both Open Provider and Collect All Sources.  Consume
+  // its durable report and return an actionable partial result instead.
+  return ["completed", "blocked", "failed", "cancelled"].includes(batch.status);
 }
 
 const WORKFLOW_STAGE_MESSAGE: Record<string, string> = {
@@ -200,7 +205,7 @@ function durableMessage(
     return "Completion is paused. Resume it from Library Completion when you are ready.";
   }
   if (batch.status === "blocked") {
-    return "A provider needs a login, security check, or download choice. Complete it in the open Stockroom window; this run will resume here.";
+    return "Automatic lookup finished without a complete CAD package. Choose Open Provider to continue in the selected provider window, or Collect All Sources to try every eligible provider.";
   }
   if (batch.status === "cancelled") return "Completion was cancelled before publication.";
   if (batch.status === "failed") {
