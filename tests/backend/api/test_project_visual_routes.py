@@ -136,7 +136,17 @@ def test_native_visuals_use_one_contract_and_serve_both_edas(
     )
 
     for record in (kicad, altium):
+        calls_before_passive_read = len(calls)
         metadata = client.get(f"/api/projects/{record['id']}/visuals")
+        assert metadata.status_code == 200, metadata.text
+        assert metadata.json()["status"] == "blocked"
+        assert "Choose Render PCB" in metadata.json()["detail"]
+        assert len(calls) == calls_before_passive_read
+
+        metadata = client.get(
+            f"/api/projects/{record['id']}/visuals",
+            params={"refresh": "true"},
+        )
         assert metadata.status_code == 200, metadata.text
         artifact = metadata.json()["documents"][0]["artifacts"][0]
         image = client.get(

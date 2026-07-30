@@ -10,6 +10,8 @@ from pathlib import Path
 
 from stockroom.kicad.errors import KiCadCliError
 
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 def _version_key(name: str) -> tuple[int, ...]:
     """Sort key for KiCad version-named install dirs so 10.0 ranks ABOVE 9.0
@@ -64,7 +66,13 @@ def find_kicad_cli(override: str | None = None) -> str | None:
         if on_path:
             return on_path
     on_path = shutil.which("kicad-cli")
-    if on_path:
+    # A workspace may put a kicad-cli.CMD compatibility shim on PATH. Passing a batch file to
+    # subprocess makes Windows create a visible cmd.exe and cannot provide the native process
+    # semantics the desktop app needs. Prefer KiCad's real installed executable on Windows.
+    if on_path and not (
+        sys.platform.startswith("win")
+        and Path(on_path).suffix.casefold() in {".bat", ".cmd"}
+    ):
         return on_path
     for cand in _standard_kicad_cli_paths():
         try:
@@ -72,6 +80,8 @@ def find_kicad_cli(override: str | None = None) -> str | None:
                 return str(cand)
         except OSError:
             continue
+    if on_path:
+        return on_path
     return None
 
 
@@ -99,6 +109,7 @@ class KiCadCli:
             text=True,
             encoding="utf-8",
             errors="replace",
+            creationflags=_NO_WINDOW,
         )
         if proc.returncode != 0:
             raise KiCadCliError(f"kicad-cli {' '.join(args)} failed: {proc.stderr.strip()}")

@@ -192,6 +192,8 @@ def projects_router(require_token) -> APIRouter:
         cached = visual_cache.get(project_id)
         if not refresh and cached is not None and cached[0] == source_key:
             return cached[1]
+        if not refresh:
+            return None
         adapter = get_adapter(rec.eda or "kicad")
         if (rec.eda or "kicad") == "kicad":
             # KiCad CLI may write a .kicad_prl preference sidecar while exporting.
@@ -286,13 +288,36 @@ def projects_router(require_token) -> APIRouter:
         project_id: str,
         refresh: bool = False,
     ) -> dict:
-        """Render native project documents through the selected EDA adapter."""
+        """Return cached visuals, rendering native documents only after explicit refresh."""
 
-        return project_visual_bundle(
-            request.app.state.ctx,
+        ctx = request.app.state.ctx
+        bundle = project_visual_bundle(
+            ctx,
             project_id,
             refresh=refresh,
-        ).evidence
+        )
+        if bundle is not None:
+            return bundle.evidence
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        adapter_key = rec.eda or "kicad"
+        adapter = get_adapter(adapter_key)
+        body = {
+            "schema_version": 1,
+            "adapter": adapter_key,
+            "status": "blocked",
+            "runtime": {"name": getattr(adapter, "label", adapter_key), "version": ""},
+            "documents": [],
+            "summary": {"documents": 0, "artifacts": 0, "blocked": 0},
+            "detail": (
+                "Native previews are paused. Choose Render PCB to run the selected EDA tool."
+            ),
+        }
+        body["digest"] = hashlib.sha256(
+            json.dumps(body, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        return body
 
     @r.get("/{project_id}/visuals/{artifact_id}")
     def project_visual_artifact(
@@ -302,10 +327,11 @@ def projects_router(require_token) -> APIRouter:
     ) -> Response:
         """Serve one immutable artifact from the same native render bundle."""
 
-        artifact = project_visual_bundle(
+        bundle = project_visual_bundle(
             request.app.state.ctx,
             project_id,
-        ).artifacts.get(artifact_id)
+        )
+        artifact = bundle.artifacts.get(artifact_id) if bundle is not None else None
         if artifact is None:
             raise FileNotFoundError(
                 f"no such project visual artifact: {artifact_id}"
