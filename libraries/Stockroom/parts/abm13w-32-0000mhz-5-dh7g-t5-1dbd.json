@@ -1,0 +1,108 @@
+{
+  "assets": {},
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://abracon.com/datasheets/ABM13W.pdf"
+  },
+  "derived": {
+    "category": "Crystals & Oscillators",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "32 MHz ±7ppm Crystal 5pF 100 Ohms 4-SMD, No Lead",
+    "display_name": "32MHz Crystal 5pF 4-SMD",
+    "specs": {
+      "ECCN": "EAR99",
+      "ESR (Equivalent Series Resistance)": "100 Ohms",
+      "Frequency": "32 MHz",
+      "Frequency Stability": "±15ppm",
+      "Frequency Tolerance": "±7ppm",
+      "HTSUS": "8541.60.0060",
+      "Height - Seated (Max)": "0.013\" (0.33mm)",
+      "Lifecycle": "Active",
+      "Load Capacitance": "5pF",
+      "Manufacturer": "Abracon LLC",
+      "Moisture Sensitivity Level (MSL)": "Not Applicable",
+      "Mounting Type": "Surface Mount",
+      "Operating Mode": "Fundamental",
+      "Operating Temperature": "-40°C ~ 85°C",
+      "Package": "4-SMD (1.2x1)",
+      "Package / Case": "4-SMD, No Lead",
+      "Packaging": "Tape & Reel (TR); Cut Tape (CT); Digi-Reel®",
+      "REACH Status": "REACH Unaffected",
+      "RoHS": "ROHS3 Compliant",
+      "Series": "ABM13W",
+      "Size / Dimension": "0.047\" L x 0.039\" W (1.20mm x 1.00mm)",
+      "Type": "MHz Crystal"
+    },
+    "value": ""
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "abm13w-32-0000mhz-5-dh7g-t5-1dbd",
+  "manufacturer": "Abracon LLC",
+  "mpn": "ABM13W-32.0000MHZ-5-DH7G-T5",
+  "part_class": "component",
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "manual",
+    "source_url": "https://abracon.com/datasheets/ABM13W.pdf"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "535-14693-2-ND",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 2.84,
+          "qty": 1
+        },
+        {
+          "currency": "USD",
+          "price": 2.471,
+          "qty": 10
+        },
+        {
+          "currency": "USD",
+          "price": 2.3372,
+          "qty": 25
+        },
+        {
+          "currency": "USD",
+          "price": 2.2404,
+          "qty": 50
+        },
+        {
+          "currency": "USD",
+          "price": 2.1478,
+          "qty": 100
+        },
+        {
+          "currency": "USD",
+          "price": 2.0312,
+          "qty": 250
+        },
+        {
+          "currency": "USD",
+          "price": 1.98136,
+          "qty": 500
+        },
+        {
+          "currency": "USD",
+          "price": 1.69319,
+          "qty": 5000
+        }
+      ],
+      "stock": 4121,
+      "url": "https://www.digikey.com/en/products/detail/abracon-llc/ABM13W-32-0000MHZ-5-DH7G-T5/9606161",
+      "vendor": "DigiKey"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 4,
+  "sources": {},
+  "tags": []
+}
