@@ -18,7 +18,8 @@ keeps the managed application checkout aligned with the pushed `main` branch.
   checkout without asking the user to download another executable.
 - The updater verifies that the native Stockroom window belongs to its process
   and waits for Windows to confirm closure before it reports a successful
-  restart handoff.
+  restart handoff. A bounded restart watchdog returns control to the stable
+  launcher if WebView2 does not close gracefully.
 - Hid native helper consoles while preserving the underlying KiCad and Altium
   operations.
 - Added the new Stockroom application icon.
