@@ -13,11 +13,45 @@ from stockroom.kicad.errors import KiCadCliError
 
 
 def test_find_kicad_cli_prefers_path(monkeypatch):
+    monkeypatch.setattr(cli_mod.sys, "platform", "linux")
     monkeypatch.setattr(
         cli_mod.shutil, "which",
         lambda name: "/usr/bin/kicad-cli" if name == "kicad-cli" else None,
     )
     assert find_kicad_cli() == "/usr/bin/kicad-cli"
+
+
+def test_windows_discovery_prefers_the_real_executable_over_a_cmd_shim(
+    tmp_path, monkeypatch
+):
+    shim = tmp_path / "capabilities" / "kicad-cli.CMD"
+    installed = tmp_path / "KiCad" / "10.0" / "bin" / "kicad-cli.exe"
+    shim.parent.mkdir(parents=True)
+    installed.parent.mkdir(parents=True)
+    shim.write_text("@echo off\r\n")
+    installed.write_bytes(b"MZ")
+    monkeypatch.setattr(cli_mod.sys, "platform", "win32")
+    monkeypatch.setattr(cli_mod.shutil, "which", lambda name: str(shim))
+    monkeypatch.setattr(cli_mod, "_standard_kicad_cli_paths", lambda: [installed])
+
+    assert find_kicad_cli() == str(installed)
+
+
+def test_kicad_commands_never_create_a_console_window(tmp_path, monkeypatch):
+    binary = tmp_path / "kicad-cli.exe"
+    binary.write_bytes(b"MZ")
+    seen = {}
+
+    def run(argv, **kwargs):
+        seen["argv"] = argv
+        seen.update(kwargs)
+        return type("Completed", (), {"returncode": 0, "stdout": "10.0\n", "stderr": ""})()
+
+    monkeypatch.setattr(cli_mod.subprocess, "run", run)
+    cli = KiCadCli(str(binary))
+
+    assert cli.version() == "10.0"
+    assert seen["creationflags"] == getattr(cli_mod.subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def test_find_kicad_cli_honors_an_explicit_override_file(tmp_path, monkeypatch):
