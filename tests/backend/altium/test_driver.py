@@ -7,11 +7,12 @@ opens, Altium dies, the ceiling is hit, the seat is held, nothing is installed) 
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from stockroom.altium.driver import AltiumDriver, RunOutcome, find_x2
+from stockroom.altium.driver import AltiumDriver, RealHost, RunOutcome, find_x2
 
 
 class FakeProcess:
@@ -290,6 +291,31 @@ def test_run_outcome_ok_is_only_true_for_ok():
     assert RunOutcome("ok", "").ok
     for status in ("busy", "dialog", "exited", "timeout", "not-installed"):
         assert not RunOutcome(status, "").ok
+
+
+def test_real_host_hides_powershell_and_cmd_children(monkeypatch):
+    run_calls = []
+    spawn_calls = []
+
+    class Completed:
+        stdout = ""
+
+    monkeypatch.setattr(
+        "stockroom.altium.driver.subprocess.run",
+        lambda *args, **kwargs: run_calls.append((args, kwargs)) or Completed(),
+    )
+    monkeypatch.setattr(
+        "stockroom.altium.driver.subprocess.Popen",
+        lambda *args, **kwargs: spawn_calls.append((args, kwargs)) or FakeProcess(),
+    )
+
+    host = RealHost()
+    host.powershell("$null")
+    host.spawn(["cmd.exe", "/c", "hidden.bat"])
+
+    expected = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    assert run_calls[0][1]["creationflags"] == expected
+    assert spawn_calls[0][1]["creationflags"] == expected
 
 
 def test_altiums_own_main_window_during_a_run_is_not_a_stuck_dialog(tmp_path: Path, x2: Path):

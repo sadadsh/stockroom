@@ -407,6 +407,7 @@ function Build-Executable {
         SOURCE_DATE_EPOCH = $env:SOURCE_DATE_EPOCH
         STOCKROOM_VERSION_FILE = $env:STOCKROOM_VERSION_FILE
         STOCKROOM_BUILD_IDENTITY = $env:STOCKROOM_BUILD_IDENTITY
+        STOCKROOM_UV_EXECUTABLE = $env:STOCKROOM_UV_EXECUTABLE
         STOCKROOM_MINGIT_ROOT = $env:STOCKROOM_MINGIT_ROOT
         STOCKROOM_WEBVIEW2_BOOTSTRAPPER = $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER
     }
@@ -415,6 +416,7 @@ function Build-Executable {
         $env:SOURCE_DATE_EPOCH = [string]$SourceDateEpoch
         $env:STOCKROOM_VERSION_FILE = $VersionInfoPath
         $env:STOCKROOM_BUILD_IDENTITY = $BuildIdentityPath
+        $env:STOCKROOM_UV_EXECUTABLE = $UvPath
         if ($Mode -eq "Production") {
             $env:STOCKROOM_MINGIT_ROOT = $MinGitRoot
             $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER = $WebView2BootstrapperPath
@@ -923,7 +925,7 @@ if (
 $Evidence = [ordered]@{
     schema = "stockroom-windows-package-build/3"
     mode = $Mode.ToLowerInvariant()
-    runtime_status = "stable-managed-release-runtime"
+    runtime_status = "continuous-main-runtime"
     source = [ordered]@{
         git_revision = $GitRevision
         git_dirty = $GitDirty

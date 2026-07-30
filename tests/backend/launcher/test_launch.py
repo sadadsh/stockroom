@@ -26,7 +26,10 @@ def test_app_workdir_uses_localappdata_on_windows(monkeypatch, tmp_path):
     monkeypatch.delenv("STOCKROOM_APP_DIR", raising=False)
     monkeypatch.setattr("stockroom.launcher.launch._os_name", lambda: "nt")
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local"))
-    assert app_workdir() == tmp_path / "Local" / "Stockroom" / "app"
+    assert (
+        app_workdir()
+        == tmp_path / "Local" / "Stockroom" / "Continuous Runtime" / "App"
+    )
 
 
 def test_app_workdir_uses_xdg_on_posix(monkeypatch, tmp_path):

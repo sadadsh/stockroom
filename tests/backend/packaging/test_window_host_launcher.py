@@ -8,6 +8,7 @@ import pytest
 import packaging.stockroom_launcher as launcher
 from stockroom.host import window_process
 from stockroom.host.window_process import WindowHostArguments, WindowHostError
+from stockroom.launcher import launch as continuous_launch
 
 _PIPE_NAME = "Stockroom.WindowHandoff." + "a" * 32
 
@@ -49,6 +50,25 @@ def test_frozen_launcher_dispatches_the_exact_window_host_contract(
             parent_process_id=111,
         )
     ]
+
+
+def test_normal_launch_dispatches_the_continuous_real_app(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared: list[bool] = []
+    monkeypatch.setattr(
+        launcher,
+        "_prepare_runtime",
+        lambda *, needs_window: prepared.append(needs_window),
+    )
+    monkeypatch.setattr(continuous_launch, "main", lambda: 7)
+    monkeypatch.setattr(sys, "argv", ["Stockroom.exe"])
+
+    with pytest.raises(SystemExit) as stopped:
+        launcher._dispatch()
+
+    assert stopped.value.code == 7
+    assert prepared == [True]
 
 
 def test_malformed_window_host_argv_fails_before_webview_runtime_preparation(
