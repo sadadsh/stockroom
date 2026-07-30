@@ -16,6 +16,9 @@ keeps the managed application checkout aligned with the pushed `main` branch.
 - Added automatic Git convergence. Pushed revisions are downloaded, the current
   UI session is persisted, and Stockroom relaunches itself on the updated
   checkout without asking the user to download another executable.
+- The updater verifies that the native Stockroom window belongs to its process
+  and waits for Windows to confirm closure before it reports a successful
+  restart handoff.
 - Hid native helper consoles while preserving the underlying KiCad and Altium
   operations.
 - Added the new Stockroom application icon.
