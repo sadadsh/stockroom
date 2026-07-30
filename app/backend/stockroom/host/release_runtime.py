@@ -459,7 +459,7 @@ class HostReleaseBoundary:
 
         self._validate_window_replacement(window_replacement)
         with self._lock:
-            self._ensure_open()
+            self._require_open()
             if self._window_replacement is not None:
                 raise HostReleaseBoundaryError("window replacement is already attached")
             self._window_replacement = window_replacement
@@ -1779,11 +1779,14 @@ def create_production_update_runtime(
     public_base_url: str,
     token: str,
     reload_window: Callable[[str], None],
+    manage_native_window: bool = True,
     bundle_root: Path | None = None,
     data_root: Path | None = None,
 ) -> ProductionUpdateRuntime:
     """Compose the production TUF/store/activator boundary from packaged inputs."""
 
+    if type(manage_native_window) is not bool:
+        raise TypeError("manage_native_window must be a boolean")
     bundle_root = _production_bundle_root(bundle_root)
     descriptor = _strict_feed_descriptor(bundle_root / "Update Feed.json")
     root_path = bundle_root / "Root.json"
@@ -1934,16 +1937,17 @@ def create_production_update_runtime(
             state_directory=state_directory / "TUF",
             staging_directory=releases_directory,
         )
-        from stockroom.host.window_runtime import ProductionWindowReplacement
+        if manage_native_window:
+            from stockroom.host.window_runtime import ProductionWindowReplacement
 
-        config = getattr(context, "config", None)
-        window_replacement = ProductionWindowReplacement(
-            active.current,
-            public_base_url=public_base_url,
-            api_credential=token,
-            config=config,
-        )
-        boundary.attach_window_replacement(window_replacement)
+            config = getattr(context, "config", None)
+            window_replacement = ProductionWindowReplacement(
+                active.current,
+                public_base_url=public_base_url,
+                api_credential=token,
+                config=config,
+            )
+            boundary.attach_window_replacement(window_replacement)
         return ProductionUpdateRuntime(
             update_control,
             update_fence,

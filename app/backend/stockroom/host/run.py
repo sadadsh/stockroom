@@ -501,6 +501,7 @@ def run_windowed(
                         url,
                         config=host_config,
                     ),
+                    manage_native_window=open_window is None,
                     data_root=production_state_root,
                 )
             except Exception:  # noqa: BLE001 - keep the signed built-in UI observable
