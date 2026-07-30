@@ -364,6 +364,7 @@ def test_window_host_publish_returns_only_its_publish_root():
     function = script[start:end]
 
     assert "$null = Invoke-Checked -FilePath $DotNetPath" in function
+    assert 'Join-Path $WorkRoot "Window Host Compilation"' in function
+    assert "-p:BaseOutputPath=$(Join-Path $compileRoot 'Bin')" in function
     assert "$hostExecutable = Join-Path" in function
     assert "$host = Join-Path" not in function
-
