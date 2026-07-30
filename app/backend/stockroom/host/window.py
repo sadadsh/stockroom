@@ -124,8 +124,12 @@ class _HostApi:
         window = active_window()
         if window is None:
             return []
+        dialog_types = getattr(webview, "FileDialog", None)
+        folder_dialog = getattr(dialog_types, "FOLDER", None)
+        if folder_dialog is None:
+            folder_dialog = webview.FOLDER_DIALOG
         result = window.create_file_dialog(
-            webview.FOLDER_DIALOG,
+            folder_dialog,
             allow_multiple=False,
         )
         return list(result) if result else []

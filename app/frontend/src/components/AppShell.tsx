@@ -56,7 +56,11 @@ function ShellStatusBar() {
     >
       {route !== "components" ? (
         <span className="text-t2">
-          {route === "stm" ? "STM Viewer" : "Settings"}
+          {route === "projects"
+            ? "Projects"
+            : route === "stm"
+              ? "STM Viewer"
+              : "Settings"}
         </span>
       ) : facets.isError ? (
         <span className="text-err">

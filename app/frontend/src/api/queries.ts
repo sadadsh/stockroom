@@ -12,9 +12,9 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import type {
+  DiscoveredProject,
   EnrichmentResult,
   PartDetail,
-  DiscoveredProject,
   ProjectReviewCandidate,
   SetLibraryBody,
   SettingsPatch,
@@ -35,6 +35,50 @@ export function useProjectWorkspace(projectId: string | null) {
     queryKey: ["project-workspace", projectId],
     queryFn: () => api.projectWorkspace(projectId!),
     enabled: !!projectId,
+  });
+}
+
+export function useProjectPlacementGeometry(projectId: string) {
+  return useQuery({
+    queryKey: ["project-placement-geometry", projectId],
+    queryFn: () => api.projectPlacementGeometry(projectId),
+    refetchOnWindowFocus: true,
+    staleTime: 10_000,
+  });
+}
+
+export function useProjectVisuals(projectId: string) {
+  return useQuery({
+    queryKey: ["project-visuals", projectId],
+    queryFn: () => api.projectVisuals(projectId),
+    enabled: !!projectId,
+    refetchOnWindowFocus: true,
+    staleTime: 10_000,
+  });
+}
+
+export function useRefreshProjectVisuals(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.projectVisuals(projectId, true),
+    onSuccess: (visuals) => {
+      queryClient.setQueryData(["project-visuals", projectId], visuals);
+      queryClient.invalidateQueries({
+        queryKey: ["project-visual-artifact", projectId],
+      });
+    },
+  });
+}
+
+export function useProjectVisualArtifact(
+  projectId: string,
+  artifactId: string,
+) {
+  return useQuery({
+    queryKey: ["project-visual-artifact", projectId, artifactId],
+    queryFn: () => api.projectVisualArtifact(projectId, artifactId),
+    enabled: !!projectId && !!artifactId,
+    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 
@@ -81,6 +125,27 @@ export function useProjectCollaboration(projectId: string) {
     queryKey: ["project-collaboration", projectId],
     queryFn: () => api.projectCollaboration(projectId),
     refetchInterval: (query) => (query.state.data?.session ? 15_000 : 5_000),
+  });
+}
+
+export function useOpenProjectDocument(projectId: string) {
+  return useMutation({
+    mutationFn: (documentId: string) =>
+      api.openProjectDocument(projectId, documentId),
+  });
+}
+
+export function useConnectProjectRemote(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (url: string) => api.connectProjectRemote(projectId, url),
+    onSuccess: (result) => {
+      queryClient.setQueryData(
+        ["project-collaboration", projectId],
+        result.collaboration,
+      );
+      queryClient.invalidateQueries({ queryKey: ["project-reviews", projectId] });
+    },
   });
 }
 

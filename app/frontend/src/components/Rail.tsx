@@ -40,6 +40,7 @@ const RAIL_GLYPH = "flex h-[17px] w-[35px] items-center justify-center";
 // to fill the identical 17px container (appearance preserved; the parent span stays).
 const NAV_ICONS: Partial<Record<Route, ReactNode>> = {
   components: <Icon id="nav.components" className="h-full w-full" />,
+  projects: <Icon id="nav.board" className="h-full w-full" />,
   stm: <Icon id="nav.stm" className="h-full w-full" />,
   settings: <Icon id="nav.settings" className="h-full w-full" />,
 };

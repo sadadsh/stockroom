@@ -14,6 +14,9 @@ function Probe() {
       <button type="button" onClick={() => navigate("stm")}>
         go stm
       </button>
+      <button type="button" onClick={() => navigate("projects")}>
+        go projects
+      </button>
     </div>
   );
 }
@@ -34,6 +37,9 @@ describe("router", () => {
     await userEvent.click(screen.getByText("go settings"));
     expect(screen.getByTestId("route")).toHaveTextContent("settings");
     expect(window.location.hash).toBe("#route=settings");
+    await userEvent.click(screen.getByText("go projects"));
+    expect(screen.getByTestId("route")).toHaveTextContent("projects");
+    expect(window.location.hash).toBe("#route=projects");
   });
 
   it("restores a valid route after the renderer remounts", () => {
@@ -75,7 +81,6 @@ describe("router", () => {
 
   it.each([
     "#https://outside.example/settings",
-    "#route=projects",
     "#route=%73ettings",
     "#route=settings&next=https://outside.example",
     "#/settings",

@@ -74,6 +74,7 @@ const KNOWN_DERIVED: readonly string[] = [
   // Rail.tsx: <RailItem data-dev-id={`rail.nav-${item.route}`}> over lib/nav.ts routes,
   // which are exactly components, STM Viewer, and settings.
   "rail.nav-components",
+  "rail.nav-projects",
   "rail.nav-stm",
   "rail.nav-settings",
   // primitives.tsx TabStrip: data-dev-id={`${devIdBase}.tabs`} + `${devIdBase}.tab-${t.id}`,
@@ -83,6 +84,12 @@ const KNOWN_DERIVED: readonly string[] = [
   "detail.tab-sourcing",
   "detail.tab-enrich",
   "detail.tab-history",
+  // ProjectsPage passes the same TabStrip primitive its shared tool ids.
+  "projects.tabs",
+  "projects.tab-overview",
+  "projects.tab-bom",
+  "projects.tab-build",
+  "projects.tab-activity",
   // primitives.tsx SegmentedControl derives one id per option. The STM target
   // definition uses fixed lens and inspector registries at the two call sites.
   "stm.lens.compatibility",
@@ -93,7 +100,7 @@ const KNOWN_DERIVED: readonly string[] = [
   "stm.inspector.decision",
   "stm.inspector.targets",
   "stm.inspector.evidence",
-]; // 19
+]; // 22
 
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
@@ -177,8 +184,9 @@ describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
     // TabStrip's generic derivation drives the detail.* tab ids.
     expect(sourceContains("${devIdBase}.tabs")).toBe(true);
     expect(sourceContains("${devIdBase}.tab-${t.id}")).toBe(true);
-    // The detail call site produces its workbench tab ids.
+    // The detail and Projects call sites produce their workbench tab ids.
     expect(sourceContains('devIdBase="detail"')).toBe(true);
+    expect(sourceContains('devIdBase="projects"')).toBe(true);
     // SegmentedControl produces the fixed STM lens and inspector option ids.
     expect(sourceContains("${devIdBase}.${opt.id}")).toBe(true);
     expect(sourceContains('devIdBase="stm.lens"')).toBe(true);
@@ -238,6 +246,7 @@ const DOCKED_PANEL_HEADERS = [
   "/src/components/primitives.tsx",
   "/src/components/Rail.tsx",
   "/src/components/DetailPanel.tsx",
+  "/src/pages/ProjectsPage.tsx",
 ];
 
 describe("panel header band height", () => {

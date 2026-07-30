@@ -723,6 +723,167 @@ export interface ProjectWorkspace {
   documents: ProjectDocument[];
 }
 
+export interface ProjectPlacement {
+  reference: string;
+  board: string;
+  x_mm: number;
+  y_mm: number;
+  rotation_deg: number;
+  side: "top" | "bottom";
+  footprint: string;
+}
+
+export interface ProjectPlacementGeometry {
+  schema_version: number;
+  adapter: "kicad" | "altium";
+  status: "ready" | "blocked";
+  runtime: {
+    name?: string;
+    version?: string;
+    available?: boolean;
+  };
+  boards: string[];
+  placements: ProjectPlacement[];
+  summary: {
+    boards: number;
+    placements: number;
+    top: number;
+    bottom: number;
+  };
+  source: {
+    digest: string;
+    files: Array<{
+      path: string;
+      bytes?: number;
+      sha256?: string;
+    }>;
+    preserved: boolean;
+  };
+  detail: string;
+  digest: string;
+}
+
+export interface ProjectVisualArtifact {
+  id: string;
+  kind: "schematic" | "pcb";
+  path: string;
+  view: string;
+  label: string;
+  page: number;
+  media_type: string;
+  width: number;
+  height: number;
+  bytes: number;
+  sha256: string;
+}
+
+export interface ProjectBoardBounds {
+  min_x: number;
+  min_y: number;
+  max_x: number;
+  max_y: number;
+  width: number;
+  height: number;
+}
+
+export interface ProjectBoardSceneComponent {
+  reference: string;
+  x_mm: number;
+  y_mm: number;
+  rotation_deg: number;
+  side: "top" | "bottom";
+  package: string;
+  part: string;
+  bounds: ProjectBoardBounds | null;
+  pins?: ProjectBoardScenePin[];
+}
+
+export interface ProjectBoardScenePin {
+  number: string;
+  net: string;
+  x_mm: number;
+  y_mm: number;
+  rotation_deg: number;
+  side: "top" | "bottom";
+  layer: string;
+  shape: {
+    kind: "circle" | "rect" | "rounded-rect" | "oval" | "unknown";
+    width_mm: number;
+    height_mm: number;
+  } | null;
+}
+
+export interface ProjectBoardSceneVia {
+  name: string;
+  net: string;
+  x_mm: number;
+  y_mm: number;
+  diameter_mm: number;
+  from_layer: string;
+  to_layer: string;
+  sides: Array<"top" | "bottom">;
+}
+
+export interface ProjectBoardSceneTrack {
+  net: string;
+  layer: string;
+  side: "top" | "bottom";
+  start_x_mm: number;
+  start_y_mm: number;
+  end_x_mm: number;
+  end_y_mm: number;
+  width_mm: number;
+}
+
+export interface ProjectBoardScene {
+  schema_version: number;
+  board: string;
+  units: "mm";
+  bounds: ProjectBoardBounds;
+  components: ProjectBoardSceneComponent[];
+  vias?: ProjectBoardSceneVia[];
+  tracks?: ProjectBoardSceneTrack[];
+  summary: {
+    components: number;
+    pins?: number;
+    vias?: number;
+    tracks?: number;
+    top: number;
+    bottom: number;
+  };
+  source: {
+    format: "ipc-2581";
+    sha256: string;
+  };
+}
+
+export interface ProjectVisualDocument {
+  kind: "schematic" | "pcb";
+  path: string;
+  status: "ready" | "blocked";
+  detail: string;
+  artifacts: ProjectVisualArtifact[];
+  scene?: ProjectBoardScene;
+}
+
+export interface ProjectVisualBundle {
+  schema_version: number;
+  adapter: "kicad" | "altium";
+  status: "ready" | "blocked";
+  runtime: {
+    name: string;
+    version: string;
+  };
+  documents: ProjectVisualDocument[];
+  summary: {
+    documents: number;
+    artifacts: number;
+    blocked: number;
+  };
+  detail: string;
+  digest: string;
+}
+
 export interface ProjectBomLine {
   refs: string[];
   qty: number;
@@ -868,6 +1029,33 @@ export interface ProjectCollaboration {
   session: ProjectWorkSession | null;
   recovery: ProjectSessionRecovery | null;
   blocked_reason?: string;
+}
+
+export interface ProjectSyncResult {
+  state:
+    | "synced"
+    | "pushed"
+    | "pulled"
+    | "offline"
+    | "diverged"
+    | "denied"
+    | "no_remote"
+    | "converged";
+  pulled: boolean;
+  pushed: boolean;
+  detail: string;
+  converged: boolean;
+}
+
+export interface ConnectProjectRemoteResult {
+  collaboration: ProjectCollaboration;
+  sync: ProjectSyncResult;
+}
+
+export interface OpenProjectDocumentResult {
+  opened: true;
+  document_id: string;
+  path: string;
 }
 
 export interface ProjectReviewCandidate {
@@ -1091,7 +1279,6 @@ export interface AssemblyRun {
     counts: Record<AssemblyPlacementState, number>;
   };
 }
-
 // POST /api/onboarding/library
 export interface SetLibraryBody {
   mode: "open" | "create" | "clone";

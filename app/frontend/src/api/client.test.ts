@@ -494,6 +494,111 @@ describe("api client", () => {
     });
   });
 
+  it("loads shared native project visual metadata for any adapter", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ adapter: "altium", status: "ready", documents: [] }),
+    );
+
+    const result = await api.projectVisuals("control board", true);
+
+    expect(result).toMatchObject({ adapter: "altium", status: "ready" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/projects/control%20board/visuals");
+    expect(String(url)).toContain("refresh=true");
+    expect((init as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer test-token",
+    });
+  });
+
+  it("connects a project remote through the project-scoped collaboration route", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        collaboration: { repository: { has_remote: true } },
+        sync: {
+          state: "pushed",
+          pulled: false,
+          pushed: true,
+          converged: false,
+          detail: "",
+        },
+      }),
+    );
+
+    const result = await api.connectProjectRemote(
+      "power board",
+      "git@github.com:team/power-board.git",
+    );
+
+    expect(result.sync.state).toBe("pushed");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain(
+      "/api/projects/power%20board/collaboration/remote",
+    );
+    expect(init).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ url: "git@github.com:team/power-board.git" }),
+    });
+  });
+
+  it("opens an adapter-reported project document without sending a filesystem path", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        opened: true,
+        document_id: "pcb:Boards/Main.PcbDoc",
+        path: "Boards/Main.PcbDoc",
+      }),
+    );
+
+    await api.openProjectDocument(
+      "control board",
+      "pcb:Boards/Main.PcbDoc",
+    );
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain(
+      "/api/projects/control%20board/documents/pcb%3ABoards%2FMain.PcbDoc/open",
+    );
+    expect(init).toMatchObject({ method: "POST" });
+    expect((init as RequestInit).body).toBeUndefined();
+  });
+
+  it("surfaces typed remote URL validation as readable field guidance", async () => {
+    fetchMock.mockResolvedValueOnce(
+      errJson(422, {
+        detail: [
+          {
+            type: "value_error",
+            loc: ["body", "url"],
+            msg: "Value error, use a secure HTTPS or SSH repository URL",
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      api.connectProjectRemote("power board", "ftp://example.com/project.git"),
+    ).rejects.toMatchObject({
+      status: 422,
+      message: "use a secure HTTPS or SSH repository URL",
+    });
+  });
+
+  it("fetches a native PCB artifact with the bearer and returns a blob", async () => {
+    fetchMock.mockResolvedValueOnce(okBlob(new Uint8Array([1, 2, 3]), "image/svg+xml"));
+
+    const blob = await api.projectVisualArtifact("power board", "top/view");
+
+    expect(blob).toBeInstanceOf(Blob);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain(
+      "/api/projects/power%20board/visuals/top%2Fview",
+    );
+    expect((init as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer test-token",
+      Accept: "image/*",
+    });
+  });
+
   // --- Per-part git timeline (M6k) ---
 
   it("reads the part git history at the history path", async () => {

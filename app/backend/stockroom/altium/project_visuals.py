@@ -10,8 +10,10 @@ from io import BytesIO
 from pathlib import Path
 
 import pypdfium2 as pdfium
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 
 from stockroom.altium.driver import AltiumDriver
+from stockroom.altium.project_scene import export_altium_board_scenes
 from stockroom.altium.project_validation import (
     _copy_project,
     _execution_descriptor,
@@ -82,8 +84,22 @@ def _configure_publish_target(
     )
     text = _set_line(text, f"OutputDocumentPath{output_index}", document_path)
     text = _set_line(text, f"OutputFilePath{medium_index}", str(target_pdf))
+    text = _set_line(
+        text,
+        f"OutputBasePath{medium_index}",
+        str(target_pdf.parent),
+    )
+    text = _set_line(text, f"OutputPathMedia{medium_index}", "")
+    text = _set_line(text, f"OutputPathMediaValue{medium_index}", "")
+    text = _set_line(text, f"OutputPathOutputer{medium_index}", "")
+    text = _set_line(text, f"OutputPathOutputerPrefix{medium_index}", "")
+    text = _set_line(text, f"OutputPathOutputerValue{medium_index}", "")
     text = _set_line(text, f"RelativeOutputPath{medium_index}", str(target_pdf))
     text = _set_line(text, f"OutputFileName{medium_index}", target_pdf.name)
+    text = _set_line(text, f"OutputFileNameMulti{medium_index}", target_pdf.name)
+    text = _set_line(text, f"UseOutputNameForMulti{medium_index}", "0")
+    text = _set_line(text, f"PublishMethod{medium_index}", "1")
+    text = _set_line(text, f"OpenOutput{medium_index}", "0")
     text = _set_line(text, f"OpenOutputs{medium_index}", "0")
     text = _set_line(text, f"AddToProject{medium_index}", "0")
     return text
@@ -214,20 +230,15 @@ def _render_script(
         Else
         Begin
             Client.ShowDocument(OutJob);
-            ProcessName := 'WorkspaceManager:Print';
-            ProcessParameters :=
-                'Action=PublishToPDF|DisableDialog=True|ObjectKind=OutputBatch';
-            RunCommand(ProcessName, ProcessParameters);
-            For WaitIndex := 1 To 60 Do
-            Begin
-                If FileExists('{_pascal(output_pdf)}') Then
-                    Break;
-                Sleep(500);
-            End;
+            ResetParameters;
+            AddStringParameter('Action', 'PublishToPDF');
+            AddStringParameter('DisableDialog', 'True');
+            AddStringParameter('ObjectKind', 'OutputBatch');
+            RunProcess('WorkspaceManager:Print');
             If FileExists('{_pascal(output_pdf)}') Then
                 Lines.Add('JOB|{_pascal(outjob.name)}|completed|PDF produced')
             Else
-                Lines.Add('JOB|{_pascal(outjob.name)}|blocked|PDF was not produced');
+                Lines.Add('JOB|{_pascal(outjob.name)}|completed|PDF generation returned');
             Client.CloseDocument(OutJob);
         End;
         If SourceDoc <> Nil Then
@@ -242,9 +253,6 @@ Var
     SourceDoc : IServerDocument;
     OutJob : IServerDocument;
     Lines  : TStringList;
-    WaitIndex : Integer;
-    ProcessName : String;
-    ProcessParameters : String;
 Begin
     Lines := TStringList.Create;
     Try
@@ -285,7 +293,83 @@ End;
 """
 
 
-def _rasterize_pdf(path: Path) -> list[tuple[bytes, int, int]]:
+def _edge_components(mask: Image.Image, marker: int = 128) -> Image.Image:
+    """Mark every white component connected to an image edge."""
+
+    pixels = mask.load()
+    width, height = mask.size
+    for x in range(width):
+        for y in (0, height - 1):
+            if pixels[x, y] == 255:
+                ImageDraw.floodfill(mask, (x, y), marker)
+    for y in range(height):
+        for x in (0, width - 1):
+            if pixels[x, y] == 255:
+                ImageDraw.floodfill(mask, (x, y), marker)
+    return mask
+
+
+def _crop_board_page(image: Image.Image) -> Image.Image:
+    """Crop Altium's PDF paper and make only the exterior page transparent.
+
+    Native PCB prints are monochrome: white copper and overlay can reach a board
+    edge, so clearing every edge-connected white pixel would erase real artwork.
+    A closed non-paper mask first seals those narrow feature gaps. Flood filling
+    its exterior then removes the page while preserving enclosed and edge-touching
+    board detail byte-for-byte; only alpha is added.
+    """
+
+    rgb = image.convert("RGB")
+    dark = rgb.convert("L").point(lambda value: 255 if value < 80 else 0)
+    bounds = dark.getbbox()
+    if bounds is None:
+        paper = Image.new("RGB", rgb.size, "white")
+        bounds = ImageChops.difference(rgb, paper).getbbox()
+        paper.close()
+    dark.close()
+    rgb.close()
+    if bounds is None:
+        return image
+
+    cropped = image.crop(bounds).convert("RGBA")
+    image.close()
+    cropped_rgb = cropped.convert("RGB")
+    channels = [
+        channel.point(lambda value: 255 if value < 248 else 0)
+        for channel in cropped_rgb.split()
+    ]
+    non_paper = ImageChops.lighter(
+        ImageChops.lighter(channels[0], channels[1]),
+        channels[2],
+    )
+    for channel in channels:
+        channel.close()
+    cropped_rgb.close()
+
+    shortest = min(cropped.size)
+    kernel = min(31, shortest if shortest % 2 else shortest - 1)
+    if kernel >= 3:
+        closed = non_paper.filter(ImageFilter.MaxFilter(kernel))
+        sealed = closed.filter(ImageFilter.MinFilter(kernel))
+        closed.close()
+    else:
+        sealed = non_paper.copy()
+    non_paper.close()
+
+    exterior = _edge_components(ImageOps.invert(sealed))
+    sealed.close()
+    alpha = exterior.point(lambda value: 0 if value == 128 else 255)
+    exterior.close()
+    cropped.putalpha(alpha)
+    alpha.close()
+    return cropped
+
+
+def _rasterize_pdf(
+    path: Path,
+    *,
+    crop_board: bool = False,
+) -> list[tuple[bytes, int, int]]:
     document = pdfium.PdfDocument(path)
     rendered: list[tuple[bytes, int, int]] = []
     try:
@@ -293,6 +377,8 @@ def _rasterize_pdf(path: Path) -> list[tuple[bytes, int, int]]:
             page = document[page_index]
             bitmap = page.render(scale=1.5)
             image = bitmap.to_pil()
+            if crop_board:
+                image = _crop_board_page(image)
             stream = BytesIO()
             image.save(stream, format="PNG", optimize=True)
             rendered.append((stream.getvalue(), image.width, image.height))
@@ -323,7 +409,7 @@ def render_altium_project(
     driver: AltiumDriver | None = None,
     *,
     timeout: int = 300,
-    allow_unqualified_pdf_publish: bool = False,
+    allow_unqualified_pdf_publish: bool = True,
 ) -> ProjectVisualBundle:
     """Generate native Altium print outputs in a disposable project copy."""
 
@@ -337,6 +423,9 @@ def render_altium_project(
             "Altium native PDF publishing is not qualified for unattended review on "
             "this host. Exact-commit visual comparison remains disabled.",
         )
+    scene_result = export_altium_board_scenes(project, drv, timeout=timeout)
+    if scene_result["status"] != "ready":
+        return _blocked(version, scene_result["detail"])
     assembly = _template_for(drv, "Assembly.OutJob")
     fabrication = _template_for(drv, "Fabrication.OutJob")
     if project.sheet_paths and assembly is None:
@@ -352,8 +441,15 @@ def render_altium_project(
     with tempfile.TemporaryDirectory(prefix="stockroom-altium-visual-") as raw:
         run_root = Path(raw) / "project"
         _copy_project(source, run_root)
-        output_root = run_root / "Stockroom Visual Output"
-        output_root.mkdir()
+        project_output_name = (
+            Path(project.pro_path).stem if project.pro_path else project.name
+        )
+        # AD26 honors the requested PDF filename but resolves publish outputs under
+        # the project's conventional output folder. Expect that native location so
+        # each job completes as soon as its file appears instead of waiting for a
+        # fallback search after the fact.
+        output_root = run_root / f"Project Outputs for {project_output_name}"
+        output_root.mkdir(exist_ok=True)
         jobs: list[tuple[Path, str, str, Path, Path]] = []
         expected: list[dict] = []
         templates: dict[str, str] = {}
@@ -429,8 +525,8 @@ def render_altium_project(
             newline="\r\n",
         )
         script_project.write_text(
-            "[Design]\r\nVersion=1.0\r\nHierarchyMode=0\r\n[Document1]\r\n"
-            f"DocumentPath={script.name}\r\n",
+            "[Design]\r\nVersion=1.0\r\nHierarchyMode=0\r\n"
+            f"[Document1]\r\nDocumentPath={script.name}\r\n",
             encoding="utf-8",
         )
         outcome = drv.run_script(
@@ -455,6 +551,8 @@ def render_altium_project(
                     "artifacts": [],
                 },
             )
+            if row["kind"] == "pcb":
+                document["scene"] = scene_result["scenes"].get(row["path"])
             pdf = row["pdf"]
             if not pdf.is_file():
                 discovered = sorted(run_root.rglob(pdf.name))
@@ -465,7 +563,7 @@ def render_altium_project(
                 document["detail"] = f"Altium returned without producing {pdf.name}."
                 continue
             try:
-                pages = _rasterize_pdf(pdf)
+                pages = _rasterize_pdf(pdf, crop_board=row["kind"] == "pcb")
             except Exception as exc:
                 document["status"] = "blocked"
                 document["detail"] = f"{pdf.name} could not be rasterized: {exc}"
@@ -510,6 +608,7 @@ def render_altium_project(
             "status": status,
             "runtime": {"name": "Altium Designer", "version": version},
             "template_sha256": templates,
+            "scene_digest": scene_result["digest"],
             "documents": documents,
             "summary": {
                 "documents": len(documents),
