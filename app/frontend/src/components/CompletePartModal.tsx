@@ -255,8 +255,8 @@ function VendorPicker({
       </div>
       <p className="mt-1.5 text-2xs leading-snug text-t3">
         Verified evidence and automatic routes run first. This preference only orders assisted
-        windows. If assistance is needed, Open Provider launches the sign-in or security-check
-        window and reuses Stockroom&apos;s provider profile on later parts.
+        windows. If assistance is needed, Open Provider is the login handoff: it launches the
+        provider window and reuses Stockroom&apos;s provider profile on later parts.
       </p>
     </div>
   );
