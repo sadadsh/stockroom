@@ -348,6 +348,34 @@ class HostManifestRehearsal:
         _backend_command(candidate, 1)
 
 
+def _prefer_newer_packaged_release(
+    store: ImmutableReleaseStore,
+    active: ActiveReleaseState,
+    packaged: AcceptedRelease,
+    *,
+    control: ServiceControl,
+    fence: GenerationFence,
+) -> ActiveReleaseState:
+    """Adopt a newer installed package without displacing a newer downloaded release."""
+
+    if _numeric_version(packaged.manifest.package_version) <= _numeric_version(
+        active.current.manifest.package_version
+    ):
+        return active
+    HostManifestRehearsal().rehearse(
+        packaged,
+        active.current,
+        generation=fence.generation,
+    )
+    return store.select_active(
+        packaged,
+        previous=active.current,
+        selection_reason="activate",
+        control=control,
+        fence=fence,
+    )
+
+
 class HostReleaseBoundary:
     """Concrete launch, health, drain, and adoption ports for ``ReleaseActivator``."""
 
@@ -1851,6 +1879,14 @@ def create_production_update_runtime(
                 accepted_packaged,
                 previous=None,
                 selection_reason="initialize",
+                control=update_control,
+                fence=update_fence,
+            )
+        else:
+            active = _prefer_newer_packaged_release(
+                store,
+                active,
+                accepted_packaged,
                 control=update_control,
                 fence=update_fence,
             )
