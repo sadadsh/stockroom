@@ -213,6 +213,9 @@ and `P2` meaningful fit, finish, or clarity debt.
 Capture root:
 `D:\Workspace\System\Runtime\Stockroom UI Review`
 
+Projects task-owned capture root:
+`D:\Workspace\Worktrees\Stockroom-Projects-Library-Grammar\work\projects-repository-audit`
+
 | Evidence | Layer | Surface / theme | Pixels | SHA-256 prefix | Findings |
 | --- | --- | --- | --- | --- | --- |
 | `components-dark-1600w.png` | Playwright Chromium | Components / dark | 3200×2000 at DPR 2 | `2c51a8cd71b7` | VA-001, 002, 004, 006–008, 011–013 |
@@ -377,3 +380,8 @@ Capture root:
 | `work/Native Current Acceptance/Screenshots/Single Value Facet Light.png` | pywebview / WebView2, current source | One-value parametric facet / light | 1384×861 | `62a32dbd9549` | Theme-parity VA-003 authority with the same static fact and result semantics. The broad empty result canvas and faint generated-filter helper remain covered by VA-004/VA-014. |
 | `work/VA Inspection Smoke/Inspection Dark 1384.png` | Chrome / source Vite + isolated API | Unified component inspection / dark | 1384×861 | `62e2c9c7f332` | VA-011 resolved; VA-017/VA-019 partial. One full-height neutral 3D stage, whole-object frame, truthful painted-geometry status, and no document overflow. |
 | `work/VA Inspection Smoke/Inspection Light 1384.png` | Chrome / source Vite + isolated API | Unified component inspection / light | 1384×861 | `7f7b7eb14a6c` | Theme-parity source proof with identical 292×465 inspector geometry, 290×425 stage, selected 3D projection, whole-object frame, and no document overflow. |
+| `local-only-dark-1024x720.png` | In-app Browser / Chromium | Projects repository setup / dark | 1024×720 | `b9d7ab35f60d` | Local and remote repository columns share one full-height workbench divider; no new finding |
+| `local-only-light-1024x720.png` | In-app Browser / Chromium | Projects repository setup / light | 1024×720 | `15981201f091` | Split repository setup remains legible and has no document or sheet overflow; no new finding |
+| `local-only-light-900x720.png` | In-app Browser / Chromium | Projects repository setup / light | 900×720 | `2992cf58913c` | The 621 px workbench stacks local facts above the remote action without horizontal overflow; no new finding |
+| `local-only-light-1384x900.png` | In-app Browser / Chromium | Projects repository setup / light | 1384×900 | `27494a050763` | Wide repository setup uses a measured 394/616 px split and keeps one action hierarchy; no new finding |
+| `no-git-dark-1024x720.png` | In-app Browser / Chromium | Projects missing-Git state / dark | 1024×720 | `252bc98fbae6` | Blocked state stays top-aligned, names the exact next action, and does not fabricate an unavailable control; no new finding |
