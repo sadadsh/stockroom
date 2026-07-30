@@ -238,12 +238,19 @@ def test_production_host_uses_signed_runtime_and_never_touches_git_fallback(
             }
 
     signed = _SignedRuntime()
+    runtime_arguments = {}
     app_ctx.app_repo = _NoGitFallback()
     monkeypatch.setenv("STOCKROOM_UPDATE_MODE", "production")
+
+    def create_signed_runtime(*args, **kwargs):
+        del args
+        runtime_arguments.update(kwargs)
+        return signed
+
     monkeypatch.setattr(
         release_runtime,
         "create_production_update_runtime",
-        lambda *args, **kwargs: signed,
+        create_signed_runtime,
     )
 
     observed = {}
@@ -260,6 +267,7 @@ def test_production_host_uses_signed_runtime_and_never_touches_git_fallback(
 
     assert signed.started
     assert signed.closed
+    assert runtime_arguments["manage_native_window"] is False
     assert observed["channel"] == "production"
     assert observed["current_revision"] == "release-1"
 

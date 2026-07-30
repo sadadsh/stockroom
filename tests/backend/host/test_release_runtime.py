@@ -23,6 +23,7 @@ from stockroom.host.proxy import SwitchableBackendProxy
 from stockroom.host.release_runtime import (
     HostManifestRehearsal,
     HostReleaseBoundary,
+    HostReleaseBoundaryError,
     HostReleaseCompatibilityError,
     HostReleaseRouteError,
     HostUpdateMode,
@@ -466,6 +467,23 @@ def _close(server, server_thread, boundary, control, fence) -> None:
     server.should_exit = True
     server_thread.join(timeout=5)
     control.release(fence)
+
+
+def test_window_replacement_can_be_attached_after_startup_route_recovery(
+    tmp_path: Path,
+) -> None:
+    runtime = _runtime(tmp_path, candidate_mode="ok")
+    boundary = runtime[11]
+    replacement = _WindowReplacement()
+    try:
+        boundary.attach_window_replacement(replacement)
+        with pytest.raises(
+            HostReleaseBoundaryError,
+            match="window replacement is already attached",
+        ):
+            boundary.attach_window_replacement(replacement)
+    finally:
+        _close(runtime[7], runtime[8], boundary, runtime[2], runtime[3])
 
 
 def test_real_process_activation_drains_old_requests_and_never_mixes_the_route(
