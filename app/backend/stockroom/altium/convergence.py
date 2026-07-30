@@ -1242,7 +1242,13 @@ def converge_altium_library(
 
 
 class AltiumLibraryConvergenceService:
-    """Background owner that follows profile switches and retries ordinary seat contention."""
+    """Background owner that follows profile switches without relaunching failed native work.
+
+    A busy Altium seat is transient and safe to poll because the driver returns before launching
+    another process. Every other failure may have already opened Altium or a command launcher, so
+    retrying it on a timer creates a visible process loop. Those failures stay paused until the
+    target changes or a caller explicitly requests another attempt.
+    """
 
     def __init__(
         self,
@@ -1263,6 +1269,18 @@ class AltiumLibraryConvergenceService:
         self.last_result: AltiumConvergenceResult | None = None
         self._stop: threading.Event | None = None
         self._thread: threading.Thread | None = None
+        self._retry_requested = threading.Event()
+
+    def _target_signature(self) -> tuple[str, bool, int, int]:
+        target = self.target()
+        if target is None:
+            return ("", False, 0, 0)
+        path = Path(target)
+        try:
+            stat = path.stat()
+        except OSError:
+            return (str(path.resolve()), False, 0, 0)
+        return (str(path.resolve()), True, stat.st_size, stat.st_mtime_ns)
 
     def run_once(self) -> AltiumConvergenceResult:
         try:
@@ -1288,9 +1306,20 @@ class AltiumLibraryConvergenceService:
         self._stop = stop
 
         def loop() -> None:
+            paused_signature: tuple[str, bool, int, int] | None = None
             while not stop.is_set():
-                result = self.run_once()
-                delay = self.poll_seconds if result.ok else self.retry_seconds
+                signature = self._target_signature()
+                retry_requested = self._retry_requested.is_set()
+                self._retry_requested.clear()
+                if paused_signature is None or signature != paused_signature or retry_requested:
+                    result = self.run_once()
+                    if result.ok or result.status == "busy":
+                        paused_signature = None
+                    else:
+                        paused_signature = signature
+                    delay = self.retry_seconds if result.status == "busy" else self.poll_seconds
+                else:
+                    delay = self.poll_seconds
                 if stop.wait(delay):
                     return
 
@@ -1301,6 +1330,15 @@ class AltiumLibraryConvergenceService:
         )
         self._thread.start()
         return stop
+
+    def request_retry(self) -> None:
+        """Allow one new attempt after a terminal failure.
+
+        This deliberately does not interrupt the polling wait: the bound is ``poll_seconds`` and
+        avoiding a second wake primitive keeps stop ownership simple.
+        """
+
+        self._retry_requested.set()
 
     def stop(self, timeout: float = 1.0) -> None:
         if self._stop is not None:
