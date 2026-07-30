@@ -83,6 +83,33 @@ def _close_active_window() -> None:
         raise RuntimeError("the active Stockroom window did not accept a close request")
 
 
+def _start_restart_watchdog(
+    graceful_handoff: threading.Event,
+    *,
+    delay_seconds: float = 8.0,
+    exit_process: Callable[[int], None] = os._exit,
+) -> threading.Thread:
+    """Guarantee the launcher regains control when a native window ignores close.
+
+    A graceful WebView close remains the preferred path because it lets the host
+    release every service normally. If that UI thread does not return within the
+    bounded delay, exiting with ``EXIT_RESTART`` transfers control to the stable
+    launcher, which starts the freshly downloaded checkout.
+    """
+
+    def _watch() -> None:
+        if not graceful_handoff.wait(max(0.0, float(delay_seconds))):
+            exit_process(EXIT_RESTART)
+
+    thread = threading.Thread(
+        target=_watch,
+        name="stockroom-restart-watchdog",
+        daemon=True,
+    )
+    thread.start()
+    return thread
+
+
 def _same_origin_reload_url(base_url: str, current_url: str | None) -> str:
     """Retarget the active SPA route onto ``base_url`` without preserving remote URLs."""
 
@@ -496,6 +523,8 @@ def run_windowed(
     handoff = None
     development_service_authority = None
     production_update_runtime = None
+    graceful_restart_handoff = threading.Event()
+    restart_watchdog_started = False
     try:
         # Close the M4 seam at runtime: enrich now renders bot-protected pages through the
         # live WebView2 engine (resolved lazily from the running window on Windows).
@@ -508,13 +537,22 @@ def run_windowed(
         restart_requested = {"value": False}
 
         def _request_restart() -> None:
+            nonlocal restart_watchdog_started
             from stockroom.host.window import active_window
 
             win = active_window()
             if win is not None:
                 _persist_active_window_session(win, host_config)
             restart_requested["value"] = True
-            _close_active_window()
+            if not restart_watchdog_started:
+                restart_watchdog_started = True
+                _start_restart_watchdog(graceful_restart_handoff)
+            try:
+                _close_active_window()
+            except RuntimeError:
+                # The watchdog owns the deterministic fallback. Do not leave
+                # convergence activation-pending after the checkout already moved.
+                pass
 
         ctx.request_restart = _request_restart
         app_repo = getattr(ctx, "app_repo", None)
@@ -728,6 +766,7 @@ def run_windowed(
             else:
                 opener = open_window or _open_window
                 opener(base_url, ctx.token)  # degraded/source compatibility window
+                graceful_restart_handoff.set()
         finally:
             try:
                 if production_update_runtime is not None:

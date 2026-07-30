@@ -17,6 +17,7 @@ from stockroom.host.run import (
     _install_injected_index,
     _mount_development_source_convergence,
     _serve_in_thread,
+    _start_restart_watchdog,
     run_windowed,
 )
 
@@ -132,6 +133,39 @@ def test_run_windowed_returns_true_when_a_restart_is_requested(app_ctx):
 
 def test_run_windowed_returns_false_on_a_normal_close(app_ctx):
     assert run_windowed(ctx=app_ctx, open_window=lambda base_url, token: None) is False
+
+
+def test_restart_watchdog_forces_the_launcher_contract_when_window_never_closes():
+    import threading
+
+    graceful = threading.Event()
+    exits: list[int] = []
+
+    watchdog = _start_restart_watchdog(
+        graceful,
+        delay_seconds=0,
+        exit_process=exits.append,
+    )
+    watchdog.join(timeout=1)
+
+    assert exits == [42]
+
+
+def test_restart_watchdog_stays_idle_after_a_graceful_window_handoff():
+    import threading
+
+    graceful = threading.Event()
+    graceful.set()
+    exits: list[int] = []
+
+    watchdog = _start_restart_watchdog(
+        graceful,
+        delay_seconds=0,
+        exit_process=exits.append,
+    )
+    watchdog.join(timeout=1)
+
+    assert exits == []
 
 
 def test_development_source_convergence_restarts_frontend_and_backend():
