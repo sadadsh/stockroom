@@ -478,8 +478,8 @@ function Build-WindowHost {
     finally {
         Pop-Location
     }
-    $host = Join-Path $publishRoot "Stockroom.WindowHost.exe"
-    if (-not (Test-Path -LiteralPath $host -PathType Leaf)) {
+    $hostExecutable = Join-Path $publishRoot "Stockroom.WindowHost.exe"
+    if (-not (Test-Path -LiteralPath $hostExecutable -PathType Leaf)) {
         throw "dotnet publish did not produce Stockroom.WindowHost.exe."
     }
     return $publishRoot
