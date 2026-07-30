@@ -16,6 +16,9 @@ keeps the managed application checkout aligned with the pushed `main` branch.
 - Added automatic Git convergence. Pushed revisions are downloaded, the current
   UI session is persisted, and Stockroom relaunches itself on the updated
   checkout without asking the user to download another executable.
+- Revisions downloaded first by library sync remain pending until the loaded
+  application runtime activates the same revision; a newer checkout is never
+  mislabeled as an already-current process.
 - The updater verifies that the native Stockroom window belongs to its process
   and waits for Windows to confirm closure before it reports a successful
   restart handoff. A bounded restart watchdog returns control to the stable
