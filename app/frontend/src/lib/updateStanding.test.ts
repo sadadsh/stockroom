@@ -27,24 +27,33 @@ describe("deriveUpdateStanding", () => {
     });
   });
 
-  it("does not translate a bare false or an offline result into current", () => {
-    for (const data of [
-      { update_available: false },
-      {
-        update_available: false,
-        state: "offline",
-        current_revision: "123456789abc",
-        detail: "network unavailable",
-      },
-    ]) {
-      expect(
-        deriveUpdateStanding({
-          data,
-          checking: false,
-          failed: false,
-        }).standing,
-      ).toBe("unknown");
-    }
+  it("does not translate a bare false into current", () => {
+    expect(
+      deriveUpdateStanding({
+        data: { update_available: false },
+        checking: false,
+        failed: false,
+      }).standing,
+    ).toBe("unknown");
+  });
+
+  it("names an interrupted remote check as an automatic retry", () => {
+    expect(
+      deriveUpdateStanding({
+        data: {
+          update_available: false,
+          state: "offline",
+          current_revision: "123456789abc",
+          detail: "network unavailable",
+        },
+        checking: false,
+        failed: false,
+      }),
+    ).toMatchObject({
+      standing: "retrying",
+      currentRevision: "123456789abc",
+      detail: "network unavailable",
+    });
   });
 
   it("does not call a locally different revision current", () => {
@@ -142,8 +151,8 @@ describe("deriveUpdateStanding", () => {
           failed: false,
         }),
       ).toMatchObject({
-        standing: "unknown",
-        targetRevision: "",
+        standing: "blocked",
+        targetRevision: "222222222222",
         detail: "automatic adoption did not complete",
       });
     }

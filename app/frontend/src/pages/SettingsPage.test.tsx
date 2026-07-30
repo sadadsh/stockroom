@@ -563,7 +563,9 @@ describe("SettingsPage — sync + kicad + update", () => {
     } as never);
     renderPage();
     await openSettings("settings.update");
-    expect(await screen.findByText(/latest revision unknown while offline/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/remote check incomplete; retrying automatically/i),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/^current$/i)).toBeNull();
     expect(screen.queryByRole("button", { name: /install and restart/i })).toBeNull();
   });
