@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -818,6 +820,104 @@ def test_background_owner_uses_the_current_profile_path_on_every_pass(tmp_path, 
         tmp_path / "First" / "altium" / "Stockroom.DbLib",
         tmp_path / "Second" / "altium" / "Stockroom.DbLib",
     ]
+
+
+def test_background_owner_does_not_relaunch_a_terminal_failure(tmp_path, monkeypatch):
+    from stockroom.altium.convergence import AltiumConvergenceResult
+
+    target = _dblib(tmp_path)
+    attempted = threading.Event()
+    calls = 0
+
+    def converge(_target, **_kwargs):
+        nonlocal calls
+        calls += 1
+        attempted.set()
+        return AltiumConvergenceResult("exited", "Altium exited before the marker.")
+
+    monkeypatch.setattr("stockroom.altium.convergence.converge_altium_library", converge)
+    service = AltiumLibraryConvergenceService(
+        lambda: target,
+        poll_seconds=0.01,
+        retry_seconds=0.01,
+        driver_factory=lambda: _Driver(tmp_path),
+    )
+
+    service.start()
+    assert attempted.wait(1)
+    time.sleep(0.06)
+    service.stop()
+
+    assert calls == 1
+
+
+def test_background_owner_retries_busy_seat_then_stops_after_terminal_failure(
+    tmp_path, monkeypatch
+):
+    from stockroom.altium.convergence import AltiumConvergenceResult
+
+    target = _dblib(tmp_path)
+    second_attempt = threading.Event()
+    calls = 0
+
+    def converge(_target, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            second_attempt.set()
+            return AltiumConvergenceResult("dialog", "Altium opened a blocking dialog.")
+        return AltiumConvergenceResult("busy", "The Altium seat is in use.")
+
+    monkeypatch.setattr("stockroom.altium.convergence.converge_altium_library", converge)
+    service = AltiumLibraryConvergenceService(
+        lambda: target,
+        poll_seconds=0.01,
+        retry_seconds=0.01,
+        driver_factory=lambda: _Driver(tmp_path),
+    )
+
+    service.start()
+    assert second_attempt.wait(1)
+    time.sleep(0.06)
+    service.stop()
+
+    assert calls == 2
+
+
+def test_background_owner_retries_after_target_change_or_explicit_request(tmp_path, monkeypatch):
+    from stockroom.altium.convergence import AltiumConvergenceResult
+
+    first = _dblib(tmp_path, "First.DbLib")
+    second = _dblib(tmp_path, "Second.DbLib")
+    active = [first]
+    attempts: list[Path] = []
+    third_attempt = threading.Event()
+
+    def converge(target, **_kwargs):
+        attempts.append(Path(target))
+        if len(attempts) == 3:
+            third_attempt.set()
+        return AltiumConvergenceResult("timeout", "The native proof timed out.")
+
+    monkeypatch.setattr("stockroom.altium.convergence.converge_altium_library", converge)
+    service = AltiumLibraryConvergenceService(
+        lambda: active[0],
+        poll_seconds=0.01,
+        retry_seconds=0.01,
+        driver_factory=lambda: _Driver(tmp_path),
+    )
+
+    service.start()
+    while len(attempts) < 1:
+        time.sleep(0.005)
+    active[0] = second
+    while len(attempts) < 2:
+        time.sleep(0.005)
+    service.request_retry()
+    assert third_attempt.wait(1)
+    service.stop()
+
+    assert attempts == [first, second, second]
 
 
 def test_native_host_starts_a_dynamic_profile_convergence_owner(tmp_path, monkeypatch):
