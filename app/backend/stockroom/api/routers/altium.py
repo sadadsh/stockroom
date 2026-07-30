@@ -5,6 +5,7 @@ switches the DbLib this surface reflects."""
 from __future__ import annotations
 
 import threading
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
@@ -90,6 +91,24 @@ def altium_router(require_token) -> APIRouter:
             "skipped": result["skipped"],
             "dblib": Path(result["dblib"]).as_posix(),
         }
+
+    @r.post("/setup")
+    def setup(request: Request) -> dict:
+        """Install and verify the active DbLib only after an explicit user action.
+
+        This may open two short Altium sessions by design. It is never called from host startup,
+        profile polling, a GET, or regeneration, so opening Stockroom cannot consume a seat or
+        create a recurring command window.
+        """
+
+        from stockroom.altium.convergence import converge_altium_library
+
+        ctx = request.app.state.ctx
+        target = Path(ctx.profile.root) / "altium" / "Stockroom.DbLib"
+        with _WRITE_LOCK:
+            result = converge_altium_library(target)
+        setattr(ctx, "last_altium_convergence", result)
+        return asdict(result)
 
     @r.get("/embed-capability")
     def embed_capability() -> dict:

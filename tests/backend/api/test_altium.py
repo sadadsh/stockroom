@@ -48,6 +48,36 @@ def test_regenerate_over_empty_is_ok(client):
     assert body["dblib"].endswith("/altium/Stockroom.DbLib")
 
 
+def test_setup_requires_token(anon_client):
+    assert anon_client.post("/api/altium/setup").status_code == 401
+
+
+def test_setup_runs_only_from_the_explicit_post(client, app_ctx, monkeypatch):
+    from stockroom.altium.convergence import AltiumConvergenceResult
+
+    calls = []
+    result = AltiumConvergenceResult(
+        "verified",
+        "Installed and verified from an explicit request.",
+        component_key="TPS62130",
+    )
+
+    def converge(target):
+        calls.append(Path(target))
+        return result
+
+    monkeypatch.setattr("stockroom.altium.convergence.converge_altium_library", converge)
+
+    assert client.get("/api/altium/status").status_code == 200
+    assert calls == []
+    response = client.post("/api/altium/setup")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "verified"
+    assert calls == [Path(app_ctx.profile.root) / "altium" / "Stockroom.DbLib"]
+    assert app_ctx.last_altium_convergence is result
+
+
 def test_local_altium_attach_is_not_a_public_activation_lane(client):
     before = client.get("/api/altium/status").json()
     r = client.post(

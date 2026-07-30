@@ -1603,6 +1603,16 @@ export interface AltiumRegenerateResult {
   dblib: string;
 }
 
+export interface AltiumSetupResult {
+  status: string;
+  detail: string;
+  dblib: string;
+  component_key: string;
+  symbol_library: string;
+  footprint_library: string;
+  receipt_path: string;
+}
+
 // A single icon override in the POST /api/dev/save request (dev-mode v2): either `body` (raw inner
 // SVG markup, sanitised by the backend before it is written) or `swapToId` (another registry icon
 // id to render instead). Both optional; an entry with neither is dropped server-side.

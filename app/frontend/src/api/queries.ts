@@ -922,6 +922,10 @@ export function useAltiumRegenerate() {
   });
 }
 
+export function useAltiumSetup() {
+  return useMutation({ mutationFn: () => api.altiumSetup() });
+}
+
 // Whether a 3D embed can run on this machine. Machine-level like the ODBC check, and it changes
 // out-of-band (the user closes Altium, freeing the license seat), so re-check on window focus:
 // coming back to the app after closing Altium must enable the action without a manual refresh.
