@@ -47,6 +47,8 @@ _datas = [
 ]
 _build_identity = _required_file("STOCKROOM_BUILD_IDENTITY")
 _datas.append((_build_identity, "."))
+_uv = _required_file("STOCKROOM_UV_EXECUTABLE")
+_datas.append((_uv, "."))
 _datas += collect_data_files("webview")
 
 # Git is a product dependency for the user's library repository, independent

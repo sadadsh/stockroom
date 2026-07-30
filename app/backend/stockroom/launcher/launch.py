@@ -163,14 +163,15 @@ def app_workdir() -> Path:
     """Where the launcher keeps its managed app working copy: a per-user, writable, stable
     location so the same checkout is reused (and self-updated) across launches.
 
-    STOCKROOM_APP_DIR wins (tests + portable installs); then %LOCALAPPDATA%/Stockroom/app on
+    STOCKROOM_APP_DIR wins (tests + portable installs); then
+    %LOCALAPPDATA%/Stockroom/Continuous Runtime/App on
     Windows; then ${XDG_DATA_HOME:-~/.local/share}/stockroom/app elsewhere."""
     override = os.environ.get("STOCKROOM_APP_DIR")
     if override:
         return Path(override)
     if _os_name() == "nt":
         base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
-        return Path(base) / "Stockroom" / "app"
+        return Path(base) / "Stockroom" / "Continuous Runtime" / "App"
     xdg = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
     return Path(xdg) / "stockroom" / "app"
 

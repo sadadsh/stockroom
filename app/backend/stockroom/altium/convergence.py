@@ -503,52 +503,58 @@ def verify_persistent_library(
     footprint_from_parameters = (
         "ModelType0=PCBLIB" in placement and f"ModelName0={component.footprint_ref}" in placement
     )
-    common = {
-        "installed_paths": installed,
-        "component_key": values.get("DbComponentKey", "") or component.key,
-        # DelphiScript does not marshal FindComponentSymbol's out WideString values in AD26.
-        # Its Boolean return is reliable, so pair it with the exact readable source asset selected
-        # before launch rather than turning an empty out-param into a false negative.
-        "symbol_library": (
-            values.get("SymbolLibrary")
-            or values.get("DbSchLibPath")
-            or (str(component.symbol_path) if symbol_resolved else "")
-        ),
-        # FindModelLibraryPath has the same empty-out behavior on a DbLib. Altium's own placement
-        # parameter string names the exact PCBLIB model; require that exact expected model.
-        "footprint_library": values.get("FootprintLibrary")
-        or (str(component.footprint_path) if footprint_from_parameters else ""),
-        "placement_parameters": placement,
-        "altium_log": log,
-    }
-    if not outcome.ok:
-        return PersistenceVerification(outcome.status, outcome.detail, **common)
-    if not is_installed(installed, dblib_win):
+    component_key = values.get("DbComponentKey", "") or component.key
+    # DelphiScript does not marshal FindComponentSymbol's out WideString values in AD26.
+    # Its Boolean return is reliable, so pair it with the exact readable source asset selected
+    # before launch rather than turning an empty out-param into a false negative.
+    symbol_library = (
+        values.get("SymbolLibrary")
+        or values.get("DbSchLibPath")
+        or (str(component.symbol_path) if symbol_resolved else "")
+    )
+    # FindModelLibraryPath has the same empty-out behavior on a DbLib. Altium's own placement
+    # parameter string names the exact PCBLIB model; require that exact expected model.
+    footprint_library = values.get("FootprintLibrary") or (
+        str(component.footprint_path) if footprint_from_parameters else ""
+    )
+
+    def verification(status: str, detail: str) -> PersistenceVerification:
         return PersistenceVerification(
+            status,
+            detail,
+            installed_paths=installed,
+            component_key=component_key,
+            symbol_library=symbol_library,
+            footprint_library=footprint_library,
+            placement_parameters=placement,
+            altium_log=log,
+        )
+
+    if not outcome.ok:
+        return verification(outcome.status, outcome.detail)
+    if not is_installed(installed, dblib_win):
+        return verification(
             "not-installed",
             f"{target.name} was absent from Altium's Installed list in a fresh process.",
-            **common,
         )
     failures = [line.strip() for line in log.splitlines() if line.strip().startswith("FAIL:")]
     if failures:
-        return PersistenceVerification("not-placeable", failures[0], **common)
+        return verification("not-placeable", failures[0])
     if not all(
         (
-            common["component_key"],
-            common["symbol_library"],
-            common["footprint_library"],
-            common["placement_parameters"],
+            component_key,
+            symbol_library,
+            footprint_library,
+            placement,
         )
     ):
-        return PersistenceVerification(
+        return verification(
             "not-placeable",
             "The fresh session listed the library but did not resolve a complete placeable part.",
-            **common,
         )
-    return PersistenceVerification(
+    return verification(
         "ok",
-        f"Fresh Altium session resolved {common['component_key']} from {target.name}.",
-        **common,
+        f"Fresh Altium session resolved {component_key} from {target.name}.",
     )
 
 
@@ -594,12 +600,20 @@ def verify_libraries_absent(
     )
     log = outcome.marker_text
     installed = parse_installed(log, "Installed")
-    common = {"installed_paths": installed, "altium_log": log}
+
+    def verification(status: str, detail: str) -> PersistenceVerification:
+        return PersistenceVerification(
+            status,
+            detail,
+            installed_paths=installed,
+            altium_log=log,
+        )
+
     if not outcome.ok:
-        return PersistenceVerification(outcome.status, outcome.detail, **common)
+        return verification(outcome.status, outcome.detail)
     failures = [line.strip() for line in log.splitlines() if line.strip().startswith("FAIL:")]
     if failures:
-        return PersistenceVerification("probe-failed", failures[0], **common)
+        return verification("probe-failed", failures[0])
 
     remaining = tuple(
         target
@@ -608,15 +622,13 @@ def verify_libraries_absent(
     )
     if remaining:
         names = ", ".join(str(item) for item in remaining)
-        return PersistenceVerification(
+        return verification(
             "still-installed",
             f"A fresh Altium session still lists Stockroom-receipted DbLibs: {names}.",
-            **common,
         )
-    return PersistenceVerification(
+    return verification(
         "ok",
         f"A fresh Altium session lists none of {len(targets)} receipted DbLib registrations.",
-        **common,
     )
 
 

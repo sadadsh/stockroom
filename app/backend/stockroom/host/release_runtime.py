@@ -1977,8 +1977,13 @@ def create_production_update_runtime(
         )
         if manage_native_window:
             from stockroom.host.window_runtime import ProductionWindowReplacement
+            from stockroom.store.machine_config import MachineConfig
 
             config = getattr(context, "config", None)
+            if not isinstance(config, MachineConfig):
+                raise ProductionUpdateConfigurationError(
+                    "production native window configuration is unavailable"
+                )
             window_replacement = ProductionWindowReplacement(
                 active.current,
                 public_base_url=public_base_url,

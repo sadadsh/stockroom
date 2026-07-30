@@ -37,6 +37,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 # Where an Altium install may live. Globbed and version-sorted rather than hardcoded: `AD26` is
 # one version on one machine, and a peer running Stockroom will have a different one.
 _INSTALL_ROOTS = (
@@ -146,13 +148,19 @@ class RealHost:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                creationflags=_NO_WINDOW,
             )
         except (OSError, subprocess.TimeoutExpired):
             return ""
         return out.stdout.replace("\r", "")
 
     def spawn(self, argv: list[str]) -> Process:
-        return subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return subprocess.Popen(
+            argv,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=_NO_WINDOW,
+        )
 
     def sleep(self, seconds: float) -> None:
         time.sleep(seconds)
@@ -167,7 +175,12 @@ class RealHost:
         if len(text) > 1 and text[1] == ":":
             return text
         try:
-            out = subprocess.run(["wslpath", "-w", text], capture_output=True, text=True)
+            out = subprocess.run(
+                ["wslpath", "-w", text],
+                capture_output=True,
+                text=True,
+                creationflags=_NO_WINDOW,
+            )
         except OSError:
             return text
         return out.stdout.strip() or text
@@ -179,7 +192,12 @@ class RealHost:
         raw = self.powershell("$env:TEMP").strip()
         if raw:
             try:
-                out = subprocess.run(["wslpath", "-u", raw], capture_output=True, text=True)
+                out = subprocess.run(
+                    ["wslpath", "-u", raw],
+                    capture_output=True,
+                    text=True,
+                    creationflags=_NO_WINDOW,
+                )
                 cand = Path(out.stdout.strip() or raw)
             except OSError:
                 cand = Path(raw)

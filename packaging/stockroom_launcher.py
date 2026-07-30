@@ -1,9 +1,9 @@
-"""Frozen entry point for Stockroom's stable managed Windows runtime.
+"""Frozen entry point for Stockroom's continuous Windows runtime.
 
-Normal launch starts the signed broker, managed service authority, API, and
-window host.  The same immutable executable is copied into each release set;
-``--port`` dispatches that copy as a windowless candidate worker, while the
-strict ``--window-host`` form starts a release-owned isolated WebView shell.
+Normal launch supervises a separate managed checkout that follows the pushed
+``main`` branch. The same executable still supports immutable release probes:
+``--port`` dispatches it as a windowless candidate worker, while the strict
+``--window-host`` form starts a release-owned isolated WebView shell.
 """
 
 from __future__ import annotations
@@ -78,9 +78,9 @@ def _dispatch() -> None:
     if any(argument.startswith("--managed-host-probe") for argument in sys.argv[1:]):
         raise SystemExit("--managed-host-probe requires exactly one absolute receipt path")
     _prepare_runtime(needs_window=True)
-    from stockroom.host.run import main as host_main
+    from stockroom.launcher.launch import main as continuous_main
 
-    host_main()
+    raise SystemExit(continuous_main())
 
 
 def _main() -> None:

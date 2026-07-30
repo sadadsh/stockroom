@@ -602,19 +602,19 @@ def test_persisted_v1_release_activates_packaged_v2_in_shared_data_root(
         control.close()
 
 
-def test_frozen_entry_and_spec_are_the_full_managed_runtime_contract() -> None:
+def test_frozen_entry_and_spec_are_the_continuous_and_managed_runtime_contract() -> None:
     launcher = LAUNCHER.read_text(encoding="utf-8")
     spec = SPEC.read_text(encoding="utf-8")
     build = BUILD_SCRIPT.read_text(encoding="utf-8")
 
-    assert "stockroom.launcher.launch import main" not in launcher
-    assert "stockroom.host.run import main as host_main" in launcher
+    assert "stockroom.launcher.launch import main as continuous_main" in launcher
+    assert "raise SystemExit(continuous_main())" in launcher
     assert "stockroom.host.worker import main as worker_main" in launcher
     assert "--managed-host-probe" in launcher
     assert 'collect_submodules("stockroom")' in spec
     assert '"app/frontend-dist"' in spec
     assert '"fastapi"' not in spec.partition("excludes=[")[2]
-    assert 'runtime_status = "stable-managed-release-runtime"' in build
+    assert 'runtime_status = "continuous-main-runtime"' in build
     assert '"stockroom-managed-host-launch/1"' in build
     assert "immutable_release_bundle_round_trip = $true" in build
     assert "managed_service_authority = $true" in build
@@ -629,6 +629,7 @@ def test_frozen_entry_and_spec_are_the_full_managed_runtime_contract() -> None:
     assert "$probeStart.Arguments" in build
     assert '$probeStart.EnvironmentVariables["STOCKROOM_CONFIG_DIR"]' in build
     assert "STOCKROOM_BUILD_IDENTITY" in spec
+    assert "STOCKROOM_UV_EXECUTABLE" in spec
     assert "stockroom-build-identity.json" in build
     assert '"--minimum-host-version", $MinimumHostVersion' in build
     assert "minimum_host_version = $MinimumHostVersion" in build

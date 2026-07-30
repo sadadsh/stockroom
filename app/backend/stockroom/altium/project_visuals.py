@@ -297,6 +297,8 @@ def _edge_components(mask: Image.Image, marker: int = 128) -> Image.Image:
     """Mark every white component connected to an image edge."""
 
     pixels = mask.load()
+    if pixels is None:
+        raise ValueError("the PCB page mask has no readable pixels")
     width, height = mask.size
     for x in range(width):
         for y in (0, height - 1):
