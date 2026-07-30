@@ -34,6 +34,7 @@ _ERROR_INSUFFICIENT_BUFFER = 122
 _LR_LOAD_FROM_FILE = 0x0010
 _IMAGE_ICON = 1
 _WM_SETICON = 0x0080
+_WM_CLOSE = 0x0010
 _ICON_SMALL = 0
 _ICON_BIG = 1
 _SM_CXICON = 11
@@ -269,6 +270,58 @@ def _current_process_window_handle(window, user32=None, process_id: int | None =
     except Exception:  # noqa: BLE001 - an unverified handle must fail closed
         _log.debug("native Stockroom window handle verification failed", exc_info=True)
         return None
+
+
+def request_window_close(
+    window=None,
+    *,
+    user32=None,
+    process_id: int | None = None,
+) -> bool:
+    """Close Stockroom from any host thread through its verified native HWND.
+
+    ``pywebview.Window.destroy`` is not a reliable cross-thread handoff on the
+    WinForms backend. Posting ``WM_CLOSE`` asks the owning UI thread to perform
+    the normal close sequence. The exact HWND is accepted only when Windows
+    confirms that it belongs to this process; test doubles and older backends
+    retain the direct-destroy fallback.
+    """
+
+    target = window if window is not None else active_window()
+    if target is None:
+        return True
+    hwnd = _current_process_window_handle(
+        target,
+        user32=user32,
+        process_id=process_id,
+    )
+    if hwnd is not None:
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            api = user32 or ctypes.windll.user32
+            post = api.PostMessageW
+            _set_signature(
+                post,
+                [
+                    wintypes.HWND,
+                    wintypes.UINT,
+                    wintypes.WPARAM,
+                    wintypes.LPARAM,
+                ],
+                wintypes.BOOL,
+            )
+            if bool(post(hwnd, _WM_CLOSE, 0, 0)):
+                return True
+        except Exception:  # noqa: BLE001 - direct destroy remains a safe fallback
+            _log.debug("native Stockroom close request failed", exc_info=True)
+    try:
+        target.destroy()
+        return True
+    except Exception:  # noqa: BLE001 - caller must retain activation for retry
+        _log.debug("managed Stockroom destroy request failed", exc_info=True)
+        return False
 
 
 def _apply_saved_window_geometry(window_handle: int, config=None):
