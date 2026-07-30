@@ -946,10 +946,38 @@ def run_window(base_url: str, token: str) -> None:
             current_url = None
         return should_inject(current_url, base_url)
 
+    startup_recovery = {"remaining": 2}
+
     def _on_loaded() -> None:
         # Re-authenticate after reload/update, but never inject into remote content.
         if _spa_is_current():
             window.evaluate_js(inject_script(base_url, token))
+            return
+        if startup_recovery["remaining"] <= 0:
+            return
+        startup_recovery["remaining"] -= 1
+
+        def _recover_startup_renderer() -> None:
+            # A forced process handoff can briefly overlap the old WebView2
+            # renderer releasing this persistent profile. Edge surfaces
+            # RESULT_CODE_KILLED, whose built-in Refresh succeeds once release
+            # completes. Perform the same explicit navigation automatically.
+            time.sleep(3.0)
+            if _spa_is_current():
+                return
+            try:
+                separator = "&" if "?" in base_url else "?"
+                window.load_url(
+                    f"{base_url}{separator}__stockroom_recover={time.time_ns()}"
+                )
+            except Exception:  # noqa: BLE001 - the next loaded event owns the bounded retry
+                _log.debug("Stockroom startup renderer recovery failed", exc_info=True)
+
+        threading.Thread(
+            target=_recover_startup_renderer,
+            name="stockroom-webview-recovery",
+            daemon=True,
+        ).start()
 
     window.events.loaded += _on_loaded
     window.events.loaded += lambda: _apply_window_icon(window)
