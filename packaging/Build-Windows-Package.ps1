@@ -29,6 +29,7 @@ $ErrorActionPreference = "Stop"
 
 $RepositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $PackagingRoot = [IO.Path]::GetFullPath($PSScriptRoot)
+$BrandAssetsTool = Join-Path $PackagingRoot "brand_assets.py"
 $ContractTool = Join-Path $PackagingRoot "package_contract.py"
 $ReleaseBundleTool = Join-Path $PackagingRoot "release_bundle.py"
 $ReleaseFeedModule = "packaging.release_feed"
@@ -292,6 +293,13 @@ if ($Mode -eq "Production") {
         Set-Variable -Name $variableName -Value $keyPaths
     }
 }
+
+# The committed ICO is generated from a small, deterministic grayscale mark.
+# Refuse stale or hand-edited identity bytes before PyInstaller or MSIX can
+# silently embed a different icon.
+Invoke-Checked -FilePath $UvPath -Arguments @(
+    "run", "--frozen", "python", $BrandAssetsTool, "--check"
+)
 
 # Advisory fail-fast check only. The probe releases its claim immediately, so
 # the packaged runtime still performs the authoritative acquisition after this

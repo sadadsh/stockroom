@@ -232,14 +232,29 @@ Microsoft references:
 - [Automatic update and repair](https://learn.microsoft.com/windows/msix/app-installer/auto-update-and-repair--overview)
 - [Sign an MSIX package](https://learn.microsoft.com/windows/msix/package/signing-package-overview)
 
+## Application identity
+
+The EXE, native host window, installed-app entry, Start tile, and taskbar tile
+all derive from the same tracked multi-resolution ICO. Its flat grayscale
+pad-field mark is generated deterministically rather than edited by hand:
+
+```powershell
+uv run python packaging\brand_assets.py --write
+uv run python packaging\brand_assets.py --check
+```
+
+Every package build runs the check before invoking PyInstaller or MakeAppx, so
+stale brand bytes fail closed.
+
 ## Development gates
 
 Run the focused contract checks from the repository root:
 
 ```powershell
+uv run python packaging\brand_assets.py --check
 uv run pytest tests\backend\packaging -q
-uv run ruff check packaging\package_contract.py packaging\release_bundle.py packaging\release_feed.py tests\backend\packaging
-uv run ty check packaging\package_contract.py packaging\release_bundle.py packaging\release_feed.py tests\backend\packaging
+uv run ruff check packaging\brand_assets.py packaging\package_contract.py packaging\release_bundle.py packaging\release_feed.py tests\backend\packaging
+uv run ty check packaging\brand_assets.py packaging\package_contract.py packaging\release_bundle.py packaging\release_feed.py tests\backend\packaging
 
 Import-Module PSScriptAnalyzer
 Invoke-ScriptAnalyzer `
