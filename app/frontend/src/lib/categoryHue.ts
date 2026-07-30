@@ -52,6 +52,24 @@ const FAMILIES: ReadonlyArray<{ family: string; match: readonly string[] }> = [
   },
 ];
 
+// Tailwind must see complete class literals. Building an arbitrary-value class with
+// `${token}` causes its scanner to emit invalid CSS containing the placeholder itself.
+const TILE_CLASSES: Readonly<Record<string, string>> = {
+  resistor:
+    "bg-[color-mix(in_srgb,var(--cat-resistor)_12%,transparent)] border-[color-mix(in_srgb,var(--cat-resistor)_34%,transparent)]",
+  capacitor:
+    "bg-[color-mix(in_srgb,var(--cat-capacitor)_12%,transparent)] border-[color-mix(in_srgb,var(--cat-capacitor)_34%,transparent)]",
+  inductor:
+    "bg-[color-mix(in_srgb,var(--cat-inductor)_12%,transparent)] border-[color-mix(in_srgb,var(--cat-inductor)_34%,transparent)]",
+  diode:
+    "bg-[color-mix(in_srgb,var(--cat-diode)_12%,transparent)] border-[color-mix(in_srgb,var(--cat-diode)_34%,transparent)]",
+  connector:
+    "bg-[color-mix(in_srgb,var(--cat-connector)_12%,transparent)] border-[color-mix(in_srgb,var(--cat-connector)_34%,transparent)]",
+  crystal:
+    "bg-[color-mix(in_srgb,var(--cat-crystal)_12%,transparent)] border-[color-mix(in_srgb,var(--cat-crystal)_34%,transparent)]",
+  ic: "bg-[color-mix(in_srgb,var(--cat-ic)_12%,transparent)] border-[color-mix(in_srgb,var(--cat-ic)_34%,transparent)]",
+};
+
 function hue(family: string): CategoryHue {
   const token = `--cat-${family}`;
   return {
@@ -60,9 +78,7 @@ function hue(family: string): CategoryHue {
     stroke: `var(${token})`,
     // a faint wash of the same hue + a slightly stronger hairline, both mixed against transparent
     // so they adapt per theme (no per-theme literal, no scattered rgba)
-    tileClass:
-      `bg-[color-mix(in_srgb,var(${token})_12%,transparent)] ` +
-      `border-[color-mix(in_srgb,var(${token})_34%,transparent)]`,
+    tileClass: TILE_CLASSES[family] ?? "",
   };
 }
 

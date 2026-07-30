@@ -268,14 +268,14 @@ function needsSubline(_hasKicad: boolean, _hasAltium: boolean, vendor: string): 
 }
 
 const ROUTE_STATUS: Record<ProviderOutcomeStatus, { label: string; tone: string }> = {
-  activated: { label: "Activated", tone: "text-ok" },
-  "succeeded-retained": { label: "Retained", tone: "text-ok" },
-  unavailable: { label: "Unavailable", tone: "text-t3" },
-  "requires-human": { label: "Needs Your Input", tone: "text-warn" },
-  blocked: { label: "Blocked", tone: "text-warn" },
-  failed: { label: "Failed", tone: "text-err" },
-  cancelled: { label: "Cancelled", tone: "text-warn" },
-  "not-attempted": { label: "Not Attempted", tone: "text-warn" },
+  activated: { label: "Activated", tone: "text-[var(--c-ok-text)]" },
+  "succeeded-retained": { label: "Retained", tone: "text-[var(--c-ok-text)]" },
+  unavailable: { label: "Unavailable", tone: "text-t2" },
+  "requires-human": { label: "Needs Your Input", tone: "text-[var(--c-warn-text)]" },
+  blocked: { label: "Blocked", tone: "text-[var(--c-warn-text)]" },
+  failed: { label: "Failed", tone: "text-[var(--c-err-text)]" },
+  cancelled: { label: "Cancelled", tone: "text-[var(--c-warn-text)]" },
+  "not-attempted": { label: "Not Attempted", tone: "text-[var(--c-warn-text)]" },
 };
 
 function routeReason(outcome: ProviderOutcome): string {
@@ -316,12 +316,13 @@ function ProviderRouteOutcomes({
     <div className="mt-3.5 border-t border-line pt-3" data-dev-id="complete.cad-provider-outcomes">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-t3">
+          <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-t2">
             Source Results
           </div>
           <p
             className={
-              "mt-1 text-2xs leading-snug " + (collectionComplete ? "text-t3" : "text-warn")
+              "mt-1 text-2xs leading-snug " +
+              (collectionComplete ? "text-t2" : "text-[var(--c-warn-text)]")
             }
           >
             {collectionComplete
@@ -332,7 +333,9 @@ function ProviderRouteOutcomes({
         <span
           className={
             "flex-none rounded-full px-2 py-0.5 text-2xs font-semibold " +
-            (collectionComplete ? "bg-ok/15 text-ok" : "bg-warn/15 text-warn")
+            (collectionComplete
+              ? "bg-ok/15 text-[var(--c-ok-text)]"
+              : "bg-warn/15 text-[var(--c-warn-text)]")
           }
         >
           {collectionComplete ? "Complete" : "Partial"}
@@ -349,7 +352,7 @@ function ProviderRouteOutcomes({
             >
               <div className="truncate text-xs font-medium text-t1">{outcome.label}</div>
               <div className={"text-2xs font-semibold " + status.tone}>{status.label}</div>
-              <div className="col-span-2 text-2xs leading-snug text-t3">{routeReason(outcome)}</div>
+              <div className="col-span-2 text-2xs leading-snug text-t2">{routeReason(outcome)}</div>
             </div>
           );
         })}
@@ -568,13 +571,13 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
   const total = requirements.length + needs.length;
 
   const statusTone = collectionPartial
-    ? "text-warn"
+    ? "text-[var(--c-warn-text)]"
     : download.status === "error"
-      ? "text-err"
+      ? "text-[var(--c-err-text)]"
       : download.status === "timed-out"
-        ? "text-warn"
+        ? "text-[var(--c-warn-text)]"
         : isDone
-          ? "text-ok"
+          ? "text-[var(--c-ok-text)]"
           : "text-t3";
 
   return (
@@ -655,7 +658,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                           <Text id="modal.completePart.cad-title">Automatic Completion</Text>
                         )}
                       </div>
-                      <div className="mt-0.5 text-2xs leading-snug text-t3">
+                      <div className="mt-0.5 text-2xs leading-snug text-t2">
                         {isDone
                           ? collectionPartial
                             ? "The active KiCad and Altium files are complete. Exhaustive source collection still needs attention."

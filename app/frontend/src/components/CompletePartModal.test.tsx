@@ -270,7 +270,9 @@ describe("CompletePartModal - automatic capture", () => {
       await screen.findByText(
         "Collection Complete. Every route is settled. Unavailable means it was checked and had no exact deliverable.",
       ),
-    ).toBeInTheDocument();
+    ).toHaveClass("text-t2");
+    expect(screen.getByText("Source Results")).toHaveClass("text-t2");
+    expect(screen.getByText("Complete")).toHaveClass("text-[var(--c-ok-text)]");
   });
 
   it("shows each DigiKey author route independently and calls blocked work partial", async () => {
@@ -354,13 +356,15 @@ describe("CompletePartModal - automatic capture", () => {
       await screen.findByText(
         "Collection Partial. A route requires human input, is blocked or failed, was cancelled, or was not attempted.",
       ),
-    ).toBeInTheDocument();
+    ).toHaveClass("text-[var(--c-warn-text)]");
+    expect(screen.getByText("Partial")).toHaveClass("text-[var(--c-warn-text)]");
     expect(screen.getByText("DigiKey / Ultra Librarian")).toBeInTheDocument();
     expect(screen.getByText("DigiKey / SnapMagic")).toBeInTheDocument();
     expect(screen.getByText("DigiKey / TraceParts")).toBeInTheDocument();
-    expect(screen.getByText("Unavailable")).toBeInTheDocument();
-    expect(screen.getByText("Needs Your Input")).toBeInTheDocument();
-    expect(screen.getByText("Not Attempted")).toBeInTheDocument();
+    expect(screen.getByText("Unavailable")).toHaveClass("text-t2");
+    expect(screen.getByText("Needs Your Input")).toHaveClass("text-[var(--c-warn-text)]");
+    expect(screen.getByText("Not Attempted")).toHaveClass("text-[var(--c-warn-text)]");
+    expect(screen.getByText("No exact deliverable was offered.")).toHaveClass("text-t2");
   });
 
   it("never shows an asset word as both Added and Needed: DETAILS is metadata-only when FILES owns the assets", async () => {
