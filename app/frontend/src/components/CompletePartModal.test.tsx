@@ -660,7 +660,7 @@ describe("CompletePartModal - vendor choice", () => {
     expect(
       screen.getByText(/verified evidence and automatic routes run first/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/open provider launches the sign-in/i)).toBeInTheDocument();
+    expect(screen.getByText(/open provider is the login handoff/i)).toBeInTheDocument();
     expect(screen.getByText(/reuses stockroom's provider profile/i)).toBeInTheDocument();
   });
 
