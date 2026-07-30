@@ -154,13 +154,21 @@ def _cache_busted_reload_url(url: str, token: str) -> str:
     )
 
 
-def _persist_active_window_session(win, config=None) -> bool:
+def _persist_active_window_session(
+    win,
+    config=None,
+    *,
+    required: bool = True,
+) -> bool:
     """Synchronously capture the renderer's last-keystroke state, when supported.
 
     The export hook is deliberately synchronous: navigation cannot race an async
     PUT whose renderer is about to be destroyed.  Old frontend bundles have no
     hook and remain reloadable.  Once a bundle exposes the hook, a malformed or
-    failed export aborts navigation rather than silently losing the user's work.
+    failed export aborts an in-process navigation rather than silently losing the
+    user's work. A full process restart may pass ``required=False``: the normal
+    debounced server copy remains durable, while a malformed transient renderer
+    envelope cannot veto application updates forever.
     """
 
     evaluate = getattr(win, "evaluate_js", None)
@@ -174,6 +182,8 @@ def _persist_active_window_session(win, config=None) -> bool:
             "})()"
         )
     except Exception:
+        if not required:
+            return False
         raise RuntimeError("the active UI session could not be exported") from None
     if exported is None:
         return False
@@ -182,6 +192,8 @@ def _persist_active_window_session(win, config=None) -> bool:
     try:
         persist_export_envelope(exported, config)
     except Exception:
+        if not required:
+            return False
         raise RuntimeError("the active UI session export was invalid") from None
     return True
 
@@ -542,7 +554,11 @@ def run_windowed(
 
             win = active_window()
             if win is not None:
-                _persist_active_window_session(win, host_config)
+                _persist_active_window_session(
+                    win,
+                    host_config,
+                    required=False,
+                )
             restart_requested["value"] = True
             if not restart_watchdog_started:
                 restart_watchdog_started = True

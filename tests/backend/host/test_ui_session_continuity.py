@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 import stockroom.host.window as window_module
-from stockroom.host.run import _reload_active_window
+from stockroom.host.run import _persist_active_window_session, _reload_active_window
 from stockroom.store.ui_session import (
     create_draft,
     default_snapshot,
@@ -118,4 +118,18 @@ def test_invalid_export_aborts_navigation_and_preserves_previous_state(
         _reload_active_window("http://127.0.0.1:43210")
 
     assert window.navigations == []
+    assert load_snapshot() == previous
+
+
+def test_invalid_export_cannot_veto_a_full_process_restart() -> None:
+    previous = default_snapshot()
+    previous["route"] = "settings"
+    from stockroom.store.ui_session import save_snapshot
+
+    save_snapshot(previous)
+    invalid = default_snapshot()
+    invalid["password"] = "must-not-persist"
+    window = _Window({"snapshot": invalid})
+
+    assert _persist_active_window_session(window, required=False) is False
     assert load_snapshot() == previous
