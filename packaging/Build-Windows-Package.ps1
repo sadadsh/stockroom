@@ -457,6 +457,11 @@ function Build-WindowHost {
     param([Parameter(Mandatory)][string]$Name)
 
     $buildRoot = Initialize-OutputDirectory -Path (Join-Path $WorkRoot $Name)
+    # Roslyn source-generator identities include generated source paths. Build
+    # both independent publish trees through the same freshly cleared compile
+    # root so path-derived names do not differ merely because the proof labels
+    # are "Build 1" and "Build 2".
+    $compileRoot = Initialize-OutputDirectory -Path (Join-Path $WorkRoot "Window Host Compilation")
     $publishRoot = Join-Path $buildRoot "Publish"
     Push-Location $RepositoryRoot
     try {
@@ -470,9 +475,9 @@ function Build-WindowHost {
             "-p:RestoreLockedMode=true",
             "-p:ContinuousIntegrationBuild=true",
             "-p:Deterministic=true",
-            "-p:BaseOutputPath=$(Join-Path $buildRoot 'Bin')\",
-            "-p:BaseIntermediateOutputPath=$(Join-Path $buildRoot 'Obj')\",
-            "-p:MSBuildProjectExtensionsPath=$(Join-Path $buildRoot 'Obj')\"
+            "-p:BaseOutputPath=$(Join-Path $compileRoot 'Bin')\",
+            "-p:BaseIntermediateOutputPath=$(Join-Path $compileRoot 'Obj')\",
+            "-p:MSBuildProjectExtensionsPath=$(Join-Path $compileRoot 'Obj')\"
         )
     }
     finally {
