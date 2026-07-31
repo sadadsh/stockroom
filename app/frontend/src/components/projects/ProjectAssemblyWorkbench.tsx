@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   useActiveAssembly,
   useCompleteAssembly,
@@ -133,13 +133,25 @@ export function ProjectAssemblyWorkbench({
             ? { title: placementRequiredTitle, detail: placementRequiredDetail, retry: true }
             : null;
   const placements = run?.placements ?? [];
+  // Pending work first (the queue advances through it), then BOARD, then reference. Without the
+  // board term a three-board run interleaved the boards and every row was labelled by reference
+  // alone, so the queue read "R1, R1, R1, R2, R2, R2" with nothing to tell the copies apart.
   const ordered = useMemo(
     () =>
       [...placements].sort((a, b) => {
         const aPending = a.state === "pending" ? 0 : 1;
         const bPending = b.state === "pending" ? 0 : 1;
-        return aPending - bPending || a.reference.localeCompare(b.reference, undefined, { numeric: true });
+        return (
+          aPending - bPending ||
+          a.board_index - b.board_index ||
+          a.reference.localeCompare(b.reference, undefined, { numeric: true })
+        );
       }),
+    [placements],
+  );
+  // One board needs no board banner; more than one needs it on every row.
+  const multiBoard = useMemo(
+    () => new Set(placements.map((placement) => placement.board_index)).size > 1,
     [placements],
   );
   const mappedReferences = useMemo(
@@ -172,12 +184,19 @@ export function ProjectAssemblyWorkbench({
   }, [geometry.isLoading, mappedReferences, ordered, selectedId]);
 
   const selected = ordered.find((placement) => placement.placement_id === selectedId) ?? null;
+  // The placement stage draws exactly one board, so its state map must describe that board.
+  // The backend emits one placement per (board_index, component), so keying by reference
+  // alone collapsed every board into a single entry and let the last board overwrite the
+  // rest - a multi-board run showed another board's progress on the selected board.
+  const activeBoardIndex = selected?.board_index ?? ordered[0]?.board_index;
   const states = useMemo(
     () =>
       Object.fromEntries(
-        placements.map((placement) => [placement.reference, placement.state]),
+        placements
+          .filter((placement) => placement.board_index === activeBoardIndex)
+          .map((placement) => [placement.reference, placement.state]),
       ),
-    [placements],
+    [placements, activeBoardIndex],
   );
   const progress = run?.progress ?? assemblyProgress(placements);
 
@@ -356,40 +375,56 @@ export function ProjectAssemblyWorkbench({
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_228px] overflow-hidden rounded-card border border-line bg-surface @[60rem]:grid-cols-[220px_minmax(420px,1fr)_250px]">
         <section className="hidden min-h-0 overflow-y-auto border-r border-line @[60rem]:block">
-          {ordered.map((placement) => {
+          {ordered.map((placement, index) => {
             const active = placement.placement_id === selectedId;
+            // A board banner opens each run of rows from the same board. Pending work sorts
+            // ahead of resolved work, so one board legitimately opens two runs; the banner
+            // repeats there rather than letting a row sit under the wrong board.
+            const opensBoard =
+              multiBoard && placement.board_index !== ordered[index - 1]?.board_index;
             return (
-              <button
-                type="button"
-                key={placement.placement_id}
-                onClick={() => setSelectedId(placement.placement_id)}
-                className={
-                  "relative w-full border-b border-line px-3 py-2.5 text-left transition-colors " +
-                  "focus-visible:z-10 focus-visible:outline focus-visible:outline-2 " +
-                  "focus-visible:-outline-offset-2 focus-visible:outline-acc " +
-                  (active ? "bg-raise2" : "hover:bg-raise")
-                }
-              >
-                <span
-                  aria-hidden
+              <Fragment key={placement.placement_id}>
+                {opensBoard ? (
+                  <div className="sticky top-0 z-[1] border-b border-line bg-band px-3 py-1.5 text-2xs font-semibold text-t2">
+                    {boardField} {placement.board_index}
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(placement.placement_id)}
                   className={
-                    "absolute inset-y-2 left-0 w-0.5 rounded-full " +
-                    (active ? "bg-acc" : "bg-transparent")
+                    "relative w-full border-b border-line px-3 py-2.5 text-left transition-colors " +
+                    "focus-visible:z-10 focus-visible:outline focus-visible:outline-2 " +
+                    "focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+                    (active ? "bg-raise2" : "hover:bg-raise")
                   }
-                />
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate font-mono text-sm font-semibold text-t1">
-                    {placement.reference}
+                >
+                  <span
+                    aria-hidden
+                    className={
+                      "absolute inset-y-2 left-0 w-0.5 rounded-full " +
+                      (active ? "bg-acc" : "bg-transparent")
+                    }
+                  />
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate font-mono text-sm font-semibold text-t1">
+                      {placement.reference}
+                    </span>
+                    {multiBoard ? (
+                      <span className="flex-none font-mono text-2xs text-t3">
+                        {boardField} {placement.board_index}
+                      </span>
+                    ) : null}
+                    <PlacementState state={placement.state} />
                   </span>
-                  <PlacementState state={placement.state} />
-                </span>
-                <span className="mt-1 block truncate text-xs font-medium text-t2">
-                  {placement.mpn || placement.value || identityNeeded}
-                </span>
-                <span className="mt-0.5 block truncate font-mono text-2xs text-t3">
-                  {placement.footprint}
-                </span>
-              </button>
+                  <span className="mt-1 block truncate text-xs font-medium text-t2">
+                    {placement.mpn || placement.value || identityNeeded}
+                  </span>
+                  <span className="mt-0.5 block truncate font-mono text-2xs text-t3">
+                    {placement.footprint}
+                  </span>
+                </button>
+              </Fragment>
             );
           })}
         </section>
@@ -406,6 +441,7 @@ export function ProjectAssemblyWorkbench({
             >
               {ordered.map((placement) => (
                 <option key={placement.placement_id} value={placement.placement_id}>
+                  {multiBoard ? `${boardField} ${placement.board_index} · ` : ""}
                   {placement.reference} · {placementStateLabels[placement.state]} ·{" "}
                   {placement.mpn || placement.value || identityNeeded}
                 </option>
@@ -421,7 +457,14 @@ export function ProjectAssemblyWorkbench({
             activeReference={selected?.reference ?? ""}
             states={states}
             onSelectReference={(reference) => {
-              const placement = ordered.find((candidate) => candidate.reference === reference);
+              // Prefer the placement on the board currently drawn; the same reference exists
+              // once per board, so matching on reference alone selected another board's row.
+              const placement =
+                ordered.find(
+                  (candidate) =>
+                    candidate.reference === reference &&
+                    candidate.board_index === activeBoardIndex,
+                ) ?? ordered.find((candidate) => candidate.reference === reference);
               if (placement) setSelectedId(placement.placement_id);
             }}
             className="min-h-0 flex-1 !rounded-none !border-0"

@@ -76,6 +76,10 @@ export interface CaptureState {
   collectionComplete: boolean | null;
   completionEvidence: CompletionEvidence | null;
   completionEvidenceReported: boolean;
+  // The part this capture displaced, when a different part was still mid-capture as it started.
+  // There is exactly one capture slot, so that earlier run stops being followed; naming it here is
+  // what keeps the surface honest instead of letting the work disappear without a word.
+  superseded: { partId: string; partName: string } | null;
 }
 
 const IDLE: CaptureState = {
@@ -92,7 +96,12 @@ const IDLE: CaptureState = {
   collectionComplete: null,
   completionEvidence: null,
   completionEvidenceReported: false,
+  superseded: null,
 };
+
+// A capture that has not reached a terminal verdict yet. Starting a different part while one of
+// these is running is what abandons the earlier follow loop.
+const IN_FLIGHT: GuidedStatus[] = ["resolving", "window-open", "receiving", "attaching"];
 
 const EVENT_PAGE_LIMIT = 200;
 const POLL_INTERVAL_MS = 750;
@@ -175,7 +184,14 @@ function terminalWorkflow(batch: WorkflowBatchSummary): boolean {
   // traps the modal in `window-open` forever even though no provider window was
   // opened, which disables both Open Provider and Collect All Sources.  Consume
   // its durable report and return an actionable partial result instead.
-  return ["completed", "blocked", "failed", "cancelled"].includes(batch.status);
+  //
+  // `paused` is terminal for this poll for the same reason.  Pause is a first-class batch
+  // state a person can resume from the completion surface, so treating it as still-running
+  // left the modal polling every 750 ms forever with `cadBusy` stuck true, which disabled
+  // Get Files and Collect All Sources with no way back short of relaunching the app.
+  return ["completed", "blocked", "failed", "cancelled", "paused"].includes(
+    batch.status,
+  );
 }
 
 const WORKFLOW_STAGE_MESSAGE: Record<string, string> = {
@@ -358,7 +374,6 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     commandKey: string;
     idempotencyKey: string;
   } | null>(null);
-  const unsupportedRuntimeRef = useRef(false);
 
   const invalidate = useCallback(() => {
     const partId = partIdRef.current;
@@ -633,19 +648,6 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       sourceKey?: string,
       mode: CaptureMode = "automatic",
     ) => {
-      if (unsupportedRuntimeRef.current) {
-        setState({
-          ...IDLE,
-          partId,
-          partName,
-          needs,
-          vendor: sourceKey ?? "Automatic",
-          status: "unavailable",
-          message: UNSUPPORTED_DURABLE_RUNTIME,
-        });
-        return;
-      }
-
       const commandKey = captureCommandKey(partId, sourceKey, mode);
       const idempotencyKey =
         retrySubmissionRef.current?.commandKey === commandKey
@@ -657,8 +659,18 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       needsRef.current = needs;
       batchIdRef.current = null;
       itemIdRef.current = null;
-      setState({
+      setState((current) => ({
         ...IDLE,
+        // ONE global capture slot. The refs above have just been repointed, so the previous part's
+        // follow loop ends at its next generation check and its durable pointer is overwritten by
+        // the first `persistWorkflow` below. Following both at once would need a real per-part job
+        // manager (one state, one saved workflow pointer, and one status pill all assume a single
+        // run), which is not a contained change. What this must never do is drop the earlier part
+        // in silence, so the displaced part travels with the new state for the surface to report.
+        superseded:
+          current.partId && current.partId !== partId && IN_FLIGHT.includes(current.status)
+            ? { partId: current.partId, partName: current.partName ?? "" }
+            : null,
         partId,
         partName,
         needs,
@@ -670,7 +682,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
             : mode === "assisted"
               ? `Preparing ${sourceKey || "the selected provider"} for one assisted capture. Stockroom handles every supported step and pauses only for a provider security check.`
               : "Planning automatic exact-identity, data, datasheet, and shared CAD completion...",
-      });
+      }));
 
       try {
         const reference = await api.runCapture({
@@ -687,7 +699,10 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         }
         if (!reference.workflow_batch_id) {
           if (reference.job_id) {
-            unsupportedRuntimeRef.current = true;
+            // Deliberately not latched for the lifetime of the hook. Stockroom restarts
+            // itself for every update, so a backend that could not serve a durable workflow
+            // a moment ago may serve one now. Remembering it made the "Try Again" button
+            // short-circuit to "unavailable" for every part until the app was relaunched.
             throw new UnsupportedDurableRuntimeError();
           }
           throw new Error(

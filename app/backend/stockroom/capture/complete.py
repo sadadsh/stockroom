@@ -46,6 +46,7 @@ from stockroom.capture.requirements import (
     capture_needs,
     capture_requirements,
 )
+from stockroom.text import plural
 
 ProviderOutcomeStatus = Literal[
     "succeeded-retained",
@@ -298,12 +299,13 @@ def _route_plan_errors(
     unexpected = sorted(observed - expected)
     if missing:
         errors.append(
-            f"{source_key}: missing terminal provider outcome(s): {', '.join(missing)}"
+            f"{source_key}: missing terminal provider "
+            f"{plural(len(missing), 'outcome')}: {', '.join(missing)}"
         )
     if unexpected:
         errors.append(
-            f"{source_key}: reported unplanned provider outcome(s): "
-            f"{', '.join(unexpected)}"
+            f"{source_key}: reported unplanned provider "
+            f"{plural(len(unexpected), 'outcome')}: {', '.join(unexpected)}"
         )
     return errors
 

@@ -713,6 +713,18 @@ def library_router(require_token) -> APIRouter:
         implemented_capture = {
             adapter.capability.key: adapter.capability for adapter in all_adapters()
         }
+        # Which providers can finish a part with nobody watching, on THIS machine right now.
+        # `capture_available` is true for every implemented adapter, so it cannot tell a surface
+        # which one to reach for first; without this a chooser defaults to the head of the trust
+        # order, which is the aggregator whose controls stay person-driven.
+        from stockroom.capture.runner import _machine_access_allowed
+
+        unattended = {
+            key
+            for key, capability in implemented_capture.items()
+            if capability.browser_access == "machine_allowed"
+            and _machine_access_allowed(key, config=ctx.config)
+        }
         first = sources[0] if sources else None
         return {
             "mpn": record.mpn,
@@ -731,6 +743,7 @@ def library_router(require_token) -> APIRouter:
                         else s.instruction
                     ),
                     "capture_available": s.key in implemented_capture,
+                    "unattended_capture": s.key in unattended,
                 }
                 for s in sources
             ],

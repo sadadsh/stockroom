@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import threading
+import time
 from collections.abc import Callable, Mapping
 from typing import Any, cast
 
@@ -21,6 +23,7 @@ from stockroom.workflow import (
     RetryOutcome,
     StageContext,
     StageHandlerError,
+    StageLeaseLost,
     StageName,
     StageOutcome,
     StageStatus,
@@ -294,3 +297,212 @@ def test_exact_replay_is_idempotent_and_a_stale_claim_never_calls_the_handler(tm
 
     stale_runtime.dispatch_claim(fresh_claim, "new-worker", now=5)
     assert calls == 1
+
+
+def test_a_stage_running_past_its_lease_is_not_reclaimed(tmp_path):
+    # The lease stays sub-second but is deliberately ten heartbeats long: a
+    # single synchronous=FULL commit on Windows can stall a few hundred
+    # milliseconds, and this test must prove renewal, not disk latency.
+    store = WorkflowStore(tmp_path / "workflow.sqlite3")
+    store.submit_batch([IntakeIdentity("ACME", "P-1")])
+    claim = store.claim_ready("worker-a", lease_seconds=0.5, limit=1)[0]
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocking(context: StageContext):
+        started.set()
+        assert release.wait(5.0)
+        return _identity(context)
+
+    runtime = WorkflowRuntime(
+        store,
+        {StageName.IDENTITY_DEDUPE: blocking},
+        heartbeat_seconds=0.05,
+    )
+    dispatched: list[object] = []
+    failures: list[BaseException] = []
+
+    def dispatch() -> None:
+        try:
+            dispatched.append(runtime.dispatch_claim(claim, "worker-a", lease_seconds=0.5))
+        except BaseException as exc:  # noqa: BLE001 - reported to the main thread
+            failures.append(exc)
+
+    worker = threading.Thread(target=dispatch, name="dispatch-under-test")
+    worker.start()
+    try:
+        assert started.wait(2.0)
+        deadline = time.monotonic() + 0.9
+        while time.monotonic() < deadline:
+            assert store.claim_ready("worker-b", lease_seconds=30, limit=1) == []
+            time.sleep(0.05)
+    finally:
+        release.set()
+        worker.join(5.0)
+
+    assert not failures
+    assert worker.is_alive() is False
+    assert len(dispatched) == 1
+    stage = store.get_stage(claim.id)
+    assert stage.status is StageStatus.COMPLETED
+    assert stage.attempt_count == 1
+
+
+def test_lease_renewal_never_rotates_the_fence(tmp_path):
+    store = WorkflowStore(tmp_path / "workflow.sqlite3")
+    store.submit_batch([IntakeIdentity("ACME", "P-1")])
+    claim = store.claim_ready("worker", lease_seconds=0.5, limit=1)[0]
+    observed: list[Any] = []
+
+    def slow(context: StageContext):
+        time.sleep(0.25)
+        observed.append(store.get_stage(claim.id))
+        return _identity(context)
+
+    runtime = WorkflowRuntime(
+        store,
+        {StageName.IDENTITY_DEDUPE: slow},
+        heartbeat_seconds=0.05,
+    )
+
+    dispatched = runtime.dispatch_claim(claim, "worker", lease_seconds=0.5)
+
+    assert dispatched is not None
+    in_flight = observed[0]
+    assert in_flight.status is StageStatus.RUNNING
+    assert in_flight.lease_token == claim.lease_token
+    assert in_flight.lease_generation == claim.lease_generation
+    assert in_flight.lease_expires_at > claim.lease_expires_at
+    completed = store.get_stage(claim.id)
+    assert completed.status is StageStatus.COMPLETED
+    assert completed.attempt_count == 1
+
+
+def test_lease_renewal_stays_out_of_the_durable_event_journal(tmp_path):
+    store = WorkflowStore(tmp_path / "workflow.sqlite3")
+    store.submit_batch([IntakeIdentity("ACME", "P-1")])
+    claim = store.claim_ready("worker", lease_seconds=0.5, limit=1)[0]
+    observed: list[Any] = []
+
+    def slow(context: StageContext):
+        time.sleep(0.25)
+        observed.append(store.get_stage(claim.id))
+        return _identity(context)
+
+    runtime = WorkflowRuntime(
+        store,
+        {StageName.IDENTITY_DEDUPE: slow},
+        heartbeat_seconds=0.02,
+    )
+
+    runtime.dispatch_claim(claim, "worker", lease_seconds=0.5)
+
+    assert observed[0].lease_expires_at > claim.lease_expires_at
+    kinds = [event.kind for event in store.events(claim.batch_id)]
+    assert kinds.count("stage_lease_renewed") == 0
+
+
+class _LeaseLosingStore(WorkflowStore):
+    """A store whose heartbeat always loses the fence it tries to renew."""
+
+    def __init__(self, database):
+        super().__init__(database)
+        self.renew_attempts = 0
+        self.terminal_calls: list[str] = []
+
+    def renew_lease(self, *args, **kwargs):
+        self.renew_attempts += 1
+        raise WorkflowConflict("stage lease fence is stale")
+
+    def resolve_exact_identity(self, *args, **kwargs):
+        self.terminal_calls.append("resolve_exact_identity")
+        return super().resolve_exact_identity(*args, **kwargs)
+
+    def complete_stage(self, *args, **kwargs):
+        self.terminal_calls.append("complete_stage")
+        return super().complete_stage(*args, **kwargs)
+
+    def fail_stage(self, *args, **kwargs):
+        self.terminal_calls.append("fail_stage")
+        return super().fail_stage(*args, **kwargs)
+
+
+def test_a_lost_lease_skips_the_terminal_transition(tmp_path):
+    store = _LeaseLosingStore(tmp_path / "workflow.sqlite3")
+    store.submit_batch([IntakeIdentity("ACME", "P-1")])
+    claim = store.claim_ready("worker", lease_seconds=30, limit=1)[0]
+    finished = threading.Event()
+
+    def slow(context: StageContext):
+        time.sleep(0.3)
+        finished.set()
+        return _identity(context)
+
+    runtime = WorkflowRuntime(
+        store,
+        {StageName.IDENTITY_DEDUPE: slow},
+        heartbeat_seconds=0.05,
+    )
+
+    with pytest.raises(StageLeaseLost):
+        runtime.dispatch_claim(claim, "worker", lease_seconds=30)
+
+    assert finished.is_set()
+    assert store.renew_attempts >= 1
+    assert store.terminal_calls == []
+    assert isinstance(StageLeaseLost("x"), WorkflowConflict)
+    assert store.get_stage(claim.id).status is StageStatus.RUNNING
+
+
+def test_a_heartbeat_free_runtime_starts_no_thread(tmp_path):
+    store = WorkflowStore(tmp_path / "workflow.sqlite3")
+    store.submit_batch([IntakeIdentity("ACME", "P-1")])
+    claim = store.claim_ready("worker", lease_seconds=30, limit=1)[0]
+    live: list[int] = []
+
+    def observe(context: StageContext):
+        live.append(
+            sum(
+                1
+                for thread in threading.enumerate()
+                if thread.name == "stockroom-workflow-lease-heartbeat"
+            )
+        )
+        return _identity(context)
+
+    WorkflowRuntime(
+        store,
+        {StageName.IDENTITY_DEDUPE: observe},
+    ).dispatch_claim(claim, "worker")
+
+    assert live == [0]
+
+
+def test_a_stale_claim_starts_no_heartbeat(tmp_path):
+    store = WorkflowStore(tmp_path / "workflow.sqlite3")
+    store.submit_batch([IntakeIdentity("ACME", "P-1")], now=1)
+    stale_claim = store.claim_ready("old-worker", now=2, lease_seconds=1, limit=1)[0]
+    store.claim_ready("new-worker", now=4, lease_seconds=100, limit=1)
+    calls = 0
+
+    def counted(context: StageContext):
+        nonlocal calls
+        calls += 1
+        return _identity(context)
+
+    runtime = WorkflowRuntime(
+        store,
+        {StageName.IDENTITY_DEDUPE: counted},
+        heartbeat_seconds=0.05,
+    )
+
+    with pytest.raises(WorkflowConflict, match="stale"):
+        runtime.dispatch_claim(stale_claim, "old-worker", now=4)
+
+    time.sleep(0.15)
+    assert calls == 0
+    assert [
+        thread.name
+        for thread in threading.enumerate()
+        if thread.name == "stockroom-workflow-lease-heartbeat"
+    ] == []

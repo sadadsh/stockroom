@@ -27,7 +27,6 @@ import {
   useSettings,
   useSyncStatus,
   useSystemInfo,
-  useUpdateCheck,
   useUpdateSettings,
   useLoadDevCreds,
   useOdbcStatus,
@@ -46,11 +45,11 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "../components/Icon";
 import {
-  deriveUpdateStanding,
   shortRevision,
   updateTargetRevision,
   type UpdateStanding,
 } from "../lib/updateStanding";
+import { useUpdateStanding } from "../lib/useUpdateStanding";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -145,7 +144,7 @@ export function SettingsPage() {
   const settingsQ = useSettings();
   const odbc = useOdbcStatus();
   const syncQ = useSyncStatus();
-  const updateQ = useUpdateCheck();
+  const { query: updateQ, view: updateStanding } = useUpdateStanding();
   const profilesQ = useProfiles();
   // The three Library disclosures that used to state NOTHING on their collapsed row, so the only
   // way to learn any of them was to open all three. Same cached queries their sections already
@@ -157,11 +156,6 @@ export function SettingsPage() {
   const lfsQ = useLibraryLfs();
   const rescanQ = useRescanState();
   const { theme } = useTheme();
-  const updateStanding = deriveUpdateStanding({
-    data: updateQ.data,
-    checking: updateQ.isPending || updateQ.isFetching,
-    failed: updateQ.isError,
-  });
 
   const [group, setGroup] = useState<GroupId>("general");
 
@@ -258,7 +252,9 @@ export function SettingsPage() {
     general:
       updateStanding.standing === "available"
         ? "neutral"
-        : ["retrying", "blocked", "unknown"].includes(updateStanding.standing)
+        : ["retrying", "blocked", "restart_required", "unknown"].includes(
+              updateStanding.standing,
+            )
           ? "warn"
           : null,
     library: unmet.some((st) => st.group === "library") ? "warn" : null,
@@ -489,6 +485,8 @@ export function SettingsPage() {
                       <span>Retrying...</span>
                     ) : updateStanding.standing === "blocked" ? (
                       <span>Update Blocked</span>
+                    ) : updateStanding.standing === "restart_required" ? (
+                      <Badge tone="warn">Restart Required</Badge>
                     ) : (
                       <Text id="settings.summary.update-unknown">Update Unknown</Text>
                     )
@@ -768,6 +766,8 @@ function MachineSetupBand({
               <Badge tone="warn">Retrying</Badge>
             ) : updateStanding === "blocked" ? (
               <Badge tone="err">Blocked</Badge>
+            ) : updateStanding === "restart_required" ? (
+              <Badge tone="warn">Restart Required</Badge>
             ) : updateStanding === "updating" ? (
               <Badge tone="neutral">Updating</Badge>
             ) : updateStanding === "available" ? (
@@ -1790,13 +1790,7 @@ function GitHubSection() {
 }
 
 function UpdateSection() {
-  const check = useUpdateCheck();
-
-  const standing = deriveUpdateStanding({
-    data: check.data,
-    checking: check.isPending || check.isFetching,
-    failed: check.isError,
-  });
+  const { query: check, view: standing } = useUpdateStanding();
   const targetRevision = updateTargetRevision(check.data);
 
   return (
@@ -1855,6 +1849,10 @@ function UpdateSection() {
                 <span className="text-warn">Remote check incomplete; retrying automatically...</span>
               ) : standing.standing === "blocked" ? (
                 <span className="text-err">Automatic convergence needs attention</span>
+              ) : standing.standing === "restart_required" ? (
+                <span className="text-warn">
+                  Restart Stockroom to finish adopting the installed revision
+                </span>
               ) : (
                 <span className="text-warn">
                   {check.data?.state === "offline"
@@ -1872,7 +1870,8 @@ function UpdateSection() {
               )
             }
           />
-          {["retrying", "blocked", "unknown"].includes(standing.standing) && standing.detail ? (
+          {["retrying", "blocked", "restart_required", "unknown"].includes(standing.standing) &&
+          standing.detail ? (
             <StatusRow label="Check Detail" value={standing.detail} />
           ) : null}
         </>

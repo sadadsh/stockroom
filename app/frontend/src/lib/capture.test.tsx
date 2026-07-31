@@ -440,6 +440,59 @@ describe("CaptureProvider store", () => {
     });
     expect(result.current.active.partId).toBe("p2"); // replaced, never two at once
     expect(result.current.active.partName).toBe("Part Two");
+    // The first run had already settled, so nothing was displaced and nothing is claimed to be.
+    expect(result.current.active.superseded).toBeNull();
+  });
+
+  it("names the part it displaced when a second part takes the single capture slot", async () => {
+    // The one global slot means starting part B abandons part A's follow loop. That used to happen
+    // in total silence: `partIdRef`/`batchIdRef`/`followGenerationRef` were overwritten, A's loop
+    // ended at its next generation check, and the saved workflow pointer moved to B. Following
+    // both would need a real per-part job manager; the floor is that A is never dropped unnamed.
+    mockSource();
+    // Neither submission resolves, so p1's capture is genuinely still in flight when p2 starts.
+    vi.spyOn(api, "runCapture").mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      void result.current.start("p1", "Part One", ["kicad_symbol"]);
+      await Promise.resolve();
+    });
+    expect(result.current.active.partId).toBe("p1");
+    expect(result.current.active.superseded).toBeNull();
+
+    await act(async () => {
+      void result.current.start("p2", "Part Two", ["kicad_symbol"]);
+      await Promise.resolve();
+    });
+
+    expect(result.current.active.partId).toBe("p2");
+    expect(result.current.active.superseded).toEqual({
+      partId: "p1",
+      partName: "Part One",
+    });
+  });
+
+  it("does not claim a supersede when the same part is started again", async () => {
+    mockSource();
+    vi.spyOn(api, "runCapture").mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      void result.current.start("p1", "Part One", ["kicad_symbol"]);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      void result.current.start("p1", "Part One", ["kicad_symbol"], "ultralibrarian");
+      await Promise.resolve();
+    });
+
+    expect(result.current.active.partId).toBe("p1");
+    expect(result.current.active.superseded).toBeNull();
   });
 
   it("keepWorking backgrounds the active capture so the pill can take over", async () => {

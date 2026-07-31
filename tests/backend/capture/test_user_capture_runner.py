@@ -325,6 +325,227 @@ def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
     assert all(source.closed for source in source_batches[0] if hasattr(source, "closed"))
 
 
+def test_collect_all_finishes_every_automated_route_before_asking_a_person(
+    monkeypatch,
+    tmp_path,
+):
+    """Person-driven providers run LAST, after every route Stockroom can drive itself.
+
+    Collect All Sources is exhaustive, so DigiKey and SamacSys are still visited.  But a
+    person-driven route can be cancelled, and cancelling one cancels the rest of the run
+    (`guided.py::_supply_user_driven_route` calls `cancel_workflow`).  With DigiKey ahead of
+    SnapMagic in `_VENDOR_CHAIN`, closing DigiKey's window threw away a SnapMagic route that
+    needed no person at all.  Automation therefore has to be exhausted before the handoff.
+    """
+
+    import stockroom.evidence as evidence_module
+    from stockroom.capture import browser as browser_module
+    from stockroom.capture import guided as guided_module
+    from stockroom.ingest import pipeline as pipeline_module
+
+    constructed: list[dict] = []
+
+    class Pipeline:
+        def __init__(self, *_args, **_options):
+            pass
+
+    class Source:
+        key = "guided"
+
+        def __init__(self, _make_pipeline, **options):
+            self.options = options
+            constructed.append(options)
+
+        def close(self):
+            pass
+
+    class Runtime:
+        def close(self):
+            pass
+
+    class Direct:
+        key = "verified-cache"
+
+    class Report:
+        items = ()
+
+        def of(self, *_statuses):
+            return False
+
+        def to_dict(self):
+            return {"items": [], "counts": {}, "collection_complete": True}
+
+    monkeypatch.setattr(guided_module, "GuidedCaptureSource", Source)
+    monkeypatch.setattr(pipeline_module, "IngestPipeline", Pipeline)
+    monkeypatch.setattr(browser_module, "SharedPlaywrightRuntime", Runtime)
+    monkeypatch.setattr(evidence_module, "EvidenceStore", lambda _root: object())
+    monkeypatch.setattr(runner, "complete_library", lambda *_args, **_options: Report())
+    monkeypatch.setattr(runner, "build_sources", lambda *_args, **_kwargs: [Direct()])
+    monkeypatch.setattr(
+        runner,
+        "_automatic_provider_keys",
+        lambda _vendor, *, config=None: ["ultralibrarian"],
+    )
+    monkeypatch.setattr(
+        runner,
+        "DurableSlidingWindowLimiter",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_capture_downloads",
+        lambda _ctx, key: tmp_path / f"{key}-downloads",
+    )
+    monkeypatch.setattr(
+        runner,
+        "_capture_profile",
+        lambda _ctx, key: tmp_path / f"{key}-profile",
+    )
+    monkeypatch.setattr(
+        runner,
+        "_capture_rate_ledger",
+        lambda _ctx, key: tmp_path / f"{key}-rate.json",
+    )
+    monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
+    record = SimpleNamespace(
+        id="part-a",
+        manufacturer="Texas Instruments",
+        mpn="BQ24074",
+    )
+    ctx = SimpleNamespace(
+        ops=SimpleNamespace(load_record=lambda _part_id: record),
+        jobs=SimpleNamespace(run_write=lambda fn: fn()),
+        rebuild_index=lambda: None,
+        auto_push=lambda: None,
+        profile=object(),
+        repo=object(),
+        cli=object(),
+        config=SimpleNamespace(ul_private_evaluation_automation=True),
+    )
+
+    runner.run_guided_capture(ctx, part_ids=["part-a"], collect_all=True)
+
+    order = [options["vendor"] for options in constructed]
+    driven = [options["user_driven"] for options in constructed]
+
+    # The default preference must not put DigiKey's person-driven window ahead of SnapMagic's
+    # operator-automated one.
+    assert order == ["ultralibrarian", "snapmagic", "digikey", "samacsys"]
+    assert driven == [False, False, True, True]
+    assert order.index("snapmagic") < order.index("digikey")
+    # Stated as the invariant, not as one hard-coded list: no automated route may follow a
+    # person-driven one.
+    assert driven == sorted(driven)
+
+
+def test_collect_all_preference_reorders_only_within_the_automation_lane(
+    monkeypatch,
+    tmp_path,
+):
+    """A preferred person-driven provider is still not promoted ahead of automation.
+
+    Preference reorders one lane; it never buys a person-driven surface the right to hold up
+    routes that need nobody.
+    """
+
+    import stockroom.evidence as evidence_module
+    from stockroom.capture import browser as browser_module
+    from stockroom.capture import guided as guided_module
+    from stockroom.ingest import pipeline as pipeline_module
+
+    constructed: list[dict] = []
+
+    class Pipeline:
+        def __init__(self, *_args, **_options):
+            pass
+
+    class Source:
+        key = "guided"
+
+        def __init__(self, _make_pipeline, **options):
+            constructed.append(options)
+
+        def close(self):
+            pass
+
+    class Runtime:
+        def close(self):
+            pass
+
+    class Direct:
+        key = "verified-cache"
+
+    class Report:
+        items = ()
+
+        def of(self, *_statuses):
+            return False
+
+        def to_dict(self):
+            return {"items": [], "counts": {}, "collection_complete": True}
+
+    monkeypatch.setattr(guided_module, "GuidedCaptureSource", Source)
+    monkeypatch.setattr(pipeline_module, "IngestPipeline", Pipeline)
+    monkeypatch.setattr(browser_module, "SharedPlaywrightRuntime", Runtime)
+    monkeypatch.setattr(evidence_module, "EvidenceStore", lambda _root: object())
+    monkeypatch.setattr(runner, "complete_library", lambda *_args, **_options: Report())
+    monkeypatch.setattr(runner, "build_sources", lambda *_args, **_kwargs: [Direct()])
+    monkeypatch.setattr(
+        runner,
+        "_automatic_provider_keys",
+        lambda _vendor, *, config=None: ["ultralibrarian"],
+    )
+    monkeypatch.setattr(
+        runner,
+        "DurableSlidingWindowLimiter",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_capture_downloads",
+        lambda _ctx, key: tmp_path / f"{key}-downloads",
+    )
+    monkeypatch.setattr(
+        runner,
+        "_capture_profile",
+        lambda _ctx, key: tmp_path / f"{key}-profile",
+    )
+    monkeypatch.setattr(
+        runner,
+        "_capture_rate_ledger",
+        lambda _ctx, key: tmp_path / f"{key}-rate.json",
+    )
+    monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
+    record = SimpleNamespace(
+        id="part-a",
+        manufacturer="Texas Instruments",
+        mpn="BQ24074",
+    )
+    ctx = SimpleNamespace(
+        ops=SimpleNamespace(load_record=lambda _part_id: record),
+        jobs=SimpleNamespace(run_write=lambda fn: fn()),
+        rebuild_index=lambda: None,
+        auto_push=lambda: None,
+        profile=object(),
+        repo=object(),
+        cli=object(),
+        config=SimpleNamespace(ul_private_evaluation_automation=True),
+    )
+
+    runner.run_guided_capture(
+        ctx,
+        part_ids=["part-a"],
+        vendor="digikey",
+        collect_all=True,
+    )
+
+    order = [options["vendor"] for options in constructed]
+
+    assert order == ["ultralibrarian", "snapmagic", "digikey", "samacsys"]
+    # Every registered provider is still visited: preference demotes nobody out of the run.
+    assert sorted(order) == sorted(runner._VENDOR_CHAIN)
+
+
 def test_runner_uses_one_immutable_evidence_resolver_for_selection_and_completion(
     monkeypatch,
     tmp_path,

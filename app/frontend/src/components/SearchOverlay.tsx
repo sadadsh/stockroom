@@ -1150,11 +1150,24 @@ function ResultsTable({
   });
   const virtualItems = virtualizer.getVirtualItems();
 
+  // The row the pointer last activated. Scrolling a hovered row into view moves the rows
+  // under the cursor, which fires another mouseenter, which scrolls again - moving the mouse
+  // dragged the list along with it. A pointer already put the row where the user can see it,
+  // so only a selection the pointer did NOT make is worth scrolling to.
+  const pointerActiveIndex = useRef(-1);
+  const activateFromPointer = (index: number) => {
+    pointerActiveIndex.current = index;
+    onHover(index);
+  };
+
   // Keyboard selection can jump directly to an unmounted result. The stable
   // id has already been resolved to an index by the parent; make that index
   // visible without mounting any intervening rows.
   useEffect(() => {
+    const fromPointer = pointerActiveIndex.current === active;
+    pointerActiveIndex.current = -1;
     if (
+      fromPointer ||
       !virtualized ||
       active < 0 ||
       !scrollElement ||
@@ -1249,7 +1262,7 @@ function ResultsTable({
               showLifecycle={presence.lifecycle}
               td={td}
               virtualized={virtualized}
-              onHover={onHover}
+              onHover={activateFromPointer}
               onOpen={onOpen}
             />
           ) : null;

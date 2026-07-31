@@ -492,7 +492,14 @@ class ContextServiceLifecycle:
             else None
         )
         self._require_active_fence(control, fence)
-        runtime = WorkflowRuntime(store, workflow_registry)
+        # One third of the coordinator's 60s lease, so an assisted capture that
+        # legitimately holds a browser window open for minutes keeps its lease
+        # across two missed beats instead of being recovered and re-dispatched.
+        runtime = WorkflowRuntime(
+            store,
+            workflow_registry,
+            heartbeat_seconds=20.0,
+        )
         coordinator = WorkflowCoordinator(control, fence, store, runtime)
         background_sync: _ActivityHandle | None = None
         launch_sync: _ActivityHandle | None = None

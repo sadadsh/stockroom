@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  ADOPTION_STALL_MS,
+  RESTART_GRACE_MS,
   aboutVersion,
   deriveUpdateStanding,
   runningVersion,
   shortRevision,
+  staleFrontend,
   updateIdentity,
 } from "./updateStanding";
 
@@ -135,6 +138,145 @@ describe("deriveUpdateStanding", () => {
     ).toBe("updating");
   });
 
+  it("reads a lost backend during a restart as the restart it is, and only while it is young", () => {
+    // C4: a real handoff KILLS the backend, so the check errors while the cached snapshot still
+    // says the adoption is in flight. The failure branch used to be tested first and shadowed the
+    // updating branch in exactly the case that branch exists for.
+    const restarting = {
+      update_available: true,
+      state: "updating",
+      convergence_phase: "handing_off",
+      current_revision: "111111111111",
+      target_revision: "222222222222",
+    } as never;
+    const at = (ms: number) =>
+      deriveUpdateStanding({
+        data: restarting,
+        checking: false,
+        failed: true,
+        now: 1_000_000 + ms,
+        failedSince: 1_000_000,
+      });
+
+    expect(at(0)).toMatchObject({
+      standing: "updating",
+      detail: "Stockroom is restarting to finish adopting a verified release.",
+    });
+    expect(at(RESTART_GRACE_MS - 1).standing).toBe("updating");
+    // ...and once the backend has had every chance to come back, "Retrying" IS the honest word.
+    expect(at(RESTART_GRACE_MS).standing).toBe("retrying");
+    expect(at(RESTART_GRACE_MS * 10).standing).toBe("retrying");
+  });
+
+  it("does not extend the restart grace to a failure with nothing in flight", () => {
+    expect(
+      deriveUpdateStanding({
+        data: {
+          update_available: false,
+          state: "up_to_date",
+          current_revision: "111111111111",
+          target_revision: "111111111111",
+        } as never,
+        checking: false,
+        failed: true,
+        now: 1_000_000,
+        failedSince: 1_000_000,
+      }).standing,
+    ).toBe("retrying");
+  });
+
+  it("gives an adoption that never completes an exit instead of Updating forever", () => {
+    // C6: nothing bounded the transitional phases, so a host that stalled held "Updating..." for
+    // the life of the window with no manual escape anywhere in the UI.
+    const applying = {
+      update_available: true,
+      state: "updating",
+      convergence_phase: "applying",
+      current_revision: "111111111111",
+      target_revision: "222222222222",
+      detail: "staging release",
+    } as never;
+    expect(
+      deriveUpdateStanding({
+        data: applying,
+        checking: false,
+        failed: false,
+        now: 1_000_000 + ADOPTION_STALL_MS,
+        phaseStartedAt: 1_000_000,
+      }).standing,
+    ).toBe("updating");
+
+    const stalled = deriveUpdateStanding({
+      data: applying,
+      checking: false,
+      failed: false,
+      now: 1_000_000 + ADOPTION_STALL_MS + 1,
+      phaseStartedAt: 1_000_000,
+    });
+    expect(stalled.standing).toBe("blocked");
+    expect(stalled.detail).toContain("has not completed");
+  });
+
+  it("reports a bundle that never reloaded onto the backend's revision", () => {
+    // C8: both readouts preferred the backend's revision, so a WebView2 bundle that missed its
+    // reload showed the new revision confidently while running the old JavaScript.
+    expect(
+      deriveUpdateStanding({
+        data: {
+          update_available: false,
+          state: "up_to_date",
+          current_revision: "2222222222222",
+          target_revision: "2222222222222",
+        } as never,
+        checking: false,
+        failed: false,
+        buildVersion: "0.1.0+1111111",
+      }),
+    ).toMatchObject({
+      standing: "restart_required",
+      detail:
+        "This window is still running the 1111111 interface while the backend reports 2222222. " +
+        "Restart Stockroom to finish adopting it.",
+    });
+  });
+
+  it("claims a mismatch only between identities that are comparable", () => {
+    // The same short revision at two lengths is one revision, and a production release ID is not a
+    // Git revision at all - "disagreeing" with either would be an invented fact, not a reported one.
+    expect(staleFrontend({ update_available: false, current_revision: "1111111abc" }, "0.1.0+1111111")).toBeNull();
+    expect(
+      staleFrontend(
+        { update_available: false, channel: "production", current_revision: "release-1.2.3.4" },
+        "0.1.0+1111111",
+      ),
+    ).toBeNull();
+    // No revision in the bundle (a plain package version) is no evidence either way.
+    expect(staleFrontend({ update_available: false, current_revision: "222222222222" }, "0.1.0")).toBeNull();
+    expect(staleFrontend({ update_available: false, current_revision: "222222222222" }, "0.1.0+1111111")).toEqual({
+      bundle: "1111111",
+      backend: "222222222222",
+    });
+  });
+
+  it("does not call a stale frontend blocked or updating while an adoption is still running", () => {
+    // The mismatch is EXPECTED mid-adoption: the backend has moved and the reload has not happened
+    // yet. Only a settled backend makes the disagreement a standing of its own.
+    expect(
+      deriveUpdateStanding({
+        data: {
+          update_available: true,
+          state: "updating",
+          convergence_phase: "reloading_frontend",
+          current_revision: "222222222222",
+          target_revision: "222222222222",
+        } as never,
+        checking: false,
+        failed: false,
+        buildVersion: "0.1.0+1111111",
+      }).standing,
+    ).toBe("updating");
+  });
+
   it("never presents failed or rolled-back adoption as update available", () => {
     for (const state of ["failed", "rolled_back"]) {
       expect(
@@ -163,7 +305,16 @@ describe("revision labels", () => {
   it("uses compact Git revisions and falls back to the existing build version", () => {
     expect(shortRevision("123456789abc")).toBe("1234567");
     expect(shortRevision("release-1.2.3.4")).toBe("release-1.2.3.4");
+    // CORRECTED (C8). This case used to expect "1234567" - the BACKEND's revision - from a bundle
+    // built at aaaaaaa, which is the defect written down as an expectation: the running version is
+    // whatever JavaScript is executing, and that is the bundle. The backend's revision is still
+    // reported, next to it, under the `restart_required` standing that names the disagreement.
     expect(runningVersion("123456789abc", "0.1.0+aaaaaaa")).toEqual({
+      value: "aaaaaaa",
+      kind: "revision",
+    });
+    // Agreeing identities (the same revision at two lengths) still resolve to the backend's.
+    expect(runningVersion("123456789abc", "0.1.0+1234567")).toEqual({
       value: "1234567",
       kind: "revision",
     });

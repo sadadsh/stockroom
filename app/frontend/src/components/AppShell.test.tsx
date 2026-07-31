@@ -8,6 +8,7 @@ import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { CaptureProvider } from "../lib/capture";
 import { ThemeProvider } from "../lib/theme";
 import { ToastProvider } from "../lib/toast";
+import { resetUpdateClocksForTests } from "../lib/useUpdateStanding";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -28,7 +29,19 @@ vi.mock("../api/client", async (importActual) => {
 
 const mockApi = vi.mocked(api);
 
+// The revision THIS bundle was built at, and the short form the status bar renders. A backend
+// revision that disagrees with the running bundle is now its own standing ("Restart Required",
+// C8), so a suite about the status bar has to state the agreeing revision instead of inheriting a
+// synthetic one no build could match. Empty when the build carries no revision (no git at build
+// time), where the comparison is never made and the literal below behaves as it always did.
+const BUNDLE_REVISION = /\+([0-9a-f]{7,})$/i.exec(__APP_VERSION__)?.[1] ?? "";
+const BACKEND_REVISION = BUNDLE_REVISION || "123456789abc";
+// Bundle and backend agree by construction above, so this one short form names both.
+const SHORT_REVISION =
+  BACKEND_REVISION.length >= 8 ? BACKEND_REVISION.slice(0, 7) : BACKEND_REVISION;
+
 beforeEach(() => {
+  resetUpdateClocksForTests();
   mockApi.facets.mockResolvedValue({
     by_category: {}, by_manufacturer: {}, complete: 0, incomplete: 0,
   } as never);
@@ -36,8 +49,8 @@ beforeEach(() => {
   mockApi.checkUpdate.mockResolvedValue({
     update_available: false,
     state: "up_to_date",
-    current_revision: "123456789abc",
-    target_revision: "123456789abc",
+    current_revision: BACKEND_REVISION,
+    target_revision: BACKEND_REVISION,
     behind: 0,
   } as never);
 });
@@ -89,37 +102,57 @@ describe("AppShell status bar", () => {
     renderShell();
     expect(
       await screen.findByRole("status", {
-        name: "running revision 1234567, Current",
+        name: `running revision ${SHORT_REVISION}, Current`,
       }),
     ).toBeInTheDocument();
+  });
+
+  it("does not call a bundle Current when the backend has moved past it", async () => {
+    // C8: the status bar preferred the backend's revision, so a WebView2 bundle that missed its
+    // reload reported the new revision as running while executing the old JavaScript. Needs a
+    // bundle carrying a revision; the pure rule for a bundle without one lives in
+    // updateStanding.test.ts.
+    if (!BUNDLE_REVISION) return;
+    mockApi.checkUpdate.mockResolvedValue({
+      update_available: false,
+      state: "up_to_date",
+      current_revision: "222222222222",
+      target_revision: "222222222222",
+      behind: 0,
+    } as never);
+    renderShell();
+    const status = await screen.findByRole("status", {
+      name: `running revision ${SHORT_REVISION}, Restart Required, backend revision 2222222`,
+    });
+    expect(status).not.toHaveTextContent("Current");
   });
 
   it("shows the running-to-target revision path when an update is available", async () => {
     mockApi.checkUpdate.mockResolvedValue({
       update_available: true,
       state: "update_available",
-      current_revision: "111111111111",
+      current_revision: BACKEND_REVISION,
       target_revision: "222222222222",
       behind: 1,
     } as never);
     renderShell();
     expect(
       await screen.findByRole("status", {
-        name: "running revision 1111111, Update Available, target revision 2222222",
+        name: `running revision ${SHORT_REVISION}, Update Available, target revision 2222222`,
       }),
-    ).toHaveTextContent("1111111→2222222Update Available");
+    ).toHaveTextContent(`${SHORT_REVISION}→2222222Update Available`);
   });
 
   it("reports Retrying instead of Current when the remote check is interrupted", async () => {
     mockApi.checkUpdate.mockResolvedValue({
       update_available: false,
       state: "offline",
-      current_revision: "123456789abc",
+      current_revision: BACKEND_REVISION,
       detail: "network unavailable",
     } as never);
     renderShell();
     const status = await screen.findByRole("status", {
-      name: "running revision 1234567, Retrying…",
+      name: `running revision ${SHORT_REVISION}, Retrying…`,
     });
     expect(status).toBeInTheDocument();
     expect(status).not.toHaveTextContent("Current");

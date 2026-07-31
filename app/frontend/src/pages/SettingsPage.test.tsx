@@ -6,7 +6,15 @@ import type { ProfilesResponse, SettingsInfo, WiringReport } from "../api/types"
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider } from "../lib/devMode";
+import { resetUpdateClocksForTests } from "../lib/useUpdateStanding";
 import { SettingsPage } from "./SettingsPage";
+
+// The revision THIS bundle was built at. A backend revision that disagrees with the running bundle
+// is a standing of its own now ("Restart Required", C8), so the update cases below have to state
+// the agreeing revision rather than inherit a synthetic one no build could match. Empty when the
+// build carries no revision (no git at build time), where the comparison is never made.
+const BUNDLE_REVISION = /\+([0-9a-f]{7,})$/i.exec(__APP_VERSION__)?.[1] ?? "";
+const BACKEND_REVISION = BUNDLE_REVISION || "123456789abc";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -140,6 +148,7 @@ async function openSettings(devId: string) {
 }
 
 beforeEach(() => {
+  resetUpdateClocksForTests();
   localStorage.clear();
   delete document.documentElement.dataset.theme;
   mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS });
@@ -157,8 +166,8 @@ beforeEach(() => {
     update_available: false,
     state: "up_to_date",
     behind: 0,
-    current_revision: "123456789abc",
-    target_revision: "123456789abc",
+    current_revision: BACKEND_REVISION,
+    target_revision: BACKEND_REVISION,
   } as never);
   mockApi.altiumOdbcStatus.mockResolvedValue({
     installed: true,
@@ -533,7 +542,7 @@ describe("SettingsPage — sync + kicad + update", () => {
       update_available: true,
       state: "update_available",
       behind: 3,
-      current_revision: "111111111111",
+      current_revision: BACKEND_REVISION,
       target_revision: "222222222222",
       automatic_on_launch: true,
       automatic_apply: true,
@@ -553,11 +562,31 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(screen.queryByRole("button", { name: /install and restart/i })).toBeNull();
   });
 
+  it("says a restart is needed when the backend has moved past this window's bundle", async () => {
+    // C8: the page reported the BACKEND's revision as the installed one, so a WebView2 bundle that
+    // missed its reload read as a healthy, current install. Needs a bundle carrying a revision;
+    // the pure rule for a bundle without one lives in lib/updateStanding.test.ts.
+    if (!BUNDLE_REVISION) return;
+    mockApi.checkUpdate.mockResolvedValue({
+      update_available: false,
+      state: "up_to_date",
+      behind: 0,
+      current_revision: "222222222222",
+      target_revision: "222222222222",
+    } as never);
+    renderPage();
+    await openSettings("settings.update");
+    expect(
+      await screen.findByText(/restart stockroom to finish adopting the installed revision/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^current$/i)).toBeNull();
+  });
+
   it("never presents an unverified offline result as Current", async () => {
     mockApi.checkUpdate.mockResolvedValue({
       update_available: false,
       state: "offline",
-      current_revision: "123456789abc",
+      current_revision: BACKEND_REVISION,
       target_revision: "",
       detail: "network unavailable",
     } as never);

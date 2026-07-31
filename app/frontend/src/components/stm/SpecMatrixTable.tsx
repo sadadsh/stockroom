@@ -21,7 +21,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { observeElementRect, useVirtualizer } from "@tanstack/react-virtual";
 import type { McuSpecRow } from "../../api/types";
 import { SearchIcon } from "../icons";
 
@@ -40,6 +40,12 @@ interface ColMeta {
 }
 
 const ROW_HEIGHT = 34;
+
+// The viewport the virtualizer assumes before (and instead of) a real measurement. A first
+// paint - and every jsdom render - measures a 0-height container, and a 0-height viewport
+// yields ZERO virtual items: the matrix then committed every model row (thousands of rows x
+// 14 columns) on that first pass. PartsList and SearchOverlay carry the same guard.
+const INITIAL_VIEWPORT = { width: 1200, height: 640 };
 
 // Per-column DEFAULT widths (px) for the shared grid template (header, filter row, and every
 // body row). Fixed tracks so columns NEVER squish as visibility changes - the matrix scrolls
@@ -201,11 +207,16 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 14,
+    initialRect: INITIAL_VIEWPORT,
+    // A real non-zero browser measurement takes over immediately; a 0-height one (jsdom, a
+    // collapsed pane, the frame before layout) keeps the conservative viewport so the window
+    // stays bounded instead of collapsing to "render everything".
+    observeElementRect: (instance, callback) =>
+      observeElementRect(instance, (rect) =>
+        callback(rect.height > 0 ? rect : INITIAL_VIEWPORT),
+      ),
   });
   const virtualItems = virtualizer.getVirtualItems();
-  // jsdom (and any 0-height first paint) measures no rows; fall back to a full render so the
-  // content is present. In the real app the container has height, so virtualization drives.
-  const useVirtual = virtualItems.length > 0;
   const totalSize = virtualizer.getTotalSize();
 
   // A shared grid template so the sticky header, the filter row, and every body row align down
@@ -363,55 +374,47 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
               No MCUs match the current filters.
             </div>
           ) : (
-            <div
-              style={{ height: useVirtual ? totalSize : undefined, position: "relative" }}
-            >
-              {(useVirtual ? virtualItems : modelRows.map((_, i) => ({ index: i, start: 0, key: modelRows[i].id }))).map(
-                (vi) => {
-                  const row = modelRows[vi.index];
-                  const selected = row.original.part === activePart;
-                  return (
-                    <button
-                      key={row.id}
-                      type="button"
-                      onClick={() => onSelectPart(row.original.part)}
-                      aria-current={selected ? "true" : undefined}
-                      style={{
-                        ...gridStyle,
-                        ...(useVirtual
-                          ? {
-                              position: "absolute",
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              height: ROW_HEIGHT,
-                              transform: `translateY(${vi.start}px)`,
-                            }
-                          : { height: ROW_HEIGHT }),
-                      }}
-                      className={
-                        "items-center border-b border-line/60 text-left transition-colors " +
-                        (selected ? "bg-acc-soft" : "hover:bg-[var(--c-hover)]")
-                      }
-                    >
-                      {row.getVisibleCells().map((cell) => {
-                        const meta = cell.column.columnDef.meta as ColMeta | undefined;
-                        return (
-                          <div
-                            key={cell.id}
-                            className={
-                              "flex min-w-0 items-center overflow-hidden px-2.5 " +
-                              (meta?.align === "right" ? "justify-end" : "justify-start")
-                            }
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </div>
-                        );
-                      })}
-                    </button>
-                  );
-                },
-              )}
+            <div style={{ height: totalSize, position: "relative" }}>
+              {virtualItems.map((vi) => {
+                const row = modelRows[vi.index];
+                const selected = row.original.part === activePart;
+                return (
+                  <button
+                    key={row.id}
+                    type="button"
+                    onClick={() => onSelectPart(row.original.part)}
+                    aria-current={selected ? "true" : undefined}
+                    style={{
+                      ...gridStyle,
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: ROW_HEIGHT,
+                      transform: `translateY(${vi.start}px)`,
+                    }}
+                    className={
+                      "items-center border-b border-line/60 text-left transition-colors " +
+                      (selected ? "bg-acc-soft" : "hover:bg-[var(--c-hover)]")
+                    }
+                  >
+                    {row.getVisibleCells().map((cell) => {
+                      const meta = cell.column.columnDef.meta as ColMeta | undefined;
+                      return (
+                        <div
+                          key={cell.id}
+                          className={
+                            "flex min-w-0 items-center overflow-hidden px-2.5 " +
+                            (meta?.align === "right" ? "justify-end" : "justify-start")
+                          }
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      );
+                    })}
+                  </button>
+                );
+              })}
             </div>
           )}
           {/* End-of-results line: the space after a narrow result set reads as a finished list,

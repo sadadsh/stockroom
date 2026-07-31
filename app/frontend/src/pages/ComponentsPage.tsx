@@ -106,13 +106,42 @@ export function ComponentsPage() {
   // Restore and continuously checkpoint the picker scroll. The stable selected
   // part accompanies the pixel offset, so a future projection can re-anchor
   // after insertions instead of treating the number as an identity.
+  //
+  // The restore CANNOT run against the loading placeholder. While the list query is
+  // in flight the picker body is a one-line "Loading parts..." block, and a browser
+  // clamps `scrollTop = N` against that tiny scroll height - the anchor silently
+  // became 0 and the checkpoint below then wrote that 0 back over the saved offset.
+  // So: wait for the settled list, retry while the assignment is still being clamped
+  // (virtual rows arrive over more than one frame), and refuse to checkpoint until
+  // the restore has actually landed.
+  const listContentSettled = !partsQuery.isLoading && !partsQuery.error;
+  const listRestoredRef = useRef(false);
   useEffect(() => {
-    if (!listScrollElement) return;
-    const restored = readUiSession().component_list_anchor.offset_px;
-    if (listScrollElement.scrollTop !== restored) listScrollElement.scrollTop = restored;
+    if (!listScrollElement || !listContentSettled) return;
+    const target = readUiSession().component_list_anchor.offset_px;
+    let frame: number | null = null;
+    let lastScrollHeight = -1;
+    const restore = () => {
+      frame = null;
+      if (listRestoredRef.current) return;
+      listScrollElement.scrollTop = target;
+      // Give up (and accept the clamped position) once the content stops growing:
+      // an anchor past the end of a now-shorter list is stale, not pending.
+      if (
+        Math.round(listScrollElement.scrollTop) >= target ||
+        listScrollElement.scrollHeight === lastScrollHeight
+      ) {
+        listRestoredRef.current = true;
+        return;
+      }
+      lastScrollHeight = listScrollElement.scrollHeight;
+      frame = requestAnimationFrame(restore);
+    };
+    restore();
     let pending: number | null = null;
     const checkpoint = () => {
       pending = null;
+      if (!listRestoredRef.current) return;
       const offset = Math.max(0, Math.round(listScrollElement.scrollTop));
       const current = readUiSession();
       if (
@@ -136,10 +165,11 @@ export function ComponentsPage() {
     listScrollElement.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       listScrollElement.removeEventListener("scroll", onScroll);
+      if (frame !== null) cancelAnimationFrame(frame);
       if (pending !== null) window.clearTimeout(pending);
       checkpoint();
     };
-  }, [listScrollElement]);
+  }, [listContentSettled, listScrollElement]);
 
   // The background capture pill asks to reopen its part: select it here so the detail (and its
   // Complete-Part modal) come up. DetailPanel finishes the handoff by opening the modal.

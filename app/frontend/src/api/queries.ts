@@ -87,6 +87,11 @@ export function useLiveProjectBom(projectId: string, boards: number) {
     queryKey: ["project-bom-live", projectId, boards],
     queryFn: () => api.liveProjectBom(projectId, boards),
     refetchOnWindowFocus: true,
+    // The board count is typed, so every keystroke mints a new key. Without this the
+    // workbench falls back to its loading branch and unmounts the three-pane view -
+    // including the board input itself - so the caret is lost after one character and a
+    // two-digit count cannot be entered at all.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -826,20 +831,27 @@ export function useUpdateCheck() {
     queryFn: () => api.checkUpdate(),
     refetchInterval: (query) => {
       const state = query.state.data?.state;
-      return !state || state === "unverified" || state === "updating" ? 5_000 : 2 * 60_000;
+      // `checking` is the state the host actually reports while its first remote probe runs,
+      // so omitting it here left the footer on the slow two-minute interval for exactly the
+      // window this fast path exists to cover.
+      return !state ||
+        state === "unverified" ||
+        state === "updating" ||
+        state === "checking"
+        ? 5_000
+        : 2 * 60_000;
     },
     refetchOnWindowFocus: true,
     staleTime: 60_000,
   });
 }
 
-export function useApplyUpdate() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => api.applyUpdate(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["update-check"] }),
-  });
-}
+// There is deliberately NO useApplyUpdate hook. Convergence adopts a verified release on its own,
+// so nothing in the UI ever called it - and a mutation hook that no component mounts is the same
+// defect the bulk-import note above describes: it made a manual escape hatch LOOK shipped while
+// "Updating..." had no exit at all. The real exit is now a bound: an adoption that never completes
+// degrades to a blocked standing that says so (see lib/updateStanding.ts, ADOPTION_STALL_MS).
+// `api.applyUpdate` stays on the client - it is the backend's contract, not a dead UI affordance.
 
 // --- Doctor page server state (M6f) ---
 

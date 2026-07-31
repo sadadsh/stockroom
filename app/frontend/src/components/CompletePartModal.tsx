@@ -21,6 +21,7 @@ import type {
 import { useCadSourceQuery } from "../api/queries";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
 import { useCapture } from "../lib/capture";
+import { useModalDismiss } from "../lib/useModalDismiss";
 import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { Button } from "./primitives";
@@ -177,10 +178,15 @@ function CaptureRow({ label, copyId, done }: { label: string; copyId: string; do
       <span className={"flex-1 text-sm " + (done ? "text-t2" : "text-t1")}>
         <Text id={copyId}>{label}</Text>
       </span>
+      {/* The waiting pill is the quiet --c-t3 tier, so it needs a surface quiet text can sit on.
+          `bg-raise2` is a RAISED step: in dark it lifted this chip to 2.92:1 against the helper
+          colour (VA-014), and nothing below --c-t1 clears AA on it -- --c-t2 only reaches 3.7:1
+          there. The recessed `bg-field` step keeps the same visual restraint and measures 5.8:1
+          dark / 5.5:1 light on the file card. Measured in CompletePartModal.contrast.test.ts. */}
       <span
         className={
           "rounded-full px-2 py-0.5 text-2xs font-medium " +
-          (done ? "bg-ok/15 text-ok" : "bg-raise2 text-t3")
+          (done ? "bg-ok/15 text-ok" : "bg-field text-t3")
         }
       >
         {done ? (
@@ -410,7 +416,10 @@ function cadLabel(status: GuidedStatus): string {
     case "unavailable":
       return "Try Again";
     case "error":
-      return "Open Provider Browser";
+      // Retrying stays automatic. Opening a provider window is now its own control, because
+      // this button silently re-arming itself to assisted mode is what turned one failure into
+      // a manual browser session nobody asked for.
+      return "Try Again";
     default:
       return "Get Files";
   }
@@ -475,11 +484,15 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
     [cadSources],
   );
   // The chosen vendor persists across parts and across launches: over a 90-part sitting, one
-  // decision beats ninety. Falls back to the head of the backend's trust order whenever the
-  // stored key is absent from what this part actually offers.
+  // decision beats ninety. With nothing stored, prefer a provider that can finish unattended
+  // over the head of the trust order: that head is the aggregator whose controls stay
+  // person-driven, so defaulting to it quietly pinned every capture to a manual route.
   const [vendorPref, setVendorPref] = useState<string>(() => readVendorPref() ?? "");
   const vendorKey =
-    captureSources.find((v) => v.key === vendorPref)?.key ?? captureSources[0]?.key ?? "";
+    captureSources.find((v) => v.key === vendorPref)?.key ??
+    captureSources.find((v) => v.unattended_capture)?.key ??
+    captureSources[0]?.key ??
+    "";
   const chosen = captureSources.find((v) => v.key === vendorKey) ?? null;
   const pickVendor = useCallback((key: string) => {
     setVendorPref(key);
@@ -551,19 +564,41 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
   const canBackground = cadBusy;
 
   // Closing the window while a capture is still in flight must not lose it: hand it to the
-  // background pill instead of dropping it. Every close path (backdrop, the X, Done) goes here.
+  // background pill instead of dropping it. Every close path (Escape, backdrop, the X, Done)
+  // goes here.
   function handleClose() {
     if (cadBusy) download.keepWorking();
     onClose();
   }
 
-  // Feel-good validation: toast each requirement the moment it flips to received.
-  const prevReceived = useRef<Partial<Record<Requirement, boolean>>>({});
+  // Escape + the Tab focus-trap + the focus move into the dialog: the shared idiom seven sibling
+  // modals already use. This window is mounted only while it is open (DetailPanel unmounts it),
+  // so `open` is true whenever it renders - the same call BenchPartModal and AboutModal make.
+  const dialogRef = useModalDismiss(true, handleClose);
+  // The hook restores focus when its `open` flips false, which an unmounted window can never do.
+  // Remember the control that opened this one during the first render - before the hook moves
+  // focus into the dialog - and hand focus back on the way out, so closing never strands focus
+  // on inert background.
+  const openerRef = useRef<HTMLElement | null>(
+    document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+      ? document.activeElement
+      : null,
+  );
+  useEffect(() => () => openerRef.current?.focus(), []);
+
+  // Feel-good validation: toast each requirement the moment it flips to received. `received` lives
+  // in the global capture store and OUTLIVES this window, so the first pass after a mount only
+  // records a baseline: without it, reopening a part replayed every toast of a run that already
+  // reported, once per reopen. `null` is the pre-baseline state, which `{}` could not express.
+  const prevReceived = useRef<Partial<Record<Requirement, boolean>> | null>(null);
   useEffect(() => {
     const rec = download.received;
-    (Object.keys(rec) as Requirement[]).forEach((req) => {
-      if (rec[req] && !prevReceived.current[req]) toast(reqToastRef.current[req], "ok");
-    });
+    const seen = prevReceived.current;
+    if (seen) {
+      (Object.keys(rec) as Requirement[]).forEach((req) => {
+        if (rec[req] && !seen[req]) toast(reqToastRef.current[req], "ok");
+      });
+    }
     prevReceived.current = { ...rec };
   }, [download.received, toast]);
 
@@ -631,9 +666,19 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
       ),
     [detail, hasSymbol, hasFootprint, hasModel, hasDatasheet, showCad],
   );
-  const doneCount =
-    requirements.filter((r) => r.present).length + needs.filter((n) => download.received[n]).length;
-  const total = requirements.length + needs.length;
+  // The header counter must count exactly what this window renders. When FILES is shown it takes
+  // the whole asset story out of DETAILS, and the card itself is one more countable item - it has
+  // its own settle glyph and it is done only when completion evidence proves it. Counting the
+  // checklist rows alone dropped the CAD rows out of the denominator with nothing in their place,
+  // so a part with complete metadata and an empty `needs` projection read "4 / 4" in the header
+  // while the card directly below it said "No completion evidence is recorded" (VA-001: completion
+  // is impossible until digest-bound evidence exists, and nothing in this window may claim it).
+  const cadTotal = showCad ? needs.length + 1 : 0;
+  const cadDone = showCad
+    ? needs.filter((n) => download.received[n]).length + (isDone ? 1 : 0)
+    : 0;
+  const doneCount = requirements.filter((r) => r.present).length + cadDone;
+  const total = requirements.length + cadTotal;
   const completionTitle = completionVerified
     ? "Files Reverified"
     : completionNotRequired
@@ -657,6 +702,10 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
               altiumRows.length > 0,
               chosen?.label ?? "a model library",
             );
+  // Stockroom holds ONE capture slot, so starting this part's capture stops the previous part's
+  // run from being followed. The store names the part that was displaced; this window says it out
+  // loud on the surface that caused it, rather than letting the earlier work vanish.
+  const superseded = capture.active.partId === detail.id ? capture.active.superseded : null;
   const showDownloadMessage =
     Boolean(download.message) &&
     (!isDone ||
@@ -677,15 +726,21 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
     <div
       className="fixed inset-0 z-[95] flex items-start justify-center overflow-y-auto bg-black/55 p-4 pt-[7vh]"
       role="presentation"
-      onClick={handleClose}
+      // Dismiss on the PRESS, and only when the press lands on the scrim itself: the guard every
+      // sibling modal uses. Closing on `click` meant a text-selection drag that began inside the
+      // window and released on the scrim counted as a backdrop click and discarded what was typed.
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
     >
       <motion.div
+        ref={dialogRef}
+        tabIndex={-1}
         data-dev-id="complete.root"
-        className="w-full max-w-[560px] overflow-hidden rounded-card border border-line2 bg-popover shadow-pop"
+        className="w-full max-w-[560px] overflow-hidden rounded-card border border-line2 bg-popover shadow-pop focus:outline-none"
         role="dialog"
         aria-modal="true"
         aria-label={dialogLabel}
-        onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, y: 10, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
@@ -816,6 +871,17 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                   <p className={"mt-3 text-xs " + statusTone}>{download.message}</p>
                 ) : null}
 
+                {superseded ? (
+                  <p
+                    data-dev-id="complete.superseded"
+                    className="mt-3 text-xs leading-snug text-[var(--c-warn-text)]"
+                  >
+                    Completion for {superseded.partName || "the previous part"} was superseded when
+                    this capture started. Stockroom follows one completion at a time, so that run is
+                    no longer being followed here. Reopen that part to start it again.
+                  </p>
+                ) : null}
+
                 <ProviderRouteOutcomes
                   outcomes={download.providerOutcomes}
                   collectionComplete={download.collectionComplete}
@@ -860,12 +926,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                       icon={<DownloadIcon className="h-3.5 w-3.5" />}
                       disabled={cadBusy}
                       onClick={() =>
-                        void download.start(
-                          vendorKey || undefined,
-                          download.status === "error" && vendorKey
-                            ? "assisted"
-                            : "automatic",
-                        )
+                        void download.start(vendorKey || undefined, "automatic")
                       }
                     >
                       <Text id={cadButtonId(download.status)}>{cadLabel(download.status)}</Text>
@@ -880,6 +941,22 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                       onClick={() => void download.start(vendorKey || undefined, "collect-all")}
                     >
                       {cadBusy ? "Collecting All Sources..." : "Collect All Sources"}
+                    </Button>
+                  ) : null}
+                  {/* Opening a provider window is deliberate, never an escalation. Automatic
+                      capture opens nothing, so a part it cannot serve is reported rather than
+                      answered with a browser window the person did not ask for. */}
+                  {!isDone &&
+                  vendorKey &&
+                  ["error", "timed-out", "unavailable"].includes(download.status) ? (
+                    <Button
+                      variant="default"
+                      small
+                      icon={<DownloadIcon className="h-3.5 w-3.5" />}
+                      disabled={cadBusy}
+                      onClick={() => void download.start(vendorKey, "assisted")}
+                    >
+                      Open Provider Window
                     </Button>
                   ) : null}
                   {canBackground ? (

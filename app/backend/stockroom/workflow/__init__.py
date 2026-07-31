@@ -53,6 +53,7 @@ from .runtime import (
     StageHandler,
     StageHandlerError,
     StageHandlerRegistry,
+    StageLeaseLost,
     StageOutcome,
     WorkflowRuntime,
 )
@@ -93,6 +94,7 @@ __all__ = [
     "StageHandler",
     "StageHandlerError",
     "StageHandlerRegistry",
+    "StageLeaseLost",
     "StageName",
     "StageOutcome",
     "StageRecord",

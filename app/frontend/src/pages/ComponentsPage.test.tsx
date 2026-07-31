@@ -11,7 +11,11 @@ import { ToastProvider } from "../lib/toast";
 import { RouterProvider } from "../lib/router";
 import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { CaptureProvider } from "../lib/capture";
-import { defaultUiSession, resetUiSessionForTests } from "../lib/uiSession";
+import {
+  defaultUiSession,
+  readUiSession,
+  resetUiSessionForTests,
+} from "../lib/uiSession";
 import { ComponentsPage } from "./ComponentsPage";
 
 // Mock the typed client so the page renders against fixtures, not a live server.
@@ -169,6 +173,105 @@ describe("ComponentsPage", () => {
       '[data-dev-id="components.list-scroll"]',
     );
     await waitFor(() => expect(scroller?.scrollTop).toBe(37));
+  });
+
+  it("restores the picker scroll only once the real rows exist, and never checkpoints the clamped 0", async () => {
+    // A3. The restore used to run the instant the scroll node mounted - while the picker body
+    // was still the one-line "Loading parts..." placeholder. A browser clamps `scrollTop = N`
+    // against that tiny scroll height, so the anchor became 0 and the unmount checkpoint then
+    // persisted that 0 over the saved offset. jsdom has no layout and stores scrollTop
+    // verbatim, so the stub below MODELS the browser clamp and records every write: what is
+    // asserted is the ORDER of the writes, not any arithmetic jsdom would have done anyway.
+    const session = defaultUiSession();
+    session.component_list_anchor = { part_id: "lm358", offset_px: 37 };
+    resetUiSessionForTests(session);
+    const descriptor = Object.getOwnPropertyDescriptor(
+      Element.prototype,
+      "scrollTop",
+    )!;
+    const writes: number[] = [];
+    // No room to scroll while the placeholder is on screen; the settled list has room.
+    let scrollCeiling = 0;
+    Object.defineProperty(Element.prototype, "scrollTop", {
+      configurable: true,
+      get: descriptor.get,
+      set(value: number) {
+        if (
+          this instanceof HTMLElement &&
+          this.dataset.devId === "components.list-scroll"
+        ) {
+          writes.push(value);
+          descriptor.set!.call(this, Math.min(value, scrollCeiling));
+          return;
+        }
+        descriptor.set!.call(this, value);
+      },
+    });
+
+    try {
+      let resolveList!: (value: { parts: PartSummary[]; count: number }) => void;
+      mockApi.listParts.mockImplementation(
+        () =>
+          new Promise<{ parts: PartSummary[]; count: number }>((resolve) => {
+            resolveList = resolve;
+          }),
+      );
+      mockApi.facets.mockResolvedValue({
+        by_category: { ICs: 1 },
+        by_manufacturer: {},
+        complete: 1,
+        incomplete: 0,
+      });
+      mockApi.partDetail.mockResolvedValue(DETAIL);
+
+      const view = wrap(<ComponentsPage />);
+
+      // The list is still in flight: nothing may be written into the placeholder.
+      expect(await screen.findByText("Loading parts...")).toBeInTheDocument();
+      expect(writes).toEqual([]);
+
+      scrollCeiling = 400;
+      await act(async () => {
+        resolveList({ parts: [SUMMARY], count: 1 });
+      });
+
+      // Only now, against the real list, is the anchor restored.
+      await waitFor(() => expect(writes).toEqual([37]));
+      view.unmount();
+      expect(readUiSession().component_list_anchor).toEqual({
+        part_id: "lm358",
+        offset_px: 37,
+      });
+    } finally {
+      Object.defineProperty(Element.prototype, "scrollTop", descriptor);
+    }
+  });
+
+  it("keeps the saved picker anchor when the page unmounts before the rows arrive", async () => {
+    // A3, the other half: a checkpoint is only honest once a restore has landed. Leaving the
+    // page mid-load must not overwrite the saved offset with wherever the placeholder sat.
+    const session = defaultUiSession();
+    session.component_list_anchor = { part_id: "lm358", offset_px: 37 };
+    resetUiSessionForTests(session);
+    mockApi.listParts.mockImplementation(
+      () => new Promise<{ parts: PartSummary[]; count: number }>(() => {}),
+    );
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockResolvedValue(DETAIL);
+
+    const view = wrap(<ComponentsPage />);
+    expect(await screen.findByText("Loading parts...")).toBeInTheDocument();
+    view.unmount();
+
+    expect(readUiSession().component_list_anchor).toEqual({
+      part_id: "lm358",
+      offset_px: 37,
+    });
   });
 
   it("lists parts, shows the count, and auto-selects the first part's detail", async () => {

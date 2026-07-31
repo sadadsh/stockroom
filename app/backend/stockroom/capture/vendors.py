@@ -36,6 +36,7 @@ from typing import Literal, Protocol, cast
 from unicodedata import normalize
 from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
+from stockroom.capture.browser import ProviderControlHint
 from stockroom.capture.identity import (
     exact_observation_error,
     page_identity,
@@ -49,6 +50,15 @@ _KICAD_REQS = frozenset(
 _ALTIUM_REQS = frozenset({Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT})
 BrowserAccessPolicy = Literal["user_driven", "machine_allowed"]
 BrowserEngine = Literal["chromium", "camoufox", "cloak"]
+
+# Bounded waits for Ultra Librarian's own export controls. Every one of these replaces either
+# Playwright's 30s DEFAULT actionability timeout on a step that is allowed to fail, or a single
+# un-awaited sample of a control the page attaches asynchronously. Neither shape belongs in the
+# one provider this machine may run unattended: a 30s hang ends in a raised error that discards
+# the whole part, and an un-awaited sample reports a render as a provider-wide blockage.
+_ACCORDION_CLICK_TIMEOUT_MS = 2_000
+_EXPORT_BUTTON_TIMEOUT_MS = 10_000
+_EXPORT_CLICK_TIMEOUT_MS = 10_000
 
 
 def formats_for(needs) -> list[str]:
@@ -108,6 +118,15 @@ class VendorCapability:
     # Whether one explicit part+provider selection authorizes Stockroom to operate ordinary export
     # controls. False keeps those controls person-driven even in the explicit-provider lane.
     operator_automation: bool = True
+    # WHERE this provider's controls sit, in the order a person works through them, so the guided
+    # HUD can draw a Stockroom-owned outline over the next one. This is POSITION data and nothing
+    # else: the HUD reads a bounding box, never page content, and never operates the control.
+    #
+    # THE SELECTOR IS NEVER INVENTED. Every string here is one this repo already measured for an
+    # automated or observation path, and the whole list is deliberately short: a provider with no
+    # measured control stays hint-less and the person gets the checklist text instead, because an
+    # outline over the wrong control is worse than no outline at all.
+    control_hints: tuple[ProviderControlHint, ...] = ()
 
     @property
     def supported_formats(self) -> frozenset[str]:
@@ -209,6 +228,35 @@ class UltraLibrarianAdapter:
             "altium": "Altium Designer (Native)",
         },
         browser_access="machine_allowed",
+        # Ultra Librarian is `machine_allowed` only while the private-evaluation policy is on; with
+        # it off, or with `operator_automation` withheld, the same page is person-driven and these
+        # outlines are the guidance. `input[name=exports]` is deliberately NOT here: it is the
+        # panel-presence probe for the whole checkbox GROUP, so it can never resolve to one
+        # control and would only ever degrade.
+        control_hints=(
+            ProviderControlHint(
+                label="KiCad v6+ export",
+                selectors=("#KiCADv6",),
+                source="version_pins['kicad'] / _export_selectors",
+            ),
+            ProviderControlHint(
+                label="3D STEP model export",
+                # The current live id first, then only the measured legacy alias, exactly as
+                # `_export_selectors` orders them.
+                selectors=("#ThreeDModel", "#MfrThreeDModel"),
+                source="version_pins['model'] / _export_selectors",
+            ),
+            ProviderControlHint(
+                label="Provider consent",
+                selectors=("input[type=checkbox][id^=consent-]",),
+                source="_accept_consents",
+            ),
+            ProviderControlHint(
+                label="Download export",
+                selectors=("#submit-export",),
+                source="UltraLibrarianAdapter._export_button / _run_export",
+            ),
+        ),
     )
 
     # The accordion each format hides behind, by its visible text.
@@ -567,7 +615,7 @@ class UltraLibrarianAdapter:
             else:
                 report.missed.append(fmt)
 
-        _accept_consents(page)
+        consent_issue = _accept_consents(page)
 
         identity_issue = _detail_identity_issue(
             "ultralibrarian",
@@ -584,9 +632,14 @@ class UltraLibrarianAdapter:
                 + " on this page; choose the format and click Download Now."
             )
             return report
+        if consent_issue:
+            # Naming the real cause now beats clicking a control the vendor has gated and then
+            # spending the whole download backstop before reporting an undelivered file.
+            report.message = consent_issue
+            return report
 
-        submit = page.locator("#submit-export").first
-        if submit.count() == 0:
+        submit = self._await_export_button(page)
+        if submit is None:
             report.blocked = True
             report.requires_user_clearance = bool(self.user_clearance_issue(page))
             report.message = (
@@ -594,7 +647,14 @@ class UltraLibrarianAdapter:
                 "not on this page."
             )
             return report
-        submit.click()
+        ran, activation_issue, needs_person = self._run_export(page, submit)
+        if not ran:
+            report.blocked = needs_person
+            report.requires_user_clearance = needs_person
+            report.message = (
+                "Selected " + " and ".join(report.selected) + ", but " + activation_issue
+            )
+            return report
         report.submitted = True
         # STATES INTENT, NEVER ACHIEVEMENT. A drive can only observe what it SELECTED and that it
         # clicked submit; whether the files arrived is decided later, by `classify_asset` on the
@@ -614,6 +674,67 @@ class UltraLibrarianAdapter:
             report.message += " " + " ".join(missed_reasons)
         return report
 
+    def _await_export_button(self, page):
+        """The panel's own Download control, WAITED FOR rather than sampled once.
+
+        Ultra Librarian attaches this link after the export controls it belongs to, so a single
+        `count()` right after selecting formats reads a render in progress as a missing button.
+        That verdict is not merely a lost part: "download button is not on this page" is one of
+        `_is_global_blockage`'s markers, so the batch engine trips its circuit breaker and
+        abandons every remaining row. Reproduced 2026-07-30 against the captured panel with the
+        link attached 1.2s late - all three formats selected, and the whole run thrown away.
+
+        A genuinely signed-out session still reaches the same answer, because everything except
+        this link renders signed out and the link never appears. The wait only costs the bounded
+        timeout before saying so, and `user_clearance_issue` still names the sign-in as the cause.
+        """
+        submit = page.locator("#submit-export").first
+        try:
+            submit.wait_for(state="attached", timeout=_EXPORT_BUTTON_TIMEOUT_MS)
+        except Exception:  # noqa: BLE001 - absence after the wait is the answer, not a crash
+            pass
+        return submit if submit.count() > 0 else None
+
+    def _run_export(self, page, submit) -> tuple[bool, str, bool]:
+        """Activate the panel's own Download control. `(ran, reason, needs_person)`.
+
+        Same defect and same shape as `_click_accordion`: an unbounded default click turned an
+        overlay into a 30s hang and then an exception that escaped `drive()` entirely, losing both
+        the selected formats and the real reason.
+
+        THE ORDER HERE IS THE SAFETY PROPERTY. An intercepted click means something is covering
+        the page, and that something may be a security control. So the recovery is not attempted
+        until `user_clearance_issue` has been consulted: if a CAPTCHA, challenge, MFA, or sign-in
+        state is present, this returns a person-handoff and the vendor's export never runs.
+        Stockroom does not operate, solve, or click past a security control for any provider.
+
+        Only with no security state does it fall back to activating the vendor's own Download
+        control in page context - exactly the reviewed technique `_check_box` already uses for the
+        vendor's own checkboxes, and no different in kind from the click that was intercepted.
+        """
+        try:
+            submit.click(timeout=_EXPORT_CLICK_TIMEOUT_MS)
+            return True, "", False
+        except Exception:  # noqa: BLE001 - an intercepted click is page state, not a crash
+            pass
+        clearance = self.user_clearance_issue(page)
+        if clearance:
+            return False, clearance, True
+        try:
+            page.evaluate(
+                "sel => { const el = document.querySelector(sel); if (el) el.click(); }",
+                "#submit-export",
+            )
+            return True, "", False
+        except Exception:  # noqa: BLE001 - report the honest miss rather than raising
+            pass
+        return (
+            False,
+            "Ultra Librarian's Download button could not be activated; something on the page is "
+            "covering it.",
+            False,
+        )
+
     def download_gate(self, page) -> str:
         """Provider-wide state explaining why a submitted export produced no browser download."""
         return self.user_clearance_issue(page)
@@ -626,13 +747,19 @@ class UltraLibrarianAdapter:
             return security
         try:
             url = page.url or ""
-            login_form = page.locator("#Username").count() > 0
-            login_link = page.locator('a[href*="/Account/Login"]').count() > 0
+            # A VISIBLE username field, not merely one in the document. Ultra Librarian ships a
+            # collapsed sign-in form on ordinary pages, and counting it stopped a usable part
+            # page as though it were a login gate.
+            username = page.locator("#Username")
+            login_form = username.count() > 0 and username.first.is_visible()
+            # A header "Sign In" ANCHOR is deliberately not evidence. Every Ultra Librarian page
+            # carries one, signed in or out, so treating a navigation link as a security gate
+            # paused every capture on a normal part page and told the person to clear a challenge
+            # that was never there. Only a real login destination or a real form counts.
             if (
                 "sso.ultralibrarian.com" in url.casefold()
                 or "/account/login" in url.casefold()
                 or login_form
-                or login_link
             ):
                 return (
                     "Ultra Librarian needs you to finish sign-in or its security verification in "
@@ -646,13 +773,41 @@ class UltraLibrarianAdapter:
 
 def _click_accordion(page, label: str) -> bool:
     """Expand the tool's section. Matched on EXACT text so "Altium" never hits the footer's
-    "Altium" marketing link, which is a real element on this page."""
+    "Altium" marketing link, which is a real element on this page.
+
+    EXPANDING IS A CONVENIENCE, NOT A REQUIREMENT, and the code has to say so. `_check_box`
+    selects and reads back a checkbox through the page's own control whether or not its section is
+    open, and `_check_exact_export_label` reads a label's text whether or not it is rendered - both
+    measured against the captured panel with Bootstrap's real `.collapse { display: none }` rule.
+    So nothing about a section staying shut costs a format.
+
+    What DID cost the whole part was this click's DEFAULT timeout. Reproduced 2026-07-30 against
+    the captured panel with an ordinary cookie banner overlaid on it: the toggle is visible,
+    enabled and stable, the banner merely intercepts pointer events, and Playwright therefore
+    retried for its full 30s default and raised. `drive()` does not catch that, so
+    `GuidedCaptureSource._supply_once` turned a cookie banner into "Ultra Librarian:
+    Locator.click: Timeout 30000ms exceeded", discarding formats that were already selected and
+    sending the owner to a manual provider window. The click is now bounded and its failure is
+    just a False, because a failed convenience is not a failed capture.
+
+    An already-open section is left alone: Bootstrap publishes `aria-expanded`, and clicking a
+    toggle that reports `true` would CLOSE the section this call exists to open.
+    """
     toggles = page.locator("a.accordion-toggle")
     for index in range(toggles.count()):
         node = toggles.nth(index)
-        if (node.inner_text() or "").strip() == label:
-            node.click()
+        try:
+            if (node.inner_text() or "").strip() != label:
+                continue
+        except Exception:  # noqa: BLE001 - an unreadable toggle is not this section's toggle
+            continue
+        try:
+            if (node.get_attribute("aria-expanded") or "").strip().casefold() == "true":
+                return True
+            node.click(timeout=_ACCORDION_CLICK_TIMEOUT_MS)
             return True
+        except Exception:  # noqa: BLE001 - selection is verified by state readback, not by this
+            return False
     return False
 
 
@@ -783,19 +938,51 @@ def _export_selectors(fmt: str, declared_id: str) -> tuple[str, ...]:
     return tuple(selectors)
 
 
-def _accept_consents(page) -> int:
-    """Tick every required consent. Owner's decision 2026-07-27, asked with options and answered:
-    always auto-tick. Ultra Librarian will not export without it and it is per-manufacturer, so a
-    90-part sitting would otherwise cost 90 manual ticks."""
+def _accept_consents(page) -> str:
+    """Tick every consent and READ EVERY STATE BACK. "" when nothing required was refused.
+
+    Owner's decision 2026-07-27, asked with options and answered: always auto-tick. Ultra
+    Librarian will not export without it and it is per-manufacturer, so a 90-part sitting would
+    otherwise cost 90 manual ticks.
+
+    THIS GOES THROUGH `_check_box` FOR THE REASON THAT FUNCTION EXISTS. The consent is one of the
+    panel's Bootstrap `custom-control-input`s, where the real input is visually replaced by a
+    stacked label, and Playwright's `check()` raises "Clicking the checkbox did not change its
+    state" whenever the forced click lands on something other than that label. Reproduced
+    2026-07-30 with an ordinary cookie banner over the captured panel: `check(force=True)` raised
+    and, because nothing here caught it, the error escaped `drive()` and threw away three formats
+    that were already selected and verified. `_check_box`'s in-page fallback ticks it and its
+    return is the state read back off the element.
+
+    A REQUIRED consent that still would not stick is REPORTED rather than ignored. The vendor will
+    not export without it, so submitting anyway spends the full 120s download backstop and then
+    blames the vendor for not delivering a file it was never asked for.
+    """
     consents = page.locator("input[type=checkbox][id^=consent-]")
-    accepted = 0
+    refused: list[str] = []
     for index in range(consents.count()):
         node = consents.nth(index)
-        if not node.is_checked():
-            node.check(force=True)
-        if node.is_checked():
-            accepted += 1
-    return accepted
+        try:
+            box_id = (node.get_attribute("id") or "").strip()
+            classes = (node.get_attribute("class") or "").split()
+        except Exception:  # noqa: BLE001 - an unreadable row cannot establish a refused consent
+            continue
+        if not box_id:
+            continue
+        # Some real export ids carry spaces and punctuation, so an escaped attribute selector is
+        # used here for the same reason `_clear_export_selections` uses one.
+        escaped = box_id.replace("\\", "\\\\").replace('"', '\\"')
+        if _check_box(page, f'input[type="checkbox"][id="{escaped}"]'):
+            continue
+        if "required" in classes:
+            refused.append(box_id)
+    if not refused:
+        return ""
+    return (
+        "Ultra Librarian requires a consent this page would not accept ("
+        + ", ".join(refused)
+        + "); no export was requested."
+    )
 
 
 _ADAPTERS: dict[str, VendorAdapter] = {
@@ -887,6 +1074,36 @@ class SnapMagicAdapter:
             "altium": "Altium native",
         },
         browser_engine="camoufox",
+        # In the person-driven order this page is actually worked: open the download modal, choose
+        # the KiCad version, then take each format. Every selector is the one `open_panel`/`drive`
+        # already use, including the two-step KiCad chooser those methods had to measure.
+        control_hints=(
+            ProviderControlHint(
+                label="Download",
+                selectors=('a[name="download-modal"]',),
+                source="SnapMagicAdapter.open_panel",
+            ),
+            ProviderControlHint(
+                label="KiCad version chooser",
+                selectors=('[data-format="kicad_options"]',),
+                source="SnapMagicAdapter.drive KiCad two-step chooser",
+            ),
+            ProviderControlHint(
+                label="KiCad V6 & Later",
+                selectors=('[data-format="kicad_modv6"]',),
+                source="version_pins['kicad']",
+            ),
+            ProviderControlHint(
+                label="STEP model",
+                selectors=('[data-format="step_model"]',),
+                source="version_pins['model']",
+            ),
+            ProviderControlHint(
+                label="Altium native",
+                selectors=('[data-format="altium_native"]',),
+                source="version_pins['altium']",
+            ),
+        ),
     )
 
     def resolve_url(self, mpn: str) -> str:
@@ -1237,6 +1454,43 @@ _DIGIKEY_CADENAS_ROUTE = DigiKeyProviderRoute(
 )
 
 
+def _digikey_route_control_hints(
+    route: DigiKeyProviderRoute,
+    *,
+    download_control: str = '[id^="btn-download-"]',
+) -> tuple[ProviderControlHint, ...]:
+    """Outline hints for one DigiKey author route, DERIVED from its measured ids.
+
+    Nothing is invented here: the row selector is the route's own ``row_ids``, the opener is the
+    exact ``onclick`` pair `_open_route_modal` waits on, and the download control is scoped to the
+    route's own ``modal_id`` - page-wide ``[id^="btn-download-"]`` matches every route's modal at
+    once and would only ever degrade. A route with no measured download contract passes
+    ``download_control=""`` and simply gets no outline for that step.
+    """
+
+    hints = [
+        ProviderControlHint(
+            label=f"{route.label} row",
+            selectors=(", ".join(f"#{row_id}" for row_id in dict.fromkeys(route.row_ids)),),
+            source=f"DigiKeyProviderRoute.row_ids for {route.evidence_provider_key}",
+        ),
+        ProviderControlHint(
+            label=f"Open {route.label} formats",
+            selectors=(f'a[onclick*="{route.modal_id}"], button[onclick*="{route.modal_id}"]',),
+            source=f"_open_route_modal opener for {route.evidence_provider_key}",
+        ),
+    ]
+    if download_control:
+        hints.append(
+            ProviderControlHint(
+                label=f"Download from {route.label}",
+                selectors=(f"#{route.modal_id} {download_control}",),
+                source=f"_download_route_format submit for {route.evidence_provider_key}",
+            )
+        )
+    return tuple(hints)
+
+
 def _digikey_format_label_matches(
     route: DigiKeyProviderRoute,
     fmt: str,
@@ -1292,6 +1546,9 @@ class DigiKeyUltraLibrarianAdapter:
         },
         browser_access="user_driven",
         operator_automation=False,
+        # The parent surface opens on its preferred coherent author, Ultra Librarian, so its
+        # outlines are that route's measured row, opener, and modal-scoped Download control.
+        control_hints=_digikey_route_control_hints(_DIGIKEY_ULTRALIBRARIAN_ROUTE),
         # Measured again against the live TPS2121RUXR product and CAD-model pages on
         # 2026-07-30. DigiKey's Cloudflare login challenge repeatedly rejected the visible
         # CloakBrowser session after a person completed the checkbox, while Camoufox reached the
@@ -2196,6 +2453,11 @@ class DigiKeySnapMagicRouteAdapter(_DigiKeyProviderRouteAdapter):
             "model": "STEP",
             "altium": "Altium Designer",
         },
+        control_hints=_digikey_route_control_hints(_DIGIKEY_SNAPMAGIC_ROUTE),
+        # Inert as routing metadata. The automated/user-driven decision is resolved once at
+        # the parent provider level through `get_adapter("digikey")`, whose capability is
+        # `user_driven` with `operator_automation=False`, so this value never reaches that
+        # decision. It records what this route was measured to support, not an authorization.
         browser_access="machine_allowed",
         browser_engine="camoufox",
         reuse_page_between_formats=True,
@@ -2220,6 +2482,8 @@ class DigiKeyTracePartsRouteAdapter(_DigiKeyProviderRouteAdapter):
         ),
         machine_format_labels={"model": "STEP AP214"},
         user_format_labels={"model": "STEP AP214"},
+        control_hints=_digikey_route_control_hints(_DIGIKEY_TRACEPARTS_ROUTE),
+        # Inert as routing metadata, for the same reason as the SnapMagic route above.
         browser_access="machine_allowed",
         browser_engine="camoufox",
         reuse_page_between_formats=True,
@@ -2273,6 +2537,12 @@ class DigiKeyManufacturerProvidedRouteAdapter(
             "delivered exact files as supplementary evidence without activating them."
         ),
         user_format_labels={"model": "3D Model"},
+        # `#btn-download-mfr` is this route's own measured Download control, not the generic
+        # prefix: `_manufacturer_step_controls` reads it by that exact id.
+        control_hints=_digikey_route_control_hints(
+            _DIGIKEY_MANUFACTURER_ROUTE,
+            download_control="#btn-download-mfr",
+        ),
         browser_access="user_driven",
         operator_automation=False,
         browser_engine="camoufox",
@@ -2297,6 +2567,13 @@ class DigiKeyCadenasRouteAdapter(_DigiKeyObservedSupplementaryRouteAdapter):
             "its machine selector remains disabled until a positive live format contract exists."
         ),
         user_format_labels={"model": "3D Model"},
+        # Row and opener only. CADENAS' format/download contract is explicitly NOT measured (its
+        # machine selector stays disabled until a positive live one exists), so Stockroom outlines
+        # the row it can point at honestly and nothing else.
+        control_hints=_digikey_route_control_hints(
+            _DIGIKEY_CADENAS_ROUTE,
+            download_control="",
+        ),
         browser_access="user_driven",
         operator_automation=False,
         browser_engine="camoufox",
@@ -2697,3 +2974,47 @@ def _is_global_blockage(message: str) -> bool:
             "sign in to ultra librarian",
         )
     )
+
+
+_HUD_GUIDANCE_INDEX: dict[str, tuple[str, tuple[ProviderControlHint, ...]]] | None = None
+
+
+def _hud_guidance_index() -> dict[str, tuple[str, tuple[ProviderControlHint, ...]]]:
+    """Index every adapter's guidance by its EXACT capability label, including author routes.
+
+    Built once and lazily, because the registry finishes assembling at the bottom of this module
+    and DigiKey's author routes are constructed on demand rather than registered. Two adapters
+    claiming one label would make a lookup a guess, so that label is emptied instead.
+    """
+
+    global _HUD_GUIDANCE_INDEX
+    if _HUD_GUIDANCE_INDEX is not None:
+        return _HUD_GUIDANCE_INDEX
+    index: dict[str, tuple[str, tuple[ProviderControlHint, ...]]] = {}
+    for adapter in all_adapters():
+        candidates = [adapter]
+        capture_routes = getattr(adapter, "capture_routes", None)
+        if callable(capture_routes):
+            candidates.extend(capture_routes())
+        for candidate in candidates:
+            capability = getattr(candidate, "capability", None)
+            if capability is None:
+                continue
+            entry = (capability.instruction, capability.control_hints)
+            existing = index.get(capability.label)
+            index[capability.label] = entry if existing is None or existing == entry else ("", ())
+    _HUD_GUIDANCE_INDEX = index
+    return index
+
+
+def provider_hud_guidance(provider_label: str) -> tuple[str, tuple[ProviderControlHint, ...]]:
+    """The provider's own instruction and measured outline hints for one exact provider label.
+
+    This is the guided HUD's read of vendor DATA. It never touches a page and never runs an
+    adapter; an unknown label simply yields no guidance, which degrades the HUD to the Tier 1
+    checklist built from Stockroom's own required-file labels.
+    """
+
+    if type(provider_label) is not str:
+        return "", ()
+    return _hud_guidance_index().get(provider_label.strip(), ("", ()))

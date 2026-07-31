@@ -167,6 +167,7 @@ def _workflow_status() -> WorkflowCoordinatorStatus:
         idle_poll_count=13,
         recovered_claim_count=1,
         handler_error_count=2,
+        lease_lost_count=0,
         unexpected_error_count=0,
         idle_round_count=3,
         current_backoff_seconds=0.25,

@@ -38,7 +38,10 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 256 after the unified inspection instrument replaced eight legacy asset-card ids with four
 // direct instrument/stage/expand/status ids.
 // 273 after restoring the shared Projects rail, shell, picker, workbenches, and native PCB stage.
-const EXPECTED_ENTRIES = 273;
+// 275 with the About window's stale-frontend note, which appears only when the running bundle and
+// the backend disagree about the installed revision.
+// 276 with the superseded-capture notice, which names the part a newly started capture displaced.
+const EXPECTED_ENTRIES = 276;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
