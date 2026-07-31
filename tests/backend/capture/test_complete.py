@@ -372,7 +372,9 @@ def test_exhaustive_collection_rejects_a_missing_planned_route():
 
     assert item.status == "already-complete"
     assert item.collection_complete is False
-    assert "missing terminal provider outcome(s)" in item.error
+    # One missing route reads "outcome", not "outcome(s)": the repo's plural gate forbids a
+    # parenthesised s in any backend message, and this one was faking the plural.
+    assert "missing terminal provider outcome:" in item.error
     assert "digikey:digikey-snapmagic" in item.error
 
 

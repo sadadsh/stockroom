@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from stockroom.api.app import create_app
 from stockroom.api.serve import pick_free_port
 from stockroom.host.run import (
+    EXIT_RESTART,
     _install_injected_index,
     _mount_development_source_convergence,
     _serve_in_thread,
@@ -136,6 +137,9 @@ def test_run_windowed_returns_false_on_a_normal_close(app_ctx):
 
 
 def test_restart_watchdog_forces_the_launcher_contract_when_window_never_closes():
+    # Unit-level: the watchdog's own decision rule, with the handoff event supplied
+    # directly. It deliberately says nothing about WHO sets that event -- see the
+    # run_windowed production/degraded tests below for that half of the contract.
     import threading
 
     graceful = threading.Event()
@@ -152,6 +156,9 @@ def test_restart_watchdog_forces_the_launcher_contract_when_window_never_closes(
 
 
 def test_restart_watchdog_stays_idle_after_a_graceful_window_handoff():
+    # Unit-level counterpart to the test above: a set handoff event stands the
+    # watchdog down. Kept as-is because the rule is correct; what was missing is
+    # any coverage of the production branch ever setting it, added below.
     import threading
 
     graceful = threading.Event()
@@ -166,6 +173,132 @@ def test_restart_watchdog_stays_idle_after_a_graceful_window_handoff():
     watchdog.join(timeout=1)
 
     assert exits == []
+
+
+class _WindowOwningRuntimeBase:
+    """Stand-in for the production release runtime that owns the native window."""
+
+    owns_native_window = True
+
+    def start(self) -> None:
+        return None
+
+    def status(self) -> dict:
+        return {
+            "update_available": False,
+            "state": "up_to_date",
+            "current_revision": "release-1",
+            "target_revision": "release-1",
+            "channel": "production",
+        }
+
+
+def _arm_production_host(monkeypatch, runtime, armed: list):
+    """Point run_windowed at the production window-owning branch.
+
+    The watchdog must not be allowed to call the real ``os._exit`` inside the test
+    process, so the arming call is intercepted; the handoff event it would have
+    watched is captured instead and fed to the real watchdog afterwards.
+    """
+    import threading
+
+    from stockroom.host import release_runtime
+    from stockroom.host import run as run_mod
+
+    monkeypatch.setenv("STOCKROOM_UPDATE_MODE", "production")
+    monkeypatch.setattr(
+        release_runtime,
+        "create_production_update_runtime",
+        lambda *args, **kwargs: runtime,
+    )
+
+    def _capture(handoff, **kwargs):
+        armed.append(handoff)
+        return threading.Thread(target=lambda: None)
+
+    monkeypatch.setattr(run_mod, "_start_restart_watchdog", _capture)
+
+
+def test_production_window_close_stands_the_restart_watchdog_down(
+    app_ctx,
+    monkeypatch,
+):
+    """A clean production window close must retire the watchdog, not race it.
+
+    ``_request_restart`` arms the watchdog while the host thread is parked in
+    ``wait_until_window_closed``. Only ``graceful_restart_handoff`` can stand it
+    down, so the production branch has to set it the moment the native window
+    confirms a clean close -- BEFORE the shutdown budget (runtime close plus
+    ``thread.join(timeout=5.0)``) starts spending seconds against the same
+    deadline. Otherwise ``os._exit`` lands mid-shutdown on EVERY update.
+    """
+    armed: list = []
+    observed: dict = {}
+
+    class _CleanClose(_WindowOwningRuntimeBase):
+        def wait_until_window_closed(self) -> int:
+            # The updater requests the restart while the host is parked here.
+            app_ctx.request_restart()
+            # The native window then confirms an authenticated close.
+            return 0
+
+        def close(self) -> None:
+            observed["handoff_before_shutdown"] = armed[0].is_set()
+
+    _arm_production_host(monkeypatch, _CleanClose(), armed)
+
+    assert run_windowed(ctx=app_ctx) is True
+
+    assert armed, "the restart watchdog was never armed"
+    # The handoff is signalled before the shutdown budget begins, so the watchdog
+    # can never fire against a shutdown that is already underway.
+    assert observed["handoff_before_shutdown"] is True
+
+    exits: list[int] = []
+    watchdog = _start_restart_watchdog(
+        armed[0],
+        delay_seconds=0,
+        exit_process=exits.append,
+    )
+    watchdog.join(timeout=1)
+    assert exits == []
+
+
+def test_production_window_that_fails_to_close_still_reaches_the_watchdog(
+    app_ctx,
+    monkeypatch,
+):
+    """The watchdog stays armed for the case it exists for.
+
+    A native window that never reaches an authenticated close leaves the handoff
+    unset, so the launcher contract still holds via ``EXIT_RESTART``.
+    """
+    armed: list = []
+
+    class _NeverCloses(_WindowOwningRuntimeBase):
+        def wait_until_window_closed(self) -> int:
+            app_ctx.request_restart()
+            raise RuntimeError("active native window exited without authenticated shutdown")
+
+        def close(self) -> None:
+            return None
+
+    _arm_production_host(monkeypatch, _NeverCloses(), armed)
+
+    with pytest.raises(RuntimeError, match="without authenticated shutdown"):
+        run_windowed(ctx=app_ctx)
+
+    assert armed, "the restart watchdog was never armed"
+    assert not armed[0].is_set()
+
+    exits: list[int] = []
+    watchdog = _start_restart_watchdog(
+        armed[0],
+        delay_seconds=0,
+        exit_process=exits.append,
+    )
+    watchdog.join(timeout=1)
+    assert exits == [EXIT_RESTART]
 
 
 def test_development_source_convergence_restarts_frontend_and_backend():

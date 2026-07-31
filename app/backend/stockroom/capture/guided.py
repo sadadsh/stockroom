@@ -78,6 +78,7 @@ from stockroom.capture.verified_cache import active_pair_is_verified
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.asset import AssetOrigin
+from stockroom.text import counted
 
 # How long to wait for the vendor's file after the adapter submits. Generous because a heavy part's
 # export genuinely generates server-side for tens of seconds (measured live on DigiKey, 2026-07-23),
@@ -1772,13 +1773,13 @@ class GuidedCaptureSource:
         if result.status == "cancelled":
             if self._cancel_workflow is not None:
                 self._cancel_workflow()
-            suffix = f" after receiving {received} file(s)" if received else ""
+            suffix = f" after receiving {counted(received, 'file')}" if received else ""
             return SourceOutcome(
                 skipped=f"{provider_label} capture was cancelled{suffix}; nothing was attached",
                 blocked=True,
             )
         if result.status == "try_another" and not result.files:
-            suffix = f" after receiving {received} file(s)" if received else ""
+            suffix = f" after receiving {counted(received, 'file')}" if received else ""
             return SourceOutcome(
                 skipped=(
                     f"{provider_label} was left for another provider{suffix}; nothing was attached"
@@ -1786,7 +1787,7 @@ class GuidedCaptureSource:
                 blocked=True,
             )
         if result.status == "timed_out" and not result.files:
-            suffix = f" after receiving {received} file(s)" if received else ""
+            suffix = f" after receiving {counted(received, 'file')}" if received else ""
             return SourceOutcome(
                 error=f"{provider_label} capture timed out{suffix}; nothing was attached"
             )

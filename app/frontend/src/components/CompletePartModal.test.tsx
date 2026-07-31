@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from "react";
+import { createElement, useState, type ReactNode } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -826,7 +826,13 @@ describe("CompletePartModal - vendor choice", () => {
     await user.click(vendorButton(/SnapMagic/));
 
     await user.click(screen.getByRole("button", { name: "Get Files" }));
-    const openProvider = await screen.findByRole("button", { name: "Open Provider Browser" });
+    // The primary control no longer re-arms itself to assisted after a failure: that silent
+    // escalation is what opened a provider window nobody asked for. Retrying stays automatic,
+    // and the window is now its own deliberate control beside it.
+    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
+    const openProvider = await screen.findByRole("button", {
+      name: "Open Provider Window",
+    });
     expect(run).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
@@ -882,5 +888,226 @@ describe("CompletePartModal - vendor choice", () => {
     expect(
       await screen.findByText(/open SnapMagic first only if assistance is needed\.?$/),
     ).toBeInTheDocument();
+  });
+});
+
+// ------------------------------------------------------ the window contract every sibling has
+//
+// This window declared `role="dialog" aria-modal` while ignoring Escape, never trapping Tab,
+// never returning focus, and closing on a backdrop `click` - so a text-selection drag that
+// released on the scrim threw away whatever had been typed into it.
+
+// The opener lives OUTSIDE the window and the provider tree outlives it, matching the real tree:
+// DetailPanel mounts this window only while it is open, and the global capture store survives
+// every open and close.
+function OpenableWindow({ detail }: { detail: PartDetail }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Complete This Part
+      </button>
+      {open ? (
+        <CompletePartModal detail={detail} hasModel={true} onClose={() => setOpen(false)} />
+      ) : null}
+    </>
+  );
+}
+
+describe("CompletePartModal - dismiss, focus, and close paths", () => {
+  it("moves focus into the dialog and keeps Tab inside it", async () => {
+    mockCadSource(["kicad_symbol"]);
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
+    const dialog = await screen.findByRole("dialog", { name: "Complete this part" });
+
+    expect(dialog).toHaveFocus();
+
+    // Tab off the last control wraps to the first rather than escaping to inert background.
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    last.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(first).toHaveFocus();
+
+    first.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(last).toHaveFocus();
+  });
+
+  it("closes on Escape and returns focus to the control that opened it", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol"]);
+    render(<OpenableWindow detail={DETAIL} />, { wrapper });
+
+    const opener = screen.getByRole("button", { name: "Complete This Part" });
+    await user.click(opener);
+    await screen.findByRole("dialog", { name: "Complete this part" });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Complete this part" })).toBeNull(),
+    );
+    expect(opener).toHaveFocus();
+  });
+
+  it("hands an in-flight capture to the background when Escape closes the window", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol"]);
+    vi.spyOn(api, "runCapture").mockResolvedValue({
+      workflow_batch_id: "batch-escape",
+      workflow_item_id: "item-escape",
+      event_cursor: 0,
+    });
+    vi.spyOn(api, "workflowEvents").mockImplementation(() => new Promise(() => undefined));
+    const onClose = vi.fn();
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={onClose} />, { wrapper });
+
+    await user.click(await screen.findByRole("button", { name: "Get Files" }));
+    await screen.findByText("Provider Work Is Active");
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    // Escape is a close path like every other, so it must go through the same hand-off, not drop
+    // a running capture on the floor.
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("keeps a selection drag that ends on the backdrop from discarding the window", async () => {
+    mockCadSource(["kicad_symbol"]);
+    const onClose = vi.fn();
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={onClose} />, { wrapper });
+    const dialog = await screen.findByRole("dialog", { name: "Complete this part" });
+    const backdrop = dialog.parentElement as HTMLElement;
+
+    // A drag that STARTS on the window's own text and releases on the scrim: the click event
+    // lands on the backdrop, and the old `onClick` handler read that as "dismiss".
+    fireEvent.mouseDown(within(dialog).getByText(DETAIL.derived.display_name));
+    fireEvent.mouseUp(backdrop);
+    fireEvent.click(backdrop);
+    expect(onClose).not.toHaveBeenCalled();
+
+    // A press that genuinely begins on the scrim still dismisses.
+    fireEvent.mouseDown(backdrop);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The header counter is a completion claim, so VA-001 governs it: nothing in this window may read
+// complete without digest-bound evidence.
+const WITH_DATASHEET: PartDetail = makePartDetail({
+  ...DETAIL,
+  datasheet: { source_url: "https://example.test/bq24074.pdf" },
+});
+
+describe("CompletePartModal - the header counter", () => {
+  it("still counts the CAD package when FILES shows no checklist", async () => {
+    // An exact identity opens FILES, which takes Symbol, Footprint, and 3D Model out of DETAILS.
+    // With an empty `needs` projection nothing replaced them in the checklist, so the counter fell
+    // to the four metadata rows and read "4 / 4" - on the same card that says no evidence exists.
+    mockCadSource([]);
+    render(<CompletePartModal detail={WITH_DATASHEET} hasModel={true} onClose={() => {}} />, {
+      wrapper,
+    });
+
+    expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "No completion evidence is recorded. Run verification before treating this part as complete.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("4 / 5")).toBeInTheDocument();
+    expect(screen.queryByText("4 / 4")).toBeNull();
+  });
+
+  it("counts the CAD package as done only once evidence proves it", async () => {
+    mockCadSource([], {
+      state: "verified",
+      manifest_digest:
+        "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      reason: "The active projections were re-resolved from retained evidence.",
+    });
+    render(<CompletePartModal detail={WITH_DATASHEET} hasModel={true} onClose={() => {}} />, {
+      wrapper,
+    });
+
+    expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
+    expect(screen.getByText("5 / 5")).toBeInTheDocument();
+  });
+
+  it("counts every rendered checklist row alongside the package itself", async () => {
+    mockCadSource(["kicad_symbol", "kicad_footprint", "altium_symbol"]);
+    render(<CompletePartModal detail={WITH_DATASHEET} hasModel={true} onClose={() => {}} />, {
+      wrapper,
+    });
+    await screen.findByText("Preferred Source");
+
+    // Four metadata rows, three waiting file rows, and the package the card is still proving.
+    expect(screen.getByText("4 / 8")).toBeInTheDocument();
+  });
+});
+
+describe("CompletePartModal - per-file toasts", () => {
+  it("toasts each received file once per capture, never once per reopen", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol"]);
+    mockCapture();
+    render(<OpenableWindow detail={DETAIL} />, { wrapper });
+
+    await user.click(screen.getByRole("button", { name: "Complete This Part" }));
+    await user.click(await screen.findByRole("button", { name: "Get Files" }));
+    expect(await screen.findByText("KiCad symbol received")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    await user.click(screen.getByRole("button", { name: "Complete This Part" }));
+    await screen.findByText("Files Reverified");
+
+    // `received` belongs to the global capture store, not to this window. Reopening must not
+    // replay a run that already reported - the toast still on screen is the original, not a
+    // second copy of it.
+    expect(screen.getAllByText("KiCad symbol received")).toHaveLength(1);
+  });
+});
+
+describe("CompletePartModal - one capture slot", () => {
+  it("says which part's capture this one superseded", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol"]);
+    // No submission resolves, so the first part's capture is genuinely still in flight.
+    vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => undefined));
+    const other: PartDetail = makePartDetail({
+      ...DETAIL,
+      id: "part2",
+      mpn: "LM317",
+      derived: { display_name: "LM317" },
+    });
+
+    const { rerender } = render(
+      <CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />,
+      { wrapper },
+    );
+    await user.click(await screen.findByRole("button", { name: "Get Files" }));
+    await screen.findByText("Provider Work Is Active");
+
+    rerender(<CompletePartModal detail={other} hasModel={true} onClose={() => {}} />);
+    await user.click(await screen.findByRole("button", { name: "Get Files" }));
+
+    expect(
+      await screen.findByText(/Completion for BQ24074 was superseded when this capture started/),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing about a supersede when no other capture was displaced", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol"]);
+    vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => undefined));
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
+
+    await user.click(await screen.findByRole("button", { name: "Get Files" }));
+    await screen.findByText("Provider Work Is Active");
+
+    expect(screen.queryByText(/was superseded when this capture started/)).toBeNull();
   });
 });

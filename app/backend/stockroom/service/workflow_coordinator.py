@@ -25,6 +25,7 @@ from stockroom.workflow import (
     ItemStatus,
     StageHandlerError,
     StageRecord,
+    WorkflowConflict,
     WorkflowEvent,
     WorkflowRuntime,
     WorkflowStore,
@@ -80,6 +81,7 @@ class WorkflowCoordinatorStatus:
     idle_poll_count: int
     recovered_claim_count: int
     handler_error_count: int
+    lease_lost_count: int
     unexpected_error_count: int
     idle_round_count: int
     current_backoff_seconds: float
@@ -170,6 +172,7 @@ class WorkflowCoordinator:
         self._idle_poll_count = 0
         self._recovered_claim_count = 0
         self._handler_error_count = 0
+        self._lease_lost_count = 0
         self._unexpected_error_count = 0
         self._idle_round_count = 0
         self._current_backoff_seconds = 0.0
@@ -304,6 +307,7 @@ class WorkflowCoordinator:
                 idle_poll_count=self._idle_poll_count,
                 recovered_claim_count=self._recovered_claim_count,
                 handler_error_count=self._handler_error_count,
+                lease_lost_count=self._lease_lost_count,
                 unexpected_error_count=self._unexpected_error_count,
                 idle_round_count=self._idle_round_count,
                 current_backoff_seconds=self._current_backoff_seconds,
@@ -501,9 +505,15 @@ class WorkflowCoordinator:
                 f"workflow-generation-{self._fence.generation}-worker-{worker_ordinal}",
                 lease_seconds=self._lease_seconds,
             )
-        except StageHandlerError:
+        except (StageHandlerError, WorkflowConflict) as exc:
+            # A lost or superseded fence is ordinary contention over durable
+            # state, not a runtime defect: it must never fault the coordinator
+            # and take the whole dispatch loop down with it.
             with self._lock:
-                self._handler_error_count += 1
+                if isinstance(exc, WorkflowConflict):
+                    self._lease_lost_count += 1
+                else:
+                    self._handler_error_count += 1
                 self._dispatch_count += 1
                 self._last_activity_at = time.time()
             return _PollOutcome.HANDLER_ERROR

@@ -9,12 +9,8 @@ import { AddPartModal } from "./AddPartModal";
 import { Text } from "../lib/copy";
 import { plural } from "../lib/plural";
 import { useRouter } from "../lib/router";
-import {
-  useActivateProfile,
-  useFacetsQuery,
-  useProfiles,
-  useUpdateCheck,
-} from "../api/queries";
+import { useActivateProfile, useFacetsQuery, useProfiles } from "../api/queries";
+import { useUpdateStanding } from "../lib/useUpdateStanding";
 import { RunningVersionIndicator } from "./RunningVersionIndicator";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -42,7 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 function ShellStatusBar() {
   const { route } = useRouter();
   const facets = useFacetsQuery();
-  const update = useUpdateCheck();
+  const { view: updateView } = useUpdateStanding();
   // The library's SCALE, which is a fact worth a permanent slot. This segment used to read
   // "Components Loaded / Components": it said Components twice (the second was the section name,
   // already obvious from the rail's active item) and carried no information, since "loaded" is true
@@ -91,11 +87,7 @@ function ShellStatusBar() {
         </>
       )}
       <span className="ml-auto flex items-center gap-2.5 text-t2">
-        <RunningVersionIndicator
-          data={update.data}
-          checking={update.isPending || update.isFetching}
-          failed={update.isError}
-        />
+        <RunningVersionIndicator view={updateView} />
         <ProfileSwitch />
       </span>
     </footer>

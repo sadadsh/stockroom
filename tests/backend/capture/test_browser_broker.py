@@ -8,6 +8,7 @@ import multiprocessing
 import sys
 import threading
 import time
+from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -18,11 +19,13 @@ import pytest
 from stockroom.capture.browser import (
     CaptureBrowserError,
     PlaywrightCaptureBrowser,
+    ProviderControlHint,
     ProviderHudSpec,
     ProviderProfileLock,
     SharedPlaywrightRuntime,
     _allow_automatic_downloads,
     _browser_candidates,
+    _ProviderHudState,
     provider_profile_dir,
 )
 from stockroom.capture.download_broker import DownloadBroker, DownloadTask
@@ -409,9 +412,7 @@ def test_digikey_session_state_survives_relaunch_only_in_its_provider_profile(tm
         relaunched = make_browser("digikey", profile)
         with relaunched.session() as page:
             page.goto(url)
-            remembered = page.evaluate(
-                "localStorage.getItem('stockroom-session-probe')"
-            )
+            remembered = page.evaluate("localStorage.getItem('stockroom-session-probe')")
 
         isolated = make_browser("ultralibrarian", tmp_path / "Profiles" / "ultralibrarian")
         with isolated.session() as page:
@@ -586,14 +587,25 @@ class _HudPage(_EventPage):
     def is_closed(self) -> bool:
         return self.closed
 
-    def invoke_hud_action(self, action: str, *, token: str | None = None) -> bool:
-        assert len(self.bindings) == 1
+    def _hud_payload(self) -> dict:
         assert self.evaluations
-        callback = next(iter(self.bindings.values()))
+        return self.evaluations[0][1]
+
+    def invoke_hud_action(self, action: str, *, token: str | None = None) -> bool:
+        payload = self._hud_payload()
+        callback = self.bindings[payload["actionBinding"]]
         return callback(
             SimpleNamespace(page=self),
             action,
-            token if token is not None else self.evaluations[0][1]["actionToken"],
+            token if token is not None else payload["actionToken"],
+        )
+
+    def read_hud_state(self, *, token: str | None = None) -> dict:
+        payload = self._hud_payload()
+        callback = self.bindings[payload["stateBinding"]]
+        return callback(
+            SimpleNamespace(page=self),
+            token if token is not None else payload["stateToken"],
         )
 
 
@@ -619,6 +631,7 @@ def _hud_capture(
     profile_dir: Path | None = None,
     provider_key: str | None = None,
     auto_finish_seconds: float = 2.0,
+    auto_finish_idle_seconds: float = 25.0,
 ):
     staging = tmp_path / "Staging"
     staging.mkdir()
@@ -640,11 +653,12 @@ def _hud_capture(
         poll_interval_s=0.01,
         settle_seconds=0,
         auto_finish_seconds=auto_finish_seconds,
+        auto_finish_idle_seconds=auto_finish_idle_seconds,
     )
     return result, broker
 
 
-def test_user_capture_hud_is_injected_before_navigation_and_survives_without_dom_inspection(
+def test_user_capture_hud_is_injected_before_navigation_and_reads_no_provider_content(
     tmp_path,
 ):
     page = _HudPage()
@@ -697,22 +711,31 @@ def test_user_capture_hud_is_injected_before_navigation_and_survives_without_dom
     assert '"Use Another Provider"' in bootstrap
     assert '"Close Capture"' in bootstrap
 
-    # The only page code Stockroom installs creates and updates its own closed-shadow surface.
-    # The fake deliberately has no locator/query APIs, and the script carries no provider-content,
-    # credential, or storage inspection primitive.
-    provider_inspection_primitives = (
-        "querySelector",
-        "getElementsBy",
-        "document.body",
+    # The narrowed contract: the injected script may ask the document WHERE an element is, and
+    # nothing else. Every primitive that would harvest page CONTENT - text, markup, attribute or
+    # form values, credentials, cookies, storage - stays forbidden, and the fake page deliberately
+    # has no locator/query APIs at all.
+    provider_content_primitives = (
         "innerHTML",
+        "outerHTML",
         "innerText",
+        "getAttribute",
+        "attributes",
+        "document.forms",
         "document.cookie",
         "localStorage",
         "sessionStorage",
+        "indexedDB",
         "navigator.credentials",
-        'input[type="password"]',
+        "FormData",
+        "fetch(",
+        "XMLHttpRequest",
     )
-    assert all(value not in bootstrap for value in provider_inspection_primitives)
+    found = [value for value in provider_content_primitives if value in bootstrap]
+    assert found == [], f"the injected HUD can harvest provider content: {found}"
+    # Position-only DOM access is what the owner relaxed the contract for, and it is present.
+    assert "getBoundingClientRect()" in bootstrap
+    assert "document.querySelectorAll(" in bootstrap
 
 
 def test_digikey_hud_names_provider_isolated_session_memory_only_with_its_profile(tmp_path):
@@ -775,6 +798,14 @@ def test_user_capture_hud_receives_live_stockroom_download_count(tmp_path):
 
 
 def test_user_capture_resumes_automatically_after_a_detected_download(tmp_path):
+    """One archive carrying every required format resumes without a click.
+
+    This route produces fewer receipts than the HUD has required-file labels, so it
+    completes on the idle gap rather than the companion-file quiet period. Resuming on the
+    first receipt while required formats are still outstanding is what truncated real
+    multi-asset providers, so that path is asserted by the required-file test instead.
+    """
+
     class Download:
         suggested_filename = "symbol.kicad_sym"
         url = "https://vendor.example.test/files/symbol.kicad_sym"
@@ -785,7 +816,12 @@ def test_user_capture_resumes_automatically_after_a_detected_download(tmp_path):
     page = _HudPage()
     page.on_goto = lambda: page.handlers[0](Download())
 
-    result, broker = _hud_capture(tmp_path, page, auto_finish_seconds=0)
+    result, broker = _hud_capture(
+        tmp_path,
+        page,
+        auto_finish_seconds=0,
+        auto_finish_idle_seconds=0,
+    )
 
     assert result.status == "completed"
     assert len(broker.receipts) == 1
@@ -828,16 +864,21 @@ def test_user_capture_hud_actions_drive_distinct_result_statuses(
     expected_status,
 ):
     page = _HudPage()
+    # Recorded rather than asserted in place: capture_user_downloads treats any exception out of
+    # goto as a navigation failure, so an assertion raised from this callback was swallowed and
+    # every outcome below silently passed through the goto-failure path instead.
+    outcomes: list[bool] = []
 
     def act_once() -> None:
-        assert page.invoke_hud_action(action, token="not-the-hud-token") is False
-        assert page.invoke_hud_action(action) is True
-        assert page.invoke_hud_action(action) is False
+        outcomes.append(page.invoke_hud_action(action, token="not-the-hud-token"))
+        outcomes.append(page.invoke_hud_action(action))
+        outcomes.append(page.invoke_hud_action(action))
 
     page.on_goto = act_once
     result, _broker = _hud_capture(tmp_path, page)
 
     assert result.status == expected_status
+    assert outcomes == [False, True, True]
 
 
 def test_user_capture_hud_rejects_identity_that_is_not_its_bound_task(tmp_path):
@@ -1015,8 +1056,14 @@ def test_task_page_reuses_initial_blank_page_and_closes_its_popups(tmp_path):
         context.pages.append(popup)
         assert page is initial
 
-    assert initial.closed is True
+    # The claimed page is the context's first page, which is exactly what the session yields
+    # and holds for its whole lifetime. Closing a page the task did not open ends the session's
+    # own window, so later routes lose the surface they navigate. Popups the task spawned are
+    # still its own and must close with it.
+    assert initial.closed is False
     assert popup.closed is True
+    assert browser._page_brokers == []
+    assert browser._wired_pages == []
 
 
 def test_user_capture_wires_before_navigation_and_collects_every_download_without_dom_actions(
@@ -1291,3 +1338,951 @@ def test_real_one_click_multi_download_does_not_deadlock(tmp_path):
         "footprint.kicad_mod": "payload:footprint.kicad_mod",
         "model.step": "payload:model.step",
     }
+
+
+def test_noopener_download_window_still_attaches_to_the_active_task(tmp_path):
+    """A provider download control that opens a rel=noopener tab must still attach its file.
+
+    Chromium reports no opener for such a window, so the opener walk cannot reach the task
+    page. The file was saved to the legacy download directory and never added to the task
+    receipts, which surfaced as "the vendor download did not produce a file" while the HUD
+    count stayed at zero and Resume Now stayed permanently disabled.
+    """
+
+    class Orphan(_EventPage):
+        def opener(self):
+            return None
+
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
+    context = _PageContext()
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    browser._context = context
+
+    with browser.task_page(broker) as page:
+        assert page is not None
+        orphan = Orphan()
+        context.pages.append(orphan)
+        browser._wire_downloads(orphan)
+        orphan.handlers[0](_Download())
+
+    assert len(broker.receipts) == 1
+    assert broker.receipts[0].path.parent == staging / "part-a"
+
+
+def test_auto_finish_waits_for_every_required_file_before_completing(tmp_path):
+    """Auto-finish must not end a capture that is still missing required formats.
+
+    The HUD names three required files. Completing a bounded quiet period after the first
+    one truncates the capture, and the partial set then fails downstream binding, so a real
+    download is discarded rather than attached.
+    """
+
+    class Download:
+        def __init__(self, name: str):
+            self.suggested_filename = name
+            self.url = f"https://vendor.example.test/{name}"
+
+        def save_as(self, destination: str) -> None:
+            Path(destination).write_text(self.suggested_filename, encoding="utf-8")
+
+    page = _HudPage()
+    page.on_goto = lambda: page.handlers[0](Download("symbol.kicad_sym"))
+
+    def deliver(count: int) -> None:
+        time.sleep(0.02)
+        if count == 6:
+            page.handlers[0](Download("footprint.kicad_mod"))
+            page.handlers[0](Download("model.step"))
+
+    page.on_wait = deliver
+
+    class Context:
+        def new_page(self):
+            return page
+
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+    broker = DownloadBroker(DownloadTask("part-a", "Exact Manufacturer", "MPN-A/7", staging))
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    browser._context = Context()
+
+    result = browser.capture_user_downloads(
+        "https://vendor.example.test/part",
+        broker,
+        hud=_provider_hud_spec(),
+        timeout_s=5,
+        poll_interval_s=0.01,
+        settle_seconds=0,
+        auto_finish_seconds=0.05,
+    )
+
+    assert result.status == "completed"
+    assert len(result.files) == 3
+
+
+def test_task_page_teardown_survives_an_unreadable_opener(tmp_path):
+    """A page whose opener cannot be read must not abort task teardown.
+
+    The ownership walk runs inside the contextmanager's finally block. An exception there
+    replaces any in-flight error and returns before the close loop, leaking every window and
+    leaving stale broker bindings that route the next task's downloads to this task.
+    """
+
+    class Hostile(_EventPage):
+        def opener(self):
+            raise RuntimeError("target page, context or browser has been closed")
+
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
+    context = _PageContext()
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    browser._context = context
+
+    with browser.task_page(broker) as page:
+        context.pages.append(Hostile())
+
+    assert page.closed is True
+    assert browser._page_brokers == []
+    assert browser._wired_pages == []
+
+
+def test_a_failed_companion_download_keeps_every_staged_file(tmp_path):
+    """One failing companion download must not discard files already staged.
+
+    The error check raised out of the capture block, so UserCaptureResult was never built and
+    every receipt staged before the failure was lost. The caller then reported a plain error
+    and attached nothing, which is exactly the loss the capture contract forbids.
+    """
+
+    class Good:
+        suggested_filename = "symbol.kicad_sym"
+        url = "https://vendor.example.test/files/symbol.kicad_sym"
+
+        def save_as(self, destination: str) -> None:
+            Path(destination).write_bytes(b"captured-symbol")
+
+    class Bad:
+        suggested_filename = "footprint.kicad_mod"
+        url = "https://vendor.example.test/files/footprint.kicad_mod"
+
+        def save_as(self, destination: str) -> None:
+            raise OSError("connection reset by peer")
+
+    class UserPage(_EventPage):
+        url = "about:blank"
+
+        def goto(self, url: str, **_options) -> None:
+            self.url = url
+            self.handlers[0](Good())
+            self.handlers[0](Bad())
+
+        def wait_for_timeout(self, _milliseconds: int) -> None:
+            return None
+
+        def is_closed(self) -> bool:
+            return False
+
+    page = UserPage()
+
+    class Context:
+        def new_page(self):
+            return page
+
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    browser._context = Context()
+
+    result = browser.capture_user_downloads(
+        "https://vendor.example.test/part",
+        broker,
+        timeout_s=1,
+        poll_interval_s=0.01,
+        settle_seconds=0,
+        auto_finish_seconds=0,
+    )
+
+    assert len(result.files) == 1
+    assert result.files[0].path.read_bytes() == b"captured-symbol"
+
+
+def test_repeating_one_hud_action_is_accepted_but_a_conflicting_one_is_not():
+    """Clicking the same HUD control twice must not report a Stockroom failure.
+
+    One state is shared across every page bound to a task, and the HUD remounts with a fresh
+    pending flag on each provider navigation, so a person can legitimately click the same
+    control again before Python acts on the first request. Rejecting the repeat surfaced
+    "Stockroom could not accept that action" for a request that had already been accepted.
+    """
+
+    state = _ProviderHudState(_provider_hud_spec())
+    token = state.action_token
+
+    assert state.request_action("finish", token) is True
+    assert state.request_action("finish", token) is True
+    assert state.request_action("cancel", token) is False
+    assert state.action == "finish"
+    assert state.request_action("finish", "wrong-token") is False
+
+
+def test_provider_hud_state_read_back_is_guarded_by_its_own_token():
+    """A remounting HUD reads the live count through a binding held to the same discipline.
+
+    The bootstrap payload embeds the count as it stood when the page was bound, so every
+    navigation remounted the panel claiming zero captured files. The read-back needs its own
+    namespace and secret exactly like the security handoff's state binding.
+    """
+
+    state = _ProviderHudState(_provider_hud_spec())
+    state.update_download_count(4)
+
+    assert state.state_binding.startswith("__stockroom_capture_state_")
+    assert state.state_binding != state.action_binding
+    assert state.state_token != state.action_token
+    assert state.read_state(state.state_token) == {"downloadCount": 4, "securityHold": False}
+    assert state.read_state(state.action_token) == {}
+    assert state.read_state("wrong-token") == {}
+    assert state.read_state(None) == {}
+
+
+def test_provider_hud_binds_a_state_read_back_before_provider_navigation(tmp_path):
+    page = _HudPage()
+
+    result, _broker = _hud_capture(tmp_path, page, action="finish")
+
+    assert result.status == "completed"
+    _bootstrap, payload = page.evaluations[0]
+    assert payload["stateBinding"] in page.bindings
+    assert payload["actionBinding"] in page.bindings
+    goto_index = page.events.index("goto:https://vendor.example.test/search?query=MPN-A%2F7")
+    assert page.events.count("expose-binding") == 2
+    assert [index for index, event in enumerate(page.events) if event == "expose-binding"][
+        -1
+    ] < goto_index
+    assert page.read_hud_state()["downloadCount"] == 0
+    assert page.read_hud_state(token="not-the-state-token") == {}
+
+
+_HUD_SHADOW_PROBE = r"""
+() => {
+  const attachShadow = Element.prototype.attachShadow;
+  Element.prototype.attachShadow = function (options) {
+    const root = attachShadow.call(this, { ...options, mode: "open" });
+    // Stockroom now attaches TWO closed roots (the panel and the outline surface), so the probe
+    // keeps every one and each read below names the surface it means.
+    (globalThis.__stockroom_probe_shadows ||= []).push(root);
+    globalThis.__stockroom_probe_shadow = root;
+    return root;
+  };
+}
+"""
+
+_HUD_PROBE_ROOT = r"""
+  const surface = (selector) =>
+    (globalThis.__stockroom_probe_shadows || []).find((root) => root.querySelector(selector));
+"""
+
+_HUD_SHADOW_READ = (
+    r"""
+() => {
+"""
+    + _HUD_PROBE_ROOT
+    + r"""
+  const root = surface(".panel");
+  if (!root) return null;
+  const spoken = root.querySelectorAll(".sr-only");
+  const finish = root.querySelector(".finish");
+  return {
+    count: root.querySelector(".mode").textContent,
+    countLabel: root.querySelector(".mode").getAttribute("aria-label"),
+    automated: root.querySelector(".state-value").textContent,
+    live: spoken[0].textContent,
+    announced: spoken[1].textContent,
+    finishLabel: finish.textContent,
+    finishDisabled: finish.disabled,
+    finishTitle: finish.title,
+    anotherDisabled: root.querySelector(".another").disabled,
+    cancelDisabled: root.querySelector(".cancel").disabled,
+  };
+}
+"""
+)
+
+_HUD_CHECKLIST_READ = (
+    r"""
+() => {
+"""
+    + _HUD_PROBE_ROOT
+    + r"""
+  const root = surface(".panel");
+  if (!root) return null;
+  const instruction = root.querySelector(".instruction");
+  const outstanding = root.querySelector(".outstanding");
+  const hintState = root.querySelector(".hint-state");
+  return {
+    instruction: instruction ? instruction.textContent : null,
+    steps: [...root.querySelectorAll(".checklist .step")].map((step) => ({
+      className: step.className,
+      mark: step.querySelector(".step-mark").textContent,
+      state: step.querySelector(".step-state").textContent,
+      text: step.querySelector(".step-text").textContent,
+    })),
+    outstanding: outstanding ? outstanding.textContent : null,
+    outstandingClass: outstanding ? outstanding.className : null,
+    hintState: hintState ? hintState.textContent : null,
+  };
+}
+"""
+)
+
+_HUD_OVERLAY_READ = (
+    r"""
+() => {
+"""
+    + _HUD_PROBE_ROOT
+    + r"""
+  const root = surface(".overlay");
+  if (!root) return null;
+  return [...root.querySelectorAll(".outline")].map((box) => ({
+    label: box.querySelector(".outline-tag").textContent,
+    pointerEvents: getComputedStyle(box).pointerEvents,
+    left: Math.round(box.getBoundingClientRect().left),
+    top: Math.round(box.getBoundingClientRect().top),
+    width: Math.round(box.getBoundingClientRect().width),
+    height: Math.round(box.getBoundingClientRect().height),
+  }));
+}
+"""
+)
+
+_HUD_CLICK_FINISH = (
+    r"""
+() => {
+"""
+    + _HUD_PROBE_ROOT
+    + r"""
+  surface(".panel").querySelector(".finish").click();
+}
+"""
+)
+
+_INERT_PROVIDER_BODY = b"<!doctype html><title>provider</title><p>provider page</p>"
+
+
+@contextmanager
+def _static_page_server(body: bytes = _INERT_PROVIDER_BODY):
+    """Serve one inert document so a real navigation can remount the HUD."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, _format: str, *_args) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}/"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@contextmanager
+def _real_provider_hud(tmp_path, *, spec: ProviderHudSpec | None = None, url: str | None = None):
+    """Mount the real HUD in real Chromium and expose its closed shadow root for reading.
+
+    The panel is deliberately unreadable from page scripts, so the probe reopens only the shadow
+    Stockroom itself attaches. Nothing here touches provider content; the fake document is inert.
+    """
+
+    from stockroom.capture.browser import chromium_unavailable_reason
+
+    reason = chromium_unavailable_reason()
+    if reason is not None:
+        pytest.skip(reason)
+
+    browser = PlaywrightCaptureBrowser(
+        download_dir=tmp_path / "Downloads",
+        profile_dir=tmp_path / "Profile",
+        provider_key="provider-hud-probe",
+        headless=True,
+        engine="chromium",
+    )
+    state = _ProviderHudState(spec if spec is not None else _provider_hud_spec())
+    with browser.session() as page:
+        # Registered before the HUD's own init script so every remount is observable too.
+        page.add_init_script(f"({_HUD_SHADOW_PROBE})();")
+        page.evaluate(_HUD_SHADOW_PROBE)
+        if url is not None:
+            page.goto(url, wait_until="domcontentloaded")
+        browser._bind_provider_hud(page, state)
+        page.wait_for_timeout(150)
+        yield browser, page, state
+
+
+@pytest.mark.timeout(90)
+def test_provider_hud_keeps_tracking_captured_files_after_an_accepted_action(tmp_path):
+    """An accepted click must not freeze the panel state that reports captured files.
+
+    The pending flag was never cleared once Python accepted an action, and it gated the finish
+    button and the automated-step line. Python can stay busy for the rest of the session, so the
+    panel then reported a stale capture reality while files kept landing.
+    """
+
+    with _real_provider_hud(tmp_path) as (browser, page, state):
+        browser._update_provider_hud(state, 1)
+        before = page.evaluate(_HUD_SHADOW_READ)
+        page.evaluate(_HUD_CLICK_FINISH)
+        page.wait_for_timeout(200)
+        pending = page.evaluate(_HUD_SHADOW_READ)
+        browser._update_provider_hud(state, 3)
+        after = page.evaluate(_HUD_SHADOW_READ)
+
+    assert state.action == "finish"
+    assert before["finishDisabled"] is False
+    assert before["automated"] == (
+        "1 file captured. Stockroom will resume automatically after downloads settle."
+    )
+
+    assert after["count"] == "3 FILES"
+    assert after["countLabel"] == "Downloads captured: 3"
+    assert after["live"] == "3 files captured in this task."
+    assert after["finishDisabled"] is False
+    assert after["finishTitle"] == "Finish this route after its downloads settle"
+
+    # The pending affordance withdraws only the controls that would conflict with the request
+    # Stockroom already accepted; it never withdraws what the capture count reports.
+    assert pending["anotherDisabled"] is True
+    assert pending["cancelDisabled"] is True
+    assert pending["automated"] == "Finishing capture after downloaded files settle."
+
+
+@pytest.mark.timeout(90)
+def test_provider_hud_announces_the_control_label_it_shows(tmp_path):
+    """The spoken confirmation must name the control the person actually pressed."""
+
+    with _real_provider_hud(tmp_path) as (browser, page, state):
+        browser._update_provider_hud(state, 1)
+        page.evaluate(_HUD_CLICK_FINISH)
+        page.wait_for_timeout(200)
+        pending = page.evaluate(_HUD_SHADOW_READ)
+
+    assert state.action == "finish"
+    assert pending["finishLabel"] == "Resume Now"
+    assert pending["announced"] == f"{pending['finishLabel']} requested."
+
+
+@pytest.mark.timeout(90)
+def test_a_remounted_provider_hud_reads_the_live_count_not_its_bind_time_snapshot(tmp_path):
+    """Every provider navigation remounts the HUD from the init script registered at bind time.
+
+    That payload froze the count at zero, so a freshly mounted panel claimed no files had been
+    captured until Python's next push - and on the navigation-failure path there is no next push.
+    """
+
+    with _real_provider_hud(tmp_path) as (browser, page, state), _static_page_server() as url:
+        browser._update_provider_hud(state, 2)
+        page.goto(url, wait_until="domcontentloaded")
+        page.wait_for_timeout(200)
+        remounted = page.evaluate(_HUD_SHADOW_READ)
+
+    assert remounted is not None
+    assert remounted["count"] == "2 FILES"
+    assert remounted["countLabel"] == "Downloads captured: 2"
+    assert remounted["live"] == "2 files captured in this task."
+    assert remounted["finishDisabled"] is False
+    assert remounted["automated"] == (
+        "2 files captured. Stockroom will resume automatically after downloads settle."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tier 1: the live guided checklist, built only from Stockroom-owned data.
+# ---------------------------------------------------------------------------
+
+
+def _hinted_hud_spec(*hints: ProviderControlHint) -> ProviderHudSpec:
+    return ProviderHudSpec(
+        provider_label="Exact Provider",
+        author_route="Exact CAD Author",
+        manufacturer="Exact Manufacturer",
+        mpn="MPN-A/7",
+        required_file_labels=(
+            "KiCad symbol (.kicad_sym)",
+            "KiCad footprint (.kicad_mod)",
+            "3D model (.step)",
+        ),
+        provider_instruction="Open the export panel and start one export.",
+        control_hints=tuple(hints),
+    )
+
+
+@pytest.mark.timeout(90)
+def test_provider_hud_checklist_ticks_off_required_files_as_downloads_land(tmp_path):
+    """The guidance is an ordered live checklist, not a static list of formats.
+
+    Every step is one exact required file label, and the only progress signal is Stockroom's own
+    receipt count arriving through the state read-back that already exists. Nothing here reads the
+    provider page.
+    """
+
+    with _real_provider_hud(tmp_path, spec=_hinted_hud_spec()) as (browser, page, state):
+        nothing_yet = page.evaluate(_HUD_CHECKLIST_READ)
+        browser._update_provider_hud(state, 1)
+        page.wait_for_timeout(100)
+        partway = page.evaluate(_HUD_CHECKLIST_READ)
+        browser._update_provider_hud(state, 3)
+        page.wait_for_timeout(100)
+        complete = page.evaluate(_HUD_CHECKLIST_READ)
+
+    assert nothing_yet is not None
+    assert nothing_yet["instruction"] == "Open the export panel and start one export."
+    assert [step["text"] for step in nothing_yet["steps"]] == [
+        "KiCad symbol (.kicad_sym)",
+        "KiCad footprint (.kicad_mod)",
+        "3D model (.step)",
+    ]
+    assert [step["state"] for step in nothing_yet["steps"]] == ["Next", "Waiting", "Waiting"]
+    assert nothing_yet["outstanding"] == (
+        "Nothing captured yet. Still outstanding: KiCad symbol (.kicad_sym), "
+        "KiCad footprint (.kicad_mod), 3D model (.step)."
+    )
+
+    assert [step["state"] for step in partway["steps"]] == ["Captured", "Next", "Waiting"]
+    assert partway["steps"][0]["mark"] == "✓"
+    assert partway["outstanding"] == (
+        "1 of 3 captured. Still outstanding: KiCad footprint (.kicad_mod), 3D model (.step). "
+        "One provider archive can carry several formats, so Stockroom checks the delivered files "
+        "and resumes on its own."
+    )
+
+    assert [step["state"] for step in complete["steps"]] == ["Captured", "Captured", "Captured"]
+    assert complete["outstandingClass"] == "outstanding done"
+    assert complete["outstanding"] == (
+        "All 3 required formats have landed. Nothing is outstanding; Stockroom resumes "
+        "automatically."
+    )
+
+
+def test_provider_hud_payload_carries_the_provider_instruction_and_its_control_hints():
+    """Tier 1 context and Tier 2 hints are Stockroom-owned data on the HUD spec."""
+
+    hint = ProviderControlHint(
+        label="Export",
+        selectors=("#submit-export",),
+        source="vendors.py UltraLibrarianAdapter._export_button",
+    )
+    payload = _ProviderHudState(_hinted_hud_spec(hint)).payload()
+
+    assert payload["providerInstruction"] == "Open the export panel and start one export."
+    assert payload["controlHints"] == [{"label": "Export", "selectors": ["#submit-export"]}]
+    # The measured provenance is for reviewers, not for the provider page.
+    assert "source" not in json.dumps(payload["controlHints"])
+
+
+def test_provider_hud_reads_its_instruction_and_hints_from_the_vendor_registry():
+    """`guided.py` builds the spec from identity alone, so the registry supplies the guidance.
+
+    Explicit spec fields still win; the registry is the fallback keyed on the exact provider
+    label the capability itself declares.
+    """
+
+    from stockroom.capture.vendors import UltraLibrarianAdapter
+
+    capability = UltraLibrarianAdapter.capability
+    payload = _ProviderHudState(
+        ProviderHudSpec(
+            provider_label=capability.label,
+            author_route=capability.label,
+            manufacturer="Exact Manufacturer",
+            mpn="MPN-A/7",
+            required_file_labels=("KiCad 6 or later",),
+        )
+    ).payload()
+
+    assert payload["providerInstruction"] == capability.instruction
+    assert [hint["selectors"] for hint in payload["controlHints"]] == [
+        list(hint.selectors) for hint in capability.control_hints
+    ]
+    assert payload["controlHints"], "Ultra Librarian has measured control hints"
+
+
+def _every_hinted_capability():
+    from stockroom.capture.vendors import all_adapters
+
+    seen: dict[str, object] = {}
+    for adapter in all_adapters():
+        candidates = [adapter]
+        routes = getattr(adapter, "capture_routes", None)
+        if callable(routes):
+            candidates.extend(routes())
+        for candidate in candidates:
+            seen[candidate.capability.label] = candidate.capability
+    return seen
+
+
+def test_every_declared_control_hint_names_a_measured_source_and_a_plain_selector():
+    """A hint may only point at something this repo measured, with a plain CSS selector.
+
+    Playwright's own pseudo-classes (`:visible`, `:has-text`) are not CSS and would either throw
+    in the page or, worse, match on TEXT - which is exactly the content the narrowed contract
+    forbids the overlay from touching.
+    """
+
+    for label, capability in _every_hinted_capability().items():
+        for hint in capability.control_hints:
+            assert hint.source.strip(), f"{label} hint {hint.label!r} names no measured source"
+            assert hint.label == hint.label.strip() and hint.label
+            for selector in hint.selectors:
+                assert ":visible" not in selector, f"{label} hint uses a Playwright pseudo-class"
+                assert ":has-text" not in selector, f"{label} hint matches on page text"
+                assert ":checked" not in selector, f"{label} hint reads a form value"
+
+
+def test_control_hints_are_derived_from_the_measured_pins_and_routes_not_invented():
+    """Every outlined selector traces back to data an automated path already measured."""
+
+    from stockroom.capture.vendors import (
+        _DIGIKEY_MANUFACTURER_ROUTE,
+        _DIGIKEY_ULTRALIBRARIAN_ROUTE,
+        SnapMagicAdapter,
+        UltraLibrarianAdapter,
+        _export_selectors,
+        get_adapter,
+    )
+
+    ultra = UltraLibrarianAdapter.capability
+    ultra_hints = {hint.label: hint.selectors for hint in ultra.control_hints}
+    assert ultra_hints["KiCad v6+ export"] == _export_selectors(
+        "kicad", ultra.version_pins["kicad"]
+    )
+    assert ultra_hints["3D STEP model export"] == _export_selectors(
+        "model", ultra.version_pins["model"]
+    )
+    # The two remaining Ultra Librarian selectors are the exact strings its own driver uses.
+    assert ultra_hints["Provider consent"] == ("input[type=checkbox][id^=consent-]",)
+    assert ultra_hints["Download export"] == ("#submit-export",)
+
+    snap = SnapMagicAdapter.capability
+    snap_selectors = [selector for hint in snap.control_hints for selector in hint.selectors]
+    assert 'a[name="download-modal"]' in snap_selectors
+    for pin in snap.version_pins.values():
+        assert f'[data-format="{pin}"]' in snap_selectors
+
+    digikey = get_adapter("digikey")
+    parent = {hint.label: hint.selectors for hint in digikey.capability.control_hints}
+    route = _DIGIKEY_ULTRALIBRARIAN_ROUTE
+    assert parent[f"{route.label} row"] == (f"#{route.row_ids[0]}",)
+    assert parent[f"Download from {route.label}"] == (f'#{route.modal_id} [id^="btn-download-"]',)
+
+    by_label = {
+        candidate.capability.label: candidate.capability for candidate in digikey.capture_routes()
+    }
+    manufacturer = by_label["DigiKey · Manufacturer Provided"]
+    mfr_hints = {hint.label: hint.selectors for hint in manufacturer.control_hints}
+    assert mfr_hints["Download from Manufacturer Provided"] == (
+        f"#{_DIGIKEY_MANUFACTURER_ROUTE.modal_id} #btn-download-mfr",
+    )
+
+    # CADENAS has no measured format/download contract, so it outlines no download control.
+    cadenas = by_label["DigiKey · CADENAS"]
+    assert all("Download" not in hint.label for hint in cadenas.control_hints)
+
+
+def test_a_provider_without_a_measured_control_is_left_hint_less():
+    """SamacSys is person-driven and this repo has measured none of its controls."""
+
+    from stockroom.capture.vendors import SamacSysAssistedAdapter
+
+    assert SamacSysAssistedAdapter.capability.control_hints == ()
+
+
+# ---------------------------------------------------------------------------
+# Tier 2: position-only outlines over the real controls.
+# ---------------------------------------------------------------------------
+
+_EXPORT_CONTROL_BODY = (
+    b"<!doctype html><title>provider</title>"
+    b"<style>#submit-export{position:absolute;left:40px;top:120px;width:160px;height:44px}</style>"
+    b"<button id='submit-export'>Download</button>"
+)
+_NO_CONTROL_BODY = b"<!doctype html><title>provider</title><p>no export panel here</p>"
+_CHALLENGE_BODY = (
+    b"<!doctype html><title>Just a moment...</title>"
+    b"<style>#submit-export{position:absolute;left:40px;top:120px;width:160px;height:44px}"
+    b".cf-turnstile{position:absolute;left:20px;top:20px;width:300px;height:65px}</style>"
+    b"<div class='cf-turnstile'></div>"
+    b"<button id='submit-export'>Download</button>"
+)
+_AMBIGUOUS_BODY = (
+    b"<!doctype html><title>provider</title>"
+    b"<style>.row{position:absolute;left:40px;width:160px;height:44px}</style>"
+    b"<button class='row' id='btn-download-a' style='top:120px'>Download</button>"
+    b"<button class='row' id='btn-download-b' style='top:200px'>Download</button>"
+)
+
+_EXPORT_HINT = ProviderControlHint(
+    label="Export",
+    selectors=("#submit-export",),
+    source="vendors.py UltraLibrarianAdapter._export_button",
+)
+
+
+@pytest.mark.timeout(90)
+def test_provider_hud_outlines_the_one_control_a_hint_uniquely_matches(tmp_path):
+    """A box is drawn at the element's own rect, and never intercepts the person's click."""
+
+    with (
+        _static_page_server(_EXPORT_CONTROL_BODY) as url,
+        _real_provider_hud(
+            tmp_path,
+            spec=_hinted_hud_spec(_EXPORT_HINT),
+            url=url,
+        ) as (_browser, page, _state),
+    ):
+        page.wait_for_timeout(250)
+        boxes = page.evaluate(_HUD_OVERLAY_READ)
+        panel = page.evaluate(_HUD_CHECKLIST_READ)
+        rect = page.evaluate(
+            "() => { const r = document.querySelector('#submit-export')"
+            ".getBoundingClientRect();"
+            " return { left: Math.round(r.left), top: Math.round(r.top),"
+            " width: Math.round(r.width), height: Math.round(r.height) }; }"
+        )
+
+    assert boxes is not None
+    assert len(boxes) == 1
+    assert boxes[0]["label"] == "1. Export"
+    assert boxes[0]["pointerEvents"] == "none"
+    assert abs(boxes[0]["left"] - rect["left"]) <= 4
+    assert abs(boxes[0]["top"] - rect["top"]) <= 4
+    assert abs(boxes[0]["width"] - rect["width"]) <= 8
+    assert abs(boxes[0]["height"] - rect["height"]) <= 8
+    assert panel["hintState"] == "Outlined on this page: Export."
+
+
+@pytest.mark.timeout(90)
+def test_outlines_keep_the_declared_order_and_mark_only_the_first_as_next(tmp_path):
+    """The route ahead is shown in order, and only the leading control is emphasised.
+
+    Which earlier control is already satisfied cannot be known without reading its state, which is
+    exactly the page content this surface may not touch, so the ordering is declared rather than
+    inferred.
+    """
+
+    body = (
+        b"<!doctype html><title>provider</title>"
+        b"<style>button{position:absolute;left:40px;width:160px;height:40px}</style>"
+        b"<button id='KiCADv6' style='top:60px'>KiCad</button>"
+        b"<button id='submit-export' style='top:140px'>Download</button>"
+    )
+    hints = (
+        ProviderControlHint(
+            label="KiCad v6+ export",
+            selectors=("#KiCADv6",),
+            source="vendors.py version_pins['kicad']",
+        ),
+        _EXPORT_HINT,
+    )
+    with (
+        _static_page_server(body) as url,
+        _real_provider_hud(tmp_path, spec=_hinted_hud_spec(*hints), url=url) as (
+            _browser,
+            page,
+            _state,
+        ),
+    ):
+        page.wait_for_timeout(250)
+        boxes = page.evaluate(_HUD_OVERLAY_READ)
+        classes = page.evaluate(
+            """
+            () => {
+              const surface = (selector) =>
+                (globalThis.__stockroom_probe_shadows || []).find((root) =>
+                  root.querySelector(selector),
+                );
+              return [...surface(".overlay").querySelectorAll(".outline")].map(
+                (box) => box.className,
+              );
+            }
+            """
+        )
+        panel = page.evaluate(_HUD_CHECKLIST_READ)
+
+    assert [box["label"] for box in boxes] == ["1. KiCad v6+ export", "2. Export"]
+    assert classes == ["outline next", "outline"]
+    assert panel["hintState"] == "Outlined on this page: KiCad v6+ export, Export."
+
+
+@pytest.mark.timeout(90)
+def test_a_control_hint_that_matches_nothing_draws_no_box_and_falls_back_to_text(tmp_path):
+    """Degrade, never guess. A box over the wrong control is worse than no box at all."""
+
+    with (
+        _static_page_server(_NO_CONTROL_BODY) as url,
+        _real_provider_hud(
+            tmp_path,
+            spec=_hinted_hud_spec(_EXPORT_HINT),
+            url=url,
+        ) as (_browser, page, _state),
+    ):
+        page.wait_for_timeout(250)
+        boxes = page.evaluate(_HUD_OVERLAY_READ)
+        panel = page.evaluate(_HUD_CHECKLIST_READ)
+
+    assert boxes == []
+    assert panel["hintState"] == (
+        "No provider control could be outlined here; follow the checklist above."
+    )
+    assert [step["text"] for step in panel["steps"]] == [
+        "KiCad symbol (.kicad_sym)",
+        "KiCad footprint (.kicad_mod)",
+        "3D model (.step)",
+    ]
+
+
+@pytest.mark.timeout(90)
+def test_a_hint_matching_more_than_one_visible_element_draws_no_box(tmp_path):
+    """`[id^="btn-download-"]` is real and can match several rows; ambiguity draws nothing."""
+
+    ambiguous = ProviderControlHint(
+        label="Download",
+        selectors=('[id^="btn-download-"]',),
+        source="vendors.py DigiKeyUltraLibrarianAdapter._download_route_format",
+    )
+    with (
+        _static_page_server(_AMBIGUOUS_BODY) as url,
+        _real_provider_hud(
+            tmp_path,
+            spec=_hinted_hud_spec(ambiguous),
+            url=url,
+        ) as (_browser, page, _state),
+    ):
+        page.wait_for_timeout(250)
+        boxes = page.evaluate(_HUD_OVERLAY_READ)
+
+    assert boxes == []
+
+
+@pytest.mark.timeout(90)
+def test_a_security_challenge_on_the_page_suppresses_every_outline(tmp_path):
+    """A challenge/CAPTCHA/login state defers to the person-handoff and outlines nothing.
+
+    The export control on this page matches its hint exactly, so the ONLY reason no box is drawn
+    is the visible challenge widget beside it.
+    """
+
+    with (
+        _static_page_server(_CHALLENGE_BODY) as url,
+        _real_provider_hud(
+            tmp_path,
+            spec=_hinted_hud_spec(_EXPORT_HINT),
+            url=url,
+        ) as (_browser, page, _state),
+    ):
+        page.wait_for_timeout(250)
+        boxes = page.evaluate(_HUD_OVERLAY_READ)
+        panel = page.evaluate(_HUD_CHECKLIST_READ)
+
+    assert boxes == []
+    assert panel["hintState"] == (
+        "This page is showing a security check. Stockroom outlines nothing until you clear it."
+    )
+
+
+@pytest.mark.timeout(90)
+def test_a_stockroom_security_handoff_suppresses_every_outline(tmp_path):
+    """`user_clearance_issue` already decides this; the overlay only obeys it."""
+
+    with (
+        _static_page_server(_EXPORT_CONTROL_BODY) as url,
+        _real_provider_hud(
+            tmp_path,
+            spec=_hinted_hud_spec(_EXPORT_HINT),
+            url=url,
+        ) as (browser, page, state),
+    ):
+        page.wait_for_timeout(250)
+        drawn = page.evaluate(_HUD_OVERLAY_READ)
+        state.set_security_hold(True)
+        browser._update_provider_hud(state, 0)
+        page.wait_for_timeout(250)
+        held = page.evaluate(_HUD_OVERLAY_READ)
+        state.set_security_hold(False)
+        browser._update_provider_hud(state, 0)
+        page.wait_for_timeout(250)
+        released = page.evaluate(_HUD_OVERLAY_READ)
+
+    assert len(drawn) == 1
+    assert held == []
+    assert len(released) == 1
+
+
+@pytest.mark.timeout(90)
+def test_outlines_stop_once_every_required_file_has_landed(tmp_path):
+    """There is nothing left to point at once the route is complete."""
+
+    with (
+        _static_page_server(_EXPORT_CONTROL_BODY) as url,
+        _real_provider_hud(
+            tmp_path,
+            spec=_hinted_hud_spec(_EXPORT_HINT),
+            url=url,
+        ) as (browser, page, state),
+    ):
+        page.wait_for_timeout(250)
+        during = page.evaluate(_HUD_OVERLAY_READ)
+        browser._update_provider_hud(state, 3)
+        page.wait_for_timeout(250)
+        after = page.evaluate(_HUD_OVERLAY_READ)
+
+    assert len(during) == 1
+    assert after == []
+
+
+def test_the_provider_hud_state_read_back_reports_the_security_hold():
+    state = _ProviderHudState(_provider_hud_spec())
+
+    assert state.read_state(state.state_token) == {"downloadCount": 0, "securityHold": False}
+    state.set_security_hold(True)
+    assert state.read_state(state.state_token) == {"downloadCount": 0, "securityHold": True}
+    assert state.read_state("wrong-token") == {}
+
+
+def test_the_overlay_code_path_never_calls_a_page_action_primitive():
+    """Position only, never act. The person performs every provider interaction.
+
+    Anything that would operate, focus, scroll, or fill a provider control - or read its content -
+    is forbidden in the one script Stockroom injects.
+    """
+
+    from stockroom.capture.browser import _PROVIDER_HUD_BOOTSTRAP
+
+    forbidden = (
+        ".click()",
+        ".focus()",
+        ".blur()",
+        ".submit()",
+        ".select()",
+        ".check()",
+        ".scrollIntoView",
+        "dispatchEvent",
+        "execCommand",
+        ".value =",
+        ".checked =",
+        "requestSubmit",
+    )
+    found = [primitive for primitive in forbidden if primitive in _PROVIDER_HUD_BOOTSTRAP]
+    assert found == [], f"the injected HUD can act on provider controls: {found}"

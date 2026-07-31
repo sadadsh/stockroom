@@ -283,4 +283,56 @@ describe("SearchOverlay 1,000-result performance contract", () => {
       "Category 00",
     );
   });
+
+  it("does not scroll the virtualized list out from under the pointer", async () => {
+    // P2: hovering a row selects it, and selection used to scroll the row into view
+    // unconditionally. On a partly visible row that scroll moved the rows under the
+    // cursor, firing another mouseenter, which scrolled again - moving the mouse dragged
+    // the list along with it. Keyboard selection still scrolls: it is the only way the
+    // active row can be off screen.
+    resetUiSessionForTests();
+    const fixture = rows(200);
+    mockApi.facets.mockResolvedValue({
+      by_category: { "Category 00": 100, "Category 01": 100 },
+      by_manufacturer: { Fixture: 200 },
+      complete: 200,
+      incomplete: 0,
+    });
+    mockApi.parametricFacets.mockResolvedValue({
+      category: null,
+      total: 200,
+      facets: [],
+    });
+    mockApi.searchParts.mockResolvedValue({
+      parts: fixture,
+      count: fixture.length,
+    });
+    mockApi.putUiSession.mockImplementation(async (snapshot) => snapshot);
+
+    const { container } = renderOverlay();
+    const table = await waitFor(() => {
+      const candidate = container.querySelector(
+        '[data-dev-id="search.results-table"]',
+      );
+      expect(candidate).toHaveAttribute("data-virtualized", "true");
+      return candidate as HTMLTableElement;
+    });
+
+    scrollTo.mockClear();
+    const hovered = table.querySelector<HTMLTableRowElement>(
+      '[data-part-id="part-0004"]',
+    );
+    expect(hovered).not.toBeNull();
+    fireEvent.mouseEnter(hovered!);
+    await waitFor(() =>
+      expect(readUiSession().search_results.active_part_id).toBe("part-0004"),
+    );
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    await userEvent.setup().keyboard("{End}");
+    await waitFor(() =>
+      expect(readUiSession().search_results.active_part_id).toBe("part-0199"),
+    );
+    expect(scrollTo).toHaveBeenCalled();
+  });
 });

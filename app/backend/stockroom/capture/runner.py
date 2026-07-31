@@ -427,10 +427,10 @@ def run_guided_capture(
                 vendor,
                 config=ctx.config,
             )
-            provider_keys = [
-                *automatic_provider_keys,
-                *(key for key in provider_order if key not in set(automatic_provider_keys)),
-            ]
+            provider_keys = _automation_first_order(
+                provider_order,
+                automatic_provider_keys,
+            )
         else:
             # One click authorizes ordinary controls on exactly the provider the person selected.
             # It is not standing permission to operate a different commercial account or a batch.
@@ -869,6 +869,44 @@ def _automatic_provider_keys(vendor, *, config=None) -> list[str]:
             and _machine_access_allowed(key, config=config)
         )
     ]
+
+
+def _automation_first_order(
+    provider_order,
+    automatic_provider_keys,
+) -> list[str]:
+    """Order a collect-all run so a person is asked only after automation is exhausted.
+
+    Collect All Sources is exhaustive -- every registered provider is visited -- so this decides
+    ONLY the order, never the membership. Order is nevertheless the whole difference between a
+    hands-off run and a person-driven one, because a cancelled person-driven window cancels the
+    REST of the run: `guided.py::_supply_user_driven_route` calls `cancel_workflow` on cancel, and
+    `guided.py::_supply_once` then skips every remaining provider. With DigiKey ahead of SnapMagic
+    in `_VENDOR_CHAIN`, closing DigiKey's window therefore threw away a SnapMagic route that
+    needed nobody at all.
+
+    Three stable lanes, with the caller's preference order preserved inside each:
+
+      1. reviewed machine-access transports, which run with no person present;
+      2. providers whose ordinary export controls this one explicit selection authorizes;
+      3. providers whose controls stay person-driven under their terms of use.
+
+    Lane membership is read from capability data, never asserted here, so this cannot promote a
+    provider past the access policy its adapter declares.
+    """
+
+    from stockroom.capture.vendors import get_adapter
+
+    automatic = set(automatic_provider_keys)
+    lanes: tuple[list[str], list[str], list[str]] = ([], [], [])
+    for key in dict.fromkeys([*automatic_provider_keys, *provider_order]):
+        if key in automatic:
+            lane = 0
+        else:
+            adapter = get_adapter(key)
+            lane = 1 if adapter is not None and adapter.capability.operator_automation else 2
+        lanes[lane].append(key)
+    return [*lanes[0], *lanes[1], *lanes[2]]
 
 
 def _machine_access_allowed(provider_key: str, *, config=None) -> bool:

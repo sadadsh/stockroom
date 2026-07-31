@@ -108,4 +108,29 @@ describe("CompletePartModal provider-route text contrast", () => {
       }
     }
   });
+
+  // VA-014. The FILES checklist pills ("Needed") are the quiet --c-t3 tier on a CHIP inside the
+  // file card, which is a third composite the ledger case above never reached: the case only ever
+  // measured --c-t2/--c-ok-text/--c-warn-text/--c-err-text against the card itself, so it stayed
+  // green while the worst offender in this window failed. On the raised `bg-raise2` chip the dark
+  // theme measured 2.92:1. The chip is the recessed `--c-field` step now, and both themes are
+  // asserted here so the pairing cannot silently regress again.
+  it.each(themes)("%s theme keeps the FILES checklist pill at WCAG AA", (_theme, selector) => {
+    const block = themeBlock(selector);
+    const popover = parseColor(property(block, "--c-popover"));
+    const helper = parseColor(property(block, "--c-t3"));
+    const chip = parseColor(property(block, "--c-field"));
+    const completeTint = parseColor(property(block, "--c-ok"));
+    const partialTint = parseColor(property(block, "--c-warn"));
+    const cards = [
+      ["file card", composite(parseColor(property(block, "--c-raise")), popover)],
+      ["complete card", composite([completeTint[0], completeTint[1], completeTint[2], 0.07], popover)],
+      ["partial card", composite([partialTint[0], partialTint[1], partialTint[2], 0.07], popover)],
+    ] as const;
+
+    for (const [cardName, card] of cards) {
+      const ratio = contrastRatio(helper, composite(chip, card));
+      expect(ratio, `--c-t3 contrast against the ${cardName} pill`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });

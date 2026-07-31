@@ -32,7 +32,12 @@ export function ProjectBomWorkbench({
   projectId: string;
   workspace: ProjectWorkspace;
 }) {
+  // The committed build quantity is always a valid 1..999 - the BOM query and the export are
+  // never issued with anything else. The DRAFT is whatever is in the field, including the empty
+  // string: `Number(event.target.value) || 1` snapped a cleared field straight back to 1, so the
+  // count could not be emptied to type a fresh one (typing 12 over 1 required selecting the 1).
   const [boards, setBoards] = useState(1);
+  const [boardsDraft, setBoardsDraft] = useState("1");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<BomFilter>("all");
   const [selectedKey, setSelectedKey] = useState("");
@@ -146,10 +151,17 @@ export function ProjectBomWorkbench({
               type="number"
               min={1}
               max={999}
-              value={boards}
-              onChange={(event) =>
-                setBoards(Math.max(1, Math.min(999, Number(event.target.value) || 1)))
-              }
+              value={boardsDraft}
+              onChange={(event) => {
+                const next = event.target.value;
+                setBoardsDraft(next);
+                const parsed = Number.parseInt(next, 10);
+                // An empty or out-of-range field keeps the last committed count in force.
+                if (parsed >= 1 && parsed <= 999) setBoards(parsed);
+              }}
+              // Leaving the field settles it back onto the count actually in force, so an
+              // abandoned empty (or 0, or 1000) never lingers as if it were the quantity.
+              onBlur={() => setBoardsDraft(String(boards))}
               className="w-12 bg-transparent text-right font-mono text-t1 outline-none"
             />
           </label>

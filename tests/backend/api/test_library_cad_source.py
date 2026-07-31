@@ -296,3 +296,21 @@ def test_a_part_with_no_mpn_offers_NOWHERE_rather_than_four_dead_searches(client
     assert body["sources"] == []
     # And the flattened default is honestly empty rather than a link to nowhere.
     assert body["url"] is None
+
+
+def test_cad_source_says_which_providers_can_finish_unattended(client, app_ctx):
+    """`capture_available` cannot answer "which one should a chooser reach for first".
+
+    Every implemented adapter is capture_available, so a surface defaulting to the head of the
+    trust order lands on the aggregator whose controls stay person-driven. DigiKey is declared
+    user_driven on Terms-of-Use grounds, so it can never be unattended whatever the machine
+    policy says; that is the invariant worth pinning here.
+    """
+    part_id = _land_bare_part(app_ctx)
+    sources = client.get(f"/api/library/parts/{part_id}/cad-source").json()["sources"]
+
+    by_key = {source["key"]: source for source in sources}
+    for source in sources:
+        assert isinstance(source["unattended_capture"], bool), source
+    assert by_key["digikey"]["unattended_capture"] is False
+    assert by_key["samacsys"]["unattended_capture"] is False

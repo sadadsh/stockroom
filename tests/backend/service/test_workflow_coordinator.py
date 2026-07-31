@@ -351,3 +351,70 @@ def test_running_coordinator_stops_when_its_generation_is_superseded(
     assert stopped.last_error_code == "stale_generation"
     assert stale_fence.owner_id not in repr(asdict(stopped))
     control.release(current_fence)
+
+
+def test_a_slow_stage_does_not_fault_the_coordinator(tmp_path: Path) -> None:
+    control, _ = _control(tmp_path)
+    fence = control.acquire()
+    store = WorkflowStore(tmp_path / "Workflow.sqlite")
+    batch = store.submit_batch([IntakeIdentity("ACME", "P-SLOW")])
+    item = store.list_items(batch.id)[0]
+    identity_calls = 0
+    lock = Lock()
+
+    def handle(context: StageContext):
+        nonlocal identity_calls
+        if context.stage.name is StageName.IDENTITY_DEDUPE:
+            with lock:
+                identity_calls += 1
+            time.sleep(1.0)
+            return ExactIdentityOutcome(
+                authoritative_manufacturer_key=context.item.manufacturer,
+                mpn_canonical=context.item.mpn,
+                registry_revision="registry-v1",
+                rule_revision="rule-v1",
+                evidence={"source": "slow-stage-test"},
+            )
+        if context.stage.name is StageName.PUBLISH:
+            return PublicationProposalOutcome(
+                candidate_digest=_digest(f"candidate:{context.item.id}"),
+                manifest_digest=_digest(f"manifest:{context.item.id}"),
+                expected_base_commit="base-commit",
+            )
+        return CompletionOutcome({"stage": context.stage.name.value})
+
+    coordinator = WorkflowCoordinator(
+        control,
+        fence,
+        store,
+        WorkflowRuntime(
+            store,
+            {name: handle for name in StageName},
+            heartbeat_seconds=0.1,
+        ),
+        worker_count=4,
+        lease_seconds=0.3,
+        minimum_idle_backoff_seconds=0.005,
+        maximum_idle_backoff_seconds=0.02,
+    )
+
+    coordinator.start()
+    _wait_until(
+        lambda: (
+            next(
+                stage
+                for stage in store.list_stages(item.id)
+                if stage.name is StageName.IDENTITY_DEDUPE
+            ).status
+            is StageStatus.COMPLETED
+        ),
+        timeout=10.0,
+    )
+    coordinator.stop()
+
+    status = coordinator.status()
+    assert identity_calls == 1
+    assert status.state is WorkflowCoordinatorState.STOPPED
+    assert status.lease_lost_count == 0
+    assert status.last_error_code is None
+    control.release(fence)

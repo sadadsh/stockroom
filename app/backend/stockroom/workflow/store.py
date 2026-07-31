@@ -3836,8 +3836,15 @@ class WorkflowStore:
         lease_generation: int,
         now: float | None = None,
         lease_seconds: float = 60.0,
+        emit_event: bool = True,
     ) -> StageRecord:
-        """Heartbeat owned in-flight work without changing its attempt number."""
+        """Heartbeat owned in-flight work without changing its attempt number.
+
+        ``emit_event=False`` keeps every ownership, status, and fence check plus
+        the fenced update, but skips the durable event row.  A per-beat renewal
+        event would otherwise dominate the journal and its SSE replay for any
+        stage whose handler legitimately runs for minutes.
+        """
 
         if not isinstance(worker_id, str) or not worker_id.strip():
             raise ValueError("worker_id must not be blank")
@@ -3884,19 +3891,20 @@ class WorkflowStore:
                 ),
             )
             self._require_fenced_transition(updated)
-            self._emit(
-                connection,
-                batch_id=row["batch_id"],
-                item_id=row["item_id"],
-                stage_id=stage_id,
-                kind="stage_lease_renewed",
-                now=timestamp,
-                payload={
-                    "lease_expires_at": lease_expires_at,
-                    "lease_generation": generation,
-                    "worker_id": worker_id,
-                },
-            )
+            if emit_event:
+                self._emit(
+                    connection,
+                    batch_id=row["batch_id"],
+                    item_id=row["item_id"],
+                    stage_id=stage_id,
+                    kind="stage_lease_renewed",
+                    now=timestamp,
+                    payload={
+                        "lease_expires_at": lease_expires_at,
+                        "lease_generation": generation,
+                        "worker_id": worker_id,
+                    },
+                )
             return self._stage_from_row(self._require_stage_row(connection, stage_id))
 
     def _promote_dependencies(

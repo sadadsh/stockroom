@@ -33,7 +33,17 @@ function Resolve-DotNetSdk {
     }
 
     foreach ($candidate in @($candidates | Select-Object -Unique)) {
-        $version = & $candidate --version 2>$null
+        # Probing a candidate must never end the search. A runtime-only `dotnet` on PATH fails
+        # this call by design, and under Windows PowerShell a native command writing to stderr
+        # while $ErrorActionPreference is 'Stop' raises a terminating NativeCommandError - so the
+        # unguarded probe aborted on the first bad candidate and reported a broken SDK on a
+        # machine whose pinned SDK was installed and working, two candidates further down.
+        $version = $null
+        try {
+            $version = & $candidate --version 2>$null
+        } catch {
+            continue
+        }
         if ($LASTEXITCODE -eq 0 -and $version -ceq $requiredVersion) {
             Write-Host ".NET SDK: $version ($candidate)"
             return $candidate

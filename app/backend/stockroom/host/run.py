@@ -779,6 +779,15 @@ def run_windowed(
                 # child can end this wait; retiring an old window during an update
                 # must never tear down the broker or service authority.
                 production_update_runtime.wait_until_window_closed()
+                # A normal return means the runtime observed an AUTHENTICATED close
+                # of the active window (every other outcome raises). That is exactly
+                # the graceful handoff the restart watchdog waits for, so stand it
+                # down HERE, before the shutdown budget below spends its seconds
+                # against the same deadline. Without this the watchdog armed by
+                # _request_restart hard-exits mid-shutdown on every production
+                # update; it must stay the last resort for a window that does not
+                # close, which is the raising path and correctly skips this line.
+                graceful_restart_handoff.set()
             else:
                 opener = open_window or _open_window
                 opener(base_url, ctx.token)  # degraded/source compatibility window

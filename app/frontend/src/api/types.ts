@@ -539,6 +539,9 @@ export interface CadSource {
   // True only when the network capture broker has a real browser adapter for this provider.
   // A discoverable provider page is not the same as an implemented capture route.
   capture_available: boolean;
+  // True when this provider can finish a part with nobody watching, on this machine right now.
+  // Every implemented adapter is `capture_available`; only some are authorized to run unattended.
+  unattended_capture?: boolean;
 }
 
 export interface CadSourceResponse {

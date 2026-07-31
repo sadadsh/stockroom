@@ -529,12 +529,20 @@ function WorkSessionCard({
   const session = collaboration?.session;
   const recovery = collaboration?.recovery;
 
+  // Seed the claim list ONCE per lock-required document set. `documents.length` must not be
+  // the guard (nor a dependency): unchecking the last file re-fired this effect and re-checked
+  // every document, so a deliberate zero selection could not be reached at all. The signature
+  // still re-seeds when the project itself offers a different set of documents.
+  const seededDocumentsRef = useRef<string | null>(null);
   useEffect(() => {
-    if (documents.length || !workspace.documents.length) return;
-    setDocuments(
-      workspace.documents.filter((document) => document.lock_required).map((document) => document.path),
-    );
-  }, [workspace.documents, documents.length]);
+    const lockRequired = workspace.documents
+      .filter((document) => document.lock_required)
+      .map((document) => document.path);
+    const signature = JSON.stringify(lockRequired);
+    if (!lockRequired.length || seededDocumentsRef.current === signature) return;
+    seededDocumentsRef.current = signature;
+    setDocuments(lockRequired);
+  }, [workspace.documents]);
 
   if (session) {
     const needsResume = recovery && recovery.state !== "healthy";

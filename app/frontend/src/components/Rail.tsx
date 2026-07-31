@@ -8,12 +8,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { railNav, railRouteFor, type NavEntry } from "../lib/nav";
 import { useRouter, type Route } from "../lib/router";
 import { useTheme } from "../lib/theme";
-import { useUpdateCheck } from "../api/queries";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "./Icon";
 import { readPref, writePref } from "../lib/uiPrefs";
 import { useModalDismiss } from "../lib/useModalDismiss";
-import { aboutVersion, deriveUpdateStanding } from "../lib/updateStanding";
+import { aboutVersion, type UpdateStanding } from "../lib/updateStanding";
+import { useUpdateStanding } from "../lib/useUpdateStanding";
 
 // Collapsed labels stay in the accessibility tree but never grow an overlay over the workspace.
 // The old hover peek expanded from 52px to 190px and then sustained its own :hover state. After a
@@ -34,6 +34,17 @@ const RAIL_ROW =
   "grid h-[34px] w-full grid-cols-[35px_minmax(0,1fr)] items-center gap-2.5 " +
   "rounded-control px-0 text-left";
 const RAIL_GLYPH = "flex h-[17px] w-[35px] items-center justify-center";
+
+// The update glyph carried exactly ONE tone - ok, for current - so a blocked adoption and a
+// healthy one were the same grey icon beside different words. These are the app's existing tone
+// tokens (the same --c-ok / --c-warn / --c-err the badges and the status bar spend), not new
+// colours: err for the state that needs a hand, warn for the ones that are not yet settled.
+const UPDATE_GLYPH_TONE: Partial<Record<UpdateStanding, string>> = {
+  current: "var(--c-ok)",
+  blocked: "var(--c-err)",
+  retrying: "var(--c-warn)",
+  restart_required: "var(--c-warn)",
+};
 
 // The primary nav destinations. Each glyph was a sizeless `.ico` svg taking its 17px box from the
 // parent span; <Icon>'s primary branch would inject its default h-3.5 box, so we pass h-full w-full
@@ -119,12 +130,7 @@ export function Rail() {
   const footItems = items.filter((item) => item.group === "foot");
   const active = railRouteFor(route);
 
-  const update = useUpdateCheck();
-  const updateView = deriveUpdateStanding({
-    data: update.data,
-    checking: !!(update.isPending || update.isFetching),
-    failed: !!update.isError,
-  });
+  const { query: update, view: updateView } = useUpdateStanding();
   const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
@@ -275,8 +281,8 @@ export function Rail() {
               aria-hidden
               className={RAIL_GLYPH}
               style={
-                updateView.standing === "current"
-                  ? { color: "var(--c-ok)" }
+                UPDATE_GLYPH_TONE[updateView.standing]
+                  ? { color: UPDATE_GLYPH_TONE[updateView.standing] }
                   : undefined
               }
             >
@@ -302,6 +308,8 @@ export function Rail() {
                 <span>Retrying...</span>
               ) : updateView.standing === "blocked" ? (
                 <span>Update Blocked</span>
+              ) : updateView.standing === "restart_required" ? (
+                <span>Restart Required</span>
               ) : (
                 <Text id="nav.update-unknown">Update Unknown</Text>
               )}
@@ -337,6 +345,10 @@ export function Rail() {
         <AboutModal
           onClose={() => setAboutOpen(false)}
           version={aboutVersion(update.data, __APP_VERSION__)}
+          // About states the backend's authoritative release as THE version. That is the same
+          // confident claim the pill used to make, so when the running bundle disagrees with the
+          // backend, the window that names the version also names the disagreement.
+          note={updateView.standing === "restart_required" ? updateView.detail : ""}
         />
       ) : null}
     </nav>
@@ -355,7 +367,15 @@ export function Rail() {
 // nothing. Seven other modals already adopted `useModalDismiss`; this one never did, while still
 // declaring `role="dialog" aria-modal`. A modal that traps you is worse than a panel that does not
 // claim to be one.
-function AboutModal({ onClose, version }: { onClose: () => void; version: string }) {
+function AboutModal({
+  onClose,
+  version,
+  note = "",
+}: {
+  onClose: () => void;
+  version: string;
+  note?: string;
+}) {
   const aboutLabel = useText("modal.about.aria", "About Stockroom");
   // Always mounted only while open, so `open` is true whenever this renders. The hook owns Escape,
   // the focus move into the dialog and the focus restore on the way out.
@@ -411,6 +431,11 @@ function AboutModal({ onClose, version }: { onClose: () => void; version: string
           <span className="font-medium">Version</span>{" "}
           <span className="tnum font-mono">{version}</span>
         </p>
+        {note ? (
+          <p data-dev-id="about.stale" className="mt-1 text-xs leading-relaxed text-warn">
+            {note}
+          </p>
+        ) : null}
         <div data-dev-id="about.links" className="mt-4 flex justify-center gap-2.5">
           <a
             href="https://www.linkedin.com/in/sadadhaidari"

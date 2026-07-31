@@ -9,8 +9,10 @@ operation; a separate publisher owns Git and catalog mutation.
 from __future__ import annotations
 
 import math
+import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Protocol, TypeAlias, TypedDict
@@ -114,9 +116,29 @@ class InvalidStageOutcome(RuntimeError):
     """A handler returned an unknown or stage-incompatible outcome."""
 
 
+class StageLeaseLost(WorkflowConflict):
+    """This worker's lease was lost while its handler was still running.
+
+    The handler is allowed to finish because a running stage has no
+    cancellation signal to honor, but its terminal transition is skipped: the
+    fence it would have used is no longer authoritative.
+    """
+
+
 class _LeaseKwargs(TypedDict):
     lease_token: str
     lease_generation: int
+
+
+@dataclass(slots=True)
+class _Heartbeat:
+    """Mutable liveness report shared with one lease-renewal thread."""
+
+    lost: BaseException | None = None
+
+
+_MAX_CONSECUTIVE_HEARTBEAT_FAILURES = 2
+_HEARTBEAT_JOIN_SECONDS = 5.0
 
 
 _PLAN = default_stage_plan()
@@ -153,6 +175,8 @@ class WorkflowRuntime:
         self,
         store: WorkflowStore,
         handlers: Mapping[StageName, StageHandler],
+        *,
+        heartbeat_seconds: float | None = None,
     ):
         if not isinstance(store, WorkflowStore):
             raise TypeError("store must be a WorkflowStore")
@@ -162,8 +186,15 @@ class WorkflowRuntime:
             if not callable(handler):
                 raise TypeError(f"handler for {name.value} must be callable")
             registered[name] = handler
+        if heartbeat_seconds is not None:
+            if type(heartbeat_seconds) not in {int, float}:
+                raise TypeError("heartbeat_seconds must be a number")
+            heartbeat_seconds = float(heartbeat_seconds)
+            if not math.isfinite(heartbeat_seconds) or heartbeat_seconds <= 0:
+                raise ValueError("heartbeat_seconds must be positive and finite")
         self._store = store
         self._handlers = MappingProxyType(registered)
+        self._heartbeat_seconds = heartbeat_seconds
 
     @property
     def handlers(self) -> Mapping[StageName, StageHandler]:
@@ -186,7 +217,12 @@ class WorkflowRuntime:
         )
         if not claimed:
             return None
-        return self.dispatch_claim(claimed[0], worker_id, now=now)
+        return self.dispatch_claim(
+            claimed[0],
+            worker_id,
+            now=now,
+            lease_seconds=lease_seconds,
+        )
 
     def dispatch_claim(
         self,
@@ -194,16 +230,21 @@ class WorkflowRuntime:
         worker_id: str,
         *,
         now: float | None = None,
+        lease_seconds: float = 60.0,
     ) -> DispatchRecord:
         """Dispatch a claim returned by :meth:`WorkflowStore.claim_ready`.
 
         Exact successful replays retain the store's idempotent behavior.  A
-        superseded lease is rejected before its handler is called.
+        superseded lease is rejected before its handler is called.  When this
+        runtime was built with a heartbeat, the lease is renewed for as long as
+        the handler runs so a legitimately slow stage is never recovered and
+        re-dispatched underneath itself.
         """
 
         current = self._require_current_claim(claim, worker_id, now)
         context = self._context_for(claim)
         handler = self._handlers.get(claim.name)
+        beat = _Heartbeat()
         if handler is None:
             outcome = PermanentFailureOutcome(
                 {
@@ -213,9 +254,13 @@ class WorkflowRuntime:
             )
         else:
             try:
-                outcome = handler(context)
+                with self._heartbeat(claim, worker_id, lease_seconds) as beat:
+                    outcome = handler(context)
             except Exception as exc:
-                if current.status is StageStatus.RUNNING:
+                # A lost lease makes every fenced transition fail, so failing
+                # the stage here would only raise a second, confusing conflict
+                # over the handler's real error.
+                if beat.lost is None and current.status is StageStatus.RUNNING:
                     self._store.fail_stage(
                         claim.id,
                         worker_id,
@@ -229,6 +274,11 @@ class WorkflowRuntime:
                         now=now,
                     )
                 raise StageHandlerError(f"handler for {claim.name.value} raised") from exc
+
+        if beat.lost is not None:
+            raise StageLeaseLost(
+                f"{claim.name.value} lost its lease while its handler was running"
+            ) from beat.lost
 
         if not isinstance(
             outcome,
@@ -265,6 +315,67 @@ class WorkflowRuntime:
             stage_name=claim.name,
             outcome=outcome,
         )
+
+    @contextmanager
+    def _heartbeat(
+        self,
+        claim: StageRecord,
+        worker_id: str,
+        lease_seconds: float,
+    ) -> Iterator[_Heartbeat]:
+        """Renew this claim's lease until the handler returns.
+
+        Renewals run on their own thread against their own sqlite connection,
+        never inside another store transaction, and never rotate the fence, so
+        the caller's original claim stays valid for its terminal transition.
+        """
+
+        beat = _Heartbeat()
+        token = claim.lease_token
+        if self._heartbeat_seconds is None or token is None:
+            yield beat
+            return
+
+        interval = self._heartbeat_seconds
+        stop = threading.Event()
+
+        def renew() -> None:
+            failures = 0
+            while not stop.wait(interval):
+                try:
+                    self._store.renew_lease(
+                        claim.id,
+                        worker_id,
+                        lease_token=token,
+                        lease_generation=claim.lease_generation,
+                        lease_seconds=lease_seconds,
+                        emit_event=False,
+                    )
+                except WorkflowConflict as exc:
+                    beat.lost = exc
+                    return
+                except BaseException as exc:
+                    # A heartbeat that dies quietly reintroduces the very
+                    # recovery race it exists to prevent, so a persistently
+                    # failing renewal is reported as a lost lease.
+                    failures += 1
+                    if failures > _MAX_CONSECUTIVE_HEARTBEAT_FAILURES:
+                        beat.lost = exc
+                        return
+                    continue
+                failures = 0
+
+        thread = threading.Thread(
+            target=renew,
+            name="stockroom-workflow-lease-heartbeat",
+            daemon=True,
+        )
+        thread.start()
+        try:
+            yield beat
+        finally:
+            stop.set()
+            thread.join(_HEARTBEAT_JOIN_SECONDS)
 
     def _context_for(self, claim: StageRecord) -> StageContext:
         ancestors = _ANCESTORS[claim.name]

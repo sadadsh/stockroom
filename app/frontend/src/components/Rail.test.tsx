@@ -3,6 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { Rail } from "./Rail";
 import { DevModeProvider } from "../lib/devMode";
 import { DEV_ID_BY_ID } from "../lib/devIds";
+import { resetUpdateClocksForTests } from "../lib/useUpdateStanding";
+
+// The revision THIS bundle was built at. A backend revision that disagrees with the running bundle
+// is a standing of its own now ("Restart Required", C8), so every case below that is about
+// something else has to state the agreeing revision rather than inherit a synthetic one no build
+// could ever match. Empty when the build carries no revision (no git at build time), in which case
+// the comparison is never made at all.
+const BUNDLE_REVISION = /\+([0-9a-f]{7,})$/i.exec(__APP_VERSION__)?.[1] ?? "";
+const BACKEND_REVISION = BUNDLE_REVISION || "123456789abc";
 
 // A controllable router stand-in so the rail can be tested in isolation.
 const { state, navigate, updateState } = vi.hoisted(() => ({
@@ -14,8 +23,8 @@ const { state, navigate, updateState } = vi.hoisted(() => ({
     channel: "main",
     current_release_id: "",
     target_release_id: "",
-    current_revision: "123456789abc",
-    target_revision: "123456789abc",
+    current_revision: "",
+    target_revision: "",
     isPending: false,
     isFetching: false,
     isError: false,
@@ -59,14 +68,15 @@ beforeEach(() => {
 
 describe("Rail", () => {
   beforeEach(() => {
+    resetUpdateClocksForTests();
     state.route = "components";
     updateState.update_available = false;
     updateState.state = "up_to_date";
     updateState.channel = "main";
     updateState.current_release_id = "";
     updateState.target_release_id = "";
-    updateState.current_revision = "123456789abc";
-    updateState.target_revision = "123456789abc";
+    updateState.current_revision = BACKEND_REVISION;
+    updateState.target_revision = BACKEND_REVISION;
     updateState.isPending = false;
     updateState.isFetching = false;
     updateState.isError = false;
@@ -110,10 +120,50 @@ describe("Rail", () => {
     expect(screen.queryByText("Current")).toBeNull();
   });
 
-  it("shows that the remote comparison is in progress", () => {
+  it("shows that the remote comparison is in progress only while there is nothing to show", () => {
+    // CORRECTED (C5). This case used to set `isFetching` and assert that "Current" DISAPPEARED,
+    // which wrote the flicker down as the contract: `isFetching` is true on every background
+    // refetch (every 5s during an update, and on every window focus), so a settled pill blinked to
+    // "Checking..." constantly. Only `isPending` - no answer has ever landed - is genuinely unknown.
     updateState.isFetching = true;
-    render(<Rail />);
+    const { rerender } = render(<Rail />);
+    expect(screen.getByText("Current")).toBeInTheDocument();
+    expect(screen.queryByText("Checking...")).toBeNull();
+
+    updateState.isFetching = false;
+    updateState.isPending = true;
+    rerender(<Rail />);
     expect(screen.getByText("Checking...")).toBeInTheDocument();
+    expect(screen.queryByText("Current")).toBeNull();
+  });
+
+  it("gives a blocked convergence a tone the healthy one does not have", () => {
+    // C9: the glyph carried exactly one colour (ok, for current), so a blocked adoption and a
+    // normal one were the same grey icon beside different words.
+    const { container, rerender } = render(<Rail />);
+    const glyph = () =>
+      container.querySelector('[data-dev-id="rail.update"] span[aria-hidden]') as HTMLElement;
+    expect(glyph().style.color).toBe("var(--c-ok)");
+
+    updateState.state = "rolled_back";
+    rerender(<Rail />);
+    expect(screen.getByText("Update Blocked")).toBeInTheDocument();
+    expect(glyph().style.color).toBe("var(--c-err)");
+
+    updateState.state = "offline";
+    rerender(<Rail />);
+    expect(screen.getByText("Retrying...")).toBeInTheDocument();
+    expect(glyph().style.color).toBe("var(--c-warn)");
+  });
+
+  it("says a restart is needed when the backend has moved past this window's bundle", () => {
+    // C8. Needs a bundle that carries a revision: one that does not cannot disagree with anything,
+    // and that case is covered as a pure rule in updateStanding.test.ts.
+    if (!BUNDLE_REVISION) return;
+    updateState.current_revision = "222222222222";
+    updateState.target_revision = "222222222222";
+    render(<Rail />);
+    expect(screen.getByText("Restart Required")).toBeInTheDocument();
     expect(screen.queryByText("Current")).toBeNull();
   });
 
@@ -142,12 +192,14 @@ describe("Rail", () => {
 // useTheme() resolves the same dark stub and no ThemeProvider is needed.
 describe("Rail AboutModal - copy + brand icon adoption", () => {
   beforeEach(() => {
+    resetUpdateClocksForTests();
     state.route = "components";
+    updateState.state = "up_to_date";
     updateState.channel = "main";
     updateState.current_release_id = "";
     updateState.target_release_id = "";
-    updateState.current_revision = "123456789abc";
-    updateState.target_revision = "123456789abc";
+    updateState.current_revision = BACKEND_REVISION;
+    updateState.target_revision = BACKEND_REVISION;
   });
 
   function toggleDevMode() {
@@ -218,6 +270,20 @@ describe("Rail AboutModal - copy + brand icon adoption", () => {
     expect(screen.getByText(__APP_VERSION__)).toBeInTheDocument();
     // no em dash anywhere in the About modal copy (design contract)
     expect(screen.getByRole("dialog").textContent).not.toContain("—");
+  });
+
+  it("does not let the version line claim a revision this window is not running", async () => {
+    // C8: About states the backend's authoritative release AS the version. That is the same
+    // confident claim the pill used to make, so the window that names the version names the
+    // disagreement too. Needs a bundle carrying a revision (see the pill case above).
+    if (!BUNDLE_REVISION) return;
+    updateState.current_revision = "222222222222";
+    updateState.target_revision = "222222222222";
+    const { container } = render(<Rail />);
+    await userEvent.click(screen.getByRole("button", { name: /About/ }));
+    const note = container.querySelector('[data-dev-id="about.stale"]');
+    expect(note).not.toBeNull();
+    expect(note!.textContent).toContain("2222222");
   });
 
   it("shows the installed production release instead of the source build version", async () => {

@@ -20,6 +20,7 @@ from stockroom.capture.vendors import (
     UltraLibrarianAdapter,
     _challenge_issue,
     _exact_result_href,
+    _is_global_blockage,
     _provider_url_allowed,
     _security_verification_issue,
     get_adapter,
@@ -27,7 +28,7 @@ from stockroom.capture.vendors import (
 from stockroom.credentials import MemoryCredentialStore
 from stockroom.store.machine_config import MachineConfig
 
-from .vendor_fixture_server import route_fixture_vendor, serve_fixture_vendor
+from .vendor_fixture_server import FIXTURES, route_fixture_vendor, serve_fixture_vendor
 
 
 class _ResultNode:
@@ -281,6 +282,16 @@ class _NoNodes:
 class _OneNode(_NoNodes):
     def count(self):
         return 1
+
+    def is_visible(self):
+        return True
+
+
+class _OneHiddenNode(_OneNode):
+    """Present in the document, not shown. Ultra Librarian ships a collapsed sign-in form."""
+
+    def is_visible(self):
+        return False
 
 
 class _Frame:
@@ -826,3 +837,301 @@ def test_native_unavailable_downloads_kicad_and_step_but_never_legacy_altium(tmp
     assert "does not offer Altium Designer (Native)" in report.message
     assert "legacy Altium script, .lia, and P-CAD exports were not selected" in report.message
     assert sorted(checked) == ["KiCADv6", "MfrThreeDModel"]
+
+
+# ---------------------------------------------------------------------------
+# Ordinary page variation must not end an authorized unattended capture.
+#
+# Ultra Librarian is the ONE provider allowed to run without a person here, so every avoidable
+# driver failure spends the owner's attention on a manual provider window. The three cases below
+# were each reproduced against the REAL captured export panel
+# (`tests/backend/host/fixtures/ul-export-panel.html`) served at an official-looking Ultra
+# Librarian URL, with the Bootstrap rules the captured markup depends on but does not carry.
+# ---------------------------------------------------------------------------
+
+_REAL_PANEL = (FIXTURES / "ul-export-panel.html").read_text(encoding="utf-8", errors="replace")
+
+# The captured panel predates Ultra Librarian's 2025-10-16 native Altium export, so the row the
+# machine path is pinned to is added here in the panel's own row shape.
+_NATIVE_ALTIUM_ROW = """
+                <div class="d-flex custom-control custom-checkbox pb-2">
+                    <input id="AltiumNativeCurrent" name="exports" type="checkbox" value="60"
+                           class="custom-control-input export-option">
+                    <label for="AltiumNativeCurrent"
+                           class="custom-control-label d-flex align-items-center flex-grow-1">
+                        Altium Designer (Native)
+                    </label>
+                </div>
+"""
+
+# The captured HTML references these Bootstrap 4 classes but the stylesheet was not captured.
+# Without them every accordion is expanded and every checkbox is an ordinary visible control,
+# which is exactly why a fixture-only test cannot see the failures below.
+_BOOTSTRAP_RULES = """
+<style>
+  .collapse { display: none; }
+  .collapse.show { display: block; }
+  .custom-control-input { position: absolute; z-index: -1; opacity: 0; }
+  .custom-control { position: relative; display: block; padding-left: 1.5rem; }
+</style>
+"""
+
+# Stands in for Ultra Librarian's own submit script, which was not captured and may not be
+# redistributed: it enables `#submit-export` once an export is chosen and records that the
+# vendor's OWN control actually ran, so a test can tell "clicked" from "exported".
+_VENDOR_SUBMIT_JS = """
+<script data-stockroom-harness="stands in for the vendor's submit JS; NOT vendor markup">
+(function(){
+  var submit = document.getElementById('submit-export');
+  function sync(){
+    submit.classList.toggle(
+      'disabled',
+      document.querySelectorAll('input[name=exports]:checked').length === 0
+    );
+  }
+  document.addEventListener('change', sync);
+  sync();
+  submit.addEventListener('click', function(){
+    if (submit.classList.contains('disabled')) return;
+    window.__ulExported = (window.__ulExported || 0) + 1;
+  });
+})();
+</script>
+"""
+
+
+def _real_panel_page(*, prefix: str = "", suffix: str = "") -> str:
+    """The real captured panel, its missing Bootstrap rules, and the native Altium row."""
+
+    anchor = (
+        '<div class="d-flex custom-control custom-checkbox pb-2">\n'
+        '                    <input id="AltiumDesigner"'
+    )
+    assert anchor in _REAL_PANEL, "captured panel no longer carries the legacy Altium row"
+    panel = _REAL_PANEL.replace(anchor, _NATIVE_ALTIUM_ROW + anchor, 1)
+    return _BOOTSTRAP_RULES + prefix + panel + _VENDOR_SUBMIT_JS + suffix
+
+
+def _drive_real_panel(tmp_path, html: str):
+    """Drive the authorized adapter over one served panel and report what the vendor observed."""
+
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+    with browser.session() as page:
+        page.route(
+            "https://app.ultralibrarian.com/**",
+            lambda route: route.fulfill(
+                status=200,
+                headers={"Content-Type": "text/html; charset=utf-8"},
+                body=html,
+            ),
+        )
+        page.goto("https://app.ultralibrarian.com/details/fixture/Acme/ABC-1?open=exports")
+        report = UltraLibrarianAdapter().drive(
+            page,
+            ["kicad", "model", "altium"],
+            expected_manufacturer="Acme",
+            expected_mpn="ABC-1",
+        )
+        exported = page.evaluate("window.__ulExported || 0")
+        checked = page.eval_on_selector_all(
+            "input[name=exports]:checked",
+            "nodes => nodes.map(node => node.id)",
+        )
+    return report, exported, checked
+
+
+_COOKIE_BANNER = """
+<div id="cookie-wall" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.4)">
+  <div style="background:#fff;padding:2rem">
+    We use cookies to improve your experience. <button id="cookie-ok">Accept</button>
+  </div>
+</div>
+"""
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_ordinary_overlay_does_not_end_the_authorized_capture(tmp_path):
+    """A cookie banner is not a reason to send the owner to a manual provider window.
+
+    Expanding a tool accordion is a convenience: the export checkboxes are selected and READ BACK
+    through the panel's own controls whether or not their section is open. An ordinary overlay
+    that merely intercepts pointer events must therefore cost nothing, rather than burning a
+    default 30s actionability timeout per section and then ending the drive.
+    """
+
+    report, exported, checked = _drive_real_panel(
+        tmp_path,
+        _real_panel_page(prefix=_COOKIE_BANNER),
+    )
+
+    assert report.selected == ["kicad", "model", "altium"]
+    assert report.missed == []
+    assert report.submitted is True
+    assert exported == 1
+    assert sorted(checked) == ["AltiumNativeCurrent", "KiCADv6", "MfrThreeDModel"]
+
+
+# Ultra Librarian renders the panel's controls before its Download link is attached. Nothing in
+# the driver waited for it, so a slow render read as a provider-wide "no Download button" state.
+_LATE_DOWNLOAD_BUTTON_JS = """
+<script>
+(function(){
+  var submit = document.getElementById('submit-export');
+  var holder = submit.parentNode;
+  submit.remove();
+  setTimeout(function(){ holder.appendChild(submit); }, 1200);
+})();
+</script>
+"""
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_late_download_button_is_awaited_instead_of_tripping_the_batch_breaker(tmp_path):
+    """A Download link that attaches a moment later is a render, not a provider-wide blockage.
+
+    `_is_global_blockage` matches "download button is not on this page", so reporting it trips the
+    batch circuit breaker and abandons every remaining part in the run - for a part whose formats
+    were all successfully selected.
+    """
+
+    report, exported, checked = _drive_real_panel(
+        tmp_path,
+        _real_panel_page(suffix=_LATE_DOWNLOAD_BUTTON_JS),
+    )
+
+    assert report.selected == ["kicad", "model", "altium"]
+    assert report.submitted is True
+    assert report.blocked is False
+    assert exported == 1
+    assert _is_global_blockage(report.message) is False
+    assert sorted(checked) == ["AltiumNativeCurrent", "KiCADv6", "MfrThreeDModel"]
+
+
+# A real security control, NOT an ordinary banner. Stockroom must never operate one.
+_TURNSTILE_OVERLAY = """
+<div id="challenge-wall" style="position:fixed;inset:0;z-index:9999;background:#fff">
+  <p>Verify you are human</p>
+  <iframe src="https://challenges.cloudflare.com/turnstile/v0/api.js" width="300" height="65">
+  </iframe>
+</div>
+"""
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_security_challenge_over_the_panel_is_handed_to_the_person_not_clicked_through(tmp_path):
+    """Recovering from an intercepted click must never become a way past a security control.
+
+    The fix for an ordinary overlay activates the vendor's own Download control in page context.
+    That recovery is gated on there being no security state, so a challenge rendered over the
+    export panel hands off to the person and the vendor's export never runs.
+    """
+
+    report, exported, _checked = _drive_real_panel(
+        tmp_path,
+        _real_panel_page(prefix=_TURNSTILE_OVERLAY),
+    )
+
+    assert report.submitted is False
+    assert report.requires_user_clearance is True
+    assert report.blocked is True
+    assert "confirm you are human" in report.message
+    assert exported == 0
+
+
+# The captured panel's consent is `class="custom-control-input consentRequest required"`, and
+# Ultra Librarian will not export without it.
+_UNACCEPTABLE_CONSENT_JS = """
+<script>
+document.getElementById('consent-TIInfoShare').disabled = true;
+</script>
+"""
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_a_required_consent_that_will_not_stick_is_named_not_waited_out(tmp_path):
+    """Say why the export cannot run instead of clicking a gated control and blaming the vendor.
+
+    Submitting without the required consent produces no download, so the run spends its full
+    120s backstop and then reports "Ultra Librarian did not deliver a file" - which points at the
+    provider rather than at the consent that was never accepted.
+    """
+
+    report, exported, checked = _drive_real_panel(
+        tmp_path,
+        _real_panel_page(suffix=_UNACCEPTABLE_CONSENT_JS),
+    )
+
+    assert report.selected == ["kicad", "model", "altium"]
+    assert report.submitted is False
+    assert exported == 0
+    assert "requires a consent this page would not accept" in report.message
+    assert "consent-TIInfoShare" in report.message
+    # The formats were genuinely selected; the consent is the only thing missing.
+    assert sorted(checked) == ["AltiumNativeCurrent", "KiCADv6", "MfrThreeDModel"]
+    # A per-manufacturer consent is not a provider-wide outage: the batch must keep going.
+    assert report.blocked is False
+    assert _is_global_blockage(report.message) is False
+
+
+class _PartPage:
+    """An ordinary Ultra Librarian part page: the export panel, and the header Sign In anchor.
+
+    Every Ultra Librarian page carries that anchor, signed in or out.
+    """
+
+    url = "https://app.ultralibrarian.com/details/abc-1"
+
+    def __init__(self, *, username_node=None):
+        self._username_node = username_node
+
+    def locator(self, selector: str):
+        if selector == 'a[href*="/Account/Login"]':
+            return _OneNode()
+        if selector == "#Username" and self._username_node is not None:
+            return self._username_node
+        return _NoNodes()
+
+    def title(self):
+        return "ABC-1 | Ultra Librarian"
+
+    def inner_text(self, selector: str):
+        assert selector == "body"
+        return "ABC-1\nGet CAD Model\nDownload\nSign In"
+
+
+def test_a_header_sign_in_link_is_not_a_security_gate():
+    """The part page a person is looking at must not be reported as a challenge.
+
+    Counting the header's Sign In anchor paused capture on every ordinary Ultra Librarian page
+    and told the person to clear a security check that was never on screen, which is exactly the
+    state the automatic route exists to avoid.
+    """
+    assert UltraLibrarianAdapter().user_clearance_issue(_PartPage()) == ""
+
+
+def test_a_collapsed_sign_in_form_is_not_a_security_gate():
+    page = _PartPage(username_node=_OneHiddenNode())
+    assert UltraLibrarianAdapter().user_clearance_issue(page) == ""
+
+
+def test_a_visible_sign_in_form_is_still_a_security_gate():
+    page = _PartPage(username_node=_OneNode())
+    issue = UltraLibrarianAdapter().user_clearance_issue(page)
+    assert "sign-in" in issue
+    assert "never operates" in issue
+
+
+def test_the_login_destination_is_still_a_security_gate():
+    assert "sign-in" in UltraLibrarianAdapter().user_clearance_issue(_LoginPage())

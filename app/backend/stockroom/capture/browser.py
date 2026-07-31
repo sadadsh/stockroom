@@ -52,6 +52,42 @@ _PROVIDER_HUD_ACTIONS = frozenset({"finish", "try_another", "cancel"})
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderControlHint:
+    """WHERE one provider control sits, so Stockroom can outline it. Position, never content.
+
+    A hint is Stockroom-owned data, declared next to the adapter that measured it:
+
+      * ``label`` is Stockroom's own short caption drawn beside the outline. It is never read
+        from the page, so an outline can never repeat provider copy back to the person.
+      * ``selectors`` are measured CSS selectors, most current first. The HUD tries them in order
+        and uses the first that matches EXACTLY ONE visible element; anything else draws nothing.
+        A tuple exists only for a measured backwards-compatible alias (Ultra Librarian's
+        ``#MfrThreeDModel``), never to widen a guess.
+      * ``source`` names where the selector was measured in this repo, so a reviewer can check the
+        claim. It is deliberately NOT sent into the page.
+    """
+
+    label: str
+    selectors: tuple[str, ...]
+    source: str
+
+    def __post_init__(self) -> None:
+        for value, field_name in ((self.label, "label"), (self.source, "source")):
+            if type(value) is not str or not value or value != value.strip():
+                raise ValueError(f"control hint {field_name} must be exact non-empty text")
+        selectors = self.selectors
+        if (
+            type(selectors) is not tuple
+            or not selectors
+            or any(
+                type(selector) is not str or not selector or selector != selector.strip()
+                for selector in selectors
+            )
+        ):
+            raise ValueError("control hint selectors must be a non-empty tuple of exact selectors")
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderHudSpec:
     """Exact Stockroom-owned text shown over one person-controlled provider page."""
 
@@ -61,9 +97,12 @@ class ProviderHudSpec:
     mpn: str
     required_file_labels: tuple[str, ...]
     automated_step: str = "Listening for provider downloads."
-    human_action: str = (
-        "Start this part's download with every required format shown here."
-    )
+    human_action: str = "Start this part's download with every required format shown here."
+    # Leading context for the checklist: the provider's own `capability.instruction`. Left empty
+    # here, it is resolved from the vendor registry by exact provider label.
+    provider_instruction: str = ""
+    # Where this provider's controls were measured to sit. Empty here, it is resolved the same way.
+    control_hints: tuple[ProviderControlHint, ...] = ()
 
     def __post_init__(self) -> None:
         for value, label in (
@@ -85,6 +124,12 @@ class ProviderHudSpec:
             )
         ):
             raise ValueError("required_file_labels must be a non-empty tuple of exact labels")
+        instruction = self.provider_instruction
+        if type(instruction) is not str or instruction != instruction.strip():
+            raise ValueError("provider_instruction must be exact text")
+        hints = self.control_hints
+        if type(hints) is not tuple or any(type(hint) is not ProviderControlHint for hint in hints):
+            raise ValueError("control_hints must be a tuple of ProviderControlHint")
 
 
 @dataclass(frozen=True)
@@ -159,11 +204,45 @@ def _exclusive_user_capture_window():
         yield
     finally:
         _USER_CAPTURE_WINDOW_LOCK.release()
+
+
+# Stockroom-owned structural markers for a bot-detection or authentication control. They mirror
+# `vendors._CHALLENGE_MARKERS` (the same measured Turnstile/reCAPTCHA/hCaptcha surfaces) and the
+# Camoufox note below recording SnapEDA's sole `cf-turnstile-response` input. The HUD checks them
+# for PRESENCE AND VISIBILITY ONLY, and only ever to STOP drawing: no value, text, or attribute of
+# a matched element is read, and nothing about the match is reported back to Python. A page that
+# shows one of these belongs entirely to the person and to the existing security handoff.
+_HUD_SECURITY_CONTROL_MARKERS = (
+    'iframe[src*="challenges.cloudflare.com"]',
+    'iframe[src*="google.com/recaptcha"]',
+    'iframe[src*="recaptcha.net"]',
+    'iframe[src*="hcaptcha.com"]',
+    ".cf-turnstile",
+    "#cf-turnstile-response",
+    ".g-recaptcha",
+    "#g-recaptcha",
+    ".h-captcha",
+    "input[type=password]",
+)
+
 _PROVIDER_HUD_BOOTSTRAP = r"""
-(payload) => {
+async (payload) => {
   if (!payload || globalThis !== globalThis.top || globalThis[payload.namespace]) {
     return;
   }
+
+  // This payload is registered once and replayed on every provider navigation, so the count it
+  // carries is only ever the one that was true at bind time. Read the live one back from Stockroom
+  // the way the security handoff does, and keep the snapshot when that read cannot be served.
+  let downloadCount = payload.downloadCount;
+  // Fail SAFE, not open: an unreadable state leaves the hold on, so a remount during a security
+  // handoff never draws an outline before Stockroom's next push arrives.
+  let securityHold = true;
+  try {
+    const state = await globalThis[payload.stateBinding](payload.stateToken);
+    if (state && Number.isInteger(state.downloadCount)) downloadCount = state.downloadCount;
+    if (state && typeof state.securityHold === "boolean") securityHold = state.securityHold;
+  } catch {}
 
   const mount = () => {
     if (!document.documentElement || globalThis[payload.namespace]) {
@@ -323,21 +402,86 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
         font-size: 10px;
         font-weight: 650;
       }
-      .files {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-      }
-      .files li {
-        padding: 3px 6px;
+      .instruction {
+        margin: 0 0 6px;
+        padding: 6px 7px;
         color: var(--sr-t2);
         background: var(--sr-field);
         border: 1px solid var(--sr-line);
         border-radius: 2px;
+        font-size: 11px;
+        overflow-wrap: anywhere;
+      }
+      .checklist {
+        display: grid;
+        gap: 3px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: sr-step;
+      }
+      .step {
+        display: grid;
+        grid-template-columns: 14px minmax(0, 1fr) max-content;
+        align-items: baseline;
+        gap: 6px;
+        padding: 4px 6px;
+        background: var(--sr-field);
+        border: 1px solid var(--sr-line);
+        border-radius: 2px;
+      }
+      .step.next {
+        border-color: var(--sr-warn);
+        border-left-width: 3px;
+      }
+      .step.done {
+        border-color: var(--sr-ok);
+        border-left-width: 3px;
+      }
+      .step-mark {
+        color: var(--sr-t3);
+        font: 700 11px/1.4 Consolas, "Cascadia Mono", ui-monospace, monospace;
+        text-align: center;
+      }
+      .step.done .step-mark {
+        color: var(--sr-ok);
+      }
+      .step.next .step-mark {
+        color: var(--sr-warn);
+      }
+      .step-text {
+        min-width: 0;
+        color: var(--sr-t1);
         font: 10px/1.4 Consolas, "Cascadia Mono", ui-monospace, monospace;
+        overflow-wrap: anywhere;
+      }
+      .step-state {
+        color: var(--sr-t3);
+        font-size: 9px;
+        font-weight: 650;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+      }
+      .step.done .step-state {
+        color: var(--sr-ok);
+      }
+      .step.next .step-state {
+        color: var(--sr-warn);
+      }
+      .outstanding {
+        margin: 5px 0 0;
+        color: var(--sr-t2);
+        font-size: 10px;
+        overflow-wrap: anywhere;
+      }
+      .outstanding.done {
+        color: var(--sr-ok);
+        font-weight: 650;
+      }
+      .hint-state {
+        margin: 4px 0 0;
+        color: var(--sr-t3);
+        font-size: 10px;
         overflow-wrap: anywhere;
       }
       .state-card {
@@ -516,7 +660,8 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
       @media (forced-colors: active) {
         .panel,
         .identity,
-        .files li,
+        .instruction,
+        .step,
         .state-card,
         .session,
         .gate,
@@ -605,14 +750,28 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
         "credentials, CAPTCHA, 2FA, or passkeys.",
     );
 
+    // The guided checklist. Every step is one exact required file label, in order, and the ONLY
+    // thing that advances it is Stockroom's own receipt count. No provider state is consulted.
     const filesSection = make("div", "gate-files");
     filesSection.append(make("h3", "section-label", "Required Files"));
-    const files = make("ul", "files");
-    files.setAttribute("aria-label", "Required file formats");
-    for (const label of payload.requiredFileLabels) {
-      files.append(make("li", "", label));
+    if (payload.providerInstruction) {
+      filesSection.append(make("p", "instruction", payload.providerInstruction));
     }
-    filesSection.append(files);
+    const checklist = make("ol", "checklist");
+    checklist.setAttribute("aria-label", "Required file checklist");
+    const steps = payload.requiredFileLabels.map((label) => {
+      const item = make("li", "step");
+      const mark = make("span", "step-mark", "○");
+      mark.setAttribute("aria-hidden", "true");
+      const text = make("span", "step-text", label);
+      const state = make("span", "step-state", "Waiting");
+      item.append(mark, text, state);
+      checklist.append(item);
+      return { item, mark, state };
+    });
+    const outstanding = make("p", "outstanding", "");
+    const hintState = make("p", "hint-state", "");
+    filesSection.append(checklist, outstanding, hintState);
     gate.append(humanLabel, humanAction, filesSection, boundary);
 
     const live = make("p", "sr-only", "No files captured yet.");
@@ -629,7 +788,6 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
     const another = make("button", "action another", "Use Another Provider");
     const cancel = make("button", "action cancel", "Close Capture");
     for (const button of [finish, another, cancel]) button.type = "button";
-    finish.title = "Available after Stockroom captures at least one file";
     actions.append(finish, another, cancel);
     const contentNodes = [identity];
     if (sessionMemory) contentNodes.push(sessionMemory);
@@ -643,6 +801,119 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
     content.append(...contentNodes);
     panel.append(header, content);
     shadow.append(style, panel);
+
+    // Stockroom's own outline surface: a SECOND closed-shadow, top-layer element. Boxes are drawn
+    // here and never injected into provider DOM, and every one is pointer-events:none so the
+    // person's click always reaches the real control underneath. It is shown before the panel so
+    // the panel stays above it in the top layer.
+    const overlayHost = document.createElement("aside");
+    overlayHost.setAttribute("popover", "manual");
+    overlayHost.setAttribute("aria-hidden", "true");
+    overlayHost.style.cssText = [
+      "position:fixed",
+      "inset:0",
+      "z-index:2147483646",
+      "display:block",
+      "width:100%",
+      "height:100%",
+      "max-width:none",
+      "max-height:none",
+      "margin:0",
+      "padding:0",
+      "border:0",
+      "overflow:visible",
+      "background:transparent",
+      "pointer-events:none",
+      "color-scheme:light dark",
+    ].join(";");
+    const overlayShadow = overlayHost.attachShadow({ mode: "closed" });
+    const overlayStyle = document.createElement("style");
+    overlayStyle.textContent = `
+      :host {
+        all: initial;
+        pointer-events: none;
+      }
+      .overlay {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+      .outline {
+        position: fixed;
+        pointer-events: none;
+        border: 2px dashed rgb(27 27 30 / 55%);
+        border-radius: 3px;
+        box-shadow: 0 0 0 2px rgb(255 255 255 / 70%);
+      }
+      .outline.next {
+        border-style: solid;
+        border-color: #1b1b1e;
+        box-shadow: 0 0 0 2px rgb(255 255 255 / 88%), 0 0 0 5px rgb(27 27 30 / 30%);
+      }
+      .outline:not(.next) .outline-tag {
+        color: #17181b;
+        background: rgb(255 255 255 / 92%);
+        border: 1px solid rgb(27 27 30 / 45%);
+      }
+      .outline-tag {
+        position: absolute;
+        left: -2px;
+        bottom: calc(100% + 4px);
+        max-width: 280px;
+        padding: 2px 6px;
+        color: #f5f5f5;
+        background: #1b1b1e;
+        border-radius: 2px;
+        font: 650 10px/1.4 "Segoe UI", system-ui, -apple-system, sans-serif;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      @media (prefers-color-scheme: dark) {
+        .outline {
+          border-color: rgb(244 244 245 / 55%);
+          box-shadow: 0 0 0 2px rgb(0 0 0 / 65%);
+        }
+        .outline.next {
+          border-color: #f4f4f5;
+          box-shadow: 0 0 0 2px rgb(0 0 0 / 78%), 0 0 0 5px rgb(244 244 245 / 26%);
+        }
+        .outline-tag {
+          color: #141414;
+          background: #f4f4f5;
+        }
+        .outline:not(.next) .outline-tag {
+          color: #f4f4f4;
+          background: rgb(20 20 20 / 92%);
+          border: 1px solid rgb(244 244 245 / 45%);
+        }
+      }
+      @media (forced-colors: active) {
+        .outline {
+          border: 2px dashed ButtonText;
+        }
+        .outline.next {
+          border: 2px solid Highlight;
+        }
+        .outline-tag {
+          color: HighlightText;
+          background: Highlight;
+        }
+      }
+    `;
+    const overlay = make("div", "overlay");
+    overlayShadow.append(overlayStyle, overlay);
+    document.documentElement.append(overlayHost);
+    if (typeof overlayHost.showPopover === "function") {
+      try {
+        overlayHost.showPopover();
+      } catch {
+        overlayHost.removeAttribute("popover");
+      }
+    } else {
+      overlayHost.removeAttribute("popover");
+    }
+
     document.documentElement.append(host);
 
     let shownInTopLayer = false;
@@ -717,64 +988,238 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
       place(host.offsetLeft + offset[0], host.offsetTop + offset[1]);
     });
 
-    let actionPending = false;
+    let pendingAction = null;
     let currentDownloadCount = 0;
-    const actionButtons = [finish, another, cancel];
-    const requestAction = async (action, spokenLabel) => {
-      if (actionPending) return;
-      actionPending = true;
-      const previousStep = automationValue.textContent;
-      for (const button of actionButtons) button.disabled = true;
-      actionStatus.textContent = `${spokenLabel} requested.`;
-      if (action === "finish") {
-        automationValue.textContent = "Finishing capture after downloaded files settle.";
-      } else if (action === "try_another") {
-        automationValue.textContent = "Closing this route and preparing the next provider.";
-      } else {
-        automationValue.textContent = "Closing the assisted capture.";
-      }
-      try {
-        const accepted = await globalThis[payload.actionBinding](action, payload.actionToken);
-        if (accepted) return;
-      } catch {}
-      actionPending = false;
-      automationValue.textContent = previousStep;
-      another.disabled = false;
-      cancel.disabled = false;
-      finish.disabled = currentDownloadCount < 1;
-      actionStatus.textContent = "Stockroom could not accept that action. Try again.";
+    const pendingSteps = {
+      finish: "Finishing capture after downloaded files settle.",
+      try_another: "Closing this route and preparing the next provider.",
+      cancel: "Closing the assisted capture.",
     };
-    finish.addEventListener("click", () => requestAction("finish", "Resume now"));
-    another.addEventListener(
-      "click",
-      () => requestAction("try_another", "Use another provider"),
-    );
-    cancel.addEventListener("click", () => requestAction("cancel", "Close capture"));
 
-    const updateDownloadCount = (value) => {
-      if (!Number.isInteger(value) || value < 0) return;
+    // ---- Tier 1: the live checklist, built only from Stockroom-owned data --------------------
+    const renderChecklist = () => {
+      const labels = payload.requiredFileLabels;
+      const total = labels.length;
+      const landed = Math.min(currentDownloadCount, total);
+      steps.forEach((step, index) => {
+        const done = index < landed;
+        const next = !done && index === landed;
+        step.item.className = done ? "step done" : next ? "step next" : "step";
+        step.mark.textContent = done ? "✓" : next ? "▸" : "○";
+        step.state.textContent = done ? "Captured" : next ? "Next" : "Waiting";
+      });
+      if (total > 0 && landed >= total) {
+        outstanding.className = "outstanding done";
+        outstanding.textContent =
+          `All ${total} required ${total === 1 ? "format has" : "formats have"} landed. ` +
+          "Nothing is outstanding; Stockroom resumes automatically.";
+        return;
+      }
+      outstanding.className = "outstanding";
+      const remaining = labels.slice(landed).join(", ");
+      outstanding.textContent =
+        landed === 0
+          ? `Nothing captured yet. Still outstanding: ${remaining}.`
+          : `${landed} of ${total} captured. Still outstanding: ${remaining}. One provider ` +
+            "archive can carry several formats, so Stockroom checks the delivered files and " +
+            "resumes on its own.";
+    };
+
+    // ---- Tier 2: position-only outlines over the real controls -------------------------------
+    // These two helpers are the WHOLE of this script's provider-DOM surface: where an element is,
+    // and whether it is worth drawing over. No page text, markup, attribute value, form value, or
+    // credential is read, kept, or reported anywhere - a rect is not content.
+    const drawableRect = (node) => {
+      if (node === host || node === overlayHost) return null;
+      const rect = node.getBoundingClientRect();
+      if (rect.width < 6 || rect.height < 6) return null;
+      if (rect.bottom <= 0 || rect.right <= 0) return null;
+      if (rect.top >= globalThis.innerHeight || rect.left >= globalThis.innerWidth) return null;
+      const style = getComputedStyle(node);
+      if (style.visibility === "hidden" || style.display === "none") return null;
+      if (Number(style.opacity) === 0) return null;
+      return rect;
+    };
+
+    const uniqueVisibleRect = (selector) => {
+      let nodes;
+      try {
+        nodes = document.querySelectorAll(selector);
+      } catch {
+        return null;
+      }
+      let found = null;
+      for (const node of nodes) {
+        const rect = drawableRect(node);
+        if (!rect) continue;
+        // Degrade, never guess. A second visible match makes the hint ambiguous, and a box on the
+        // wrong control is worse than no box at all.
+        if (found) return null;
+        found = rect;
+      }
+      return found;
+    };
+
+    const anyVisible = (selector) => {
+      let nodes;
+      try {
+        nodes = document.querySelectorAll(selector);
+      } catch {
+        return false;
+      }
+      for (const node of nodes) {
+        if (drawableRect(node)) return true;
+      }
+      return false;
+    };
+
+    const clearOutlines = () => {
+      while (overlay.firstChild) overlay.firstChild.remove();
+    };
+
+    const syncOverlay = () => {
+      const total = payload.requiredFileLabels.length;
+      if (securityHold) {
+        clearOutlines();
+        hintState.textContent =
+          "Stockroom is waiting on a provider security check. It outlines nothing until you " +
+          "clear it.";
+        return;
+      }
+      if (!payload.controlHints.length) {
+        clearOutlines();
+        hintState.textContent =
+          "Stockroom has no measured control outline for this provider; follow the checklist " +
+          "above.";
+        return;
+      }
+      if (pendingAction !== null) {
+        clearOutlines();
+        hintState.textContent = "";
+        return;
+      }
+      if (total > 0 && currentDownloadCount >= total) {
+        clearOutlines();
+        hintState.textContent = "Every required file has landed; nothing is left to outline.";
+        return;
+      }
+      // A challenge, CAPTCHA, or sign-in belongs entirely to the person and to Stockroom's
+      // existing handoff. Presence and visibility are the only things checked, and the only
+      // thing they can do is STOP drawing.
+      if (payload.securityControlMarkers.some(anyVisible)) {
+        clearOutlines();
+        hintState.textContent =
+          "This page is showing a security check. Stockroom outlines nothing until you clear it.";
+        return;
+      }
+      clearOutlines();
+      const drawn = [];
+      for (const hint of payload.controlHints) {
+        let rect = null;
+        for (const selector of hint.selectors) {
+          rect = uniqueVisibleRect(selector);
+          if (rect) break;
+        }
+        if (!rect) continue;
+        drawn.push(hint.label);
+        // The first hint that resolves is the one to work next; the rest are the route ahead of
+        // it. Which of them is already SATISFIED cannot be known without reading the control's
+        // own state, and that is exactly the page content this surface may not touch - so the
+        // ordering is stated honestly rather than guessed at.
+        const box = make("div", drawn.length === 1 ? "outline next" : "outline");
+        box.style.left = `${Math.round(rect.left)}px`;
+        box.style.top = `${Math.round(rect.top)}px`;
+        box.style.width = `${Math.round(rect.width)}px`;
+        box.style.height = `${Math.round(rect.height)}px`;
+        box.append(make("span", "outline-tag", `${drawn.length}. ${hint.label}`));
+        overlay.append(box);
+      }
+      hintState.textContent = drawn.length
+        ? `Outlined on this page: ${drawn.join(", ")}.`
+        : "No provider control could be outlined here; follow the checklist above.";
+    };
+
+    const render = () => {
+      const value = currentDownloadCount;
       const noun = value === 1 ? "file" : "files";
-      currentDownloadCount = value;
       captureCount.textContent = `${value} ${noun.toUpperCase()}`;
       captureCount.setAttribute("aria-label", `Downloads captured: ${value}`);
       live.textContent =
         value === 0 ? "No files captured yet." : `${value} ${noun} captured in this task.`;
-      if (!actionPending) {
-        finish.disabled = value === 0;
-        finish.title =
-          value === 0
-            ? "Available after Stockroom captures at least one file"
-            : "Finish this route after its downloads settle";
-        automationValue.textContent =
-          value === 0
+      // Stockroom can stay busy for the rest of the session on a request it has already accepted,
+      // so everything the capture count implies has to keep tracking reality while it works.
+      finish.disabled = value === 0 || (pendingAction !== null && pendingAction !== "finish");
+      finish.title =
+        value === 0
+          ? "Available after Stockroom captures at least one file"
+          : "Finish this route after its downloads settle";
+      // Only a control that would conflict with the accepted request is withdrawn. Repeating the
+      // pending request itself is idempotent, and the guard in requestAction is what stops a
+      // second submission, so no button state has to be frozen to keep one click one request.
+      another.disabled = pendingAction !== null && pendingAction !== "try_another";
+      cancel.disabled = pendingAction !== null && pendingAction !== "cancel";
+      automationValue.textContent =
+        pendingAction !== null
+          ? pendingSteps[pendingAction]
+          : value === 0
             ? payload.automatedStep
             : `${value} ${noun} captured. Stockroom will resume automatically after downloads settle.`;
-      }
+      renderChecklist();
+      syncOverlay();
     };
-    updateDownloadCount(payload.downloadCount);
+
+    const requestAction = async (action, spokenLabel) => {
+      if (pendingAction !== null) {
+        if (pendingAction === action) actionStatus.textContent = `${spokenLabel} requested.`;
+        return;
+      }
+      pendingAction = action;
+      render();
+      actionStatus.textContent = `${spokenLabel} requested.`;
+      try {
+        const accepted = await globalThis[payload.actionBinding](action, payload.actionToken);
+        if (accepted) return;
+      } catch {}
+      pendingAction = null;
+      render();
+      actionStatus.textContent = "Stockroom could not accept that action. Try again.";
+    };
+    for (const [button, action] of [
+      [finish, "finish"],
+      [another, "try_another"],
+      [cancel, "cancel"],
+    ]) {
+      // The spoken confirmation is read from the control's own label, so the two cannot drift.
+      button.addEventListener("click", () => requestAction(action, button.textContent));
+    }
+
+    const updateState = (next) => {
+      if (!next) return;
+      if (Number.isInteger(next.downloadCount) && next.downloadCount >= 0) {
+        currentDownloadCount = next.downloadCount;
+      }
+      if (typeof next.securityHold === "boolean") securityHold = next.securityHold;
+      render();
+    };
+    updateState({ downloadCount, securityHold });
+
+    // Provider layouts move under the person constantly. The animation frame keeps a visible tab
+    // exact; the bounded interval covers a backgrounded tab, where animation frames do not fire
+    // and a stale box would otherwise sit over the wrong place.
+    let overlayFrame = 0;
+    const scheduleOverlay = () => {
+      if (overlayFrame) return;
+      overlayFrame = requestAnimationFrame(() => {
+        overlayFrame = 0;
+        syncOverlay();
+      });
+    };
+    globalThis.addEventListener("scroll", scheduleOverlay, { passive: true, capture: true });
+    globalThis.addEventListener("resize", scheduleOverlay, { passive: true });
+    setInterval(scheduleOverlay, 500);
 
     Object.defineProperty(globalThis, payload.namespace, {
-      value: Object.freeze({ updateDownloadCount }),
+      value: Object.freeze({ updateState }),
       configurable: false,
       enumerable: false,
       writable: false,
@@ -789,10 +1234,10 @@ _PROVIDER_HUD_BOOTSTRAP = r"""
 }
 """
 _PROVIDER_HUD_UPDATE = r"""
-({ namespace, downloadCount }) => {
+({ namespace, downloadCount, securityHold }) => {
   const hud = globalThis[namespace];
-  if (hud && typeof hud.updateDownloadCount === "function") {
-    hud.updateDownloadCount(downloadCount);
+  if (hud && typeof hud.updateState === "function") {
+    hud.updateState({ downloadCount, securityHold });
   }
 }
 """
@@ -1136,8 +1581,15 @@ class _ProviderHudState:
         default_factory=lambda: f"__stockroom_capture_action_{secrets.token_hex(12)}"
     )
     action_token: str = field(default_factory=lambda: secrets.token_hex(24))
+    state_binding: str = field(
+        default_factory=lambda: f"__stockroom_capture_state_{secrets.token_hex(12)}"
+    )
+    state_token: str = field(default_factory=lambda: secrets.token_hex(24))
     _action: ProviderHudAction | None = None
     _download_count: int = 0
+    # True while Stockroom's own `user_clearance_issue` detection says this page belongs to the
+    # person. The HUD draws no control outline at all while it is set.
+    _security_hold: bool = False
     _lock: threading.RLock = field(default_factory=threading.RLock)
 
     @property
@@ -1155,7 +1607,12 @@ class _ProviderHudState:
             return False
         with self._lock:
             if self._action is not None:
-                return False
+                # One state is shared across every page bound to this task, and the HUD remounts
+                # with a fresh pending flag on each provider navigation, so the person can click
+                # the same control again before Python has acted on the first request. Reporting
+                # failure for an action already accepted is what surfaced "Stockroom could not
+                # accept that action". A genuinely conflicting action is still refused.
+                return self._action == action
             self._action = cast(ProviderHudAction, action)
             return True
 
@@ -1165,12 +1622,50 @@ class _ProviderHudState:
         with self._lock:
             self._download_count = count
 
+    @property
+    def download_count(self) -> int:
+        with self._lock:
+            return self._download_count
+
+    @property
+    def security_hold(self) -> bool:
+        with self._lock:
+            return self._security_hold
+
+    def set_security_hold(self, held: object) -> None:
+        """Suppress or restore every control outline from Stockroom's own security detection."""
+
+        if type(held) is not bool:
+            raise ValueError("security hold must be a bool")
+        with self._lock:
+            self._security_hold = held
+
+    def read_state(self, token: object) -> dict[str, object]:
+        """Serve the live receipt count and outline hold to a HUD that has just mounted.
+
+        The bootstrap payload is registered once and replayed on every provider navigation, so a
+        remounted panel would otherwise report the count as it stood at bind time. Nothing here
+        reads the provider page: this is Stockroom's own count and Stockroom's own security
+        verdict, both behind Stockroom's own secret.
+        """
+
+        if type(token) is not str or not secrets.compare_digest(token, self.state_token):
+            return {}
+        with self._lock:
+            return {
+                "downloadCount": self._download_count,
+                "securityHold": self._security_hold,
+            }
+
     def payload(self) -> dict[str, object]:
+        instruction, hints = _provider_guidance(self.spec)
         with self._lock:
             return {
                 "namespace": self.namespace,
                 "actionBinding": self.action_binding,
                 "actionToken": self.action_token,
+                "stateBinding": self.state_binding,
+                "stateToken": self.state_token,
                 "providerLabel": self.spec.provider_label,
                 "authorRoute": self.spec.author_route,
                 "manufacturer": self.spec.manufacturer,
@@ -1180,7 +1675,43 @@ class _ProviderHudState:
                 "humanAction": self.spec.human_action,
                 "sessionPersistent": self.persistent_session,
                 "downloadCount": self._download_count,
+                "securityHold": self._security_hold,
+                "providerInstruction": instruction,
+                # Only what the surface needs to DRAW. The measured provenance of each selector
+                # stays in Python, where reviewers read it; the page never receives it.
+                "controlHints": [
+                    {"label": hint.label, "selectors": list(hint.selectors)} for hint in hints
+                ],
+                "securityControlMarkers": list(_HUD_SECURITY_CONTROL_MARKERS),
             }
+
+
+def _provider_guidance(
+    spec: ProviderHudSpec,
+) -> tuple[str, tuple[ProviderControlHint, ...]]:
+    """The provider's own instruction and measured control hints for one HUD spec.
+
+    An explicit spec always wins. Otherwise the vendor registry is consulted by the EXACT provider
+    label, which is the adapter's own ``capability.label`` and unique across the registry. That
+    fallback is what lets the guidance reach a HUD whose caller builds the spec from task identity
+    alone. The import is deferred so this module keeps no import-time dependency on the vendor
+    registry, and an unavailable registry simply means Tier 1 text with no outlines.
+    """
+
+    if spec.provider_instruction and spec.control_hints:
+        return spec.provider_instruction, spec.control_hints
+    instruction = spec.provider_instruction
+    hints = spec.control_hints
+    try:
+        from stockroom.capture.vendors import provider_hud_guidance
+
+        registry_instruction, registry_hints = provider_hud_guidance(spec.provider_label)
+    except Exception:  # noqa: BLE001 - guidance is an enhancement, never a capture blocker
+        return instruction, hints
+    return (
+        instruction or registry_instruction,
+        hints or registry_hints,
+    )
 
 
 def _disable_webrtc(context) -> None:
@@ -1514,6 +2045,10 @@ class PlaywrightCaptureBrowser:
             ),
             None,
         )
+        # Claiming a pre-existing page avoids a stray blank window, but that page is the one
+        # `session()` yields and keeps for the whole session. Only a page this task actually
+        # opened may be closed with it; closing a claimed one ends the session's own surface.
+        task_opened_page = page is None
         if page is None:
             page = context.new_page()
         self._wire_downloads(page)
@@ -1536,11 +2071,17 @@ class PlaywrightCaptureBrowser:
                 while current is not None and id(current) not in seen:
                     seen.add(id(current))
                     opener = getattr(current, "opener", None)
-                    current = opener() if callable(opener) else None
+                    try:
+                        current = opener() if callable(opener) else None
+                    except Exception:  # noqa: BLE001 - an unreadable opener is simply unbound
+                        current = None
                     if current is page:
                         owned_pages.append(candidate)
                         break
-            for owned in reversed(owned_pages):
+            closable_pages = [
+                owned for owned in owned_pages if owned is not page or task_opened_page
+            ]
+            for owned in reversed(closable_pages):
                 try:
                     owned.close()
                 except Exception:  # noqa: BLE001 - teardown is best effort
@@ -1589,6 +2130,7 @@ class PlaywrightCaptureBrowser:
         or submits any provider element. The HUD is registered for future documents before it is
         mounted on the current one, so an SSO or 2FA navigation retains the handoff. Once cleared,
         the binding returns inactive and later automation navigations cannot remount stale guidance.
+        For as long as the gate stands, this task's provider HUD also draws no control outline.
         """
 
         for value, label in (
@@ -1621,86 +2163,90 @@ class PlaywrightCaptureBrowser:
         if not current_issue:
             return True
 
-        namespace = f"__stockroom_security_handoff_{secrets.token_hex(12)}"
-        state_binding = f"__stockroom_security_state_{secrets.token_hex(12)}"
-        state_token = secrets.token_hex(24)
-        state: dict[str, object] = {
-            "active": True,
-            "providerLabel": provider_label,
-            "authorRoute": author_route,
-            "manufacturer": manufacturer,
-            "mpn": mpn,
-            "message": current_issue,
-            "sessionPersistent": self.persistent_digikey_session,
-        }
+        # A page that needs a person is not a page Stockroom points at. While this gate
+        # stands, the provider HUD bound to this task draws no control outline at all, so
+        # `user_clearance_issue` stays the single detector behind that decision.
+        with self._provider_hud_security_hold(page):
+            namespace = f"__stockroom_security_handoff_{secrets.token_hex(12)}"
+            state_binding = f"__stockroom_security_state_{secrets.token_hex(12)}"
+            state_token = secrets.token_hex(24)
+            state: dict[str, object] = {
+                "active": True,
+                "providerLabel": provider_label,
+                "authorRoute": author_route,
+                "manufacturer": manufacturer,
+                "mpn": mpn,
+                "message": current_issue,
+                "sessionPersistent": self.persistent_digikey_session,
+            }
 
-        def provide_state(_source, token) -> dict[str, object]:
-            if type(token) is not str or not secrets.compare_digest(token, state_token):
-                return {"active": False}
-            return dict(state)
+            def provide_state(_source, token) -> dict[str, object]:
+                if type(token) is not str or not secrets.compare_digest(token, state_token):
+                    return {"active": False}
+                return dict(state)
 
-        payload = {
-            "namespace": namespace,
-            "stateBinding": state_binding,
-            "stateToken": state_token,
-        }
-        bootstrap = (
-            f"({_HANDOFF_HUD_BOOTSTRAP})("
-            f"{json.dumps(payload, ensure_ascii=True, separators=(',', ':'))}"
-            ");"
-        )
-        try:
-            page.expose_binding(state_binding, provide_state)
-            page.add_init_script(bootstrap)
-            page.evaluate(_HANDOFF_HUD_BOOTSTRAP, payload)
-        except Exception as exc:  # noqa: BLE001 - a hidden handoff is not a safe handoff
-            state["active"] = False
-            raise CaptureBrowserError(
-                "could not show the Stockroom security handoff before pausing automation"
-            ) from exc
-
-        deadline = time.monotonic() + timeout
-        last_issue = current_issue
-        while time.monotonic() < deadline:
-            if should_cancel is not None and should_cancel():
-                state["active"] = False
-                try:
-                    page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
-                except Exception:  # noqa: BLE001 - cancellation is already authoritative
-                    pass
-                return False
-            if _page_is_closed(page):
-                state["active"] = False
-                return False
+            payload = {
+                "namespace": namespace,
+                "stateBinding": state_binding,
+                "stateToken": state_token,
+            }
+            bootstrap = (
+                f"({_HANDOFF_HUD_BOOTSTRAP})("
+                f"{json.dumps(payload, ensure_ascii=True, separators=(',', ':'))}"
+                ");"
+            )
             try:
-                issue = issue_detector() or ""
-            except Exception:  # noqa: BLE001 - navigation can temporarily make the page unreadable
-                issue = last_issue
-            if not issue:
+                page.expose_binding(state_binding, provide_state)
+                page.add_init_script(bootstrap)
+                page.evaluate(_HANDOFF_HUD_BOOTSTRAP, payload)
+            except Exception as exc:  # noqa: BLE001 - a hidden handoff is not a safe handoff
                 state["active"] = False
-                try:
-                    page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
-                except Exception:  # noqa: BLE001 - navigation may already have removed the document
-                    pass
-                return True
-            if issue != last_issue:
-                last_issue = issue
-                state["message"] = issue
-                try:
-                    page.evaluate(
-                        _HANDOFF_HUD_UPDATE,
-                        {"namespace": namespace, "message": issue},
-                    )
-                except Exception:  # noqa: BLE001 - the init script remounts after navigation
-                    pass
-            page.wait_for_timeout(max(1, int(poll * 1000)))
+                raise CaptureBrowserError(
+                    "could not show the Stockroom security handoff before pausing automation"
+                ) from exc
 
-        state["active"] = False
-        try:
-            page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
-        except Exception:  # noqa: BLE001 - timeout is already the authoritative outcome
-            pass
-        return False
+            deadline = time.monotonic() + timeout
+            last_issue = current_issue
+            while time.monotonic() < deadline:
+                if should_cancel is not None and should_cancel():
+                    state["active"] = False
+                    try:
+                        page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
+                    except Exception:  # noqa: BLE001 - cancellation is already authoritative
+                        pass
+                    return False
+                if _page_is_closed(page):
+                    state["active"] = False
+                    return False
+                try:
+                    issue = issue_detector() or ""
+                except Exception:  # noqa: BLE001 - navigation can temporarily make the page unreadable
+                    issue = last_issue
+                if not issue:
+                    state["active"] = False
+                    try:
+                        page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
+                    except Exception:  # noqa: BLE001 - navigation may already have removed the document
+                        pass
+                    return True
+                if issue != last_issue:
+                    last_issue = issue
+                    state["message"] = issue
+                    try:
+                        page.evaluate(
+                            _HANDOFF_HUD_UPDATE,
+                            {"namespace": namespace, "message": issue},
+                        )
+                    except Exception:  # noqa: BLE001 - the init script remounts after navigation
+                        pass
+                page.wait_for_timeout(max(1, int(poll * 1000)))
+
+            state["active"] = False
+            try:
+                page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
+            except Exception:  # noqa: BLE001 - timeout is already the authoritative outcome
+                pass
+            return False
 
     def capture_user_downloads(
         self,
@@ -1714,6 +2260,7 @@ class PlaywrightCaptureBrowser:
         poll_interval_s: float = 0.1,
         settle_seconds: float = 0.75,
         auto_finish_seconds: float = 2.0,
+        auto_finish_idle_seconds: float = 25.0,
     ) -> UserCaptureResult:
         """Open one provider page and observe downloads while the person controls it.
 
@@ -1721,15 +2268,30 @@ class PlaywrightCaptureBrowser:
         wires the task-bound download handler and optional Stockroom HUD *before* navigation, opens
         exactly ``url``, pumps Playwright, and observes only explicit HUD/caller actions, page
         closure, or timeout. The HUD is a closed-shadow, top-layer Stockroom surface whose exact
-        identity and required-file labels come only from ``hud``. Neither Python nor that surface
-        inspects or searches provider DOM, reads credentials, fills fields, selects a result or
-        format, accepts terms, or clicks a provider control.
+        identity, required-file labels, and guidance text come only from Stockroom's own data.
+
+        THE PROVIDER-DOM CONTRACT, narrowed deliberately by the owner rather than dropped
+        The HUD may ask the provider document exactly ONE class of question: WHERE a control it
+        already knows about is - an element's bounding box and whether it is visible - so it can
+        draw a Stockroom-owned outline over it. That is the entire allowance. Neither Python nor
+        that surface reads, collects, stores, transmits, or returns page text, markup, attribute
+        values, form values, credentials, prices, or any other page CONTENT; a rect is not content,
+        and that distinction is the whole basis for this being acceptable. Nothing here clicks,
+        focuses, scrolls, fills, selects a result or format, accepts terms, or otherwise operates
+        any provider control - the person performs every interaction. Selectors come only from
+        measured per-provider hints, a hint that does not match exactly one visible element draws
+        nothing at all, and a page showing a challenge, CAPTCHA, or sign-in draws nothing at all
+        and defers to the existing person-handoff.
 
         ``should_finish`` remains a caller-owned completion signal beside the HUD's Finish button.
-        A completed download automatically finishes after a bounded quiet period, so detecting a
-        file is sufficient for Stockroom to ingest it. The quiet period resets for every companion
-        file. Closing the page also completes the session. Try Another Provider, cancellation, and
-        timeout return every file already intercepted; staging never depends on a second click.
+        Capture finishes automatically once every file ``hud`` declares required has landed and a
+        bounded quiet period passes; the quiet period resets for every companion file. A capture
+        still missing a required format keeps waiting for the person, because finishing on the
+        first file truncates multi-asset providers and the partial set is then rejected downstream.
+        ``auto_finish_idle_seconds`` bounds that wait so a provider that packs every required
+        format into one archive still completes without a click. Closing the page also completes
+        the session. Try Another Provider, cancellation, and timeout return every file already
+        intercepted; staging never depends on a second click.
         """
 
         if type(broker) is not DownloadBroker:
@@ -1769,23 +2331,34 @@ class PlaywrightCaptureBrowser:
             maximum=30.0,
             allow_zero=True,
         )
+        auto_finish_idle = _bounded_seconds(
+            auto_finish_idle_seconds,
+            "auto_finish_idle_seconds",
+            maximum=600.0,
+            allow_zero=True,
+        )
+        # The HUD names exactly the formats this route must come home with, so it is also the
+        # only completeness signal available here. Without a HUD there is nothing to be complete
+        # against and the first quiet period stands.
+        expected_files = len(hud.required_file_labels) if hud is not None else 0
 
         deadline = time.monotonic() + timeout
         status: UserCaptureStatus = "timed_out"
         final_url = url
         error_mark = len(self.download_errors)
         hud_state = (
-            _ProviderHudState(hud, self.persistent_digikey_session)
-            if hud is not None
-            else None
+            _ProviderHudState(hud, self.persistent_digikey_session) if hud is not None else None
         )
         if hud_state is not None:
             hud_state.update_download_count(len(broker.receipts))
 
-        with _exclusive_user_capture_window(), self.task_page(
-            broker,
-            hud_state=hud_state,
-        ) as page:
+        with (
+            _exclusive_user_capture_window(),
+            self.task_page(
+                broker,
+                hud_state=hud_state,
+            ) as page,
+        ):
             if should_cancel is not None and should_cancel():
                 status = "cancelled"
             else:
@@ -1827,7 +2400,16 @@ class PlaywrightCaptureBrowser:
                     while True:
                         errors = self.download_errors
                         if len(errors) > error_mark:
-                            raise errors[error_mark]
+                            # A failing companion does not invalidate files already staged.
+                            # Raising here discarded them along with the result object, so a
+                            # partially successful capture reported nothing at all. Surface the
+                            # failure only when there is genuinely nothing to hand back; the
+                            # error stays readable on the browser for diagnostics, and
+                            # downstream verification judges whether the set is complete.
+                            if not broker.receipts:
+                                raise errors[error_mark]
+                            status = "completed"
+                            break
 
                         now = time.monotonic()
                         current_count = len(broker.receipts)
@@ -1856,12 +2438,20 @@ class PlaywrightCaptureBrowser:
                             finish_requested = True
                         if hud_action == "finish":
                             finish_requested = True
-                        if finish_requested and (
-                            current_count == 0 or now - quiet_since >= settle
+                        if finish_requested and (current_count == 0 or now - quiet_since >= settle):
+                            status = "completed"
+                            break
+                        if (
+                            current_count > 0
+                            and now - quiet_since >= auto_finish
+                            and current_count >= expected_files
                         ):
                             status = "completed"
                             break
-                        if current_count > 0 and now - quiet_since >= auto_finish:
+                        # A provider that ships every required format in one archive produces
+                        # fewer receipts than labels and would otherwise wait for a click the
+                        # HUD's own copy promises is unnecessary. Finish on a longer idle gap.
+                        if current_count > 0 and now - quiet_since >= auto_finish_idle:
                             status = "completed"
                             break
                         if now >= deadline:
@@ -2177,7 +2767,11 @@ class PlaywrightCaptureBrowser:
                 self._wired_pages.clear()
 
     def _bind_provider_hud(self, page, state: _ProviderHudState) -> None:
-        """Install one Stockroom-owned HUD without reading provider-controlled page content."""
+        """Install one Stockroom-owned HUD that never reads provider-controlled page content.
+
+        The surface it mounts may ask the document where a measured control sits, so it can draw
+        an outline over it, and nothing else. See ``capture_user_downloads`` for the full contract.
+        """
 
         with self._download_lock:
             if any(wired is page for wired, _bound in self._page_huds):
@@ -2188,6 +2782,9 @@ class PlaywrightCaptureBrowser:
         def receive_action(_source, action, token) -> bool:
             return state.request_action(action, token)
 
+        def provide_state(_source, token) -> dict[str, object]:
+            return state.read_state(token)
+
         init_script = (
             f"({_PROVIDER_HUD_BOOTSTRAP})("
             f"{json.dumps(payload, ensure_ascii=True, separators=(',', ':'))}"
@@ -2195,6 +2792,9 @@ class PlaywrightCaptureBrowser:
         )
         try:
             page.expose_binding(state.action_binding, receive_action)
+            # Bound before the init script that reads it, so a HUD that remounts on the very first
+            # provider navigation already has a live count to ask for.
+            page.expose_binding(state.state_binding, provide_state)
             # Registration precedes the first provider navigation and runs again for every
             # subsequent document. Evaluating the same idempotent bootstrap mounts it in the
             # existing about:blank document too.
@@ -2211,8 +2811,30 @@ class PlaywrightCaptureBrowser:
                 "could not install the Stockroom capture panel before provider navigation"
             ) from exc
 
+    @contextmanager
+    def _provider_hud_security_hold(self, page):
+        """Suppress this task's control outlines while the person owns a provider gate.
+
+        Reuses the one detection Stockroom already has: whatever decided to call
+        ``wait_for_user_clearance`` decides this too. A page with no bound provider HUD simply has
+        nothing to suppress, and the hold is always released, including on cancellation and
+        timeout, so a cleared gate restores the guidance without a second detector.
+        """
+
+        state = self._hud_for_page(page)
+        if state is None:
+            yield
+            return
+        state.set_security_hold(True)
+        self._update_provider_hud(state, state.download_count)
+        try:
+            yield
+        finally:
+            state.set_security_hold(False)
+            self._update_provider_hud(state, state.download_count)
+
     def _update_provider_hud(self, state: _ProviderHudState, download_count: int) -> None:
-        """Push Stockroom's receipt count into every page displaying this task's HUD."""
+        """Push Stockroom's receipt count and outline hold into every page showing this HUD."""
 
         state.update_download_count(download_count)
         with self._download_lock:
@@ -2220,6 +2842,7 @@ class PlaywrightCaptureBrowser:
         payload = {
             "namespace": state.namespace,
             "downloadCount": download_count,
+            "securityHold": state.security_hold,
         }
         for page in pages:
             try:
@@ -2272,6 +2895,14 @@ class PlaywrightCaptureBrowser:
                 current = opener() if callable(opener) else None
             except Exception:  # noqa: BLE001 - an unreadable opener is simply unbound
                 current = None
+        # Provider download controls routinely open rel="noopener" windows, and Chromium reports
+        # no opener for those. The walk above can never reach the task page from one, so the file
+        # fell through to the legacy directory, left broker.receipts empty, and surfaced as "the
+        # vendor download did not produce a file" while the HUD count stayed at zero. One assisted
+        # capture window is exclusive, so a single bound task is unambiguously that file's owner.
+        with self._download_lock:
+            if len(self._page_brokers) == 1:
+                return self._page_brokers[0][1]
         return None
 
     def _hud_for_page(self, page) -> _ProviderHudState | None:

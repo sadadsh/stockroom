@@ -46,6 +46,30 @@ describe("SpecMatrixTable", () => {
     }
   });
 
+  it("keeps the first paint bounded instead of committing every row", () => {
+    // A5. The virtualizer measures its scroll container, and a container that has not been
+    // laid out yet (the first paint, and every jsdom render) measures 0 height - which yields
+    // zero virtual items. The old fallback took that as "virtualization is unavailable" and
+    // rendered modelRows in full: thousands of rows x 14 columns on the very first commit.
+    // The initialRect guard PartsList and SearchOverlay already carry keeps the window bounded.
+    const many = Array.from({ length: 2_000 }, (_, index) =>
+      row({
+        part: `STM32REF${index}`,
+        mpn_example: `STM32MPN${index}`,
+      }),
+    );
+    render(<SpecMatrixTable rows={many} activePart={null} onSelectPart={vi.fn()} />);
+
+    const body = screen.getByTestId("spec-matrix-scroll");
+    const rendered = Array.from(body.querySelectorAll("button")).filter((node) =>
+      /STM32MPN\d+/.test(node.textContent ?? ""),
+    );
+    expect(rendered.length).toBeGreaterThan(0);
+    expect(rendered.length).toBeLessThan(200);
+    // The count line still reports the whole model, so nothing about the data is hidden.
+    expect(screen.getByText("All 2,000 parts shown")).toBeInTheDocument();
+  });
+
   it("strips the Arm Cortex- prefix from the Core cell so the tier is readable", () => {
     render(
       <SpecMatrixTable
