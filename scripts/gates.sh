@@ -268,9 +268,9 @@ case "${1:-all}" in
             run "backend (projects+store+model)" env QT_QPA_PLATFORM=offscreen \
                 .venv/bin/python -m pytest tests/backend/projects tests/backend/store \
                 tests/backend/model -q -p no:randomly ;;
-  types)    run "ty" .venv/bin/ty check app/backend/stockroom --python-platform win32 ;;
+  types)    run "ty" .venv/bin/ty check app/backend/stockroom ;;
   all)      run "ruff" lint
-            run "ty" .venv/bin/ty check app/backend/stockroom --python-platform win32
+            run "ty" .venv/bin/ty check app/backend/stockroom
             run "typecheck" fe typecheck
             run "frontend tests" fe test:run
             run "backend suite" backend
