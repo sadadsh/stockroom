@@ -40,10 +40,12 @@ jobs:
           dotnet-version: "10.0.302"
       - name: Sync
         run: uv sync --frozen
-      - name: Type check backend
-        # Stockroom is a Windows desktop product. Keep the Linux runner for
-        # portable backend tests, but type-check the declared runtime target so
-        # Win32-only APIs are resolved consistently on every runner.
+      - name: Type check Windows backend
+        # pywebview and the Win32 host dependencies are deliberately installed
+        # only on Windows. Ubuntu still runs the portable import and backend
+        # suites below; the complete desktop backend is checked on its actual
+        # runtime platform.
+        if: runner.os == 'Windows'
         run: uv run ty check app/backend/stockroom --python-platform win32
       - name: Run Native Window Host Suite
         if: runner.os == 'Windows'
