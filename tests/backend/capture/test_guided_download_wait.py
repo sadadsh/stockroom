@@ -50,6 +50,20 @@ class _Record:
         return {}  # nothing present, so everything is still needed
 
 
+class _CatalogRecord(_Record):
+    catalog = {
+        "digikey": {
+            "product_url": "https://www.digikey.com/en/products/detail/acme/exact/1",
+            "media": [
+                {
+                    "title": "TPD6E05U06RVZR by Ultra Librarian",
+                    "url": "https://app.ultralibrarian.com/details/exact/tpd6e05u06rvzr",
+                }
+            ],
+        }
+    }
+
+
 class _CapturedFile:
     def __init__(
         self,
@@ -174,6 +188,82 @@ def test_guided_source_reports_the_provider_without_changing_its_engine_key(monk
 
     assert source.key == "guided"
     assert source.report_label == "Faketron"
+
+
+def test_exact_digikey_media_route_wins_over_a_synthesized_provider_search(monkeypatch, tmp_path):
+    browser = _FakeBrowser()
+    _install_adapter(monkeypatch, browser, on_drive=lambda _browser: None)
+    adapter = guided.get_adapter("faketron")
+
+    assert guided._exact_catalog_url(adapter, _CatalogRecord()) == (
+        "https://app.ultralibrarian.com/details/exact/tpd6e05u06rvzr"
+    )
+
+
+def test_strict_catalog_capture_stops_instead_of_falling_back_to_search(monkeypatch, tmp_path):
+    browser = _FakeBrowser()
+    _install_adapter(monkeypatch, browser, on_drive=lambda _browser: None)
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="faketron",
+        download_root=tmp_path / "dl",
+        headless=True,
+        strict_catalog_urls=True,
+    )
+
+    outcome = source.supply(_Record())
+
+    assert "DigiKey Media did not return an exact" in outcome.skipped
+    assert source._session is None
+
+
+def test_person_driven_route_uses_the_embedded_provider_surface(monkeypatch, tmp_path):
+    browser_arguments: list[dict[str, object]] = []
+    surface_events: list[str] = []
+
+    class _Choice:
+        name = guided.TRANSPORT_DEFAULT_BROWSER
+        why = "test person-driven route"
+
+    class _EmbeddedBrowser:
+        def __init__(self, **kwargs):
+            browser_arguments.append(kwargs)
+
+        @contextmanager
+        def session(self):
+            yield _FakePage()
+
+    @contextmanager
+    def provider_surface():
+        surface_events.append("shown")
+        try:
+            yield "http://127.0.0.1:48123"
+        finally:
+            surface_events.append("hidden")
+
+    monkeypatch.setattr(guided, "select_transport", lambda *_args, **_kwargs: _Choice())
+    monkeypatch.setattr(guided, "trace_transport", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(guided, "PlaywrightCaptureBrowser", _EmbeddedBrowser)
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="faketron",
+        download_root=tmp_path / "downloads",
+        user_driven=True,
+        provider_surface=provider_surface,
+    )
+
+    _install_adapter(
+        monkeypatch,
+        _FakeBrowser(),
+        on_drive=lambda _: None,
+    )
+    session = source._ensure_session()
+
+    assert session.page is not None
+    assert browser_arguments[0]["cdp_endpoint"] == "http://127.0.0.1:48123"
+    assert surface_events == ["shown"]
+    source.close()
+    assert surface_events == ["shown", "hidden"]
 
 
 def test_a_download_consumed_by_the_session_handler_still_counts_as_delivered(

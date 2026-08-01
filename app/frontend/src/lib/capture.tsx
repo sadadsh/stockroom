@@ -136,9 +136,8 @@ export function captureInFlight(state: CaptureState): boolean {
 /**
  * Can the person say "I am finished with this route" or "skip this component" right now?
  *
- * Only a person-driven lane opens a provider page in the person's own browser, so only those runs
- * have a route in front of anybody to finish. Offering the controls on an automatic pass would be
- * offering a button the backend correctly refuses.
+ * Only a provider route waiting for human input opens the embedded provider surface, so only that
+ * state has a route in front of anybody to finish. The automatic stages keep these controls hidden.
  */
 export function captureAwaitsPerson(state: CaptureState): boolean {
   return captureInFlight(state) && state.mode !== null && state.mode !== "automatic";
@@ -221,15 +220,15 @@ function delay(milliseconds: number): Promise<void> {
 
 function terminalWorkflow(batch: WorkflowBatchSummary): boolean {
   // A blocked guided-capture batch has finished every automatic stage it can
-  // perform without a person-driven provider handoff.  Leaving it non-terminal
-  // traps the modal in `window-open` forever even though no provider window was
-  // opened, which disables both Open Provider and Collect All Sources.  Consume
+  // perform without a person-driven provider handoff. Leaving it non-terminal
+  // traps the modal in `window-open` forever even though no embedded provider page was
+  // opened, which disables Get Files. Consume
   // its durable report and return an actionable partial result instead.
   //
   // `paused` is terminal for this poll for the same reason.  Pause is a first-class batch
   // state a person can resume from the completion surface, so treating it as still-running
   // left the modal polling every 750 ms forever with `cadBusy` stuck true, which disabled
-  // Get Files and Collect All Sources with no way back short of relaunching the app.
+  // Get Files with no way back short of relaunching the app.
   return ["completed", "blocked", "failed", "cancelled", "paused"].includes(
     batch.status,
   );
@@ -255,16 +254,15 @@ const WORKFLOW_STAGE_MESSAGE: Record<string, string> = {
 function durableMessage(
   batch: WorkflowBatchSummary,
   events: WorkflowEvent[],
-  mode: CaptureMode,
-  vendor: string | null,
+  _mode: CaptureMode,
+  _vendor: string | null,
 ): string {
   if (batch.status === "paused") {
     return "Completion is paused. Resume it from Library Completion when you are ready.";
   }
   if (batch.status === "blocked") {
-    return `Automatic lookup finished without a complete CAD package. Open the ${
-      vendor || "selected"
-    } provider browser now, or choose Collect All Sources to try every eligible provider.`;
+    return "Automatic collection paused before a complete CAD package was available. " +
+      "Complete the security step in Stockroom's provider browser to resume.";
   }
   if (batch.status === "cancelled") return "Completion was cancelled before publication.";
   if (batch.status === "failed") {
@@ -278,20 +276,11 @@ function durableMessage(
     .map((event) => event.details.stage)
     .find((stage): stage is string => typeof stage === "string");
   if (latestStage === "cad_acquisition") {
-    if (mode === "collect-all") {
-      return "Collecting every eligible source in order and retaining verified variants.";
-    }
-    if (mode === "assisted") {
-      return `Using ${vendor || "the selected provider"} and handling every supported step. You only need to answer a provider security check.`;
-    }
+    return "Collecting every eligible source in order and retaining verified variants.";
   }
   return latestStage
     ? (WORKFLOW_STAGE_MESSAGE[latestStage] ?? "Completing this part.")
-    : mode === "assisted"
-      ? `Starting the ${vendor || "selected"} provider browser. First launch normally takes 10 to 20 seconds. It opens in a separate window and keeps its login on this PC.`
-      : mode === "collect-all"
-        ? "Preparing the next visible provider route. Stockroom keeps every verified file as each route finishes."
-        : "Completion is active. Stockroom is checking exact identity, saved evidence, and network sources in order.";
+    : "Completion is active. Stockroom is checking cached evidence, exact identity, and every eligible network source in order.";
 }
 
 function resultFromProjection(
@@ -509,13 +498,15 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         message:
           !projectionComplete
             ? incompleteMessage
+            : completionEvidence?.state === "not-required"
+              ? completionEvidenceMessage(completionEvidence)
             : mode === "collect-all"
               ? collectionComplete
-                ? `${summary}. Every eligible route completed without a blocked or failed outcome.`
+                ? summary
+                  ? `${summary}. Every eligible route completed without a blocked or failed outcome.`
+                  : "Every eligible route completed without a blocked or failed outcome."
                 : `${summary || "Source collection stopped"}. Review the blocked or failed routes below.`
-              : completionEvidence?.state === "not-required"
-                ? completionEvidenceMessage(completionEvidence)
-                : durableSuccessMessage ?? completionEvidenceMessage(completionEvidence),
+              : durableSuccessMessage ?? completionEvidenceMessage(completionEvidence),
       }));
     },
     [invalidate, markReceived],
@@ -693,7 +684,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       partName: string,
       needs: Requirement[],
       sourceKey?: string,
-      mode: CaptureMode = "automatic",
+      mode: CaptureMode = "collect-all",
     ) => {
       const commandKey = captureCommandKey(partId, sourceKey, mode);
       const idempotencyKey =
@@ -721,15 +712,11 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         partId,
         partName,
         needs,
-        vendor: sourceKey ?? "Automatic",
+        vendor: sourceKey ?? "All Sources",
         mode,
         status: "resolving",
         message:
-          mode === "collect-all"
-            ? "Planning every eligible source route..."
-            : mode === "assisted"
-              ? `Preparing ${sourceKey || "the selected provider"} for one assisted capture. Stockroom handles every supported step and pauses only for a provider security check.`
-              : "Planning automatic exact-identity, data, datasheet, and shared CAD completion...",
+          "Planning one automatic pass through cached evidence, exact identity, data, datasheet, and every eligible CAD source...",
       }));
 
       try {
@@ -771,11 +758,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
           ...current,
           status: "receiving",
           message:
-            mode === "assisted"
-              ? `Starting the ${sourceKey || "selected"} provider browser. First launch normally takes 10 to 20 seconds. It opens separately and keeps its login on this PC.`
-              : mode === "collect-all"
-                ? "Source collection started. Stockroom will open each provider route in order."
-                : "Completion started. Stockroom is checking exact identity, saved evidence, and network sources in order.",
+            "Automatic completion is running. Provider pages appear inside Stockroom only when needed, and verified files are retained as they land.",
         }));
         await followDurable({
           batchId,
@@ -818,7 +801,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       partName: string,
       needs: Requirement[],
       sourceKey?: string,
-      mode: CaptureMode = "automatic",
+      mode: CaptureMode = "collect-all",
     ): Promise<void> => {
       const commandKey = captureCommandKey(partId, sourceKey, mode);
       const pending = pendingStartRef.current;

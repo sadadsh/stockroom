@@ -370,7 +370,7 @@ async function startCompletionCommand(
     ref = await api.runCapture({
       ...input,
       limit: requestedLimit,
-      mode: "automatic",
+      mode: "collect-all",
       idempotencyKey,
     });
   } catch (error) {

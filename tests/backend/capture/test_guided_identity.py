@@ -339,6 +339,26 @@ def test_a_url_slug_separator_does_not_reject_an_exact_part():
     assert exact_observation_error(requested, observed) == ""
 
 
+def test_candidate_gate_uses_the_shared_slug_aware_page_identity():
+    requested = _Record(
+        id="abm13w",
+        mpn="ABM13W-32.0000MHZ-5-DH7G-T5",
+        manufacturer="Abracon LLC",
+    )
+
+    selection = select_exact_candidate(
+        requested,
+        [],
+        vendor_key="ultralibrarian",
+        detail_url=(
+            "https://app.ultralibrarian.com/details/catalogue/Abracon/"
+            "ABM13W-32-0000MHZ-5-DH7G-T5"
+        ),
+    )
+
+    assert selection.error == ""
+
+
 def test_slug_folding_never_merges_two_different_parts():
     """Only separators fold. Alphanumerics, their order, and separator POSITIONS still bind."""
     requested = _Requested(mpn="ABM13W-32.0000MHZ", manufacturer="Abracon")

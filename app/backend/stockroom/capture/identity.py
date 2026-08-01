@@ -404,7 +404,7 @@ def select_exact_candidate(
 
     detail = page_identity(vendor_key, detail_url)
     if detail is not None:
-        if _mpn_key(detail.mpn) != _mpn_key(requested_mpn):
+        if not same_mpn(detail.mpn, requested_mpn):
             return CandidateSelection(
                 error=(
                     "the vendor detail page identifies "

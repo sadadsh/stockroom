@@ -84,7 +84,7 @@ describe("durable completion store", () => {
     expect(run).toHaveBeenCalledWith({
       partIds: ["p1"],
       limit: 1,
-      mode: "automatic",
+      mode: "collect-all",
       idempotencyKey: expect.stringMatching(/^library-completion-/),
     });
 

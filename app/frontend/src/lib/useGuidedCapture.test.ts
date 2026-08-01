@@ -74,13 +74,13 @@ describe("useGuidedCapture", () => {
       expect.objectContaining({
         partIds: ["part1"],
         vendor: undefined,
-        mode: "automatic",
+        mode: "collect-all",
       }),
     );
     expect(result.current.status).toBe("done");
   });
 
-  it("passes the preferred provider while keeping the first attempt automatic", async () => {
+  it("prioritizes a retained provider inside the same all-source run", async () => {
     mockCadSourceUrl();
     const capture = mockCapture();
     const { result } = render(["kicad_symbol", "kicad_footprint"]);
@@ -92,12 +92,12 @@ describe("useGuidedCapture", () => {
     expect(capture.run).toHaveBeenCalledWith(
       expect.objectContaining({
         vendor: "ultralibrarian",
-        mode: "automatic",
+        mode: "collect-all",
       }),
     );
   });
 
-  it("still runs direct automatic acquisition when no provider URL resolves", async () => {
+  it("still runs the all-source ladder when no provider URL resolves", async () => {
     mockCadSourceUrl(null);
     const capture = mockCapture();
     const { result } = render(["kicad_symbol", "kicad_footprint"]);
@@ -111,7 +111,7 @@ describe("useGuidedCapture", () => {
       expect.objectContaining({
         partIds: ["part1"],
         vendor: undefined,
-        mode: "automatic",
+        mode: "collect-all",
       }),
     );
   });

@@ -1,23 +1,18 @@
 /**
  * What ONE library-wide run could not finish by itself, as a short list of single actions.
  *
- * The owner's ask is *"a simple download button in our app that can do everything for you"*, and
- * most of that distance is reachable: the run above completes every part it is authorized to
- * complete with nobody watching. The rest cannot be automated at all - DigiKey serves CAD models
- * only through a page whose automation their terms forbid - so the honest remainder is presented
- * as WORK, not as an error log.
+ * The owner asked for one simple download action that does everything it safely can. The automatic
+ * run completes every available stage; this list exposes only the rare provider pages that still
+ * need a human security clearance or download choice.
  *
  * The design rules this surface follows, because a "what is left" list is exactly the kind of
  * thing that turns into noise:
- *  - ONE row is ONE trip, and the row STARTS it. Its control runs the same person-driven capture
- *    the Complete Part window runs: the backend opens that provider on that exact component in the
- *    person's own browser and watches their Downloads, so what they download is imported. A row
- *    that merely opened a link routed the person and then dropped the result on the floor.
- *  - Nothing here clicks anything on a provider page, ever. The person does that.
+ *  - ONE row is ONE trip, and the row starts the same Get Files workflow as Complete Part. The
+ *    backend opens an exact provider route inside Stockroom and owns its task-bound downloads.
+ *  - Ordinary controls may be automated; security challenges remain human-only.
  *  - The reason is the ROUTE'S OWN words ("no Ultra Librarian sign-in is saved..."), never a
  *    category this component invented from a status code.
- *  - The frontend never builds a provider URL. The backend owns opening the page; the plain link
- *    kept beside the control is the backend's own resolved URL, for someone who only wants a look.
+ *  - The frontend never builds a provider URL. The backend resolves and opens the exact page.
  *  - Parts nothing can currently help are counted apart from parts a person can advance. Merging
  *    them would send someone to a provider that already said it has nothing.
  *  - ONE capture runs at a time (one slot in `lib/capture.tsx`, one process-wide exclusive window
@@ -30,7 +25,7 @@
  *    before the person has dealt with the last one.
  */
 import { useEffect, useRef, useState } from "react";
-import { useCadSourceQuery, useCaptureWorklist } from "../api/queries";
+import { useCaptureWorklist } from "../api/queries";
 import type { CaptureWorklistRow, Requirement } from "../api/types";
 import { captureAwaitsPerson, captureInFlight, REQ_LABELS, useCapture } from "../lib/capture";
 import { CaptureRouteControls } from "./CaptureRouteControls";
@@ -102,11 +97,10 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
               file the person downloads is snapshotted, adopted, and put through the unchanged
               identity gates. Only the clicking is theirs. */}
           <p className="text-sm text-t2">
-            These routes cannot be finished for you. Starting one opens that provider on this exact
-            component in your own browser and watches your Downloads, so what you collect is filed
-            against that component. Stockroom runs one capture at a time: Work Through All starts
-            the first component and starts the next one as each capture finishes, so the only
-            clicking left is on the provider pages themselves.
+            Get Files runs the same automatic workflow for each component. Stockroom reuses saved
+            evidence, tries every eligible source, and shows a provider inside the app only when a
+            security or download choice needs you. Work Through All starts the next component as
+            each one finishes.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -133,7 +127,7 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
             {auto.running ? (
               <span data-testid="completion-worklist-auto" className="text-2xs text-t2">
                 {auto.openName
-                  ? `Working through ${auto.done + 1} of ${auto.total}. ${auto.openName} is open in your browser; the next component starts when this capture finishes.`
+                  ? `Working through ${auto.done + 1} of ${auto.total}. ${auto.openName} is active in Stockroom; the next component starts when this capture finishes.`
                   : `Working through ${auto.done} of ${auto.total}. Starting the next component.`}
               </span>
             ) : null}
@@ -228,7 +222,6 @@ function WorklistRow({
       </div>
       <div className="flex flex-none flex-col items-end gap-1">
         <StartCapture row={row} busy={busy} running={running} />
-        <OpenProvider row={row} />
       </div>
       <p className="col-span-2 text-2xs leading-snug text-[var(--c-warn-text)]">{row.reason}</p>
       {incomplete ? (
@@ -262,7 +255,6 @@ function WorklistRow({
 interface QueuedRow {
   partId: string;
   name: string;
-  providerKey: string;
   remaining: Requirement[];
 }
 
@@ -357,7 +349,7 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
     heldRef.current = false;
     openedRef.current = false;
     setPass({ ...pass, queue: pass.queue.slice(1), open: next });
-    void start(next.partId, next.name, next.remaining, next.providerKey, "assisted");
+    void start(next.partId, next.name, next.remaining, undefined, "collect-all");
   }, [pass, active, start]);
 
   return {
@@ -376,7 +368,6 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
         queue: rows.map((row) => ({
           partId: row.part_id,
           name: row.display_name || row.mpn || row.part_id,
-          providerKey: row.provider_key,
           remaining: row.remaining,
         })),
         open: null,
@@ -392,7 +383,7 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
           : {
               ...current,
               ended: current.open
-                ? `Stopped working through the list. ${current.open.name} is still open in your browser; finish or skip it there.`
+                ? `Stopped working through the list. ${current.open.name} is still active in Stockroom; finish or skip it there.`
                 : "Stopped working through the list.",
             },
       );
@@ -401,16 +392,11 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
 }
 
 /**
- * The row's PRIMARY control: start the real capture for this component on this provider.
+ * The row's primary control: start the one Get Files workflow for this component.
  *
- * It runs the same path the Complete Part window runs - one assisted capture naming this part and
- * this provider - so the backend opens the page in the person's own browser AND snapshots their
- * Downloads. That second half is the whole point: a control that only opened a link routed the
- * person and then had no way to receive what they collected.
- *
- * The frontend never constructs the provider URL; it sends the provider KEY the route reported and
- * lets the backend resolve and open it, which is the only version of this that cannot silently land
- * on the wrong page.
+ * It runs the same all-source path as Complete Part. The backend reuses exact retained evidence,
+ * drives every usable route, opens a provider inside Stockroom only when needed, and captures its
+ * downloads into the active component without making the person choose a provider first.
  */
 function StartCapture({
   row,
@@ -435,76 +421,17 @@ function StartCapture({
       disabled={busy}
       title={
         running
-          ? `Capturing ${row.label} for ${row.mpn || row.part_id} now`
+          ? `Getting every available file for ${row.mpn || row.part_id}`
           : blocked
             ? "Stockroom runs one capture at a time. Finish or skip the one in progress first."
-            : `Capture ${row.label} for ${row.mpn || row.part_id}`
+            : `Get every available file for ${row.mpn || row.part_id}`
       }
-      // Twenty-five rows of "Start Capture" are twenty-five identical button names to anyone
-      // reading by voice, so the component and provider travel in the accessible name.
-      aria-label={`Start the ${row.label} capture for ${name}`}
+      aria-label={`Get files for ${name}`}
       onClick={() =>
-        void capture.start(row.part_id, name, row.remaining, row.provider_key, "assisted")
+        void capture.start(row.part_id, name, row.remaining, undefined, "collect-all")
       }
     >
-      {running ? "Capturing" : "Start Capture"}
+      {running ? "Getting Files" : "Get Files"}
     </Button>
-  );
-}
-
-/**
- * The secondary affordance: just look at the page, without starting anything.
- *
- * The href is whatever the backend resolved for THIS part on THIS provider - for DigiKey that is
- * already the exact models tab when a previous capture learned it. When the backend resolved no
- * page, this says so instead of offering a link that lands on a search for nothing. Downloading
- * from here imports nothing: no capture is running, so nothing is watching Downloads.
- */
-function OpenProvider({ row }: { row: CaptureWorklistRow }) {
-  const source = useCadSourceQuery(row.part_id, true);
-  const target = source.data?.sources.find((candidate) => candidate.key === row.provider_key);
-
-  if (!target?.url) {
-    return (
-      <span className="flex-none text-2xs text-t3">
-        {source.isLoading ? "Finding the page..." : "No page resolved"}
-      </span>
-    );
-  }
-  return (
-    <a
-      href={target.url}
-      target="_blank"
-      rel="noreferrer"
-      data-dev-id="settings.completion-worklist-open"
-      // The provider's own instruction is deliberately NOT the tooltip here: for an
-      // implemented provider it describes the capture Stockroom drives, and this control only
-      // opens a page. Name the destination instead.
-      title={`Open ${target.label} for ${row.mpn || row.part_id} without capturing`}
-      // Twenty-five rows of "Open Ultra Librarian" are twenty-five identical link names to
-      // anyone reading by voice. The part travels in the accessible name so each row is
-      // distinguishable out of its visual context.
-      aria-label={`Open ${target.label} for ${row.mpn || row.part_id} without capturing`}
-      className={
-        "inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-control px-1 " +
-        "text-2xs font-medium text-t3 transition-colors hover:text-t1 " +
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
-        "focus-visible:outline-acc"
-      }
-    >
-      Open {target.label}
-      <svg
-        width="10"
-        height="10"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        aria-hidden="true"
-      >
-        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-        <path d="M15 3h6v6M10 14 21 3" />
-      </svg>
-    </a>
   );
 }

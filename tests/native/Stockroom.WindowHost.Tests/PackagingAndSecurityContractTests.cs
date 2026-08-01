@@ -46,7 +46,7 @@ public sealed class PackagingAndSecurityContractTests
     }
 
     [Fact]
-    public void ProductionSourceHasNoRemoteDebuggingOrRendererSecretBootstrap()
+    public void ProductionSourceKeepsRendererSecretsOutAndScopesProviderDebugging()
     {
         var projectDirectory = FindProjectDirectory();
         var sources = Directory
@@ -63,10 +63,23 @@ public sealed class PackagingAndSecurityContractTests
             .ToArray();
         var allSource = string.Join("\n", sources);
 
-        Assert.DoesNotContain(
-            "--remote-debugging",
+        Assert.Equal(
+            1,
+            allSource.Split(
+                "--remote-debugging-port=",
+                StringSplitOptions.None).Length - 1);
+        Assert.Contains(
+            "ProviderProfileDirectory",
             allSource,
-            StringComparison.OrdinalIgnoreCase);
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "_webView.Visibility = Visibility.Collapsed;",
+            allSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "_webView.Visibility = Visibility.Visible;",
+            allSource,
+            StringComparison.Ordinal);
         Assert.DoesNotContain(
             "window.__STOCKROOM_TOKEN__",
             allSource,

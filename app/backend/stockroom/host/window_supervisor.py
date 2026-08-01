@@ -943,6 +943,56 @@ class WindowHostClient:
 
         self._command("focus", "focused", parse)
 
+    def provider_endpoint(self) -> str:
+        """Return the loopback CDP endpoint of the embedded provider WebView."""
+
+        def parse(response: HandoffMessage, sequence: int) -> str:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"port"}),
+            )
+            port = result["port"]
+            if type(port) is not int or not 0 < port <= 65535:
+                raise WindowSupervisorProtocolError(
+                    "provider browser endpoint is invalid"
+                )
+            return f"http://127.0.0.1:{port}"
+
+        return self._command(
+            "provider-endpoint",
+            "provider-endpoint",
+            parse,
+        )
+
+    def show_provider(self) -> None:
+        def parse(response: HandoffMessage, sequence: int) -> None:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"visible"}),
+            )
+            if result["visible"] is not True:
+                raise WindowSupervisorProtocolError(
+                    "provider browser did not report visible"
+                )
+
+        self._command("provider-show", "provider-shown", parse)
+
+    def hide_provider(self) -> None:
+        def parse(response: HandoffMessage, sequence: int) -> None:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"visible"}),
+            )
+            if result["visible"] is not False:
+                raise WindowSupervisorProtocolError(
+                    "provider browser did not report hidden"
+                )
+
+        self._command("provider-hide", "provider-hidden", parse)
+
     def health(self) -> WindowHostHealth:
         def parse(response: HandoffMessage, sequence: int) -> WindowHostHealth:
             result = _strict_result(

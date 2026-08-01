@@ -1090,9 +1090,9 @@ export const api = {
     );
   },
 
-  // AUTOMATIC ACQUISITION, through the SAME route on Windows and Linux. Direct/keyless sources run
-  // first, then Stockroom drives exact provider results and falls through automatically. Assisted
-  // mode is an explicit last resort for a provider gate that genuinely requires a person.
+  // ONE ACQUISITION WORKFLOW. Direct/keyless sources run first, then Stockroom drives exact
+  // provider results and falls through automatically. A provider page appears inside Stockroom
+  // only when a security gate or download choice genuinely requires a person.
   //
   // `partIds: [one]` is per-component; omitting it captures every part still missing files. Both
   // are the same backend path deliberately, so verifying one verifies the other.
@@ -1127,10 +1127,9 @@ export const api = {
     );
   },
 
-  // What the person decided about the person-driven capture in front of them: "no more files are
-  // coming from this page" (finish-route), or "stop this component" (skip-part). The provider page
-  // opens in their OWN browser now, so these are statements to Stockroom about their own intent -
-  // nothing here reaches into a vendor page. A 409 means Stockroom is running no such capture.
+  // What the person decided about the embedded provider page in front of them: "no more files are
+  // coming from this page" (finish-route), or "stop this component" (skip-part). These are
+  // statements to Stockroom about their intent; a 409 means no such capture is running.
   captureIntent(
     partId: string,
     action: CapturePersonIntentAction,

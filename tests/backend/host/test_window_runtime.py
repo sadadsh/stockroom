@@ -95,6 +95,16 @@ class _Client:
     def focus(self) -> None:
         self.commands.append("focus")
 
+    def provider_endpoint(self) -> str:
+        self.commands.append("provider-endpoint")
+        return "http://127.0.0.1:43127"
+
+    def show_provider(self) -> None:
+        self.commands.append("provider-show")
+
+    def hide_provider(self) -> None:
+        self.commands.append("provider-hide")
+
     def health(self) -> WindowHostHealth:
         return WindowHostHealth(
             window_handle=self.identity.window_handle,
@@ -228,6 +238,20 @@ def test_active_native_window_observation_is_exact_and_read_only(
     assert observation.exported.snapshot["route"] == "settings"
     assert observation.exported.theme == "dark"
     assert session_path.read_bytes() == before
+    runtime.close()
+
+
+def test_provider_browser_surface_is_one_scoped_in_app_lease(
+    tmp_path: Path,
+) -> None:
+    runtime, old, _new, _candidate = _runtime(tmp_path)
+    runtime.start_initial()
+
+    with runtime.provider_browser_surface() as endpoint:
+        assert endpoint == "http://127.0.0.1:43127"
+        assert old.commands[-2:] == ["provider-endpoint", "provider-show"]
+
+    assert old.commands[-1] == "provider-hide"
     runtime.close()
 
 

@@ -1412,6 +1412,14 @@ class ProductionUpdateRuntime:
             raise HostReleaseBoundaryError("production native window is unavailable")
         return replacement.wait_until_closed()
 
+    def provider_browser_surface(self):
+        replacement = self._window_replacement
+        if replacement is None:
+            raise HostReleaseBoundaryError(
+                "production provider browser is unavailable"
+            )
+        return replacement.provider_browser_surface()
+
     def _activate_loop(self) -> None:
         while True:
             with self._condition:

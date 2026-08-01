@@ -3,8 +3,12 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Net;
+using System.Net.Sockets;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 
@@ -32,11 +36,16 @@ internal sealed class WebViewWindowHost : IDisposable
     private readonly Action _fatalFailure;
     private readonly Window _window;
     private readonly WebView2 _webView;
+    private readonly Grid _root;
+    private readonly Grid _providerSurface;
+    private readonly WebView2 _providerWebView;
     private readonly TaskCompletionSource<bool> _navigationCompletion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly string _probeNonce;
 
     private CoreWebView2Environment? _environment;
+    private CoreWebView2Environment? _providerEnvironment;
+    private int _providerCdpPort;
     private IntPtr _windowHandle;
     private ResolvedWindowGeometry? _resolvedGeometry;
     private RendererReadiness? _readiness;
@@ -67,6 +76,17 @@ internal sealed class WebViewWindowHost : IDisposable
             AllowDrop = false,
             CreationProperties = new CoreWebView2CreationProperties(),
         };
+        _providerWebView = new WebView2
+        {
+            AllowDrop = false,
+            CreationProperties = new CoreWebView2CreationProperties(),
+        };
+        _root = new Grid();
+        _root.Children.Add(_webView);
+        _providerSurface = BuildProviderSurface(
+            _providerWebView,
+            HideProviderBrowser);
+        _root.Children.Add(_providerSurface);
         _window = new Window
         {
             Title = "Stockroom",
@@ -80,7 +100,7 @@ internal sealed class WebViewWindowHost : IDisposable
             Visibility = Visibility.Hidden,
             Opacity = 0,
             AllowDrop = false,
-            Content = _webView,
+            Content = _root,
         };
         _window.Closing += OnWindowClosing;
     }
@@ -138,6 +158,7 @@ internal sealed class WebViewWindowHost : IDisposable
             .ConfigureAwait(true);
         _webView.CoreWebView2.NavigationCompleted +=
             OnNavigationCompleted;
+        await InitializeProviderBrowserAsync().ConfigureAwait(true);
         SetFailureStage(WindowHostFailureStage.Navigation);
         _webView.Source = _bootstrap.BaseUri;
 
@@ -264,6 +285,46 @@ internal sealed class WebViewWindowHost : IDisposable
             });
     }
 
+    internal int ProviderCdpPort()
+    {
+        return InvokeOnDispatcher(
+            () =>
+            {
+                ThrowIfNotReady();
+                if (_providerCdpPort is < 1 or > 65535)
+                {
+                    throw new WindowHostException(
+                        "provider browser endpoint is unavailable");
+                }
+
+                return _providerCdpPort;
+            });
+    }
+
+    internal void ShowProviderBrowser()
+    {
+        InvokeOnDispatcher(
+            () =>
+            {
+                ThrowIfNotReady();
+                _webView.Visibility = Visibility.Collapsed;
+                _providerSurface.Visibility = Visibility.Visible;
+                _providerWebView.Focus();
+            });
+    }
+
+    internal void HideProviderBrowser()
+    {
+        InvokeOnDispatcher(
+            () =>
+            {
+                ThrowIfNotReady();
+                _providerSurface.Visibility = Visibility.Collapsed;
+                _webView.Visibility = Visibility.Visible;
+                _webView.Focus();
+            });
+    }
+
     internal IReadOnlyDictionary<string, object?> ExportSession()
     {
         return InvokeOnDispatcher(
@@ -337,6 +398,7 @@ internal sealed class WebViewWindowHost : IDisposable
 
                 _shuttingDown = true;
                 _hidden = true;
+                _providerWebView.Dispose();
                 _webView.Dispose();
                 _window.Close();
                 Application.Current.Shutdown(0);
@@ -380,6 +442,185 @@ internal sealed class WebViewWindowHost : IDisposable
         core.BasicAuthenticationRequested +=
             OnBasicAuthenticationRequested;
         core.ProcessFailed += OnProcessFailed;
+    }
+
+    private async Task InitializeProviderBrowserAsync()
+    {
+        _providerCdpPort = _machineConfig.ProviderCdpPort(
+            ReserveLoopbackPort);
+        var options = new CoreWebView2EnvironmentOptions
+        {
+            // Release handoff starts the next native host before retiring the old one. Both
+            // controls intentionally share this stable profile/browser process so login state and
+            // the CDP endpoint survive that overlap without opening a second provider session.
+            ExclusiveUserDataFolderAccess = false,
+            AdditionalBrowserArguments = string.Create(
+                CultureInfo.InvariantCulture,
+                $"--remote-debugging-port={_providerCdpPort}"),
+        };
+        _providerEnvironment = await CoreWebView2Environment.CreateAsync(
+                browserExecutableFolder: null,
+                userDataFolder: _machineConfig.ProviderProfileDirectory(),
+                options)
+            .ConfigureAwait(true);
+        await _providerWebView.EnsureCoreWebView2Async(
+                _providerEnvironment)
+            .ConfigureAwait(true);
+        ConfigureProviderCoreWebView(_providerWebView.CoreWebView2);
+        _providerWebView.Source = new Uri("about:blank");
+        _providerSurface.Visibility = Visibility.Collapsed;
+    }
+
+    private static int ReserveLoopbackPort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        try
+        {
+            listener.Start();
+            return ((IPEndPoint)listener.LocalEndpoint).Port;
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    private static Grid BuildProviderSurface(
+        WebView2 providerWebView,
+        Action hideProviderBrowser)
+    {
+        var surface = new Grid
+        {
+            Background = new SolidColorBrush(Color.FromArgb(224, 9, 12, 18)),
+            Visibility = Visibility.Collapsed,
+        };
+        var panel = new Grid
+        {
+            Margin = new Thickness(24),
+            Background = new SolidColorBrush(Color.FromRgb(17, 21, 29)),
+        };
+        panel.RowDefinitions.Add(
+            new RowDefinition { Height = new GridLength(44) });
+        panel.RowDefinitions.Add(
+            new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var header = new Grid();
+        header.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = GridLength.Auto });
+        var title = new TextBlock
+        {
+            Text = "STOCKROOM  /  PROVIDER BROWSER",
+            Foreground = new SolidColorBrush(Color.FromRgb(205, 214, 225)),
+            FontFamily = new FontFamily("Segoe UI Semibold"),
+            FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(16, 0, 0, 0),
+        };
+        var close = new Button
+        {
+            Content = "Return To Stockroom",
+            Foreground = new SolidColorBrush(Color.FromRgb(205, 214, 225)),
+            Background = new SolidColorBrush(Color.FromRgb(27, 33, 44)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(55, 65, 81)),
+            FontFamily = new FontFamily("Segoe UI Semibold"),
+            FontSize = 11,
+            Padding = new Thickness(10, 4, 10, 4),
+            Margin = new Thickness(0, 7, 10, 7),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        close.Click += (_, _) => hideProviderBrowser();
+        Grid.SetColumn(title, 0);
+        Grid.SetColumn(close, 1);
+        header.Children.Add(title);
+        header.Children.Add(close);
+        Grid.SetRow(header, 0);
+        panel.Children.Add(header);
+        Grid.SetRow(providerWebView, 1);
+        panel.Children.Add(providerWebView);
+        surface.Children.Add(panel);
+        return surface;
+    }
+
+    private static void ConfigureProviderCoreWebView(CoreWebView2 core)
+    {
+        var settings = core.Settings;
+        settings.AreBrowserAcceleratorKeysEnabled = true;
+        settings.AreDefaultContextMenusEnabled = true;
+        settings.AreDefaultScriptDialogsEnabled = true;
+        settings.AreDevToolsEnabled = false;
+        settings.AreHostObjectsAllowed = false;
+        settings.IsBuiltInErrorPageEnabled = true;
+        settings.IsGeneralAutofillEnabled = true;
+        settings.IsPasswordAutosaveEnabled = true;
+        settings.IsStatusBarEnabled = false;
+        settings.IsWebMessageEnabled = false;
+        settings.IsZoomControlEnabled = true;
+        core.NavigationStarting += OnProviderNavigationStarting;
+        core.FrameNavigationStarting += OnProviderNavigationStarting;
+        core.NewWindowRequested += OnProviderNewWindowRequested;
+        core.PermissionRequested += OnProviderPermissionRequested;
+        core.BasicAuthenticationRequested +=
+            OnBasicAuthenticationRequested;
+    }
+
+    private static void OnProviderNavigationStarting(
+        object? sender,
+        CoreWebView2NavigationStartingEventArgs eventArguments)
+    {
+        if (!ProviderNavigationAllowed(eventArguments.Uri))
+        {
+            eventArguments.Cancel = true;
+        }
+    }
+
+    private static bool ProviderNavigationAllowed(string? value)
+    {
+        if (string.Equals(value, "about:blank", StringComparison.Ordinal))
+        {
+            return true;
+        }
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttps
+            || !string.IsNullOrEmpty(uri.UserInfo))
+        {
+            return false;
+        }
+        var host = uri.IdnHost.ToLowerInvariant();
+        string[] officialRoots =
+        [
+            "digikey.com",
+            "ultralibrarian.com",
+            "snapeda.com",
+            "snapmagic.com",
+            "samacsys.com",
+            "componentsearchengine.com",
+            "traceparts.com",
+            "3dcontentcentral.com",
+        ];
+        return officialRoots.Any(
+            root => host == root
+                || host.EndsWith("." + root, StringComparison.Ordinal));
+    }
+
+    private static void OnProviderNewWindowRequested(
+        object? sender,
+        CoreWebView2NewWindowRequestedEventArgs eventArguments)
+    {
+        if (sender is CoreWebView2 core
+            && ProviderNavigationAllowed(eventArguments.Uri))
+        {
+            core.Navigate(eventArguments.Uri);
+        }
+        eventArguments.Handled = true;
+    }
+
+    private static void OnProviderPermissionRequested(
+        object? sender,
+        CoreWebView2PermissionRequestedEventArgs eventArguments)
+    {
+        eventArguments.State = CoreWebView2PermissionState.Deny;
+        eventArguments.SavesInProfile = false;
     }
 
     private async Task AddMachineUiBootstrapAsync(CoreWebView2 core)

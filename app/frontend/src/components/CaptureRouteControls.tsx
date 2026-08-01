@@ -1,15 +1,8 @@
 /**
- * The person's own two answers about the provider page in front of them.
+ * The person's two answers about the provider page currently embedded in Stockroom.
  *
- * De-automation put the provider page in the PERSON'S OWN browser, which is the whole point - an
- * automation-controlled session is exactly what a bot check was catching while a person did the
- * clicking. The cost was the HUD: Stockroom cannot draw an overlay inside a window it does not own,
- * so the Finish and Try Another buttons that used to sit on the provider page went away and nothing
- * replaced them. A person-driven route then ended only on Stockroom's global Cancel, on roughly 25
- * seconds of quiet after at least one file had landed, or on the 600 second timeout - five times
- * over for DigiKey's five author routes.
- *
- * These are the replacements, and they live where Stockroom can actually draw them: its own window.
+ * The page and these controls share one app window while the backend keeps ownership of the route,
+ * persistent provider session, and task-bound downloads.
  *  - FINISH ROUTE means "no more files are coming from this page". It is not a discard: the route
  *    drains what is still landing and everything already adopted is attached exactly as it would
  *    have been.
@@ -18,12 +11,8 @@
  * NEITHER TOUCHES A PROVIDER PAGE. They describe the person's intent to Stockroom, which hands it
  * to the running capture through the same polled predicate a cancellation travels on.
  *
- * WHY THE GATE IS THE LANE, NOT THE ROUTE. These render for any capture in a person-driven lane
- * (assisted or Collect All Sources), not for one exact route, because a single Collect All run
- * interleaves routes a person works with routes Stockroom drives itself and the frontend has no
- * live per-route signal to switch on. Finish Route is therefore answered only by a route that is
- * actually waiting on a person; the copy below names that condition rather than implying the
- * button applies to every second of the run.
+ * These render only while the one Get Files workflow is waiting for a person. Finish Route is
+ * therefore answered only by a route that actually has an embedded provider page open.
  */
 import { captureAwaitsPerson, useCapture } from "../lib/capture";
 import { Button } from "./primitives";
@@ -56,7 +45,7 @@ export function CaptureRouteControls({ partId }: { partId: string }) {
           routes Stockroom drives itself, and only the first kind has a page to be finished with;
           claiming otherwise would be claiming the button does something it cannot. */}
       <p className="mt-1 text-2xs leading-snug text-t2">
-        Use these when a provider page is open in your own browser. Finish Route when you have
+        Use these when a provider page is open in Stockroom. Finish Route when you have
         downloaded everything it offers: Stockroom keeps what already landed and moves on. Skip
         This Part stops this component&apos;s remaining routes.
       </p>

@@ -61,10 +61,12 @@ function terminalCompletion(overrides: Record<string, unknown> = {}) {
               sources: [],
               notes: [],
               error: "",
+              collection_complete: true,
               ...overrides,
             },
           ],
           counts: { "already-complete": 1 },
+          collection_complete: true,
           stopped: false,
           stop_reason: "",
         },
@@ -152,7 +154,7 @@ describe("CaptureProvider store", () => {
     });
 
     expect(result.current.active.status).toBe("done");
-    expect(result.current.active.message).toContain("datasheet");
+    expect(result.current.active.message).toContain("Every eligible route completed");
     expect(stream).not.toHaveBeenCalled();
     expect(readUiSession().selected_ids.workflow_batch).toBeNull();
   });
@@ -233,7 +235,9 @@ describe("CaptureProvider store", () => {
     });
 
     expect(result.current.active.status).toBe("error");
-    expect(result.current.active.message).toContain("Open the ultralibrarian provider browser");
+    expect(result.current.active.message).toContain(
+      "Complete the security step in Stockroom's provider browser",
+    );
     expect(result.current.active.providerOutcomes[0]?.status).toBe("requires-human");
     expect(readUiSession().selected_ids.workflow_batch).toBeNull();
   });
@@ -599,7 +603,7 @@ describe("CaptureProvider store", () => {
       expect.objectContaining({
         partIds: ["p1"],
         vendor: undefined,
-        mode: "automatic",
+        mode: "collect-all",
         idempotencyKey: expect.stringMatching(/^guided-capture-/),
       }),
     );

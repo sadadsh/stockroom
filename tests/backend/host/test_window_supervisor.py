@@ -287,6 +287,12 @@ class _Channel:
             return "shown", {"visible": True}
         if request.name == "focus":
             return "focused", {"focused": True}
+        if request.name == "provider-endpoint":
+            return "provider-endpoint", {"port": 43127}
+        if request.name == "provider-show":
+            return "provider-shown", {"visible": True}
+        if request.name == "provider-hide":
+            return "provider-hidden", {"visible": False}
         if request.name == "health":
             return (
                 "health",
@@ -501,6 +507,14 @@ def test_launch_binds_exact_child_and_sends_secrets_only_in_bootstrap(
     assert client.identity.parent_process_id == _PARENT_PID
     assert client.identity.window_handle == 4500
     assert client.identity.renderer == "edgechromium"
+    assert client.provider_endpoint() == "http://127.0.0.1:43127"
+    client.show_provider()
+    client.hide_provider()
+    assert [message.name for message in channel.sent[-3:]] == [
+        "provider-endpoint",
+        "provider-show",
+        "provider-hide",
+    ]
     assert server.accepted_pids == [_CHILD_PID]
     assert channel.expected_names[0] == frozenset({"hello-hidden"})
     bootstrap = channel.sent[0]

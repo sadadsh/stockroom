@@ -17,6 +17,7 @@ from stockroom.capture.download_broker import DownloadBroker, DownloadTask
 from stockroom.capture.pacing import DurableSlidingWindowLimiter
 from stockroom.capture.vendors import (
     DriveReport,
+    SnapMagicAdapter,
     UltraLibrarianAdapter,
     _challenge_issue,
     _exact_result_href,
@@ -335,6 +336,20 @@ def test_ultra_challenge_is_a_user_handoff_not_an_automation_attempt():
     report = UltraLibrarianAdapter().drive(
         _ChallengePage(),
         ["kicad", "model", "altium"],
+        expected_manufacturer="Acme",
+        expected_mpn="ABC-1",
+    )
+
+    assert report.submitted is False
+    assert report.blocked is True
+    assert report.requires_user_clearance is True
+    assert "confirm you are human" in report.message
+
+
+def test_snapmagic_challenge_is_a_user_handoff_not_a_closed_browser():
+    report = SnapMagicAdapter().drive(
+        _ChallengePage(),
+        ["kicad"],
         expected_manufacturer="Acme",
         expected_mpn="ABC-1",
     )

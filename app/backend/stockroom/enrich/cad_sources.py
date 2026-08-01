@@ -1,25 +1,14 @@
-"""Where a part's CAD files can be fetched, per vendor.
+"""Resolve every known CAD route for one exact part.
 
-Owner, 2026-07-27: *"yes rebuild guided capture, digikey UL snapmagic and samacsys"*. That
-instruction is what remained after every AUTOMATED route was measured and closed:
+DigiKey Product Information V4 Media is durable route evidence, not an Ultra Librarian preference.
+Stockroom retains the complete Media payload, recognizes every known CAD author it names, and the
+single Get Files workflow walks DigiKey's multi-author surface plus direct fallbacks. A partial
+result from one author never ends collection: valid files are retained and later routes fill gaps
+or become selectable alternatives.
 
-* **Nexar / Octopart** — a sanctioned, CAD-aware API that aggregates UL and SnapMagic, at
-  **$1,000/month**. Priced out.
-* **Ultra Librarian** — its terms state verbatim: *"You may not use any robot or other automated
-  means to access or gather content from the Website."* Automation is forbidden, not merely hard.
-* **SnapMagic** — an API exists, but its catalogue blends community-built and automatically generated models,
-  which fails the owner's actual bar ("not trusted where we've gotten them").
-* **Mouser** — the Search API carries no CAD fields at all (verified by dumping every key it
-  returns). Its "Download Design Files" button is SamacSys, a separate service.
-* **LCSC / EasyEDA** — ruled out by the owner, and KiCad-only regardless.
-
-So the human clicks Download, in their own browser session, and the app does everything either
-side of that click: pick the part, open exactly the right page, catch the file, classify it,
-attach it, move to the next part.
-
-**This module resolves URLs and nothing else.** It downloads no file and automates no vendor site.
-That is precisely what keeps the guided flow inside every one of those vendors' terms, and it is
-why the acquisition path is a link rather than a fetcher.
+This module only resolves exact or provider-search URLs. The capture layer owns the persistent
+in-app provider WebView, ordinary interaction automation, task-bound downloads, validation, and
+attachment; security challenges remain human-only.
 """
 
 from __future__ import annotations
@@ -152,7 +141,7 @@ def _digikey_product_url(mpn: str, adapter) -> str:
     return getattr(product, "value", "") or ""
 
 
-def _catalog_provider_urls(catalog: dict | None) -> dict[str, str]:
+def catalog_provider_urls(catalog: dict | None) -> dict[str, str]:
     """Exact provider detail links DigiKey's Media API returned for this product."""
     out: dict[str, str] = {}
     if not isinstance(catalog, dict):
@@ -170,6 +159,12 @@ def _catalog_provider_urls(catalog: dict | None) -> dict[str, str]:
             key = "snapmagic"
         elif "samacsys" in haystack or "componentsearchengine" in haystack:
             key = "samacsys"
+        elif "traceparts" in haystack:
+            key = "traceparts"
+        elif "cadenas" in haystack:
+            key = "cadenas"
+        elif "manufacturer provided" in haystack:
+            key = "manufacturer"
         if key and url.startswith("https://"):
             out.setdefault(key, url)
     return out
@@ -200,7 +195,7 @@ def resolve_cad_sources(
         if isinstance(digikey_catalog, dict)
         else ""
     ) or _digikey_product_url(mpn, digikey)
-    exact_provider_urls = _catalog_provider_urls(digikey_catalog)
+    exact_provider_urls = catalog_provider_urls(digikey_catalog)
     return [
         CadSource(
             key=source.key,
