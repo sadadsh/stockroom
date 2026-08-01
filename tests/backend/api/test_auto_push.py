@@ -1,6 +1,9 @@
-"""Auto-push on a library write: adding / editing a part pushes it to the remote when a GitHub
-token is configured (so a part lands in git immediately and collaborators get it on next launch),
-and is a quiet no-op without a token or with sync disabled (the commit still stands locally)."""
+"""Auto-push on a library write uses Git's configured credential helper.
+
+The legacy token field no longer gates synchronization: Git Credential Manager owns GitHub
+authentication, while a local/file remote needs no credential at all. Sync-disabled and
+no-remote cases remain quiet no-ops.
+"""
 
 from __future__ import annotations
 
@@ -42,13 +45,13 @@ def test_auto_push_pushes_a_write_when_a_token_is_set(app_ctx, tmp_path):
     assert _head(origin) != before  # the commit reached the remote
 
 
-def test_auto_push_is_a_noop_without_a_token(app_ctx, tmp_path):
+def test_auto_push_uses_git_without_a_legacy_token(app_ctx, tmp_path):
     origin = _origin_with_upstream(app_ctx.repo, tmp_path)
-    app_ctx.config.github_token = ""  # no credential yet
+    app_ctx.config.github_token = ""
     _add_local_commit(app_ctx.repo, "p2.json")
     before = _head(origin)
-    app_ctx.auto_push()  # never pushes, never raises
-    assert _head(origin) == before
+    app_ctx.auto_push()
+    assert _head(origin) != before
 
 
 def test_auto_push_is_a_noop_when_sync_disabled(app_ctx, tmp_path):
