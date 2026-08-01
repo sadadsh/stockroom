@@ -41,7 +41,10 @@ jobs:
       - name: Sync
         run: uv sync --frozen
       - name: Type check backend
-        run: uv run ty check app/backend/stockroom
+        # Stockroom is a Windows desktop product. Keep the Linux runner for
+        # portable backend tests, but type-check the declared runtime target so
+        # Win32-only APIs are resolved consistently on every runner.
+        run: uv run ty check app/backend/stockroom --python-platform win32
       - name: Run Native Window Host Suite
         if: runner.os == 'Windows'
         shell: pwsh
