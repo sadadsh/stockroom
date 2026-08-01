@@ -105,6 +105,38 @@ def test_windows_policy_falls_back_to_managed_chromium_with_the_same_provider_pr
     assert preferences["profile"]["default_content_setting_values"]["automatic_downloads"] == 1
 
 
+def test_embedded_webview_connection_reuses_its_existing_context(tmp_path):
+    context = _Context()
+    browser_connection = SimpleNamespace(contexts=[context])
+
+    class Chromium:
+        def __init__(self):
+            self.calls = []
+
+        def connect_over_cdp(self, endpoint, **options):
+            self.calls.append((endpoint, options))
+            return browser_connection
+
+    chromium = Chromium()
+    browser = PlaywrightCaptureBrowser(
+        download_dir=tmp_path / "downloads",
+        provider_key="snapmagic",
+        cdp_endpoint="http://127.0.0.1:43127",
+    )
+
+    opened_context, opened_browser = browser._launch_playwright(
+        SimpleNamespace(chromium=chromium)
+    )
+
+    assert opened_context is context
+    assert opened_browser is browser_connection
+    assert chromium.calls == [
+        ("http://127.0.0.1:43127", {"timeout": 20_000})
+    ]
+    assert browser.launched_browser == "Stockroom Embedded WebView2"
+    assert "RTCPeerConnection" in context.init_scripts[0]
+
+
 def test_automatic_download_permission_preserves_existing_profile_preferences(tmp_path):
     profile = tmp_path / "snapmagic"
     preferences_path = profile / "Default" / "Preferences"

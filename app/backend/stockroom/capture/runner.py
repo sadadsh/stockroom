@@ -627,6 +627,10 @@ def run_guided_capture(
     )
 
     automatic_provider_set = set(automatic_provider_keys)
+    update_runtime = getattr(ctx, "update_convergence", None)
+    provider_surface = getattr(update_runtime, "provider_browser_surface", None)
+    if not callable(provider_surface):
+        provider_surface = None
 
     # ONE store for the whole run, and one chance to refresh it from the person's own browser
     # history before any source is built. Person-driven capture opens the owner's real browser and
@@ -726,6 +730,14 @@ def run_guided_capture(
             # navigation so their SECOND visit to a part skips the search they already did; every
             # other provider, and every first visit, is untouched.
             models_ids=models_ids if key == "digikey" else None,
+            # Configured Product Information V4 credentials make DigiKey's exact ProductDetails
+            # and Media response authoritative. Do not silently replace a missing exact route
+            # with a provider-wide search page; surface the missing route to the operator.
+            strict_catalog_urls=bool(
+                getattr(ctx.config, "digikey_client_id", "")
+                and getattr(ctx.config, "digikey_client_secret", "")
+            ),
+            provider_surface=provider_surface,
         )
 
     guided_sources = [make_guided_source(key) for key in provider_keys]

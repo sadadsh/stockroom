@@ -79,6 +79,7 @@ export function mockCapture(
                 sources: ["ultralibrarian"],
                 notes: [],
                 error: "",
+                collection_complete: true,
                 completion_evidence: {
                   state: "verified",
                   manifest_digest:
@@ -88,6 +89,7 @@ export function mockCapture(
               },
             ],
             counts: { completed: 1 },
+            collection_complete: true,
             stopped: false,
             stop_reason: "",
           });

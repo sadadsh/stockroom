@@ -18,6 +18,12 @@ internal interface IWindowHostController
 
     IReadOnlyDictionary<string, object?> ExportSession();
 
+    int ProviderCdpPort();
+
+    void ShowProviderBrowser();
+
+    void HideProviderBrowser();
+
     void Shutdown();
 }
 
@@ -50,6 +56,12 @@ internal sealed class WebViewWindowController : IWindowHostController
     public IReadOnlyDictionary<string, object?> ExportSession() =>
         _host.ExportSession();
 
+    public int ProviderCdpPort() => _host.ProviderCdpPort();
+
+    public void ShowProviderBrowser() => _host.ShowProviderBrowser();
+
+    public void HideProviderBrowser() => _host.HideProviderBrowser();
+
     public void Shutdown() => _host.Shutdown();
 }
 
@@ -62,6 +74,9 @@ internal sealed class WindowHostSession
         "focus",
         "health",
         "export",
+        "provider-endpoint",
+        "provider-show",
+        "provider-hide",
         "shutdown",
     ];
 
@@ -204,6 +219,9 @@ internal sealed class WindowHostSession
                 "health",
                 _controller.Health()),
             "export" => Export(),
+            "provider-endpoint" => ProviderEndpoint(),
+            "provider-show" => ProviderShow(),
+            "provider-hide" => ProviderHide(),
             "shutdown" => (
                 "stopping",
                 new Dictionary<string, object?>
@@ -289,6 +307,52 @@ internal sealed class WindowHostSession
             new Dictionary<string, object?>
             {
                 ["snapshot"] = _controller.ExportSession(),
+            });
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderEndpoint()
+    {
+        return (
+            "provider-endpoint",
+            new Dictionary<string, object?>
+            {
+                ["port"] = _controller.ProviderCdpPort(),
+            });
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderShow()
+    {
+        if (!_visible)
+        {
+            throw new WindowHostException(
+                "provider browser requires a visible Stockroom window");
+        }
+        _controller.ShowProviderBrowser();
+        return (
+            "provider-shown",
+            new Dictionary<string, object?>
+            {
+                ["visible"] = true,
+            });
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderHide()
+    {
+        _controller.HideProviderBrowser();
+        return (
+            "provider-hidden",
+            new Dictionary<string, object?>
+            {
+                ["visible"] = false,
             });
     }
 

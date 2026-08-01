@@ -1981,6 +1981,7 @@ class PlaywrightCaptureBrowser:
         engine: str = "chromium",
         provider_key: str | None = None,
         playwright_runtime: SharedPlaywrightRuntime | None = None,
+        cdp_endpoint: str | None = None,
     ) -> None:
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
@@ -1988,6 +1989,7 @@ class PlaywrightCaptureBrowser:
         self.headless = headless
         self.engine = engine
         self._playwright_runtime = playwright_runtime
+        self._cdp_endpoint = cdp_endpoint
         self.provider_key = (
             _normalise_provider_key(provider_key)
             if provider_key is not None
@@ -2601,7 +2603,8 @@ class PlaywrightCaptureBrowser:
             self._wire_downloads(page)
             yield page
         finally:
-            for closable in (context, browser):
+            closables = () if self._cdp_endpoint is not None else (context, browser)
+            for closable in closables:
                 if closable is not None:
                     try:
                         closable.close()
@@ -2621,6 +2624,31 @@ class PlaywrightCaptureBrowser:
         Playwright Chromium. A failed candidate is fully discarded before the next one is
         attempted.
         """
+
+        if self._cdp_endpoint is not None:
+            try:
+                browser = pw.chromium.connect_over_cdp(
+                    self._cdp_endpoint,
+                    timeout=_BROWSER_LAUNCH_TIMEOUT_MS,
+                )
+                contexts = list(browser.contexts)
+                if not contexts:
+                    raise CaptureBrowserError(
+                        "the embedded provider browser exposed no context"
+                    )
+                self.launched_browser = "Stockroom Embedded WebView2"
+                context = contexts[0]
+                _disable_webrtc(context)
+                return context, browser
+            except Exception as exc:
+                detail = (
+                    str(exc).strip().splitlines()[0]
+                    if str(exc).strip()
+                    else type(exc).__name__
+                )
+                raise CaptureBrowserError(
+                    f"could not attach to Stockroom's embedded provider browser: {detail}"
+                ) from exc
 
         candidates = _browser_candidates(self.engine)
         failures: list[str] = []

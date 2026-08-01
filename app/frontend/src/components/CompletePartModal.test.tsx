@@ -4,12 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { mockCapture } from "../test/captureMocks";
-import type {
-  CompletionEvidence,
-  PartDetail,
-  WorkflowBatchStatus,
-  WorkflowEventsPage,
-} from "../api/types";
+import type { CompletionEvidence, PartDetail } from "../api/types";
 import { makeAsset, makeEdaAssets, makePartDetail } from "../test/partFixture";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
@@ -61,38 +56,6 @@ const DETAIL: PartDetail = makePartDetail({
   derived: { display_name: "BQ24074", category: "ICs", description: "Li-Ion charger" },
   assets: { kicad: makeEdaAssets() },
 });
-
-function durableCapturePage(
-  batchId: string,
-  status: WorkflowBatchStatus,
-): WorkflowEventsPage {
-  return {
-    schema_version: 1,
-    batch: {
-      id: batchId,
-      kind: "guided_capture",
-      status,
-      created_at: 1,
-      updated_at: 2,
-      total_items: 1,
-      item_counts: { [status]: 1 },
-      cancellation: null,
-      actions: {
-        can_pause: false,
-        can_resume: false,
-        can_retry: status === "failed",
-        can_cancel: false,
-      },
-    },
-    events: [],
-    cursor: {
-      after_sequence: 0,
-      next_sequence: 1,
-      limit: 200,
-      has_more: false,
-    },
-  };
-}
 
 // The real DTO: every vendor in the owner's trust order, plus the flattened head.
 const CAD_SOURCES = [
@@ -193,13 +156,15 @@ describe("CompletePartModal - automatic capture", () => {
     expect(capture.run).toHaveBeenCalledWith(expect.objectContaining({ partIds: [DETAIL.id] }));
   });
 
-  it("names DigiKey's multi-author surface first in the automatic-completion subline", async () => {
+  it("presents one source-agnostic automatic-completion workflow", async () => {
     mockCadSource(["kicad_symbol", "altium_symbol"]);
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
     expect(
-      await screen.findByText(/open DigiKey first only if assistance is needed\.?$/),
+      await screen.findByText(
+        "One automatic run reuses verified evidence, collects every eligible source, and builds the shared KiCad + Altium + STEP package.",
+      ),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/the vendor/)).toBeNull();
+    expect(screen.queryByText("Preferred Source")).toBeNull();
   });
 
   it("offers coherent network acquisition without a local-file fallback", async () => {
@@ -303,14 +268,14 @@ describe("CompletePartModal - automatic capture", () => {
     expect(capture.run).toHaveBeenCalledWith(
       expect.objectContaining({
         partIds: [DETAIL.id],
-        vendor: "digikey",
+        vendor: undefined,
         mode: "collect-all",
       }),
     );
     expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
     expect(screen.getByText(/Reverified from sha256:bbbbbbbbbbbbb/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Get Files" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Check Other Sources" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh Sources" })).toBeInTheDocument();
     expect(
       await screen.findByText(
         "Collection Complete. Every route is settled. Unavailable means it was checked and had no exact deliverable.",
@@ -520,7 +485,7 @@ describe("CompletePartModal - automatic capture", () => {
     render(<CompletePartModal detail={withSymbol} hasModel={true} onClose={() => {}} />, {
       wrapper,
     });
-    await screen.findByText("Preferred Source");
+    await waitFor(() => expect(track("Altium")).not.toBeNull());
 
     // FILES owns the whole asset story: Symbol + Footprint live only under the Altium track, Needed.
     expect(within(track("Altium")).getByText("Symbol")).toBeInTheDocument();
@@ -633,291 +598,53 @@ describe("CompletePartModal - copy + icon adoption", () => {
   });
 });
 
-// --------------------------------------------- choosing the preferred first browser provider
-//
-// The control the four-vendor module existed for and nothing rendered. Before this the route
-// resolved a single DigiKey link, so a person who wanted Ultra Librarian's manufacturer-verified
-// model had no way to say so.
+// ----------------------------------------------------------- one automatic acquisition workflow
 
 const RENDER = () =>
   render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
 
-// The picker's own buttons, found through the group's heading rather than a testid: this repo
-// carries `data-dev-id`, not `data-testid`, and querying the wrong attribute is a test that fails
-// for a reason unrelated to the thing it is about.
-const vendorGroup = () =>
-  screen.getByText("Preferred Source").parentElement!.querySelector("div")!.parentElement!;
-const vendorButton = (name: RegExp) => within(vendorGroup()).getByRole("button", { name });
-
-describe("CompletePartModal - vendor choice", () => {
-  beforeEach(() => {
-    window.localStorage.clear();
-  });
-
-  it("offers implemented capture providers in trust order", async () => {
+describe("CompletePartModal - one automatic acquisition workflow", () => {
+  it("offers one Get Files action with no mode or provider choice", async () => {
+    const user = userEvent.setup();
     mockCadSource(["kicad_symbol", "altium_symbol"]);
-    RENDER();
-    await screen.findByText("Preferred Source");
-
-    const names = within(vendorGroup())
-      .getAllByRole("button")
-      .map((b) => b.textContent!.replace("hosts all three", "").trim());
-    expect(names).toEqual(["DigiKey", "Ultra Librarian", "SamacSys", "SnapMagic"]);
-    expect(screen.getByText(/checks saved evidence and every eligible source/i)).toBeInTheDocument();
-    expect(screen.getByText(/never limits the fallback sources/i)).toBeInTheDocument();
-  });
-
-  it("offers every provider only when the backend declares an executable capture route", async () => {
-    mockCadSource(["kicad_symbol"]);
-    RENDER();
-    await screen.findByText("Preferred Source");
-
-    expect(within(vendorGroup()).getByRole("button", { name: /DigiKey/ })).toBeInTheDocument();
-    expect(within(vendorGroup()).getByRole("button", { name: /SamacSys/ })).toBeInTheDocument();
-  });
-
-  it("passes the chosen provider as the one-action collection preference", async () => {
-    mockCadSource(["kicad_symbol"]);
     const capture = mockCapture();
     RENDER();
-    await screen.findByText("Preferred Source");
 
-    await userEvent.click(vendorButton(/Ultra Librarian/));
-    await userEvent.click(screen.getByRole("button", { name: "Get Files" }));
+    expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
+    expect(screen.queryByText("Preferred Source")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ultra Librarian/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /SnapMagic/ })).toBeNull();
 
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
     await waitFor(() => expect(capture.run).toHaveBeenCalled());
     expect(capture.run).toHaveBeenCalledWith(
       expect.objectContaining({
-        vendor: "ultralibrarian",
+        partIds: [DETAIL.id],
+        vendor: undefined,
         mode: "collect-all",
       }),
     );
   });
 
-  it("shows elapsed provider work and the DigiKey loop escape while a browser starts", async () => {
+  it("keeps provider work inside Stockroom and exposes only security handoff controls", async () => {
     const user = userEvent.setup();
     mockCadSource(["kicad_symbol"]);
-    vi.spyOn(api, "runCapture").mockImplementation(
-      () =>
-        new Promise(() => {
-          // Keep submission pending so the modal remains in its honest browser-starting state.
-        }),
-    );
+    vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => {}));
     RENDER();
-    await screen.findByText("Preferred Source");
+    await screen.findByText("Automatic Completion");
 
     await user.click(screen.getByRole("button", { name: "Get Files" }));
 
     expect(await screen.findByText("Provider Work Is Active")).toBeInTheDocument();
     expect(screen.getByText("Starting")).toBeInTheDocument();
-    expect(screen.getByText(/exact page opens in your default browser/i)).toBeInTheDocument();
-    expect(screen.getByText(/if digikey repeats the same security check/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Looking Up..." })).toBeDisabled();
-  });
-
-  it("offers the person's own Finish Route and Skip controls while a provider page is theirs", async () => {
-    // De-automation put the provider page in the person's OWN browser, so Stockroom cannot draw a
-    // HUD on it. Without these the route ends only on cancel, on ~25 s of quiet after a file
-    // landed, or on the 600 s timeout - once per author route.
-    const user = userEvent.setup();
-    mockCadSource(["kicad_symbol"]);
-    vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => {}));
-    RENDER();
-    await screen.findByText("Preferred Source");
-
-    // DigiKey is the default and is not reviewed for unattended capture, so Get Files opens the
-    // person-driven lane.
-    await user.click(screen.getByRole("button", { name: "Get Files" }));
-
-    expect(await screen.findByRole("button", { name: "Finish Route" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Skip This Part" })).toBeInTheDocument();
-  });
-
-  it("keeps route controls available for the one-action collection lane", async () => {
-    const user = userEvent.setup();
-    mockCadSource(["kicad_symbol"]);
-    vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => {}));
-    RENDER();
-    await screen.findByText("Preferred Source");
-
-    await user.click(vendorButton(/Ultra Librarian/));
-    await user.click(screen.getByRole("button", { name: "Get Files" }));
-
-    await screen.findByText("Provider Work Is Active");
-    expect(screen.getByTestId("capture-route-controls")).toBeInTheDocument();
-  });
-
-  it("retries the same one-action collection after an incomplete result", async () => {
-    const user = userEvent.setup();
-    mockCadSource(["kicad_symbol"]);
-    const run = vi
-      .spyOn(api, "runCapture")
-      .mockResolvedValueOnce({
-        workflow_batch_id: "automatic-batch",
-        workflow_item_id: "automatic-item",
-        event_cursor: 0,
-      })
-      .mockResolvedValueOnce({
-        workflow_batch_id: "assisted-batch",
-        workflow_item_id: "assisted-item",
-        event_cursor: 0,
-      });
-    vi.spyOn(api, "workflowEvents")
-      .mockResolvedValueOnce(
-        durableCapturePage("automatic-batch", "blocked"),
-      )
-      .mockResolvedValueOnce(
-        durableCapturePage("assisted-batch", "completed"),
-      );
-    vi.spyOn(api, "captureWorkflow")
-      .mockResolvedValueOnce({
-        workflow_batch_id: "automatic-batch",
-        workflow_item_id: "automatic-item",
-        part_id: "part1",
-        mode: "collect-all",
-        vendor: "snapmagic",
-        background: false,
-        initial_needs: ["kicad_symbol"],
-        report: {
-          items: [
-            {
-              part_id: "part1",
-              mpn: "BQ24074",
-              display_name: "BQ24074",
-              category: "ICs",
-              status: "unchanged",
-              needed: ["kicad_symbol"],
-              satisfied: [],
-              remaining: ["kicad_symbol"],
-              sources: [],
-              notes: ["SnapMagic: provider interaction required"],
-              error: "",
-              provider_outcomes: [
-                {
-                  route_id: "snapmagic:snapmagic",
-                  provider_key: "snapmagic",
-                  author_key: "snapmagic",
-                  label: "SnapMagic",
-                  status: "requires-human",
-                  attempted: false,
-                  retained: 0,
-                  activated: false,
-                  reason: "A person-driven provider handoff is required.",
-                },
-              ],
-              collection_complete: false,
-              completion_evidence: {
-                state: "unverified",
-                manifest_digest: null,
-                reason: "No complete shared CAD package was verified.",
-              },
-            },
-          ],
-          counts: { unchanged: 1 },
-          collection_complete: false,
-          stopped: false,
-          stop_reason: "",
-        },
-      })
-      .mockResolvedValueOnce({
-        workflow_batch_id: "assisted-batch",
-        workflow_item_id: "assisted-item",
-        part_id: "part1",
-        mode: "collect-all",
-        vendor: "snapmagic",
-        background: false,
-        initial_needs: ["kicad_symbol"],
-        report: {
-          items: [
-            {
-              part_id: "part1",
-              mpn: "BQ24074",
-              display_name: "BQ24074",
-              category: "ICs",
-              status: "completed",
-              needed: ["kicad_symbol"],
-              satisfied: ["kicad_symbol"],
-              remaining: [],
-              sources: ["snapmagic"],
-              notes: [],
-              error: "",
-              completion_evidence: {
-                state: "verified",
-                manifest_digest:
-                  "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-                reason: "The active package was reverified.",
-              },
-            },
-          ],
-          counts: { completed: 1 },
-          stopped: false,
-          stop_reason: "",
-        },
-      });
-    RENDER();
-    await screen.findByText("Preferred Source");
-    await user.click(vendorButton(/SnapMagic/));
-
-    await user.click(screen.getByRole("button", { name: "Get Files" }));
-    // One command owns the complete route plan. A partial result retries that same command; it
-    // never grows a second provider-window action beside the primary control.
-    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open Provider Window" })).toBeNull();
-    expect(run).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        partIds: [DETAIL.id],
-        vendor: "snapmagic",
-        mode: "collect-all",
-      }),
-    );
-
-    await user.click(screen.getByRole("button", { name: "Try Again" }));
-    await waitFor(() => expect(run).toHaveBeenCalledTimes(2));
-    expect(run).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        partIds: [DETAIL.id],
-        vendor: "snapmagic",
-        mode: "collect-all",
-      }),
-    );
-  });
-
-  it("remembers the choice, because over 90 parts one decision beats ninety", async () => {
-    mockCadSource(["kicad_symbol"]);
-    const { unmount } = RENDER();
-    await screen.findByText("Preferred Source");
-    await userEvent.click(vendorButton(/SnapMagic/));
-    unmount();
-
-    mockCadSource(["kicad_symbol"]);
-    RENDER();
-    await screen.findByText("Preferred Source");
-
-    expect(vendorButton(/SnapMagic/)).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("falls back to the trust order's head when the remembered vendor is not offered", async () => {
-    // A stored key from a build that knew a vendor this one does not must not open nowhere.
-    window.localStorage.setItem("stockroom.capture.vendor.v2", "a-vendor-that-retired");
-    mockCadSource(["kicad_symbol"]);
-    RENDER();
-    await screen.findByText("Preferred Source");
-
-    expect(vendorButton(/DigiKey/)).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("names the chosen preferred provider in the subline", async () => {
-    mockCadSource(["kicad_symbol"]);
-    RENDER();
-    await screen.findByText("Preferred Source");
-
-    await userEvent.click(vendorButton(/SnapMagic/));
-
     expect(
-      await screen.findByText(/open SnapMagic first only if assistance is needed\.?$/),
+      screen.getByText(/its exact page appears inside Stockroom/i),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/default browser/i)).toBeNull();
+    expect(screen.queryByText(/separate window/i)).toBeNull();
+    expect(screen.getByTestId("capture-route-controls")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Finish Route" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Skip This Part" })).toBeInTheDocument();
   });
 });
 
@@ -1072,10 +799,10 @@ describe("CompletePartModal - the header counter", () => {
     render(<CompletePartModal detail={WITH_DATASHEET} hasModel={true} onClose={() => {}} />, {
       wrapper,
     });
-    await screen.findByText("Preferred Source");
+    await screen.findByText("Automatic Completion");
 
     // Four metadata rows, three waiting file rows, and the package the card is still proving.
-    expect(screen.getByText("4 / 8")).toBeInTheDocument();
+    expect(await screen.findByText("4 / 8")).toBeInTheDocument();
   });
 });
 

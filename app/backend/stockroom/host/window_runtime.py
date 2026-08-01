@@ -20,6 +20,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
@@ -83,6 +84,12 @@ class WindowClientPort(Protocol):
     def show(self) -> None: ...
 
     def focus(self) -> None: ...
+
+    def provider_endpoint(self) -> str: ...
+
+    def show_provider(self) -> None: ...
+
+    def hide_provider(self) -> None: ...
 
     def health(self) -> WindowHostHealth: ...
 
@@ -444,6 +451,26 @@ class SupervisorWindowHandoffPorts(WindowHandoffPorts):
             exported=exported,
         )
 
+    def open_provider_browser(self) -> str:
+        """Show and return the active window's one embedded provider surface."""
+
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError(
+                "active native provider browser is unavailable"
+            )
+        endpoint = client.provider_endpoint()
+        client.show_provider()
+        return endpoint
+
+    def close_provider_browser(self) -> None:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            return
+        client.hide_provider()
+
     def spawn_hidden(
         self,
         handoff_id: str,
@@ -659,6 +686,7 @@ class ProductionWindowReplacement:
         )
         self._initial_release = initial_release
         self._started = False
+        self._provider_lock = threading.RLock()
 
     @property
     def active_release_id(self) -> str | None:
@@ -666,6 +694,17 @@ class ProductionWindowReplacement:
 
     def observe_active(self) -> NativeWindowObservation:
         return self._ports.observe_active()
+
+    @contextmanager
+    def provider_browser_surface(self):
+        """Lease the embedded browser so an update cannot replace it mid-capture."""
+
+        with self._provider_lock:
+            endpoint = self._ports.open_provider_browser()
+            try:
+                yield endpoint
+            finally:
+                self._ports.close_provider_browser()
 
     def start_initial(self, release: AcceptedRelease | None = None) -> WindowContinuity:
         selected = self._initial_release if release is None else release
@@ -676,18 +715,29 @@ class ProductionWindowReplacement:
     def begin(self, target_release: AcceptedRelease) -> WindowHandoffAdoption:
         if not isinstance(target_release, AcceptedRelease):
             raise TypeError("target_release must be an AcceptedRelease")
-        self._ports.register_release(target_release)
-        return self._handoff.begin(target_release.release_id)
+        self._provider_lock.acquire()
+        try:
+            self._ports.register_release(target_release)
+            return self._handoff.begin(target_release.release_id)
+        except BaseException:
+            self._provider_lock.release()
+            raise
 
     def commit(self, adoption: object) -> WindowHandoffReceipt:
         if type(adoption) is not WindowHandoffAdoption:
             raise TypeError("adoption must be a WindowHandoffAdoption")
-        return self._handoff.commit(adoption)
+        try:
+            return self._handoff.commit(adoption)
+        finally:
+            self._provider_lock.release()
 
     def rollback(self, adoption: object) -> None:
         if type(adoption) is not WindowHandoffAdoption:
             raise TypeError("adoption must be a WindowHandoffAdoption")
-        self._handoff.rollback(adoption)
+        try:
+            self._handoff.rollback(adoption)
+        finally:
+            self._provider_lock.release()
 
     def wait_until_closed(self) -> int:
         if not self._started:

@@ -21,6 +21,31 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-01 — Embedded Provider Surface
+
+- Capture layer: Computer Use against the isolated self-contained native
+  `Stockroom.WindowHost.exe`, with the production WPF/WebView2 provider surface
+  and a task-owned diagnostic endpoint.
+- Evidence:
+  `work/Embedded Provider Visual Audit/Embedded Ultra Librarian Provider.jpg`,
+  1,266 × 833, SHA-256 `18289af5c958`;
+  `work/Embedded Provider Visual Audit/Returned To Stockroom.jpg`,
+  1,266 × 833, SHA-256 `0a74146204c8`; and
+  `work/Native Window Host/Embedded Provider Smoke 20260801-174945/Smoke Evidence.json`.
+- Intended claim: an exact provider page opens inside the Stockroom window, the
+  persistent provider WebView is reachable over its private CDP endpoint, and
+  `Return To Stockroom` restores the main app without opening a separate browser.
+- Acceptance result: pass. The first live capture exposed an HWND airspace
+  defect that painted the main WebView above the provider WebView; the native
+  host now collapses the inactive WebView, and the corrected capture visibly
+  contains Ultra Librarian plus Stockroom-owned chrome. The return control was
+  activated through the native accessibility tree and restored Components.
+  `diagnostic endpoint absent` in the returned frame is expected from this
+  deliberately isolated smoke service, not a packaged-app result. Super-critical
+  critique: Ultra Librarian's hero copy clips at the left edge at this viewport;
+  VA-045 tracks provider-responsive mitigation without invalidating the visible
+  login, navigation, search, or Stockroom return controls.
+
 ### 2026-08-01 — Independent Library Repository Settings
 
 - Capture layer: Codex in-app browser against the isolated FastAPI service and
@@ -197,6 +222,7 @@ and `P2` meaningful fit, finish, or clarity debt.
 | VA-032 | P1 | Native acquisition, all surfaces | A managed `chrome-headless-shell.exe` launch raised a Windows Firewall public/private-network prompt over Stockroom even though acquisition needs outbound HTTPS and local process transport, not inbound LAN access. The security dialog obscured and disabled the primary app until dismissed. | Acquisition does not request inbound public/private firewall access. Any unavoidable browser/runtime setup happens only after an explicit acquisition action, explains why, and never presents a raw publisher-unknown system prompt as part of normal app startup. |
 | VA-033 | P1 | Altium Components, profile switching | Two Stockroom-managed DbLib paths appear as identical `Stockroom.DbLib - Parts` choices, so the active profile cannot be identified from Altium's selector and a profile switch can leave a stale library selectable. | Automatic convergence keeps exactly one Stockroom-receipted DbLib installed. It installs and verifies the new active target before removing only obsolete receipt-owned targets, never touches arbitrary user libraries, and fails closed without abandoning the last working target. The isolated native embed acceptance run then removed the exact receipted proof DbLib and the exact prior UL-canary DbLib; Altium's measured final list contains only its built-in Simulation Generic Components library and zero Stockroom test registrations. |
 | VA-043 | P1 | Live DigiKey assisted capture and security handoff | The redesigned closed-shadow HUD is verified in isolated Chromium at desktop and 320 × 600 bounds, but the new compact route, Session Memory, sticky outcomes, and paused-gate presentation have not yet been re-captured on DigiKey's live model, cookie, consent, sign-in, and guest-limit surfaces. | A visible managed DigiKey run captures assisted and paused states in light and dark at supported Windows scale factors. Exact provider/author/MPN, required formats, receipt count, Session Memory, Resume/Use Another/Close, collapse/move/focus, and the one human gate remain readable without obscuring the active provider control. Session Memory appears only with DigiKey's isolated persistent profile. |
+| VA-045 | P2 | Embedded provider surface | Ultra Librarian's desktop hero content begins outside the left edge at a 1,266 × 833 native window even though its navigation, login, search, and Stockroom return controls remain reachable. This is provider-owned responsive behavior exposed by the new embedded viewport. | Provider-specific presentation mitigation is measured rather than guessed: supported provider pages retain their actionable controls and exact component identity at 1,024, 1,266, and 1,384 px Windows widths without Stockroom applying a global zoom that breaks another provider. |
 
 ## Resolved Findings
 

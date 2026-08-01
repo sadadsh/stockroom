@@ -50,7 +50,8 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // starts the first row and starts the next one each time a capture reaches a terminal state, and
 // the same control stops the pass.
 // 280 after the obsolete profile switch/menu pair became one noninteractive active-library label.
-const EXPECTED_ENTRIES = 280;
+// 278 after the one Get Files workflow removed the provider picker and separate open-provider link.
+const EXPECTED_ENTRIES = 278;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

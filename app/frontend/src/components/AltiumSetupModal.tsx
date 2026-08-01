@@ -167,7 +167,7 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
                   Only parts with a verified same-download KiCad and native Altium pair are
                   place-ready. Their shared STEP stays linked in KiCad and embedded in the Altium
                   footprint. Rebuild DbLib is a recovery action; missing assets return to Components
-                  and Collect All Sources.
+                  and Get Files.
                 </Text>
               </p>
               {data ? (

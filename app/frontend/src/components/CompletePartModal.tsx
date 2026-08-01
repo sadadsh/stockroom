@@ -7,11 +7,10 @@
  * moving while the files land. Metadata rows use the normal edit-field seam; CAD assets can only
  * arrive through the network capture workflow, so the record stays the single source of truth.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { assetPresent, assetsFor } from "../lib/edaTarget";
 import type {
-  CadSource,
   CompletionEvidence,
   PartDetail,
   ProviderOutcome,
@@ -35,31 +34,6 @@ interface Props {
   onClose: () => void;
   onEditField?: (field: string, value: unknown) => void;
   busy?: boolean;
-}
-
-// The registry check glyph (dev-mode editable), sized for the small badge slots here.
-// The preferred first browser provider, remembered. It never disables direct/keyless acquisition
-// or the assisted job's subsequent provider fallback. Deliberately localStorage and not a
-// machine-config field: it is
-// a per-person preference that changes nothing another device renders differently.
-// v2 resets the earlier SnapMagic-first default now that the owner selected Ultra Librarian's
-// manufacturer-verified assets as the trust-order head.
-const VENDOR_PREF_KEY = "stockroom.capture.vendor.v2";
-
-function readVendorPref(): string | null {
-  try {
-    return window.localStorage.getItem(VENDOR_PREF_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function writeVendorPref(key: string): void {
-  try {
-    window.localStorage.setItem(VENDOR_PREF_KEY, key);
-  } catch {
-    /* a denied storage must not break the capture */
-  }
 }
 
 const CheckMark = () => <Icon id="modal.check" className="h-2.5 w-2.5" />;
@@ -201,77 +175,10 @@ function CaptureRow({ label, copyId, done }: { label: string; copyId: string; do
 }
 
 // A needs-accurate one-liner: never promise KiCad when only Altium is missing (or vice versa).
-/**
- * Which browser provider automatic acquisition should try first.
- *
- * This is the control the whole four-vendor module existed for and nothing rendered: the route
- * resolved a single DigiKey link, so a person who wanted Ultra Librarian's manufacturer-verified
- * model had no way to say so. The owner's trust ranking is not decoration -- SnapMagic blends
- * community and AI-generated models, which is exactly the defect that started the trust
- * workstream, so it must be VISIBLY last and never the silent default.
- *
- * The choice STICKS (localStorage), but it is optional: Stockroom still tries direct sources first.
- * If provider help is needed, this choice opens first and the same assisted job can advance to the
- * other provider without another visit to this window.
- */
-function VendorPicker({
-  sources,
-  value,
-  onChange,
-  disabled,
-}: {
-  sources: CadSource[];
-  value: string;
-  onChange: (key: string) => void;
-  disabled: boolean;
-}) {
-  if (sources.length < 2) return null;
+function needsSubline(): string {
   return (
-    <div className="mt-3" data-dev-id="complete.cad-vendor">
-      <div className="mb-1.5 text-2xs font-medium uppercase tracking-wide text-t3">
-        <Text id="modal.completePart.vendor">Preferred Source</Text>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {sources.map((v) => {
-          const active = v.key === value;
-          return (
-            <button
-              key={v.key}
-              type="button"
-              disabled={disabled}
-              onClick={() => onChange(v.key)}
-              aria-pressed={active}
-              title={v.instruction}
-              className={
-                "rounded-control border px-2.5 py-1 text-xs font-medium transition-colors " +
-                "disabled:opacity-50 disabled:cursor-not-allowed " +
-                (active
-                  ? "border-acc bg-acc/[0.14] text-t1"
-                  : "border-line2 bg-raise2 text-t2 hover:text-t1")
-              }
-            >
-              {v.label}
-              {v.aggregator ? (
-                <span className="ml-1.5 text-2xs font-normal text-t3">
-                  <Text id="modal.completePart.vendor-hosts">hosts all three</Text>
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-      <p className="mt-1.5 text-2xs leading-snug text-t3">
-        Stockroom checks saved evidence and every eligible source in order. This preference picks
-        which provider is tried first; it never limits the fallback sources or the files retained.
-      </p>
-    </div>
-  );
-}
-
-function needsSubline(_hasKicad: boolean, _hasAltium: boolean, vendor: string): string {
-  return (
-    "Reuse verified evidence, then search and rank eligible sources for one shared KiCad + " +
-    `Altium + STEP package; open ${vendor} first only if assistance is needed.`
+    "One automatic run reuses verified evidence, collects every eligible source, and builds the " +
+    "shared KiCad + Altium + STEP package."
   );
 }
 
@@ -416,9 +323,7 @@ function cadLabel(status: GuidedStatus): string {
     case "unavailable":
       return "Try Again";
     case "error":
-      // Retrying stays automatic. Opening a provider window is now its own control, because
-      // this button silently re-arming itself to assisted mode is what turned one failure into
-      // a manual browser session nobody asked for.
+      // Retrying uses the same Get Files workflow and preserves the existing evidence/session.
       return "Try Again";
     default:
       return "Get Files";
@@ -478,25 +383,6 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
   const hasDatasheet = !!(detail.datasheet?.source_url || detail.datasheet?.file);
 
   const cadSource = useCadSourceQuery(detail.id, true);
-  const cadSources = useMemo<CadSource[]>(() => cadSource.data?.sources ?? [], [cadSource.data]);
-  const captureSources = useMemo(
-    () => cadSources.filter((source) => source.capture_available),
-    [cadSources],
-  );
-  // The chosen vendor persists across parts and across launches: over a 90-part sitting, one
-  // decision beats ninety. With nothing stored this falls back to the head of the trust order,
-  // which is the aggregator: it carries Ultra Librarian, SnapMagic and SamacSys downloads on one
-  // page, so it reaches formats no single author offers. Preferring an unattended-capable
-  // provider instead was briefly tried and is wrong for this library - the provider that can be
-  // driven unaided is also the one with the narrowest catalogue.
-  const [vendorPref, setVendorPref] = useState<string>(() => readVendorPref() ?? "");
-  const vendorKey =
-    captureSources.find((v) => v.key === vendorPref)?.key ?? captureSources[0]?.key ?? "";
-  const chosen = captureSources.find((v) => v.key === vendorKey) ?? null;
-  const pickVendor = useCallback((key: string) => {
-    setVendorPref(key);
-    writeVendorPref(key);
-  }, []);
   const cadNeeds = useMemo<Requirement[]>(() => cadSource.data?.needs ?? [], [cadSource.data]);
   const download = useGuidedCapture(detail.id, cadNeeds, detail.derived.display_name);
   const capture = useCapture();
@@ -546,8 +432,8 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
     download.status === "window-open" ||
     download.status === "receiving" ||
     download.status === "attaching";
-  // Only a person-driven lane opens a provider page in this person's own browser, so only those
-  // runs have a route in front of anybody to finish or skip.
+  // Only a route waiting for human input opens the embedded provider page and can be finished or
+  // skipped by the person.
   const awaitsPerson =
     capture.active.partId === detail.id && captureAwaitsPerson(capture.active);
   const [captureElapsed, setCaptureElapsed] = useState(0);
@@ -700,11 +586,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
           "The last completion attempt did not produce verified evidence."
         : needs.length === 0
           ? "No completion evidence is recorded. Run verification before treating this part as complete."
-          : needsSubline(
-              kicadRows.length > 0 || sharedRows.length > 0,
-              altiumRows.length > 0,
-              chosen?.label ?? "a model library",
-            );
+          : needsSubline();
   // Stockroom holds ONE capture slot, so starting this part's capture stops the previous part's
   // run from being followed. The store names the part that was displaced; this window says it out
   // loud on the surface that caused it, rather than letting the earlier work vanish.
@@ -833,13 +715,6 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                   ) : null}
                 </div>
 
-                <VendorPicker
-                  sources={captureSources}
-                  value={vendorKey}
-                  onChange={pickVendor}
-                  disabled={cadBusy}
-                />
-
                 {needs.length > 0 ? (
                   <div data-dev-id="complete.cad-checklist" className="mt-3.5 flex flex-col gap-3">
                     {kicadRows.length > 0 ? (
@@ -905,16 +780,9 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                     </div>
                     <p className="mt-1 text-2xs leading-snug text-t2">
                       Stockroom is checking saved evidence and every eligible source. If a
-                      provider needs your sign-in or security check, its exact page opens in your
-                      default browser; downloaded files return here automatically.
+                      provider needs your sign-in or security check, its exact page appears inside
+                      Stockroom; clearing it resumes the same automatic run.
                     </p>
-                    {vendorKey === "digikey" ? (
-                      <p className="mt-1 text-2xs leading-snug text-[var(--c-warn-text)]">
-                        If DigiKey repeats the same security check, close that provider window.
-                        Stockroom will mark DigiKey blocked so you can continue with Ultra
-                        Librarian instead of retrying the loop.
-                      </p>
-                    ) : null}
                     {/* The person's own end-of-route controls. Without them a route a person
                         cannot finish runs to its 600 s timeout, once per author route. */}
                     {awaitsPerson ? (
@@ -935,10 +803,10 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                       small
                       icon={<DownloadIcon className="h-3.5 w-3.5" />}
                       disabled={cadBusy}
-                      onClick={() => void download.start(vendorKey || undefined, "collect-all")}
+                      onClick={() => void download.start(undefined, "collect-all")}
                     >
                       {isDone ? (
-                        "Check Other Sources"
+                        "Refresh Sources"
                       ) : (
                         <Text id={cadButtonId(download.status)}>{cadLabel(download.status)}</Text>
                       )}

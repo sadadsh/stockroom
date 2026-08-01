@@ -210,8 +210,8 @@ function CoverageBody({
           {needsAssistance === 1
             ? "component has a gap that needs"
             : "components have gaps that need"}{" "}
-          one explicit Collect All Sources session. Stockroom reuses the provider session, captures
-          and validates downloads, and advances through fallbacks; the visible window pauses only
+          one Get Files run. Stockroom reuses the provider session, captures and validates
+          downloads, and advances through fallbacks; the in-app provider pauses only
           for a provider-required login, security check, or download choice.
         </p>
       ) : null}
@@ -220,7 +220,7 @@ function CoverageBody({
         <p className="border-l-2 border-line pl-3 text-sm text-t2">
           <span className="tnum text-t2">{unsourced}</span>{" "}
           {unsourced === 1 ? "component needs a file" : "components need files"} that neither an
-          automatic source nor a managed provider can supply yet.
+          eligible source can supply yet.
         </p>
       ) : null}
     </div>

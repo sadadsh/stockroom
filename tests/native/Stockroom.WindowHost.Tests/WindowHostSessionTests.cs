@@ -39,6 +39,21 @@ public sealed class WindowHostSessionTests
                 new Dictionary<string, object?>()),
             HandoffProtocolTests.BuildMessage(
                 7,
+                "provider-endpoint",
+                Now + 30_000,
+                new Dictionary<string, object?>()),
+            HandoffProtocolTests.BuildMessage(
+                8,
+                "provider-show",
+                Now + 30_000,
+                new Dictionary<string, object?>()),
+            HandoffProtocolTests.BuildMessage(
+                9,
+                "provider-hide",
+                Now + 30_000,
+                new Dictionary<string, object?>()),
+            HandoffProtocolTests.BuildMessage(
+                10,
                 "shutdown",
                 Now + 30_000,
                 new Dictionary<string, object?>()));
@@ -64,6 +79,9 @@ public sealed class WindowHostSessionTests
                 "export",
                 "show",
                 "focus",
+                "provider-endpoint",
+                "provider-show",
+                "provider-hide",
                 "shutdown",
             ],
             controller.Operations);
@@ -76,11 +94,14 @@ public sealed class WindowHostSessionTests
                 "exported",
                 "shown",
                 "focused",
+                "provider-endpoint",
+                "provider-shown",
+                "provider-hidden",
                 "stopping",
             ],
             responses.Select(static item => item.Name));
         Assert.Equal(
-            Enumerable.Range(1, 7).Select(static item => (long)item),
+            Enumerable.Range(1, 10).Select(static item => (long)item),
             responses.Select(static item => item.Sequence));
 
         var hello = responses[0].Payload.GetProperty("result");
@@ -131,6 +152,13 @@ public sealed class WindowHostSessionTests
                 .GetProperty("schema")
                 .GetString());
         Assert.True(controller.ShutdownCalled);
+        Assert.Equal(
+            43127,
+            responses[6]
+                .Payload
+                .GetProperty("result")
+                .GetProperty("port")
+                .GetInt32());
     }
 
     [Fact]
@@ -264,6 +292,18 @@ public sealed class WindowHostSessionTests
         public void Show() => Operations.Add("show");
 
         public void Focus() => Operations.Add("focus");
+
+        public int ProviderCdpPort()
+        {
+            Operations.Add("provider-endpoint");
+            return 43127;
+        }
+
+        public void ShowProviderBrowser() =>
+            Operations.Add("provider-show");
+
+        public void HideProviderBrowser() =>
+            Operations.Add("provider-hide");
 
         public IReadOnlyDictionary<string, object?> Health()
         {

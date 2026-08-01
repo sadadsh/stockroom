@@ -1518,6 +1518,11 @@ class SnapMagicAdapter:
             return "the SnapMagic format list did not open"
         return ""
 
+    def user_clearance_issue(self, page) -> str:
+        """Return the security step that requires the person, never browser automation."""
+
+        return _security_verification_issue(page, self.capability.label)
+
     def drive(
         self,
         page,
@@ -1539,8 +1544,10 @@ class SnapMagicAdapter:
             expected_mpn=expected_mpn,
         )
         if blocked:
+            clearance = self.user_clearance_issue(page)
             report.missed = list(formats)
-            report.blocked = _is_global_blockage(blocked)
+            report.blocked = bool(clearance) or _is_global_blockage(blocked)
+            report.requires_user_clearance = bool(clearance)
             report.message = blocked
             return report
         for fmt in formats[:1]:

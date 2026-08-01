@@ -197,15 +197,15 @@ describe("coverage", () => {
     expect(await screen.findByText(/about 23.8 hours/i)).toBeInTheDocument();
   });
 
-  it("separately names the components neither acquisition lane can reach", async () => {
+  it("separately names the components no eligible source can reach", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
     renderSection();
     expect(
-      await screen.findByText(/neither an automatic source nor a managed provider/i),
+      await screen.findByText(/neither an eligible source can supply/i),
     ).toBeInTheDocument();
   });
 
-  it("explains the one assisted session and its genuine human checkpoints", async () => {
+  it("explains the one Get Files run and its genuine human checkpoints", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(
       coverage({
         needs_assistance: 31,
@@ -219,7 +219,7 @@ describe("coverage", () => {
         (_text, node) =>
           node?.tagName === "P" &&
           !!node.textContent?.match(
-            /31 components have gaps that need one explicit collect all sources session/i,
+            /31 components have gaps that need one Get Files run/i,
           ),
       ),
     ).toBeInTheDocument();
@@ -447,7 +447,7 @@ describe("running", () => {
   it("starts one bounded run over every component that needs files, never part by part", async () => {
     // The owner asked for "a simple download button ... that can do everything for you". One
     // press, no selection: the command carries no part ids, which the API defines as every part
-    // still missing files. It is submitted as an automatic CAPTURE so each part retains the
+    // still missing files. It is submitted as the one all-source CAPTURE so each part retains the
     // report the worklist below is read from; the batch it resolves is the same one either
     // command produced.
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
@@ -466,7 +466,7 @@ describe("running", () => {
     expect(submit).toHaveBeenCalledTimes(1);
     expect(submit).toHaveBeenCalledWith({
       limit: 1_000,
-      mode: "automatic",
+      mode: "collect-all",
       idempotencyKey: expect.stringMatching(/^library-completion-/),
     });
     expect(submit.mock.calls[0][0]).not.toHaveProperty("partIds");
@@ -506,8 +506,9 @@ describe("running", () => {
 
     expect(await screen.findByTestId("completion-worklist")).toHaveTextContent("1 Needs You");
     expect(
-      await screen.findByRole("link", { name: /Open Ultra Librarian/ }),
-    ).toHaveAttribute("href", "https://app.ultralibrarian.com/search?queryText=LM317");
+      await screen.findByRole("button", { name: "Get files for LM317 Regulator" }),
+    ).toBeEnabled();
+    expect(screen.queryByRole("link", { name: /Open Ultra Librarian/ })).not.toBeInTheDocument();
     expect(api.captureWorklist).toHaveBeenCalledWith("batch-1");
   });
 

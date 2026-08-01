@@ -98,7 +98,7 @@ function Displacer() {
   return (
     <button
       type="button"
-      onClick={() => void capture.start("ne555", "NE555 Timer", [], "digikey", "assisted")}
+      onClick={() => void capture.start("ne555", "NE555 Timer", [], undefined, "collect-all")}
     >
       Start Elsewhere
     </button>
@@ -143,7 +143,7 @@ describe("completion worklist", () => {
     expect(screen.getByText("Altium Symbol")).toBeInTheDocument();
   });
 
-  it("starts the real capture for that component on that provider, not just a link", async () => {
+  it("starts the one automatic workflow for that component", async () => {
     // The defect this replaces: the row opened the provider URL directly, so no backend capture
     // session started, the person's Downloads were never snapshotted, and the file they collected
     // was never imported. The row routed them and dropped the result on the floor.
@@ -154,18 +154,16 @@ describe("completion worklist", () => {
 
     await userEvent.click(
       await screen.findByRole("button", {
-        name: "Start the Ultra Librarian capture for LM317 Regulator",
+        name: "Get files for LM317 Regulator",
       }),
     );
 
     await waitFor(() => expect(capture.run).toHaveBeenCalled());
-    // The provider KEY the route reported, in assisted mode: the backend owns resolving and
-    // opening the page, so no provider URL is ever built here.
     expect(capture.run).toHaveBeenCalledWith(
       expect.objectContaining({
         partIds: ["lm317"],
-        vendor: "ultralibrarian",
-        mode: "assisted",
+        vendor: undefined,
+        mode: "collect-all",
       }),
     );
   });
@@ -192,7 +190,7 @@ describe("completion worklist", () => {
 
     await userEvent.click(
       await screen.findByRole("button", {
-        name: "Start the Ultra Librarian capture for LM317 Regulator",
+        name: "Get files for LM317 Regulator",
       }),
     );
 
@@ -200,15 +198,15 @@ describe("completion worklist", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("button", {
-          name: "Start the Ultra Librarian capture for NE555 Timer",
+          name: "Get files for NE555 Timer",
         }),
       ).toBeDisabled(),
     );
     expect(
       screen.getByRole("button", {
-        name: "Start the Ultra Librarian capture for LM317 Regulator",
+        name: "Get files for LM317 Regulator",
       }),
-    ).toHaveTextContent("Capturing");
+    ).toHaveTextContent("Getting Files");
   });
 
   it("names the row whose capture another surface displaced, rather than losing it quietly", async () => {
@@ -221,7 +219,7 @@ describe("completion worklist", () => {
 
     await userEvent.click(
       await screen.findByRole("button", {
-        name: "Start the Ultra Librarian capture for LM317 Regulator",
+        name: "Get files for LM317 Regulator",
       }),
     );
     await userEvent.click(screen.getByRole("button", { name: "Start Elsewhere" }));
@@ -246,7 +244,7 @@ describe("completion worklist", () => {
 
     await userEvent.click(
       await screen.findByRole("button", {
-        name: "Start the Ultra Librarian capture for LM317 Regulator",
+        name: "Get files for LM317 Regulator",
       }),
     );
     await userEvent.click(await screen.findByRole("button", { name: "Finish Route" }));
@@ -257,31 +255,14 @@ describe("completion worklist", () => {
     ).toBeInTheDocument();
   });
 
-  it("opens the provider the route named, at the URL the backend resolved for that part", async () => {
+  it("does not expose a provider-only link beside Get Files", async () => {
     vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
-    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    const source = vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
     renderWorklist();
 
-    const open = await screen.findByRole("link", { name: /Open Ultra Librarian/ });
-    // The row's provider, not the head of the trust order: sending someone to DigiKey when the
-    // route that needs them is Ultra Librarian is a wasted trip.
-    expect(open).toHaveAttribute(
-      "href",
-      "https://app.ultralibrarian.com/search?queryText=LM317",
-    );
-    expect(open).toHaveAttribute("target", "_blank");
-    expect(api.partCadSource).toHaveBeenCalledWith("lm317");
-  });
-
-  it("says so instead of offering a link when the backend resolved no page for that provider", async () => {
-    vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
-    vi.spyOn(api, "partCadSource").mockResolvedValue(
-      cadSource({ sources: cadSource().sources.slice(0, 1) }),
-    );
-    renderWorklist();
-
-    expect(await screen.findByText("No page resolved")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Get files for LM317 Regulator" })).toBeInTheDocument();
     expect(screen.queryByRole("link")).toBeNull();
+    expect(source).not.toHaveBeenCalled();
   });
 
   it("counts what finished unattended apart from what needs a person", async () => {
@@ -371,11 +352,11 @@ describe("completion worklist", () => {
     // capture reached a terminal state, not because a timer went off.
     expect(capture.run).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ partIds: ["lm317"], vendor: "ultralibrarian", mode: "assisted" }),
+      expect.objectContaining({ partIds: ["lm317"], vendor: undefined, mode: "collect-all" }),
     );
     expect(capture.run).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ partIds: ["ne555"], vendor: "ultralibrarian", mode: "assisted" }),
+      expect.objectContaining({ partIds: ["ne555"], vendor: undefined, mode: "collect-all" }),
     );
     expect(await screen.findByTestId("completion-worklist-auto-ended")).toHaveTextContent(
       "Worked through all 2 components.",
@@ -391,7 +372,7 @@ describe("completion worklist", () => {
     await userEvent.click(await screen.findByRole("button", { name: WORK_THROUGH_ALL }));
 
     expect(await screen.findByTestId("completion-worklist-auto")).toHaveTextContent(
-      "Working through 1 of 2. LM317 Regulator is open in your browser",
+      "Working through 1 of 2. LM317 Regulator is active in Stockroom",
     );
   });
 
@@ -406,7 +387,7 @@ describe("completion worklist", () => {
     await userEvent.click(await screen.findByRole("button", { name: STOP_ADVANCING }));
 
     expect(await screen.findByTestId("completion-worklist-auto-ended")).toHaveTextContent(
-      "LM317 Regulator is still open in your browser",
+      "LM317 Regulator is still active in Stockroom",
     );
     // Stopping the pass is not cancelling the capture: the person still finishes or skips the page
     // they are standing in front of.

@@ -1,21 +1,11 @@
-"""Where a part's CAD files can be fetched, across every vendor the owner trusts.
-
-Owner, 2026-07-27: *"yes rebuild guided capture, digikey UL snapmagic and samacsys"*, after every
-AUTOMATED route was closed off — Nexar is $1,000/month, Ultra Librarian's terms forbid robots,
-SnapMagic blends AI-generated models, and Mouser's API carries no CAD at all. What remains is the
-human clicking Download in a real browser session, with the app doing everything either side of
-that click. So this module's whole job is: given a part, open exactly the right page, on each
-vendor, first try.
-
-It resolves URLs. It downloads nothing and automates no vendor site, which is what keeps the
-guided flow inside every one of those vendors' terms.
-"""
+"""CAD route resolution from exact DigiKey Media evidence and direct fallbacks."""
 
 import pytest
 
 from stockroom.enrich.cad_sources import (
     CadSource,
     all_cad_sources,
+    catalog_provider_urls,
     resolve_cad_sources,
 )
 
@@ -235,6 +225,25 @@ def test_digikey_media_replaces_provider_searches_with_exact_model_links():
     assert got["ultralibrarian"] == "https://app.ultralibrarian.com/details/acme/x"
     assert got["snapmagic"] == "https://www.snapeda.com/parts/X/Acme/view-part/"
     assert "componentsearchengine.com/search" in got["samacsys"]
+
+
+def test_digikey_media_recognizes_every_known_cad_author():
+    catalog = {
+        "media": [
+            {"title": "TraceParts 3D Model", "url": "https://www.traceparts.com/x"},
+            {"title": "CADENAS CAD Model", "url": "https://cadenas.example/x"},
+            {
+                "title": "Manufacturer Provided CAD Models",
+                "url": "https://manufacturer.example/x",
+            },
+        ]
+    }
+
+    assert catalog_provider_urls(catalog) == {
+        "traceparts": "https://www.traceparts.com/x",
+        "cadenas": "https://cadenas.example/x",
+        "manufacturer": "https://manufacturer.example/x",
+    }
 
 
 @pytest.mark.parametrize(

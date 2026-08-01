@@ -35,7 +35,7 @@ import inspect
 import tempfile
 import time
 from collections.abc import Callable
-from contextlib import nullcontext
+from contextlib import ExitStack, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
@@ -1021,6 +1021,27 @@ class _SessionManager(Protocol):
     def __exit__(self, typ, value, traceback) -> object: ...
 
 
+def _exact_catalog_url(adapter, record) -> str:
+    """Return only the provider URL authorized by DigiKey's exact Media evidence.
+
+    Product Information V4 is the discovery authority when it is configured.  Provider search
+    pages are deliberately not synthesized here: a configured strict run must either use the
+    exact product/provider URL DigiKey returned or stop with an actionable missing-route result.
+    """
+
+    catalog = getattr(record, "catalog", None)
+    digikey = catalog.get("digikey") if isinstance(catalog, dict) else None
+    if not isinstance(digikey, dict):
+        return ""
+    provider_key = str(getattr(getattr(adapter, "capability", None), "key", "") or "")
+    if provider_key == "digikey":
+        url = str(digikey.get("product_url") or "").strip()
+        return url if url.startswith("https://") else ""
+    from stockroom.enrich.cad_sources import catalog_provider_urls
+
+    return catalog_provider_urls(digikey).get(provider_key, "")
+
+
 class GuidedCaptureSource:
     """Capture a part's CAD files from a trusted vendor, through a real browser.
 
@@ -1094,6 +1115,8 @@ class GuidedCaptureSource:
         user_clearance_timeout_s: float = 600.0,
         machine_access_check: Callable[[], bool] | None = None,
         models_ids=None,
+        strict_catalog_urls: bool = False,
+        provider_surface=None,
     ) -> None:
         self._make_pipeline = make_pipeline
         self._vendor_key = vendor
@@ -1144,6 +1167,8 @@ class GuidedCaptureSource:
         # part, learned from the person's own navigation, so a second capture can skip the search
         # they already did. Without it every capture is exactly the first-run journey.
         self._models_ids = models_ids
+        self._strict_catalog_urls = bool(strict_catalog_urls)
+        self._provider_surface = provider_surface
         self._sign_in_attempted = False
         self._session: _Session | None = None
 
@@ -1172,7 +1197,7 @@ class GuidedCaptureSource:
                 provider_key=self._vendor_key,
                 engine=self._engine if choice.name == TRANSPORT_PLAYWRIGHT else "",
             )
-            if choice.name == TRANSPORT_DEFAULT_BROWSER:
+            if choice.name == TRANSPORT_DEFAULT_BROWSER and self._provider_surface is None:
                 transport = DefaultBrowserCapture(provider_key=self._vendor_key)
                 self._session = _Session(
                     browser=cast(PlaywrightCaptureBrowser, transport),
@@ -1180,17 +1205,27 @@ class GuidedCaptureSource:
                     page=None,
                 )
                 return self._session
-        browser = PlaywrightCaptureBrowser(
-            engine=self._engine,
-            download_dir=self._download_root,
-            profile_dir=self._profile_dir,
-            headless=self._headless,
-            provider_key=self._vendor_key,
-            playwright_runtime=self._playwright_runtime,
-        )
-        manager = browser.session()
-        page = manager.__enter__()
-        self._session = _Session(browser=browser, ctx_manager=manager, page=page)
+        stack = ExitStack()
+        try:
+            cdp_endpoint = (
+                stack.enter_context(self._provider_surface())
+                if self._provider_surface is not None and not self._headless
+                else None
+            )
+            browser = PlaywrightCaptureBrowser(
+                engine=self._engine,
+                download_dir=self._download_root,
+                profile_dir=self._profile_dir,
+                headless=self._headless,
+                provider_key=self._vendor_key,
+                playwright_runtime=self._playwright_runtime,
+                cdp_endpoint=cdp_endpoint,
+            )
+            page = stack.enter_context(browser.session())
+        except BaseException:
+            stack.close()
+            raise
+        self._session = _Session(browser=browser, ctx_manager=stack, page=page)
         return self._session
 
     def _sign_in_once(self, page) -> None:
@@ -1356,12 +1391,19 @@ class GuidedCaptureSource:
                 stage="formats",
             )
 
-        url = adapter.resolve_url(mpn)
+        url = _exact_catalog_url(adapter, record)
+        if not url and not self._strict_catalog_urls:
+            url = adapter.resolve_url(mpn)
         if not url:
             return self._decline(
                 adapter,
                 SourceOutcome(
-                    skipped=f"no {adapter.capability.label} page for {record.id}"
+                    skipped=(
+                        f"DigiKey Media did not return an exact {adapter.capability.label} route "
+                        f"for {record.id}"
+                        if self._strict_catalog_urls
+                        else f"no {adapter.capability.label} page for {record.id}"
+                    )
                 ),
                 attempted=True,
                 status="unavailable",

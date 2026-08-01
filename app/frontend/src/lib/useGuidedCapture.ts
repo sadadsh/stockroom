@@ -45,7 +45,7 @@ export function useGuidedCapture(partId: string, needs: Requirement[] = [], part
     altiumComplete: subsetComplete(activeNeeds, received, ALTIUM_REQS),
     start: (
       sourceKey?: string,
-      mode: CaptureMode = "automatic",
+      mode: CaptureMode = "collect-all",
     ) => cap.start(partId, partName, needs, sourceKey, mode),
     reset: () => cap.reset(),
     keepWorking: () => cap.keepWorking(),
