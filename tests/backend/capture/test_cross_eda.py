@@ -76,6 +76,8 @@ def _system_step() -> Path:
         root = find_kicad_share_dir()
     except Exception as exc:
         pytest.skip(f"installed KiCad library is unavailable: {exc}")
+    if root is None:
+        pytest.skip("installed KiCad library is unavailable")
     step = root / "3dmodels" / "Diode_SMD.3dshapes" / "D_SMA.step"
     if not step.is_file():
         pytest.skip("installed KiCad D_SMA STEP model is unavailable")

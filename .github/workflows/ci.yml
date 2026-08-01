@@ -45,7 +45,7 @@ jobs:
           dotnet-version: "10.0.302"
       - name: Sync
         run: uv sync --frozen
-      - name: Type check Windows backend
+      - name: Type check backend
         # pywebview and the Win32 host dependencies are deliberately installed
         # only on Windows. Ubuntu still runs the portable import and backend
         # suites below; the complete desktop backend is checked on its actual
@@ -96,5 +96,35 @@ jobs:
               app/backend/stockroom/stm/ app/backend/stockroom/api/routers/stm.py ; then
             echo "stockroom/stm/ and api/routers/stm.py must not reference NETDECK/switch-fabric concepts"; exit 1
           fi
-      - name: Run backend suite
-        run: uv run pytest tests/backend -v
+      - name: Run portable backend suite
+        if: runner.os == 'Linux'
+        run: >-
+          uv run pytest
+          tests/backend/catalog
+          tests/backend/credentials
+          tests/backend/derive
+          tests/backend/domain
+          tests/backend/enrich
+          tests/backend/evidence
+          tests/backend/model
+          tests/backend/planning
+          tests/backend/scrape
+          tests/backend/sexp
+          tests/backend/store
+          tests/backend/templates
+          tests/backend/update
+          tests/backend/vcs
+          tests/backend/workflow
+          -v
+      - name: Run backend suite - parallel safe
+        if: runner.os == 'Windows'
+        run: >-
+          uv run pytest tests/backend -q -p no:randomly
+          -m "not live_enrich and not global_windows_mutex and not performance_budget"
+          --dist loadgroup -n 4
+      - name: Run backend suite - serialized Windows and budgets
+        if: runner.os == 'Windows'
+        run: >-
+          uv run pytest tests/backend -q -p no:randomly
+          -m "not live_enrich and (global_windows_mutex or performance_budget)"
+          -n 0
