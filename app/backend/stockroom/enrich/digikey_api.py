@@ -14,6 +14,7 @@ import time as _time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Iterable
 
 from stockroom.enrich.errors import EnrichError, status_from_error
 from stockroom.enrich.schema import (
@@ -95,6 +96,197 @@ def _default_requester(client_id: str, client_secret: str, timeout: float = 8):
     return request
 
 
+class DigiKeyClient:
+    """One authenticated Product Information V4 client.
+
+    Product discovery, catalogue intelligence and order-time pricing deliberately share one
+    token cache and one transport.  The old adapter exposed only KeywordSearch, which made every
+    later feature invent its own auth/request code and turned the approved API surface into a
+    collection of unrelated one-offs.
+    """
+
+    API_ROOT = "https://api.digikey.com/products/v4"
+
+    def __init__(self, client_id: str, client_secret: str, timeout: float = 8):
+        self.client_id = (client_id or "").strip()
+        self.client_secret = client_secret or ""
+        self.timeout = timeout
+        self._token: str | None = None
+        self._expires_at = 0.0
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.client_id and self.client_secret)
+
+    def _cached_token(self) -> str:
+        now = _time.monotonic()
+        if self._token and now < self._expires_at:
+            return self._token
+        token = _fetch_token(self.client_id, self.client_secret, self.timeout)
+        if not token:
+            raise EnrichError("digikey: no OAuth token (bad creds or throttled)")
+        self._token = token
+        self._expires_at = now + 1500.0
+        return token
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        body: dict | None = None,
+        query: dict[str, object] | None = None,
+    ) -> dict:
+        if not self.enabled:
+            raise EnrichError("digikey: client credentials are not configured")
+        url = f"{self.API_ROOT}{path}"
+        if query:
+            encoded = urllib.parse.urlencode(
+                {key: value for key, value in query.items() if value is not None}
+            )
+            if encoded:
+                url += f"?{encoded}"
+        data = json.dumps(body).encode() if body is not None else None
+        req = urllib.request.Request(
+            url,
+            data=data,
+            method=method,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._cached_token()}",
+                "X-DIGIKEY-Client-Id": self.client_id,
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                decoded = json.loads(response.read().decode())
+        except urllib.error.HTTPError as exc:
+            raise EnrichError(f"digikey request failed: {exc}", status_code=exc.code) from exc
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+            raise EnrichError(f"digikey request failed: {exc}") from exc
+        if not isinstance(decoded, dict):
+            raise EnrichError("digikey response was not a JSON object")
+        return decoded
+
+    @staticmethod
+    def _product_number(value: str) -> str:
+        return urllib.parse.quote(str(value or "").strip(), safe="")
+
+    def keyword_search(self, keywords: str, *, search_options: Iterable[str] = ()) -> dict:
+        filters = [str(option) for option in search_options if str(option).strip()]
+        body: dict[str, object] = {
+            "Keywords": str(keywords or "").strip(),
+            "Limit": 10,
+            "Offset": 0,
+        }
+        if filters:
+            body["FilterOptionsRequest"] = {"SearchOptions": filters}
+        return self._request("POST", "/search/keyword", body=body)
+
+    def product_details(self, product_number: str) -> dict:
+        return self._request(
+            "GET", f"/search/{self._product_number(product_number)}/productdetails"
+        )
+
+    def media(self, product_number: str) -> dict:
+        return self._request("GET", f"/search/{self._product_number(product_number)}/media")
+
+    def product_pricing(self, product_number: str) -> dict:
+        return self._request("GET", f"/search/{self._product_number(product_number)}/pricing")
+
+    def alternate_packaging(self, product_number: str) -> dict:
+        return self._request(
+            "GET", f"/search/{self._product_number(product_number)}/alternatepackaging"
+        )
+
+    def recommended_products(self, product_number: str) -> dict:
+        return self._request(
+            "GET", f"/search/{self._product_number(product_number)}/recommendedproducts"
+        )
+
+    def substitutions(self, product_number: str) -> dict:
+        return self._request(
+            "GET", f"/search/{self._product_number(product_number)}/substitutions"
+        )
+
+    def associations(self, product_number: str) -> dict:
+        return self._request(
+            "GET", f"/search/{self._product_number(product_number)}/associations"
+        )
+
+    def pricing_options_by_quantity(self, product_number: str, quantity: int) -> dict:
+        if int(quantity) < 1:
+            raise ValueError("requested quantity must be positive")
+        return self._request(
+            "GET",
+            f"/search/{self._product_number(product_number)}/pricingbyquantity/{int(quantity)}",
+        )
+
+    def digireel_pricing(self, product_number: str, quantity: int) -> dict:
+        if int(quantity) < 1:
+            raise ValueError("requested quantity must be positive")
+        return self._request(
+            "GET",
+            f"/search/{self._product_number(product_number)}/digireelpricing",
+            query={"requestedQuantity": int(quantity)},
+        )
+
+    def manufacturers(self) -> dict:
+        return self._request("GET", "/search/manufacturers")
+
+    def categories(self) -> dict:
+        return self._request("GET", "/search/categories")
+
+    def category(self, category_id: int | str) -> dict:
+        return self._request("GET", f"/search/categories/{int(category_id)}")
+
+    def intake_bundle(self, mpn: str) -> dict:
+        """Complete non-order evidence for a newly resolved part.
+
+        ProductDetails and Media are unconditional.  Relationship endpoints are kept separate in
+        the bundle so alternate packaging can drive identity de-duplication without ever being
+        confused with substitutions, recommendations or associations.  Quantity pricing and
+        DigiReel are intentionally absent because they have no meaning until a BOM/order supplies
+        a requested quantity.
+        """
+        search = self.keyword_search(mpn)
+        product = _choose_product(search, mpn)
+        product_number = _digikey_product_number(product)
+        if not product_number:
+            return {"schema_version": 1, "keyword_search": search}
+
+        responses: dict[str, dict] = {"keyword_search": search}
+        calls = (
+            ("product_details", self.product_details),
+            ("media", self.media),
+            ("alternate_packaging", self.alternate_packaging),
+            ("substitutions", self.substitutions),
+            ("recommended_products", self.recommended_products),
+            ("associations", self.associations),
+        )
+        for key, fetch in calls:
+            try:
+                responses[key] = fetch(product_number)
+            except EnrichError as exc:
+                # One optional catalogue relationship must never erase the product itself.  Keep
+                # the missing endpoint named, without leaking auth headers or response bodies.
+                responses[key] = {"_status": status_from_error(exc)}
+
+        # The official filters are the authoritative availability probes.  They answer a
+        # different question from Media (which tells us the provider links): whether an exact
+        # search result is admitted by DigiKey's CAD/3D catalogue flags.
+        for key, option in (
+            ("has_cad_model_search", "HasCadModel"),
+            ("has_3d_model_search", "Has3DModel"),
+        ):
+            try:
+                responses[key] = self.keyword_search(mpn, search_options=(option,))
+            except EnrichError as exc:
+                responses[key] = {"_status": status_from_error(exc)}
+        return {"schema_version": 1, "product_number": product_number, **responses}
+
+
 _CLASSIFICATION_LABELS = {
     "RohsStatus": "RoHS",
     "ReachStatus": "REACH",
@@ -138,6 +330,205 @@ def _pick_variation(variations) -> dict:
             if isinstance(v, dict):
                 return v
     return {}
+
+
+def _products(body: dict | None) -> list[dict]:
+    if not isinstance(body, dict):
+        return []
+    for key in ("Products", "ProductVariations", "SearchResults"):
+        value = body.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    product = body.get("Product")
+    if isinstance(product, dict):
+        return [product]
+    if _obj_str(body.get("ManufacturerProductNumber")):
+        return [body]
+    return []
+
+
+def _choose_product(body: dict | None, mpn: str) -> dict:
+    products = _products(body)
+    if not products:
+        return {}
+    target = normalize_mpn(mpn)
+    return next(
+        (
+            product
+            for product in products
+            if normalize_mpn(_obj_str(product.get("ManufacturerProductNumber"))) == target
+        ),
+        products[0],
+    )
+
+
+def _digikey_product_number(product: dict) -> str:
+    direct = _obj_str(product.get("DigiKeyProductNumber"))
+    if direct:
+        return direct
+    return _obj_str(_pick_variation(product.get("ProductVariations")).get("DigiKeyProductNumber"))
+
+
+def _bundle_response(body: dict | None, key: str) -> dict:
+    value = (body or {}).get(key) if isinstance(body, dict) else None
+    return value if isinstance(value, dict) else {}
+
+
+def _details_product(body: dict | None, mpn: str) -> dict:
+    details = _bundle_response(body, "product_details")
+    chosen = _choose_product(details, mpn)
+    return chosen or _choose_product(_bundle_response(body, "keyword_search"), mpn)
+
+
+def _walk_dicts(value):
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from _walk_dicts(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk_dicts(child)
+
+
+def _media_links(body: dict | None) -> list[dict]:
+    """Flatten Media without binding Stockroom to one response wrapper revision."""
+    media = _bundle_response(body, "media")
+    out: list[dict] = []
+    seen: set[str] = set()
+    for item in _walk_dicts(media):
+        url = _obj_str(item.get("Url")) or _obj_str(item.get("URL"))
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        out.append(
+            {
+                "media_type": _obj_str(item.get("MediaType")) or _obj_str(item.get("Type")),
+                "title": _obj_str(item.get("Title")) or _obj_str(item.get("Text")),
+                "url": url,
+            }
+        )
+    return out
+
+
+def _provider_for_media(link: dict) -> str:
+    haystack = f"{link.get('title', '')} {link.get('url', '')}".casefold()
+    if "ultralibrarian" in haystack or "ultra librarian" in haystack:
+        return "Ultra Librarian"
+    if "snapeda" in haystack or "snapmagic" in haystack:
+        return "SnapMagic"
+    if "traceparts" in haystack:
+        return "TraceParts"
+    if "samacsys" in haystack or "componentsearchengine" in haystack:
+        return "SamacSys"
+    if "cadenas" in haystack:
+        return "CADENAS"
+    return ""
+
+
+def _exact_filter_match(body: dict | None, mpn: str) -> bool | None:
+    if not isinstance(body, dict) or body.get("_status"):
+        return None
+    target = normalize_mpn(mpn)
+    return any(
+        normalize_mpn(_obj_str(product.get("ManufacturerProductNumber"))) == target
+        for product in _products(body)
+    )
+
+
+def pricing_options_from_payload(body: dict | None) -> list[dict]:
+    """Flatten DigiKey quantity-pricing revisions into one stable purchasing view."""
+    if not isinstance(body, dict):
+        return []
+    options: list[dict] = []
+    seen: set[tuple] = set()
+    def visit(value, inherited_product_number: str = "", inherited_packaging: str = "") -> None:
+        if isinstance(value, list):
+            for child in value:
+                visit(child, inherited_product_number, inherited_packaging)
+            return
+        if not isinstance(value, dict):
+            return
+        item = value
+        product_number = _obj_str(item.get("DigiKeyProductNumber")) or inherited_product_number
+        packaging = (
+            _obj_str(item.get("PackageType"), "Name")
+            or _obj_str(item.get("Packaging"), "Name")
+            or _obj_str(item.get("PackageType"))
+            or _obj_str(item.get("Packaging"))
+            or inherited_packaging
+        )
+        price = item.get("UnitPrice")
+        if price is None:
+            price = item.get("Price")
+        try:
+            unit_price = float(price)
+        except (TypeError, ValueError):
+            pass
+        else:
+            quantity = item.get(
+                "RequestedQuantity", item.get("Quantity", item.get("BreakQuantity", 0))
+            )
+            try:
+                quantity_value = int(quantity or 0)
+            except (TypeError, ValueError):
+                quantity_value = 0
+            currency = _obj_str(item.get("Currency")) or "USD"
+            key = (product_number, packaging, quantity_value, unit_price, currency)
+            if key not in seen:
+                seen.add(key)
+                options.append(
+                    {
+                        "product_number": product_number,
+                        "packaging": packaging,
+                        "quantity": quantity_value,
+                        "unit_price": unit_price,
+                        "currency": currency,
+                    }
+                )
+        for child in item.values():
+            visit(child, product_number, packaging)
+
+    visit(body)
+    return sorted(options, key=lambda option: (option["unit_price"], option["product_number"]))
+
+
+def digikey_catalog_from_payload(body: dict | None, mpn: str) -> dict:
+    """Stable UI/persistence view over the complete raw DigiKey evidence bundle."""
+    if not isinstance(body, dict):
+        return {}
+    product = _details_product(body, mpn)
+    if not product:
+        return {}
+    media = _media_links(body)
+    eda = [
+        link
+        for link in media
+        if "eda" in str(link.get("media_type", "")).casefold()
+        or "cad" in str(link.get("title", "")).casefold()
+    ]
+    providers = sorted({provider for link in eda if (provider := _provider_for_media(link))})
+    cad_probe = _exact_filter_match(_bundle_response(body, "has_cad_model_search"), mpn)
+    model_probe = _exact_filter_match(_bundle_response(body, "has_3d_model_search"), mpn)
+    has_cad = cad_probe if cad_probe is not None else (True if eda else None)
+    return {
+        "schema_version": 1,
+        "product_number": str(body.get("product_number") or _digikey_product_number(product)),
+        "manufacturer_product_number": _obj_str(product.get("ManufacturerProductNumber")),
+        "product_url": _obj_str(product.get("ProductUrl")),
+        "availability": {
+            "cad_model": has_cad,
+            "three_d_model": model_probe,
+            "providers": providers,
+        },
+        "media": media,
+        # These remain separately named raw responses.  Their semantics are intentionally not
+        # collapsed into one "related parts" list: alternate packaging is identity-equivalent;
+        # substitutions, recommendations and associations are progressively weaker/different.
+        "alternate_packaging": _bundle_response(body, "alternate_packaging"),
+        "substitutions": _bundle_response(body, "substitutions"),
+        "recommended_products": _bundle_response(body, "recommended_products"),
+        "associations": _bundle_response(body, "associations"),
+    }
 
 
 def _parse_digikey_part(product: dict) -> EnrichmentResult:
@@ -240,7 +631,12 @@ def parse_digikey_payload(body: dict | None, mpn: str) -> EnrichmentResult:
     The sibling of `parse_mouser_payload`; see that docstring for why the full body is the unit
     stored and re-parsed rather than the already-selected product.
     """
-    products = (body or {}).get("Products") or []
+    # Import evidence written before the Product Information expansion is a plain
+    # KeywordSearch response. New evidence is a versioned bundle whose ProductDetails answer is
+    # the richer canonical product and whose KeywordSearch response remains the exact fallback.
+    legacy = body or {}
+    search = _bundle_response(body, "keyword_search") or legacy
+    products = _products(search)
     if not products:
         return EnrichmentResult()
     target = normalize_mpn(mpn)
@@ -253,10 +649,14 @@ def parse_digikey_payload(body: dict | None, mpn: str) -> EnrichmentResult:
         ),
         None,
     )
-    chosen = exact if exact is not None else products[0]
+    detailed = _details_product(body, mpn)
+    chosen = detailed or (exact if exact is not None else products[0])
     if not isinstance(chosen, dict):
         return EnrichmentResult()
     result = _parse_digikey_part(chosen)
+    catalog = digikey_catalog_from_payload(body, mpn)
+    if catalog:
+        result.catalog["digikey"] = catalog
     if exact is None and result.mpn is not None:
         result.mpn = Sourced(result.mpn.value, "digikey", "low")  # flag for manual review
     return result
@@ -266,9 +666,11 @@ class DigiKeyAdapter:
     def __init__(self, client_id: str = "", client_secret: str = "", requester=None):
         self.client_id = client_id or ""
         self.client_secret = client_secret or ""
-        self._requester = requester or (
-            _default_requester(self.client_id, self.client_secret) if self.enabled else None
+        self.client = (
+            DigiKeyClient(self.client_id, self.client_secret) if self.enabled and requester is None
+            else None
         )
+        self._requester = requester or (self.client.intake_bundle if self.client is not None else None)
         # out-of-band signal for the rescan circuit breaker (Phase-1b-2b); never affects the
         # returned EnrichmentResult, which stays exactly what it is today on every path.
         self.last_status: str = ""

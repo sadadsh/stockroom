@@ -183,6 +183,11 @@ class EnrichmentResult:
     # for comparison (owner 2026-07-24), not only the pasted vendor's.
     dist_price_breaks: dict[str, list[PriceBreak]] = field(default_factory=dict)
     dist_stock: dict[str, int | None] = field(default_factory=dict)
+    # Provider-keyed structured catalogue intelligence. This is deliberately separate from
+    # electrical `specs`: media, packaging equivalence, substitutions, recommendations and
+    # associations have different semantics and must survive without being flattened into
+    # display strings. Values are JSON-compatible versioned dictionaries.
+    catalog: dict[str, dict] = field(default_factory=dict)
     price_breaks: list[PriceBreak] = field(default_factory=list)
     specs: dict[str, Sourced] = field(default_factory=dict)
     # Where two sources DISAGREE on a spec, every distinct value is kept here with its
@@ -206,6 +211,8 @@ class EnrichmentResult:
             out.add("dist_pns")
         if self.dist_urls:
             out.add("dist_urls")
+        if self.catalog:
+            out.add("catalog")
         return out
 
     def merge_missing(self, other: "EnrichmentResult", record_conflicts: bool = True) -> None:
@@ -259,3 +266,5 @@ class EnrichmentResult:
             self.dist_pns.setdefault(key, val)
         for key, val in other.dist_urls.items():
             self.dist_urls.setdefault(key, val)
+        for key, val in other.catalog.items():
+            self.catalog.setdefault(key, dict(val))

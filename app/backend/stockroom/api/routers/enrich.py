@@ -77,6 +77,7 @@ def _result_dto(r: EnrichmentResult) -> dict:
             for k, v in r.dist_price_breaks.items()
         },
         "dist_stock": dict(r.dist_stock),
+        "catalog": {key: dict(value) for key, value in r.catalog.items()},
         # both distributor buy links (mouser + digikey) when both APIs answered, so the committed
         # part carries every place it can be ordered, not only the pasted link.
         "dist_urls": dict(r.dist_urls),
@@ -233,6 +234,90 @@ def enrich_router(require_token) -> APIRouter:
                 ctx.jobs.run_write(ctx.rebuild_index)
                 ctx.jobs.run_write(ctx.auto_push)
             return _import_report_dto(report)
+
+        return {"job_id": ctx.jobs.submit(work)}
+
+    @r.post("/digikey/quantity-pricing")
+    def digikey_quantity_pricing(request: Request, body: dict) -> dict:
+        """Quantity-aware official pricing for a BOM/order decision.
+
+        DigiReel is opt-in per request: merely looking at a part never asks DigiKey to calculate
+        an order service. The caller must explicitly say it is preparing an order.
+        """
+        from stockroom.enrich.digikey_api import DigiKeyClient
+
+        ctx = request.app.state.ctx
+        product_number = str(body.get("product_number") or "").strip()
+        quantity_value = body.get("quantity")
+        try:
+            if isinstance(quantity_value, bool):
+                raise ValueError
+            quantity = int(str(quantity_value))
+        except (TypeError, ValueError):
+            raise ApiError(422, "quantity must be a positive integer") from None
+        if not product_number or quantity < 1:
+            raise ApiError(422, "product_number and a positive quantity are required")
+        if not ctx.config.digikey_client_id or not ctx.config.digikey_client_secret:
+            raise ApiError(409, "DigiKey Product Information credentials are not configured")
+        prepare_order = body.get("prepare_order") is True
+
+        def work(progress):
+            client = DigiKeyClient(
+                ctx.config.digikey_client_id,
+                ctx.config.digikey_client_secret,
+            )
+            progress({"stage": "fetching", "pct": 0.2, "message": "reading quantity pricing"})
+            pricing_payload = client.pricing_options_by_quantity(product_number, quantity)
+            from stockroom.enrich.digikey_api import pricing_options_from_payload
+
+            result = {
+                "product_number": product_number,
+                "quantity": quantity,
+                "options": pricing_options_from_payload(pricing_payload),
+                "pricing_options": pricing_payload,
+                "digireel": None,
+            }
+            if prepare_order:
+                progress({"stage": "fetching", "pct": 0.7, "message": "calculating DigiReel"})
+                result["digireel"] = client.digireel_pricing(product_number, quantity)
+            return result
+
+        return {"job_id": ctx.jobs.submit(work)}
+
+    @r.post("/digikey/taxonomy")
+    def digikey_taxonomy(request: Request, body: dict | None = None) -> dict:
+        """Cached canonical DigiKey manufacturers/categories for pickers and classification."""
+        from stockroom.enrich.cache import TtlCache
+        from stockroom.enrich.digikey_api import DigiKeyClient
+
+        ctx = request.app.state.ctx
+        if not ctx.config.digikey_client_id or not ctx.config.digikey_client_secret:
+            raise ApiError(409, "DigiKey Product Information credentials are not configured")
+        refresh = isinstance(body, dict) and body.get("refresh") is True
+
+        def work(progress):
+            cache = TtlCache(
+                ctx.enrich_cache_dir,
+                ttl=7 * 86400.0,
+                prefix="digikey-taxonomy",
+            )
+            if not refresh and (cached := cache.get("canonical")) is not None:
+                return {**cached, "cached": True}
+            client = DigiKeyClient(
+                ctx.config.digikey_client_id,
+                ctx.config.digikey_client_secret,
+            )
+            progress({"stage": "fetching", "pct": 0.25, "message": "reading manufacturers"})
+            manufacturers = client.manufacturers()
+            progress({"stage": "fetching", "pct": 0.7, "message": "reading categories"})
+            categories = client.categories()
+            result = {
+                "schema_version": 1,
+                "manufacturers": manufacturers,
+                "categories": categories,
+            }
+            cache.put("canonical", result)
+            return {**result, "cached": False}
 
         return {"job_id": ctx.jobs.submit(work)}
 

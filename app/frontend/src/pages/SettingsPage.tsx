@@ -1,14 +1,14 @@
 /**
  * Settings (spec sections 5.3, 9, 11, 12): the per-machine controls that live
- * outside the library. Appearance (the theme toggle), library profiles (switch,
- * create, delete), library sync, the KiCad wiring status, the Mouser API key, and
+ * outside the library. Appearance, independent library repositories, library
+ * sync, EDA wiring, distributor credentials, and
  * the app self-update. Every section is honest about its state: offline/divergence
  * and a missing kicad-cli are surfaced verbatim, never faked green, and the Mouser
  * key is only ever shown as a last-4 hint.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, api } from "../api/client";
-import type { SettingsPatch, WiringReport } from "../api/types";
+import type { SetLibraryBody, SettingsPatch, WiringReport } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { AltiumDbLibSection } from "../components/AltiumDbLibSection";
 import { SettingsDisclosure } from "../components/SettingsDisclosure";
@@ -19,11 +19,10 @@ import { LibraryHealthSection } from "../components/LibraryHealthSection";
 import { LibrarySyncSection } from "../components/LibrarySyncSection";
 import { RescanSection, lastChecked } from "../components/RescanSection";
 import {
-  useActivateProfile,
-  useCreateProfile,
-  useDeleteProfile,
   useDoSync,
-  useProfiles,
+  useConnectLibraryRemote,
+  useOnboarding,
+  useSetLibrary,
   useSettings,
   useSyncStatus,
   useSystemInfo,
@@ -41,7 +40,6 @@ import { useTheme, type Theme } from "../lib/theme";
 import { statusTone } from "../lib/statusTone";
 import { useToast } from "../lib/toast";
 import { Badge, Button, Card, Dot, Eyebrow, PanelTitle } from "../components/primitives";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "../components/Icon";
 import {
@@ -145,7 +143,7 @@ export function SettingsPage() {
   const odbc = useOdbcStatus();
   const syncQ = useSyncStatus();
   const { query: updateQ, view: updateStanding } = useUpdateStanding();
-  const profilesQ = useProfiles();
+  const librariesQ = useOnboarding();
   // The three Library disclosures that used to state NOTHING on their collapsed row, so the only
   // way to learn any of them was to open all three. Same cached queries their sections already
   // use, so this costs one fetch each and makes opening the section instant rather than slower.
@@ -194,6 +192,10 @@ export function SettingsPage() {
 
   const s = settingsQ.data;
   const odbcInstalled = odbc.data?.installed;
+  const githubAccounts = syncQ.data?.github_auth.accounts ?? [];
+  // A legacy app-owned token may still exist on an upgraded machine. It remains a temporary
+  // compatibility signal, but the UI creates no new tokens and GCM is the durable authority.
+  const githubConnected = githubAccounts.length > 0 || Boolean(s?.github_token_set);
 
   function jump(step: SetupStep) {
     setGroup(step.group);
@@ -241,7 +243,7 @@ export function SettingsPage() {
       labelId: "settings.machine.step-github",
       metLabel: "GitHub Connected",
       metLabelId: "settings.machine.step-github-met",
-      met: s.github_token_set,
+      met: githubConnected,
       group: "library",
     });
   }
@@ -500,14 +502,21 @@ export function SettingsPage() {
             ) : group === "library" ? (
               <>
                 <SettingsDisclosure
-                  title="Component Profiles"
+                  title="Library Repositories"
                   titleId="settings.profiles.title"
-                  hint="Switch between independent component collections. Creating or switching a profile changes the active library."
+                  hint="Each library is a separate Git repository. Switching libraries never changes Stockroom's application repository."
                   hintId="settings.profiles.hint"
-                  summary={profilesQ.data ? <span>{profilesQ.data.active}</span> : null}
+                  summary={
+                    librariesQ.data ? (
+                      <span>
+                        {librariesQ.data.libraries.find((library) => library.active)?.name ??
+                          "Current Library"}
+                      </span>
+                    ) : null
+                  }
                   data-dev-id="settings.profiles"
                 >
-                  <ProfilesSection />
+                  <LibraryRepositoriesSection />
                 </SettingsDisclosure>
                 <SettingsDisclosure
                   title="Share Library Changes"
@@ -522,11 +531,11 @@ export function SettingsPage() {
                 <SettingsDisclosure
                   title="GitHub Access"
                   titleId="settings.github.title"
-                  hint="Connect the account allowed to push this library. The token stays in Windows Credential Manager and is never shown again."
+                  hint="Sign in with the Windows user's GitHub account. Git Credential Manager stores access outside Stockroom and GitHub repository permissions control collaboration."
                   hintId="settings.github.hint"
                   summary={
                     s ? (
-                      s.github_token_set ? (
+                      githubConnected ? (
                         <Text id="settings.summary.github-connected">Connected</Text>
                       ) : (
                         <Badge tone="neutral">
@@ -546,7 +555,7 @@ export function SettingsPage() {
                 <SettingsDisclosure
                   title="KiCad Integration"
                   titleId="settings.kicad.title"
-                  hint="Stockroom wires the active profile into KiCad automatically. Manual paths are advanced recovery controls."
+                  hint="Stockroom wires the active library repository into KiCad automatically. Manual paths are advanced recovery controls."
                   hintId="settings.kicad.hint"
                   summary={
                     s ? (
@@ -566,7 +575,7 @@ export function SettingsPage() {
                 <SettingsDisclosure
                   title="Altium Integration"
                   titleId="settings.altium.title"
-                  hint="The database library follows the active profile. The SQLite ODBC driver is the one machine-level prerequisite."
+                  hint="The database library follows the active library repository. The SQLite ODBC driver is the one machine-level prerequisite."
                   hintId="settings.altium.hint"
                   summary={
                     odbcInstalled === true ? (
@@ -900,89 +909,58 @@ function AppearanceSection() {
   );
 }
 
-function ProfilesSection() {
-  const profiles = useProfiles();
-  const activate = useActivateProfile();
-  const create = useCreateProfile();
-  const del = useDeleteProfile();
+function LibraryRepositoriesSection() {
+  const libraries = useOnboarding();
+  const setLibrary = useSetLibrary();
   const { toast } = useToast();
-  const [newName, setNewName] = useState("");
-  const [archive, setArchive] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
-  const namePlaceholder = useText("settings.profiles.name-placeholder", "New Profile Name");
-  const deleteTitle = useText("settings.profiles.delete-title", "Delete Profile");
-  const deleteConfirm = useText("settings.profiles.delete-confirm", "Delete");
+  const [mode, setMode] = useState<SetLibraryBody["mode"]>("create");
+  const [path, setPath] = useState("");
+  const [url, setUrl] = useState("");
 
-  function onActivate(name: string) {
-    activate.mutate(name, {
-      onSuccess: () => toast(`Switched to ${name}.`, "ok"),
-      onError: (e) => toast(errMsg(e), "err"),
-    });
-  }
-
-  function onCreate() {
-    const name = newName.trim();
-    // guard the keyboard (Enter) path too, not just the disabled button, so a
-    // rapid double-Enter cannot fire a duplicate create for the same name.
-    if (!name || create.isPending) return;
-    create.mutate(
-      { name, archive },
-      {
-        onSuccess: () => {
-          setNewName("");
-          setArchive(false);
-          toast(`Created ${name}.`, "ok");
-        },
-        onError: (e) => toast(errMsg(e), "err"),
+  function apply(body: SetLibraryBody) {
+    if (setLibrary.isPending) return;
+    setLibrary.mutate(body, {
+      onSuccess: (result) => {
+        setPath("");
+        setUrl("");
+        toast(`Library ready at ${result.libraries_root}.`, "ok");
       },
-    );
-  }
-
-  function onConfirmDelete() {
-    const name = pendingDelete;
-    if (!name) return;
-    del.mutate(name, {
-      onSuccess: () => {
-        setPendingDelete(null);
-        toast(`Deleted ${name}.`, "ok");
-      },
-      onError: (e) => {
-        setPendingDelete(null);
-        toast(errMsg(e), "err");
-      },
+      onError: (error) => toast(errMsg(error), "err"),
     });
   }
 
   return (
     <>
-      {profiles.isLoading ? (
-        <p className="py-1 text-sm text-t3">Loading profiles...</p>
-      ) : profiles.isError ? (
-        <p className="py-1 text-sm text-err">Could not load profiles.</p>
+      {libraries.isLoading ? (
+        <p className="py-1 text-sm text-t3">Loading libraries...</p>
+      ) : libraries.isError ? (
+        <p className="py-1 text-sm text-err">Could not load libraries.</p>
       ) : (
         <div>
-          {profiles.data?.profiles.map((name) => {
-            const active = name === profiles.data?.active;
+          {libraries.data?.libraries.map((library) => {
             return (
               <div
-                key={name}
-                data-profile-row
+                key={library.path}
+                data-library-row
                 data-dev-id="settings.profiles-row"
                 className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0"
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="truncate text-sm text-t1">{name}</span>
-                  {active ? <Badge tone="ok">Active</Badge> : null}
-                </div>
-                {!active ? (
-                  <div className="flex flex-none items-center gap-2">
-                    <Button small onClick={() => onActivate(name)} disabled={activate.isPending}>
-                      <Text id="settings.profiles.activate">Switch To This Profile</Text>
-                    </Button>
-                    <Button small variant="ghost-danger" onClick={() => setPendingDelete(name)}>
-                      <Text id="settings.profiles.delete">Delete</Text>
-                    </Button>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-t1">{library.name}</p>
+                    <p className="truncate text-xs text-t3">{library.path}</p>
                   </div>
+                  {library.active ? <Badge tone="ok">Active</Badge> : null}
+                  {!library.available ? <Badge tone="warn">Unavailable</Badge> : null}
+                </div>
+                {!library.active && library.available ? (
+                  <Button
+                    small
+                    onClick={() => apply({ mode: "open", path: library.path })}
+                    disabled={setLibrary.isPending}
+                  >
+                    <Text id="settings.profiles.activate">Switch Library</Text>
+                  </Button>
                 ) : null}
               </div>
             );
@@ -991,42 +969,54 @@ function ProfilesSection() {
       )}
 
       <div
-        className="mt-3.5 flex flex-wrap items-center gap-2.5"
+        className="mt-3.5 space-y-2.5"
         data-dev-id="settings.profiles-create"
       >
+        <div className="flex flex-wrap gap-2">
+          {(["create", "open", "clone"] as const).map((choice) => (
+            <Button
+              key={choice}
+              small
+              variant={mode === choice ? "accent" : "default"}
+              onClick={() => setMode(choice)}
+            >
+              {choice === "create" ? "Create New" : choice === "open" ? "Open Existing" : "Clone From Git"}
+            </Button>
+          ))}
+        </div>
+        {mode === "clone" ? (
+          <input
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            placeholder="Git Repository URL"
+            aria-label="Git Repository URL"
+            className={INPUT_CLS}
+          />
+        ) : null}
         <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onCreate();
-          }}
-          placeholder={namePlaceholder}
+          value={path}
+          onChange={(event) => setPath(event.target.value)}
+          placeholder={mode === "open" ? "Existing Library Folder" : "New Library Folder"}
+          aria-label={mode === "open" ? "Existing Library Folder" : "New Library Folder"}
           className={INPUT_CLS}
         />
-        <label className="flex flex-none cursor-pointer select-none items-center gap-1.5 text-xs text-t2">
-          <input type="checkbox" checked={archive} onChange={(e) => setArchive(e.target.checked)} />
-          <Text id="settings.profiles.archive">Archive Profile</Text>
-        </label>
-        <Button onClick={onCreate} disabled={!newName.trim() || create.isPending}>
-          <Text id="settings.profiles.create">Create Profile</Text>
+        <Button
+          onClick={() =>
+            apply(
+              mode === "clone"
+                ? { mode, url: url.trim(), dest: path.trim() }
+                : { mode, path: path.trim() },
+            )
+          }
+          disabled={!path.trim() || (mode === "clone" && !url.trim()) || setLibrary.isPending}
+        >
+          <Text id="settings.profiles.create">Set Up Library Repository</Text>
         </Button>
+        <p className="text-xs text-t3">
+          Creating a library initializes its own Git repository. Stockroom source and other
+          libraries are never added to it.
+        </p>
       </div>
-
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        title={deleteTitle}
-        body={
-          <>
-            Delete the profile <b>{pendingDelete}</b>? Its parts remain on disk; just the profile
-            entry is removed.
-          </>
-        }
-        confirmLabel={deleteConfirm}
-        danger
-        busy={del.isPending}
-        onConfirm={onConfirmDelete}
-        onCancel={() => setPendingDelete(null)}
-      />
     </>
   );
 }
@@ -1034,7 +1024,9 @@ function ProfilesSection() {
 function SyncSection() {
   const status = useSyncStatus();
   const sync = useDoSync();
+  const connectRemote = useConnectLibraryRemote();
   const { toast } = useToast();
+  const [remoteUrl, setRemoteUrl] = useState("");
 
   function onSync() {
     sync.mutate(undefined, {
@@ -1051,7 +1043,7 @@ function SyncSection() {
         }
         if (r.state === "denied") {
           toast(
-            "Sync failed: the remote refused this token (403). A collaborator must accept the repo invitation and use a CLASSIC personal access token with the repo scope; a fine-grained token cannot reach another user's repo.",
+            "Sync failed: GitHub denied this Windows user's account. Accept the repository invitation or ask its owner for write access, then sign in again.",
             "err",
           );
           return;
@@ -1194,6 +1186,31 @@ function SyncSection() {
           />
         </>
       ) : null}
+      {status.data && !status.data.has_remote ? (
+        <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+          <input
+            value={remoteUrl}
+            onChange={(event) => setRemoteUrl(event.target.value)}
+            placeholder="https://github.com/you/library.git"
+            aria-label="Library GitHub Repository URL"
+            className={INPUT_CLS}
+          />
+          <Button
+            onClick={() =>
+              connectRemote.mutate(remoteUrl.trim(), {
+                onSuccess: () => {
+                  setRemoteUrl("");
+                  toast("Library repository connected. Sync will publish its current history.", "ok");
+                },
+                onError: (error) => toast(errMsg(error), "err"),
+              })
+            }
+            disabled={!remoteUrl.trim() || connectRemote.isPending}
+          >
+            Connect Library Repository
+          </Button>
+        </div>
+      ) : null}
       <div className="mt-3.5 flex items-center gap-3">
         <Button
           variant="accent"
@@ -1311,7 +1328,7 @@ function KiCadSection() {
               settings.isLoading ? (
                 "Loading..."
               ) : settings.data?.kicad_wired ? (
-                <span className="text-ok">Wired to the active profile</span>
+                <span className="text-ok">Wired to the active library</span>
               ) : (
                 <span className="text-warn">
                   Not wired so far (use Recheck And Wire KiCad below)
@@ -1689,59 +1706,33 @@ function VendorLoginsSection() {
   );
 }
 
-// The GitHub sign-in: paste a fine-grained personal access token so the app can auto-push a part
-// add to the library repo and pull collaborators' changes. Each collaborator connects their own
-// token; the repo owner grants them write access on GitHub. The token is stored per machine and
-// never shown again.
+// GitHub authentication belongs to the current Windows user, not to Stockroom configuration.
+// Git Credential Manager owns OAuth/device sign-in and credential storage. Repository access on
+// GitHub remains the only collaboration authority; no PAT crosses the Stockroom API.
 function GitHubSection() {
-  const settings = useSettings();
-  const save = useUpdateSettings();
+  const status = useSyncStatus();
+  const loginJob = useJob<{ mode: string; accounts: string[] }>();
   const { toast } = useToast();
-  const [tokenInput, setTokenInput] = useState("");
-  const isSet = settings.data?.github_token_set ?? false;
-  const tokenPlaceholderNew = useText(
-    "settings.github.token-placeholder",
-    "Paste a token to connect",
-  );
-  const tokenPlaceholderReplace = useText(
-    "settings.github.token-placeholder-replace",
-    "Paste a new token to replace it",
-  );
   const toastConnected = useText(
     "settings.github.toast-connected",
-    "Connected to GitHub. Part changes now push on their own.",
+    "GitHub sign-in complete. Repository permissions now control library sharing.",
   );
-  const toastDisconnected = useText(
-    "settings.github.toast-disconnected",
-    "Disconnected from GitHub.",
-  );
+  const accounts = status.data?.github_auth.accounts ?? [];
+  const pending = loginJob.status === "running";
 
-  function onSave() {
-    const token = tokenInput.trim();
-    if (!token || save.isPending) return;
-    save.mutate(
-      { github_token: token },
-      {
-        onSuccess: () => {
-          setTokenInput("");
-          toast(toastConnected, "ok");
-        },
-        onError: (e) => toast(errMsg(e), "err"),
-      },
-    );
-  }
-
-  function onClear() {
-    save.mutate(
-      { github_token: "" },
-      {
-        onSuccess: () => {
-          setTokenInput("");
-          toast(toastDisconnected, "ok");
-        },
-        onError: (e) => toast(errMsg(e), "err"),
-      },
-    );
+  async function onSignIn() {
+    if (pending) return;
+    try {
+      const ref = await api.startGitHubLogin();
+      const final = await loginJob.run(ref.job_id);
+      if (final.status !== "done") {
+        throw new Error(final.error ?? "GitHub sign-in did not complete.");
+      }
+      await status.refetch();
+      toast(toastConnected, "ok");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : errMsg(error), "err");
+    }
   }
 
   return (
@@ -1750,10 +1741,10 @@ function GitHubSection() {
         label="Connection"
         labelId="settings.github.connection"
         value={
-          settings.isLoading
+          status.isLoading
             ? "Loading..."
-            : isSet
-              ? `Connected (token ending ${settings.data?.github_token_hint})`
+            : accounts.length
+              ? accounts.join(", ")
               : "Not connected"
         }
       />
@@ -1761,29 +1752,14 @@ function GitHubSection() {
         className="mt-3.5 flex flex-wrap items-center gap-2.5"
         data-dev-id="settings.github-token"
       >
-        <label htmlFor="github-token" className="sr-only">
-          GitHub Personal Access Token
-        </label>
-        <input
-          id="github-token"
-          type="password"
-          autoComplete="off"
-          value={tokenInput}
-          onChange={(e) => setTokenInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onSave();
-          }}
-          placeholder={isSet ? tokenPlaceholderReplace : tokenPlaceholderNew}
-          className={INPUT_CLS}
-        />
-        <Button onClick={onSave} disabled={!tokenInput.trim() || save.isPending}>
-          <Text id="settings.github.connect">Save GitHub Access</Text>
+        <Button onClick={() => void onSignIn()} disabled={pending}>
+          <Text id="settings.github.connect">
+            {pending ? "Waiting For GitHub" : "Sign In With GitHub"}
+          </Text>
         </Button>
-        {isSet ? (
-          <Button variant="danger" onClick={onClear} disabled={save.isPending}>
-            <Text id="settings.github.disconnect">Remove GitHub Access</Text>
-          </Button>
-        ) : null}
+        <p className="text-xs text-t3">
+          Stockroom never receives or stores your GitHub password or personal access token.
+        </p>
       </div>
     </>
   );

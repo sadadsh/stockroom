@@ -179,6 +179,7 @@ def build_passive_record(
     specs: dict | None = None,
     price_breaks: list | None = None,
     stock: int | None = None,
+    catalog: dict | None = None,
     footprints_root=None,
 ) -> PassiveBuild:
     """Build (but do not commit) a passive PartRecord from `source` (a bare MPN or a
@@ -323,5 +324,10 @@ def build_passive_record(
             source_url=purchase_url,
         ),
         specs=record_specs,
+        catalog={
+            str(key): dict(value)
+            for key, value in (catalog or {}).items()
+            if isinstance(value, dict)
+        },
     )
     return PassiveBuild(record=record, stock_present=resolved.present, gaps=record.missing_fields())

@@ -333,6 +333,14 @@ function commandKey(input: { partIds?: string[]; limit: number }): string {
  * A saved cursor always reconnects before a new command is considered. The
  * idempotency key is retained across a failed response so retrying the same
  * command cannot create a second durable batch after an ambiguous disconnect.
+ *
+ * Submitted through the CAPTURE command with no part ids, which the API defines as
+ * "every part still missing files" - the same bounded scan, resolved by the same
+ * backend helper, as the completion command it replaced. The stage work is identical
+ * (an automatic capture request is what a completion item already decoded to); the one
+ * difference is that a capture item RETAINS its per-part report, which is the only place
+ * a per-route `requires-human` outcome exists. Without it the run can complete a library
+ * and still be unable to say which provider needs a person for which part.
  */
 async function startCompletionCommand(
   input: { partIds?: string[]; limit?: number },
@@ -359,9 +367,10 @@ async function startCompletionCommand(
   retrySubmission = { commandKey: requestedCommand, idempotencyKey };
   let ref;
   try {
-    ref = await api.runCompletion({
+    ref = await api.runCapture({
       ...input,
       limit: requestedLimit,
+      mode: "automatic",
       idempotencyKey,
     });
   } catch (error) {

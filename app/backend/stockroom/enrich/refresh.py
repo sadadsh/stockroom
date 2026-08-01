@@ -105,6 +105,14 @@ def _apply_pulled_detail(record, vendor: str, result: EnrichmentResult, now_iso:
     the lane: Lifecycle, Lead Time and the tariff are re-read from the vendor each pass.
     """
     changed = False
+    # Catalogue intelligence is a versioned snapshot rather than a scalar spec. A refresh replaces
+    # only the provider that answered and leaves every other provider block untouched.
+    for provider, data in result.catalog.items():
+        if not isinstance(data, dict):
+            continue
+        if record.catalog.get(provider) != data:
+            record.catalog[provider] = dict(data)
+            changed = True
     for label, value, sourced in spec_updates(result):
         key = normalize_spec_key(label)
         if not key:

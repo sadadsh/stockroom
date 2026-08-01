@@ -17,7 +17,6 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Request
 
 from stockroom.api.schemas import SetLibraryBody
-from stockroom.store import library_location as libloc
 from stockroom.store import onboarding as onb
 from stockroom.vcs.repo import GitError, GitRepo
 
@@ -25,16 +24,29 @@ from stockroom.vcs.repo import GitError, GitRepo
 def _status(ctx) -> dict:
     cfg = ctx.config
     root = Path(ctx.libraries_root)
-    # The library that ships inside the app repo counts as onboarded even if this machine never
-    # ran the setup screen: a clone of the app already carries it, so the app opens straight on
-    # it. A completed onboarding choice keeps onboarded True too.
-    onboarded = bool(getattr(cfg, "onboarded", False)) or libloc.ships_in_repo(root)
+    onboarded = bool(getattr(cfg, "onboarded", False))
     # under_git via git itself (rev-parse), so the in-repo library, backed by the ENCLOSING app
     # repo with no nested .git of its own, still reports True.
     try:
         under_git = GitRepo(root).is_git_repo()
     except GitError:
         under_git = (root / ".git").exists()
+    workspaces = []
+    for item in getattr(cfg, "library_workspaces", []):
+        if not isinstance(item, dict) or not str(item.get("path", "")).strip():
+            continue
+        path = Path(str(item["path"]))
+        try:
+            active = path.resolve(strict=False) == root.resolve(strict=False)
+        except OSError:
+            active = str(path) == str(root)
+        workspaces.append({
+            "name": str(item.get("name") or path.name),
+            "path": path.as_posix(),
+            "active": active,
+            "available": path.is_dir(),
+            "under_git": (path / ".git").exists(),
+        })
     return {
         "onboarded": onboarded,
         "first_run": not onboarded,
@@ -42,6 +54,7 @@ def _status(ctx) -> dict:
         "profiles": ctx.profile_store.list(),
         "under_git": under_git,
         "default_dir": onb.default_library_dir().as_posix(),
+        "libraries": workspaces,
     }
 
 

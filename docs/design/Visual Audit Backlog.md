@@ -21,6 +21,29 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-01 — Independent Library Repository Settings
+
+- Capture layer: Codex in-app browser against the isolated FastAPI service and
+  current production frontend bundle.
+- Evidence:
+  `work/Library Repository Audit/Library Repositories Dark 1280x720.png`,
+  1,280 × 720, SHA-256 `f7adcab94750`; and
+  `work/Library Repository Audit/Library Repositories Light 1280x720.png`,
+  1,280 × 720, SHA-256 `96356f955273`.
+- Intended claim: library choice is repository choice; the active and available
+  repositories, separate working-copy state, library-only synchronization,
+  per-user Git Credential Manager identity, and no-PAT boundary are visible in
+  both themes without horizontal overflow.
+- Acceptance result: pass at the browser-rendered product layer. Document width
+  remained exactly 1,280/1,280 px in light theme. The first dark capture exposed
+  the retired `Profile: Stockroom` footer control; the source and tests were
+  corrected to the non-interactive `Library: Stockroom Library` repository fact
+  before these authority captures. Super-critical critique: at 720 px tall the
+  GitHub Access panel begins below the bounded settings viewport, so users must
+  scroll to inspect account details; muted helper text and the dense two-column
+  Settings hierarchy remain covered by VA-014 and VA-027 rather than opening a
+  duplicate finding. Real packaged WebView2/DPI proof remains outstanding.
+
 ### 2026-07-29 — Windows App Identity Asset Audit
 
 - Capture layer: deterministic canonical asset contact sheet.

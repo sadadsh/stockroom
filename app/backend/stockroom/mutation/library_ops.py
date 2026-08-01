@@ -165,6 +165,7 @@ class StagedPart:
     # candidate computes them, this is only the hop between.
     enrichment: dict = field(default_factory=dict)
     alternates: dict = field(default_factory=dict)
+    catalog: dict = field(default_factory=dict)
 
 
 class IncompleteError(ValueError):
@@ -498,6 +499,11 @@ class LibraryOps:
                 alternates={
                     k: [SourcedValue.from_dict(a) for a in entries if isinstance(a, dict)]
                     for k, entries in staged.alternates.items()
+                },
+                catalog={
+                    str(key): dict(value)
+                    for key, value in staged.catalog.items()
+                    if isinstance(value, dict)
                 },
             )
             if staged.symbol_source is not None:

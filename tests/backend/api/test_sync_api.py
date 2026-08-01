@@ -13,6 +13,18 @@ def test_sync_status_reads_without_network(client):
     body = r.json()
     assert "has_remote" in body
     assert "current_branch" in body
+    assert body["github_auth"]["mode"] == "git_credential_manager"
+
+
+def test_sync_status_reports_the_windows_users_github_accounts(client, monkeypatch):
+    monkeypatch.setattr("stockroom.vcs.github_auth.accounts", lambda _repo: ["sadadsh"])
+
+    body = client.get("/api/sync/status").json()
+
+    assert body["github_auth"] == {
+        "mode": "git_credential_manager",
+        "accounts": ["sadadsh"],
+    }
 
 
 def test_handed_off_worker_reads_the_host_checkout_inventory(client, app_ctx, tmp_path):
@@ -45,6 +57,22 @@ def test_sync_no_remote_is_a_first_class_state(client):
     r = client.post("/api/sync")
     assert r.status_code == 200
     assert r.json()["state"] == "no_remote"
+
+
+def test_connect_remote_accepts_only_credential_free_https_github_urls(client, app_ctx):
+    denied = client.post(
+        "/api/sync/remote",
+        json={"url": "https://person:secret@github.com/owner/library.git"},
+    )
+    assert denied.status_code == 400
+
+    response = client.post(
+        "/api/sync/remote",
+        json={"url": "https://github.com/owner/library.git"},
+    )
+
+    assert response.status_code == 200
+    assert app_ctx.repo.remote_url("origin") == "https://github.com/owner/library.git"
 
 
 def test_sync_refreshes_derivations_then_rebuilds_both_indexes_on_pull(

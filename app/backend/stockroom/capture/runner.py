@@ -23,6 +23,7 @@ from pathlib import Path
 
 from stockroom.capture.access_policy import (
     machine_access_authorized,
+    machine_access_decision,
     machine_access_policy,
 )
 from stockroom.capture.complete import (
@@ -31,10 +32,13 @@ from stockroom.capture.complete import (
     complete_library,
     iter_incomplete,
 )
+from stockroom.capture.digikey_models import default_digikey_models_ids
+from stockroom.capture.intent import PersonCaptureIntent, person_capture_intent
 from stockroom.capture.pacing import (
     CircuitBreaker,
     DurableSlidingWindowLimiter,
 )
+from stockroom.capture.trace import install_capture_log, trace
 from stockroom.text import counted
 
 # Five parts in a row all blocked is the catalogue having closed the door, not a burst edge.
@@ -64,6 +68,8 @@ class HumanRequiredSource:
         provider_key: str,
         routes: tuple[ProviderRoutePlan, ...],
         provides,
+        *,
+        access_detail: str = "",
     ) -> None:
         from stockroom.capture.vendors import get_adapter
 
@@ -80,6 +86,11 @@ class HumanRequiredSource:
         )
         self._routes = routes
         self._provides = frozenset(provides)
+        # WHY this provider was left to a person, when a reviewed exception exists and simply is
+        # not active right now. Without it the report says only "needs a person-driven session",
+        # which reads identically for a provider whose terms forbid automation and for one whose
+        # per-machine authorization flag was never turned on.
+        self._access_detail = " ".join(str(access_detail or "").split())
 
     def provides(self):
         return self._provides
@@ -91,6 +102,15 @@ class HumanRequiredSource:
         reason = (
             "requires an explicit one-part Collect All Sources session; automatic batch capture "
             "did not open a person-driven provider window"
+        )
+        if self._access_detail:
+            reason = f"{reason} ({self._access_detail})"
+        trace(
+            "capture.route.deferred",
+            provider=self.provider_key,
+            label=self.report_label,
+            routes=[route.route_id for route in self._routes],
+            why=reason,
         )
         return SourceOutcome(
             skipped=reason,
@@ -137,6 +157,96 @@ def _provider_route_plan(provider_key: str) -> tuple[ProviderRoutePlan, ...]:
     if not planned:
         raise ValueError(f"provider {provider_key!r} has no implemented author route")
     return tuple(planned)
+
+
+def _machine_access_detail(provider_key: str, *, config=None) -> str:
+    """The sentence explaining a withheld machine-access exception, or "" when none applies.
+
+    A provider with no reviewed exception at all is not "unauthorized" - person-driven IS its
+    normal contract - so that case adds nothing and stays blank.
+    """
+
+    try:
+        decision = machine_access_decision(provider_key, config=config)
+    except Exception:  # noqa: BLE001 - an undescribable decision simply adds no detail
+        return ""
+    if decision.authorized or decision.signal == "no-reviewed-policy":
+        return ""
+    return decision.detail
+
+
+def _trace_provider_routing(
+    *,
+    mode: str,
+    vendor,
+    config,
+    provider_keys,
+    automatic_provider_keys,
+    deferred_keys,
+) -> None:
+    """Say WHY every registered provider is in, out, or deferred, before any page opens.
+
+    This is the first question a failed run raises and the one the report could never answer: the
+    owner saw "no complete CAD package" with no way to tell an unauthorized provider from an
+    absent one. Every fact logged here is already a decision input elsewhere in this module, so
+    the trace cannot disagree with the run. Wrapped whole: describing a route may never break one.
+    """
+
+    try:
+        from stockroom.capture.vendors import get_adapter
+
+        automatic = set(automatic_provider_keys)
+        selected = list(provider_keys)
+        deferred = set(deferred_keys)
+        trace(
+            "capture.route.order",
+            mode=mode,
+            preferred=str(vendor or ""),
+            selected=selected,
+            automatic=sorted(automatic),
+            deferred=sorted(deferred),
+        )
+        try:
+            registered = _vendor_chain(vendor)
+        except Exception:  # noqa: BLE001 - an unknown preference is the caller's error to raise
+            registered = list(_VENDOR_CHAIN)
+        for key in dict.fromkeys([*selected, *registered]):
+            adapter = get_adapter(key)
+            if adapter is None:
+                trace(
+                    "capture.route.provider",
+                    provider=key,
+                    included=False,
+                    why="no implemented capture adapter",
+                )
+                continue
+            decision = machine_access_decision(key, config=config)
+            included = key in selected
+            if included and key in automatic:
+                lane = "automatic"
+            elif included:
+                lane = "explicit-provider"
+            elif key in deferred:
+                lane = "deferred-to-person"
+            else:
+                lane = "excluded"
+            trace(
+                "capture.route.provider",
+                provider=key,
+                label=adapter.capability.label,
+                included=included,
+                lane=lane,
+                browser_access=adapter.capability.browser_access,
+                operator_automation=adapter.capability.operator_automation,
+                machine_access=decision.authorized,
+                access_signal=decision.signal,
+                access_why=decision.detail,
+                exception_code=decision.exception_code,
+                formats=sorted(adapter.capability.supported_formats),
+                engine=adapter.capability.browser_engine,
+            )
+    except Exception:  # noqa: BLE001 - the routing trace is never a routing decision
+        pass
 
 
 def _provider_requirements(provider_key: str):
@@ -394,11 +504,43 @@ def run_guided_capture(
     from threading import Event
 
     workflow_cancelled = Event()
+    # What the PERSON says about the capture in front of them. It is published under the one
+    # selected part below (see `capture/intent.py`) and reaches this run through the SAME polled
+    # predicates cancellation already uses, because that is the channel that demonstrably reaches
+    # a running person-driven window. A library-wide automatic pass opens no such window, so its
+    # intent is simply never published and nothing can signal it.
+    person_intent = PersonCaptureIntent()
     explicit_provider_capture = user_driven or operator_authorized
     exact_part_id: str | None = None
+    capture_mode = (
+        "collect-all"
+        if collect_all
+        else "assisted"
+        if operator_authorized
+        else "user-driven"
+        if user_driven
+        else "automatic"
+    )
+    trace(
+        "capture.run.start",
+        mode=capture_mode,
+        preferred_provider=str(vendor or ""),
+        parts=(len(list(part_ids)) if isinstance(part_ids, (list, tuple)) else "derived"),
+        limit=limit,
+        headless=headless,
+        engine=engine or "capability-default",
+        log=install_capture_log(),
+    )
 
     def capture_should_stop() -> bool:
-        return workflow_cancelled.is_set() or bool(should_stop and should_stop())
+        # A person skipping the part is their own stop, so it travels on the existing stop
+        # predicate rather than a second channel that would have to be proven to reach the
+        # running capture separately.
+        return (
+            workflow_cancelled.is_set()
+            or person_intent.part_skipped()
+            or bool(should_stop and should_stop())
+        )
 
     if explicit_provider_capture or collect_all:
         if part_ids is None or isinstance(part_ids, (str, bytes)):
@@ -486,6 +628,17 @@ def run_guided_capture(
 
     automatic_provider_set = set(automatic_provider_keys)
 
+    # ONE store for the whole run, and one chance to refresh it from the person's own browser
+    # history before any source is built. Person-driven capture opens the owner's real browser and
+    # hands the window back to them, so `final_url` no longer teaches Stockroom anything and this
+    # is the only remaining way a NEW id is ever learned. Opt-in and default off; when it is off
+    # this is a dictionary lookup and nothing more. See `capture/models_history.py`.
+    models_ids = default_digikey_models_ids() if "digikey" in provider_keys else None
+    if models_ids is not None:
+        from stockroom.capture.models_history import learn_models_ids_for_library
+
+        learn_models_ids_for_library(ctx, store=models_ids)
+
     def make_guided_source(key: str):
         from stockroom.capture.vendors import get_adapter
 
@@ -549,6 +702,11 @@ def run_guided_capture(
             user_driven=source_user_driven,
             operator_authorized=source_operator_authorized,
             user_cancelled=capture_should_stop,
+            # "No more is coming from this page", consumed by whichever route is open when the
+            # person says it. Without this the seam existed and was never passed, so a
+            # person-driven route could only end on cancel, ~25 s of quiet after a file landed,
+            # or the 600 s timeout - five times over for DigiKey's five author routes.
+            user_finished=person_intent.take_route_finish,
             cancel_workflow=workflow_cancelled.set,
             rate_limiter=rate_limiter,
             # Re-load the non-secret authorization flag and kill switches immediately before
@@ -563,10 +721,16 @@ def run_guided_capture(
                 if policy is not None
                 else None
             ),
+            # DigiKey only, because DigiKey is the only surface with a per-part models page and a
+            # provider tab to land on. It carries the opaque id learned from the person's own
+            # navigation so their SECOND visit to a part skips the search they already did; every
+            # other provider, and every first visit, is untouched.
+            models_ids=models_ids if key == "digikey" else None,
         )
 
     guided_sources = [make_guided_source(key) for key in provider_keys]
     deferred_sources = []
+    deferred_keys: list[str] = []
     if not explicit_provider_capture and not collect_all:
         deferred_keys = [key for key in _vendor_chain(vendor) if key not in automatic_provider_set]
         deferred_sources = [
@@ -574,9 +738,18 @@ def run_guided_capture(
                 key,
                 _provider_route_plan(key),
                 _provider_requirements(key),
+                access_detail=_machine_access_detail(key, config=ctx.config),
             )
             for key in deferred_keys
         ]
+    _trace_provider_routing(
+        mode=capture_mode,
+        vendor=vendor,
+        config=getattr(ctx, "config", None),
+        provider_keys=provider_keys,
+        automatic_provider_keys=automatic_provider_keys,
+        deferred_keys=deferred_keys,
+    )
     # Direct/keyless acquisition is the zero-interaction first lane. If it fills the remaining
     # KiCad requirements, GuidedCaptureSource is never asked and no browser window opens.
     sources = (
@@ -612,24 +785,27 @@ def run_guided_capture(
         total = min(total, limit) if total is not None else None
 
     try:
-        report = complete_library(
-            work,
-            load_record=load_record,
-            sources=sources,
-            on_progress=progress,
-            should_stop=capture_should_stop,
-            total=total,
-            breaker=CircuitBreaker(threshold=_BREAKER_THRESHOLD),
-            collect_variants=explicit_provider_capture or collect_all,
-            exhaustive=collect_all,
-            evidence_resolver=completion_evidence_resolver,
-        )
+        # Published for exactly as long as a person could be standing in front of this capture.
+        with person_capture_intent(exact_part_id, person_intent):
+            report = complete_library(
+                work,
+                load_record=load_record,
+                sources=sources,
+                on_progress=progress,
+                should_stop=capture_should_stop,
+                total=total,
+                breaker=CircuitBreaker(threshold=_BREAKER_THRESHOLD),
+                collect_variants=explicit_provider_capture or collect_all,
+                exhaustive=collect_all,
+                evidence_resolver=completion_evidence_resolver,
+            )
     finally:
         for source in guided_sources:
             source.close()
         if playwright_runtime is not None:
             playwright_runtime.close()
 
+    _trace_run_verdict(capture_mode, report)
     if report.of("completed", "improved") or any(
         outcome.activated
         for item in getattr(report, "items", ())
@@ -638,6 +814,40 @@ def run_guided_capture(
         ctx.jobs.run_write(ctx.rebuild_index)
         ctx.jobs.run_write(ctx.auto_push)
     return report.to_dict()
+
+
+def _trace_run_verdict(mode: str, report) -> None:
+    """One final line per part, naming the specific reason each provider route ended on."""
+
+    try:
+        for item in getattr(report, "items", ()) or ():
+            trace(
+                "capture.part.verdict",
+                mode=mode,
+                part=getattr(item, "part_id", ""),
+                mpn=getattr(item, "mpn", ""),
+                status=getattr(item, "status", ""),
+                satisfied=list(getattr(item, "satisfied", ()) or ()),
+                remaining=list(getattr(item, "remaining", ()) or ()),
+                retained=getattr(item, "retained", 0),
+                error=getattr(item, "error", ""),
+            )
+            for outcome in getattr(item, "provider_outcomes", ()) or ():
+                trace(
+                    "capture.route.verdict",
+                    part=getattr(item, "part_id", ""),
+                    route=outcome.route_id,
+                    label=outcome.label,
+                    status=outcome.status,
+                    attempted=outcome.attempted,
+                    activated=outcome.activated,
+                    retained=outcome.retained,
+                    why=outcome.reason,
+                )
+        counts = report.counts() if hasattr(report, "counts") else {}
+        trace("capture.run.finish", mode=mode, counts=sorted(f"{k}={v}" for k, v in counts.items()))
+    except Exception:  # noqa: BLE001 - the verdict trace never rewrites the verdict
+        pass
 
 
 def _utc_now_iso() -> str:

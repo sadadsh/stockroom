@@ -107,6 +107,7 @@ export function PassiveAddSection({
         ? result.price_breaks.map((b) => ({ qty: b.qty, price: b.price }))
         : undefined,
       stock: stockNum,
+      catalog: result.catalog,
     };
   }
 

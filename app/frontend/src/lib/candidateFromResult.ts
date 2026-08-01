@@ -164,6 +164,7 @@ export function mergeResultIntoCandidate(
 
   return {
     ...candidate,
+    catalog: { ...(candidate.catalog ?? {}), ...(result.catalog ?? {}) },
     alternates,
     mpn: mpn || candidate.mpn,
     manufacturer: manufacturer || candidate.manufacturer,

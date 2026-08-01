@@ -5,6 +5,7 @@ repo sync, distinct from the app self-update (updater.py)."""
 from __future__ import annotations
 
 import json
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request
 
@@ -73,11 +74,17 @@ def sync_router(require_token) -> APIRouter:
                     checkout_inventory = candidate
             except (OSError, ValueError):
                 pass
+        from stockroom.vcs.github_auth import accounts as github_accounts
+
         return {
             "has_remote": ctx.repo.has_remote(),
             "current_branch": ctx.repo.current_branch(),
             "ahead": ab[0] if ab else 0,
             "behind": ab[1] if ab else 0,
+            "github_auth": {
+                "mode": "git_credential_manager",
+                "accounts": github_accounts(ctx.repo),
+            },
             "working_copy": _working_copy_status(ctx),
             "checkout_inventory": checkout_inventory
             or {
@@ -97,5 +104,37 @@ def sync_router(require_token) -> APIRouter:
                 }
             ),
         }
+
+    @r.post("/github/login")
+    def github_login(request: Request) -> dict:
+        """Start the current Windows user's Git Credential Manager OAuth flow."""
+        from stockroom.vcs.github_auth import login
+
+        ctx = request.app.state.ctx
+
+        def work(progress):
+            progress({"stage": "waiting", "pct": 0.2, "message": "waiting for GitHub sign-in"})
+            return {"mode": "git_credential_manager", "accounts": login(ctx.repo)}
+
+        return {"job_id": ctx.jobs.submit(work)}
+
+    @r.post("/remote")
+    def connect_remote(request: Request, body: dict) -> dict:
+        """Attach this library repo to one credential-helper-authenticated GitHub remote."""
+        url = str(body.get("url") or "").strip()
+        parsed = urlsplit(url)
+        if (
+            parsed.scheme.casefold() != "https"
+            or (parsed.hostname or "").casefold() != "github.com"
+            or parsed.username
+            or parsed.password
+            or not parsed.path.strip("/")
+        ):
+            raise ValueError("enter an HTTPS GitHub repository URL without embedded credentials")
+        ctx = request.app.state.ctx
+        if ctx.repo.remote_url("origin"):
+            raise ValueError("origin is already configured for this library")
+        ctx.repo.add_remote("origin", url)
+        return {"configured": True, "remote": url}
 
     return r

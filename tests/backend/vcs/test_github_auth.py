@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+from types import SimpleNamespace
 
 import pytest
 
@@ -119,3 +120,31 @@ def test_configure_never_puts_the_token_in_the_remote_url(tmp_path, monkeypatch)
 
     remotes = repo._run("remote", "-v").stdout
     assert "ghp_SECRET" not in remotes
+
+
+def test_accounts_are_read_from_git_credential_manager_without_a_stockroom_token():
+    calls: list[tuple[str, ...]] = []
+
+    class _Repo:
+        def _run(self, *args, **_kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="sadadsh\ncollaborator\nsadadsh\n")
+
+    assert github_auth.accounts(_Repo()) == ["collaborator", "sadadsh"]
+    assert calls == [("credential-manager", "github", "list", "--no-ui")]
+
+
+def test_login_delegates_oauth_to_git_credential_manager(monkeypatch):
+    calls: list[tuple[str, ...]] = []
+
+    class _Repo:
+        def _run(self, *args, **_kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="sadadsh\n")
+
+    repo = _Repo()
+    assert github_auth.login(repo) == ["sadadsh"]
+    assert calls == [
+        ("credential-manager", "github", "login"),
+        ("credential-manager", "github", "list", "--no-ui"),
+    ]

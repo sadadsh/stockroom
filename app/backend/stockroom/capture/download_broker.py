@@ -293,6 +293,46 @@ class DownloadBroker:
             self._last_playwright_event_at = self._monotonic()
         raise error from last_error
 
+    def capture_local_file(
+        self,
+        path,
+        *,
+        source_url: str = "",
+        transport: str = "default-browser",
+    ) -> DownloadReceipt:
+        """COPY one file the PERSON downloaded into this task's staging directory.
+
+        Exists for the de-automated transport, where there is no Playwright ``Download`` to bind to
+        and the only artifact is a file the person's own browser wrote into their Downloads folder.
+
+        The original is READ, never moved and never removed. That is deliberate and load-bearing:
+        the file belongs to the person, so adopting it must leave their copy exactly where their
+        browser put it, which is what makes an adoption reversible by deleting the staged copy.
+
+        This performs no identity check whatsoever. Binding a file to the part that asked for it is
+        the job of the unchanged inspection and identity gates downstream; a broker that guessed
+        from a filename is exactly the failure the retired Downloads watcher shipped.
+        """
+
+        source = Path(path)
+        if source.is_symlink() or not source.is_file():
+            raise DownloadBrokerError(f"handoff candidate is not a real file: {source.name}")
+        name = source.name or "download"
+
+        def _chunks() -> Iterator[bytes]:
+            with source.open("rb") as handle:
+                while chunk := handle.read(_CHUNK_BYTES):
+                    yield chunk
+
+        return self._materialize_chunks(
+            _chunks(),
+            suggested_name=name,
+            source_url=_receipt_url(source_url) if source_url else "",
+            final_url=_receipt_url(source_url) if source_url else "",
+            transport=transport,
+            attempt=1,
+        )
+
     def wait_for_playwright(
         self,
         page,

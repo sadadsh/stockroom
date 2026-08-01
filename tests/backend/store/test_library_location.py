@@ -57,17 +57,16 @@ def test_configured_root_wins_even_when_in_repo_default_exists(tmp_path):
     assert resolve_libraries_root(cfg) != IN_REPO_DEFAULT
 
 
-def test_blank_config_falls_back_to_in_repo_default_or_none():
+def test_blank_config_never_falls_back_to_application_repo():
     cfg = MachineConfig()  # libraries_root == ""
     got = resolve_libraries_root(cfg)
-    # On a source checkout the in-repo library may exist; beside a frozen exe it does not.
-    assert got == (IN_REPO_DEFAULT if IN_REPO_DEFAULT.exists() else None)
+    assert got is None
 
 
 def test_whitespace_only_config_is_treated_as_unset(tmp_path):
     cfg = MachineConfig(libraries_root="   ")
     got = resolve_libraries_root(cfg)
-    assert got == (IN_REPO_DEFAULT if IN_REPO_DEFAULT.exists() else None)
+    assert got is None
 
 
 def test_library_is_initialized_true_for_dir_with_a_profile(tmp_path):

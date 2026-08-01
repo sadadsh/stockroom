@@ -3,13 +3,13 @@
  * their own body (header + panes); the shell owns the rail and the surface
  * background so every page reads consistent.
  */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Rail } from "./Rail";
 import { AddPartModal } from "./AddPartModal";
 import { Text } from "../lib/copy";
 import { plural } from "../lib/plural";
 import { useRouter } from "../lib/router";
-import { useActivateProfile, useFacetsQuery, useProfiles } from "../api/queries";
+import { useFacetsQuery, useOnboarding } from "../api/queries";
 import { useUpdateStanding } from "../lib/useUpdateStanding";
 import { RunningVersionIndicator } from "./RunningVersionIndicator";
 
@@ -34,7 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 // the components load state (Title Case, no status dot) and the active section, named from
 // the nav registry so "stm" reads "STM Viewer", never a capitalized route slug. Right: the
 // working context that matters day to day - the exact running revision, its remotely proven
-// standing, and the active profile. All read from queries the app already caches.
+// standing, and the active library repository. All read from queries the app already caches.
 function ShellStatusBar() {
   const { route } = useRouter();
   const facets = useFacetsQuery();
@@ -88,88 +88,28 @@ function ShellStatusBar() {
       )}
       <span className="ml-auto flex items-center gap-2.5 text-t2">
         <RunningVersionIndicator view={updateView} />
-        <ProfileSwitch />
+        <LibraryStatus />
       </span>
     </footer>
   );
 }
 
 /**
- * The active profile, and a way to CHANGE it (punch 13b).
- *
- * The bar already called `useProfiles()` and rendered the name as dead text - it had zero
- * interactive elements in it. Switching a profile repoints the whole library, so the one place the
- * active profile is always visible is the right place to switch it from.
+ * The active independent library repository. Repository switching lives in Settings where its
+ * filesystem and Git consequences are explicit; the status bar is a quiet, permanent fact.
  */
-function ProfileSwitch() {
-  const profiles = useProfiles();
-  const activate = useActivateProfile();
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const active = profiles.data?.active ?? "";
-  const others = (profiles.data?.profiles ?? []).filter((name) => name !== active);
-
-  // Escape and an outside pointer both close it. A popover that can only be dismissed by clicking
-  // its own trigger again is a trap, and the Filters popover next door already has that flaw.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    const onDown = (e: PointerEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onDown);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onDown);
-    };
-  }, [open]);
-
+function LibraryStatus() {
+  const onboarding = useOnboarding();
+  const active = onboarding.data?.libraries.find((library) => library.active);
   if (!active) return null;
   return (
-    <div ref={wrapRef} className="relative">
-      <button
-        type="button"
-        data-dev-id="shell.profile-switch"
-        aria-expanded={open}
-        disabled={activate.isPending || others.length === 0}
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-control px-1 py-0.5 text-2xs text-t2 transition-colors hover:text-t1 disabled:pointer-events-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc"
-      >
-        <span className="text-t2">
-          <Text id="shell.status.profile">Profile</Text>:
-        </span>
-        <span className="font-semibold text-t1">{active}</span>
-        {others.length > 0 ? (
-          <span aria-hidden className="text-t3">
-            {open ? "▾" : "▴"}
-          </span>
-        ) : null}
-      </button>
-      {open ? (
-        // opens UPWARD: the bar is the last row on screen, so a downward menu would be clipped by
-        // the window edge (the same mistake the CAD readiness popover shipped with)
-        <div
-          data-dev-id="shell.profile-menu"
-          className="absolute bottom-[calc(100%+6px)] right-0 z-[80] min-w-[160px] rounded-card border border-line2 bg-popover p-1 shadow-pop"
-        >
-          {others.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                activate.mutate(name);
-              }}
-              className="block w-full truncate rounded-control px-2 py-1 text-left text-2xs text-t2 transition-colors hover:bg-[var(--c-hover)] hover:text-t1"
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <span
+      data-dev-id="shell.library"
+      aria-label={`Library: ${active.name}`}
+      className="inline-flex min-w-0 items-center gap-1 text-t2"
+    >
+      <span><Text id="shell.status.library">Library</Text>:</span>
+      <span className="max-w-[220px] truncate font-semibold text-t1">{active.name}</span>
+    </span>
   );
 }

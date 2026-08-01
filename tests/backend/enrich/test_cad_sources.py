@@ -188,6 +188,73 @@ def test_samacsys_search_is_a_query_parameter_not_a_path_segment():
     assert "/search/TPD6E05U06RVZR" not in url
 
 
+# --- the DigiKey models deep link ------------------------------------------------------------
+
+
+def test_digikey_prefers_the_models_page_once_the_person_has_been_there():
+    """The exact product page still costs a scroll to CAD Models and a tab click. The models
+    page IS that surface, and its opaque id can only come from the person's own navigation."""
+
+    dk = FakeDigiKey(url="https://www.digikey.com/en/products/detail/ti/TPS62130RGTR/123")
+    got = {
+        s.key: s.url
+        for s in resolve_cad_sources("TPS62130RGTR", digikey=dk, digikey_models_id="6695662")
+    }
+    assert got["digikey"] == "https://www.digikey.com/en/models/6695662"
+    # One vendor's deep link must not disturb the other three.
+    assert "TPS62130RGTR" in got["ultralibrarian"]
+
+
+def test_no_known_models_id_leaves_every_url_exactly_as_it_was():
+    baseline = {s.key: s.url for s in resolve_cad_sources("TPS62130RGTR", digikey=FakeDigiKey())}
+    assert {
+        s.key: s.url
+        for s in resolve_cad_sources("TPS62130RGTR", digikey=FakeDigiKey(), digikey_models_id="")
+    } == baseline
+
+
+def test_digikey_media_replaces_provider_searches_with_exact_model_links():
+    catalog = {
+        "media": [
+            {
+                "media_type": "EDA Models",
+                "title": "Ultra Librarian CAD Models",
+                "url": "https://app.ultralibrarian.com/details/acme/x",
+            },
+            {
+                "media_type": "EDA Models",
+                "title": "SnapEDA CAD Models",
+                "url": "https://www.snapeda.com/parts/X/Acme/view-part/",
+            },
+        ]
+    }
+    got = {
+        source.key: source.url
+        for source in resolve_cad_sources("X", digikey=FakeDigiKey(), digikey_catalog=catalog)
+    }
+    assert got["ultralibrarian"] == "https://app.ultralibrarian.com/details/acme/x"
+    assert got["snapmagic"] == "https://www.snapeda.com/parts/X/Acme/view-part/"
+    assert "componentsearchengine.com/search" in got["samacsys"]
+
+
+@pytest.mark.parametrize(
+    "models_id",
+    ["abc", "../evil", "6695662/../evil", "6695662?tab=evil", "0123", "6695662 ", None, 6695662],
+)
+def test_a_malformed_models_id_falls_back_instead_of_being_interpolated(models_id):
+    baseline = {s.key: s.url for s in resolve_cad_sources("TPS62130RGTR", digikey=FakeDigiKey())}
+    got = {
+        s.key: s.url
+        for s in resolve_cad_sources(
+            "TPS62130RGTR",
+            digikey=FakeDigiKey(),
+            digikey_models_id=models_id,
+        )
+    }
+    assert got == baseline
+    assert "evil" not in got["digikey"]
+
+
 def test_a_source_carries_what_the_user_must_do_there():
     # The guided window shows this, so it must be per-vendor rather than one generic instruction.
     for source in resolve_cad_sources("TPS62130RGTR"):

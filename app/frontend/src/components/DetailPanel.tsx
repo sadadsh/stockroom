@@ -87,6 +87,7 @@ import {
 import { useToast } from "../lib/toast";
 import { CompletePartModal } from "./CompletePartModal";
 import { CadVariantSection } from "./CadVariantSection";
+import { CatalogProductDataBlock } from "./PulledDepth";
 import {
   ExternalIcon,
   RefreshIcon,
@@ -455,7 +456,8 @@ export function hasRecordedSourcing(
     detail.derived.category,
     detail.derived.specs,
   ).some((group) => group.title === TRADE_GROUP && group.rows.length > 0);
-  return hasPurchaseEvidence || hasTradeEvidence;
+  const hasCatalogEvidence = Object.keys(detail.catalog ?? {}).length > 0;
+  return hasPurchaseEvidence || hasTradeEvidence || hasCatalogEvidence;
 }
 
 /**
@@ -1239,6 +1241,9 @@ export function DetailPanel({
                 status={refreshStatus}
                 error={refreshError}
               />
+              {detail.catalog?.digikey ? (
+                <CatalogProductDataBlock data={detail.catalog.digikey} />
+              ) : null}
               {tradeGroup ? (
                 <TradeCompliance
                   group={tradeGroup}

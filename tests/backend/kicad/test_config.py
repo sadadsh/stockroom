@@ -65,3 +65,28 @@ def test_detect_running_never_raises():
     def boom():
         raise OSError("no process tool")
     assert detect_running_kicad(lister=boom) is False
+
+
+def test_windows_reads_the_process_snapshot_instead_of_shelling_out(monkeypatch):
+    """`tasklist` enumerates AND formats every process; the snapshot API only enumerates.
+
+    Measured on the owner's machine, which runs ~3,600 processes: 6.75 s versus 82 ms. This runs
+    inside `GET /api/system/info`, so the command version held that endpoint open past the
+    client's default read timeout and the request failed rather than answering slowly.
+    """
+    import os
+    import subprocess
+
+    from stockroom.kicad import config
+
+    if os.name != "nt":
+        return
+
+    def refuse(*_args, **_kwargs):
+        raise AssertionError("the Windows path must not spawn a process lister")
+
+    monkeypatch.setattr(subprocess, "run", refuse)
+    names = config._default_lister()
+    assert names.strip(), "the snapshot returned no process names"
+    # The reader itself must run, not merely be defined: this test process is in its own snapshot.
+    assert "python" in names.lower() or "pytest" in names.lower()

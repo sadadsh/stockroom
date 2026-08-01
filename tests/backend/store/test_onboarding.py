@@ -33,7 +33,7 @@ def _library(root, profile="Main"):
     return root
 
 
-# -- in-repo library (lives inside the app repo) -------------------------------
+# -- repository isolation ------------------------------------------------------
 
 
 def test_ensure_git_isolates_a_library_nested_in_an_unrelated_repo(tmp_path):
@@ -49,23 +49,26 @@ def test_ensure_git_isolates_a_library_nested_in_an_unrelated_repo(tmp_path):
     assert (lib / ".git").exists()  # its OWN repo, isolated from the unrelated parent
 
 
-def test_bootstrap_prefers_in_repo_over_a_placeholder_config(tmp_path, monkeypatch):
-    # A machine whose config only holds the auto-created bootstrap placeholder (never onboarded)
-    # repoints at the library that ships in the app repo, so the app opens straight on it.
+def test_bootstrap_never_adopts_the_application_repo_library(tmp_path, monkeypatch):
+    # The historical in-repo directory is migration input, never runtime authority. A first-run
+    # placeholder therefore remains its own repo instead of contaminating Stockroom source.
     in_repo = _library(tmp_path / "libraries")
     monkeypatch.setattr("stockroom.store.library_location.IN_REPO_DEFAULT", in_repo)
     placeholder = str(onboarding._bootstrap_dir())
     cfg = MachineConfig(libraries_root=placeholder, onboarded=False)
     root = onboarding.bootstrap_library(cfg)
-    assert root == in_repo
-    assert cfg.libraries_root == str(in_repo)
+    assert root == onboarding._bootstrap_dir()
+    assert root != in_repo
+    assert (root / ".git").exists()
 
 
-def test_bootstrap_prefers_in_repo_when_config_is_unset(tmp_path, monkeypatch):
+def test_bootstrap_uses_isolated_placeholder_when_config_is_unset(tmp_path, monkeypatch):
     in_repo = _library(tmp_path / "libraries")
     monkeypatch.setattr("stockroom.store.library_location.IN_REPO_DEFAULT", in_repo)
     cfg = MachineConfig()  # unset
-    assert onboarding.bootstrap_library(cfg) == in_repo
+    root = onboarding.bootstrap_library(cfg)
+    assert root == onboarding._bootstrap_dir()
+    assert root != in_repo
 
 
 def test_bootstrap_does_not_override_a_real_configured_library(tmp_path, monkeypatch):
@@ -89,6 +92,7 @@ def test_create_makes_git_repo_with_profile_and_persists(tmp_path):
     assert library_is_initialized(root)
     assert cfg.libraries_root == str(root)
     assert cfg.onboarded is True
+    assert cfg.library_workspaces == [{"name": "new", "path": str(root.resolve())}]
     assert MachineConfig.load().libraries_root == str(root)  # persisted to disk
 
 

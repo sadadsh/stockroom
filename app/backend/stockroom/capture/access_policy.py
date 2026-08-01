@@ -50,10 +50,106 @@ _POLICIES = {
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 
+@dataclass(frozen=True, slots=True)
+class MachineAccessDecision:
+    """Why this installation may or may not run one provider adapter unattended.
+
+    ``authorized`` is the whole decision; ``signal`` and ``detail`` exist so the capture trace can
+    say WHICH policy row, flag, or environment kill switch settled it. Nothing here names a
+    credential: the only per-machine state consulted is a public boolean flag.
+    """
+
+    provider_key: str
+    authorized: bool
+    signal: str
+    detail: str
+    policy: MachineAccessPolicy | None = None
+
+    @property
+    def exception_code(self) -> str:
+        return self.policy.exception_code if self.policy is not None else ""
+
+
 def machine_access_policy(provider_key: str) -> MachineAccessPolicy | None:
     """Return the reviewed policy row for ``provider_key``, if one exists."""
 
     return _POLICIES.get((provider_key or "").strip().casefold())
+
+
+def machine_access_decision(
+    provider_key: str,
+    *,
+    config: object | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> MachineAccessDecision:
+    """The authorization verdict WITH the exact reason that produced it.
+
+    Same three facts, same order, same fail-closed behaviour as ``machine_access_authorized``,
+    which is implemented in terms of this. Splitting them would let the trace describe a decision
+    the run did not actually make.
+    """
+
+    key = (provider_key or "").strip().casefold()
+    policy = machine_access_policy(key)
+    if policy is None:
+        return MachineAccessDecision(
+            provider_key=key,
+            authorized=False,
+            signal="no-reviewed-policy",
+            detail=(
+                "no reviewed machine-access exception exists for this provider; "
+                "it stays assisted-only"
+            ),
+        )
+    environment = os.environ if environ is None else environ
+    if _environment_flag(environment, _GLOBAL_KILL_SWITCH):
+        return MachineAccessDecision(
+            provider_key=key,
+            authorized=False,
+            signal="global-kill-switch",
+            detail=f"{_GLOBAL_KILL_SWITCH} is set",
+            policy=policy,
+        )
+    if _environment_flag(environment, policy.provider_kill_switch):
+        return MachineAccessDecision(
+            provider_key=key,
+            authorized=False,
+            signal="provider-kill-switch",
+            detail=f"{policy.provider_kill_switch} is set",
+            policy=policy,
+        )
+    if config is None:
+        try:
+            from stockroom.store.machine_config import MachineConfig
+
+            config = MachineConfig.load()
+        except Exception:  # noqa: BLE001 - unreadable authorization state is not authorization
+            return MachineAccessDecision(
+                provider_key=key,
+                authorized=False,
+                signal="config-unreadable",
+                detail="the per-machine configuration could not be read; failing closed",
+                policy=policy,
+            )
+    if getattr(config, policy.authorization_flag, None) is True:
+        return MachineAccessDecision(
+            provider_key=key,
+            authorized=True,
+            signal="authorized",
+            detail=(
+                f"{policy.authorization_flag} is enabled under {policy.exception_code}"
+            ),
+            policy=policy,
+        )
+    return MachineAccessDecision(
+        provider_key=key,
+        authorized=False,
+        signal="flag-not-enabled",
+        detail=(
+            f"the per-machine {policy.authorization_flag} authorization flag is not enabled"
+        ),
+        policy=policy,
+    )
 
 
 def machine_access_authorized(
@@ -73,23 +169,11 @@ def machine_access_authorized(
     A malformed or unreadable machine configuration fails closed.
     """
 
-    policy = machine_access_policy(provider_key)
-    if policy is None:
-        return False
-    environment = os.environ if environ is None else environ
-    if _environment_flag(environment, _GLOBAL_KILL_SWITCH) or _environment_flag(
-        environment,
-        policy.provider_kill_switch,
-    ):
-        return False
-    if config is None:
-        try:
-            from stockroom.store.machine_config import MachineConfig
-
-            config = MachineConfig.load()
-        except Exception:  # noqa: BLE001 - unreadable authorization state is not authorization
-            return False
-    return getattr(config, policy.authorization_flag, None) is True
+    return machine_access_decision(
+        provider_key,
+        config=config,
+        environ=environ,
+    ).authorized
 
 
 def _environment_flag(environment: Mapping[str, str], name: str) -> bool:
@@ -97,7 +181,9 @@ def _environment_flag(environment: Mapping[str, str], name: str) -> bool:
 
 
 __all__ = [
+    "MachineAccessDecision",
     "MachineAccessPolicy",
     "machine_access_authorized",
+    "machine_access_decision",
     "machine_access_policy",
 ]

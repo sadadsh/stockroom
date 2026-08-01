@@ -43,6 +43,7 @@ from stockroom.capture.identity import (
     provider_url_allowed,
 )
 from stockroom.capture.requirements import Requirement
+from stockroom.capture.trace import trace, trace_debug, url_note
 
 _KICAD_REQS = frozenset(
     {Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT, Requirement.KICAD_MODEL}
@@ -448,7 +449,15 @@ class UltraLibrarianAdapter:
 
         Returns "" on success, else a human-readable reason.
         """
-        if page.locator("input[name=exports]").count() > 0:
+        exports_present = page.locator("input[name=exports]").count()
+        trace(
+            "capture.step.open-panel",
+            provider="Ultra Librarian",
+            url=url_note(getattr(page, "url", "")),
+            selector="input[name=exports]",
+            matches=exports_present,
+        )
+        if exports_present > 0:
             return _detail_identity_issue(
                 "ultralibrarian",
                 page.url or "",
@@ -460,6 +469,13 @@ class UltraLibrarianAdapter:
             return challenge
         missing = _ultralibrarian_missing_model_issue(page)
         if missing:
+            trace(
+                "capture.step.open-panel",
+                provider="Ultra Librarian",
+                stage="landing",
+                outcome="no-model",
+                why=missing,
+            )
             return missing
 
         if "/search" in (page.url or ""):
@@ -468,12 +484,29 @@ class UltraLibrarianAdapter:
             try:
                 results.first.wait_for(state="visible", timeout=20_000)
             except Exception:  # noqa: BLE001 - no result is an answer, not a crash
+                trace(
+                    "capture.step.search",
+                    provider="Ultra Librarian",
+                    selector='a[href*="/details/"]',
+                    matches=0,
+                    bounded_wait_ms=20_000,
+                    outcome="no-result",
+                )
                 return "Ultra Librarian has no model for this part."
+            result_count = results.count()
             href, selection_error = _exact_result_href(
                 results,
                 requested_mpn,
                 expected_manufacturer=expected_manufacturer,
                 vendor_key="ultralibrarian",
+            )
+            trace(
+                "capture.step.search",
+                provider="Ultra Librarian",
+                selector='a[href*="/details/"]',
+                matches=result_count,
+                exact_row=bool(href),
+                why=selection_error,
             )
             if selection_error:
                 return f"Ultra Librarian {selection_error}"
@@ -529,7 +562,19 @@ class UltraLibrarianAdapter:
             missing = _ultralibrarian_missing_model_issue(page)
             if missing:
                 return missing
-            if page.locator('a[href*="/Account/Login"]').count() > 0:
+            login_links = page.locator('a[href*="/Account/Login"]').count()
+            trace(
+                "capture.step.open-panel",
+                provider="Ultra Librarian",
+                stage="export-panel",
+                selector="input[name=exports]",
+                matches=0,
+                bounded_wait_ms=20_000,
+                login_link_selector='a[href*="/Account/Login"]',
+                login_link_matches=login_links,
+                outcome="signed-out" if login_links > 0 else "panel-absent",
+            )
+            if login_links > 0:
                 return "Sign in to Ultra Librarian in the window; the sign-in is remembered."
             return "the CAD format list did not open on this page"
         return _detail_identity_issue(
@@ -563,6 +608,13 @@ class UltraLibrarianAdapter:
         )
         if blocked:
             clearance = self.user_clearance_issue(page)
+            trace(
+                "capture.step.panel-blocked",
+                provider=self.capability.label,
+                needs_person=bool(clearance),
+                global_blockage=_is_global_blockage(blocked),
+                why=blocked,
+            )
             return DriveReport(
                 missed=list(formats),
                 blocked=bool(clearance) or _is_global_blockage(blocked),
@@ -596,6 +648,13 @@ class UltraLibrarianAdapter:
             box_id = self.capability.version_pins.get(fmt)
             exact_label = self.capability.machine_format_labels.get(fmt)
             if not box_id and not exact_label:
+                trace(
+                    "capture.step.format",
+                    provider=self.capability.label,
+                    format=fmt,
+                    selected=False,
+                    why="no pinned control id and no exact visible label declared",
+                )
                 report.missed.append(fmt)
                 continue
             accordion = self._ACCORDION.get(fmt)
@@ -604,15 +663,41 @@ class UltraLibrarianAdapter:
             if box_id and any(
                 _check_box(page, selector) for selector in _export_selectors(fmt, box_id)
             ):
+                trace(
+                    "capture.step.format",
+                    provider=self.capability.label,
+                    format=fmt,
+                    selected=True,
+                    via="pinned-id",
+                    selectors=list(_export_selectors(fmt, box_id)),
+                )
                 report.selected.append(fmt)
             elif exact_label:
                 selected, reason = _check_exact_export_label(page, exact_label)
+                trace(
+                    "capture.step.format",
+                    provider=self.capability.label,
+                    format=fmt,
+                    selected=bool(selected),
+                    via="exact-label",
+                    label=exact_label,
+                    why=reason,
+                )
                 if selected:
                     report.selected.append(fmt)
                 else:
                     report.missed.append(fmt)
                     missed_reasons.append(reason)
             else:
+                trace(
+                    "capture.step.format",
+                    provider=self.capability.label,
+                    format=fmt,
+                    selected=False,
+                    via="pinned-id",
+                    selectors=list(_export_selectors(fmt, box_id or "")),
+                    why="the pinned control did not read back as checked",
+                )
                 report.missed.append(fmt)
 
         consent_issue = _accept_consents(page)
@@ -689,11 +774,20 @@ class UltraLibrarianAdapter:
         timeout before saying so, and `user_clearance_issue` still names the sign-in as the cause.
         """
         submit = page.locator("#submit-export").first
+        waited = False
         try:
             submit.wait_for(state="attached", timeout=_EXPORT_BUTTON_TIMEOUT_MS)
         except Exception:  # noqa: BLE001 - absence after the wait is the answer, not a crash
-            pass
-        return submit if submit.count() > 0 else None
+            waited = True
+        matches = submit.count()
+        trace(
+            "capture.step.export-button",
+            selector="#submit-export",
+            matches=matches,
+            bounded_wait_ms=_EXPORT_BUTTON_TIMEOUT_MS,
+            wait_expired=waited,
+        )
+        return submit if matches > 0 else None
 
     def _run_export(self, page, submit) -> tuple[bool, str, bool]:
         """Activate the panel's own Download control. `(ran, reason, needs_person)`.
@@ -714,20 +808,42 @@ class UltraLibrarianAdapter:
         """
         try:
             submit.click(timeout=_EXPORT_CLICK_TIMEOUT_MS)
+            trace("capture.step.export-run", selector="#submit-export", via="click", ran=True)
             return True, "", False
         except Exception:  # noqa: BLE001 - an intercepted click is page state, not a crash
             pass
         clearance = self.user_clearance_issue(page)
         if clearance:
+            trace(
+                "capture.step.export-run",
+                selector="#submit-export",
+                via="intercepted",
+                ran=False,
+                needs_person=True,
+                why=clearance,
+            )
             return False, clearance, True
         try:
             page.evaluate(
                 "sel => { const el = document.querySelector(sel); if (el) el.click(); }",
                 "#submit-export",
             )
+            trace(
+                "capture.step.export-run",
+                selector="#submit-export",
+                via="in-page-click",
+                ran=True,
+            )
             return True, "", False
         except Exception:  # noqa: BLE001 - report the honest miss rather than raising
             pass
+        trace(
+            "capture.step.export-run",
+            selector="#submit-export",
+            via="none",
+            ran=False,
+            needs_person=False,
+        )
         return (
             False,
             "Ultra Librarian's Download button could not be activated; something on the page is "
@@ -740,10 +856,23 @@ class UltraLibrarianAdapter:
         return self.user_clearance_issue(page)
 
     def user_clearance_issue(self, page) -> str:
-        """Security or authentication state that requires a person, never automation."""
+        """Security or authentication state that requires a person, never automation.
+
+        EVERY outcome is traced with the SIGNAL that produced it, because until 2026-07-31 a false
+        positive here was indistinguishable from a real gate: both ended as the same sentence in
+        the report with nothing behind it. The three signals are separately named (a security
+        marker, a login destination, a genuinely visible form) so "Ultra Librarian wants a person"
+        can be checked rather than believed.
+        """
 
         security = _security_verification_issue(page, self.capability.label)
         if security:
+            trace(
+                "capture.signal.clearance",
+                provider=self.capability.label,
+                fired=True,
+                signal="security-verification",
+            )
             return security
         try:
             url = page.url or ""
@@ -751,23 +880,55 @@ class UltraLibrarianAdapter:
             # collapsed sign-in form on ordinary pages, and counting it stopped a usable part
             # page as though it were a login gate.
             username = page.locator("#Username")
-            login_form = username.count() > 0 and username.first.is_visible()
+            username_count = username.count()
+            login_form = username_count > 0 and username.first.is_visible()
             # A header "Sign In" ANCHOR is deliberately not evidence. Every Ultra Librarian page
             # carries one, signed in or out, so treating a navigation link as a security gate
             # paused every capture on a normal part page and told the person to clear a challenge
             # that was never there. Only a real login destination or a real form counts.
-            if (
-                "sso.ultralibrarian.com" in url.casefold()
-                or "/account/login" in url.casefold()
-                or login_form
-            ):
+            on_sso = "sso.ultralibrarian.com" in url.casefold()
+            on_login_path = "/account/login" in url.casefold()
+            if on_sso or on_login_path or login_form:
+                trace(
+                    "capture.signal.clearance",
+                    provider=self.capability.label,
+                    fired=True,
+                    signal=(
+                        "url-sso-host"
+                        if on_sso
+                        else "url-account-login"
+                        if on_login_path
+                        else "visible-login-form"
+                    ),
+                    url=url_note(url),
+                    # NAMED `login_field_*`, not `username_*`: the trace guard redacts any field
+                    # whose name looks credential-bearing, and it is right to. A selector and a
+                    # match count are decision inputs, so they get a name that says so.
+                    login_field_selector="#Username",
+                    login_field_matches=username_count,
+                    login_field_visible=bool(login_form),
+                )
                 return (
                     "Ultra Librarian needs you to finish sign-in or its security verification in "
                     "this window. Stockroom never operates CAPTCHA, 2FA, or security controls and "
                     "will resume automatically after you clear them."
                 )
+            trace_debug(
+                "capture.signal.clearance",
+                provider=self.capability.label,
+                fired=False,
+                url=url_note(url),
+                login_field_selector="#Username",
+                login_field_matches=username_count,
+                login_field_visible=False,
+            )
         except Exception:  # noqa: BLE001 - unreadable state is not evidence of a security gate
-            pass
+            trace_debug(
+                "capture.signal.clearance",
+                provider=self.capability.label,
+                fired=False,
+                readable=False,
+            )
         return ""
 
 
@@ -794,7 +955,8 @@ def _click_accordion(page, label: str) -> bool:
     toggle that reports `true` would CLOSE the section this call exists to open.
     """
     toggles = page.locator("a.accordion-toggle")
-    for index in range(toggles.count()):
+    toggle_count = toggles.count()
+    for index in range(toggle_count):
         node = toggles.nth(index)
         try:
             if (node.inner_text() or "").strip() != label:
@@ -803,11 +965,40 @@ def _click_accordion(page, label: str) -> bool:
             continue
         try:
             if (node.get_attribute("aria-expanded") or "").strip().casefold() == "true":
+                trace_debug(
+                    "capture.step.accordion",
+                    selector="a.accordion-toggle",
+                    section=label,
+                    toggles=toggle_count,
+                    outcome="already-open",
+                )
                 return True
             node.click(timeout=_ACCORDION_CLICK_TIMEOUT_MS)
+            trace_debug(
+                "capture.step.accordion",
+                selector="a.accordion-toggle",
+                section=label,
+                toggles=toggle_count,
+                outcome="opened",
+            )
             return True
         except Exception:  # noqa: BLE001 - selection is verified by state readback, not by this
+            trace_debug(
+                "capture.step.accordion",
+                selector="a.accordion-toggle",
+                section=label,
+                toggles=toggle_count,
+                outcome="click-refused",
+                bounded_wait_ms=_ACCORDION_CLICK_TIMEOUT_MS,
+            )
             return False
+    trace_debug(
+        "capture.step.accordion",
+        selector="a.accordion-toggle",
+        section=label,
+        toggles=toggle_count,
+        outcome="section-absent",
+    )
     return False
 
 
@@ -828,21 +1019,34 @@ def _check_box(page, selector: str) -> bool:
     Either way the RETURN is the state read back off the element, so a miss is reported honestly.
     """
     box = page.locator(selector).first
-    if box.count() == 0:
+    matches = box.count()
+    if matches == 0:
+        trace_debug("capture.step.check", selector=selector, matches=0, checked=False)
         return False
+    route = "already-checked"
     if not box.is_checked():
+        route = "playwright-check"
         try:
             box.check(force=True, timeout=5_000)
         except Exception:  # noqa: BLE001 - a styled control refuses the synthetic check; try JS
             pass
     if not box.is_checked():
+        route = "in-page-click"
         try:
             page.evaluate(
                 "sel => { const el = document.querySelector(sel); if (el) el.click(); }", selector
             )
         except Exception:  # noqa: BLE001 - report the honest miss rather than raising
             pass
-    return box.is_checked()
+    checked = box.is_checked()
+    trace_debug(
+        "capture.step.check",
+        selector=selector,
+        matches=matches,
+        via=route,
+        checked=bool(checked),
+    )
+    return checked
 
 
 def _check_exact_export_label(page, exact_label: str) -> tuple[bool, str]:
@@ -856,8 +1060,9 @@ def _check_exact_export_label(page, exact_label: str) -> tuple[bool, str]:
 
     wanted = " ".join(normalize("NFKC", exact_label or "").split())
     labels = page.locator("label[for]")
+    label_count = labels.count()
     matching_ids: list[str] = []
-    for index in range(labels.count()):
+    for index in range(label_count):
         label = labels.nth(index)
         try:
             visible = " ".join(normalize("NFKC", label.inner_text() or "").split())
@@ -866,6 +1071,12 @@ def _check_exact_export_label(page, exact_label: str) -> tuple[bool, str]:
             continue
         if visible == wanted and control_id and control_id not in matching_ids:
             matching_ids.append(control_id)
+    trace(
+        "capture.step.exact-label",
+        wanted=wanted,
+        labels_scanned=label_count,
+        exact_matches=len(matching_ids),
+    )
     if not matching_ids:
         return (
             False,
@@ -925,9 +1136,16 @@ def _clear_export_selections(page) -> bool:
         # `#id` selector is not generally valid here. An escaped attribute selector is.
         escaped = box_id.replace("\\", "\\\\").replace('"', '\\"')
         selectors.append(f'input[name="exports"][id="{escaped}"]')
-    return all(_uncheck_box(page, selector) for selector in selectors) and (
-        page.locator("input[name=exports]:checked").count() == 0
+    cleared = all(_uncheck_box(page, selector) for selector in selectors)
+    remaining = page.locator("input[name=exports]:checked").count()
+    trace(
+        "capture.step.clear-exports",
+        selector="input[name=exports]:checked",
+        stale_selections=len(selectors),
+        cleared=bool(cleared),
+        still_checked=remaining,
     )
+    return cleared and remaining == 0
 
 
 def _export_selectors(fmt: str, declared_id: str) -> tuple[str, ...]:
@@ -960,7 +1178,8 @@ def _accept_consents(page) -> str:
     """
     consents = page.locator("input[type=checkbox][id^=consent-]")
     refused: list[str] = []
-    for index in range(consents.count()):
+    consent_count = consents.count()
+    for index in range(consent_count):
         node = consents.nth(index)
         try:
             box_id = (node.get_attribute("id") or "").strip()
@@ -976,6 +1195,13 @@ def _accept_consents(page) -> str:
             continue
         if "required" in classes:
             refused.append(box_id)
+    trace(
+        "capture.step.consents",
+        selector="input[type=checkbox][id^=consent-]",
+        matches=consent_count,
+        refused_required=len(refused),
+        refused_ids=refused,
+    )
     if not refused:
         return ""
     return (
@@ -1402,6 +1628,15 @@ class DigiKeyProviderRoute:
     model_label: str
     supported_formats: tuple[str, ...]
     model_only: bool = False
+    # The `?tab=` value that lands DIRECTLY on this author inside DigiKey's per-part models page
+    # (`/en/models/<id>?tab=<models_tab>`), removing a search, a scroll and a tab click once the
+    # part's opaque models id has been learned from the person's own navigation.
+    #
+    # DATA, deliberately, and empty unless someone has actually seen DigiKey serve it. Deriving it
+    # from `evidence_provider_key` would spell `traceparts`, `manufacturer` and `cadenas` into
+    # existence, and a wrong tab is worse than no tab: it promises a surface and delivers whatever
+    # DigiKey does with an unknown one.
+    models_tab: str = ""
 
 
 _DIGIKEY_SNAPMAGIC_ROUTE = DigiKeyProviderRoute(
@@ -1412,6 +1647,9 @@ _DIGIKEY_SNAPMAGIC_ROUTE = DigiKeyProviderRoute(
     altium_label="altium designer",
     model_label="step",
     supported_formats=("kicad", "model", "altium"),
+    # Owner-confirmed 2026-07-31, and corroborated by DigiKey's own publicly indexed models URLs,
+    # e.g. https://www.digikey.com/en/models/303553?tab=snapmagic.
+    models_tab="snapmagic",
 )
 _DIGIKEY_ULTRALIBRARIAN_ROUTE = DigiKeyProviderRoute(
     evidence_provider_key="digikey-ultralibrarian",
@@ -1421,6 +1659,10 @@ _DIGIKEY_ULTRALIBRARIAN_ROUTE = DigiKeyProviderRoute(
     altium_label="altium designer (script based)",
     model_label="step",
     supported_formats=("kicad", "model", "altium"),
+    # DigiKey's own publicly indexed models URLs carry it verbatim, e.g.
+    # https://www.digikey.com/en/models/3906419?tab=ultralibrarian (and the same shape on the
+    # regional storefronts, digikey.ca/en/models/7313085?tab=ultralibrarian).
+    models_tab="ultralibrarian",
 )
 _DIGIKEY_TRACEPARTS_ROUTE = DigiKeyProviderRoute(
     evidence_provider_key="digikey-traceparts",
@@ -1580,6 +1822,12 @@ class DigiKeyUltraLibrarianAdapter:
 
     def resolve_url(self, mpn: str) -> str:
         return "https://www.digikey.com/en/products/result?keywords=" + quote_plus(mpn)
+
+    @property
+    def models_tab(self) -> str:
+        """This surface opens on its preferred coherent author, so it carries that route's tab."""
+
+        return _DIGIKEY_ULTRALIBRARIAN_ROUTE.models_tab
 
     def signed_in(self, page) -> bool:
         """Positive DigiKey account state, never inferred from one missing login link."""
@@ -2257,27 +2505,62 @@ class DigiKeyUltraLibrarianAdapter:
     def user_clearance_issue(self, page) -> str:
         security = _security_verification_issue(page, self.capability.label)
         if security:
+            trace(
+                "capture.signal.clearance",
+                provider=self.capability.label,
+                fired=True,
+                signal="security-verification",
+            )
             return security
         try:
             url = (page.url or "").casefold()
             if "auth.digikey.com" in url:
+                trace(
+                    "capture.signal.clearance",
+                    provider=self.capability.label,
+                    fired=True,
+                    signal="url-auth-host",
+                    url=url_note(url),
+                )
                 return (
                     "DigiKey needs you to finish sign-in in this window. Stockroom resumes after "
                     "the provider security flow clears."
                 )
             dialogs = page.locator('[role="dialog"], [class*="modal"]')
-            for index in range(min(dialogs.count(), 20)):
+            dialog_count = dialogs.count()
+            for index in range(min(dialog_count, 20)):
                 dialog = dialogs.nth(index)
                 if not dialog.is_visible():
                     continue
                 text = " ".join((dialog.inner_text() or "").split()).casefold()
-                if "download speed bump" in text or "guest limit" in text:
-                    return (
-                        "DigiKey reached its guest download limit. Sign in once in this window; "
-                        "the isolated provider profile remembers the session."
-                    )
+                for marker in ("download speed bump", "guest limit"):
+                    if marker in text:
+                        trace(
+                            "capture.signal.clearance",
+                            provider=self.capability.label,
+                            fired=True,
+                            signal="visible-dialog-marker",
+                            marker=marker,
+                            dialog_index=index,
+                        )
+                        return (
+                            "DigiKey reached its guest download limit. Sign in once in this "
+                            "window; the isolated provider profile remembers the session."
+                        )
+            trace_debug(
+                "capture.signal.clearance",
+                provider=self.capability.label,
+                fired=False,
+                url=url_note(url),
+                dialogs=dialog_count,
+            )
         except Exception:  # noqa: BLE001 - unreadable state establishes no account gate
-            pass
+            trace_debug(
+                "capture.signal.clearance",
+                provider=self.capability.label,
+                fired=False,
+                readable=False,
+            )
         return ""
 
     def download_gate(self, page) -> str:
@@ -2366,6 +2649,12 @@ class _DigiKeyProviderRouteAdapter:
 
     def resolve_url(self, mpn: str) -> str:
         return self._surface.resolve_url(mpn)
+
+    @property
+    def models_tab(self) -> str:
+        """This route's measured DigiKey models tab, or "" when none is evidenced."""
+
+        return self._route.models_tab
 
     def signed_in(self, page) -> bool:
         return self._surface.signed_in(page)
@@ -2795,7 +3084,27 @@ def _exact_result_href(
                     observed,
                 )
                 if mismatch:
-                    wrong_manufacturer = True
+                    # Only a candidate whose MPN DOES match can be evidence of a manufacturer
+                    # problem. Flagging every rejection as one reported an MPN mismatch as
+                    # "showed the requested MPN only under a different manufacturer", which is a
+                    # different fault with a different remedy and sent the reader to the wrong
+                    # place entirely.
+                    wrong_manufacturer = not exact_observation_error(
+                        SimpleNamespace(manufacturer="", mpn=requested_mpn),
+                        observed,
+                    )
+                    # Name BOTH sides. "only under a different manufacturer" is unactionable on
+                    # its own: it cannot distinguish a genuinely different company from a spelling
+                    # this comparison has not been taught, which is the difference between "this
+                    # part is not there" and "Stockroom threw away an exact MPN match".
+                    trace(
+                        "capture.step.candidate-rejected",
+                        provider=vendor_key,
+                        expected_manufacturer=expected_manufacturer,
+                        observed_manufacturer=observed.manufacturer,
+                        observed_mpn=observed.mpn,
+                        why=mismatch,
+                    )
                     continue
             identity = _canonical_detail_identity(absolute, vendor_key)
             if identity is not None:
@@ -2894,15 +3203,40 @@ _SECURITY_VERIFICATION_MARKERS = (
 )
 
 
+def _fired_marker(markers, buckets: list[tuple[str, str]]) -> tuple[str, str]:
+    """Which marker fired, and in which evidence bucket. ``("", "cross-sample")`` when none did.
+
+    DIAGNOSTIC ONLY, and deliberately a second pass over the same evidence rather than a rewrite
+    of the decision: the caller still decides on the joined text exactly as before, so attributing
+    a gate can never create or suppress one. A marker that matched only across the seam between two
+    buckets is reported honestly as ``cross-sample`` instead of guessed at.
+
+    It returns marker NAMES and bucket names. The page text itself is never returned and never
+    logged - that separation is what makes the trace safe to keep on by default.
+    """
+
+    for name, text in buckets:
+        for marker in markers:
+            if marker in text:
+                return marker, name
+    return "", "cross-sample"
+
+
 def _challenge_issue(page, label: str) -> str:
     """Return an actionable explanation for a measured anti-bot interstitial."""
     samples: list[str] = [getattr(page, "url", "") or ""]
+    buckets: list[tuple[str, str]] = [("url", samples[0].casefold())]
+    iframe_srcs: list[str] = []
     try:
-        samples.append(page.title() or "")
+        title = page.title() or ""
+        samples.append(title)
+        buckets.append(("title", title.casefold()))
     except Exception:  # noqa: BLE001 - another signal may still identify it
         pass
     try:
-        samples.append(page.inner_text("body") or "")
+        body = page.inner_text("body") or ""
+        samples.append(body)
+        buckets.append(("body", body.casefold()))
     except Exception:  # noqa: BLE001 - textless challenge shells are common
         pass
     try:
@@ -2917,12 +3251,35 @@ def _challenge_issue(page, label: str) -> str:
             is_visible = getattr(frame, "is_visible", None)
             if callable(is_visible) and not is_visible():
                 continue
-            samples.append(frame.get_attribute("src") or "")
+            src = frame.get_attribute("src") or ""
+            samples.append(src)
+            buckets.append(("iframe-src", src.casefold()))
+            iframe_srcs.append(src)
     except Exception:  # noqa: BLE001 - frames are an optional signal
         pass
     evidence = "\n".join(samples).casefold()
     if not any(marker in evidence for marker in _CHALLENGE_MARKERS):
+        # "Nothing fired" is a first-class diagnostic: it is what separates a real gate from a page
+        # Stockroom simply could not read. Counts and bucket names only, never the text itself.
+        trace_debug(
+            "capture.signal.challenge",
+            provider=label,
+            fired=False,
+            url=url_note(samples[0]),
+            read=[name for name, _text in buckets],
+            visible_iframes=len(iframe_srcs),
+        )
         return ""
+    marker, bucket = _fired_marker(_CHALLENGE_MARKERS, buckets)
+    trace(
+        "capture.signal.challenge",
+        provider=label,
+        fired=True,
+        marker=marker,
+        source=bucket,
+        url=url_note(samples[0]),
+        iframes=[url_note(src) for src in iframe_srcs],
+    )
     return (
         f"{label} is asking you to confirm you are human. Clear it once in this window; "
         "the provider-specific browser profile remembers the session."
@@ -2937,7 +3294,24 @@ def _security_verification_issue(page, label: str) -> str:
         return challenge
     body = _visible_body_text(page)
     if not any(marker in body for marker in _SECURITY_VERIFICATION_MARKERS):
+        trace_debug(
+            "capture.signal.security",
+            provider=label,
+            fired=False,
+            visible_body_chars=len(body),
+        )
         return ""
+    marker, _bucket = _fired_marker(
+        _SECURITY_VERIFICATION_MARKERS,
+        [("visible-body", body)],
+    )
+    trace(
+        "capture.signal.security",
+        provider=label,
+        fired=True,
+        marker=marker,
+        source="visible-body",
+    )
     return (
         f"{label} needs you to finish its security verification in this window. Stockroom never "
         "operates CAPTCHA, 2FA, MFA, passkeys, or security controls and will resume automatically "

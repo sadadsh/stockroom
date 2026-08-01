@@ -295,3 +295,21 @@ def test_a_record_written_by_this_build_round_trips_unchanged():
         origin=AssetOrigin(vendor="samacsys", url="u", captured_at="t"),
     )
     assert PartRecord.loads(rec.dumps()).dumps() == rec.dumps()
+
+
+def test_structured_catalogue_intelligence_round_trips_without_becoming_specs():
+    rec = _rec()
+    rec.catalog = {
+        "digikey": {
+            "schema_version": 1,
+            "availability": {
+                "cad_model": True,
+                "three_d_model": None,
+                "providers": ["Ultra Librarian"],
+            },
+            "media": [{"media_type": "EDA Models", "url": "https://u/x", "title": "CAD"}],
+        }
+    }
+    back = PartRecord.loads(rec.dumps())
+    assert back.catalog == rec.catalog
+    assert "catalog" not in back.specs

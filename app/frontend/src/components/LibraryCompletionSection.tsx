@@ -24,6 +24,7 @@
 import { useEffect } from "react";
 import { useLibraryCoverage } from "../api/queries";
 import type { CompletionItem, LibraryCoverage } from "../api/types";
+import { CompletionWorklist } from "./CompletionWorklist";
 import {
   cancelCompletion,
   pauseCompletion,
@@ -120,6 +121,12 @@ export function LibraryCompletionSection() {
         />
       ) : null}
       {run.transport === "durable" && run.batchId ? <DurableRun /> : null}
+      {/* The same run, read as WORK: what it finished alone, and the short list it could not.
+          Mounted with the batch rather than at its end, because each part's result is retained as
+          that part settles - a person can start the first provider trip while the rest still run. */}
+      {run.transport === "durable" && run.batchId ? (
+        <CompletionWorklist batchId={run.batchId} live={run.status === "running"} />
+      ) : null}
       {run.transport !== "durable" && run.status === "running" ? <LiveRun /> : null}
       {run.transport !== "durable" && run.status === "done" && run.result ? <RunReport /> : null}
       {run.transport !== "durable" && run.status === "error" && run.error ? (
@@ -165,7 +172,15 @@ function CoverageBody({
       <CoverageMatrix data={data} />
 
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
-        <Button variant="accent" onClick={onRun} disabled={running || needsFiles === 0}>
+        {/* Enabled whenever ANY remaining gap is reachable by either lane, not only by the
+            automatic one. A library whose last gaps all need a provider route still has work for
+            this button: the run settles what it can and reports, per part, which provider needs a
+            person - which is the only way that list exists at all. */}
+        <Button
+          variant="accent"
+          onClick={onRun}
+          disabled={running || (needsFiles === 0 && needsAssistance === 0)}
+        >
           {running ? "Filling Gaps" : "Fill Supported CAD Gaps"}
         </Button>
         <p className="text-sm text-t2">
@@ -178,6 +193,11 @@ function CoverageBody({
             </>
           ) : total === 0 ? (
             "Add a component first."
+          ) : needsAssistance > 0 ? (
+            <>
+              Every remaining gap needs a provider route. The run still settles what it can and
+              then names the component and provider for each one that needs you.
+            </>
           ) : (
             "Nothing here can be filled automatically right now."
           )}

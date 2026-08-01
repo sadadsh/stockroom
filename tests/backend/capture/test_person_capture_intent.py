@@ -1,0 +1,143 @@
+"""The person's OWN Finish and Skip controls, and the channel that carries them into a live run.
+
+WHY THIS EXISTS
+De-automation removed the provider HUD, so the Finish / Try Another / Close buttons that used to be
+drawn over the provider page are gone. What replaced them was nothing: a person-driven route ended
+only on Stockroom's global Cancel, roughly 25 seconds of quiet after at least one file had landed,
+or the 600 second timeout. DigiKey fans out to FIVE author routes, so a part where nothing
+downloads held the owner for five timeouts in a row.
+
+WHAT IS ASSERTED
+That the signal is a statement of the PERSON'S intent held for a running capture and refused
+otherwise; that finishing a route is answered ONCE (a latched finish would end all five DigiKey
+routes on one click); that skipping travels on the same predicate the runner already stops on; and
+that both are named in the capture trace so a run's story says who ended it.
+"""
+
+from __future__ import annotations
+
+import logging
+
+import pytest
+
+from stockroom.capture.intent import (
+    FINISH_ROUTE,
+    SKIP_PART,
+    PersonCaptureIntent,
+    PersonCaptureIntentError,
+    person_capture_intent,
+    running_person_captures,
+    signal_person_capture,
+)
+from stockroom.capture.trace import LOGGER_NAME, reset_for_tests
+
+
+@pytest.fixture(autouse=True)
+def _isolated_trace(tmp_path, monkeypatch):
+    monkeypatch.setenv("STOCKROOM_CAPTURE_LOG", str(tmp_path / "capture.log"))
+    reset_for_tests()
+    yield
+    reset_for_tests()
+
+
+# --- 1. the signal only exists while a capture does --------------------------------------------
+
+
+def test_a_signal_for_a_part_with_no_running_capture_is_refused_not_remembered():
+    with pytest.raises(PersonCaptureIntentError):
+        signal_person_capture("lm317", FINISH_ROUTE)
+
+    # And nothing was stored, so the NEXT run for that part starts unsignalled.
+    intent = PersonCaptureIntent()
+    with person_capture_intent("lm317", intent):
+        assert intent.take_route_finish() is False
+        assert intent.part_skipped() is False
+
+
+def test_a_running_capture_is_published_under_its_part_for_exactly_its_run():
+    intent = PersonCaptureIntent()
+
+    assert running_person_captures() == ()
+    with person_capture_intent("lm317", intent):
+        assert running_person_captures() == ("lm317",)
+        assert intent.part_id == "lm317"
+    assert running_person_captures() == ()
+
+
+def test_a_library_wide_run_publishes_nothing_a_person_could_signal():
+    intent = PersonCaptureIntent()
+
+    with person_capture_intent(None, intent):
+        assert running_person_captures() == ()
+
+
+def test_one_part_cannot_own_two_captures_at_once():
+    with person_capture_intent("lm317", PersonCaptureIntent()):
+        with pytest.raises(PersonCaptureIntentError):
+            with person_capture_intent("lm317", PersonCaptureIntent()):
+                pytest.fail("a second capture claimed the same part")
+
+
+def test_an_unknown_action_or_a_blank_part_is_a_caller_error():
+    with person_capture_intent("lm317", PersonCaptureIntent()):
+        with pytest.raises(ValueError):
+            signal_person_capture("lm317", "finish-everything")
+        with pytest.raises(ValueError):
+            signal_person_capture("  ", FINISH_ROUTE)
+
+
+# --- 2. finishing a route is answered once, for the route in front of the person ----------------
+
+
+def test_finishing_a_route_is_consumed_by_the_one_route_that_is_open():
+    intent = PersonCaptureIntent()
+    with person_capture_intent("lm317", intent):
+        signal_person_capture("lm317", FINISH_ROUTE)
+
+        # The route that is open when the person says it takes the answer...
+        assert intent.take_route_finish() is True
+        # ...and the next of DigiKey's five author routes does NOT, because one click means one
+        # route. A latched finish would close every remaining route with nobody asking.
+        assert intent.take_route_finish() is False
+
+
+def test_finishing_never_stops_the_part_so_files_already_adopted_keep_landing():
+    intent = PersonCaptureIntent()
+    with person_capture_intent("lm317", intent):
+        signal_person_capture("lm317", FINISH_ROUTE)
+
+        # Finish means "no more is coming", never "throw away what landed": the run's own stop
+        # predicate is untouched, so the route drains and attaches what it already has.
+        assert intent.part_skipped() is False
+
+
+# --- 3. skipping is the whole part's verdict, and it latches ------------------------------------
+
+
+def test_skipping_the_part_latches_for_the_rest_of_the_run():
+    intent = PersonCaptureIntent()
+    with person_capture_intent("lm317", intent):
+        signal_person_capture("lm317", SKIP_PART)
+
+        assert intent.part_skipped() is True
+        assert intent.part_skipped() is True
+
+
+# --- 4. the trace names the person, so a run's story says who ended it --------------------------
+
+
+def test_the_trace_records_a_person_driven_finish_a_skip_and_a_refusal(caplog):
+    intent = PersonCaptureIntent()
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
+        with person_capture_intent("lm317", intent):
+            signal_person_capture("lm317", FINISH_ROUTE)
+            intent.take_route_finish()
+            signal_person_capture("lm317", SKIP_PART)
+        with pytest.raises(PersonCaptureIntentError):
+            signal_person_capture("lm317", SKIP_PART)
+
+    lines = [record.getMessage() for record in caplog.records]
+    assert any(line.startswith("capture.person.finish part=lm317") for line in lines)
+    assert any(line.startswith("capture.person.finish.applied part=lm317") for line in lines)
+    assert any(line.startswith("capture.person.skip part=lm317") for line in lines)
+    assert any(line.startswith("capture.person.refused part=lm317") for line in lines)

@@ -60,6 +60,10 @@ _OPAQUE_WORKFLOW_REFERENCE = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z",
     re.ASCII,
 )
+# One durable batch may hold a thousand parts, and every group below is a LIST of rows rather
+# than a count, so each group is bounded and reports its own true total beside it. A surface can
+# then say "12 of 340" honestly instead of receiving a response sized by the library.
+_WORKLIST_MAX_ROWS = 200
 
 
 def _completion_request(
@@ -349,6 +353,45 @@ def _capture_item_projection(item) -> dict:
     }
 
 
+def _worklist_text(value: object) -> str:
+    """Exactly the string a report carried, or nothing. Never a coerced repr."""
+
+    return value if type(value) is str else ""
+
+
+def _worklist_requirements(value: object) -> list[str]:
+    """The requirement keys a report row named, filtered to the ones this API speaks."""
+
+    if type(value) is not list:
+        return []
+    return [
+        requirement
+        for requirement in value
+        if type(requirement) is str and requirement in _CAPTURE_REQUIREMENTS
+    ]
+
+
+def _reported_completion_row(report: object, part_id: str) -> dict | None:
+    """The one completion row a retained durable report holds for this exact part.
+
+    The report is produced by a ONE-part run inside copy-on-write staging, whose record id is
+    derived from the canonical MPN and can therefore differ from the library id. Match the id
+    first, and fall back to a single-row report rather than dropping a result that plainly
+    belongs to this item.
+    """
+
+    if not isinstance(report, dict):
+        return None
+    rows = report.get("items")
+    if type(rows) is not list:
+        return None
+    rows = [row for row in rows if isinstance(row, dict)]
+    for row in rows:
+        if row.get("part_id") == part_id:
+            return row
+    return rows[0] if len(rows) == 1 else None
+
+
 # Single-flight guard for POST /rescan: two concurrent rescans would double the API quota
 # AND clobber each other's rescan-state.json (each engine saves its whole in-memory dict,
 # last-writer-wins), so a second POST while one is QUEUED/RUNNING must return the SAME
@@ -574,6 +617,7 @@ def library_router(require_token) -> APIRouter:
             specs=(body.get("specs") or None),
             price_breaks=(body.get("price_breaks") or None),
             stock=body.get("stock"),
+            catalog=(body.get("catalog") or None),
         )
 
     @r.post("/passive/preview")
@@ -707,7 +751,24 @@ def library_router(require_token) -> APIRouter:
         digikey = next(
             (a for a in build_refresh_adapters(ctx) if getattr(a, "vendor", "") == "DigiKey"), None
         )
-        sources = resolve_cad_sources(record.mpn, digikey)
+        # If a previous capture for this exact part ended on DigiKey's models page, its link
+        # becomes that page - the CAD surface itself, with no search and no scroll. Unknown for a
+        # part nobody has opened yet, and then the link is exactly what it was before.
+        from stockroom.capture.digikey_models import default_digikey_models_ids
+
+        try:
+            models_id = default_digikey_models_ids().get(
+                manufacturer=record.manufacturer,
+                mpn=record.mpn,
+            )
+        except Exception:  # noqa: BLE001 - an unreadable hint costs a search, never the response
+            models_id = ""
+        sources = resolve_cad_sources(
+            record.mpn,
+            digikey,
+            digikey_models_id=models_id,
+            digikey_catalog=record.catalog.get("digikey"),
+        )
         from stockroom.capture.vendors import all_adapters
 
         implemented_capture = {
@@ -1129,10 +1190,59 @@ def library_router(require_token) -> APIRouter:
 
         return {"job_id": ctx.jobs.submit_cancellable(work)}
 
+    @r.post("/capture/parts/{part_id}/intent")
+    def capture_person_intent(part_id: str, body: dict | None = None) -> dict:
+        """Record what the PERSON decided about the person-driven capture in front of them.
+
+        De-automation removed the provider HUD, so the Finish and Skip buttons that used to sit on
+        the provider page have nowhere to live except Stockroom's own window. This is the route
+        those buttons reach: `finish-route` says no more files are coming from the page in front of
+        the person, and `skip-part` stops that component's remaining provider routes.
+
+        NOTHING HERE TOUCHES A PROVIDER PAGE. The body is one word describing the person's own
+        intent; `capture/intent.py` hands it to the running capture through the same polled
+        predicates cancellation already uses.
+
+        A signal naming a component with no running capture is refused rather than remembered,
+        because a remembered one would silently end the next run the person started.
+        """
+
+        from stockroom.capture.intent import (
+            PERSON_CAPTURE_ACTIONS,
+            PersonCaptureIntentError,
+            signal_person_capture,
+        )
+
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        payload = {} if body is None else body
+        unexpected = sorted(str(key) for key in payload if key != "action")
+        if unexpected:
+            raise ValueError("unknown capture intent fields: " + ", ".join(unexpected))
+        action = payload.get("action")
+        if action not in PERSON_CAPTURE_ACTIONS:
+            raise ValueError("action must be 'finish-route' or 'skip-part'")
+        try:
+            signal_person_capture(part_id, action)
+        except PersonCaptureIntentError as exc:
+            raise ApiError(409, str(exc)) from exc
+        return {"part_id": part_id, "action": action, "accepted": True}
+
     @r.get("/capture/batches/{batch_id}")
     def capture_batch(request: Request, batch_id: str) -> dict:
-        """Project one durable guided-capture request and its safe terminal report."""
+        """Project one durable guided-capture request, its handoff guidance, and its report.
 
+        `handoff` carries what the provider HUD used to say, for the routes where that HUD can no
+        longer exist. A person-driven provider page now opens in the PERSON'S own browser - which
+        is the point, because an automation-controlled session is exactly what a bot check was
+        catching while a person did the clicking - and Stockroom cannot draw an overlay inside a
+        window it does not own. So the ordered required-file checklist and the provider's own
+        instruction are published here instead, for Stockroom's own window to show while the person
+        is away. It is null when no single provider was named, because guidance for "whichever
+        provider the chain reaches" would be a guess.
+        """
+
+        from stockroom.capture.handoff import handoff_guidance
         from stockroom.capture.runner import read_durable_capture_report
 
         if _OPAQUE_WORKFLOW_REFERENCE.fullmatch(batch_id) is None:
@@ -1144,15 +1254,165 @@ def library_router(require_token) -> APIRouter:
         items = coordinator.list_items(batch_id)
         if len(items) != 1:
             raise ApiError(409, "Guided capture requires one durable workflow item.")
-        projection = _capture_item_projection(items[0])
+        item = items[0]
+        projection = _capture_item_projection(item)
         try:
-            report = read_durable_capture_report(items[0].id)
+            report = read_durable_capture_report(item.id)
         except ValueError as exc:
             raise ApiError(409, str(exc)) from exc
+        vendor = projection["vendor"]
+        handoff = (
+            handoff_guidance(
+                vendor,
+                needs=projection["initial_needs"],
+                manufacturer=str(getattr(item, "manufacturer", "") or ""),
+                mpn=str(getattr(item, "mpn", "") or ""),
+            )
+            if vendor
+            else None
+        )
         return {
             "workflow_batch_id": batch_id,
             **projection,
+            "handoff": handoff,
             "report": report,
+        }
+
+    @r.get("/capture/batches/{batch_id}/worklist")
+    def capture_batch_worklist(request: Request, batch_id: str) -> dict:
+        """Split one library-wide capture batch into what finished alone and what needs a person.
+
+        The owner wants one button that does everything it is allowed to do. Most of that
+        distance is reachable, and this route reports the rest HONESTLY rather than pretending
+        the gap does not exist: every `worklist` row is one provider route the run itself
+        terminated as `requires-human`, carrying that route's own reason ("no Ultra Librarian
+        sign-in is saved...", "does not offer Altium Designer (Native) for this exact part").
+        The frontend turns each row into one trip to that provider for that part; it never
+        drives the provider page, which is exactly what those terms forbid.
+
+        Nothing here is inferred. A part whose report has not landed is `pending_items`, a
+        finished part no route can currently help is `stalled` (a different fact from needing a
+        person), and a report this API cannot read is named in `unreadable` rather than silently
+        dropped. Read-only: it projects retained machine-local reports and the durable item list.
+        """
+
+        from stockroom.capture.complete import sanitize_provider_reason
+        from stockroom.capture.runner import read_durable_capture_report
+
+        if _OPAQUE_WORKFLOW_REFERENCE.fullmatch(batch_id) is None:
+            raise ApiError(400, "batch_id is not a valid opaque workflow identifier")
+        coordinator = request.app.state.ctx.workflow_coordinator
+        if coordinator is None:
+            raise ApiError(503, "The durable workflow coordinator is not mounted.")
+        coordinator.get_batch(batch_id)
+        items = coordinator.list_items(batch_id)
+        unattended: list[dict] = []
+        stalled: list[dict] = []
+        worklist: list[dict] = []
+        unreadable: list[str] = []
+        unattended_total = 0
+        stalled_total = 0
+        worklist_total = 0
+        pending = 0
+        for item in items:
+            projection = _capture_item_projection(item)
+            part_id = projection["part_id"]
+            try:
+                report = read_durable_capture_report(item.id)
+            except ValueError:
+                unreadable.append(part_id)
+                continue
+            if report is None:
+                pending += 1
+                continue
+            row = _reported_completion_row(report, part_id)
+            if row is None:
+                unreadable.append(part_id)
+                continue
+            mpn = _worklist_text(row.get("mpn"))
+            display_name = _worklist_text(row.get("display_name"))
+            status = _worklist_text(row.get("status"))
+            raw_remaining = row.get("remaining")
+            # An EMPTY `remaining` is a real answer, so it is never widened back to the needs the
+            # item started with; only a missing list falls back to what the request recorded.
+            remaining = (
+                _worklist_requirements(raw_remaining)
+                if type(raw_remaining) is list
+                else list(projection["initial_needs"])
+            )
+            outcomes = row.get("provider_outcomes")
+            human_routes: list[dict] = []
+            for outcome in outcomes if type(outcomes) is list else []:
+                if not isinstance(outcome, dict) or outcome.get("status") != "requires-human":
+                    continue
+                provider_key = _worklist_text(outcome.get("provider_key"))
+                route_id = _worklist_text(outcome.get("route_id"))
+                if not provider_key or not route_id:
+                    continue
+                human_routes.append(
+                    {
+                        "part_id": part_id,
+                        "mpn": mpn,
+                        "display_name": display_name,
+                        "route_id": route_id,
+                        "provider_key": provider_key,
+                        "label": _worklist_text(outcome.get("label")) or provider_key,
+                        "status": "requires-human",
+                        # Re-sanitized on the way out. It was sanitized when the outcome was
+                        # built, and a retained file is still a file: a bounded, single-line,
+                        # secret-free reason is a property of this response, not of its input.
+                        "reason": sanitize_provider_reason(outcome.get("reason")),
+                        "remaining": remaining,
+                    }
+                )
+            if human_routes:
+                worklist_total += len(human_routes)
+                worklist.extend(human_routes[: max(0, _WORKLIST_MAX_ROWS - len(worklist))])
+                continue
+            if status in {"completed", "already-complete"}:
+                unattended_total += 1
+                if len(unattended) < _WORKLIST_MAX_ROWS:
+                    unattended.append(
+                        {
+                            "part_id": part_id,
+                            "mpn": mpn,
+                            "display_name": display_name,
+                            "status": status,
+                            "remaining": remaining,
+                        }
+                    )
+                continue
+            notes = row.get("notes")
+            stalled_total += 1
+            if len(stalled) < _WORKLIST_MAX_ROWS:
+                stalled.append(
+                    {
+                        "part_id": part_id,
+                        "mpn": mpn,
+                        "display_name": display_name,
+                        "status": status,
+                        "reason": sanitize_provider_reason(
+                            _worklist_text(row.get("error"))
+                            or "; ".join(
+                                _worklist_text(note)
+                                for note in (notes if type(notes) is list else [])
+                                if _worklist_text(note)
+                            )
+                        ),
+                        "remaining": remaining,
+                    }
+                )
+        return {
+            "workflow_batch_id": batch_id,
+            "total_items": len(items),
+            "pending_items": pending,
+            "worklist": worklist,
+            "worklist_total": worklist_total,
+            "unattended": unattended,
+            "unattended_total": unattended_total,
+            "stalled": stalled,
+            "stalled_total": stalled_total,
+            "unreadable": unreadable,
         }
 
     @r.get("/capture/vendors")

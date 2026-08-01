@@ -376,7 +376,8 @@ describe("DetailPanel network-only completion affordance", () => {
     await userEvent.click(screen.getByRole("button", { name: /Complete Part/ }));
     const dialog = await screen.findByRole("dialog", { name: /complete this part/i });
 
-    expect(within(dialog).getByRole("button", { name: "Collect All Sources" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Get Files" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Collect All Sources" })).toBeNull();
     expect(within(dialog).queryByLabelText("Library")).toBeNull();
     expect(within(dialog).queryByLabelText("Name")).toBeNull();
     expect(within(dialog).queryByRole("button", { name: "Attach" })).toBeNull();
@@ -1514,5 +1515,32 @@ describe("the Complete-Part needs line respects the part's class (cold-eyes find
     });
     expect(text).toMatch(/symbol/i);
     expect(text).toMatch(/footprint/i);
+  });
+});
+
+describe("persisted catalogue intelligence", () => {
+  it("shows CAD availability and provider resources on the stored part", async () => {
+    wrap(<DetailPanel detail={detail({
+      catalog: { digikey: {
+        schema_version: 1,
+        product_number: "296-X-ND",
+        manufacturer_product_number: "X",
+        product_url: "https://www.digikey.com/x",
+        availability: { cad_model: true, three_d_model: true, providers: ["Ultra Librarian"] },
+        media: [{ media_type: "EDA Models", title: "CAD Models", url: "https://u.example/x" }],
+        alternate_packaging: {},
+        substitutions: {},
+        recommended_products: {},
+        associations: {},
+      } },
+    })} {...BASE} />);
+    const sourcingControl = screen.queryByRole("button", { name: /expand sourcing/i });
+    if (sourcingControl) await userEvent.click(sourcingControl);
+    expect(await screen.findByText("CAD Model")).toBeInTheDocument();
+    expect(screen.getAllByText("3D Model").length).toBeGreaterThan(1);
+    expect(screen.getByText("Ultra Librarian")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "CAD Models" })).toHaveAttribute(
+      "href", "https://u.example/x",
+    );
   });
 });

@@ -331,3 +331,61 @@ def test_bulk_import_reads_a_pasted_bom_csv(client, monkeypatch, tmp_path):
 def test_bulk_import_refuses_an_empty_list(client):
     r = client.post("/api/enrich/bulk-import", json={"part_numbers": []})
     assert r.status_code == 422
+
+
+def test_quantity_pricing_uses_exact_quantity_and_skips_digireel_until_order(
+    client, app_ctx, monkeypatch
+):
+    calls: list[tuple] = []
+    app_ctx.config.digikey_client_id = "client"
+    app_ctx.config.digikey_client_secret = "secret"
+    monkeypatch.setattr(
+        "stockroom.enrich.digikey_api.DigiKeyClient.pricing_options_by_quantity",
+        lambda _self, product, quantity: calls.append(("pricing", product, quantity))
+        or {
+            "DigiKeyProductNumber": "CUT-ND",
+            "Packaging": "Cut Tape",
+            "RequestedQuantity": quantity,
+            "UnitPrice": 0.12,
+            "Currency": "USD",
+        },
+    )
+    monkeypatch.setattr(
+        "stockroom.enrich.digikey_api.DigiKeyClient.digireel_pricing",
+        lambda _self, product, quantity: calls.append(("digireel", product, quantity)) or {},
+    )
+
+    response = client.post(
+        "/api/enrich/digikey/quantity-pricing",
+        json={"product_number": "PART-ND", "quantity": 250, "prepare_order": False},
+    )
+    result = _drain_job(client, response.json()["job_id"])["result"]
+
+    assert calls == [("pricing", "PART-ND", 250)]
+    assert result["options"][0]["unit_price"] == 0.12
+    assert result["digireel"] is None
+
+
+def test_quantity_pricing_requests_digireel_only_for_explicit_order_preparation(
+    client, app_ctx, monkeypatch
+):
+    calls: list[str] = []
+    app_ctx.config.digikey_client_id = "client"
+    app_ctx.config.digikey_client_secret = "secret"
+    monkeypatch.setattr(
+        "stockroom.enrich.digikey_api.DigiKeyClient.pricing_options_by_quantity",
+        lambda *_args: {},
+    )
+    monkeypatch.setattr(
+        "stockroom.enrich.digikey_api.DigiKeyClient.digireel_pricing",
+        lambda *_args: calls.append("digireel") or {"UnitPrice": 0.08},
+    )
+
+    response = client.post(
+        "/api/enrich/digikey/quantity-pricing",
+        json={"product_number": "PART-ND", "quantity": 250, "prepare_order": True},
+    )
+    result = _drain_job(client, response.json()["job_id"])["result"]
+
+    assert calls == ["digireel"]
+    assert result["digireel"] == {"UnitPrice": 0.08}

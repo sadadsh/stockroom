@@ -663,3 +663,188 @@ def test_coverage_does_not_bless_populated_bare_cad_references(
     assert report["needs_files"] == 1
     assert report["unsourced"] == 0
     assert set(report["by_requirement"]) == {requirement.value for requirement in Requirement}
+
+
+def test_the_person_can_finish_a_route_and_skip_the_part_while_the_run_is_live(
+    monkeypatch,
+    tmp_path,
+):
+    """The Finish / Skip seam, end to end, on the run that is actually executing.
+
+    `capture_user_downloads(..., should_finish=...)` and `GuidedCaptureSource(user_finished=...)`
+    both existed and were simply never passed, so a person-driven route ended only on cancel, on
+    ~25 s of quiet after a file landed, or on the 600 s timeout. This asserts the whole chain: the
+    run publishes its intent under its one selected part, a signal raised mid-run reaches the
+    predicates the running capture polls, and it is unreachable once the run is over.
+    """
+
+    import stockroom.evidence as evidence_module
+    from stockroom.capture import browser as browser_module
+    from stockroom.capture import guided as guided_module
+    from stockroom.capture.intent import (
+        FINISH_ROUTE,
+        SKIP_PART,
+        PersonCaptureIntentError,
+        running_person_captures,
+        signal_person_capture,
+    )
+    from stockroom.ingest import pipeline as pipeline_module
+
+    constructed: list[dict] = []
+    observed: dict[str, object] = {}
+
+    class Pipeline:
+        def __init__(self, *_args, **_options):
+            pass
+
+    class Source:
+        key = "guided"
+
+        def __init__(self, _make_pipeline, **options):
+            constructed.append(options)
+
+        def close(self):
+            return None
+
+    class Runtime:
+        def close(self):
+            return None
+
+    class Report:
+        items = ()
+
+        def of(self, *_statuses):
+            return False
+
+        def to_dict(self):
+            return {"items": [], "counts": {}}
+
+    def complete(work, *, should_stop, **_options):
+        assert list(work) == ["part-a"]
+        finished = constructed[-1]["user_finished"]
+        observed["published"] = running_person_captures()
+        observed["quiet_finish"] = finished()
+        observed["quiet_stop"] = should_stop()
+
+        signal_person_capture("part-a", FINISH_ROUTE)
+        # The route that is open takes the answer, and only that route: one click must not close
+        # all five of DigiKey's author routes.
+        observed["finish_open_route"] = finished()
+        observed["finish_next_route"] = finished()
+        # Finishing says "no more is coming", never "throw away what landed", so the run itself
+        # is not stopped and the route still drains and attaches.
+        observed["stop_after_finish"] = should_stop()
+
+        signal_person_capture("part-a", SKIP_PART)
+        observed["stop_after_skip"] = should_stop()
+        return Report()
+
+    monkeypatch.setattr(guided_module, "GuidedCaptureSource", Source)
+    monkeypatch.setattr(pipeline_module, "IngestPipeline", Pipeline)
+    monkeypatch.setattr(browser_module, "SharedPlaywrightRuntime", Runtime)
+    monkeypatch.setattr(evidence_module, "EvidenceStore", lambda _root: object())
+    monkeypatch.setattr(runner, "complete_library", complete)
+    monkeypatch.setattr(
+        runner,
+        "_capture_downloads",
+        lambda _ctx, key: tmp_path / f"{key}-downloads",
+    )
+    monkeypatch.setattr(
+        runner,
+        "_capture_profile",
+        lambda _ctx, key: tmp_path / f"{key}-profile",
+    )
+    monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
+    ctx = SimpleNamespace(
+        ops=SimpleNamespace(load_record=lambda _part_id: None),
+        jobs=SimpleNamespace(run_write=lambda fn: fn()),
+        rebuild_index=lambda: None,
+        auto_push=lambda: None,
+        profile=object(),
+        repo=object(),
+        cli=object(),
+        config=SimpleNamespace(ul_private_evaluation_automation=False),
+    )
+
+    runner.run_guided_capture(
+        ctx,
+        part_ids=["part-a"],
+        vendor="digikey",
+        operator_authorized=True,
+    )
+
+    assert observed["published"] == ("part-a",)
+    assert observed["quiet_finish"] is False
+    assert observed["quiet_stop"] is False
+    assert observed["finish_open_route"] is True
+    assert observed["finish_next_route"] is False
+    assert observed["stop_after_finish"] is False
+    assert observed["stop_after_skip"] is True
+    # The intent lives exactly as long as the run a person could be standing in front of.
+    assert running_person_captures() == ()
+    with pytest.raises(PersonCaptureIntentError):
+        signal_person_capture("part-a", SKIP_PART)
+
+
+def test_a_library_wide_automatic_run_publishes_no_person_control(monkeypatch, tmp_path):
+    """Nothing opens a person-driven window, so there is nothing for a person to finish or skip."""
+
+    import stockroom.evidence as evidence_module
+    from stockroom.capture import browser as browser_module
+    from stockroom.capture import guided as guided_module
+    from stockroom.capture.intent import running_person_captures
+    from stockroom.ingest import pipeline as pipeline_module
+
+    published: list[tuple[str, ...]] = []
+
+    class Pipeline:
+        def __init__(self, *_args, **_options):
+            pass
+
+    class Source:
+        key = "guided"
+
+        def __init__(self, _make_pipeline, **_options):
+            pass
+
+        def close(self):
+            return None
+
+    class Runtime:
+        def close(self):
+            return None
+
+    class Report:
+        items = ()
+
+        def of(self, *_statuses):
+            return False
+
+        def to_dict(self):
+            return {"items": [], "counts": {}}
+
+    def complete(_work, **_options):
+        published.append(running_person_captures())
+        return Report()
+
+    monkeypatch.setattr(guided_module, "GuidedCaptureSource", Source)
+    monkeypatch.setattr(pipeline_module, "IngestPipeline", Pipeline)
+    monkeypatch.setattr(browser_module, "SharedPlaywrightRuntime", Runtime)
+    monkeypatch.setattr(evidence_module, "EvidenceStore", lambda _root: object())
+    monkeypatch.setattr(runner, "complete_library", complete)
+    monkeypatch.setattr(runner, "build_sources", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
+    ctx = SimpleNamespace(
+        ops=SimpleNamespace(load_record=lambda _part_id: None),
+        jobs=SimpleNamespace(run_write=lambda fn: fn()),
+        rebuild_index=lambda: None,
+        auto_push=lambda: None,
+        profile=object(),
+        repo=object(),
+        cli=object(),
+        config=SimpleNamespace(ul_private_evaluation_automation=False),
+    )
+
+    runner.run_guided_capture(ctx, part_ids=["part-a", "part-b"])
+
+    assert published == [()]

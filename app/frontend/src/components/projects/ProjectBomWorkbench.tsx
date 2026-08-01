@@ -6,13 +6,16 @@ import {
   useProjectBomExport,
   useProjectPlacementGeometry,
 } from "../../api/queries";
+import { api } from "../../api/client";
 import type {
+  DigiKeyQuantityPricing,
   ProjectAssignmentGroup,
   ProjectBomLine,
   ProjectWorkspace,
 } from "../../api/types";
 import { Text, useText } from "../../lib/copy";
 import { useToast } from "../../lib/toast";
+import { useJob } from "../../lib/useJob";
 import { DownloadIcon, RefreshIcon, SearchIcon } from "../icons";
 import {
   Badge,
@@ -393,6 +396,7 @@ function BomLineInspector({
   writable: boolean;
 }) {
   const assign = useAssignProjectGroup(projectId);
+  const pricing = useJob<DigiKeyQuantityPricing>();
   const { toast } = useToast();
   const inspectorLabel = useText("projects.bom.inspector-aria", "BOM line details");
   const identityNeeded = useText("projects.identity-needed", "Identity Needed");
@@ -412,6 +416,20 @@ function BomLineInspector({
   const linkedLabel = useText("projects.bom.filter-linked", "Linked");
   const needsLinkLabel = useText("projects.bom.filter-needs-link", "Needs Link");
   const linkFailed = useText("projects.bom.toast-link-failed", "Could not link component");
+  useEffect(() => pricing.reset(), [line?.mpn, line?.final_qty, pricing.reset]);
+
+  async function checkPricing() {
+    if (!line?.mpn || pricing.status === "running") return;
+    try {
+      const ref = await api.startDigiKeyQuantityPricing(line.mpn, line.final_qty, false);
+      const final = await pricing.run(ref.job_id);
+      if (final.status !== "done") {
+        toast(final.error ?? "Could not read DigiKey pricing.", "err");
+      }
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not read DigiKey pricing.", "err");
+    }
+  }
   if (!line) {
     return (
       <CenteredMessage>
@@ -449,6 +467,49 @@ function BomLineInspector({
           { label: packageLabel, value: line.package || notSet },
         ]}
       />
+
+      {line.mpn ? (
+        <section className="mt-4 border-t border-line pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <SectionHeading>
+              <Text id="projects.bom.digikey-pricing">DigiKey Quantity Pricing</Text>
+            </SectionHeading>
+            <Button small onClick={() => void checkPricing()} disabled={pricing.status === "running"}>
+              {pricing.status === "running" ? "Checking..." : "Check Pricing"}
+            </Button>
+          </div>
+          {pricing.result ? (
+            pricing.result.options.length ? (
+              <div className="mt-2 space-y-1">
+                {pricing.result.options.map((option, index) => (
+                  <div
+                    key={`${option.product_number}:${option.packaging}:${index}`}
+                    className="flex items-start justify-between gap-3 rounded-control bg-field px-2.5 py-2 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-t1">
+                        {option.product_number || line.mpn}
+                      </p>
+                      <p className="truncate text-2xs text-t3">
+                        {option.packaging || "Standard packaging"}
+                      </p>
+                    </div>
+                    <p className="flex-none font-mono text-t1">
+                      {option.currency} {option.unit_price.toFixed(4)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-t3">No pricing option was returned for this quantity.</p>
+            )
+          ) : (
+            <p className="mt-2 text-xs leading-5 text-t3">
+              Uses the exact build quantity. DigiReel is not requested until an order is prepared.
+            </p>
+          )}
+        </section>
+      ) : null}
 
       {!line.in_library ? (
         <div className="mt-4">

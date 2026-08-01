@@ -20,6 +20,7 @@ const STATUS: OnboardingStatus = {
   profiles: [],
   under_git: false,
   default_dir: "/home/u/.config/stockroom/library",
+  libraries: [],
 };
 
 function renderGate() {

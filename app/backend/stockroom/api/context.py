@@ -247,15 +247,13 @@ class AppContext:
             old_stm_index.close()
 
     def auto_push(self) -> None:
-        """After a library write, push it to the remote when a GitHub token is configured and sync
-        is enabled, first rebasing to pick up any collaborator changes. Non-fatal: an offline /
+        """After a library write, push it through the user's Git credential helper when sync is
+        enabled, first rebasing to pick up any collaborator changes. Non-fatal: an offline /
         no-remote / auth / conflict failure never breaks the write (the change is already committed
         locally, and the next launch's pull + a Sync push it). So a part add lands in git
         immediately and reaches every collaborator on their next launch."""
         if not getattr(self.config, "sync_enabled", True):
             return
-        if not (getattr(self.config, "github_token", "") or "").strip():
-            return  # no credential yet; the commit stands locally, Sync pushes once a token is set
         try:
             if not self.repo.has_remote():
                 return
@@ -344,9 +342,9 @@ class AppContext:
         launch never rebases or merges anything behind the user's back; a genuine divergence still
         surfaces on the Sync surface where it can be read and decided.
 
-        Deliberately NOT gated on a GitHub token, unlike `auto_push`: pushing needs a credential,
-        PULLING a public library does not, and gating both on the token is what would leave a
-        read-only collaborator permanently stale.
+        Deliberately not gated on an app-owned GitHub token. Git's credential helper owns both
+        pull and push authentication, so every Windows user signs into their own account and a
+        public read still needs no credential.
 
         Best-effort and silent about failure, for the same reason auto_push is: offline, no remote,
         no credential and a rejected fast-forward are all ordinary, and none of them may stop the

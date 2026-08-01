@@ -93,7 +93,7 @@ describe("AltiumDbLibSection", () => {
     });
   });
 
-  it("shows the place-ready ratio, active profile, and install path", async () => {
+  it("shows the place-ready ratio, active library, and install path", async () => {
     mockApi.altiumStatus.mockResolvedValue(STATUS);
     renderSection();
 
@@ -145,7 +145,7 @@ describe("AltiumDbLibSection", () => {
       await screen.findByText(/without opening Altium until you choose the setup action/i),
     ).toBeInTheDocument();
     expect(screen.getByText("Explicit Install And Verification")).toBeInTheDocument();
-    expect(screen.getByText(/Opening Stockroom, switching profiles, and rebuilding the DbLib never launch Altium/i)).toBeInTheDocument();
+    expect(screen.getByText(/Opening Stockroom, switching libraries, and rebuilding the DbLib never launch Altium/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Set Up In Altium/ })).toBeInTheDocument();
     expect(screen.queryByText(/right-click the library/i)).not.toBeInTheDocument();
   });

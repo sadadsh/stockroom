@@ -61,6 +61,10 @@ class MachineConfig:
     # app runs first-run onboarding (open / clone / create a library); persisted thereafter.
     # A frozen exe ships no library, so this is the ONLY thing that tells it where to look.
     libraries_root: str = ""
+    # Known user libraries on this machine. Each path names the ROOT of an independent Git
+    # repository. This is only a recent-workspace index; the repositories themselves remain the
+    # authority and removing an entry must never delete library data.
+    library_workspaces: list[dict[str, str]] = field(default_factory=list)
     # Where the STM32CubeMX MCU XML tree lives on this machine (stm-viewer workstream,
     # Phase 3, API-02). Blank until the user points it there (the all-families source is
     # Windows-side per research and is not bundled); stm.source.default_cubemx_source()
@@ -78,10 +82,9 @@ class MachineConfig:
     # so a saved account clears the sign-in wall before the in-DigiKey CAD providers are reached.
     digikey_username: str = ""
     digikey_password: str = field(default="", repr=False)
-    # A GitHub personal access token (fine-grained, Contents: write on the library repo) used to
-    # authenticate library push/pull for the in-repo library, so a part add can auto-push and a
-    # collaborator's changes pull. Stored in Windows Credential Manager and held here only in
-    # process memory. Blank = no auto-push, sign in later.
+    # Legacy upgrade-only GitHub token. New sign-ins are owned by Git Credential Manager and no
+    # GitHub secret crosses Stockroom. Retained temporarily so an existing installation can scrub
+    # or migrate its old credential without losing access.
     github_token: str = field(default="", repr=False)
     # Saved logins for the in-DigiKey CAD providers the guided capture window drives:
     # Ultra Librarian, SnapEDA, and SamacSys. DigiKey's EDA/CAD Models section aggregates

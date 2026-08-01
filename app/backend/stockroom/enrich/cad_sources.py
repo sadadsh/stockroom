@@ -93,7 +93,7 @@ def all_cad_sources() -> tuple[CadSource, ...]:
     )
 
 
-def _url_for(key: str, mpn: str, digikey_product_url: str) -> str:
+def _url_for(key: str, mpn: str, digikey_product_url: str, digikey_models_id: str = "") -> str:
     """The search or product URL for one vendor.
 
     Every MPN is percent-encoded. Real part numbers carry `+`, `/`, `#` and spaces
@@ -102,6 +102,17 @@ def _url_for(key: str, mpn: str, digikey_product_url: str) -> str:
     part, which is worse than landing them nowhere.
     """
     if key == "digikey":
+        # Best first: the models page IS the CAD surface, so it costs neither the search nor the
+        # scroll to the CAD Models section. Its id is opaque and unlookupable, so it exists only
+        # for a part the person has already opened once — see `capture/digikey_models.py`. Then
+        # the exact product page, then the keyword search, exactly as before.
+        if digikey_models_id:
+            from stockroom.capture.digikey_models import digikey_models_url
+
+            try:
+                return digikey_models_url(digikey_models_id)
+            except ValueError:
+                pass  # not an id: fall through rather than interpolate it into a URL
         return digikey_product_url or (
             f"https://www.digikey.com/en/products/result?keywords={quote_plus(mpn)}"
         )
@@ -141,21 +152,61 @@ def _digikey_product_url(mpn: str, adapter) -> str:
     return getattr(product, "value", "") or ""
 
 
-def resolve_cad_sources(mpn: str, digikey=None) -> list[CadSource]:
+def _catalog_provider_urls(catalog: dict | None) -> dict[str, str]:
+    """Exact provider detail links DigiKey's Media API returned for this product."""
+    out: dict[str, str] = {}
+    if not isinstance(catalog, dict):
+        return out
+    for item in catalog.get("media") or []:
+        if not isinstance(item, dict):
+            continue
+        url = str(item.get("url") or "").strip()
+        title = str(item.get("title") or "").casefold()
+        haystack = f"{title} {url.casefold()}"
+        key = ""
+        if "ultralibrarian" in haystack or "ultra librarian" in haystack:
+            key = "ultralibrarian"
+        elif "snapeda" in haystack or "snapmagic" in haystack:
+            key = "snapmagic"
+        elif "samacsys" in haystack or "componentsearchengine" in haystack:
+            key = "samacsys"
+        if key and url.startswith("https://"):
+            out.setdefault(key, url)
+    return out
+
+
+def resolve_cad_sources(
+    mpn: str,
+    digikey=None,
+    *,
+    digikey_models_id: str = "",
+    digikey_catalog: dict | None = None,
+) -> list[CadSource]:
     """Every vendor page this part can be fetched from, in trust order.
 
     A blank MPN resolves to NOTHING rather than to a set of vendor home pages: sending someone to
     a search for "" is worse than telling them there is nowhere to go.
+
+    `digikey_models_id` is optional and purely an optimisation: pass the id learned from a previous
+    capture of THIS exact part and DigiKey's link becomes its models page. Omit it — or pass
+    anything that is not an id — and every URL is exactly what it was before.
     """
     mpn = (mpn or "").strip()
     if not mpn:
         return []
-    product_url = _digikey_product_url(mpn, digikey)
+    models_id = digikey_models_id if isinstance(digikey_models_id, str) else ""
+    product_url = (
+        str(digikey_catalog.get("product_url") or "").strip()
+        if isinstance(digikey_catalog, dict)
+        else ""
+    ) or _digikey_product_url(mpn, digikey)
+    exact_provider_urls = _catalog_provider_urls(digikey_catalog)
     return [
         CadSource(
             key=source.key,
             label=source.label,
-            url=_url_for(source.key, mpn, product_url),
+            url=exact_provider_urls.get(source.key)
+            or _url_for(source.key, mpn, product_url, models_id),
             tools=source.tools,
             aggregator=source.aggregator,
             instruction=source.instruction,

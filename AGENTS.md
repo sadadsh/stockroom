@@ -40,7 +40,10 @@ behavior. `CONTRIBUTING.md` defines the product gates.
 - Test, demo, and screenshot fixtures must set `STOCKROOM_CONFIG_DIR` to a
   task-owned temporary directory. Never repoint the live machine config at a
   fixture or `work\` library; after native acceptance, verify the live config
-  still names the canonical library root and profile.
+  still names the canonical library root and profile. Passing a directly
+  constructed `MachineConfig` into `build_context` is not isolation: any later
+  Settings or library mutation can still resolve `save()` to the live default
+  path unless `STOCKROOM_CONFIG_DIR` was set before app import.
 - Every screenshot is also a visual audit. Deduplicate observations into
   `docs\design\Visual Audit Backlog.md` with the exact evidence capture; only a
   finding that invalidates current acceptance evidence interrupts the active slice.

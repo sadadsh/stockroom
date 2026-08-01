@@ -113,6 +113,9 @@ const CAD_SOURCES = [
     aggregator: false,
     instruction: "Pick the part, choose KiCad and Altium as the export formats, then Download.",
     capture_available: true,
+    // The one provider reviewed for unattended capture; every other source is person-driven,
+    // which is what decides whether Get Files runs a pass or opens the guided window.
+    unattended_capture: true,
   },
   {
     key: "samacsys",
@@ -294,7 +297,7 @@ describe("CompletePartModal - automatic capture", () => {
     expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
     expect(screen.queryByText("Files Reverified")).toBeNull();
     expect(screen.getByRole("button", { name: "Get Files" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Collect All Sources" }));
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
 
     await waitFor(() => expect(capture.run).toHaveBeenCalled());
     expect(capture.run).toHaveBeenCalledWith(
@@ -307,6 +310,7 @@ describe("CompletePartModal - automatic capture", () => {
     expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
     expect(screen.getByText(/Reverified from sha256:bbbbbbbbbbbbb/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Get Files" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Check Other Sources" })).toBeInTheDocument();
     expect(
       await screen.findByText(
         "Collection Complete. Every route is settled. Unavailable means it was checked and had no exact deliverable.",
@@ -397,7 +401,7 @@ describe("CompletePartModal - automatic capture", () => {
       wrapper,
     });
     await screen.findByText("Automatic Completion");
-    await user.click(screen.getByRole("button", { name: "Collect All Sources" }));
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
 
     expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
     expect(
@@ -659,11 +663,8 @@ describe("CompletePartModal - vendor choice", () => {
       .getAllByRole("button")
       .map((b) => b.textContent!.replace("hosts all three", "").trim());
     expect(names).toEqual(["DigiKey", "Ultra Librarian", "SamacSys", "SnapMagic"]);
-    expect(
-      screen.getByText(/verified evidence and automatic routes run first/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/open provider browser is the login handoff/i)).toBeInTheDocument();
-    expect(screen.getByText(/reuses stockroom's provider profile/i)).toBeInTheDocument();
+    expect(screen.getByText(/checks saved evidence and every eligible source/i)).toBeInTheDocument();
+    expect(screen.getByText(/never limits the fallback sources/i)).toBeInTheDocument();
   });
 
   it("offers every provider only when the backend declares an executable capture route", async () => {
@@ -675,7 +676,7 @@ describe("CompletePartModal - vendor choice", () => {
     expect(within(vendorGroup()).getByRole("button", { name: /SamacSys/ })).toBeInTheDocument();
   });
 
-  it("passes the chosen provider as the automatic attempt's preference", async () => {
+  it("passes the chosen provider as the one-action collection preference", async () => {
     mockCadSource(["kicad_symbol"]);
     const capture = mockCapture();
     RENDER();
@@ -688,7 +689,7 @@ describe("CompletePartModal - vendor choice", () => {
     expect(capture.run).toHaveBeenCalledWith(
       expect.objectContaining({
         vendor: "ultralibrarian",
-        mode: "automatic",
+        mode: "collect-all",
       }),
     );
   });
@@ -709,12 +710,44 @@ describe("CompletePartModal - vendor choice", () => {
 
     expect(await screen.findByText("Provider Work Is Active")).toBeInTheDocument();
     expect(screen.getByText("Starting")).toBeInTheDocument();
-    expect(screen.getByText(/provider browser opens in a separate window/i)).toBeInTheDocument();
+    expect(screen.getByText(/exact page opens in your default browser/i)).toBeInTheDocument();
     expect(screen.getByText(/if digikey repeats the same security check/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Looking Up..." })).toBeDisabled();
   });
 
-  it("turns an incomplete automatic result into an assisted Open Provider retry", async () => {
+  it("offers the person's own Finish Route and Skip controls while a provider page is theirs", async () => {
+    // De-automation put the provider page in the person's OWN browser, so Stockroom cannot draw a
+    // HUD on it. Without these the route ends only on cancel, on ~25 s of quiet after a file
+    // landed, or on the 600 s timeout - once per author route.
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol"]);
+    vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => {}));
+    RENDER();
+    await screen.findByText("Preferred Source");
+
+    // DigiKey is the default and is not reviewed for unattended capture, so Get Files opens the
+    // person-driven lane.
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
+
+    expect(await screen.findByRole("button", { name: "Finish Route" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Skip This Part" })).toBeInTheDocument();
+  });
+
+  it("keeps route controls available for the one-action collection lane", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol"]);
+    vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => {}));
+    RENDER();
+    await screen.findByText("Preferred Source");
+
+    await user.click(vendorButton(/Ultra Librarian/));
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
+
+    await screen.findByText("Provider Work Is Active");
+    expect(screen.getByTestId("capture-route-controls")).toBeInTheDocument();
+  });
+
+  it("retries the same one-action collection after an incomplete result", async () => {
     const user = userEvent.setup();
     mockCadSource(["kicad_symbol"]);
     const run = vi
@@ -741,7 +774,7 @@ describe("CompletePartModal - vendor choice", () => {
         workflow_batch_id: "automatic-batch",
         workflow_item_id: "automatic-item",
         part_id: "part1",
-        mode: "automatic",
+        mode: "collect-all",
         vendor: "snapmagic",
         background: false,
         initial_needs: ["kicad_symbol"],
@@ -790,7 +823,7 @@ describe("CompletePartModal - vendor choice", () => {
         workflow_batch_id: "assisted-batch",
         workflow_item_id: "assisted-item",
         part_id: "part1",
-        mode: "assisted",
+        mode: "collect-all",
         vendor: "snapmagic",
         background: false,
         initial_needs: ["kicad_symbol"],
@@ -826,30 +859,27 @@ describe("CompletePartModal - vendor choice", () => {
     await user.click(vendorButton(/SnapMagic/));
 
     await user.click(screen.getByRole("button", { name: "Get Files" }));
-    // The primary control no longer re-arms itself to assisted after a failure: that silent
-    // escalation is what opened a provider window nobody asked for. Retrying stays automatic,
-    // and the window is now its own deliberate control beside it.
+    // One command owns the complete route plan. A partial result retries that same command; it
+    // never grows a second provider-window action beside the primary control.
     expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
-    const openProvider = await screen.findByRole("button", {
-      name: "Open Provider Window",
-    });
+    expect(screen.queryByRole("button", { name: "Open Provider Window" })).toBeNull();
     expect(run).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
         partIds: [DETAIL.id],
         vendor: "snapmagic",
-        mode: "automatic",
+        mode: "collect-all",
       }),
     );
 
-    await user.click(openProvider);
+    await user.click(screen.getByRole("button", { name: "Try Again" }));
     await waitFor(() => expect(run).toHaveBeenCalledTimes(2));
     expect(run).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         partIds: [DETAIL.id],
         vendor: "snapmagic",
-        mode: "assisted",
+        mode: "collect-all",
       }),
     );
   });
