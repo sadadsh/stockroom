@@ -22,6 +22,11 @@ jobs:
       # manager can hang a push/pull); fail fast instead so a bad remote surfaces as an error.
       GIT_TERMINAL_PROMPT: "0"
       GCM_INTERACTIVE: "never"
+      # This is set before pytest collection. The suite's autouse fixture applies
+      # the same isolation after collection begins, but a pair of STM corpus
+      # modules resolve their optional source while being imported. CI must
+      # never touch a platform credential manager, and Linux has none.
+      STOCKROOM_CREDENTIALS_BACKEND: "memory"
     steps:
       - name: Check out the exact revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
