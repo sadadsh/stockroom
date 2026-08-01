@@ -51,13 +51,13 @@ jobs:
           dotnet restore $project --locked-mode --nologo
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet test $project --configuration Release --no-restore --nologo
-      - name: Run backend suite - parallel safe
-        run: >-
-          uv run pytest tests/backend -q -p no:randomly
-          -m "not live_enrich and not global_windows_mutex and not performance_budget and not serial_only"
-          --dist loadgroup -n 4
       - name: Run backend suite - serialized Windows state
         run: >-
           uv run pytest tests/backend -q -p no:randomly
           -m "not live_enrich and (global_windows_mutex or serial_only)"
           -n 0
+      - name: Run backend suite - parallel safe
+        run: >-
+          uv run pytest tests/backend -q -p no:randomly
+          -m "not live_enrich and not global_windows_mutex and not performance_budget and not serial_only"
+          --dist loadgroup -n 4
