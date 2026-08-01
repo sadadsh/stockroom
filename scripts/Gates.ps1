@@ -182,7 +182,7 @@ try {
         & uv run ruff check app\backend scripts tests
     }
     Invoke-Checked 'Backend Type Check' {
-        & uv run ty check app\backend\stockroom
+        & uv run ty check app\backend\stockroom --python-platform win32
     }
     Invoke-Checked 'Native Window Host Tests' {
         $dotnetSdk = Resolve-DotNetSdk
