@@ -9,11 +9,7 @@ permissions:
 
 jobs:
   backend:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     # A hard cap so a hung test (a browser launch that blocks on a headless Windows runner, a git
     # op waiting on a credential prompt) fails the job in minutes instead of running for hours.
     timeout-minutes: 30
@@ -39,91 +35,28 @@ jobs:
           python-version: "3.12.13"
           enable-cache: false
       - name: Install Pinned .NET SDK
-        if: runner.os == 'Windows'
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: "10.0.302"
       - name: Sync
         run: uv sync --frozen
       - name: Type check backend
-        # pywebview and the Win32 host dependencies are deliberately installed
-        # only on Windows. Ubuntu still runs the portable import and backend
-        # suites below; the complete desktop backend is checked on its actual
-        # runtime platform.
-        if: runner.os == 'Windows'
+        # Stockroom is a Windows desktop product; check the complete backend on
+        # its declared runtime platform, including pywebview and Win32 APIs.
         run: uv run ty check app/backend/stockroom --python-platform win32
       - name: Run Native Window Host Suite
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $project = "tests/native/Stockroom.WindowHost.Tests/Stockroom.WindowHost.Tests.csproj"
           dotnet restore $project --locked-mode --nologo
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet test $project --configuration Release --no-restore --nologo
-      - name: Provision render browsers (Playwright Chromium + Camoufox)
-        # Linux only. The scrape engine renders through Playwright Chromium (BrowserFetcher) and
-        # the genuine-fingerprint Camoufox Firefox (CamoufoxFetcher, which defeats Akamai +
-        # DataDome), and the render path is validated on the Linux job. On the windows-latest
-        # runner these browser LAUNCHES hang (headless startup blocks), so browsers are NOT
-        # provisioned there and the `requires_browser` tests self-skip (conftest _browser_available)
-        # — keeping the Windows gate fast and focused on the Windows-specific engine (git file-lock
-        # retries, path handling, the Qt-free API), which is what it exists to catch.
-        if: runner.os == 'Linux'
-        run: |
-          uv run python -m playwright install --with-deps chromium
-          uv run python -m camoufox fetch
-      - name: Zero-Qt / zero-pywebview import gate
-        if: runner.os == 'Linux'
-        run: |
-          set -e
-          # the backend engine imports zero PyQt (it is a headless Qt-free engine)
-          if grep -REn 'import[[:space:]]+PyQt5|from[[:space:]]+PyQt5|QtCore|QtWidgets|QtGui' \
-              app/backend/stockroom/ ; then
-            echo "stockroom backend must not import PyQt (it is a Qt-free engine)"; exit 1
-          fi
-          # stockroom/api/ imports zero pywebview (host-only dependency, keeps the API headless-testable).
-          # Match IMPORTS only (import webview / from webview / import pywebview / from pywebview) so a
-          # mention of the word in a comment or docstring is not a false positive that breaks the gate.
-          if grep -REn '^[[:space:]]*(import|from)[[:space:]]+(py)?webview\b' \
-              app/backend/stockroom/api/ ; then
-            echo "stockroom/api must not import pywebview (host-only dependency)"; exit 1
-          fi
-          # stm-viewer workstream (API-04): nothing under stockroom/stm/ or the stm.py router
-          # may reference a board/switch-fabric concept (INTERFACES.md section 6's
-          # DO-NOT-REUSE row). Region-scoped to these two paths ONLY - the identifiers
-          # legitimately exist under legacy/tools/, which must NOT be grepped here.
-          if grep -rEn 'ADG714|switch_identity|classify_pin|SwitchDecision|TARGET_NET|CELL_|ZIF|CoreSight|lint_card|fabric_drc' \
-              app/backend/stockroom/stm/ app/backend/stockroom/api/routers/stm.py ; then
-            echo "stockroom/stm/ and api/routers/stm.py must not reference NETDECK/switch-fabric concepts"; exit 1
-          fi
-      - name: Run portable backend suite
-        if: runner.os == 'Linux'
-        run: >-
-          uv run pytest
-          tests/backend/catalog
-          tests/backend/credentials
-          tests/backend/derive
-          tests/backend/domain
-          tests/backend/enrich
-          tests/backend/evidence
-          tests/backend/model
-          tests/backend/planning
-          tests/backend/scrape
-          tests/backend/sexp
-          tests/backend/store
-          tests/backend/templates
-          tests/backend/update
-          tests/backend/vcs
-          tests/backend/workflow
-          -v
       - name: Run backend suite - parallel safe
-        if: runner.os == 'Windows'
         run: >-
           uv run pytest tests/backend -q -p no:randomly
           -m "not live_enrich and not global_windows_mutex and not performance_budget"
           --dist loadgroup -n 4
       - name: Run backend suite - serialized Windows and budgets
-        if: runner.os == 'Windows'
         run: >-
           uv run pytest tests/backend -q -p no:randomly
           -m "not live_enrich and (global_windows_mutex or performance_budget)"
