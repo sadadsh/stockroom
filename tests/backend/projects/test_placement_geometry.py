@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from stockroom.kicad.cli import KiCadCli
 from stockroom.model.project import ProjectRecord
 from stockroom.projects.placement_geometry import (
@@ -54,6 +56,7 @@ def test_kicad_and_altium_parsers_return_the_same_placement_shape():
     assert set(kicad[0]) == set(altium[0])
 
 
+@pytest.mark.serial_only
 def test_kicad_geometry_uses_native_metric_csv_and_preserves_the_board(tmp_path):
     board = tmp_path / "Board.kicad_pcb"
     board.write_text(

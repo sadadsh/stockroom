@@ -201,12 +201,12 @@ try {
     }
     Invoke-Checked 'Backend Tests - Parallel Safe' {
         & uv run pytest tests\backend -q -p no:randomly `
-            -m 'not live_enrich and not global_windows_mutex and not performance_budget' `
+            -m 'not live_enrich and not global_windows_mutex and not performance_budget and not serial_only' `
             --dist loadgroup -n $Workers
     }
     Invoke-Checked 'Backend Tests - Serialized Windows And Budgets' {
         & uv run pytest tests\backend -q -p no:randomly `
-            -m 'not live_enrich and (global_windows_mutex or performance_budget)' `
+            -m 'not live_enrich and (global_windows_mutex or performance_budget or serial_only)' `
             -n 0
     }
     Invoke-Checked 'Frontend Tests' {
