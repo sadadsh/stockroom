@@ -875,6 +875,7 @@ def _submit(environment: _Environment):
     )
 
 
+@pytest.mark.serial_only
 def test_production_registry_runs_one_exact_part_through_all_fourteen_stages(
     tmp_path: Path,
 ) -> None:
@@ -928,6 +929,7 @@ def test_production_registry_runs_one_exact_part_through_all_fourteen_stages(
     assert altium_symbol.origin.vendor == _PROVIDER
 
 
+@pytest.mark.serial_only
 def test_zero_config_public_composition_uses_lifecycle_store_and_publishes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

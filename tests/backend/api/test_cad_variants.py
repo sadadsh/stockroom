@@ -5,6 +5,8 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import pytest
+
 from stockroom.api.errors import ApiError
 from stockroom.api.routers.cad_variants import ActivateCadPairBody, _activate_pair
 from stockroom.capture.download_broker import DownloadReceipt
@@ -455,6 +457,7 @@ def test_supplementary_originals_remain_downloadable_but_never_activatable(
     assert app_ctx.repo.head() == head
 
 
+@pytest.mark.serial_only
 def test_stale_or_failed_pair_switch_leaves_both_tools_and_pointers_unchanged(
     client,
     app_ctx,

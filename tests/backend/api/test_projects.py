@@ -2737,6 +2737,7 @@ def test_fab_status_unknown_id_is_404(client):
     assert client.get("/api/projects/nope/fab").status_code == 404
 
 
+@pytest.mark.serial_only
 def test_fab_export_streams_the_zip(client, tmp_path, monkeypatch):
     from stockroom.projects import fab_export as fx
 
@@ -2767,6 +2768,7 @@ def test_fab_export_unknown_id_is_404(client):
     assert client.get("/api/projects/nope/fab/export").status_code == 404
 
 
+@pytest.mark.serial_only
 def test_fab_export_missing_cli_is_502(client, tmp_path, monkeypatch):
     from stockroom.kicad.errors import KiCadCliError
     from stockroom.projects import fab_export as fx
@@ -2782,6 +2784,7 @@ def test_fab_export_missing_cli_is_502(client, tmp_path, monkeypatch):
     assert "not found" in r.json()["detail"]
 
 
+@pytest.mark.serial_only
 def test_fab_export_passes_options_through(client, tmp_path, monkeypatch):
     from stockroom.projects import fab_export as fx
 

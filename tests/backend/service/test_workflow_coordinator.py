@@ -135,6 +135,7 @@ def _wait_until(predicate, *, timeout: float = 5.0) -> None:
     raise AssertionError("condition did not become true before timeout")
 
 
+@pytest.mark.serial_only
 def test_background_polling_is_bounded_fair_clean_and_payload_free(
     tmp_path: Path,
 ) -> None:
@@ -353,6 +354,7 @@ def test_running_coordinator_stops_when_its_generation_is_superseded(
     control.release(current_fence)
 
 
+@pytest.mark.serial_only
 def test_a_slow_stage_does_not_fault_the_coordinator(tmp_path: Path) -> None:
     control, _ = _control(tmp_path)
     fence = control.acquire()

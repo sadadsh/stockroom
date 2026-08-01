@@ -95,6 +95,7 @@ markers = [
     "requires_browser: test launches a real headless Chromium; skipped when Playwright/Chromium cannot launch",
     "global_windows_mutex: test owns the one current-user Windows coordinator mutex and must run outside the parallel backend pool",
     "performance_budget: wall-clock acceptance budget that must run without competing backend workers",
+    "serial_only: test owns process-global or shared filesystem state and must not run beside xdist workers",
 ]
 
 [tool.ruff]
