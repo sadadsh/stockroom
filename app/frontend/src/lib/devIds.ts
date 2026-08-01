@@ -237,6 +237,11 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "settings.library-hygiene", label: "Files the library shares that it should not", area: "settings" },
   { id: "settings.library-hygiene.sync", label: "Stop sharing the library per-user files", area: "settings" },
   { id: "settings.completion", label: "Library Completion section", area: "settings" },
+  { id: "settings.completion-worklist", label: "What still needs a person", area: "settings" },
+  { id: "settings.completion-worklist-row", label: "One provider trip for one component", area: "settings" },
+  { id: "settings.completion-worklist-start", label: "Start this provider capture for this component", area: "settings" },
+  { id: "settings.completion-worklist-run", label: "Work through every listed component in order", area: "settings" },
+  { id: "settings.completion-worklist-open", label: "Open this provider for this component", area: "settings" },
   { id: "settings.derivation", label: "Presentation Data section", area: "settings" },
   { id: "settings.cad-clear", label: "Clear CAD Files section", area: "settings" },
   { id: "settings.cad-clear.run", label: "Remove All CAD Files button", area: "settings" },
@@ -297,8 +302,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "confirm.cancel", label: "Cancel button", area: "confirm" },
   { id: "shell.root", label: "App frame", area: "shell" },
   { id: "shell.content", label: "Page content column", area: "shell" },
-  { id: "shell.profile-switch", label: "Active profile switcher", area: "shell" },
-  { id: "shell.profile-menu", label: "Profile switch menu", area: "shell" },
+  { id: "shell.library", label: "Active library repository", area: "shell" },
   { id: "shell.statusbar", label: "Bottom status bar", area: "shell" },
 ];
 

@@ -400,6 +400,7 @@ _KNOWN_KEYS: frozenset[str] = frozenset(
         "hashes",
         "enrichment",
         "alternates",
+        "catalog",
     }
 )
 
@@ -464,6 +465,10 @@ class PartRecord:
     # with `enrichment`. Omitted from the JSON entirely when empty - a part must not gain a key
     # just because this feature exists.
     alternates: dict[str, list[SourcedValue]] = field(default_factory=dict)
+    # Provider-keyed, versioned catalogue intelligence captured during intake. This is neither
+    # an electrical spec nor a derived display field: CAD/3D availability, media resources,
+    # packaging equivalence and relationship classes retain their own structured semantics.
+    catalog: dict[str, dict] = field(default_factory=dict)
     # The schema version this record was WRITTEN at. A record read from disk keeps its own
     # value (never downgraded to ours, never RAISED to ours without a real migration), so a
     # build that does not fully understand a newer record cannot claim otherwise to the next
@@ -593,6 +598,10 @@ class PartRecord:
                 {"alternates": {k: [a.to_dict() for a in v] for k, v in self.alternates.items()}}
                 if self.alternates else {}
             ),
+            **(
+                {"catalog": {key: dict(value) for key, value in self.catalog.items()}}
+                if self.catalog else {}
+            ),
         }
 
     @classmethod
@@ -630,6 +639,11 @@ class PartRecord:
             alternates={
                 k: [SourcedValue.from_dict(a) for a in (v or []) if isinstance(a, dict)]
                 for k, v in (d.get("alternates") or {}).items()
+            },
+            catalog={
+                str(key): dict(value)
+                for key, value in (d.get("catalog") or {}).items()
+                if isinstance(value, dict)
             },
             schema_version=record_version(d),
             extra={k: v for k, v in d.items() if k not in _KNOWN_KEYS},

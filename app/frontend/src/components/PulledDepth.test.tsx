@@ -86,4 +86,50 @@ describe("PulledDepth", () => {
     const { container } = render(<PulledDepth result={empty} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("shows DigiKey CAD availability, providers, resources and distinct relationship classes", () => {
+    render(<PulledDepth result={{
+      ...FULL,
+      catalog: { digikey: {
+        schema_version: 1,
+        product_number: "296-39349-1-ND",
+        manufacturer_product_number: "TPD6E05U06RVZR",
+        product_url: "https://www.digikey.com/product",
+        availability: {
+          cad_model: true,
+          three_d_model: true,
+          providers: ["Ultra Librarian", "SnapMagic"],
+        },
+        media: [
+          { media_type: "EDA Models", title: "Ultra Librarian CAD Models", url: "https://ul.example/model" },
+          { media_type: "Datasheets", title: "Datasheet", url: "https://example.test/data.pdf" },
+        ],
+        alternate_packaging: { Products: [{ ManufacturerProductNumber: "TPD6E05U06RVZT" }] },
+        substitutions: { Products: [{ ManufacturerProductNumber: "TPD6E05U06A" }] },
+        recommended_products: { Products: [{ ManufacturerProductNumber: "REC" }] },
+        associations: { Products: [{
+          ManufacturerProductNumber: "MATE",
+          DigiKeyProductNumber: "MATE-ND",
+          ProductUrl: "https://www.digikey.com/mate",
+          Manufacturer: { Name: "Connector Co" },
+        }] },
+      } },
+    }} />);
+    expect(screen.getByText("CAD Model")).toBeInTheDocument();
+    expect(screen.getByText("3D Model")).toBeInTheDocument();
+    expect(screen.getAllByText("Available")).toHaveLength(2);
+    expect(screen.getByText("Ultra Librarian")).toBeInTheDocument();
+    expect(screen.getByText("SnapMagic")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Datasheet" })).toHaveAttribute(
+      "href", "https://example.test/data.pdf",
+    );
+    expect(screen.getByText("Alternate Packages")).toBeInTheDocument();
+    expect(screen.getAllByText("Substitutions")).toHaveLength(2);
+    expect(screen.getByText("TPD6E05U06RVZT")).toBeInTheDocument();
+    expect(screen.getByText("TPD6E05U06A")).toBeInTheDocument();
+    expect(screen.getByText("REC")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /MATE/ })).toHaveAttribute(
+      "href", "https://www.digikey.com/mate",
+    );
+  });
 });

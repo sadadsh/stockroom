@@ -8,11 +8,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LibraryCompletionSection } from "./LibraryCompletionSection";
+import { CaptureProvider } from "../lib/capture";
 import { ToastProvider } from "../lib/toast";
 import { api } from "../api/client";
 import { resetCompletion } from "../lib/completionStore";
 import { defaultUiSession, resetUiSessionForTests } from "../lib/uiSession";
 import type {
+  CaptureBatchWorklist,
   LibraryCoverage,
   WorkflowBatchSummary,
   WorkflowEvent,
@@ -87,13 +89,47 @@ function durablePage(
   };
 }
 
+// One library-wide run's own split: two parts finished unattended, one provider route left that
+// only a person can pass.
+function worklist(): CaptureBatchWorklist {
+  return {
+    workflow_batch_id: "batch-1",
+    total_items: 3,
+    pending_items: 0,
+    worklist: [
+      {
+        part_id: "lm317",
+        mpn: "LM317",
+        display_name: "LM317 Regulator",
+        route_id: "ultralibrarian:ultralibrarian",
+        provider_key: "ultralibrarian",
+        label: "Ultra Librarian",
+        status: "requires-human",
+        reason: "no Ultra Librarian sign-in is saved on this PC",
+        remaining: ["kicad_model"],
+      },
+    ],
+    worklist_total: 1,
+    unattended: [],
+    unattended_total: 2,
+    stalled: [],
+    stalled_total: 0,
+    unreadable: [],
+  };
+}
+
+// CaptureProvider, because the worklist inside this section now STARTS captures rather than
+// merely linking to a provider page, and it reads the one global capture slot to know whether a
+// start is available. `main.tsx` mounts the same provider above the whole app.
 function renderSection() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <ToastProvider>
-        <LibraryCompletionSection />
-      </ToastProvider>
+      <CaptureProvider>
+        <ToastProvider>
+          <LibraryCompletionSection />
+        </ToastProvider>
+      </CaptureProvider>
     </QueryClientProvider>,
   );
 }
@@ -195,6 +231,23 @@ describe("coverage", () => {
     expect(screen.queryByText("No Source")).not.toBeInTheDocument();
   });
 
+  it("still runs when every remaining gap needs a provider route", async () => {
+    // The run is the only thing that can say WHICH provider needs a person for WHICH part, so a
+    // library whose last gaps are all assisted must still be able to start it. Disabling the
+    // button here left the worklist permanently unreachable.
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(
+      coverage({
+        needs_files: 0,
+        needs_assistance: 12,
+        assisted_can_provide: ["altium_symbol", "altium_footprint"],
+      }),
+    );
+    renderSection();
+
+    expect(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" })).toBeEnabled();
+    expect(screen.getByText(/Every remaining gap needs a provider route/i)).toBeInTheDocument();
+  });
+
   it("disables the action when there is genuinely nothing to do", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(
       coverage({ complete: 158, needs_files: 0, unsourced: 0, by_requirement: {} }),
@@ -224,7 +277,7 @@ describe("coverage", () => {
 describe("running", () => {
   it("shows a durable in-flight run and offers cancellation without a job stream", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockResolvedValue({
+    vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-1",
       event_cursor: 0,
     });
@@ -241,7 +294,7 @@ describe("running", () => {
 
   it("renders durable aggregate counts and refreshes coverage only after terminal completion", async () => {
     const coverageRead = vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockResolvedValue({
+    vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-1",
       event_cursor: 0,
     });
@@ -273,7 +326,7 @@ describe("running", () => {
 
   it("routes cancellation through the durable workflow control", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockResolvedValue({
+    vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-1",
       event_cursor: 0,
     });
@@ -308,7 +361,7 @@ describe("running", () => {
 
   it("keeps completed and failed durable item counts distinct", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockResolvedValue({
+    vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-1",
       event_cursor: 0,
     });
@@ -328,7 +381,7 @@ describe("running", () => {
 
   it("explains that durable retry preserves already completed evidence", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockResolvedValue({
+    vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-1",
       event_cursor: 0,
     });
@@ -344,7 +397,7 @@ describe("running", () => {
 
   it("projects only the allowlisted durable failure event, never a raw provider payload", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockResolvedValue({
+    vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-1",
       event_cursor: 0,
     });
@@ -374,7 +427,7 @@ describe("running", () => {
 
   it("does not infer filed CAD from a terminal workflow status", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockResolvedValue({
+    vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-1",
       event_cursor: 0,
     });
@@ -391,9 +444,76 @@ describe("running", () => {
     expect(screen.queryByText(/Supplementary Retained/i)).toBeNull();
   });
 
+  it("starts one bounded run over every component that needs files, never part by part", async () => {
+    // The owner asked for "a simple download button ... that can do everything for you". One
+    // press, no selection: the command carries no part ids, which the API defines as every part
+    // still missing files. It is submitted as an automatic CAPTURE so each part retains the
+    // report the worklist below is read from; the batch it resolves is the same one either
+    // command produced.
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
+    const submit = vi.spyOn(api, "runCapture").mockResolvedValue({
+      workflow_batch_id: "batch-1",
+      event_cursor: 0,
+    });
+    vi.spyOn(api, "workflowEvents").mockResolvedValue(
+      durablePage(durableBatch("completed", { completed: 2 }, 2), [], 0),
+    );
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
+    renderSection();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
+
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(submit).toHaveBeenCalledWith({
+      limit: 1_000,
+      mode: "automatic",
+      idempotencyKey: expect.stringMatching(/^library-completion-/),
+    });
+    expect(submit.mock.calls[0][0]).not.toHaveProperty("partIds");
+  });
+
+  it("shows the worklist of what the run could not finish alone, beside the run itself", async () => {
+    vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
+    vi.spyOn(api, "runCapture").mockResolvedValue({
+      workflow_batch_id: "batch-1",
+      event_cursor: 0,
+    });
+    vi.spyOn(api, "workflowEvents").mockResolvedValue(
+      durablePage(durableBatch("completed", { completed: 2 }, 2), [], 0),
+    );
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
+    vi.spyOn(api, "partCadSource").mockResolvedValue({
+      mpn: "LM317",
+      needs: ["kicad_model"],
+      sources: [
+        {
+          key: "ultralibrarian",
+          label: "Ultra Librarian",
+          url: "https://app.ultralibrarian.com/search?queryText=LM317",
+          tools: ["kicad", "altium"],
+          aggregator: false,
+          instruction: "Pick the part, choose KiCad and Altium, then Download.",
+          capture_available: true,
+          unattended_capture: true,
+        },
+      ],
+      url: "https://app.ultralibrarian.com/search?queryText=LM317",
+      vendor: "Ultra Librarian",
+    } as never);
+    renderSection();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
+
+    expect(await screen.findByTestId("completion-worklist")).toHaveTextContent("1 Needs You");
+    expect(
+      await screen.findByRole("link", { name: /Open Ultra Librarian/ }),
+    ).toHaveAttribute("href", "https://app.ultralibrarian.com/search?queryText=LM317");
+    expect(api.captureWorklist).toHaveBeenCalledWith("batch-1");
+  });
+
   it("surfaces a failure to start rather than sitting on a spinner", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockRejectedValue(new Error("backend is down"));
+    vi.spyOn(api, "runCapture").mockRejectedValue(new Error("backend is down"));
     renderSection();
     await userEvent.click(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" }));
     // Reported in two places on purpose: the toast is transient, the paragraph persists.
@@ -417,7 +537,7 @@ describe("durable completion", () => {
 
   it("reconnects from the last sequence and never duplicates replayed events", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockResolvedValue({
+    vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-1",
       event_cursor: 10,
     });
@@ -452,7 +572,7 @@ describe("durable completion", () => {
       ["batch-1", 11, 200],
       ["batch-1", 11, 200],
     ]);
-    expect(api.runCompletion).toHaveBeenCalledWith(
+    expect(api.runCapture).toHaveBeenCalledWith(
       expect.objectContaining({
         limit: 1_000,
         idempotencyKey: expect.stringMatching(/^library-completion-/),
@@ -463,7 +583,7 @@ describe("durable completion", () => {
 
   it("keeps a 1,000-item durable run aggregate while bounding its event-log DOM", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockResolvedValue({
+    vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-1",
       event_cursor: 0,
     });
@@ -526,7 +646,7 @@ describe("durable completion", () => {
       [600, 200],
       [800, 200],
     ]);
-    expect(api.runCompletion).toHaveBeenCalledWith(
+    expect(api.runCapture).toHaveBeenCalledWith(
       expect.objectContaining({
         limit: 1_000,
         idempotencyKey: expect.stringMatching(/^library-completion-/),
@@ -547,7 +667,7 @@ describe("durable completion", () => {
         78,
       ),
     );
-    const submit = vi.spyOn(api, "runCompletion");
+    const submit = vi.spyOn(api, "runCapture");
 
     renderSection();
 
@@ -558,7 +678,7 @@ describe("durable completion", () => {
 
   it("exposes real pause, resume, and cancel controls from durable actions", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockResolvedValue({
+    vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-1",
       event_cursor: 0,
     });
@@ -600,7 +720,7 @@ describe("durable completion", () => {
 
   it("retries only a durably failed batch and reports no invented file outcome", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
-    vi.spyOn(api, "runCompletion").mockResolvedValue({
+    vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-1",
       event_cursor: 4,
     });

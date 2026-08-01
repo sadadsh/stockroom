@@ -130,7 +130,7 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
               <p className="text-xs leading-relaxed text-t3">
                 <Text id="altiumdb.setup.step2-body">
                   Stockroom builds the machine-local data source at this path and keeps it aligned
-                  with the active profile. Copy it only when diagnosing an integration problem.
+                  with the active library. Copy it only when diagnosing an integration problem.
                 </Text>
               </p>
               <div className="mt-1.5 flex items-center justify-between gap-3">
@@ -155,7 +155,7 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
                 <Text id="altiumdb.setup.step3-body">
                   Stockroom installs the active DbLib as an Altium Installed library, closes Altium
                   cleanly, then proves a real component resolves in a fresh session only after you
-                  press Set Up In Altium. Opening Stockroom, switching profiles, and rebuilding the
+                  press Set Up In Altium. Opening Stockroom, switching libraries, and rebuilding the
                   DbLib never launch Altium.
                 </Text>
               </p>

@@ -831,12 +831,21 @@ def test_an_already_signed_in_profile_is_not_signed_in_again(monkeypatch, tmp_pa
     assert adapter.calls == []
 
 
-def test_no_saved_credentials_is_a_silent_no_op(monkeypatch, tmp_path):
+def test_no_saved_credentials_is_named_but_never_fatal(monkeypatch, tmp_path):
+    """Nothing saved must be NAMED on the part row, and must still not attempt a login.
+
+    It stayed silent until 2026-07-31, and that silence is what left the owner guessing: a
+    signed-out provider produced only "the Download button is not on this page", which is the
+    symptom of the missing sign-in rather than the cause. The reason now rides on
+    `_sign_in_error` and is appended to that row. It is still not fatal - everything up to the
+    Download button works signed out, so the drive still runs and may report something better.
+    """
+
     adapter = _LoginAdapter()
     src = _source_with_adapter(monkeypatch, tmp_path, _FakeBrowser(), adapter, lambda key: None)
     src._sign_in_once(_FakePage())
     assert adapter.calls == []
-    assert src._sign_in_error == ""
+    assert "no Faketron sign-in is saved in Settings" in src._sign_in_error
 
 
 def test_a_refused_sign_in_is_explained_in_the_part_row(monkeypatch, tmp_path):

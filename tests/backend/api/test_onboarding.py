@@ -32,15 +32,15 @@ def test_status_reports_current_library(client):
                       "under_git", "default_dir"}
 
 
-def test_status_onboarded_when_library_ships_in_repo(client, app_ctx, monkeypatch):
-    # The library committed inside the app repo counts as onboarded even if this machine never
-    # ran the setup screen (a clone of the app already carries it), so the welcome gate is skipped.
+def test_status_never_treats_an_application_repo_library_as_onboarded(
+    client, app_ctx, monkeypatch
+):
     app_ctx.config.onboarded = False
     monkeypatch.setattr(
         "stockroom.store.library_location.IN_REPO_DEFAULT", Path(app_ctx.libraries_root)
     )
     d = client.get("/api/onboarding").json()
-    assert d["onboarded"] is True and d["first_run"] is False
+    assert d["onboarded"] is False and d["first_run"] is True
     assert d["under_git"] is True
 
 
@@ -56,6 +56,15 @@ def test_set_library_open_repoints_engine_live(client, app_ctx, tmp_path):
     assert d["libraries_root"] == other.as_posix()
     assert d["profiles"] == ["Bench"]
     assert d["onboarded"] is True
+    assert d["libraries"] == [
+        {
+            "name": "other",
+            "path": other.as_posix(),
+            "active": True,
+            "available": True,
+            "under_git": True,
+        }
+    ]
     # the running context actually repointed (in place), and the token still authenticates
     assert app_ctx.libraries_root == other
     assert client.get("/api/onboarding").json()["libraries_root"] == other.as_posix()

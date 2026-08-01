@@ -284,6 +284,9 @@ export interface PartDetail {
   // aside. Optional because the backend omits the key entirely for a part whose sources never
   // disagreed - most parts carry no alternates at all.
   alternates?: Record<string, SourcedAlternate[]>;
+  // Structured provider catalogue intelligence captured at intake. Optional for records written
+  // before this capability; provider keys are lowercase (currently `digikey`).
+  catalog?: Record<string, CatalogProductData>;
 }
 
 // One value a source offered for a field. `value` is unknown, not string: a tariff rate is a
@@ -335,6 +338,7 @@ export interface PassiveAddBody {
   specs?: Record<string, string>;
   price_breaks?: { qty: number; price: number }[];
   stock?: number;
+  catalog?: Record<string, CatalogProductData>;
 }
 
 export interface ApiErrorBody {
@@ -396,6 +400,48 @@ export interface EnrichPriceBreak {
   currency: string;
 }
 
+export interface CatalogMediaLink {
+  media_type: string;
+  title: string;
+  url: string;
+}
+
+export interface CatalogModelAvailability {
+  cad_model: boolean | null;
+  three_d_model: boolean | null;
+  providers: string[];
+}
+
+/** Provider-owned structured catalogue data. Relationship response objects remain distinct:
+ * alternate packaging is identity-equivalent, substitutions are possible replacements,
+ * recommendations are weaker suggestions, and associations are companion/mating parts. */
+export interface CatalogProductData {
+  schema_version: number;
+  product_number: string;
+  manufacturer_product_number: string;
+  product_url: string;
+  availability: CatalogModelAvailability;
+  media: CatalogMediaLink[];
+  alternate_packaging: Record<string, unknown>;
+  substitutions: Record<string, unknown>;
+  recommended_products: Record<string, unknown>;
+  associations: Record<string, unknown>;
+}
+
+export interface DigiKeyQuantityPricing {
+  product_number: string;
+  quantity: number;
+  options: Array<{
+    product_number: string;
+    packaging: string;
+    quantity: number;
+    unit_price: number;
+    currency: string;
+  }>;
+  pricing_options: Record<string, unknown>;
+  digireel: Record<string, unknown> | null;
+}
+
 // The passive-or-not determination the unified Add-A-Part flow branches on. Non-null
 // means the pulled page describes a file-less passive (R/C/L) that adds with KiCad
 // stock symbol/footprint/3D, carrying the fields the file-less add needs; null means
@@ -428,6 +474,7 @@ export interface EnrichmentResult {
   // lookup we keep BOTH, so the part carries every place it can be ordered, not only the pasted
   // link. Optional so older payloads without it still type-check.
   dist_urls?: Record<string, string>;
+  catalog?: Record<string, CatalogProductData>;
   price_breaks: EnrichPriceBreak[];
   specs: Record<string, SourcedField | null>;
   // Every kept disagreement between sources for a spec key: all values with their
@@ -487,6 +534,7 @@ export interface StagingCandidate {
   alternates?: Record<string, { value: string; source: string; confidence: string }[]>;
   // per-key provenance for `specs`, the same trip and the same reason
   enrichment?: Record<string, { source: string; confidence: string }>;
+  catalog?: Record<string, CatalogProductData>;
   // carries the datasheet source_url onto the committed record; absent on
   // candidates staged before it was round-tripped
   provenance?: {
@@ -653,6 +701,13 @@ export interface OnboardingStatus {
   profiles: string[];
   under_git: boolean;
   default_dir: string;
+  libraries: Array<{
+    name: string;
+    path: string;
+    active: boolean;
+    available: boolean;
+    under_git: boolean;
+  }>;
 }
 
 export interface ProjectSummary {
@@ -1296,6 +1351,10 @@ export interface SyncStatus {
   current_branch: string;
   ahead: number;
   behind: number;
+  github_auth: {
+    mode: "git_credential_manager";
+    accounts: string[];
+  };
   working_copy?: {
     mode: "embedded" | "rival_application_checkout" | "separate";
     detail: string;
@@ -2788,6 +2847,59 @@ export interface CompletionResult {
   stop_reason: string;
 }
 
+/**
+ * GET /api/library/capture/batches/{id}/worklist -- one library-wide run, split into what
+ * finished with nobody watching and what still needs one person.
+ *
+ * A row is ONE provider route the run itself terminated as `requires-human`, so `reason` is that
+ * route's own words rather than a category this surface invented. `remaining` is what the part
+ * still lacks, so the person knows what to tick before they leave the provider page.
+ */
+export interface CaptureWorklistRow {
+  part_id: string;
+  mpn: string;
+  display_name: string;
+  route_id: string;
+  // The provider key to open for this part. It matches one CadSource.key, which is where the URL
+  // comes from -- this surface never builds a provider URL of its own.
+  provider_key: string;
+  label: string;
+  status: "requires-human";
+  reason: string;
+  remaining: Requirement[];
+}
+
+// A part the run finished unattended, through an authorized automatic route.
+export interface CaptureWorklistCompleted {
+  part_id: string;
+  mpn: string;
+  display_name: string;
+  status: string;
+  remaining: Requirement[];
+}
+
+// A part that finished with files still missing and NO route that a person could advance. A
+// different fact from needing a person, and never merged with one.
+export interface CaptureWorklistStalled extends CaptureWorklistCompleted {
+  reason: string;
+}
+
+export interface CaptureBatchWorklist {
+  workflow_batch_id: string;
+  total_items: number;
+  // Items whose per-part report has not landed yet: neither finished nor stuck.
+  pending_items: number;
+  // Bounded rows; `*_total` is the true count behind each bounded list.
+  worklist: CaptureWorklistRow[];
+  worklist_total: number;
+  unattended: CaptureWorklistCompleted[];
+  unattended_total: number;
+  stalled: CaptureWorklistStalled[];
+  stalled_total: number;
+  // Parts whose retained report could not be read. Named rather than dropped in silence.
+  unreadable: string[];
+}
+
 export interface CaptureWorkflowSession {
   workflow_batch_id: string;
   workflow_item_id: string;
@@ -2797,6 +2909,17 @@ export interface CaptureWorkflowSession {
   background: boolean;
   initial_needs: Requirement[];
   report: CompletionResult | null;
+}
+
+// What the PERSON decided about the person-driven capture in front of them. De-automation
+// removed the provider HUD, so Finish and Skip live in Stockroom's own window and travel to the
+// running capture as one of these two words. Neither ever touches a provider page.
+export type CapturePersonIntentAction = "finish-route" | "skip-part";
+
+export interface CapturePersonIntentResult {
+  part_id: string;
+  action: CapturePersonIntentAction;
+  accepted: boolean;
 }
 
 // A progress frame from a completion run's SSE stream.

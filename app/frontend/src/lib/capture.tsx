@@ -17,6 +17,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../api/client";
 import type {
+  CapturePersonIntentAction,
   CompletionEvidence,
   CompletionResult,
   CadSourceResponse,
@@ -62,6 +63,8 @@ export const REQ_LABELS: Record<Requirement, string> = {
 
 type Received = Partial<Record<Requirement, boolean>>;
 
+export type { CapturePersonIntentAction };
+
 export interface CaptureState {
   partId: string | null;
   partName: string | null;
@@ -69,6 +72,18 @@ export interface CaptureState {
   message: string | null;
   url: string | null;
   vendor: string | null;
+  // Which lane this run is in. Only the person-driven lanes open a provider page a person can be
+  // standing in front of, so only they may offer Finish Route and Skip This Part.
+  mode: CaptureMode | null;
+  // The person-driven decision currently being sent, and what came back. Kept apart from
+  // `message`, which the durable follow loop rewrites on every poll and would erase this.
+  intentPending: CapturePersonIntentAction | null;
+  intentNote: string | null;
+  // The last decision this capture ACCEPTED, which outlives `intentPending` on purpose. A surface
+  // working a list of components has to know the difference between a route that ended by itself
+  // and one the person deliberately stopped, and by the time the capture is terminal the pending
+  // flag is long cleared. Reset with the rest of the state when a new capture takes the slot.
+  intentSent: CapturePersonIntentAction | null;
   needs: Requirement[];
   received: Received;
   backgrounded: boolean;
@@ -89,6 +104,10 @@ const IDLE: CaptureState = {
   message: null,
   url: null,
   vendor: null,
+  mode: null,
+  intentPending: null,
+  intentNote: null,
+  intentSent: null,
   needs: [],
   received: {},
   backgrounded: false,
@@ -102,6 +121,28 @@ const IDLE: CaptureState = {
 // A capture that has not reached a terminal verdict yet. Starting a different part while one of
 // these is running is what abandons the earlier follow loop.
 const IN_FLIGHT: GuidedStatus[] = ["resolving", "window-open", "receiving", "attaching"];
+
+/**
+ * Is this capture still running?
+ *
+ * There is exactly ONE capture slot here and a process-wide exclusive window in the backend, so
+ * every surface that can START a capture has to ask this first. Exported rather than re-derived
+ * per surface, because a second list of "busy" statuses is a second answer waiting to disagree.
+ */
+export function captureInFlight(state: CaptureState): boolean {
+  return IN_FLIGHT.includes(state.status);
+}
+
+/**
+ * Can the person say "I am finished with this route" or "skip this component" right now?
+ *
+ * Only a person-driven lane opens a provider page in the person's own browser, so only those runs
+ * have a route in front of anybody to finish. Offering the controls on an automatic pass would be
+ * offering a button the backend correctly refuses.
+ */
+export function captureAwaitsPerson(state: CaptureState): boolean {
+  return captureInFlight(state) && state.mode !== null && state.mode !== "automatic";
+}
 
 const EVENT_PAGE_LIMIT = 200;
 const POLL_INTERVAL_MS = 750;
@@ -311,6 +352,11 @@ export interface CaptureApi {
   ) => Promise<void>;
   reset: () => void;
   keepWorking: () => void;
+  // The person's own two answers about the page in front of them. `finishRoute` says no more files
+  // are coming from it (what already landed is kept); `skipPart` stops this component's remaining
+  // provider routes. Neither touches the provider page - they describe the person's intent.
+  finishRoute: () => Promise<void>;
+  skipPart: () => Promise<void>;
   reopenPartId: string | null;
   requestReopen: () => void;
   requestOpenFor: (partId: string) => void;
@@ -601,6 +647,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
             partName,
             needs: session.initial_needs,
             vendor: session.vendor ?? "Automatic",
+            mode: session.mode,
             status: "receiving",
             backgrounded: true,
             message: "Reconnected to durable completion. Restoring the latest verified stage...",
@@ -675,6 +722,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         partName,
         needs,
         vendor: sourceKey ?? "Automatic",
+        mode,
         status: "resolving",
         message:
           mode === "collect-all"
@@ -801,6 +849,55 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     setState((current) => ({ ...current, backgrounded: true }));
   }, []);
 
+  // The person's own decision about the provider page in front of them, sent to the running
+  // capture. It is deliberately NOT optimistic: the backend refuses a signal for a component it is
+  // not capturing, and a control that claimed success anyway would be exactly the control nobody
+  // could trust. `intentNote` reports the outcome without touching `message`, which the durable
+  // follow loop rewrites every 750 ms.
+  const sendIntent = useCallback(
+    async (action: CapturePersonIntentAction, sent: string): Promise<void> => {
+      const partId = partIdRef.current;
+      if (!partId) return;
+      setState((current) => ({ ...current, intentPending: action, intentNote: null }));
+      try {
+        await api.captureIntent(partId, action);
+        if (partIdRef.current !== partId) return;
+        setState((current) => ({
+          ...current,
+          intentPending: null,
+          intentNote: sent,
+          intentSent: action,
+        }));
+      } catch (error) {
+        if (partIdRef.current !== partId) return;
+        setState((current) => ({
+          ...current,
+          intentPending: null,
+          intentNote: errorMessage(error, "Stockroom could not reach this capture."),
+        }));
+      }
+    },
+    [],
+  );
+
+  const finishRoute = useCallback(
+    () =>
+      sendIntent(
+        "finish-route",
+        "Stockroom is closing out this provider route. Anything already downloaded is kept.",
+      ),
+    [sendIntent],
+  );
+
+  const skipPart = useCallback(
+    () =>
+      sendIntent(
+        "skip-part",
+        "Stockroom is stopping this component's remaining provider routes.",
+      ),
+    [sendIntent],
+  );
+
   const requestReopen = useCallback(() => {
     setReopenPartId(partIdRef.current);
     setState((current) => ({ ...current, backgrounded: false }));
@@ -819,6 +916,8 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         start,
         reset,
         keepWorking,
+        finishRoute,
+        skipPart,
         reopenPartId,
         requestReopen,
         requestOpenFor,

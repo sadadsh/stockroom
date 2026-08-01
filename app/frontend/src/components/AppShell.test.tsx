@@ -19,6 +19,7 @@ vi.mock("../api/client", async (importActual) => {
       facets: vi.fn(),
       listProfiles: vi.fn(),
       activateProfile: vi.fn(),
+      getOnboarding: vi.fn(),
       checkUpdate: vi.fn(),
       // The rail persists its collapsed state through the settings endpoint now, so the mock has to
       // carry it or the write throws inside the effect that saves the preference.
@@ -46,6 +47,23 @@ beforeEach(() => {
     by_category: {}, by_manufacturer: {}, complete: 0, incomplete: 0,
   } as never);
   mockApi.listProfiles.mockResolvedValue({ profiles: [], active: "" } as never);
+  mockApi.getOnboarding.mockResolvedValue({
+    onboarded: true,
+    first_run: false,
+    libraries_root: "D:/Libraries/Stockroom Library",
+    profiles: ["Stockroom"],
+    under_git: true,
+    default_dir: "D:/Libraries/Stockroom Library",
+    libraries: [
+      {
+        name: "Stockroom Library",
+        path: "D:/Libraries/Stockroom Library",
+        active: true,
+        available: true,
+        under_git: true,
+      },
+    ],
+  } as never);
   mockApi.checkUpdate.mockResolvedValue({
     update_available: false,
     state: "up_to_date",
@@ -93,8 +111,8 @@ describe("AppShell network-only Add A Part boundary", () => {
   });
 });
 
-// -- punch 13b + the doubled wording. The status bar called useProfiles() and then rendered the
-// active profile as DEAD TEXT: zero interactive elements in the whole bar. And its left segment read
+// The status bar renders the independent library repository as a quiet fact. Switching lives in
+// Settings where the filesystem and Git boundary are explicit. Its left segment used to read
 // "Components Loaded / Components", saying Components twice, while carrying no information - the
 // state it reported is true almost always.
 describe("AppShell status bar", () => {
@@ -178,24 +196,20 @@ describe("AppShell status bar", () => {
     expect(screen.queryByText("Components Loaded")).toBeNull();
   });
 
-  it("renders permanent status facts legibly and separates the profile label from its value", async () => {
+  it("renders permanent status facts and names the active library repository", async () => {
     mockApi.facets.mockResolvedValue({
       by_category: { ICs: 158 },
       by_manufacturer: {},
       complete: 158,
       incomplete: 0,
     } as never);
-    mockApi.listProfiles.mockResolvedValue({
-      profiles: ["Stockroom", "Archive"],
-      active: "Stockroom",
-    } as never);
     renderShell();
 
     expect(await screen.findByText("158 Components")).toHaveClass("text-t1");
-    const profile = await screen.findByRole("button", { name: "Profile: Stockroom" });
-    expect(profile).toHaveClass("text-t2");
-    expect(profile.textContent).toContain("Profile:");
-    expect(profile.querySelector(".text-t1")).toHaveTextContent("Stockroom");
+    const library = await screen.findByLabelText("Library: Stockroom Library");
+    expect(library).toHaveClass("text-t2");
+    expect(library.textContent).toContain("Library:");
+    expect(library.querySelector(".text-t1")).toHaveTextContent("Stockroom Library");
   });
 
   it("agrees with its number at exactly one component", async () => {
@@ -240,38 +254,11 @@ describe("AppShell status bar", () => {
     expect(screen.queryByText(/Could Not Load Components/)).toBeNull();
   });
 
-  it("switches the active profile from the status bar", async () => {
-    const user = userEvent.setup();
-    mockApi.facets.mockResolvedValue({
-      by_category: {}, by_manufacturer: {}, complete: 0, incomplete: 0,
-    } as never);
-    mockApi.listProfiles.mockResolvedValue({
-      profiles: ["Stockroom", "Archive"],
-      active: "Stockroom",
-    } as never);
-    mockApi.activateProfile.mockResolvedValue({ profiles: [], active: "Archive" } as never);
+  it("does not expose the retired profile switcher", async () => {
     renderShell();
-
-    const trigger = await screen.findByRole("button", { name: /Profile: Stockroom/i });
-    await user.click(trigger);
-    await user.click(await screen.findByRole("button", { name: "Archive" }));
-    expect(mockApi.activateProfile).toHaveBeenCalledWith("Archive");
-  });
-
-  it("closes the profile menu on Escape", async () => {
-    const user = userEvent.setup();
-    mockApi.facets.mockResolvedValue({
-      by_category: {}, by_manufacturer: {}, complete: 0, incomplete: 0,
-    } as never);
-    mockApi.listProfiles.mockResolvedValue({
-      profiles: ["Stockroom", "Archive"],
-      active: "Stockroom",
-    } as never);
-    renderShell();
-    await user.click(await screen.findByRole("button", { name: /Profile: Stockroom/i }));
-    expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("button", { name: "Archive" })).toBeNull();
+    expect(await screen.findByLabelText("Library: Stockroom Library")).toBeInTheDocument();
+    expect(screen.queryByText("Profile:")).toBeNull();
+    expect(screen.queryByTestId("shell.profile-menu")).toBeNull();
   });
 });
 

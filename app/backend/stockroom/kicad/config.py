@@ -51,9 +51,67 @@ def kicad_config_dir(version: str | None = None, override: str = "") -> Path:
     return base / version
 
 
+def _windows_process_names() -> str:
+    """Every running image name, read straight from the process snapshot API.
+
+    `tasklist` measured 6.75 s on the owner's machine, which runs ~3,600 processes: it enumerates
+    them all and then FORMATS them into a table. The same snapshot through kernel32 measured
+    82 ms. That difference is not cosmetic - this runs inside `GET /api/system/info`, where six
+    seconds is past the client's default read timeout, so the endpoint was timing out rather than
+    answering. Raises on any failure so the caller can fall back to the command.
+    """
+
+    import ctypes
+    import ctypes.wintypes as wintypes
+
+    class _ProcessEntry32(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", wintypes.DWORD),
+            ("cntUsage", wintypes.DWORD),
+            ("th32ProcessID", wintypes.DWORD),
+            ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+            ("th32ModuleID", wintypes.DWORD),
+            ("cntThreads", wintypes.DWORD),
+            ("th32ParentProcessID", wintypes.DWORD),
+            ("pcPriClassBase", ctypes.c_long),
+            ("dwFlags", wintypes.DWORD),
+            ("szExeFile", ctypes.c_char * 260),
+        ]
+
+    kernel32 = ctypes.windll.kernel32
+    snapshot = kernel32.CreateToolhelp32Snapshot(0x2, 0)  # TH32CS_SNAPPROCESS
+    if snapshot in (0, -1, ctypes.c_void_p(-1).value):
+        raise OSError("could not snapshot the process list")
+    names: list[str] = []
+    try:
+        entry = _ProcessEntry32()
+        entry.dwSize = ctypes.sizeof(_ProcessEntry32)
+        if kernel32.Process32First(snapshot, ctypes.byref(entry)):
+            while True:
+                names.append(entry.szExeFile.decode("latin-1", "replace"))
+                if not kernel32.Process32Next(snapshot, ctypes.byref(entry)):
+                    break
+    finally:
+        kernel32.CloseHandle(snapshot)
+    return "\n".join(names)
+
+
 def _default_lister() -> str:
+    if os.name == "nt":
+        try:
+            return _windows_process_names()
+        except Exception:  # noqa: BLE001 - the command below is the portable fallback
+            pass
     cmd = ["tasklist"] if os.name == "nt" else ["ps", "-A", "-o", "comm"]
-    proc = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
+    # Bounded: this is a best-effort hint, and an unbounded process enumeration behind a request
+    # handler is what let a slow machine hold the endpoint open past its client's timeout.
+    proc = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        errors="replace",
+        timeout=10,
+    )
     return proc.stdout
 
 

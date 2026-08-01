@@ -41,7 +41,16 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 275 with the About window's stale-frontend note, which appears only when the running bundle and
 // the backend disagree about the installed revision.
 // 276 with the superseded-capture notice, which names the part a newly started capture displaced.
-const EXPECTED_ENTRIES = 276;
+// 279 with the completion worklist: the block itself, one row per provider route a run could not
+// finish alone, and the control that opens that provider on that exact component.
+// 280 with `settings.completion-worklist-start`, the row's new PRIMARY control. It starts the real
+// person-driven capture for that component and provider, so what the person downloads is actually
+// imported; the pre-existing `-open` id stays as the secondary "just look" link.
+// 281 with `settings.completion-worklist-run`, the one control that works the whole worklist: it
+// starts the first row and starts the next one each time a capture reaches a terminal state, and
+// the same control stops the pass.
+// 280 after the obsolete profile switch/menu pair became one noninteractive active-library label.
+const EXPECTED_ENTRIES = 280;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

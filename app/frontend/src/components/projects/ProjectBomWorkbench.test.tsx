@@ -18,6 +18,8 @@ vi.mock("../../api/client", async (importActual) => {
       projectPlacementGeometry: vi.fn(),
       projectVisuals: vi.fn(),
       projectVisualArtifact: vi.fn(),
+      startDigiKeyQuantityPricing: vi.fn(),
+      openJobStream: vi.fn(),
     },
   };
 });
@@ -142,5 +144,34 @@ describe("ProjectBomWorkbench build quantity", () => {
     await waitFor(() =>
       expect(mockApi.liveProjectBom).toHaveBeenLastCalledWith("kicad-project", 8),
     );
+  });
+
+  it("checks DigiKey at the exact build quantity without requesting DigiReel", async () => {
+    mockApi.startDigiKeyQuantityPricing.mockResolvedValue({ job_id: "pricing" });
+    const frames = [
+      'event: result\ndata: {"result":{"product_number":"RC0402FR-0710KL","quantity":2,"options":[{"product_number":"311-10.0KLRCT-ND","packaging":"Cut Tape","quantity":2,"unit_price":0.0123,"currency":"USD"}],"pricing_options":{},"digireel":null}}\n\n',
+      "event: done\ndata: {}\n\n",
+    ];
+    mockApi.openJobStream.mockResolvedValue(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          const encoder = new TextEncoder();
+          frames.forEach((frame) => controller.enqueue(encoder.encode(frame)));
+          controller.close();
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    renderWorkbench();
+
+    await user.click(await screen.findByRole("button", { name: "Check Pricing" }));
+
+    expect(mockApi.startDigiKeyQuantityPricing).toHaveBeenCalledWith(
+      "RC0402FR-0710KL",
+      2,
+      false,
+    );
+    expect(await screen.findByText("311-10.0KLRCT-ND")).toBeInTheDocument();
+    expect(screen.getByText("USD 0.0123")).toBeInTheDocument();
   });
 });

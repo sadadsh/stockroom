@@ -65,3 +65,31 @@ def configure(repo, token: str) -> None:
         _run_credential(repo, "approve", _credential_payload(path, token))
     else:
         _run_credential(repo, "reject", _credential_payload(path, ""))
+
+
+def accounts(repo) -> list[str]:
+    """GitHub accounts already owned by this Windows user's Git Credential Manager."""
+    result = repo._run(
+        "credential-manager",
+        "github",
+        "list",
+        "--no-ui",
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+    return sorted({line.strip() for line in result.stdout.splitlines() if line.strip()})
+
+
+def login(repo) -> list[str]:
+    """Open Git Credential Manager's GitHub OAuth flow, then return the signed-in accounts.
+
+    No token crosses Stockroom's API or configuration. GCM owns the browser/device flow and stores
+    the resulting credential for the current Windows user.
+    """
+    result = repo._run("credential-manager", "github", "login", check=False)
+    if result.returncode != 0:
+        from stockroom.vcs.repo import GitError
+
+        raise GitError("GitHub sign-in did not complete")
+    return accounts(repo)

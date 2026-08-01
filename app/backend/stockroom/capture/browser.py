@@ -40,6 +40,7 @@ from stockroom.capture.download_broker import (
     DownloadBrokerError,
     DownloadReceipt,
 )
+from stockroom.capture.trace import file_note, trace, trace_debug, trace_warning, url_note
 
 
 class CaptureBrowserError(RuntimeError):
@@ -194,7 +195,16 @@ _DISABLE_WEBRTC_INIT_SCRIPT = """
 
 
 @contextmanager
-def _exclusive_user_capture_window():
+def exclusive_user_capture_window():
+    """At most ONE person-driven capture window in this process, whatever transport opened it.
+
+    Public because the de-automated transport in ``capture/handoff.py`` must hold the SAME lock,
+    not one of its own. Two concurrent person-driven captures watching one Downloads directory is
+    precisely how the retired implementation attributed a file to the wrong task; one person can
+    only work one provider page at a time, so serializing them removes the ambiguity at the source
+    rather than trying to resolve it afterwards.
+    """
+
     if not _USER_CAPTURE_WINDOW_LOCK.acquire(blocking=False):
         raise CaptureBrowserError(
             "another assisted capture window is already active; Stockroom will retry this "
@@ -204,6 +214,9 @@ def _exclusive_user_capture_window():
         yield
     finally:
         _USER_CAPTURE_WINDOW_LOCK.release()
+
+
+_exclusive_user_capture_window = exclusive_user_capture_window
 
 
 # Stockroom-owned structural markers for a bot-detection or authentication control. They mirror
@@ -1954,6 +1967,11 @@ class PlaywrightCaptureBrowser:
     drive the same bundled browser policy the product ships.
     """
 
+    # Stockroom launched this window and is responsible for closing it. The de-automated transport
+    # in ``capture/handoff.py`` declares the opposite, and that difference is the whole contract:
+    # a window Stockroom owns is an automated session, and a person-driven route must not have one.
+    owns_window = True
+
     def __init__(
         self,
         *,
@@ -2158,8 +2176,19 @@ class PlaywrightCaptureBrowser:
 
         try:
             current_issue = issue_detector() or ""
+            readable = True
         except Exception:  # noqa: BLE001 - unreadable gate stays blocked and visible
             current_issue = message
+            readable = False
+        trace(
+            "capture.clearance.wait",
+            provider=provider_label,
+            author_route=author_route,
+            gate_present=bool(current_issue),
+            detector_readable=readable,
+            timeout_s=timeout,
+            why=current_issue,
+        )
         if not current_issue:
             return True
 
@@ -2214,9 +2243,21 @@ class PlaywrightCaptureBrowser:
                         page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
                     except Exception:  # noqa: BLE001 - cancellation is already authoritative
                         pass
+                    trace(
+                        "capture.clearance.result",
+                        provider=provider_label,
+                        cleared=False,
+                        ended="cancelled",
+                    )
                     return False
                 if _page_is_closed(page):
                     state["active"] = False
+                    trace(
+                        "capture.clearance.result",
+                        provider=provider_label,
+                        cleared=False,
+                        ended="page-closed",
+                    )
                     return False
                 try:
                     issue = issue_detector() or ""
@@ -2228,9 +2269,20 @@ class PlaywrightCaptureBrowser:
                         page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
                     except Exception:  # noqa: BLE001 - navigation may already have removed the document
                         pass
+                    trace(
+                        "capture.clearance.result",
+                        provider=provider_label,
+                        cleared=True,
+                        ended="gate-gone",
+                    )
                     return True
                 if issue != last_issue:
                     last_issue = issue
+                    trace_debug(
+                        "capture.clearance.changed",
+                        provider=provider_label,
+                        why=issue,
+                    )
                     state["message"] = issue
                     try:
                         page.evaluate(
@@ -2246,6 +2298,14 @@ class PlaywrightCaptureBrowser:
                 page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
             except Exception:  # noqa: BLE001 - timeout is already the authoritative outcome
                 pass
+            trace(
+                "capture.clearance.result",
+                provider=provider_label,
+                cleared=False,
+                ended="timed-out",
+                timeout_s=timeout,
+                why=last_issue,
+            )
             return False
 
     def capture_user_downloads(
@@ -2324,6 +2384,14 @@ class PlaywrightCaptureBrowser:
             "settle_seconds",
             maximum=30.0,
             allow_zero=True,
+        )
+        trace(
+            "capture.user-window.open",
+            provider=self.provider_key,
+            url=url_note(url),
+            task=broker.task.task_id,
+            required=list(hud.required_file_labels) if hud is not None else [],
+            timeout_s=timeout,
         )
         auto_finish = _bounded_seconds(
             auto_finish_seconds,
@@ -2879,7 +2947,20 @@ class PlaywrightCaptureBrowser:
             self._bind_provider_hud(page, inherited_hud)
 
     def _broker_for_page(self, page) -> DownloadBroker | None:
+        return self._broker_for_page_with_route(page)[0]
+
+    def _broker_for_page_with_route(self, page) -> tuple[DownloadBroker | None, str]:
+        """The owning task, AND which of the three paths found it.
+
+        Which path resolved a download's task is exactly the question "the vendor download did
+        not produce a file" could never answer: a direct binding, an opener walk, and the
+        single-task fallback all end in the same receipt, but only one of them means the provider
+        behaved as measured. The route name is diagnostics only - the returned broker is
+        unchanged.
+        """
+
         current = page
+        depth = 0
         seen: set[int] = set()
         while current is not None and id(current) not in seen:
             seen.add(id(current))
@@ -2889,12 +2970,13 @@ class PlaywrightCaptureBrowser:
                     None,
                 )
             if broker is not None:
-                return broker
+                return broker, ("direct-binding" if depth == 0 else f"opener-walk({depth})")
             opener = getattr(current, "opener", None)
             try:
                 current = opener() if callable(opener) else None
             except Exception:  # noqa: BLE001 - an unreadable opener is simply unbound
                 current = None
+            depth += 1
         # Provider download controls routinely open rel="noopener" windows, and Chromium reports
         # no opener for those. The walk above can never reach the task page from one, so the file
         # fell through to the legacy directory, left broker.receipts empty, and surfaced as "the
@@ -2902,8 +2984,8 @@ class PlaywrightCaptureBrowser:
         # capture window is exclusive, so a single bound task is unambiguously that file's owner.
         with self._download_lock:
             if len(self._page_brokers) == 1:
-                return self._page_brokers[0][1]
-        return None
+                return self._page_brokers[0][1], "single-task-fallback"
+        return None, "unbound"
 
     def _hud_for_page(self, page) -> _ProviderHudState | None:
         current = page
@@ -2932,11 +3014,27 @@ class PlaywrightCaptureBrowser:
         the file landed" failure the owner called out.
         """
         name = download.suggested_filename or "cad-download"
-        broker = self._broker_for_page(page) if page is not None else None
+        broker, route = (
+            self._broker_for_page_with_route(page) if page is not None else (None, "no-page")
+        )
+        trace(
+            "capture.download.event",
+            provider=self.provider_key,
+            file=name,
+            broker=broker is not None,
+            via=route,
+        )
         if broker is not None:
             try:
                 receipt = broker.capture_playwright(download)
             except DownloadBrokerError as exc:
+                trace_warning(
+                    "capture.download.refused",
+                    provider=self.provider_key,
+                    file=name,
+                    via=route,
+                    why=str(exc),
+                )
                 raise CaptureBrowserError(str(exc)) from exc
             with self._download_lock:
                 if all(captured.path != receipt.path for captured in self._captured):
@@ -2947,6 +3045,13 @@ class PlaywrightCaptureBrowser:
                             url=receipt.source_url,
                         )
                     )
+            trace(
+                "capture.download.saved",
+                provider=self.provider_key,
+                via=route,
+                saved=file_note(receipt.path),
+                path=receipt.path,
+            )
             return
 
         with self._download_lock:
@@ -2959,12 +3064,27 @@ class PlaywrightCaptureBrowser:
                 dest.unlink(missing_ok=True)
                 failure = getattr(download, "failure", None)
                 reason = failure() if callable(failure) else exc
+                trace_warning(
+                    "capture.download.failed",
+                    provider=self.provider_key,
+                    file=name,
+                    via=route,
+                    why=str(reason),
+                )
                 raise CaptureBrowserError(
                     f"the vendor download did not complete ({reason}); nothing was saved for "
                     f"{name!r}"
                 ) from exc
             self._captured.append(
                 CapturedFile(path=dest, suggested_name=name, url=download.url or "")
+            )
+            trace(
+                "capture.download.saved",
+                provider=self.provider_key,
+                via=route,
+                saved=file_note(dest),
+                path=dest,
+                task_bound=False,
             )
 
 

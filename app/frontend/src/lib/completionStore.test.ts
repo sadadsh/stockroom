@@ -66,7 +66,12 @@ describe("durable completion store", () => {
     }>((resolve) => {
       resolveReference = resolve;
     });
-    const run = vi.spyOn(api, "runCompletion").mockImplementation(() => reference);
+    // CORRECTED with the worklist slice: the library-wide run is submitted through the CAPTURE
+    // command with no part ids ("every part still missing files"), because only a capture item
+    // retains the per-part report that carries each route's `requires-human` outcome. The batch
+    // resolution, bound, and stage work are unchanged - an automatic capture request is exactly
+    // what a completion item already decoded to.
+    const run = vi.spyOn(api, "runCapture").mockImplementation(() => reference);
     const stream = vi.spyOn(api, "openJobStream");
     vi.spyOn(api, "workflowEvents").mockResolvedValue(
       terminalEvents("batch-completion-1"),
@@ -79,6 +84,7 @@ describe("durable completion store", () => {
     expect(run).toHaveBeenCalledWith({
       partIds: ["p1"],
       limit: 1,
+      mode: "automatic",
       idempotencyKey: expect.stringMatching(/^library-completion-/),
     });
 
@@ -103,7 +109,7 @@ describe("durable completion store", () => {
     const events = vi
       .spyOn(api, "workflowEvents")
       .mockResolvedValue(terminalEvents("batch-restored-completion", 41));
-    const run = vi.spyOn(api, "runCompletion");
+    const run = vi.spyOn(api, "runCapture");
 
     const result = await reconnectCompletion();
 
@@ -113,7 +119,7 @@ describe("durable completion store", () => {
   });
 
   it("never follows or stores a process-local compatibility job", async () => {
-    vi.spyOn(api, "runCompletion").mockResolvedValue({ job_id: "memory-only-job" });
+    vi.spyOn(api, "runCapture").mockResolvedValue({ job_id: "memory-only-job" });
     const stream = vi.spyOn(api, "openJobStream");
 
     const result = await startCompletion({ limit: 1 });

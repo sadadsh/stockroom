@@ -69,7 +69,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
             </h2>
             <span className="text-xs text-t3">
               {readyCount} of {rows.length} mapped
-              {status.data ? ` · ${status.data.profile}` : ""}
+              {status.data ? ` · Library ${status.data.profile}` : ""}
             </span>
           </div>
           <button
@@ -110,7 +110,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
               <Dot tone="neutral" />
               <span className="text-sm text-t3">
                 {rows.length === 0 ? (
-                  <Text id="modal.altium.empty-no-parts">This profile has no parts yet.</Text>
+                  <Text id="modal.altium.empty-no-parts">This library has no parts yet.</Text>
                 ) : filter === "ready" ? (
                   <Text id="modal.altium.empty-none-ready">
                     No parts are ready to place yet. Collect the complete source set from Components.

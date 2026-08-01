@@ -293,6 +293,34 @@ def test_a_candidate_with_no_disagreements_round_trips_to_empty_not_missing():
     assert dto_to_candidate(dto).alternates == {}
 
 
+def test_candidate_catalog_intelligence_survives_the_commit_dto():
+    from stockroom.api.routers.ingest import candidate_to_dto, dto_to_candidate
+    from stockroom.ingest.staging import StagingCandidate
+
+    catalog = {
+        "digikey": {
+            "schema_version": 1,
+            "product_number": "296-X-ND",
+            "availability": {
+                "cad_model": True,
+                "three_d_model": False,
+                "providers": ["Ultra Librarian"],
+            },
+            "media": [{"media_type": "EDA Models", "title": "CAD", "url": "https://u/x"}],
+        }
+    }
+    candidate = StagingCandidate(
+        vendor="digikey",
+        symbol_lib_path=None,
+        symbol_name="",
+        footprint_variants=[],
+        catalog=catalog,
+    )
+    dto = candidate_to_dto(candidate)
+    assert dto["catalog"] == catalog
+    assert dto_to_candidate(dto).catalog == catalog
+
+
 def test_a_part_committed_through_the_api_has_the_disagreements_in_its_RECORD(client, app_ctx):
     """End to end, at the layer the sheet reads from.
 

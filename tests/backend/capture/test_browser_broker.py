@@ -918,13 +918,17 @@ def test_download_is_saved_before_it_is_reported_and_uses_a_windows_safe_name(tm
 
 
 def test_empty_download_is_removed_and_never_reported(tmp_path):
+    from stockroom.store.machine_config import config_dir
+
     browser = PlaywrightCaptureBrowser(download_dir=tmp_path)
 
     with pytest.raises(CaptureBrowserError, match="missing or empty"):
         browser._on_download(_EmptyDownload())
 
     assert browser.captured == []
-    assert list(tmp_path.iterdir()) == []
+    # No download artifact survives. The suite-wide config isolation puts the capture trace's own
+    # directory under the same tmp root, and that is not a leftover download.
+    assert [entry for entry in tmp_path.iterdir() if entry != config_dir()] == []
 
 
 def test_download_callback_failure_is_reported_to_the_owning_wait(tmp_path):

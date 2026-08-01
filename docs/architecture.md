@@ -18,8 +18,8 @@ Stockroom is a KiCad component-library and PCB-project manager for the desktop. 
 │      (Python, no Qt)        is the built SPA served as static files (api routes always win).     │
 │              │  reads/writes                                                                      │
 │              ▼                                                                                    │
-│   the library  ── a git repo of one-JSON-per-part records + the real KiCad files, with a         │
-│                   derived, never-committed SQLite index. Every KiCad write goes through a         │
+│   one library repo ── one independent git repo per component collection: one-JSON-per-part       │
+│                      records + real KiCad/Altium assets and a derived SQLite index. Every write   │
 │                   byte-preserving s-expression layer inside one atomic git transaction.          │
 │                                                                                                   │
 │   app/frontend  ── a React + TypeScript + Tailwind + TanStack Query SPA. Built to                 │
@@ -29,7 +29,10 @@ Stockroom is a KiCad component-library and PCB-project manager for the desktop. 
 ```
 
 The frontend never touches the filesystem or KiCad. It only speaks to `/api/*`. The backend owns
-all state, all file I/O, and all KiCad knowledge.
+all state, all file I/O, and all KiCad knowledge. The application repository never contains a
+user library: each library has its own root, Git history, optional remote, and collaborator ACL.
+Changing libraries means changing repositories. The legacy one-profile folder inside a migrated
+library is an internal disk-compatibility boundary, not a user-facing workspace concept.
 
 ## Backend packages (`app/backend/stockroom/`)
 
@@ -40,7 +43,7 @@ package only for a genuinely new domain.
 |---|---|
 | `api/` | The FastAPI app (`app.py`), the request context (`context.py`), the single error→HTTP map (`errors.py`), the bearer-token guard (`security.py`), and one router per surface under `api/routers/`. |
 | `model/` | The canonical records (`PartRecord`, `ProjectRecord`) and their JSON shape. The source of truth the index and the API DTOs mirror. |
-| `store/` | The library on disk: profiles, the derived SQLite index, per-machine config. |
+| `store/` | Independent library-repository discovery/selection, the internal compatibility layout, derived SQLite indexes, and per-machine config. |
 | `mutation/` | The atomic write engine: `Transaction` (one scoped git commit or full rollback), plus the library/project mutation ops. The ONLY committer. |
 | `sexp/` | Layer 0: the byte-preserving s-expression editor. The ONLY thing that edits `.kicad_*` files (scoped span-splices, never a re-serialize). |
 | `kicad/` | KiCad domain logic: symbols, footprints, boards, netlists, the CLI wrapper. |
@@ -52,7 +55,7 @@ package only for a genuinely new domain.
 | `altium/` | The Altium DbLib emitter + status. |
 | `capture/` | The API-owned provider browser, task-bound download broker, evidence, requirements, and acquisition orchestration. |
 | `host/` | The WebView2 app shell, lifecycle, rendered-DOM bridge, and diagnostics. The ONLY place `pywebview` may be imported. |
-| `vcs/` | Git: the repo wrapper, GitHub auth. |
+| `vcs/` | Git: the repo wrapper, library-only synchronization, and per-Windows-user GitHub auth through Git Credential Manager. Stockroom never stores an app-wide PAT. |
 | `verify/` | Self-check / doctor helpers. |
 
 **Two invariants that shape everything here:** the backend imports zero Qt (CI greps and fails on

@@ -77,6 +77,29 @@ describe("mergeResultIntoCandidate", () => {
     expect(merged.display_name).toBe("My Part");
   });
 
+  it("carries structured catalogue intelligence onto the commit candidate", () => {
+    const catalog = {
+      digikey: {
+        schema_version: 1,
+        product_number: "497-STM32-ND",
+        manufacturer_product_number: "STM32F103C8T6",
+        product_url: "https://www.digikey.com/x",
+        availability: { cad_model: true, three_d_model: true, providers: ["SnapMagic"] },
+        media: [],
+        alternate_packaging: {},
+        substitutions: {},
+        recommended_products: {},
+        associations: {},
+      },
+    };
+    const merged = mergeResultIntoCandidate(
+      ZIP_CANDIDATE,
+      { ...RESULT, catalog },
+      "https://www.mouser.com/x",
+    );
+    expect(merged.catalog).toEqual(catalog);
+  });
+
   it("derives the vendor from the host", () => {
     expect(vendorFromUrl("https://www.mouser.com/a")).toBe("Mouser");
     expect(vendorFromUrl("https://lcsc.com/a")).toBe("LCSC");

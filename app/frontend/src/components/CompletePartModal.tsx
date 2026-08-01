@@ -20,7 +20,8 @@ import type {
 } from "../api/types";
 import { useCadSourceQuery } from "../api/queries";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
-import { useCapture } from "../lib/capture";
+import { captureAwaitsPerson, useCapture } from "../lib/capture";
+import { CaptureRouteControls } from "./CaptureRouteControls";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
@@ -260,9 +261,8 @@ function VendorPicker({
         })}
       </div>
       <p className="mt-1.5 text-2xs leading-snug text-t3">
-        Verified evidence and automatic routes run first. This preference only orders assisted
-        windows. If assistance is needed, Open Provider Browser is the login handoff: it launches
-        the provider window and reuses Stockroom&apos;s provider profile on later parts.
+        Stockroom checks saved evidence and every eligible source in order. This preference picks
+        which provider is tried first; it never limits the fallback sources or the files retained.
       </p>
     </div>
   );
@@ -484,15 +484,14 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
     [cadSources],
   );
   // The chosen vendor persists across parts and across launches: over a 90-part sitting, one
-  // decision beats ninety. With nothing stored, prefer a provider that can finish unattended
-  // over the head of the trust order: that head is the aggregator whose controls stay
-  // person-driven, so defaulting to it quietly pinned every capture to a manual route.
+  // decision beats ninety. With nothing stored this falls back to the head of the trust order,
+  // which is the aggregator: it carries Ultra Librarian, SnapMagic and SamacSys downloads on one
+  // page, so it reaches formats no single author offers. Preferring an unattended-capable
+  // provider instead was briefly tried and is wrong for this library - the provider that can be
+  // driven unaided is also the one with the narrowest catalogue.
   const [vendorPref, setVendorPref] = useState<string>(() => readVendorPref() ?? "");
   const vendorKey =
-    captureSources.find((v) => v.key === vendorPref)?.key ??
-    captureSources.find((v) => v.unattended_capture)?.key ??
-    captureSources[0]?.key ??
-    "";
+    captureSources.find((v) => v.key === vendorPref)?.key ?? captureSources[0]?.key ?? "";
   const chosen = captureSources.find((v) => v.key === vendorKey) ?? null;
   const pickVendor = useCallback((key: string) => {
     setVendorPref(key);
@@ -547,6 +546,10 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
     download.status === "window-open" ||
     download.status === "receiving" ||
     download.status === "attaching";
+  // Only a person-driven lane opens a provider page in this person's own browser, so only those
+  // runs have a route in front of anybody to finish or skip.
+  const awaitsPerson =
+    capture.active.partId === detail.id && captureAwaitsPerson(capture.active);
   const [captureElapsed, setCaptureElapsed] = useState(0);
   useEffect(() => {
     if (!cadBusy) {
@@ -814,7 +817,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                             {completionTitle}
                           </Text>
                         ) : (
-                          <Text id="modal.completePart.cad-title">Automatic Completion</Text>
+                        <Text id="modal.completePart.cad-title">Automatic Completion</Text>
                         )}
                       </div>
                       <div className="mt-0.5 text-2xs leading-snug text-t2">
@@ -901,9 +904,9 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                       </span>
                     </div>
                     <p className="mt-1 text-2xs leading-snug text-t2">
-                      The provider browser opens in a separate window. Complete only its sign-in
-                      or security check; Stockroom handles supported navigation, captures the
-                      downloads, and returns here automatically.
+                      Stockroom is checking saved evidence and every eligible source. If a
+                      provider needs your sign-in or security check, its exact page opens in your
+                      default browser; downloaded files return here automatically.
                     </p>
                     {vendorKey === "digikey" ? (
                       <p className="mt-1 text-2xs leading-snug text-[var(--c-warn-text)]">
@@ -912,6 +915,13 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                         Librarian instead of retrying the loop.
                       </p>
                     ) : null}
+                    {/* The person's own end-of-route controls. Without them a route a person
+                        cannot finish runs to its 600 s timeout, once per author route. */}
+                    {awaitsPerson ? (
+                      <div className="mt-2 border-t border-line pt-2">
+                        <CaptureRouteControls partId={detail.id} />
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -919,45 +929,24 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                   data-dev-id="complete.cad-actions"
                   className="mt-3 flex flex-wrap items-center gap-2"
                 >
-                  {!isDone && (needs.length > 0 || hasExactIdentity) ? (
-                    <Button
-                      variant="accent"
-                      small
-                      icon={<DownloadIcon className="h-3.5 w-3.5" />}
-                      disabled={cadBusy}
-                      onClick={() =>
-                        void download.start(vendorKey || undefined, "automatic")
-                      }
-                    >
-                      <Text id={cadButtonId(download.status)}>{cadLabel(download.status)}</Text>
-                    </Button>
-                  ) : null}
                   {hasExactIdentity ? (
                     <Button
-                      variant={isDone ? "accent" : "default"}
+                      variant={isDone ? "default" : "accent"}
                       small
                       icon={<DownloadIcon className="h-3.5 w-3.5" />}
                       disabled={cadBusy}
                       onClick={() => void download.start(vendorKey || undefined, "collect-all")}
                     >
-                      {cadBusy ? "Collecting All Sources..." : "Collect All Sources"}
+                      {isDone ? (
+                        "Check Other Sources"
+                      ) : (
+                        <Text id={cadButtonId(download.status)}>{cadLabel(download.status)}</Text>
+                      )}
                     </Button>
-                  ) : null}
-                  {/* Opening a provider window is deliberate, never an escalation. Automatic
-                      capture opens nothing, so a part it cannot serve is reported rather than
-                      answered with a browser window the person did not ask for. */}
-                  {!isDone &&
-                  vendorKey &&
-                  ["error", "timed-out", "unavailable"].includes(download.status) ? (
-                    <Button
-                      variant="default"
-                      small
-                      icon={<DownloadIcon className="h-3.5 w-3.5" />}
-                      disabled={cadBusy}
-                      onClick={() => void download.start(vendorKey, "assisted")}
-                    >
-                      Open Provider Window
-                    </Button>
+                  ) : needs.length > 0 ? (
+                    <p className="text-xs text-[var(--c-warn-text)]">
+                      Add the manufacturer and exact part number before collecting files.
+                    </p>
                   ) : null}
                   {canBackground ? (
                     <button

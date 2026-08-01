@@ -6,7 +6,7 @@
  * now pulls (which the UI previously dropped even though the record held it). Renders nothing
  * when a lookup carried none of it, so an empty or blocked fetch shows no hollow panel.
  */
-import type { EnrichmentResult } from "../api/types";
+import type { CatalogProductData, EnrichmentResult } from "../api/types";
 import { distributorLabel, sv } from "../lib/sourced";
 import { Badge, Eyebrow } from "./primitives";
 
@@ -33,6 +33,187 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function availability(value: boolean | null): string {
+  if (value === true) return "Available";
+  if (value === false) return "Not Listed";
+  return "Unknown";
+}
+
+function productCount(value: unknown): number {
+  if (Array.isArray(value)) {
+    return value.filter(
+      (item) => item != null && typeof item === "object" && "ManufacturerProductNumber" in item,
+    ).length + value.reduce((sum, item) => sum + productCount(item), 0);
+  }
+  if (value != null && typeof value === "object") {
+    return Object.values(value).reduce((sum, item) => sum + productCount(item), 0);
+  }
+  return 0;
+}
+
+interface RelatedProduct {
+  mpn: string;
+  productNumber: string;
+  manufacturer: string;
+  description: string;
+  url: string;
+}
+
+function objectText(value: unknown, nestedKey = ""): string {
+  if (typeof value === "string" || typeof value === "number") return String(value).trim();
+  if (value && typeof value === "object" && nestedKey) {
+    return objectText((value as Record<string, unknown>)[nestedKey]);
+  }
+  return "";
+}
+
+function relatedProducts(value: unknown): RelatedProduct[] {
+  const found: RelatedProduct[] = [];
+  const seen = new Set<string>();
+  function visit(item: unknown) {
+    if (Array.isArray(item)) {
+      item.forEach(visit);
+      return;
+    }
+    if (!item || typeof item !== "object") return;
+    const record = item as Record<string, unknown>;
+    const mpn = objectText(record.ManufacturerProductNumber);
+    const productNumber = objectText(record.DigiKeyProductNumber);
+    if (mpn || productNumber) {
+      const key = `${mpn}\u0000${productNumber}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        found.push({
+          mpn,
+          productNumber,
+          manufacturer: objectText(record.Manufacturer, "Name"),
+          description:
+            objectText(record.Description, "ProductDescription") ||
+            objectText(record.DetailedDescription),
+          url: objectText(record.ProductUrl),
+        });
+      }
+    }
+    Object.values(record).forEach(visit);
+  }
+  visit(value);
+  return found;
+}
+
+function RelatedProducts({
+  label,
+  meaning,
+  value,
+}: {
+  label: string;
+  meaning: string;
+  value: unknown;
+}) {
+  const products = relatedProducts(value);
+  if (!products.length) return null;
+  return (
+    <section className="rounded-control border border-line2 bg-field p-2.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h4 className="text-xs font-semibold text-t1">{label}</h4>
+        <span className="text-2xs tabular-nums text-t3">{products.length}</span>
+      </div>
+      <p className="mt-0.5 text-2xs text-t3">{meaning}</p>
+      <div className="mt-2 max-h-32 space-y-1 overflow-y-auto pr-1">
+        {products.map((product) => {
+          const title = product.mpn || product.productNumber;
+          const detail = [product.manufacturer, product.productNumber, product.description]
+            .filter(Boolean)
+            .join(" · ");
+          return product.url ? (
+            <a
+              key={`${product.mpn}:${product.productNumber}`}
+              href={product.url}
+              target="_blank"
+              rel="noreferrer"
+              className="block rounded-control px-1.5 py-1 hover:bg-raise"
+            >
+              <span className="block text-xs font-medium text-acc">{title}</span>
+              {detail ? <span className="block truncate text-2xs text-t3">{detail}</span> : null}
+            </a>
+          ) : (
+            <div key={`${product.mpn}:${product.productNumber}`} className="px-1.5 py-1">
+              <span className="block text-xs font-medium text-t1">{title}</span>
+              {detail ? <span className="block truncate text-2xs text-t3">{detail}</span> : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function CatalogProductDataBlock({ data }: { data: CatalogProductData }) {
+  return (
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Eyebrow>Product Data</Eyebrow>
+        {data.availability.providers.map((provider) => (
+          <Badge key={provider} tone="neutral">{provider}</Badge>
+        ))}
+        {data.product_url ? (
+          <a href={data.product_url} target="_blank" rel="noreferrer" className="text-xs text-acc hover:underline">
+            {data.product_number || data.manufacturer_product_number || "DigiKey Product"}
+          </a>
+        ) : null}
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Stat label="CAD Model" value={availability(data.availability.cad_model)} />
+        <Stat label="3D Model" value={availability(data.availability.three_d_model)} />
+        <Stat
+          label="Alternate Packages"
+          value={productCount(data.alternate_packaging).toLocaleString()}
+        />
+        <Stat
+          label="Substitutions"
+          value={productCount(data.substitutions).toLocaleString()}
+        />
+      </div>
+      {data.media.length > 0 ? (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+          {data.media.map((resource) => (
+            <a
+              key={`${resource.media_type}:${resource.url}`}
+              href={resource.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-acc hover:underline"
+            >
+              {resource.title || resource.media_type || "DigiKey Resource"}
+            </a>
+          ))}
+        </div>
+      ) : null}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <RelatedProducts
+          label="Alternate Packaging"
+          meaning="The same component sold in another packaging or order format."
+          value={data.alternate_packaging}
+        />
+        <RelatedProducts
+          label="Substitutions"
+          meaning="Potential replacements. Verify electrical and mechanical fit."
+          value={data.substitutions}
+        />
+        <RelatedProducts
+          label="Recommendations"
+          meaning="DigiKey suggestions, kept separate from validated substitutes."
+          value={data.recommended_products}
+        />
+        <RelatedProducts
+          label="Associations"
+          meaning="Mating connectors, kits, and companion products."
+          value={data.associations}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function PulledDepth({ result }: { result: EnrichmentResult }) {
   const stockNum =
     result.stock != null && Number.isFinite(Number(result.stock.value))
@@ -45,6 +226,7 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
     breaks.length > 0
       ? breaks.reduce((a, b) => (b.price < a.price ? b : a))
       : null;
+  const digikey = result.catalog?.digikey;
 
   // The union of every distributor we captured a link OR an order number for, so BOTH the Mouser
   // and DigiKey buy links show when both APIs answered (the owner's "store + display both links").
@@ -60,7 +242,7 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
   if (lifecycle) stats.push(["Lifecycle", lifecycle]);
   if (best) stats.push(["Best Price", `${money(best.price, best.currency)}/ea`]);
 
-  if (stats.length === 0 && breaks.length === 0 && distKeys.length === 0) return null;
+  if (stats.length === 0 && breaks.length === 0 && distKeys.length === 0 && !digikey) return null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -98,6 +280,9 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
             <Stat key={label} label={label} value={value} />
           ))}
         </div>
+      ) : null}
+      {digikey ? (
+        <CatalogProductDataBlock data={digikey} />
       ) : null}
       {breaks.length > 0 ? (
         <div

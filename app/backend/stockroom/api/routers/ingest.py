@@ -77,6 +77,7 @@ def candidate_to_dto(c: StagingCandidate) -> dict:
         # reads these keys unconditionally and a missing key crashes it.
         "alternates": {k: list(v) for k, v in c.alternates.items()},
         "enrichment": dict(c.enrichment),
+        "catalog": {key: dict(value) for key, value in c.catalog.items()},
         # provenance carries the datasheet source_url that to_staged_part records
         # on the committed part, so it must survive the inspect -> edit -> commit trip
         "provenance": (
@@ -122,6 +123,11 @@ def dto_to_candidate(d: dict) -> StagingCandidate:
         specs=dict(d.get("specs", {})),
         alternates={k: list(v) for k, v in (d.get("alternates") or {}).items()},
         enrichment=dict(d.get("enrichment") or {}),
+        catalog={
+            str(key): dict(value)
+            for key, value in (d.get("catalog") or {}).items()
+            if isinstance(value, dict)
+        },
     )
 
 

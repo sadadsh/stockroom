@@ -27,6 +27,9 @@ import type {
   AltiumStatus,
   OdbcStatus,
   CadSourceResponse,
+  CaptureBatchWorklist,
+  CapturePersonIntentAction,
+  CapturePersonIntentResult,
   CaptureWorkflowSession,
   ConnectProjectRemoteResult,
   DiffResponse,
@@ -875,6 +878,30 @@ export const api = {
     return request<SyncResult>("POST", "/api/sync");
   },
 
+  connectLibraryRemote(url: string): Promise<{ configured: boolean; remote: string }> {
+    return request<{ configured: boolean; remote: string }>("POST", "/api/sync/remote", {
+      body: { url },
+    });
+  },
+
+  startGitHubLogin(): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/sync/github/login");
+  },
+
+  startDigiKeyQuantityPricing(
+    productNumber: string,
+    quantity: number,
+    prepareOrder = false,
+  ): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/enrich/digikey/quantity-pricing", {
+      body: {
+        product_number: productNumber,
+        quantity,
+        prepare_order: prepareOrder,
+      },
+    });
+  },
+
   // First-run library onboarding (M9b/M9c): point the app at a library (open an existing
   // one, clone a git URL, or create a fresh one) and repoint the running engine at it live.
   // A set/complete changes which library EVERY other query reads, so callers invalidate all.
@@ -1097,6 +1124,30 @@ export const api = {
   captureWorkflow(batchId: string): Promise<CaptureWorkflowSession> {
     return apiGet<CaptureWorkflowSession>(
       `/api/library/capture/batches/${encodeURIComponent(batchId)}`,
+    );
+  },
+
+  // What the person decided about the person-driven capture in front of them: "no more files are
+  // coming from this page" (finish-route), or "stop this component" (skip-part). The provider page
+  // opens in their OWN browser now, so these are statements to Stockroom about their own intent -
+  // nothing here reaches into a vendor page. A 409 means Stockroom is running no such capture.
+  captureIntent(
+    partId: string,
+    action: CapturePersonIntentAction,
+  ): Promise<CapturePersonIntentResult> {
+    return request<CapturePersonIntentResult>(
+      "POST",
+      `/api/library/capture/parts/${encodeURIComponent(partId)}/intent`,
+      { body: { action } },
+    );
+  },
+
+  // What one library-wide run finished on its own, and what it could not finish without a
+  // person. Read-only: the backend projects the per-part reports the run already retained, so
+  // asking again costs nothing and never re-runs a provider.
+  captureWorklist(batchId: string): Promise<CaptureBatchWorklist> {
+    return apiGet<CaptureBatchWorklist>(
+      `/api/library/capture/batches/${encodeURIComponent(batchId)}/worklist`,
     );
   },
 

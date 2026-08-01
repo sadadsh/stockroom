@@ -5,7 +5,15 @@ import urllib.request
 
 import pytest
 
-from stockroom.enrich.digikey_api import DigiKeyAdapter, _default_requester, _parse_digikey_part
+from stockroom.enrich.digikey_api import (
+    DigiKeyAdapter,
+    DigiKeyClient,
+    _default_requester,
+    _parse_digikey_part,
+    digikey_catalog_from_payload,
+    parse_digikey_payload,
+    pricing_options_from_payload,
+)
 from stockroom.enrich.errors import EnrichError
 
 _PRODUCT = {
@@ -110,6 +118,45 @@ def test_lookup_picks_the_exact_mpn():
     r = a.lookup("sn74lvc1g08dbvr")   # case-insensitive exact match
     assert r.mpn.value == "SN74LVC1G08DBVR" and r.mpn.source == "digikey"
     assert r.mpn.confidence == "high"
+
+
+def test_quantity_pricing_is_normalized_and_sorted_without_losing_raw_variants():
+    payload = {
+        "ProductVariations": [
+            {
+                "DigiKeyProductNumber": "CUT-ND",
+                "PackageType": {"Name": "Cut Tape"},
+                "Pricing": [
+                    {"RequestedQuantity": 100, "UnitPrice": 0.09, "Currency": "USD"},
+                    {"RequestedQuantity": 100, "UnitPrice": 0.09, "Currency": "USD"},
+                ],
+            },
+            {
+                "DigiKeyProductNumber": "REEL-ND",
+                "Packaging": "Tape & Reel",
+                "Quantity": 100,
+                "UnitPrice": "0.07",
+                "Currency": "USD",
+            },
+        ]
+    }
+
+    assert pricing_options_from_payload(payload) == [
+        {
+            "product_number": "REEL-ND",
+            "packaging": "Tape & Reel",
+            "quantity": 100,
+            "unit_price": 0.07,
+            "currency": "USD",
+        },
+        {
+            "product_number": "CUT-ND",
+            "packaging": "Cut Tape",
+            "quantity": 100,
+            "unit_price": 0.09,
+            "currency": "USD",
+        },
+    ]
 
 
 def test_lookup_downgrades_confidence_without_exact_match():
@@ -352,3 +399,112 @@ def test_the_listing_description_is_still_used_when_it_is_the_only_one_there():
         "Description": {"ProductDescription": "CAP CER 0.47UF 10V X7R 0402"},
     }
     assert _parse_digikey_part(product).description.value == "CAP CER 0.47UF 10V X7R 0402"
+
+
+def test_complete_bundle_prefers_product_details_and_exposes_media_model_facts():
+    bundle = {
+        "schema_version": 1,
+        "product_number": "296-39349-1-ND",
+        "keyword_search": {"Products": [{
+            "ManufacturerProductNumber": "TPD6E05U06RVZR",
+            "Manufacturer": {"Name": "Texas Instruments"},
+            "Description": {"ProductDescription": "short"},
+            "ProductVariations": [{"DigiKeyProductNumber": "296-39349-1-ND"}],
+        }]},
+        "product_details": {"Product": {
+            "ManufacturerProductNumber": "TPD6E05U06RVZR",
+            "Manufacturer": {"Name": "Texas Instruments"},
+            "Description": {"DetailedDescription": "Six-channel ESD protection diode"},
+            "ProductUrl": "https://www.digikey.com/en/products/detail/ti/x/1",
+            "ProductVariations": [{"DigiKeyProductNumber": "296-39349-1-ND"}],
+        }},
+        "media": {"MediaLinks": [
+            {"MediaType": "EDA Models", "Title": "Ultra Librarian CAD Models",
+             "Url": "https://app.ultralibrarian.com/details/example"},
+            {"MediaType": "EDA Models", "Title": "SnapEDA CAD Models",
+             "Url": "https://www.snapeda.com/parts/example"},
+            {"MediaType": "Datasheets", "Title": "Datasheet",
+             "Url": "https://example.test/data.pdf"},
+        ]},
+        "has_cad_model_search": {"Products": [
+            {"ManufacturerProductNumber": "TPD6E05U06RVZR"}
+        ]},
+        "has_3d_model_search": {"Products": [
+            {"ManufacturerProductNumber": "TPD6E05U06RVZR"}
+        ]},
+        "alternate_packaging": {"ProductVariations": [{"DigiKeyProductNumber": "296-X-2-ND"}]},
+        "substitutions": {"Products": [{"ManufacturerProductNumber": "SUB"}]},
+        "recommended_products": {"Products": [{"ManufacturerProductNumber": "REC"}]},
+        "associations": {"Products": [{"ManufacturerProductNumber": "MATE"}]},
+    }
+    result = parse_digikey_payload(bundle, "TPD6E05U06RVZR")
+    assert result.description.value == "Six-channel ESD protection diode"
+    catalog = result.catalog["digikey"]
+    assert catalog["availability"] == {
+        "cad_model": True,
+        "three_d_model": True,
+        "providers": ["SnapMagic", "Ultra Librarian"],
+    }
+    assert {item["media_type"] for item in catalog["media"]} == {"EDA Models", "Datasheets"}
+    assert catalog["alternate_packaging"]["ProductVariations"][0]["DigiKeyProductNumber"] == "296-X-2-ND"
+    assert catalog["substitutions"]["Products"][0]["ManufacturerProductNumber"] == "SUB"
+
+
+def test_catalog_keeps_unknown_availability_honest_when_a_probe_failed():
+    bundle = {
+        "keyword_search": {"Products": [{
+            "ManufacturerProductNumber": "X",
+            "ProductVariations": [{"DigiKeyProductNumber": "X-ND"}],
+        }]},
+        "product_details": {"Product": {"ManufacturerProductNumber": "X"}},
+        "media": {"MediaLinks": []},
+        "has_cad_model_search": {"_status": "rate_limited"},
+        "has_3d_model_search": {"_status": "rate_limited"},
+    }
+    availability = digikey_catalog_from_payload(bundle, "X")["availability"]
+    assert availability["cad_model"] is None
+    assert availability["three_d_model"] is None
+
+
+def test_client_maps_every_approved_product_information_endpoint(monkeypatch):
+    calls: list[tuple[str, str, dict | None]] = []
+
+    def _open(req, timeout=8):
+        url = req.full_url
+        if "oauth2/token" in url:
+            return _Resp(_json.dumps({"access_token": "TOK"}).encode())
+        body = _json.loads(req.data.decode()) if req.data else None
+        calls.append((req.get_method(), url, body))
+        return _Resp(b"{}")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _open)
+    client = DigiKeyClient("id", "secret")
+    client.keyword_search("X", search_options=("HasCadModel",))
+    client.product_details("X/1")
+    client.media("X")
+    client.product_pricing("X")
+    client.alternate_packaging("X")
+    client.recommended_products("X")
+    client.substitutions("X")
+    client.associations("X")
+    client.pricing_options_by_quantity("X", 125)
+    client.digireel_pricing("X", 250)
+    client.manufacturers()
+    client.categories()
+    client.category(32)
+
+    urls = [url for _, url, _ in calls]
+    assert calls[0][2]["FilterOptionsRequest"] == {"SearchOptions": ["HasCadModel"]}
+    assert any("/X%2F1/productdetails" in url for url in urls)
+    assert any("/media" in url for url in urls)
+    assert any("/pricing" in url for url in urls)
+    assert any("/alternatepackaging" in url for url in urls)
+    assert any("/recommendedproducts" in url for url in urls)
+    assert any("/substitutions" in url for url in urls)
+    assert any("/associations" in url for url in urls)
+    assert any("/pricingbyquantity/125" in url for url in urls)
+    assert any("/digireelpricing?requestedQuantity=250" in url for url in urls)
+    assert any(url.endswith("/search/manufacturers") for url in urls)
+    assert any(url.endswith("/search/categories") for url in urls)
+    assert any(url.endswith("/search/categories/32") for url in urls)
+    assert sum("oauth2/token" in url for _, url, _ in calls) == 0

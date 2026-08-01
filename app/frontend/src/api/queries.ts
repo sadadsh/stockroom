@@ -818,6 +818,14 @@ export function useDoSync() {
   });
 }
 
+export function useConnectLibraryRemote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (url: string) => api.connectLibraryRemote(url),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sync-status"] }),
+  });
+}
+
 // The rail mounts this on boot, so the check must keep running on its own - otherwise a
 // release pushed AFTER the app opened never surfaces until something else remounts the query
 // (the reported bug: the Update pill only appeared after opening Settings, whose own observer
@@ -1025,6 +1033,26 @@ export function useLibraryCoverage() {
   return useQuery({
     queryKey: ["library-coverage"],
     queryFn: () => api.libraryCoverage(),
+  });
+}
+
+/**
+ * What one library-wide run finished alone, and what still needs a person.
+ *
+ * `live` polls while the batch is still working, because each part's report is retained as that
+ * part settles: the worklist is meant to fill in as the run goes, not to appear only at the end.
+ * The query stays keyed on the batch alone so a poll updates the SAME rows rather than growing a
+ * new cache entry per status transition.
+ */
+export function useCaptureWorklist(batchId: string | null, live: boolean) {
+  return useQuery({
+    queryKey: ["capture-worklist", batchId],
+    queryFn: () => api.captureWorklist(batchId as string),
+    enabled: !!batchId,
+    // Five seconds, not one: the projection re-reads one retained report per item, and a
+    // thousand-part batch does not need that walk three times a minute faster than a provider
+    // can settle a single part.
+    refetchInterval: live ? 5_000 : false,
   });
 }
 

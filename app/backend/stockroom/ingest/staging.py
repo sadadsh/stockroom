@@ -51,6 +51,7 @@ class StagingCandidate:
     # keyed like the record's `alternates`. Without this the candidate was where a kept
     # disagreement died - the enrich layer computed it and nothing downstream could hold it.
     alternates: dict = field(default_factory=dict)
+    catalog: dict = field(default_factory=dict)
 
     @property
     def chosen_footprint(self) -> Path | None:
@@ -88,6 +89,11 @@ class StagingCandidate:
             specs=dict(self.specs),
             enrichment=dict(self.enrichment),
             alternates={k: list(v) for k, v in self.alternates.items()},
+            catalog={
+                str(key): dict(value)
+                for key, value in self.catalog.items()
+                if isinstance(value, dict)
+            },
         )
 
 

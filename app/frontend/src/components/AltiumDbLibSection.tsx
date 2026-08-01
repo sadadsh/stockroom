@@ -87,7 +87,7 @@ export function AltiumDbLibSection() {
               </span>
             </div>
             <span className="text-xs text-t3">
-              Profile <span className="text-t2">{data.profile}</span>
+              Library <span className="text-t2">{data.profile}</span>
             </span>
           </div>
 

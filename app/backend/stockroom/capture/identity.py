@@ -101,7 +101,7 @@ def exact_observation_error(record: object, observed: PageIdentity) -> str:
     requested_manufacturer = getattr(record, "manufacturer", "") or ""
     if not requested_mpn.strip():
         return "cannot verify provider identity without a requested MPN"
-    if _mpn_key(observed.mpn) != _mpn_key(requested_mpn):
+    if not same_mpn(observed.mpn, requested_mpn):
         return (
             "the provider exposed no exact candidate: "
             f"MPN {observed.mpn!r} is not requested MPN {requested_mpn!r}"
@@ -140,10 +140,103 @@ def _mpn_key(value: str) -> str:
     return unicodedata.normalize("NFKC", value or "").strip().casefold()
 
 
-def _manufacturer_key(value: str) -> str:
-    """Normalize presentation separators, not manufacturer words or aliases."""
+# Legal entity forms, not descriptive words. A company is the same company with or without the
+# form its registration takes, and distributor catalogues carry it while model libraries usually
+# do not: the owner's own record says "Abracon LLC" where Ultra Librarian says "Abracon", and an
+# exact-MPN match was being discarded over that alone. Deliberately NOT extended to descriptors
+# such as "electronics", "semiconductor" or "technologies" - dropping those starts merging names
+# that a person would not merge, and this comparison is what stops another manufacturer's
+# footprint being attached to a board.
+_MANUFACTURER_ENTITY_FORMS = frozenset(
+    {
+        "ag",
+        "bv",
+        "co",
+        "company",
+        "corp",
+        "corporation",
+        "gmbh",
+        "inc",
+        "incorporated",
+        "kg",
+        "kk",
+        "limited",
+        "llc",
+        "ltd",
+        "nv",
+        "plc",
+        "pte",
+        "pty",
+        "sa",
+        "sarl",
+        "spa",
+        "srl",
+    }
+)
+
+
+def _manufacturer_tokens(value: str) -> tuple[str, ...]:
+    """The identifying words of a manufacturer name, without its legal entity form."""
     normalized = unicodedata.normalize("NFKC", value or "").casefold()
-    return "".join(character for character in normalized if character.isalnum())
+    words = "".join(
+        character if character.isalnum() else " " for character in normalized
+    ).split()
+    identifying = tuple(word for word in words if word not in _MANUFACTURER_ENTITY_FORMS)
+    # A name that is ONLY an entity form identifies nobody; keep it whole rather than empty so it
+    # can never compare equal to an unrelated manufacturer.
+    return identifying or tuple(words)
+
+
+_MPN_SLUG_SEPARATORS = ".-_ /"
+
+
+def _same_slugged_mpn(observed: str, requested: str) -> bool:
+    """Accept a separator difference that a URL slug provably destroyed, and nothing else.
+
+    Provider identities here are parsed out of a detail URL, and a slug cannot carry every
+    separator a real MPN uses: Ultra Librarian publishes Abracon's ABM13W-32.0000MHZ-5-DH7G-T5 as
+    ``ABM13W-32-0000MHZ-5-DH7G-T5``. Demanding punctuation fidelity from a source that already
+    discarded it rejected an exact match on every MPN containing a period.
+
+    Deliberately narrow: only separators fold, and only against each other. Every alphanumeric
+    character, their order, and the number of separator positions must still agree, so
+    ``ABC-1`` never becomes ``ABC1`` or ``ABC-2``. `_mpn_key` remains the primary comparison and
+    is still exact; this is the one concession made to a lossy carrier.
+    """
+
+    def parts(value: str) -> list[str] | None:
+        normalized = unicodedata.normalize("NFKC", value or "").strip().casefold()
+        if not normalized or not any(character in normalized for character in _MPN_SLUG_SEPARATORS):
+            return None
+        separated = "".join(
+            "\x00" if character in _MPN_SLUG_SEPARATORS else character for character in normalized
+        )
+        return separated.split("\x00")
+
+    observed_parts = parts(observed)
+    requested_parts = parts(requested)
+    if observed_parts is None or requested_parts is None:
+        return False
+    return observed_parts == requested_parts
+
+
+def same_mpn(left: str, right: str) -> bool:
+    """Whether two MPN spellings name the same part number. THE MPN comparison for capture.
+
+    Exact after case and Unicode folding, plus the one concession `_same_slugged_mpn` documents:
+    a separator difference a lossy carrier provably destroyed. Public because more than one seam
+    now needs it - the provider identity gate that has always used it, and the DigiKey models id
+    recovered from browser history, whose only evidence is a page title. A second comparison would
+    be a second answer to "is this the requested part", which is the question the whole exact
+    identity gate exists to answer once.
+    """
+
+    return _mpn_key(left) == _mpn_key(right) or _same_slugged_mpn(left, right)
+
+
+def _manufacturer_key(value: str) -> str:
+    """Normalize presentation separators and the legal entity form, not words or aliases."""
+    return "".join(_manufacturer_tokens(value))
 
 
 def _same_manufacturer(left: str, right: str) -> bool:
@@ -158,7 +251,51 @@ def _same_manufacturer(left: str, right: str) -> bool:
 
     if _manufacturer_key(left) == _manufacturer_key(right):
         return True
+    if _leads_manufacturer(left, right) or _leads_manufacturer(right, left):
+        return True
+    if _is_single_token_truncation(left, right):
+        # "Micro" is not Microchip. The shared abbreviation proof accepts a truncation, which is
+        # right for reconciling a canonical field and wrong here: this comparison decides whether
+        # another manufacturer's footprint may be attached to a board.
+        return False
     return is_abbreviation_of(left, right) or is_abbreviation_of(right, left)
+
+
+def _is_single_token_truncation(left: str, right: str) -> bool:
+    """One single-word name is a character prefix of the other single-word name.
+
+    Distinct from an initialism, which is what the abbreviation proof exists for: "TI" is not a
+    character prefix of "TexasInstruments", so it stays acceptable, while "Micro"/"Microchip" -
+    two different companies - no longer does.
+    """
+
+    first = _manufacturer_tokens(left)
+    second = _manufacturer_tokens(right)
+    if len(first) != 1 or len(second) != 1:
+        return False
+    short, long_form = sorted((first[0], second[0]), key=len)
+    return short != long_form and long_form.startswith(short)
+
+
+def _leads_manufacturer(shorter: str, longer: str) -> bool:
+    """True when one name is the LEADING words of the other, whole words only.
+
+    A model library lists the brand; a distributor record appends what it trades under. "Murata"
+    heads "Murata Electronics", "Vishay" heads "Vishay Intertechnology", "Nexperia" heads
+    "Nexperia USA", "Wurth Elektronik" heads "Wurth Elektronik eiSos" - all one company, and each
+    was discarding an exact-MPN match.
+
+    Leading and whole-word, not containment, because those are what keep it closed: "Micro" does
+    not head "Microchip" (one token, not a prefix of the token sequence), and "Semiconductor
+    Components" does not head "ON Semiconductor" (wrong first word). A trailing difference is a
+    descriptor; a differing FIRST word is a different company.
+    """
+
+    left = _manufacturer_tokens(shorter)
+    right = _manufacturer_tokens(longer)
+    if not left or not right or len(left) >= len(right):
+        return False
+    return right[: len(left)] == left
 
 
 def provider_url_allowed(

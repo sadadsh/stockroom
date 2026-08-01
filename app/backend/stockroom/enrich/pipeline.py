@@ -944,6 +944,7 @@ def _result_to_cache(r: EnrichmentResult) -> dict:
             for k, v in r.dist_price_breaks.items()
         },
         "dist_stock": dict(r.dist_stock),
+        "catalog": {key: dict(value) for key, value in r.catalog.items()},
         "price_breaks": [{"qty": b.qty, "price": b.price, "currency": b.currency} for b in r.price_breaks],
         "specs": {k: {"value": v.value, "source": v.source, "confidence": v.confidence} for k, v in r.specs.items()},
         # every kept disagreement (a cache hit must not silently resolve a conflict), for the
@@ -977,6 +978,11 @@ def _result_from_cache(d: dict, category: str) -> EnrichmentResult:
         for k, v in d.get("dist_price_breaks", {}).items()
     }
     r.dist_stock = dict(d.get("dist_stock", {}))
+    r.catalog = {
+        str(key): dict(value)
+        for key, value in (d.get("catalog") or {}).items()
+        if isinstance(value, dict)
+    }
     r.price_breaks = [PriceBreak(**b) for b in d.get("price_breaks", [])]
     r.specs = {k: Sourced(v["value"], v["source"], v["confidence"]) for k, v in d.get("specs", {}).items()}
     r.spec_conflicts = {

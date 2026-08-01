@@ -1,10 +1,9 @@
-"""Where the library lives on THIS machine, and whether first-run onboarding is needed (M9a).
+"""Where the active independent library repository lives on this machine.
 
-The library lives INSIDE the app repo, at `<repo>/libraries`, committed and cloned with the
-app: a frozen exe's launcher clones the app repo (code + the `libraries/` dir together), so a
-fresh machine already carries the library and no first-run onboarding is needed. A completed
-onboarding choice (`MachineConfig.libraries_root` + `onboarded`) still wins and repoints the app
-at a different library on that machine. Pure, Qt-free.
+Application source and user library data are separate authorities. Only the persisted
+``MachineConfig.libraries_root`` may select a real library. A first run without one boots through
+an internal placeholder and requires onboarding; the historical in-repo directory is migration
+input, never an implicit runtime library.
 
 No em dashes anywhere (standing owner rule).
 """
@@ -22,14 +21,10 @@ IN_REPO_DEFAULT = Path(__file__).resolve().parents[4] / "libraries"
 
 
 def resolve_libraries_root(config: MachineConfig) -> Path | None:
-    """The effective library root: the persisted choice if set, else the in-repo dev
-    library when it exists, else None (a frozen first run with nothing chosen yet, which
-    the caller turns into onboarding rather than a crash)."""
+    """The persisted independent library root, or None before onboarding."""
     chosen = (config.libraries_root or "").strip()
     if chosen:
         return Path(chosen)
-    if IN_REPO_DEFAULT.exists():
-        return IN_REPO_DEFAULT
     return None
 
 

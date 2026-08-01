@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { api } from "../api/client";
-import type { ProfilesResponse, SettingsInfo, WiringReport } from "../api/types";
+import type { OnboardingStatus, SettingsInfo, WiringReport } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider } from "../lib/devMode";
@@ -27,8 +27,12 @@ vi.mock("../api/client", async (importActual) => {
       createProfile: vi.fn(),
       activateProfile: vi.fn(),
       deleteProfile: vi.fn(),
+      getOnboarding: vi.fn(),
+      setLibrary: vi.fn(),
       getSyncStatus: vi.fn(),
+      startGitHubLogin: vi.fn(),
       doSync: vi.fn(),
+      connectLibraryRemote: vi.fn(),
       checkUpdate: vi.fn(),
       applyUpdate: vi.fn(),
       getSystemInfo: vi.fn(),
@@ -80,6 +84,31 @@ const BASE_SETTINGS: SettingsInfo = {
   kicad_cli_path: "/usr/bin/kicad-cli",
   kicad_cli_available: true,
   kicad_wired: true,
+};
+
+const BASE_ONBOARDING: OnboardingStatus = {
+  onboarded: true,
+  first_run: false,
+  libraries_root: "C:/Libraries/Main",
+  profiles: ["Main"],
+  under_git: true,
+  default_dir: "C:/Libraries/Library",
+  libraries: [
+    {
+      name: "Main",
+      path: "C:/Libraries/Main",
+      active: true,
+      available: true,
+      under_git: true,
+    },
+    {
+      name: "Archive",
+      path: "C:/Libraries/Archive",
+      active: false,
+      available: true,
+      under_git: true,
+    },
+  ],
 };
 
 function renderPage() {
@@ -156,11 +185,14 @@ beforeEach(() => {
     profiles: ["Main", "Archive"],
     active: "Main",
   });
+  mockApi.getOnboarding.mockResolvedValue(BASE_ONBOARDING);
+  mockApi.setLibrary.mockResolvedValue(BASE_ONBOARDING);
   mockApi.getSyncStatus.mockResolvedValue({
     has_remote: true,
     current_branch: "main",
     ahead: 0,
     behind: 2,
+    github_auth: { mode: "git_credential_manager", accounts: [] },
   });
   mockApi.checkUpdate.mockResolvedValue({
     update_available: false,
@@ -220,6 +252,10 @@ beforeEach(() => {
     pushed: false,
     detail: "",
   });
+  mockApi.connectLibraryRemote.mockResolvedValue({
+    configured: true,
+    remote: "https://github.com/sadadsh/library.git",
+  });
   mockApi.applyUpdate.mockResolvedValue({
     state: "updated",
     updated: true,
@@ -265,81 +301,48 @@ beforeEach(() => {
   });
 });
 
-function profileRow(name: string): HTMLElement {
-  // the active profile's name ALSO shows in the Profiles disclosure summary, so
-  // resolve through the row wrapper, not a unique-text lookup
+function libraryRow(name: string): HTMLElement {
   const row = screen
     .getAllByText(name)
-    .map((el) => el.closest("[data-profile-row]"))
+    .map((el) => el.closest("[data-library-row]"))
     .find(Boolean);
   return row as HTMLElement;
 }
 
-describe("SettingsPage — profiles", () => {
-  it("lists profiles and marks the active one", async () => {
+describe("SettingsPage - library repositories", () => {
+  it("lists repositories and marks the active one", async () => {
     renderPage();
     await openSettings("settings.profiles");
     expect(await screen.findByText("Archive")).toBeInTheDocument();
-    // the active profile is labelled and has no switch control
-    expect(within(profileRow("Main")).getByText(/active/i)).toBeInTheDocument();
-    expect(
-      within(profileRow("Main")).queryByRole("button", { name: /switch to this profile/i }),
-    ).toBeNull();
-    // a non-active profile can be selected explicitly
-    expect(
-      within(profileRow("Archive")).getByRole("button", { name: /switch to this profile/i }),
-    ).toBeInTheDocument();
+    expect(within(libraryRow("Main")).getByText(/active/i)).toBeInTheDocument();
+    expect(within(libraryRow("Main")).queryByRole("button", { name: /switch/i })).toBeNull();
+    expect(within(libraryRow("Archive")).getByRole("button", { name: /switch library/i }))
+      .toBeInTheDocument();
   });
 
-  it("activates a non-active profile", async () => {
+  it("switches by opening the selected repository", async () => {
     renderPage();
     await openSettings("settings.profiles");
     await screen.findByText("Archive");
     await userEvent.click(
-      within(profileRow("Archive")).getByRole("button", { name: /switch to this profile/i }),
+      within(libraryRow("Archive")).getByRole("button", { name: /switch library/i }),
     );
-    expect(mockApi.activateProfile).toHaveBeenCalledWith("Archive");
+    expect(mockApi.setLibrary).toHaveBeenCalledWith({
+      mode: "open",
+      path: "C:/Libraries/Archive",
+    });
   });
 
-  it("creates a profile with the archive flag", async () => {
+  it("creates a fresh Git repository at the requested path", async () => {
     renderPage();
     await openSettings("settings.profiles");
     await screen.findByText("Archive");
-    await userEvent.type(screen.getByPlaceholderText(/new profile/i), "Scratch");
-    await userEvent.click(screen.getByLabelText(/archive profile/i));
-    await userEvent.click(screen.getByRole("button", { name: /^create profile$/i }));
-    expect(mockApi.createProfile).toHaveBeenCalledWith("Scratch", true);
-  });
-
-  it("does not double-create on a rapid double-Enter while the first is in flight", async () => {
-    let resolve!: (v: ProfilesResponse) => void;
-    mockApi.createProfile.mockReturnValue(
-      new Promise<ProfilesResponse>((r) => {
-        resolve = r;
-      }),
-    );
-    renderPage();
-    await openSettings("settings.profiles");
-    await screen.findByText("Archive");
-    const input = screen.getByPlaceholderText(/new profile/i);
-    await userEvent.type(input, "Scratch");
-    // two Enter presses before the first create resolves; the second must be
-    // dropped by the pending guard, not fire a duplicate create.
-    await userEvent.type(input, "{Enter}{Enter}");
-    expect(mockApi.createProfile).toHaveBeenCalledTimes(1);
-    resolve({ profiles: ["Main", "Archive", "Scratch"], active: "Main" });
-  });
-
-  it("deletes a non-active profile only after an in-window confirm", async () => {
-    renderPage();
-    await openSettings("settings.profiles");
-    await screen.findByText("Archive");
-    await userEvent.click(within(profileRow("Archive")).getByRole("button", { name: /^delete$/i }));
-    // nothing deleted until the confirm dialog is accepted
-    expect(mockApi.deleteProfile).not.toHaveBeenCalled();
-    const dialog = screen.getByRole("dialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: /^delete$/i }));
-    expect(mockApi.deleteProfile).toHaveBeenCalledWith("Archive");
+    await userEvent.type(screen.getByLabelText("New Library Folder"), "D:\\Libraries\\Scratch");
+    await userEvent.click(screen.getByRole("button", { name: /set up library repository/i }));
+    expect(mockApi.setLibrary).toHaveBeenCalledWith({
+      mode: "create",
+      path: "D:\\Libraries\\Scratch",
+    });
   });
 });
 
@@ -406,12 +409,31 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(mockApi.doSync).toHaveBeenCalled();
   });
 
-  it("shows the automatic device outcome and detects an active rival app checkout", async () => {
+  it("connects a fresh library to its own GitHub repository", async () => {
     mockApi.getSyncStatus.mockResolvedValue({
-      has_remote: true,
+      has_remote: false,
       current_branch: "main",
       ahead: 0,
       behind: 0,
+      github_auth: { mode: "git_credential_manager", accounts: ["sadadsh"] },
+    });
+    renderPage();
+    await openSettings("settings.sync");
+    const input = await screen.findByLabelText("Library GitHub Repository URL");
+    await userEvent.type(input, "https://github.com/sadadsh/parts.git");
+    await userEvent.click(screen.getByRole("button", { name: "Connect Library Repository" }));
+    expect(mockApi.connectLibraryRemote).toHaveBeenCalledWith(
+      "https://github.com/sadadsh/parts.git",
+    );
+  });
+
+  it("shows the automatic device outcome and detects an active rival app checkout", async () => {
+  mockApi.getSyncStatus.mockResolvedValue({
+    has_remote: true,
+    current_branch: "main",
+    ahead: 0,
+    behind: 0,
+    github_auth: { mode: "git_credential_manager", accounts: [] },
       working_copy: {
         mode: "rival_application_checkout",
         detail: "The active library is inside a second checkout.",
@@ -473,7 +495,7 @@ describe("SettingsPage — sync + kicad + update", () => {
     await openSettings("settings.sync");
     await screen.findByRole("button", { name: /pull and push library/i });
     await userEvent.click(screen.getByRole("button", { name: /pull and push library/i }));
-    expect(await screen.findByText(/refused this token/i)).toBeInTheDocument();
+    expect(await screen.findByText(/denied this windows user's account/i)).toBeInTheDocument();
     expect(screen.queryByText(/diverged/i)).toBeNull();
   });
 
@@ -502,7 +524,7 @@ describe("SettingsPage — sync + kicad + update", () => {
   it("shows the wiring status when SR_LIB points at the active library", async () => {
     renderPage();
     await openSettings("settings.kicad");
-    expect(await screen.findByText(/wired to the active profile/i)).toBeInTheDocument();
+    expect(await screen.findByText(/wired to the active library/i)).toBeInTheDocument();
   });
 
   it("shows an honest not-wired status", async () => {
@@ -600,15 +622,38 @@ describe("SettingsPage — sync + kicad + update", () => {
   });
 });
 
-it("connects a GitHub token so part changes auto-push, and never asks for it raw", async () => {
-  mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS });
+it("signs the Windows user into GitHub without asking Stockroom for a token", async () => {
+  mockApi.getSyncStatus
+    .mockResolvedValueOnce({
+      has_remote: true,
+      current_branch: "main",
+      ahead: 0,
+      behind: 0,
+      github_auth: { mode: "git_credential_manager", accounts: [] },
+    })
+    .mockResolvedValue({
+      has_remote: true,
+      current_branch: "main",
+      ahead: 0,
+      behind: 0,
+      github_auth: { mode: "git_credential_manager", accounts: ["sadadsh"] },
+    });
+  mockApi.startGitHubLogin.mockResolvedValue({ job_id: "github-login" });
+  mockApi.openJobStream.mockResolvedValue(
+    sseStream([
+      'event: result\ndata: {"result":{"mode":"git_credential_manager","accounts":["sadadsh"]}}',
+      "event: done\ndata: {}",
+    ]),
+  );
   renderPage();
   await openSettings("settings.github");
-  const input = screen.getByLabelText("GitHub Personal Access Token");
-  expect((input as HTMLInputElement).type).toBe("password"); // the token is never shown
-  await userEvent.type(input, "ghp_TESTTOKEN");
-  await userEvent.click(screen.getByRole("button", { name: /save github access/i }));
-  expect(mockApi.updateSettings).toHaveBeenCalledWith({ github_token: "ghp_TESTTOKEN" });
+  expect(screen.queryByLabelText(/personal access token/i)).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: /sign in with github/i }));
+  expect(mockApi.startGitHubLogin).toHaveBeenCalledTimes(1);
+  expect(await screen.findByText("sadadsh")).toBeInTheDocument();
+  expect(mockApi.updateSettings).not.toHaveBeenCalledWith(expect.objectContaining({
+    github_token: expect.anything(),
+  }));
 });
 
 // KiCad wiring moved here from the Doctor page (D3): the manual re-wire button
@@ -750,7 +795,7 @@ describe("SettingsPage - copy adoption", () => {
     // Walk to the Library group and open the sections whose labels we spot-check.
     await openSettings("settings.sync");
     await openSettings("settings.github");
-    await screen.findByRole("button", { name: /save github access/i });
+    await screen.findByRole("button", { name: /sign in with github/i });
 
     // Outside dev mode a <Text> is a bare string with no wrapper: no copy targets yet.
     expect(container.querySelector("[data-copy-id]")).toBeNull();
@@ -775,21 +820,17 @@ describe("SettingsPage - copy adoption", () => {
     await openSettings("settings.sync");
     await openSettings("settings.github");
     expect(screen.getByText("Settings")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /save github access/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sign in with github/i })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /pull and push library/i }));
     expect(mockApi.doSync).toHaveBeenCalled();
   });
 
-  it("still shows the delete ConfirmDialog title and confirm action through the copy layer", async () => {
+  it("keeps repository setup copy in the shared copy layer", async () => {
     renderPage();
     await openSettings("settings.profiles");
-    await screen.findByText("Archive");
-    await userEvent.click(within(profileRow("Archive")).getByRole("button", { name: /^delete$/i }));
-    const dialog = screen.getByRole("dialog");
-    // The call-site-wrapped props resolve to their defaults: the title and the
-    // danger confirm label both read through useText.
-    expect(within(dialog).getByText("Delete Profile")).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /set up library repository/i }),
+    ).toBeInTheDocument();
   });
 });
 

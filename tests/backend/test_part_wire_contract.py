@@ -65,6 +65,12 @@ def _record(*, maximal: bool):
         rec.alternates = {
             "description": [SourcedValue(value="Step-down converter", source="digikey")]
         }
+        rec.catalog = {
+            "digikey": {
+                "schema_version": 1,
+                "availability": {"cad_model": True, "three_d_model": True, "providers": []},
+            }
+        }
     return rec
 
 

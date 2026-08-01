@@ -287,3 +287,103 @@ def test_guided_attach_rejects_mixed_digikey_route_receipts(monkeypatch, tmp_pat
     )
 
     assert "binding mismatch for evidence provider key" in outcome.error
+
+
+@dataclass
+class _Requested:
+    mpn: str
+    manufacturer: str
+
+
+def test_a_legal_entity_form_is_not_a_different_manufacturer():
+    """"Abracon LLC" and "Abracon" are one company, and an exact MPN match must survive it.
+
+    Distributor records carry the registered form; model libraries usually carry the brand. The
+    owner's own ABM13W-32.0000MHZ-5-DH7G-T5 is stored as "Abracon LLC" while Ultra Librarian
+    lists "Abracon", and the exact-MPN candidate was being discarded over that alone, reported
+    as "showed the requested MPN only under a different manufacturer".
+    """
+    requested = _Requested(mpn="ABM13W-32.0000MHZ-5-DH7G-T5", manufacturer="Abracon LLC")
+    observed = PageIdentity(mpn="ABM13W-32.0000MHZ-5-DH7G-T5", manufacturer="Abracon")
+
+    assert exact_observation_error(requested, observed) == ""
+
+
+def test_entity_forms_do_not_merge_unrelated_manufacturers():
+    """The guard still fails closed: this is what stops another vendor's footprint landing."""
+    requested = _Requested(mpn="PART-1", manufacturer="Abracon LLC")
+    for other in ("Aptina", "Maruwa", "Toshiba", "Semiconductor Components"):
+        observed = PageIdentity(mpn="PART-1", manufacturer=other)
+        assert exact_observation_error(requested, observed) != "", other
+
+
+def test_a_bare_entity_form_identifies_nobody():
+    """"LLC" must never compare equal to a real manufacturer, however it normalizes."""
+    requested = _Requested(mpn="PART-1", manufacturer="LLC")
+    observed = PageIdentity(mpn="PART-1", manufacturer="Abracon")
+
+    assert exact_observation_error(requested, observed) != ""
+
+
+def test_a_url_slug_separator_does_not_reject_an_exact_part():
+    """Ultra Librarian publishes ABM13W-32.0000MHZ-5-DH7G-T5 with the period slugged to a hyphen.
+
+    The observed identity is parsed out of a detail URL, so the separator was already lost before
+    this comparison ran. Demanding punctuation fidelity from a lossy carrier rejected an exact
+    match on every MPN containing a period, and the caller then reported it as a MANUFACTURER
+    mismatch, which is a different fault entirely.
+    """
+    requested = _Requested(mpn="ABM13W-32.0000MHZ-5-DH7G-T5", manufacturer="Abracon LLC")
+    observed = PageIdentity(mpn="ABM13W-32-0000MHZ-5-DH7G-T5", manufacturer="Abracon")
+
+    assert exact_observation_error(requested, observed) == ""
+
+
+def test_slug_folding_never_merges_two_different_parts():
+    """Only separators fold. Alphanumerics, their order, and separator POSITIONS still bind."""
+    requested = _Requested(mpn="ABM13W-32.0000MHZ", manufacturer="Abracon")
+    for other in (
+        "ABM13W-33-0000MHZ",  # a different frequency
+        "ABM13W320000MHZ",  # separator dropped entirely, not substituted
+        "ABM13W-32-0000MHZ-X",  # an extra segment
+    ):
+        observed = PageIdentity(mpn=other, manufacturer="Abracon")
+        assert exact_observation_error(requested, observed) != "", other
+
+
+def test_a_trailing_descriptor_is_not_a_different_manufacturer():
+    """A model library lists the brand; a distributor record appends what it trades under.
+
+    Murata Electronics, Vishay Intertechnology, Nexperia USA and Wurth Elektronik eiSos are each
+    one company with the catalogue's own suffix, and every one of them was discarding an exact
+    MPN match and sending the person to do the part by hand.
+    """
+    for stored, listed in (
+        ("Murata Electronics", "Murata"),
+        ("Vishay Intertechnology Inc.", "Vishay"),
+        ("Nexperia USA Inc.", "Nexperia"),
+        ("Wurth Elektronik eiSos", "Wurth Elektronik"),
+    ):
+        requested = _Requested(mpn="PART-1", manufacturer=stored)
+        observed = PageIdentity(mpn="PART-1", manufacturer=listed)
+        assert exact_observation_error(requested, observed) == "", (stored, listed)
+
+
+def test_a_differing_first_word_is_still_a_different_manufacturer():
+    """Leading-words only. A trailing difference is a descriptor; a leading one is a company."""
+    for stored, listed in (
+        ("Micro", "Microchip"),  # a truncation the shared abbreviation proof used to accept
+        ("ON Semiconductor", "Semiconductor Components"),
+        ("Texas Instruments", "Texas Advanced Optoelectronic"),
+        ("Murata", "Maruwa"),
+    ):
+        requested = _Requested(mpn="PART-1", manufacturer=stored)
+        observed = PageIdentity(mpn="PART-1", manufacturer=listed)
+        assert exact_observation_error(requested, observed) != "", (stored, listed)
+
+
+def test_a_real_initialism_still_resolves():
+    """TI is not a truncation of TexasInstruments, so the abbreviation proof still applies."""
+    requested = _Requested(mpn="PART-1", manufacturer="Texas Instruments")
+    observed = PageIdentity(mpn="PART-1", manufacturer="TI")
+    assert exact_observation_error(requested, observed) == ""

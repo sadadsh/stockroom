@@ -1,0 +1,492 @@
+/**
+ * The worklist, tested for the promises that make it worth showing at all: a row STARTS the real
+ * person-driven capture for an exact part on an exact provider, it uses the reason the route itself
+ * gave, it never invents work (or completeness) the run did not report, and it is honest about
+ * there being exactly one capture slot.
+ */
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { CompletionWorklist } from "./CompletionWorklist";
+import { CaptureProvider, useCapture } from "../lib/capture";
+import { api } from "../api/client";
+import { mockCapture } from "../test/captureMocks";
+import { resetUiSessionForTests } from "../lib/uiSession";
+import type { CadSourceResponse, CaptureBatchWorklist } from "../api/types";
+
+function worklist(over: Partial<CaptureBatchWorklist> = {}): CaptureBatchWorklist {
+  return {
+    workflow_batch_id: "batch-1",
+    total_items: 3,
+    pending_items: 0,
+    worklist: [
+      {
+        part_id: "lm317",
+        mpn: "LM317",
+        display_name: "LM317 Regulator",
+        route_id: "ultralibrarian:ultralibrarian",
+        provider_key: "ultralibrarian",
+        label: "Ultra Librarian",
+        status: "requires-human",
+        reason: "no Ultra Librarian sign-in is saved on this PC",
+        remaining: ["kicad_model", "altium_symbol"],
+      },
+    ],
+    worklist_total: 1,
+    unattended: [],
+    unattended_total: 2,
+    stalled: [],
+    stalled_total: 0,
+    unreadable: [],
+    ...over,
+  };
+}
+
+function cadSource(over: Partial<CadSourceResponse> = {}): CadSourceResponse {
+  return {
+    mpn: "LM317",
+    needs: ["kicad_model"],
+    sources: [
+      {
+        key: "digikey",
+        label: "DigiKey",
+        url: "https://www.digikey.com/en/models/1234",
+        tools: ["kicad", "altium"],
+        aggregator: true,
+        instruction: "Open the models tab.",
+        capture_available: true,
+        unattended_capture: false,
+      },
+      {
+        key: "ultralibrarian",
+        label: "Ultra Librarian",
+        url: "https://app.ultralibrarian.com/search?queryText=LM317",
+        tools: ["kicad", "altium"],
+        aggregator: false,
+        instruction: "Pick the part, choose KiCad and Altium, then Download.",
+        capture_available: true,
+        unattended_capture: true,
+      },
+    ],
+    url: "https://www.digikey.com/en/models/1234",
+    vendor: "DigiKey",
+    ...over,
+  } as CadSourceResponse;
+}
+
+// Two rows, so a test can watch the one-click pass move from the first to the second.
+function twoRows(): CaptureBatchWorklist {
+  const first = worklist().worklist[0];
+  return worklist({
+    worklist: [
+      first,
+      { ...first, part_id: "ne555", mpn: "NE555", display_name: "NE555 Timer" },
+    ],
+    worklist_total: 2,
+  });
+}
+
+const WORK_THROUGH_ALL = "Work through every listed component, one capture at a time";
+const STOP_ADVANCING = "Stop working through the completion worklist";
+
+// Another surface holding the SAME one capture slot, so a test can reproduce the displacement the
+// Complete Part window causes when it starts a capture while a worklist row is still running.
+function Displacer() {
+  const capture = useCapture();
+  return (
+    <button
+      type="button"
+      onClick={() => void capture.start("ne555", "NE555 Timer", [], "digikey", "assisted")}
+    >
+      Start Elsewhere
+    </button>
+  );
+}
+
+// CaptureProvider is the one global capture slot. A row starts a real capture through it, so this
+// surface cannot be rendered without it - exactly as `main.tsx` mounts it above the whole app.
+function renderWorklist(live = false, extra?: ReactNode) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <CaptureProvider>
+        <CompletionWorklist batchId="batch-1" live={live} />
+        {extra}
+      </CaptureProvider>
+    </QueryClientProvider>,
+  );
+}
+
+beforeEach(() => {
+  vi.restoreAllMocks();
+  resetUiSessionForTests();
+});
+
+afterEach(() => {
+  resetUiSessionForTests();
+});
+
+describe("completion worklist", () => {
+  it("names the part, the route's own reason, and the formats still outstanding", async () => {
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    renderWorklist();
+
+    expect(await screen.findByText("LM317 Regulator")).toBeInTheDocument();
+    // The reason is the outcome's own sentence, not a status word this surface chose.
+    expect(
+      screen.getByText("no Ultra Librarian sign-in is saved on this PC"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("3D Model")).toBeInTheDocument();
+    expect(screen.getByText("Altium Symbol")).toBeInTheDocument();
+  });
+
+  it("starts the real capture for that component on that provider, not just a link", async () => {
+    // The defect this replaces: the row opened the provider URL directly, so no backend capture
+    // session started, the person's Downloads were never snapshotted, and the file they collected
+    // was never imported. The row routed them and dropped the result on the floor.
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    const capture = mockCapture();
+    renderWorklist();
+
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Start the Ultra Librarian capture for LM317 Regulator",
+      }),
+    );
+
+    await waitFor(() => expect(capture.run).toHaveBeenCalled());
+    // The provider KEY the route reported, in assisted mode: the backend owns resolving and
+    // opening the page, so no provider URL is ever built here.
+    expect(capture.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partIds: ["lm317"],
+        vendor: "ultralibrarian",
+        mode: "assisted",
+      }),
+    );
+  });
+
+  it("runs one capture at a time and refuses to let another row displace it", async () => {
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(
+      worklist({
+        worklist: [
+          worklist().worklist[0],
+          {
+            ...worklist().worklist[0],
+            part_id: "ne555",
+            mpn: "NE555",
+            display_name: "NE555 Timer",
+          },
+        ],
+        worklist_total: 2,
+      }),
+    );
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    // Never resolves: the capture stays in flight, which is the state the other rows must honour.
+    const run = vi.spyOn(api, "runCapture").mockReturnValue(new Promise(() => {}));
+    renderWorklist();
+
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Start the Ultra Librarian capture for LM317 Regulator",
+      }),
+    );
+
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: "Start the Ultra Librarian capture for NE555 Timer",
+        }),
+      ).toBeDisabled(),
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "Start the Ultra Librarian capture for LM317 Regulator",
+      }),
+    ).toHaveTextContent("Capturing");
+  });
+
+  it("names the row whose capture another surface displaced, rather than losing it quietly", async () => {
+    // One slot. The store already carries the displaced part as `superseded`; this surface reuses
+    // that rather than inventing a second notion of "the run that stopped being followed".
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    vi.spyOn(api, "runCapture").mockReturnValue(new Promise(() => {}));
+    renderWorklist(false, <Displacer />);
+
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Start the Ultra Librarian capture for LM317 Regulator",
+      }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Start Elsewhere" }));
+
+    expect(
+      await screen.findByTestId("completion-worklist-superseded"),
+    ).toHaveTextContent("Completion for LM317 Regulator was superseded");
+  });
+
+  it("lets the person end the open route from the row that is running it", async () => {
+    // De-automation removed the provider HUD, so without this the route ends only on cancel, on
+    // ~25 s of quiet after a file landed, or on the 600 s timeout - five times over for DigiKey.
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    vi.spyOn(api, "runCapture").mockReturnValue(new Promise(() => {}));
+    const intent = vi.spyOn(api, "captureIntent").mockResolvedValue({
+      part_id: "lm317",
+      action: "finish-route",
+      accepted: true,
+    });
+    renderWorklist();
+
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Start the Ultra Librarian capture for LM317 Regulator",
+      }),
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Finish Route" }));
+
+    await waitFor(() => expect(intent).toHaveBeenCalledWith("lm317", "finish-route"));
+    expect(
+      await screen.findByText(/Anything already downloaded is kept/),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the provider the route named, at the URL the backend resolved for that part", async () => {
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    renderWorklist();
+
+    const open = await screen.findByRole("link", { name: /Open Ultra Librarian/ });
+    // The row's provider, not the head of the trust order: sending someone to DigiKey when the
+    // route that needs them is Ultra Librarian is a wasted trip.
+    expect(open).toHaveAttribute(
+      "href",
+      "https://app.ultralibrarian.com/search?queryText=LM317",
+    );
+    expect(open).toHaveAttribute("target", "_blank");
+    expect(api.partCadSource).toHaveBeenCalledWith("lm317");
+  });
+
+  it("says so instead of offering a link when the backend resolved no page for that provider", async () => {
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(
+      cadSource({ sources: cadSource().sources.slice(0, 1) }),
+    );
+    renderWorklist();
+
+    expect(await screen.findByText("No page resolved")).toBeInTheDocument();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("counts what finished unattended apart from what needs a person", async () => {
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    renderWorklist();
+
+    expect(await screen.findByText("1 Needs You")).toBeInTheDocument();
+    expect(screen.getByText("2 Done For You")).toBeInTheDocument();
+  });
+
+  it("keeps a part no route can advance out of the worklist, and still reports it", async () => {
+    // A stalled part sent to a provider that already said it has nothing is a wasted trip, so it
+    // is counted separately rather than folded into the rows a person can act on.
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(
+      worklist({
+        worklist: [],
+        worklist_total: 0,
+        stalled: [
+          {
+            part_id: "mystery",
+            mpn: "MYSTERY",
+            display_name: "MYSTERY",
+            status: "unchanged",
+            reason: "no exact model exists for this package",
+            remaining: ["kicad_model"],
+          },
+        ],
+        stalled_total: 1,
+      }),
+    );
+    renderWorklist();
+
+    expect(await screen.findByText("Nothing on this run needs a person.")).toBeInTheDocument();
+    expect(screen.getByText("1 No Route")).toBeInTheDocument();
+    expect(
+      screen.getByText(/no provider route a person could advance/i),
+    ).toBeInTheDocument();
+  });
+
+  it("reports items still working rather than calling an unfinished run complete", async () => {
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(
+      worklist({ worklist: [], worklist_total: 0, unattended_total: 0, pending_items: 4 }),
+    );
+    renderWorklist(true);
+
+    expect(await screen.findByText("4 Still Working")).toBeInTheDocument();
+    expect(
+      screen.getByText("Nothing needs you yet. This fills in as each component settles."),
+    ).toBeInTheDocument();
+  });
+
+  it("bounds the rendered rows and states how many are left", async () => {
+    const rows = Array.from({ length: 30 }, (_, index) => ({
+      ...worklist().worklist[0],
+      part_id: `part-${index}`,
+      mpn: `MPN-${index}`,
+      display_name: `Part ${index}`,
+    }));
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(
+      worklist({ worklist: rows, worklist_total: 30 }),
+    );
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    renderWorklist();
+
+    expect(await screen.findByText("Part 0")).toBeInTheDocument();
+    expect(screen.queryByText("Part 25")).toBeNull();
+    expect(screen.getByText(/5 more components need a person/i)).toBeInTheDocument();
+  });
+
+  // --- one click for the whole list -----------------------------------------------------------
+  //
+  // Clearing the worklist used to cost one Start Capture per row on top of the provider clicks
+  // nobody can remove. These prove the single control replaces every one of those, and that it
+  // stops the moment continuing would be wrong.
+
+  it("works the whole list from one click, starting each row as the last capture finishes", async () => {
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(twoRows());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    const capture = mockCapture();
+    renderWorklist();
+
+    await userEvent.click(await screen.findByRole("button", { name: WORK_THROUGH_ALL }));
+
+    await waitFor(() => expect(capture.run).toHaveBeenCalledTimes(2));
+    // In list order, and never two at once: the second start only happened because the first
+    // capture reached a terminal state, not because a timer went off.
+    expect(capture.run).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ partIds: ["lm317"], vendor: "ultralibrarian", mode: "assisted" }),
+    );
+    expect(capture.run).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ partIds: ["ne555"], vendor: "ultralibrarian", mode: "assisted" }),
+    );
+    expect(await screen.findByTestId("completion-worklist-auto-ended")).toHaveTextContent(
+      "Worked through all 2 components.",
+    );
+  });
+
+  it("names the row that is open and how many are left while the pass runs", async () => {
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(twoRows());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    vi.spyOn(api, "runCapture").mockReturnValue(new Promise(() => {}));
+    renderWorklist();
+
+    await userEvent.click(await screen.findByRole("button", { name: WORK_THROUGH_ALL }));
+
+    expect(await screen.findByTestId("completion-worklist-auto")).toHaveTextContent(
+      "Working through 1 of 2. LM317 Regulator is open in your browser",
+    );
+  });
+
+  it("stops advancing when the person says so, and leaves the open capture alone", async () => {
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(twoRows());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    const run = vi.spyOn(api, "runCapture").mockReturnValue(new Promise(() => {}));
+    renderWorklist();
+
+    await userEvent.click(await screen.findByRole("button", { name: WORK_THROUGH_ALL }));
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+    await userEvent.click(await screen.findByRole("button", { name: STOP_ADVANCING }));
+
+    expect(await screen.findByTestId("completion-worklist-auto-ended")).toHaveTextContent(
+      "LM317 Regulator is still open in your browser",
+    );
+    // Stopping the pass is not cancelling the capture: the person still finishes or skips the page
+    // they are standing in front of.
+    expect(screen.getByRole("button", { name: "Finish Route" })).toBeInTheDocument();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops the pass when the person skips the component rather than finishing it", async () => {
+    // Skip This Part is the person taking the list back by hand. Marching on to the next provider
+    // page would be Stockroom overruling the one decision it just asked them for.
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(twoRows());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    vi.spyOn(api, "captureIntent").mockResolvedValue({
+      part_id: "lm317",
+      action: "skip-part",
+      accepted: true,
+    });
+    const capture = mockCapture();
+    // Hold the first submission open so the row is genuinely in flight when Skip is pressed.
+    const submit = capture.run.getMockImplementation();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    capture.run.mockImplementation(async (body: unknown) => {
+      await held;
+      return (submit as (input: unknown) => Promise<unknown>)(body);
+    });
+    renderWorklist();
+
+    await userEvent.click(await screen.findByRole("button", { name: WORK_THROUGH_ALL }));
+    await userEvent.click(await screen.findByRole("button", { name: "Skip This Part" }));
+    await waitFor(() => expect(api.captureIntent).toHaveBeenCalledWith("lm317", "skip-part"));
+    release();
+
+    expect(await screen.findByTestId("completion-worklist-auto-ended")).toHaveTextContent(
+      "You skipped LM317 Regulator",
+    );
+    expect(capture.run).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops instead of opening every remaining page when a start fails outright", async () => {
+    // A capture that never opened a page failed for a reason that repeats identically on the next
+    // row, so advancing would walk the whole list on one fault and open nothing.
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(twoRows());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    const run = vi.spyOn(api, "runCapture").mockRejectedValue(new Error("no durable runtime"));
+    renderWorklist();
+
+    await userEvent.click(await screen.findByRole("button", { name: WORK_THROUGH_ALL }));
+
+    expect(await screen.findByTestId("completion-worklist-auto-ended")).toHaveTextContent(
+      "LM317 Regulator could not be started",
+    );
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a row that did not complete in the list and says so", async () => {
+    // The failure this forbids: a pass that marched through every row and left nobody able to tell
+    // which components it actually finished.
+    vi.spyOn(api, "captureWorklist").mockResolvedValue(twoRows());
+    vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
+    const capture = mockCapture([{ event: "error", data: { message: "provider gave nothing" } }]);
+    renderWorklist();
+
+    await userEvent.click(await screen.findByRole("button", { name: WORK_THROUGH_ALL }));
+
+    await waitFor(() => expect(capture.run).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("completion-worklist-auto-ended")).toHaveTextContent(
+      "2 did not complete and are still listed above",
+    );
+    expect(
+      screen.getAllByText(/This capture ended without completing/),
+    ).toHaveLength(2);
+  });
+
+  it("renders nothing at all when the batch has no worklist projection", async () => {
+    vi.spyOn(api, "captureWorklist").mockRejectedValue(new Error("no guided capture"));
+    const { container } = renderWorklist();
+
+    expect(container.querySelector("[data-testid='completion-worklist']")).toBeNull();
+  });
+});

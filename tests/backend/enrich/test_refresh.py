@@ -204,3 +204,15 @@ def test_a_refresh_fills_a_missing_description_rather_than_only_recording_it():
     apply_procurement_refresh(rec, [("Mouser", _rich())], "NOW")
     assert rec.description == "3A Buck Converter"
     assert rec.alternates.get("description") is None
+
+
+def test_a_refresh_updates_only_the_answering_provider_catalogue_snapshot():
+    rec = _record(catalog={"mouser": {"schema_version": 1, "value": "keep"}})
+    result = _rich("digikey")
+    result.catalog["digikey"] = {
+        "schema_version": 1,
+        "availability": {"cad_model": True, "three_d_model": True, "providers": []},
+    }
+    assert apply_procurement_refresh(rec, [("DigiKey", result)], "NOW") is True
+    assert rec.catalog["mouser"]["value"] == "keep"
+    assert rec.catalog["digikey"]["availability"]["cad_model"] is True

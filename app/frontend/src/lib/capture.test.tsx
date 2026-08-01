@@ -548,6 +548,37 @@ describe("CaptureProvider store", () => {
     expect(result.current.active.status).toBe("idle");
   });
 
+  it("remembers the decision a capture accepted, not just the one in flight", async () => {
+    // `intentPending` is cleared the instant the request comes back, so by the time the capture
+    // reaches a terminal state it says nothing at all. A surface working through a list of
+    // components has to tell a route that ended by itself from one the person deliberately
+    // stopped, and that answer has to still be there when the run finishes.
+    mockSource();
+    vi.spyOn(api, "runCapture").mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    const intent = vi.spyOn(api, "captureIntent").mockResolvedValue({
+      part_id: "p1",
+      action: "skip-part",
+      accepted: true,
+    });
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      void result.current.start("p1", "Part One", ["kicad_symbol"], "ultralibrarian", "assisted");
+      await Promise.resolve();
+    });
+    expect(result.current.active.intentSent).toBeNull();
+
+    await act(async () => {
+      await result.current.skipPart();
+    });
+
+    expect(intent).toHaveBeenCalledWith("p1", "skip-part");
+    expect(result.current.active.intentPending).toBeNull();
+    expect(result.current.active.intentSent).toBe("skip-part");
+  });
+
   // -- The behaviours that still matter now the host callback is gone -----------------------
   //
   // The old tests here drove `window.__STOCKROOM_CAD_DOWNLOAD__`: a token-guarded "done" signal

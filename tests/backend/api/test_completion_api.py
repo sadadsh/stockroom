@@ -505,7 +505,11 @@ def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
 
     projected = client.get(f"/api/library/capture/batches/{batch_id}")
     assert projected.status_code == 200, projected.text
-    assert projected.json() == {
+    body = projected.json()
+    # `handoff` is asserted separately below: it is derived guidance, not part of the durable
+    # request, and pinning its full text here would make every provider wording change a failure.
+    handoff = body.pop("handoff")
+    assert body == {
         "workflow_batch_id": batch_id,
         "workflow_item_id": item_id,
         "part_id": "tps62130",
@@ -521,6 +525,12 @@ def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
         ],
         "report": None,
     }
+    # Ultra Librarian is the ONE route Stockroom is authorized to drive, so it keeps the
+    # Playwright transport and its own window; the checklist still travels with it.
+    assert handoff["transport"] == "playwright"
+    assert handoff["opens_in"] == "a Stockroom-controlled window"
+    assert handoff["mpn"]
+    assert handoff["routes"] and all(route["required_files"] for route in handoff["routes"])
     replay = client.get(
         f"/api/workflows/batches/{batch_id}/events",
         params={"after_sequence": 0},
@@ -568,6 +578,221 @@ def test_durable_capture_projection_returns_the_retained_terminal_report(
 
     assert projected.status_code == 200, projected.text
     assert projected.json()["report"] == report
+
+
+def _write_completable_part(app_ctx, part_id: str, mpn: str) -> None:
+    """One more current record that a library-wide batch can legitimately pick up."""
+
+    from stockroom.model.part import AssetRef, PartRecord
+
+    record = PartRecord(
+        id=part_id,
+        display_name=mpn,
+        category="ICs",
+        description="a part",
+        mpn=mpn,
+        manufacturer="TI",
+    )
+    record.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name=mpn)
+    (app_ctx.profile.library.parts_dir / f"{part_id}.json").write_text(
+        record.dumps(),
+        encoding="utf-8",
+    )
+
+
+def _item_ids_by_part(store, batch_id: str) -> dict[str, str]:
+    return {item.payload["part_id"]: item.id for item in store.list_items(batch_id)}
+
+
+def _batch_report(part_id: str, **item) -> dict:
+    row = {
+        "part_id": part_id,
+        "mpn": part_id.upper(),
+        "display_name": part_id.upper(),
+        "status": "completed",
+        "needed": [],
+        "satisfied": [],
+        "remaining": [],
+        "sources": [],
+        "notes": [],
+        "error": "",
+        "provider_outcomes": [],
+        "collection_complete": None,
+        "completion_evidence": {
+            "state": "verified",
+            "manifest_digest": _digest(part_id),
+            "reason": "Verified.",
+        },
+    }
+    row.update(item)
+    return {
+        "items": [row],
+        "counts": {row["status"]: 1},
+        "retained": 0,
+        "collection_complete": None,
+        "stopped": False,
+        "stop_reason": "",
+    }
+
+
+def test_batch_worklist_separates_unattended_parts_from_the_routes_needing_a_person(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    """One library-wide batch, split into what finished alone and what a person must finish.
+
+    This is the whole point of the worklist: the run is allowed to do everything it is
+    permitted to do, and what remains is named per part with the route's OWN reason, so the
+    person is routed rather than left to guess which provider page to open.
+    """
+    store, _ = _mount_completion_authority(app_ctx, tmp_path)
+    monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(tmp_path / "Capture State"))
+    _write_completable_part(app_ctx, "lm317", "LM317")
+    from stockroom.capture.runner import write_durable_capture_report
+
+    reference = client.post(
+        "/api/library/capture/run",
+        json={"part_ids": ["tps62130", "lm317"]},
+    ).json()
+    batch_id = reference["workflow_batch_id"]
+    item_ids = _item_ids_by_part(store, batch_id)
+    write_durable_capture_report(
+        item_ids["tps62130"],
+        _batch_report("tps62130", status="completed"),
+    )
+    write_durable_capture_report(
+        item_ids["lm317"],
+        _batch_report(
+            "lm317",
+            status="improved",
+            remaining=["kicad_model", "altium_symbol"],
+            provider_outcomes=[
+                {
+                    "route_id": "ultralibrarian:ultralibrarian",
+                    "provider_key": "ultralibrarian",
+                    "author_key": "ultralibrarian",
+                    "label": "Ultra Librarian",
+                    "status": "requires-human",
+                    "attempted": True,
+                    "retained": 0,
+                    "activated": False,
+                    "reason": "no Ultra Librarian sign-in is saved on this PC",
+                },
+                {
+                    "route_id": "digikey:samacsys",
+                    "provider_key": "digikey",
+                    "author_key": "samacsys",
+                    "label": "DigiKey - SamacSys",
+                    "status": "unavailable",
+                    "attempted": True,
+                    "retained": 0,
+                    "activated": False,
+                    "reason": "does not offer Altium Designer (Native) for this exact part",
+                },
+            ],
+        ),
+    )
+
+    body = client.get(f"/api/library/capture/batches/{batch_id}/worklist")
+
+    assert body.status_code == 200, body.text
+    projected = body.json()
+    assert projected["workflow_batch_id"] == batch_id
+    assert projected["total_items"] == 2
+    assert projected["pending_items"] == 0
+    assert [row["part_id"] for row in projected["unattended"]] == ["tps62130"]
+    # Exactly one row: only the `requires-human` route needs a person. The unavailable route
+    # was genuinely evaluated and has nothing to offer, so sending someone there would waste
+    # the trip.
+    assert projected["worklist_total"] == 1
+    assert projected["worklist"] == [
+        {
+            "part_id": "lm317",
+            "mpn": "LM317",
+            "display_name": "LM317",
+            "route_id": "ultralibrarian:ultralibrarian",
+            "provider_key": "ultralibrarian",
+            "label": "Ultra Librarian",
+            "status": "requires-human",
+            "reason": "no Ultra Librarian sign-in is saved on this PC",
+            "remaining": ["kicad_model", "altium_symbol"],
+        }
+    ]
+    assert projected["stalled"] == []
+    assert projected["unreadable"] == []
+
+
+def test_batch_worklist_counts_an_unreported_item_as_pending_rather_than_finished(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    # A part whose report has not landed yet is neither done nor stuck, and saying either
+    # would be the surface inventing a result the run never produced.
+    store, _ = _mount_completion_authority(app_ctx, tmp_path)
+    monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(tmp_path / "Capture State"))
+    reference = client.post(
+        "/api/library/capture/run",
+        json={"part_ids": ["tps62130"]},
+    ).json()
+    assert store.list_items(reference["workflow_batch_id"])
+
+    projected = client.get(
+        f"/api/library/capture/batches/{reference['workflow_batch_id']}/worklist"
+    ).json()
+
+    assert projected["pending_items"] == 1
+    assert projected["unattended"] == []
+    assert projected["worklist"] == []
+
+
+def test_batch_worklist_reports_a_finished_part_no_route_can_help_apart_from_the_worklist(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    store, _ = _mount_completion_authority(app_ctx, tmp_path)
+    monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(tmp_path / "Capture State"))
+    from stockroom.capture.runner import write_durable_capture_report
+
+    reference = client.post(
+        "/api/library/capture/run",
+        json={"part_ids": ["tps62130"]},
+    ).json()
+    batch_id = reference["workflow_batch_id"]
+    write_durable_capture_report(
+        _item_ids_by_part(store, batch_id)["tps62130"],
+        _batch_report(
+            "tps62130",
+            status="unchanged",
+            remaining=["kicad_model"],
+            notes=["no exact model exists for this package"],
+        ),
+    )
+
+    projected = client.get(f"/api/library/capture/batches/{batch_id}/worklist").json()
+
+    assert projected["worklist"] == []
+    assert projected["unattended"] == []
+    assert projected["stalled"] == [
+        {
+            "part_id": "tps62130",
+            "mpn": "TPS62130",
+            "display_name": "TPS62130",
+            "status": "unchanged",
+            "reason": "no exact model exists for this package",
+            "remaining": ["kicad_model"],
+        }
+    ]
+
+
+def test_batch_worklist_rejects_an_invalid_reference_and_needs_a_token(client, anon_client):
+    assert client.get("/api/library/capture/batches/not a reference/worklist").status_code == 400
+    assert anon_client.get("/api/library/capture/batches/batch-1/worklist").status_code == 401
 
 
 @pytest.mark.parametrize(
@@ -750,3 +975,73 @@ def test_the_registered_source_requires_the_complete_dual_eda_set(app_ctx, key):
 
     provided = {r.value for s in build_sources(app_ctx) for r in s.provides()}
     assert key in provided
+
+
+def test_a_person_can_finish_the_open_route_or_skip_the_part_from_stockrooms_own_window(client):
+    """The Finish / Skip route, against the SAME registry `run_guided_capture` publishes into.
+
+    De-automation removed the provider HUD, so these two statements of the person's own intent
+    have nowhere to live but Stockroom's window. Nothing here touches a provider page.
+    """
+
+    from stockroom.capture.intent import PersonCaptureIntent, person_capture_intent
+
+    intent = PersonCaptureIntent()
+    with person_capture_intent("tps62130", intent):
+        finished = client.post(
+            "/api/library/capture/parts/tps62130/intent",
+            json={"action": "finish-route"},
+        )
+        assert finished.status_code == 200
+        assert finished.json() == {
+            "part_id": "tps62130",
+            "action": "finish-route",
+            "accepted": True,
+        }
+        # The open route takes the answer, and finishing never stops the part.
+        assert intent.take_route_finish() is True
+        assert intent.part_skipped() is False
+
+        skipped = client.post(
+            "/api/library/capture/parts/tps62130/intent",
+            json={"action": "skip-part"},
+        )
+        assert skipped.status_code == 200
+        assert intent.part_skipped() is True
+
+
+def test_a_person_driven_signal_for_a_component_with_no_running_capture_is_refused(client):
+    # Remembering it would silently end the next run the person started.
+    response = client.post(
+        "/api/library/capture/parts/tps62130/intent",
+        json={"action": "finish-route"},
+    )
+
+    assert response.status_code == 409
+
+
+@pytest.mark.parametrize(
+    ("part_id", "body", "expected_status"),
+    [
+        ("tps62130", {"action": "finish-everything"}, 400),
+        ("tps62130", {}, 400),
+        ("tps62130", {"action": "skip-part", "vendor": "digikey"}, 400),
+        ("not a part id", {"action": "skip-part"}, 400),
+    ],
+)
+def test_an_invalid_person_driven_signal_is_refused(client, part_id, body, expected_status):
+    response = client.post(
+        f"/api/library/capture/parts/{part_id}/intent",
+        json=body,
+    )
+
+    assert response.status_code == expected_status
+
+
+def test_a_person_driven_signal_needs_a_token(anon_client):
+    response = anon_client.post(
+        "/api/library/capture/parts/tps62130/intent",
+        json={"action": "skip-part"},
+    )
+
+    assert response.status_code == 401
