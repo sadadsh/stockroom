@@ -909,13 +909,14 @@ internal sealed class WebViewWindowHost : IDisposable
                     const value = event.data;
                     if (
                       !value ||
-                      value.schema !== "stockroom.host.folder-result" ||
+                      (value.schema !== "stockroom.host.folder-result" &&
+                       value.schema !== "stockroom.host.file-result") ||
                       typeof value.id !== "string" ||
                       !Array.isArray(value.paths) ||
                       !value.paths.every((path) => typeof path === "string")
                     ) return;
                     const request = pending.get(value.id);
-                    if (!request) return;
+                    if (!request || value.schema !== request.expectedSchema) return;
                     pending.delete(value.id);
                     clearTimeout(request.timer);
                     if (typeof value.error === "string" && value.error) {
@@ -935,9 +936,37 @@ internal sealed class WebViewWindowHost : IDisposable
                           pending.delete(id);
                           reject(new Error("The Stockroom folder picker did not respond."));
                         }, 300000);
-                        pending.set(id, { resolve, reject, timer });
+                        pending.set(id, {
+                          resolve,
+                          reject,
+                          timer,
+                          expectedSchema: "stockroom.host.folder-result"
+                        });
                         webview.postMessage({
                           schema: "stockroom.host.folder-request",
+                          id,
+                          purpose
+                        });
+                      });
+                    },
+                    pickFiles(purpose) {
+                      if (purpose !== "cad-recovery") {
+                        return Promise.reject(new Error("Unknown Stockroom file purpose."));
+                      }
+                      const id = crypto.randomUUID();
+                      return new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => {
+                          pending.delete(id);
+                          reject(new Error("The Stockroom file picker did not respond."));
+                        }, 300000);
+                        pending.set(id, {
+                          resolve,
+                          reject,
+                          timer,
+                          expectedSchema: "stockroom.host.file-result"
+                        });
+                        webview.postMessage({
+                          schema: "stockroom.host.file-request",
                           id,
                           purpose
                         });
@@ -1112,6 +1141,7 @@ internal sealed class WebViewWindowHost : IDisposable
 
         string id;
         string purpose;
+        var fileRequest = false;
         try
         {
             using var document = JsonDocument.Parse(
@@ -1119,19 +1149,24 @@ internal sealed class WebViewWindowHost : IDisposable
             var root = document.RootElement;
             HandoffCodec.RequireExactObject(
                 root,
-                "renderer folder request",
+                "renderer picker request",
                 "schema",
                 "id",
                 "purpose");
-            if (HandoffCodec.GetRequiredString(root, "schema")
-                    != "stockroom.host.folder-request")
+            var schema = HandoffCodec.GetRequiredString(root, "schema");
+            if (schema is not (
+                    "stockroom.host.folder-request" or
+                    "stockroom.host.file-request"))
             {
                 return;
             }
+            fileRequest = schema == "stockroom.host.file-request";
             id = HandoffCodec.GetRequiredString(root, "id");
             purpose = HandoffCodec.GetRequiredString(root, "purpose");
             if (!Guid.TryParseExact(id, "D", out _)
-                || purpose is not ("project" or "stm-cubemx"))
+                || (fileRequest
+                    ? purpose != "cad-recovery"
+                    : purpose is not ("project" or "stm-cubemx")))
             {
                 return;
             }
@@ -1146,17 +1181,35 @@ internal sealed class WebViewWindowHost : IDisposable
         var error = "";
         try
         {
-            var dialog = new OpenFolderDialog
+            if (fileRequest)
             {
-                Multiselect = false,
-                Title = purpose == "project"
-                    ? "Choose A Project Folder"
-                    : "Choose The STM32CubeMX Folder",
-            };
-            if (dialog.ShowDialog(_window) == true
-                && !string.IsNullOrWhiteSpace(dialog.FolderName))
+                var dialog = new OpenFileDialog
+                {
+                    Multiselect = true,
+                    Title = "Choose Downloaded CAD Files",
+                    Filter = "CAD files|*.zip;*.kicad_sym;*.kicad_mod;*.step;*.stp;*.SchLib;*.PcbLib|All files|*.*",
+                };
+                if (dialog.ShowDialog(_window) == true)
+                {
+                    paths = dialog.FileNames
+                        .Select(Path.GetFullPath)
+                        .ToArray();
+                }
+            }
+            else
             {
-                paths = [Path.GetFullPath(dialog.FolderName)];
+                var dialog = new OpenFolderDialog
+                {
+                    Multiselect = false,
+                    Title = purpose == "project"
+                        ? "Choose A Project Folder"
+                        : "Choose The STM32CubeMX Folder",
+                };
+                if (dialog.ShowDialog(_window) == true
+                    && !string.IsNullOrWhiteSpace(dialog.FolderName))
+                {
+                    paths = [Path.GetFullPath(dialog.FolderName)];
+                }
             }
         }
         catch (Exception exception)
@@ -1165,14 +1218,16 @@ internal sealed class WebViewWindowHost : IDisposable
                 or ArgumentException
                 or InvalidOperationException)
         {
-            error = "Stockroom could not open the Windows folder picker.";
+            error = "Stockroom could not open the Windows picker.";
         }
 
         core.PostWebMessageAsJson(
             JsonSerializer.Serialize(
                 new Dictionary<string, object?>
                 {
-                    ["schema"] = "stockroom.host.folder-result",
+                    ["schema"] = fileRequest
+                        ? "stockroom.host.file-result"
+                        : "stockroom.host.folder-result",
                     ["id"] = id,
                     ["paths"] = paths,
                     ["error"] = error,

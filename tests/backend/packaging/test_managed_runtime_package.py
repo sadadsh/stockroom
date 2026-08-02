@@ -614,7 +614,8 @@ def test_frozen_entry_and_spec_are_the_continuous_and_managed_runtime_contract()
     assert 'collect_submodules("stockroom")' in spec
     assert '"app/frontend-dist"' in spec
     assert '"fastapi"' not in spec.partition("excludes=[")[2]
-    assert 'runtime_status = "continuous-main-runtime"' in build
+    assert '"verified-offline-fixture"' in build
+    assert '"stable-managed-release-runtime"' in build
     assert '"stockroom-managed-host-launch/1"' in build
     assert "immutable_release_bundle_round_trip = $true" in build
     assert "managed_service_authority = $true" in build

@@ -43,7 +43,7 @@ export function mockCapture(
   type Request = {
     partIds?: string[];
     vendor?: string;
-    mode?: "automatic" | "assisted" | "collect-all";
+    mode?: "automatic" | "assisted" | "finish-first" | "collect-all";
   };
   type Run = {
     request: Request;

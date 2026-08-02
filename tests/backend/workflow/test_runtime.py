@@ -87,6 +87,7 @@ def test_dispatches_the_real_dag_and_only_joins_publication(tmp_path):
     item = store.list_items(batch.id)[0]
     assert all(context.item.id == item.id for context in seen.values())
     assert all(context.item.payload == {"row": 7} for context in seen.values())
+    assert all(context.should_stop() is False for context in seen.values())
     assert all(context.stage.name is name for name, context in seen.items())
     assert seen[StageName.IDENTITY_DEDUPE].prior_results == {}
     assert set(seen[StageName.RECONCILE].prior_results) == {

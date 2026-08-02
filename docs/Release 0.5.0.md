@@ -1,9 +1,9 @@
 # Stockroom 0.5.0
 
-Stockroom 0.5.0 is the first continuously delivered Windows build. The
-downloaded executable is a stable launcher for the writable Stockroom
-application, not a read-only demo shell. It includes the showcase library and
-keeps the managed application checkout aligned with the pushed `main` branch.
+Stockroom 0.5.0 is a verified unsigned Windows fixture with a writable Stockroom
+application and showcase library. It is not connected to a production update
+feed and therefore does not follow pushed `main`. Install a later signed
+production build once its real HTTPS release feed is available.
 
 ## What Changed
 
@@ -13,16 +13,9 @@ keeps the managed application checkout aligned with the pushed `main` branch.
   SamacSys, and SnapMagic sessions.
 - Made `Open Provider` the explicit login/security-check handoff when a provider
   needs user input; the provider profile is reused on later parts.
-- Added automatic Git convergence. Pushed revisions are downloaded, the current
-  UI session is persisted, and Stockroom relaunches itself on the updated
-  checkout without asking the user to download another executable.
-- Revisions downloaded first by library sync remain pending until the loaded
-  application runtime activates the same revision; a newer checkout is never
-  mislabeled as an already-current process.
-- The updater verifies that the native Stockroom window belongs to its process
-  and waits for Windows to confirm closure before it reports a successful
-  restart handoff. A bounded restart watchdog returns control to the stable
-  launcher if WebView2 does not close gracefully.
+- Preserved the current UI session across ordinary fixture restarts. Production
+  release convergence is intentionally unavailable in this unsigned fixture;
+  it requires a signed artifact and real HTTPS release feed.
 - Hid native helper consoles while preserving the underlying KiCad and Altium
   operations.
 - Added the new Stockroom application icon.
@@ -34,6 +27,6 @@ keeps the managed application checkout aligned with the pushed `main` branch.
 - SHA-256:
   `3a0987d263a63d4d967b239d0588f944b8fee0c2e65edabdbe3809af42049ca3`
 
-The executable is an unsigned development build. Windows may show a SmartScreen
-warning. The first launch requires internet access to prepare the managed
-runtime and fetch the current application revision.
+The executable is an unsigned, self-contained development fixture. Windows may
+show a SmartScreen warning. It runs the bundled application revision and does
+not fetch or activate newer application revisions.

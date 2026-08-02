@@ -929,7 +929,12 @@ if (
 $Evidence = [ordered]@{
     schema = "stockroom-windows-package-build/3"
     mode = $Mode.ToLowerInvariant()
-    runtime_status = "continuous-main-runtime"
+    runtime_status = if ($Mode -eq "Fixture") {
+        "verified-offline-fixture"
+    }
+    else {
+        "stable-managed-release-runtime"
+    }
     source = [ordered]@{
         git_revision = $GitRevision
         git_dirty = $GitDirty

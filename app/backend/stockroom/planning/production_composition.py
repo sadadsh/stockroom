@@ -31,9 +31,9 @@ import subprocess
 import tempfile
 import threading
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 from typing import Protocol, cast
@@ -507,6 +507,12 @@ class _CaptureRequest:
     vendor: str | None = None
     background: bool = False
     report_item_id: str | None = None
+    should_stop: Callable[[], bool] = field(
+        default=lambda: False,
+        repr=False,
+        compare=False,
+        hash=False,
+    )
 
 
 _DEFAULT_CAPTURE_REQUEST = _CaptureRequest()
@@ -522,7 +528,7 @@ def _capture_request(item_id: str, payload: object) -> _CaptureRequest:
         raise ProductionWorkflowError("workflow item has an unsupported workflow kind")
     capture = _mapping(payload.get("capture"), "guided capture request")
     mode = capture.get("mode")
-    if mode not in {"automatic", "assisted", "collect-all"}:
+    if mode not in {"automatic", "assisted", "finish-first", "collect-all"}:
         raise ProductionWorkflowError("guided capture mode is not supported")
     vendor = capture.get("vendor")
     if vendor is not None and (
@@ -534,8 +540,8 @@ def _capture_request(item_id: str, payload: object) -> _CaptureRequest:
     background = capture.get("background")
     if type(background) is not bool:
         raise ProductionWorkflowError("guided capture background flag must be a boolean")
-    if mode == "collect-all" and background:
-        raise ProductionWorkflowError("collect-all guided capture must remain visible")
+    if mode in {"finish-first", "collect-all"} and background:
+        raise ProductionWorkflowError(f"{mode} guided capture must remain visible")
     return _CaptureRequest(
         mode=cast(str, mode),
         vendor=vendor,
@@ -579,7 +585,10 @@ class StockroomAcquisitionProviderAdapter:
     ) -> Iterator[None]:
         """Bind one durable item's capture contract across provider worker threads."""
 
-        request = _capture_request(context.item.id, context.item.payload)
+        request = replace(
+            _capture_request(context.item.id, context.item.payload),
+            should_stop=context.should_stop,
+        )
         with self._scope_guard:
             identity_lock = self._scope_locks.setdefault(identity, threading.Lock())
         identity_lock.acquire()
@@ -645,7 +654,10 @@ class StockroomAcquisitionProviderAdapter:
                 vendor=request.vendor,
                 headless=request.background,
                 operator_authorized=request.mode == "assisted",
+                finish_first=request.mode == "finish-first",
                 collect_all=request.mode == "collect-all",
+                should_stop=request.should_stop,
+                capture_id=request.report_item_id,
             )
             if request.report_item_id is not None:
                 write_durable_capture_report(request.report_item_id, report)
@@ -739,7 +751,7 @@ class StockroomAcquisitionProviderAdapter:
             try:
                 request = self._capture_options(identity)
                 bundle = self._selection(identity)
-                if bundle is None or request.mode == "collect-all":
+                if bundle is None or request.mode in {"finish-first", "collect-all"}:
                     self._acquire(identity, request)
                     bundle = self._selection(identity)
                 if bundle is None:

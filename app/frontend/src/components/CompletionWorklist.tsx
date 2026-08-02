@@ -351,7 +351,7 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
     heldRef.current = false;
     openedRef.current = false;
     setPass({ ...pass, queue: pass.queue.slice(1), open: next });
-    void start(next.partId, next.name, next.remaining, undefined, "collect-all").catch(
+    void start(next.partId, next.name, next.remaining, undefined, "finish-first").catch(
       (error) => {
         const detail = error instanceof Error ? error.message : "the capture slot was unavailable";
         setPass((current) =>
@@ -435,15 +435,15 @@ function StartCapture({
       disabled={busy}
       title={
         running
-          ? `Getting every available file for ${row.mpn || row.part_id}`
+          ? `Completing ${row.mpn || row.part_id}`
           : blocked
             ? "Stockroom runs one capture at a time. Finish or skip the one in progress first."
-            : `Get every available file for ${row.mpn || row.part_id}`
+            : `Get the first complete validated file set for ${row.mpn || row.part_id}`
       }
       aria-label={`Get files for ${name}`}
       onClick={() =>
         void capture
-          .start(row.part_id, name, row.remaining, undefined, "collect-all")
+          .start(row.part_id, name, row.remaining, undefined, "finish-first")
           .catch(() => capture.requestReopen())
       }
     >

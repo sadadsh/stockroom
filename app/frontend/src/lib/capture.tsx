@@ -2,8 +2,9 @@
  * One global network-capture job.
  *
  * The backend owns discovery, provider browsers, downloads, validation, retention, and coherent
- * attachment. The frontend starts that job and renders its evidenced result. It deliberately has
- * no host callback, local file picker, manual inspect/commit seam, or per-tool attach path.
+ * attachment. The frontend starts that job and renders its evidenced result. A native file picker
+ * can recover downloads for the active provider task, but it feeds the same backend validation
+ * path; there is still no per-tool attach seam or client-side commit authority.
  */
 import {
   createContext,
@@ -40,7 +41,7 @@ export type GuidedStatus =
   | "unavailable"
   | "error";
 
-export type CaptureMode = "automatic" | "assisted" | "collect-all";
+export type CaptureMode = "automatic" | "assisted" | "finish-first" | "collect-all";
 
 export class CaptureBusyError extends Error {
   constructor(partName: string) {
@@ -71,10 +72,12 @@ type Received = Partial<Record<Requirement, boolean>>;
 
 export interface CaptureState {
   partId: string | null;
+  workflowItemId: string | null;
   partName: string | null;
   status: GuidedStatus;
   message: string | null;
   url: string | null;
+  routeToken: string | null;
   vendor: string | null;
   // Which lane this run is in. Only the person-driven lanes open a provider page a person can be
   // standing in front of, so only they may offer Finish Route and Skip This Part.
@@ -90,10 +93,12 @@ export interface CaptureState {
 
 const IDLE: CaptureState = {
   partId: null,
+  workflowItemId: null,
   partName: null,
   status: "idle",
   message: null,
   url: null,
+  routeToken: null,
   vendor: null,
   mode: null,
   needs: [],
@@ -231,7 +236,7 @@ const WORKFLOW_STAGE_MESSAGE: Record<string, string> = {
 function durableMessage(
   batch: WorkflowBatchSummary,
   events: WorkflowEvent[],
-  _mode: CaptureMode,
+  mode: CaptureMode,
   _vendor: string | null,
 ): string {
   if (batch.status === "paused") {
@@ -255,11 +260,15 @@ function durableMessage(
     .map((event) => event.details.stage)
     .find((stage): stage is string => typeof stage === "string");
   if (latestStage === "cad_acquisition") {
-    return "Collecting every eligible source in order and retaining verified variants.";
+    return mode === "collect-all"
+      ? "Collecting every eligible source in order and retaining verified variants."
+      : "Checking eligible sources in order and stopping at the first complete validated set.";
   }
   return latestStage
     ? (WORKFLOW_STAGE_MESSAGE[latestStage] ?? "Completing this part.")
-    : "Completion is active. Stockroom is checking cached evidence, exact identity, and every eligible network source in order.";
+    : mode === "collect-all"
+      ? "Completion is active. Stockroom is checking cached evidence, exact identity, and every eligible network source in order."
+      : "Completion is active. Stockroom is checking cached evidence and eligible network sources until one complete validated set is ready.";
 }
 
 function resultFromProjection(
@@ -514,7 +523,10 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       let failures = 0;
       while (generation === followGenerationRef.current) {
         try {
-          const page = await api.workflowEvents(batchId, cursor, EVENT_PAGE_LIMIT);
+          const [page, liveSession] = await Promise.all([
+            api.workflowEvents(batchId, cursor, EVENT_PAGE_LIMIT),
+            api.captureWorkflow(batchId),
+          ]);
           if (page.batch.kind !== "guided_capture") {
             throw new Error("The saved workflow is not a guided capture.");
           }
@@ -525,14 +537,15 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
             ...current,
             status: page.batch.status === "blocked" ? "window-open" : "receiving",
             message: durableMessage(page.batch, page.events, mode, vendor),
+            vendor: liveSession.active_route?.vendor ?? current.vendor,
+            url: liveSession.active_route?.detail_url ?? null,
+            routeToken: liveSession.active_route?.route_token ?? null,
           }));
 
           if (page.cursor.has_more) continue;
           if (terminalWorkflow(page.batch)) {
-            const [session, source] = await Promise.all([
-              api.captureWorkflow(batchId),
-              api.partCadSource(partId),
-            ]);
+            const session = liveSession;
+            const source = await api.partCadSource(partId);
             if (session.workflow_item_id !== itemId || session.part_id !== partId) {
               throw new Error("The durable capture identity changed while reconnecting.");
             }
@@ -611,6 +624,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
           setState({
             ...IDLE,
             partId: session.part_id,
+            workflowItemId: itemId,
             partName,
             needs: session.initial_needs,
             vendor: session.vendor ?? "Automatic",
@@ -660,7 +674,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       partName: string,
       needs: Requirement[],
       sourceKey?: string,
-      mode: CaptureMode = "collect-all",
+      mode: CaptureMode = "finish-first",
     ) => {
       const commandKey = captureCommandKey(partId, sourceKey, mode);
       const idempotencyKey =
@@ -682,7 +696,9 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         mode,
         status: "resolving",
         message:
-          "Planning one automatic pass through cached evidence, exact identity, data, datasheet, and every eligible CAD source...",
+          mode === "collect-all"
+            ? "Planning one automatic pass through cached evidence, exact identity, data, datasheet, and every eligible CAD source..."
+            : "Planning one automatic pass through cached evidence, exact identity, data, datasheet, and the fastest complete CAD source...",
       }));
 
       try {
@@ -722,6 +738,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         persistWorkflow(batchId, itemId, cursor);
         setState((current) => ({
           ...current,
+          workflowItemId: itemId,
           status: "receiving",
           message:
             "Automatic completion is running. Provider pages appear inside Stockroom only when needed, and verified files are retained as they land.",
@@ -767,7 +784,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       partName: string,
       needs: Requirement[],
       sourceKey?: string,
-      mode: CaptureMode = "collect-all",
+      mode: CaptureMode = "finish-first",
     ): Promise<void> => {
       const commandKey = captureCommandKey(partId, sourceKey, mode);
       const pending = pendingStartRef.current;

@@ -11,9 +11,9 @@ from __future__ import annotations
 import math
 import threading
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Protocol, TypeAlias, TypedDict
 
@@ -33,6 +33,10 @@ FrozenJson: TypeAlias = JsonScalar | tuple["FrozenJson", ...] | Mapping[str, "Fr
 PriorStageResults: TypeAlias = Mapping[StageName, FrozenJson]
 
 
+def _never_stop() -> bool:
+    return False
+
+
 @dataclass(frozen=True, slots=True)
 class StageContext:
     """Immutable inputs visible to one stage handler.
@@ -45,6 +49,11 @@ class StageContext:
     item: ItemRecord
     stage: StageRecord
     prior_results: PriorStageResults
+    should_stop: Callable[[], bool] = field(
+        default=_never_stop,
+        repr=False,
+        compare=False,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,9 +128,9 @@ class InvalidStageOutcome(RuntimeError):
 class StageLeaseLost(WorkflowConflict):
     """This worker's lease was lost while its handler was still running.
 
-    The handler is allowed to finish because a running stage has no
-    cancellation signal to honor, but its terminal transition is skipped: the
-    fence it would have used is no longer authoritative.
+    Cooperative handlers can stop through :attr:`StageContext.should_stop`.
+    A handler that cannot stop is allowed to finish, but its terminal
+    transition is skipped because its fence is no longer authoritative.
     """
 
 
@@ -393,6 +402,7 @@ class WorkflowRuntime:
             item=item,
             stage=claim,
             prior_results=MappingProxyType(results),
+            should_stop=lambda: self._store.get_batch_cancellation(item.batch_id) is not None,
         )
 
     def _require_current_claim(

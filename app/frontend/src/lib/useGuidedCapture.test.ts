@@ -74,7 +74,7 @@ describe("useGuidedCapture", () => {
       expect.objectContaining({
         partIds: ["part1"],
         vendor: undefined,
-        mode: "collect-all",
+        mode: "finish-first",
       }),
     );
     expect(result.current.status).toBe("done");
@@ -92,7 +92,7 @@ describe("useGuidedCapture", () => {
     expect(capture.run).toHaveBeenCalledWith(
       expect.objectContaining({
         vendor: "ultralibrarian",
-        mode: "collect-all",
+        mode: "finish-first",
       }),
     );
   });
@@ -111,7 +111,7 @@ describe("useGuidedCapture", () => {
       expect.objectContaining({
         partIds: ["part1"],
         vendor: undefined,
-        mode: "collect-all",
+        mode: "finish-first",
       }),
     );
   });

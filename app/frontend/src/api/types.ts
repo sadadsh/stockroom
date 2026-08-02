@@ -2909,9 +2909,10 @@ export interface CaptureWorkflowSession {
   workflow_batch_id: string;
   workflow_item_id: string;
   part_id: string;
-  mode: "automatic" | "assisted" | "collect-all";
+  mode: "automatic" | "assisted" | "finish-first" | "collect-all";
   vendor: string | null;
   background: boolean;
+  active_route?: { vendor: string; detail_url: string; route_token: string } | null;
   initial_needs: Requirement[];
   report: CompletionResult | null;
 }

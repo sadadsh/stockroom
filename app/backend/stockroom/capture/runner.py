@@ -472,7 +472,9 @@ def run_guided_capture(
     engine: str = "",
     user_driven: bool = False,
     operator_authorized: bool = False,
+    finish_first: bool = False,
     collect_all: bool = False,
+    capture_id: str | None = None,
 ) -> dict:
     """Complete CAD automatically, with person-controlled capture only as an explicit fallback.
 
@@ -492,15 +494,19 @@ def run_guided_capture(
     if (
         type(user_driven) is not bool
         or type(operator_authorized) is not bool
+        or type(finish_first) is not bool
         or type(collect_all) is not bool
     ):
         raise TypeError("capture authorization flags must be booleans")
     if user_driven and operator_authorized:
         raise ValueError("capture cannot be both user-driven and operator-authorized automation")
-    if collect_all and (user_driven or operator_authorized):
-        raise ValueError("collect-all owns its provider authorization plan")
-    if collect_all and headless:
-        raise ValueError("collect-all requires visible sequential provider handoffs")
+    if finish_first and collect_all:
+        raise ValueError("finish-first and collect-all are mutually exclusive")
+    sequential_providers = finish_first or collect_all
+    if sequential_providers and (user_driven or operator_authorized):
+        raise ValueError("sequential capture owns its provider authorization plan")
+    if sequential_providers and headless:
+        raise ValueError("sequential capture requires visible provider handoffs")
     from threading import Event
 
     workflow_cancelled = Event()
@@ -515,6 +521,8 @@ def run_guided_capture(
     capture_mode = (
         "collect-all"
         if collect_all
+        else "finish-first"
+        if finish_first
         else "assisted"
         if operator_authorized
         else "user-driven"
@@ -542,9 +550,9 @@ def run_guided_capture(
             or bool(should_stop and should_stop())
         )
 
-    if explicit_provider_capture or collect_all:
+    if explicit_provider_capture or sequential_providers:
         if part_ids is None or isinstance(part_ids, (str, bytes)):
-            scope = "collect-all" if collect_all else "explicit provider capture"
+            scope = "sequential capture" if sequential_providers else "explicit provider capture"
             raise ValueError(f"{scope} requires exactly one selected part")
         selected_parts = list(part_ids)
         if (
@@ -553,16 +561,16 @@ def run_guided_capture(
             or not selected_parts[0].strip()
             or selected_parts[0] != selected_parts[0].strip()
         ):
-            scope = "collect-all" if collect_all else "explicit provider capture"
+            scope = "sequential capture" if sequential_providers else "explicit provider capture"
             raise ValueError(f"{scope} requires exactly one selected part")
-        if not collect_all and (not isinstance(vendor, str) or not vendor.strip()):
+        if not sequential_providers and (not isinstance(vendor, str) or not vendor.strip()):
             raise ValueError("explicit provider capture requires one selected provider")
         if limit is not None:
-            scope = "collect-all" if collect_all else "explicit provider capture"
+            scope = "sequential capture" if sequential_providers else "explicit provider capture"
             raise ValueError(f"{scope} does not accept a batch limit; select exactly one part")
         part_ids = selected_parts
         exact_part_id = selected_parts[0]
-        if collect_all:
+        if sequential_providers:
             # Preference reorders one lane; it never removes a registered provider.
             provider_order = _vendor_chain(vendor)
             automatic_provider_keys = _automatic_provider_keys(
@@ -606,7 +614,7 @@ def run_guided_capture(
     def completion_evidence_resolver(record):
         return record_completion_evidence(evidence_store, record)
 
-    if collect_all:
+    if sequential_providers:
         from stockroom.capture.evidence import exact_identity
 
         # Fail before constructing a provider runtime or opening a page. A search-only MPN or a
@@ -651,7 +659,7 @@ def run_guided_capture(
             raise ValueError(f"no network capture adapter for provider {key!r}")
         evidence_provider_key = getattr(adapter, "evidence_provider_key", key)
         automatic_source = key in automatic_provider_set
-        if collect_all:
+        if sequential_providers:
             source_user_driven = not automatic_source and not adapter.capability.operator_automation
             source_operator_authorized = not automatic_source and not source_user_driven
         else:
@@ -694,7 +702,7 @@ def run_guided_capture(
             ),
             collect_variants=explicit_provider_capture or collect_all,
             preserve_active_pair=collect_all,
-            close_after_supply=collect_all,
+            close_after_supply=sequential_providers,
             # Credentials are supplied only to providers whose reviewed policy explicitly permits
             # machine access. User-driven providers retain their session in the isolated profile
             # without Stockroom impersonating provider-side choices.
@@ -738,12 +746,15 @@ def run_guided_capture(
                 and getattr(ctx.config, "digikey_client_secret", "")
             ),
             provider_surface=provider_surface,
+            publish_active_route=person_intent.set_active_route,
+            clear_active_route=person_intent.clear_active_route,
+            take_selected_files=person_intent.take_selected_files,
         )
 
     guided_sources = [make_guided_source(key) for key in provider_keys]
     deferred_sources = []
     deferred_keys: list[str] = []
-    if not explicit_provider_capture and not collect_all:
+    if not explicit_provider_capture and not sequential_providers:
         deferred_keys = [key for key in _vendor_chain(vendor) if key not in automatic_provider_set]
         deferred_sources = [
             HumanRequiredSource(
@@ -798,7 +809,11 @@ def run_guided_capture(
 
     try:
         # Published for exactly as long as a person could be standing in front of this capture.
-        with person_capture_intent(exact_part_id, person_intent):
+        with person_capture_intent(
+            exact_part_id,
+            person_intent,
+            capture_id=capture_id,
+        ):
             report = complete_library(
                 work,
                 load_record=load_record,

@@ -143,6 +143,30 @@ class _HostApi:
 
         return self.pick_folder("project")
 
+    def pick_files(self, purpose: str) -> list[str]:
+        """Pick recovery CAD files without granting the renderer arbitrary filesystem access."""
+
+        if purpose != "cad-recovery":
+            return []
+        import webview
+
+        window = active_window()
+        if window is None:
+            return []
+        dialog_types = getattr(webview, "FileDialog", None)
+        open_dialog = getattr(dialog_types, "OPEN", None)
+        if open_dialog is None:
+            open_dialog = webview.OPEN_DIALOG
+        result = window.create_file_dialog(
+            open_dialog,
+            allow_multiple=True,
+            file_types=(
+                "CAD Files (*.zip;*.kicad_sym;*.kicad_mod;*.step;*.stp;*.SchLib;*.PcbLib)",
+                "All Files (*.*)",
+            ),
+        )
+        return list(result) if result else []
+
 
 def _set_signature(function, argument_types, result_type) -> None:
     """Declare a ctypes Win32 signature when ``function`` is a real DLL export."""
