@@ -99,7 +99,11 @@ export function staleFrontend(
   buildVersion: string | undefined,
 ): { bundle: string; backend: string } | null {
   const bundle = bundleRevision(buildVersion ?? "");
-  const backend = (data?.current_revision ?? "").trim();
+  // Compare against the exact bundle the backend is serving, not the checkout HEAD. Because
+  // frontend-dist is committed, a build commit necessarily follows the source revision baked
+  // into its bundle; comparing those two Git commits made every clean release look stale forever.
+  // Fall back for rolling compatibility with an older backend that has not learned this field.
+  const backend = (data?.frontend_revision ?? data?.current_revision ?? "").trim();
   return revisionsDisagree(bundle, backend) ? { bundle, backend } : null;
 }
 

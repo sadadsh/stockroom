@@ -1,10 +1,13 @@
 import json
 
+from stockroom.api.routers.update import _frontend_revision
 from stockroom.api.updater import UpdateState
 
 
 def test_check_explains_an_unmanaged_installation(client, app_ctx):
     app_ctx.app_repo = None
+    frontend_revision = _frontend_revision()
+    assert frontend_revision
 
     response = client.get("/api/update/check")
 
@@ -18,6 +21,7 @@ def test_check_explains_an_unmanaged_installation(client, app_ctx):
         "channel": "unmanaged",
         "automatic_on_launch": False,
         "check_interval_seconds": 120,
+        "frontend_revision": frontend_revision,
     }
 
 
@@ -54,7 +58,7 @@ def test_check_uses_the_hosts_observable_automatic_convergence_state(client, app
     response = client.get("/api/update/check")
 
     assert response.status_code == 200
-    assert response.json() == expected
+    assert response.json() == {**expected, "frontend_revision": _frontend_revision()}
 
     apply = client.post("/api/update/apply")
 
@@ -81,7 +85,7 @@ def test_handed_off_worker_reads_the_host_convergence_status_file(client, app_ct
     response = client.get("/api/update/check")
 
     assert response.status_code == 200
-    assert response.json() == expected
+    assert response.json() == {**expected, "frontend_revision": _frontend_revision()}
 
     apply = client.post("/api/update/apply")
 
