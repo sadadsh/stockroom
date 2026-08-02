@@ -60,11 +60,19 @@ def _window_host_publish(root: Path) -> Path:
     return root
 
 
+def _cad_converter_publish(root: Path) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "Stockroom.CadConverter.exe").write_bytes(b"MZcad-converter")
+    (root / "Stockroom.CadConverter.dll").write_bytes(b"cad-converter-runtime")
+    return root
+
+
 def _build_fixture(executable: Path, bundle: Path) -> dict[str, str]:
     return build_release_bundle(
         mode="Fixture",
         executable=executable,
         window_host_root=_window_host_publish(executable.parent / "Window Host Publish"),
+        cad_converter_root=_cad_converter_publish(executable.parent / "CAD Converter Publish"),
         bundle_root=bundle,
         version="1.2.3.4",
         minimum_host_version="1.0.0.0",
@@ -105,6 +113,10 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
     assert manifest.supports_direct_activation_from("release-bootstrap")
     assert {member.kind for member in manifest.members} == {
         "backend",
+        "cad-converter",
+        "cad-converter-runtime",
+        "license",
+        "notice",
         "sbom",
         "window-host",
         "window-host-runtime",
@@ -115,6 +127,19 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
     assert next(member for member in manifest.members if member.kind == "backend").path == (
         "Backend/Stockroom Worker.exe"
     )
+    assert next(
+        member for member in manifest.members if member.kind == "cad-converter"
+    ).path == "Tools/CadConverter/Stockroom.CadConverter.exe"
+    assert first_evidence["cad_converter_sha256"] == hashlib.sha256(
+        b"MZcad-converter"
+    ).hexdigest()
+    support = first / "Initial Release" / "release-1.2.3.4" / "Support"
+    assert "OpenMcdf 3.1.4" in (support / "Third Party Notices.txt").read_text(
+        encoding="utf-8"
+    )
+    assert (support / "Licenses" / "AltiumSharp Apache-2.0.txt").read_text(
+        encoding="utf-8"
+    ).startswith("Apache License")
 
 
 def test_production_bundle_requires_a_valid_offline_root(tmp_path: Path) -> None:
@@ -128,6 +153,7 @@ def test_production_bundle_requires_a_valid_offline_root(tmp_path: Path) -> None
             mode="Production",
             executable=executable,
             window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
+            cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
             bundle_root=tmp_path / "Production",
             version="1.2.3.4",
             minimum_host_version="1.0.0.0",
@@ -158,6 +184,7 @@ def test_release_bundle_rejects_an_invalid_host_abi_floor(
             mode="Fixture",
             executable=executable,
             window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
+            cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
             bundle_root=tmp_path / "Update",
             version="1.2.3.4",
             minimum_host_version=minimum_host_version,
@@ -178,6 +205,7 @@ def test_fixture_release_bundle_authors_explicit_predecessor_chain(
         mode="Fixture",
         executable=executable,
         window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
+        cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
         bundle_root=bundle,
         version="2.0.0.0",
         minimum_host_version="1.0.0.0",
@@ -319,6 +347,7 @@ def test_production_feed_requires_and_uses_root_authorized_online_keys(
         mode="Production",
         executable=executable,
         window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
+        cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
         bundle_root=bundle,
         version="7.8.9.10",
         minimum_host_version="7.0.0.0",
@@ -504,6 +533,7 @@ def test_persisted_v1_release_activates_packaged_v2_in_shared_data_root(
         mode="Fixture",
         executable=executable,
         window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
+        cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
         bundle_root=v1_bundle,
         version="1.0.0.0",
         minimum_host_version="1.0.0.0",
@@ -516,6 +546,7 @@ def test_persisted_v1_release_activates_packaged_v2_in_shared_data_root(
         mode="Fixture",
         executable=executable,
         window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
+        cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
         bundle_root=v2_bundle,
         version="2.0.0.0",
         minimum_host_version="1.0.0.0",

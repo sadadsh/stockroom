@@ -219,7 +219,8 @@ class UltraLibrarianAdapter:
         needs_login=True,
         instruction=(
             "Stockroom confirms the exact part and selects KiCad, STEP, and Altium Designer "
-            "(Native). Clear a provider security check only if one appears."
+            "(Native), using PCAD v15 only when native libraries are unavailable. Clear a "
+            "provider security check only if one appears."
         ),
         # Measured element ids on the export panel. `model` is separate from `kicad`: the STEP
         # sits behind its own "3D CAD Model" accordion and is missed entirely if not ticked.
@@ -678,7 +679,11 @@ class UltraLibrarianAdapter:
                 )
                 report.selected.append(fmt)
             elif exact_label:
-                selected, reason = _check_exact_export_label(page, exact_label)
+                selected, reason = _check_exact_export_label(
+                    page,
+                    exact_label,
+                    fallback_labels=("PCAD v15",) if fmt == "altium" else (),
+                )
                 trace(
                     "capture.step.format",
                     provider=self.capability.label,
@@ -1054,19 +1059,28 @@ def _check_box(page, selector: str) -> bool:
     return checked
 
 
-def _check_exact_export_label(page, exact_label: str) -> tuple[bool, str]:
+def _check_exact_export_label(
+    page,
+    exact_label: str,
+    *,
+    fallback_labels: tuple[str, ...] = (),
+) -> tuple[bool, str]:
     """Select one uniquely and exactly labelled Ultra Librarian export.
 
-    The native Altium control's DOM id is not a published contract. Its exact visible label is:
-    Ultra Librarian's current help and announcement distinguish ``Altium Designer (Native)`` from
-    the legacy Altium script and P-CAD exports. Matching a substring such as ``Altium Designer``
-    would therefore select the very fallback this path is forbidden to use.
+    The native Altium control's DOM id is not a published contract. Ultra Librarian's current help
+    distinguishes ``Altium Designer (Native)`` from script and P-CAD exports, so every candidate
+    remains an exact label. Stockroom may explicitly prefer native and then select ``PCAD v15``:
+    unlike the script row, that structured library now has a proven no-Altium conversion path.
     """
 
     wanted = " ".join(normalize("NFKC", exact_label or "").split())
     labels = page.locator("label[for]")
     label_count = labels.count()
-    matching_ids: list[str] = []
+    normalized_candidates = tuple(
+        " ".join(normalize("NFKC", label or "").split())
+        for label in (wanted, *fallback_labels)
+    )
+    matches_by_label: dict[str, list[str]] = {label: [] for label in normalized_candidates}
     for index in range(label_count):
         label = labels.nth(index)
         try:
@@ -1074,35 +1088,29 @@ def _check_exact_export_label(page, exact_label: str) -> tuple[bool, str]:
             control_id = (label.get_attribute("for") or "").strip()
         except Exception:  # noqa: BLE001 - an unreadable label cannot establish an exact choice
             continue
-        if visible == wanted and control_id and control_id not in matching_ids:
-            matching_ids.append(control_id)
-    trace(
-        "capture.step.exact-label",
-        wanted=wanted,
-        labels_scanned=label_count,
-        exact_matches=len(matching_ids),
-    )
-    if not matching_ids:
-        return (
-            False,
-            "Ultra Librarian does not offer Altium Designer (Native) for this exact part; legacy "
-            "Altium script, .lia, and P-CAD exports were not selected.",
+        if visible in matches_by_label and control_id not in matches_by_label[visible]:
+            matches_by_label[visible].append(control_id)
+    for position, label in enumerate(normalized_candidates):
+        matching_ids = matches_by_label[label]
+        trace(
+            "capture.step.exact-label",
+            wanted=label,
+            labels_scanned=label_count,
+            exact_matches=len(matching_ids),
         )
-    if len(matching_ids) != 1:
-        return (
-            False,
-            "Ultra Librarian exposed multiple Altium Designer (Native) choices; refusing an "
-            "ambiguous export.",
-        )
-    escaped = matching_ids[0].replace("\\", "\\\\").replace('"', '\\"')
-    selector = f'input[name="exports"][id="{escaped}"]'
-    if _check_box(page, selector):
-        return True, ""
-    return (
-        False,
-        "Ultra Librarian exposed Altium Designer (Native), but its exact checkbox did not remain "
-        "selected; legacy exports were not used.",
-    )
+        if not matching_ids:
+            continue
+        if len(matching_ids) != 1:
+            return False, f"Ultra Librarian exposed multiple {label} choices."
+        escaped = matching_ids[0].replace("\\", "\\\\").replace('"', '\\"')
+        selector = f'input[name="exports"][id="{escaped}"]'
+        if _check_box(page, selector):
+            if position == 0:
+                return True, ""
+            return True, f"Using {label} because {wanted} is unavailable."
+        return False, f"Ultra Librarian exposed {label}, but it did not remain selected."
+    offered = " or ".join(normalized_candidates)
+    return False, f"Ultra Librarian does not offer {offered} for this exact part."
 
 
 def _uncheck_box(page, selector: str) -> bool:

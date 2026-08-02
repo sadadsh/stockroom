@@ -4,6 +4,8 @@ This directory contains Stockroom's production Windows package boundary:
 
 - deterministic full-application PyInstaller payload creation;
 - a self-contained .NET 10 `win-x64` native window-host publish;
+- a self-contained, source-pinned native CAD converter for P-CAD `.lia` to
+  Altium `.SchLib`/`.PcbLib` conversion without launching Altium;
 - a pinned TUF root and complete immutable built-in release set;
 - one executable that runs the stable broker/window host normally and an
   immutable candidate worker with `--port`;
@@ -41,10 +43,13 @@ Fixture mode is deliberately non-installable:
 - no certificate is created, installed, trusted, or used; and
 - both the executable and MSIX remain unsigned.
 
-The build requires a .NET 10 SDK resolved from the canonical `dotnet` command.
+The build requires a .NET 10 SDK resolved from the canonical `dotnet` command
+and the two intentionally narrow source submodules initialized as documented in
+`CONTRIBUTING.md`.
 Unless `-SkipReproducibilityProof` is supplied, the command builds both the
-PyInstaller executable and complete native window-host publish twice in
-independent directories and requires identical content. For an unsigned fixture
+PyInstaller executable, complete native window-host publish, and native CAD
+converter publish twice in independent directories and requires identical
+content. For an unsigned fixture
 it also creates the MSIX twice and requires identical package and App Installer
 bytes.
 
@@ -62,7 +67,8 @@ Outputs are written under `Artifacts`:
 
 `Build Evidence.json` records exact digests, SDK/PyInstaller versions,
 reproducibility comparison, immutable-release round-trip, managed-host launch
-receipt, service generation, coordinator state, frontend proof, policy values,
+receipt, packaged CAD conversion canary and converter digest, service generation,
+coordinator state, frontend proof, policy values,
 Git state, and the fixture's signing blocker. `Release Feed Evidence.json`
 records every signed metadata and target digest plus an independent trusted
 updater round trip.
@@ -214,9 +220,11 @@ The build fixes:
 
 The installed x64 Windows SDK `MakeAppx.exe` runs without `/nv`, so its normal
 semantic validation remains enabled. The command then unpacks the produced
-MSIX, requires the executable, manifest, native `WindowHost` runtime tree, and
+MSIX, requires the executable, manifest, native `WindowHost` runtime tree,
+attested `Tools/CadConverter` runtime tree, and
 complete immutable update bundle to be byte-identical to staging, and reruns the strict Stockroom contract
-validator against the unpacked contents and App Installer file. It then starts
+validator against the unpacked contents and App Installer file. It also converts
+`Cad Converter Probe.lia` using the exact manifest-bound sidecar. It then starts
 that exact unpacked executable in headless acceptance mode and requires a
 receipt proving active generation authority, a running workflow coordinator,
 the production update channel, and the packaged frontend.

@@ -30,6 +30,7 @@ from stockroom.kicad.cli import KiCadCli
 from stockroom.model.asset import Asset, AssetOrigin, AssetRef
 from stockroom.model.part import Datasheet, PartRecord, Purchase
 from stockroom.model.part_id import make_part_id
+from stockroom.model.trust import Verdict
 from stockroom.planning.production_composition import (
     ManufacturerDatasheetProviderAdapter,
     ProductionApplicationContext,
@@ -46,6 +47,7 @@ from stockroom.planning.production_workflow import (
     ProductionStageStop,
     ProductionWorkflowError,
     ProductionWorkflowRegistry,
+    _provider_detail_attestation,
     build_production_workflow_handlers,
 )
 from stockroom.planning.provider_policy import (
@@ -73,6 +75,7 @@ from stockroom.publish import (
     PreparedTarget,
     ScopedComponentPublisher,
 )
+from stockroom.store.index import LibraryIndex
 from stockroom.store.machine_config import MachineConfig
 from stockroom.store.profile import Profile
 from stockroom.vcs import GitRepo
@@ -238,6 +241,24 @@ def _provider_cad_report(
             "valid": True,
         }
     )
+
+
+def test_provider_detail_attestation_requires_the_exact_preserved_identity() -> None:
+    identity = ExactPartIdentity("Texas Instruments", "TPD6E05U06RVZR")
+    validation = {
+        "identity_observations": {
+            "provider_detail_page": {
+                "manufacturer": "Texas Instruments",
+                "mpn": "TPD6E05U06RVZR",
+            }
+        },
+        "valid": True,
+    }
+
+    assert _provider_detail_attestation(validation, identity) == identity
+
+    validation["identity_observations"]["provider_detail_page"]["mpn"] = "TPD6E05U06RVZ"
+    assert _provider_detail_attestation(validation, identity) is None
 
 
 def _seed_provider_evidence(
@@ -877,8 +898,21 @@ def _submit(environment: _Environment):
 
 @pytest.mark.serial_only
 def test_production_registry_runs_one_exact_part_through_all_fourteen_stages(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    from stockroom.capture.cross_eda import read_altium_footprint as read_footprint
+
+    observed_altium_readback_preferences: list[str] = []
+
+    def _read_footprint(path: Path, preferred_entry: str):
+        observed_altium_readback_preferences.append(preferred_entry)
+        return read_footprint(path, preferred_entry)
+
+    monkeypatch.setattr(
+        "stockroom.planning.production_workflow.read_altium_footprint",
+        _read_footprint,
+    )
     environment = _environment(tmp_path)
     registry = _registry(environment)
     assert set(registry) == set(StageName)
@@ -904,6 +938,7 @@ def test_production_registry_runs_one_exact_part_through_all_fourteen_stages(
 
     completed = environment.store.get_batch(batch.id)
     assert completed.status is BatchStatus.COMPLETED
+    assert observed_altium_readback_preferences == ["DIOM5227X270N"]
     item = environment.store.list_items(batch.id)[0]
     stages = environment.store.list_stages(item.id)
     assert [(stage.name, stage.status) for stage in stages] == [
@@ -1003,6 +1038,23 @@ def test_zero_config_public_composition_uses_lifecycle_store_and_publishes(
     model = published.assets_for("kicad").model
     assert model is not None
     assert (profile.root / model.file).is_file()
+    for tool in ("kicad", "altium"):
+        assets = published.assets_for(tool)
+        assert all(
+            asset is not None and asset.checks
+            for asset in (assets.symbol, assets.footprint, assets.model)
+        )
+    index = LibraryIndex.build(environment.parts_dir)
+    try:
+        row = index.get(published.id)
+        assert row is not None
+        for tool in ("kicad", "altium"):
+            readiness = row.eda_readiness[tool]
+            assert readiness.coverage_complete is True
+            assert readiness.trust is Verdict.PASS
+            assert readiness.ready is True
+    finally:
+        index.close()
 
 
 @pytest.mark.parametrize("record_path", ["S1M.pdf", "datasheets/S1M.pdf"])
@@ -1042,6 +1094,163 @@ def test_production_datasheet_resolves_canonical_and_legacy_relative_paths(
 
     assert outcome.status is AdapterOutcomeStatus.SUCCESS
     assert len(outcome.evidence_digests) == 1
+
+
+def test_production_datasheet_accepts_the_same_manufacturer_without_legal_suffix(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    profile_root = tmp_path / "Stockroom"
+    parts_dir = profile_root / "parts"
+    parts_dir.mkdir(parents=True)
+    datasheet = profile_root / "datasheets" / "Abracon.pdf"
+    datasheet.parent.mkdir()
+    datasheet.write_bytes(_datasheet_pdf())
+    mpn = "ABM13W-32.0000MHZ-5-DH7G-T5"
+    record = PartRecord(
+        id=make_part_id(mpn),
+        mpn=mpn,
+        manufacturer="Abracon LLC",
+        display_name="ABM13W Crystal",
+        category="Crystals",
+        description="32 MHz crystal",
+        datasheet=Datasheet(file="Abracon.pdf"),
+        purchase=[Purchase(vendor="DigiKey", url="https://www.digikey.com/ABM13W")],
+    )
+    (parts_dir / f"{record.id}.json").write_text(record.dumps(), encoding="utf-8")
+    monkeypatch.setattr(
+        "stockroom.planning.production_composition.extract_datasheet_specs",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            mpn=SimpleNamespace(value=mpn),
+            manufacturer=SimpleNamespace(value="Abracon"),
+            package=None,
+        ),
+    )
+    evidence = EvidenceStore((tmp_path / "Evidence").absolute())
+    adapter = ManufacturerDatasheetProviderAdapter(
+        profile_root=profile_root,
+        parts_dir=parts_dir,
+        evidence_store=evidence,
+        staging_root=tmp_path / "Staging",
+    )
+
+    outcome = adapter.execute(
+        ExactPartIdentity("Abracon LLC", mpn),
+        DATASHEET_OPERATION,
+    )
+
+    assert outcome.status is AdapterOutcomeStatus.SUCCESS
+    manifest = json.loads(evidence.object_bytes(outcome.evidence_digests[0]))
+    payload = json.loads(evidence.object_bytes(manifest["payload"]["digest"]))
+    assert payload["manufacturer"] == "Abracon LLC"
+    assert payload["observed_manufacturer"] == "Abracon"
+
+
+def test_production_datasheet_accepts_an_exact_digikey_media_binding_for_series_pdf(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    profile_root = tmp_path / "Stockroom"
+    parts_dir = profile_root / "parts"
+    parts_dir.mkdir(parents=True)
+    datasheet = profile_root / "datasheets" / "ABM13W.pdf"
+    datasheet.parent.mkdir()
+    datasheet.write_bytes(_datasheet_pdf())
+    mpn = "ABM13W-32.0000MHZ-5-DH7G-T5"
+    source_url = "https://abracon.com/datasheets/ABM13W.pdf"
+    record = PartRecord(
+        id=make_part_id(mpn),
+        mpn=mpn,
+        manufacturer="Abracon LLC",
+        display_name="ABM13W Crystal",
+        category="Crystals",
+        description="32 MHz crystal",
+        datasheet=Datasheet(file="ABM13W.pdf", source_url=source_url),
+        purchase=[Purchase(vendor="DigiKey", url="https://www.digikey.com/ABM13W")],
+        catalog={
+            "digikey": {
+                "manufacturer_product_number": mpn,
+                "product_url": (
+                    "https://www.digikey.com/en/products/detail/abracon-llc/"
+                    "ABM13W-32-0000MHZ-5-DH7G-T5/9606161"
+                ),
+                "media": [
+                    {
+                        "media_type": "Datasheets",
+                        "title": "ABM13W Series Datasheet",
+                        "url": source_url,
+                    }
+                ],
+            }
+        },
+    )
+    (parts_dir / f"{record.id}.json").write_text(record.dumps(), encoding="utf-8")
+    monkeypatch.setattr(
+        "stockroom.planning.production_composition.extract_datasheet_specs",
+        lambda *_args, **_kwargs: SimpleNamespace(mpn=None, manufacturer=None, package=None),
+    )
+    evidence = EvidenceStore((tmp_path / "Evidence").absolute())
+    adapter = ManufacturerDatasheetProviderAdapter(
+        profile_root=profile_root,
+        parts_dir=parts_dir,
+        evidence_store=evidence,
+        staging_root=tmp_path / "Staging",
+    )
+
+    outcome = adapter.execute(
+        ExactPartIdentity("Abracon LLC", mpn),
+        DATASHEET_OPERATION,
+    )
+
+    assert outcome.status is AdapterOutcomeStatus.SUCCESS
+    manifest = json.loads(evidence.object_bytes(outcome.evidence_digests[0]))
+    payload = json.loads(evidence.object_bytes(manifest["payload"]["digest"]))
+    assert payload["manufacturer"] == "Abracon LLC"
+    assert payload["mpn"] == mpn
+    assert payload["observed_manufacturer"] is None
+    assert payload["observed_mpn"] is None
+    assert payload["verification_mode"] == "digikey_exact_product_media_binding"
+
+
+def test_production_datasheet_rejects_a_series_pdf_without_exact_media_binding(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    profile_root = tmp_path / "Stockroom"
+    parts_dir = profile_root / "parts"
+    parts_dir.mkdir(parents=True)
+    datasheet = profile_root / "datasheets" / "ABM13W.pdf"
+    datasheet.parent.mkdir()
+    datasheet.write_bytes(_datasheet_pdf())
+    mpn = "ABM13W-32.0000MHZ-5-DH7G-T5"
+    record = PartRecord(
+        id=make_part_id(mpn),
+        mpn=mpn,
+        manufacturer="Abracon LLC",
+        display_name="ABM13W Crystal",
+        category="Crystals",
+        description="32 MHz crystal",
+        datasheet=Datasheet(file="ABM13W.pdf", source_url="https://abracon.com/ABM13W.pdf"),
+        purchase=[Purchase(vendor="DigiKey", url="https://www.digikey.com/ABM13W")],
+    )
+    (parts_dir / f"{record.id}.json").write_text(record.dumps(), encoding="utf-8")
+    monkeypatch.setattr(
+        "stockroom.planning.production_composition.extract_datasheet_specs",
+        lambda *_args, **_kwargs: SimpleNamespace(mpn=None, manufacturer=None, package=None),
+    )
+    adapter = ManufacturerDatasheetProviderAdapter(
+        profile_root=profile_root,
+        parts_dir=parts_dir,
+        evidence_store=EvidenceStore((tmp_path / "Evidence").absolute()),
+        staging_root=tmp_path / "Staging",
+    )
+
+    outcome = adapter.execute(
+        ExactPartIdentity("Abracon LLC", mpn),
+        DATASHEET_OPERATION,
+    )
+
+    assert outcome.status.value == "near_match_rejected"
 
 
 def test_exact_adapter_rejects_same_provider_roles_from_separate_manifests(

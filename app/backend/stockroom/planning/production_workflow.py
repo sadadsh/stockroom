@@ -53,6 +53,7 @@ from stockroom.capture.cross_eda import (
     verify_cross_eda_component,
     verify_kicad_component,
 )
+from stockroom.capture.identity import same_manufacturer, same_mpn
 from stockroom.evidence import EvidenceStore
 from stockroom.model.part import PartRecord
 from stockroom.model.part_id import is_valid_part_id, part_id_matches
@@ -383,6 +384,38 @@ def _string(value: object, label: str) -> str:
     return value
 
 
+def _provider_detail_attestation(
+    validation: Mapping[str, object],
+    identity: ExactPartIdentity,
+) -> ExactPartIdentity | None:
+    """Recover only the exact provider-page identity preserved in CAD evidence.
+
+    Older provider-native libraries can omit a manufacturer parameter even though the
+    browser capture proved the exact manufacturer and MPN on the provider detail page.
+    The immutable validation report is the authority for that narrow missing-field
+    binding; the evidence manifest and every artifact are still reverified separately.
+    """
+
+    if validation.get("valid") is not True:
+        return None
+    raw_observations = validation.get("identity_observations")
+    if not isinstance(raw_observations, Mapping):
+        return None
+    raw_detail = raw_observations.get("provider_detail_page")
+    if not isinstance(raw_detail, Mapping):
+        return None
+    manufacturer = raw_detail.get("manufacturer")
+    mpn = raw_detail.get("mpn")
+    if type(manufacturer) is not str or type(mpn) is not str:
+        return None
+    if not same_manufacturer(
+        manufacturer,
+        identity.authoritative_manufacturer_key,
+    ) or not same_mpn(mpn, identity.mpn_canonical):
+        return None
+    return ExactPartIdentity(manufacturer, mpn)
+
+
 def _assert_production_value(value: object, *, label: str) -> None:
     """Reject the known non-production provenance markers recursively."""
 
@@ -558,6 +591,11 @@ class ExactEvidenceCadBundleAdapter:
                     tool="altium",
                     manifest_digest=descriptor.manifest_digest,
                 )
+                validation = store.verified_cad_validation_report(
+                    descriptor.manifest_digest,
+                    identity=identity,
+                )
+                attestation = _provider_detail_attestation(validation, identity)
                 with tempfile.TemporaryDirectory(
                     prefix=".Altium-Candidate-",
                     dir=workspace,
@@ -600,6 +638,7 @@ class ExactEvidenceCadBundleAdapter:
                         kicad_footprint=footprint,
                         step_model=model,
                         altium_sources=(schlib, pcblib),
+                        altium_identity_attestation=attestation,
                     )
                 if not cross_eda_report_is_proved(verification):
                     raise ProductionWorkflowError("strict cross-EDA verification was not proved")
@@ -1562,9 +1601,37 @@ class ProductionWorkflowRegistry(Mapping[StageName, StageHandler]):
 
     def _strict_cross_report(
         self,
+        context: StageContext,
         request: ProductionStageRequest,
         paths: Mapping[NativeCadRole, Path],
     ) -> tuple[JsonObject, str]:
+        native_result = _mapping(
+            context.prior_results.get(StageName.NATIVE_CONVERSION_ACQUISITION),
+            "native CAD dependency",
+        )
+        selection_digest = _string(
+            native_result.get("selection_digest"),
+            "native CAD selection digest",
+        )
+        selection_bytes = self._verify_evidence_object(selection_digest)
+        selection = _mapping(
+            json.loads(selection_bytes),
+            "native CAD selection",
+        )
+        manifest_digest = _string(
+            selection.get("evidence_set_manifest_digest"),
+            "native CAD evidence-set manifest",
+        )
+        if (
+            selection.get("kicad_manifest_digest") != manifest_digest
+            or selection.get("altium_manifest_digest") != manifest_digest
+        ):
+            raise ProductionWorkflowError("native CAD selection is not one evidence set")
+        validation = self.evidence_store.verified_cad_validation_report(
+            manifest_digest,
+            identity=request.identity,
+        )
+        attestation = _provider_detail_attestation(validation, request.identity)
         report = verify_cross_eda_component(
             identity=request.identity,
             kicad_symbol=paths[NativeCadRole.KICAD_SYMBOL],
@@ -1574,6 +1641,7 @@ class ProductionWorkflowRegistry(Mapping[StageName, StageHandler]):
                 paths[NativeCadRole.ALTIUM_SYMBOL],
                 paths[NativeCadRole.ALTIUM_FOOTPRINT],
             ),
+            altium_identity_attestation=attestation,
         )
         if not cross_eda_report_is_proved(report):
             raise ProductionWorkflowError("native CAD cross-verification was not proved")
@@ -1588,7 +1656,7 @@ class ProductionWorkflowRegistry(Mapping[StageName, StageHandler]):
         def verify() -> CompletionOutcome:
             request = self._request(context)
             paths = self._native_artifacts(context, request.workspace)
-            cross_report, cross_digest = self._strict_cross_report(request, paths)
+            cross_report, cross_digest = self._strict_cross_report(context, request, paths)
             kicad_section = _mapping(cross_report.get("kicad"), "cross-EDA KiCad section")
             allowed = frozenset(
                 _string(value, "unrepresented KiCad pad")
@@ -1630,14 +1698,22 @@ class ProductionWorkflowRegistry(Mapping[StageName, StageHandler]):
         def verify() -> CompletionOutcome:
             request = self._request(context)
             paths = self._native_artifacts(context, request.workspace)
-            _cross_report, cross_digest = self._strict_cross_report(request, paths)
+            cross_report, cross_digest = self._strict_cross_report(context, request, paths)
+            cross_altium = _mapping(
+                cross_report.get("altium"),
+                "cross-EDA Altium section",
+            )
+            footprint_entry = _string(
+                cross_altium.get("footprint_entry"),
+                "cross-EDA Altium footprint entry",
+            )
             symbol = read_altium_symbol(
                 paths[NativeCadRole.ALTIUM_SYMBOL],
                 request.identity.mpn_canonical,
             )
             footprint = read_altium_footprint(
                 paths[NativeCadRole.ALTIUM_FOOTPRINT],
-                request.identity.mpn_canonical,
+                footprint_entry,
             )
             readback = _strict(
                 {
@@ -1677,7 +1753,7 @@ class ProductionWorkflowRegistry(Mapping[StageName, StageHandler]):
         def verify() -> CompletionOutcome:
             request = self._request(context)
             paths = self._native_artifacts(context, request.workspace)
-            report, report_digest = self._strict_cross_report(request, paths)
+            report, report_digest = self._strict_cross_report(context, request, paths)
             dependencies = (
                 StageName.KICAD_BUILD_READBACK,
                 StageName.ALTIUM_BUILD_READBACK,

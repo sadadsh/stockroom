@@ -27,6 +27,7 @@ import olefile
 from stockroom.altium.extract import extract_intlib
 from stockroom.altium.native_authoring import read_embedded_model_payloads
 from stockroom.altium.oleread import pick_entry, read_footprint_names, read_symbol_names
+from stockroom.capture.identity import same_manufacturer
 from stockroom.kicad.footprint import Footprint, Pad
 from stockroom.kicad.model_convert import model_to_glb
 from stockroom.planning import ExactPartIdentity
@@ -36,6 +37,10 @@ _ALTIUM_PAD_TRAILER = b"\x01\x00\x00\x00\x00\x05\x00\x00\x00\x04|&|0"
 _ALTIUM_COORDINATE_TO_MM = 2.54e-6
 _GEOMETRY_ABSOLUTE_TOLERANCE_MM = 0.05
 _GEOMETRY_RELATIVE_TOLERANCE = 0.01
+# Measured AD26 P-CAD import behavior: legacy component names are truncated to 16 characters.
+# A truncated entry is never identity proof by itself; an exact provider attestation is still
+# required before it can stand in for the MPN field absent from the converted SchLib.
+_ALTIUM_PCAD_ENTRY_LIMIT = 16
 
 _MANUFACTURER_FIELDS = (
     "manufacturer",
@@ -77,6 +82,7 @@ class _SymbolReadback:
     manufacturer: str
     mpn: str
     pins: tuple[_Pin, ...]
+    mpn_from_entry: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,11 +94,6 @@ class _FootprintReadback:
 
 def _mpn_key(value: str) -> str:
     return unicodedata.normalize("NFKC", value).strip().casefold()
-
-
-def _manufacturer_key(value: str) -> str:
-    normalized = unicodedata.normalize("NFKC", value).casefold()
-    return "".join(character for character in normalized if character.isalnum())
 
 
 def _pin_name_key(value: str) -> str:
@@ -127,20 +128,31 @@ def _verify_identity(
     attested: ExactPartIdentity | None = None,
 ) -> tuple[str, ...]:
     missing: list[str] = []
-    if observed.manufacturer and _manufacturer_key(
-        observed.manufacturer
-    ) != _manufacturer_key(expected.authoritative_manufacturer_key):
+    if observed.manufacturer and not same_manufacturer(
+        observed.manufacturer,
+        expected.authoritative_manufacturer_key,
+    ):
         raise CrossEdaVerificationError(
             f"{tool} symbol manufacturer {observed.manufacturer!r} does not equal "
             f"{expected.authoritative_manufacturer_key!r}"
         )
-    if observed.mpn and _mpn_key(observed.mpn) != _mpn_key(expected.mpn_canonical):
+    truncated_attested_entry = (
+        tool == "Altium"
+        and observed.mpn_from_entry
+        and len(observed.mpn) == _ALTIUM_PCAD_ENTRY_LIMIT
+        and _mpn_key(expected.mpn_canonical).startswith(_mpn_key(observed.mpn))
+    )
+    if (
+        observed.mpn
+        and _mpn_key(observed.mpn) != _mpn_key(expected.mpn_canonical)
+        and not truncated_attested_entry
+    ):
         raise CrossEdaVerificationError(
             f"{tool} symbol MPN {observed.mpn!r} does not equal {expected.mpn_canonical!r}"
         )
     if not observed.manufacturer:
         missing.append("manufacturer")
-    if not observed.mpn:
+    if not observed.mpn or truncated_attested_entry:
         missing.append("mpn")
     if not missing:
         return ()
@@ -148,8 +160,9 @@ def _verify_identity(
         raise CrossEdaVerificationError(
             f"{tool} symbol does not carry both manufacturer and MPN identity"
         )
-    if _manufacturer_key(attested.authoritative_manufacturer_key) != _manufacturer_key(
-        expected.authoritative_manufacturer_key
+    if not same_manufacturer(
+        attested.authoritative_manufacturer_key,
+        expected.authoritative_manufacturer_key,
     ) or _mpn_key(attested.mpn_canonical) != _mpn_key(expected.mpn_canonical):
         raise CrossEdaVerificationError(
             f"{tool} symbol's missing identity is not covered by an exact provider attestation"
@@ -311,11 +324,13 @@ def _read_altium_symbol_stream(raw: bytes, entry: str) -> _SymbolReadback:
         for record in records
         if record.get("RECORD") == "41" and record.get("NAME")
     }
+    mpn = _field(properties, _MPN_FIELDS)
     return _SymbolReadback(
         entry=entry,
         manufacturer=_field(properties, _MANUFACTURER_FIELDS),
-        mpn=_field(properties, _MPN_FIELDS) or (entry if _mpn_key(entry) else ""),
+        mpn=mpn or (entry if _mpn_key(entry) else ""),
         pins=observed_pins,
+        mpn_from_entry=not bool(mpn),
     )
 
 
@@ -472,6 +487,20 @@ def _close(left: float, right: float) -> bool:
     )
 
 
+def _tolerance_ratio(left: float, right: float) -> float:
+    """Return the observed error as a fraction of the accepted geometry tolerance.
+
+    Unlike a stored pass/fail flag, this is a measurement that can be re-judged if the
+    tolerance policy changes.  ``1.0`` is exactly the current acceptance boundary.
+    """
+
+    allowed_error = max(
+        _GEOMETRY_ABSOLUTE_TOLERANCE_MM,
+        _GEOMETRY_RELATIVE_TOLERANCE * max(abs(left), abs(right)),
+    )
+    return abs(left - right) / allowed_error
+
+
 def _distance_signature(
     pads: tuple[_PadGeometry, ...],
     labels: dict[str, str],
@@ -581,6 +610,40 @@ def _verify_geometry(
                     f"KiCad and Altium pad dimensions differ for terminal {key!r}"
                 )
     return physical_map
+
+
+def _geometry_tolerance_ratio(
+    kicad_pads: tuple[_PadGeometry, ...],
+    altium_pads: tuple[_PadGeometry, ...],
+    physical_map: dict[str, str],
+) -> float:
+    """Measure the worst normalized error across the already-verified pad geometry."""
+
+    canonical = {number: number for number in physical_map}
+    altium_canonical = {
+        native: canonical_number for canonical_number, native in physical_map.items()
+    }
+    ratios: list[float] = []
+    left_distances = _distance_signature(kicad_pads, canonical)
+    right_distances = _distance_signature(altium_pads, altium_canonical)
+    for key in sorted(left_distances):
+        ratios.extend(
+            _tolerance_ratio(left, right)
+            for left, right in zip(
+                left_distances[key],
+                right_distances[key],
+                strict=True,
+            )
+        )
+    left_sizes = _size_signature(kicad_pads, canonical)
+    right_sizes = _size_signature(altium_pads, altium_canonical)
+    for key in sorted(left_sizes):
+        for left, right in zip(left_sizes[key], right_sizes[key], strict=True):
+            ratios.extend(
+                _tolerance_ratio(left_dimension, right_dimension)
+                for left_dimension, right_dimension in zip(left, right, strict=True)
+            )
+    return max(ratios, default=0.0)
 
 
 def _verify_step(path: Path) -> dict[str, object]:
@@ -704,7 +767,12 @@ def verify_cross_eda_component(
                 altium_identity_attestation,
             )
             kicad_fp = read_kicad_footprint(kicad_footprint, step_model)
-            altium_fp = read_altium_footprint(pcblib, identity.mpn_canonical)
+            # A provider library can legitimately carry several land-pattern variants for one
+            # MPN. The KiCad symbol has already selected one exact footprint from that same
+            # package; use its native entry name to select the corresponding Altium footprint.
+            # This is an explicit provider binding, not a file-order guess. A missing or ambiguous
+            # matching entry still fails closed inside ``read_altium_footprint``.
+            altium_fp = read_altium_footprint(pcblib, kicad_fp.entry)
             mapping, kicad_no_connects, altium_no_connects = _terminal_map(kicad, altium)
             physical_mapping = _verify_geometry(
                 kicad_fp.pads,
@@ -712,6 +780,11 @@ def verify_cross_eda_component(
                 mapping,
                 kicad_no_connects=kicad_no_connects,
                 altium_no_connects=altium_no_connects,
+            )
+            geometry_tolerance_ratio = _geometry_tolerance_ratio(
+                kicad_fp.pads,
+                altium_fp.pads,
+                physical_mapping,
             )
             represented_kicad = {pin.number for pin in kicad.pins}
             unrepresented_kicad = frozenset(physical_mapping) - represented_kicad
@@ -731,35 +804,44 @@ def verify_cross_eda_component(
     except Exception as exc:
         raise CrossEdaVerificationError(f"native CAD readback failed: {exc}") from exc
 
+    altium_binding: dict[str, object] | None = None
+    if bound_altium_fields:
+        if altium_identity_attestation is None:  # pragma: no cover - guarded by _verify_identity
+            raise CrossEdaVerificationError("Altium identity binding has no attestation")
+        altium_binding = {
+            "authoritative_manufacturer_key": (
+                altium_identity_attestation.authoritative_manufacturer_key
+            ),
+            "fields": list(bound_altium_fields),
+            "mpn_canonical": altium_identity_attestation.mpn_canonical,
+            "source": "exact-provider-detail-page",
+        }
+
     return {
         "altium": {
             "embedded_step": bool(embedded),
             "footprint_entry": altium_fp.entry,
+            "manufacturer": altium.manufacturer,
+            "mpn": altium.mpn,
             "pad_count": len(altium_fp.pads),
             "pin_count": len(altium.pins),
             "symbol_entry": altium.entry,
         },
         "geometry": {
             "absolute_tolerance_mm": _GEOMETRY_ABSOLUTE_TOLERANCE_MM,
+            "max_tolerance_ratio": geometry_tolerance_ratio,
             "method": "mapped-pad-distance-and-size-signatures",
             "relative_tolerance": _GEOMETRY_RELATIVE_TOLERANCE,
         },
         "identity": {
             "authoritative_manufacturer_key": identity.authoritative_manufacturer_key,
             "mpn_canonical": identity.mpn_canonical,
-            **(
-                {
-                    "altium_binding": {
-                        "fields": list(bound_altium_fields),
-                        "source": "exact-provider-detail-page",
-                    }
-                }
-                if bound_altium_fields
-                else {}
-            ),
+            **({"altium_binding": altium_binding} if altium_binding is not None else {}),
         },
         "kicad": {
             "footprint_entry": kicad_fp.entry,
+            "manufacturer": kicad.manufacturer,
+            "mpn": kicad.mpn,
             "pad_count": len(kicad_fp.pads),
             "pin_count": len(kicad.pins),
             "symbol_entry": kicad.entry,

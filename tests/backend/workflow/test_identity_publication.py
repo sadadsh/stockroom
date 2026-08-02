@@ -349,6 +349,8 @@ def test_same_candidate_is_one_global_publication_and_one_receipt(tmp_path):
         _join(store, publish[batch_id], now=timestamp + index)
         for index, batch_id in enumerate((first.id, second.id))
     ]
+    assert store.get_batch(first.id).status is BatchStatus.RUNNING
+    assert store.get_batch(second.id).status is BatchStatus.RUNNING
     assert len({membership.publication_id for membership in memberships}) == 1
     publication_id = memberships[0].publication_id
     assert len(store.claim_publications("probe", now=timestamp + 2, limit=10)) == 1

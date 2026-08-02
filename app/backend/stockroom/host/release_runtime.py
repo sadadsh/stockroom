@@ -212,6 +212,24 @@ def _backend_command(candidate: AcceptedRelease, port: int) -> list[str]:
     raise HostReleaseProcessError("release backend member has an unsupported format")
 
 
+def _cad_converter_path(candidate: AcceptedRelease | VerifiedReleaseSet) -> Path | None:
+    members = [
+        candidate.members[member.path]
+        for member in candidate.manifest.members
+        if member.kind == "cad-converter"
+    ]
+    if not members:
+        return None
+    if len(members) != 1:
+        raise HostReleaseProcessError(
+            "release manifest must contain at most one CAD converter member"
+        )
+    executable = members[0]
+    if executable.name.casefold() != "stockroom.cadconverter.exe":
+        raise HostReleaseProcessError("release CAD converter member has an invalid executable")
+    return executable
+
+
 def _numeric_version(value: str) -> tuple[int, ...]:
     if re.fullmatch(r"\d+(?:\.\d+)*", value) is None:
         raise HostReleaseCompatibilityError("release host version requirement is not canonical")
@@ -570,6 +588,10 @@ class HostReleaseBoundary:
             port = _free_port()
             command = _backend_command(candidate, port)
             environment = os.environ.copy()
+            environment.pop("STOCKROOM_CAD_CONVERTER", None)
+            cad_converter = _cad_converter_path(candidate)
+            if cad_converter is not None:
+                environment["STOCKROOM_CAD_CONVERTER"] = str(cad_converter)
             environment["STOCKROOM_HANDOFF_TOKEN"] = self._token
             environment["STOCKROOM_PUBLIC_BASE_URL"] = self._public_base_url
             environment["STOCKROOM_RELEASE_ID"] = candidate.release_id
@@ -1845,6 +1867,10 @@ def create_production_update_runtime(
         release_id=release_id,
         manifest_sha256=descriptor["current_manifest_sha256"],
     )
+    os.environ.pop("STOCKROOM_CAD_CONVERTER", None)
+    packaged_cad_converter = _cad_converter_path(packaged)
+    if packaged_cad_converter is not None:
+        os.environ["STOCKROOM_CAD_CONVERTER"] = str(packaged_cad_converter)
 
     from stockroom.planning.production_composition import (
         build_production_workflow_registry_for_context,

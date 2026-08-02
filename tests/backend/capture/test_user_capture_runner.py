@@ -184,6 +184,18 @@ def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_expl
     pipeline_factories[-1]()
     assert pipeline_options[-1] == {"auto_embed_altium_models": True}
 
+    runner.run_guided_capture(
+        ctx,
+        part_ids=["part-a"],
+        vendor="ultralibrarian",
+        user_driven=True,
+        should_stop=stop,
+    )
+
+    ultra = constructed[-1]
+    assert ultra["vendor"] == "ultralibrarian"
+    assert ultra["convert_altium"] is runner._convert_ul_altium_package
+
 
 def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
     monkeypatch,

@@ -889,16 +889,14 @@ def _provider_hud_author_route(adapter) -> str:
     return adapter.capability.label
 
 
-# What `altium/extract.py::normalize_altium_source` can actually take TODAY. `.lia` is not here
-# because normalize_altium_source raises on it, NOT because a P-CAD library is unconvertible -
-# that was a wrong conclusion reached without research (owner corrected it, 2026-07-27).
+# Native libraries attach directly. A `.lia` deliberately stays out of this suffix list because
+# the route converter parses it and emits a verified native pair before attachment.
 #
 # A `.lia` is convertible by SEVERAL routes, and Altium is only one of them (owner pushed back on an
 # Altium-only framing, correctly, 2026-07-27):
 #   * ACCEL_ASCII is an OPEN, parsed format - `xtoolbox/pcad2kicad` implements a parser for it and
 #     KiCad itself natively loads P-CAD ASCII. Nothing about reading a `.lia` is proprietary.
-#   * `AltiumSharp` (C#/.NET, open source) reads AND WRITES `.SchLib`/`.PcbLib` explicitly WITHOUT
-#     Altium installed - so a conversion needs no license and no Windows.
+#   * Stockroom's pinned AltiumSharp sidecar writes `.SchLib`/`.PcbLib` without launching Altium.
 #   * Altium's own Import Wizard does it natively, and this repo already drives installed Altium.
 # Cheapest of all is not converting: a vendor that ships NATIVE Altium libraries needs none of this,
 # and the attach path above already handles those. See the ledger's 2026-07-27 P-CAD findings.
@@ -1143,9 +1141,10 @@ class GuidedCaptureSource:
         self._profile_dir = profile_dir
         self._headless = headless
         self._engine = engine
-        # Optional provider-package conversion seam. DigiKey's embedded Ultra Librarian route
-        # delivers an official Altium scripting project, not native libraries. The runner injects
-        # the narrowly recognized converter only for that route.
+        # Optional provider-package conversion seam. Direct and DigiKey-embedded Ultra Librarian
+        # routes can deliver a recognized legacy P-CAD/script package instead of native Altium
+        # libraries. The runner injects a content-recognizing converter on those provider surfaces;
+        # unrelated archives return ``None`` and continue through the ordinary validation path.
         self._convert_altium = convert_altium
         # Explicit provider capture may be used after a part is already complete to retain another
         # exact provider's full dual-EDA set. It must never silently replace the active pair; the
@@ -2646,7 +2645,7 @@ class GuidedCaptureSource:
             )
         cleanup_callbacks = []
         try:
-            return self._attach_impl(
+            outcome = self._attach_impl(
                 record,
                 landed,
                 url,
@@ -2655,6 +2654,17 @@ class GuidedCaptureSource:
                 cleanup_callbacks=cleanup_callbacks,
                 provider_note=provider_note,
             )
+            trace(
+                "capture.attach.result",
+                provider=self._vendor_key,
+                route=provider_key,
+                satisfied=sorted(item.value for item in outcome.satisfied),
+                retained=outcome.retained,
+                error=outcome.error,
+                skipped=outcome.skipped,
+                blocked=outcome.blocked,
+            )
+            return outcome
         finally:
             for cleanup in reversed(cleanup_callbacks):
                 cleanup()
@@ -2690,11 +2700,13 @@ class GuidedCaptureSource:
         if captured_altium is not None:
             cleanup_callbacks.append(captured_altium.cleanup)
         altium_sources = [] if captured_altium is None else list(captured_altium.paths)
-        route_converter = (
-            self._convert_altium
-            if evidence_provider_key == self._evidence_provider_key
-            else None
-        )
+        # Recovery is intentionally content-bound, not timing-bound. The native picker belongs to
+        # the active provider task, but the person may return an Ultra Librarian archive after the
+        # DigiKey surface has already advanced from its UL row to SnapMagic or TraceParts. The
+        # injected converter recognizes only a supported UL P-CAD/script package and returns None
+        # for every other archive; receipt, identity, provenance, and coherent-pair checks below
+        # still bind and validate the exact active task before anything can be activated.
+        route_converter = self._convert_altium
         if not altium_sources and route_converter is not None:
             try:
                 converted = route_converter(

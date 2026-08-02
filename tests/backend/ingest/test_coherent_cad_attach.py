@@ -178,7 +178,10 @@ def _prove_native_embed(
     installed_name: str,
     payload_matches: bool,
 ) -> None:
-    index_reads = iter(((), ({"NAME": installed_name},)))
+    # The coherent attach first asks whether the provider PcbLib already carries the exact
+    # validated STEP. A plain fixture does not, so the native embed path then performs its own
+    # before/after index reads.
+    index_reads = iter(((), (), ({"NAME": installed_name},)))
     stream_reads = iter(
         (
             {"Library/Models/Data": 0},
@@ -235,6 +238,44 @@ def test_coherent_pair_materializes_in_one_commit(tmp_path: Path, fixtures_dir: 
     )
 
 
+def test_coherent_pair_uses_the_provider_symbol_footprint_binding(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    fixtures_dir: Path,
+) -> None:
+    pipeline, candidate, kicad_pointer, altium_pointer, _ = _setup(
+        tmp_path,
+        fixtures_dir,
+    )
+    candidate.footprint_variants[0] = candidate.footprint_variants[0].with_name(
+        "Variant.kicad_mod"
+    )
+    shutil.copy2(
+        tmp_path / "Source.kicad_mod",
+        candidate.footprint_variants[0],
+    )
+    monkeypatch.setattr(
+        "stockroom.altium.oleread.read_footprint_names",
+        lambda _path: ("TEST-FP", "TEST-FP-M", "TEST-FP-L"),
+    )
+
+    record = pipeline.attach_coherent_cad_assets(
+        "pair",
+        candidate,
+        _ALTIUM / "sample.SchLib",
+        _ALTIUM / "sample.PcbLib",
+        kicad_origin=None,
+        altium_origin=None,
+        now_iso="2026-07-29T00:00:00Z",
+        kicad_active_variant=kicad_pointer,
+        altium_active_variant=altium_pointer,
+    )
+
+    footprint = record.assets_for("altium").footprint
+    assert footprint is not None
+    assert footprint.name == "TEST-FP"
+
+
 def test_guided_coherent_pair_embeds_exact_step_in_the_bound_footprint(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -279,6 +320,44 @@ def test_guided_coherent_pair_embeds_exact_step_in_the_bound_footprint(
     assert model.file == "models/S1M.step"
     assert model.lib == footprint.lib == "pair.PcbLib"
     assert model.name == footprint.name == "DIOM5227X270N"
+
+
+def test_coherent_pair_does_not_reembed_an_identical_native_step(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    fixtures_dir: Path,
+) -> None:
+    driver = _SuccessfulEmbedDriver(tmp_path / "altium-run")
+    pipeline, candidate, kicad_pointer, altium_pointer, _ = _setup(
+        tmp_path,
+        fixtures_dir,
+        auto_embed_altium_models=True,
+        altium_driver=driver,
+    )
+    assert candidate.model_path is not None
+    monkeypatch.setattr(
+        "stockroom.altium.embed3d.read_model_index",
+        lambda _path: ({"NAME": candidate.model_path.name},),
+    )
+    monkeypatch.setattr(
+        "stockroom.altium.native_authoring.read_embedded_model_payloads",
+        lambda _path: (candidate.model_path.read_bytes(),),
+    )
+
+    record = pipeline.attach_coherent_cad_assets(
+        "pair",
+        candidate,
+        _ALTIUM / "sample.SchLib",
+        _ALTIUM / "sample.PcbLib",
+        kicad_origin=None,
+        altium_origin=None,
+        now_iso="2026-07-29T00:00:00Z",
+        kicad_active_variant=kicad_pointer,
+        altium_active_variant=altium_pointer,
+    )
+
+    assert driver.runs == 0
+    assert record.assets_for("altium").footprint is not None
 
 
 def test_native_embed_readback_failure_rolls_back_both_eda_projections(

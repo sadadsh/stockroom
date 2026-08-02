@@ -657,7 +657,6 @@ def run_guided_capture(
         adapter = get_adapter(key)
         if adapter is None:
             raise ValueError(f"no network capture adapter for provider {key!r}")
-        evidence_provider_key = getattr(adapter, "evidence_provider_key", key)
         automatic_source = key in automatic_provider_set
         if sequential_providers:
             source_user_driven = not automatic_source and not adapter.capability.operator_automation
@@ -692,12 +691,15 @@ def run_guided_capture(
             # automation version underneath a provider adapter. Camoufox and branded channels
             # remain explicit provider-specific experiments, never the default.
             engine=provider_engines[key],
-            # DigiKey's embedded UL exporter labels its Altium output honestly as a scripting
-            # project. Convert only that reviewed provider package, through the existing Altium
-            # watchdog, before the normal native-library verification and attach path.
+            # Both the direct and DigiKey-aggregated Ultra Librarian paths can deliver legacy
+            # P-CAD/script packages when native Altium libraries are unavailable. Inject the
+            # content-recognizing converter at the provider-surface boundary: it returns ``None``
+            # for unrelated archives, so a person-selected UL package can still be recovered if
+            # the assisted DigiKey surface advanced to another author route before the picker
+            # returned. Identity and coherent-pair validation remain downstream and unchanged.
             convert_altium=(
                 _convert_ul_altium_package
-                if evidence_provider_key == "digikey-ultralibrarian"
+                if key in {"digikey", "ultralibrarian"}
                 else None
             ),
             collect_variants=explicit_provider_capture or collect_all,

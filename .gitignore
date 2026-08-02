@@ -26,6 +26,8 @@ Thumbs.db
 # PyInstaller / launcher build outputs (packaging/build_exe.ps1 + the release CI produce these)
 /dist/
 /build/
+**/bin/
+**/obj/
 /packaging/mingit/
 /packaging/webview2/
 /mingit.zip

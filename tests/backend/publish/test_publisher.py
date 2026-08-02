@@ -31,7 +31,7 @@ from stockroom.publish import (
     PublishConflict,
     ScopedComponentPublisher,
 )
-from stockroom.vcs import GitRepo
+from stockroom.vcs import GitRepo, lfs
 from stockroom.workflow import (
     IntakeIdentity,
     PublicationLease,
@@ -225,12 +225,22 @@ def _prepare_case(
     tmp_path: Path,
     *,
     publication_lease_seconds: float = 100,
+    lfs_binary: bool = False,
 ) -> _PreparedCase:
     repo = GitRepo(tmp_path / "Repository")
     repo.init()
     readme = repo.root / "README.md"
     readme.write_text("Stockroom publication test\n", encoding="utf-8")
-    base_commit = repo.commit("Initial", [readme])
+    initial_paths = [readme]
+    if lfs_binary:
+        lfs.enable(repo)
+        attributes = repo.root / ".gitattributes"
+        attributes.write_text(
+            "*.PcbLib filter=lfs binary\n*.kicad_sym text eol=lf\n",
+            encoding="utf-8",
+        )
+        initial_paths.append(attributes)
+    base_commit = repo.commit("Initial", initial_paths)
 
     live_catalog = (tmp_path / "Live" / CATALOG_FILENAME).resolve()
     live_catalog.parent.mkdir()
@@ -253,6 +263,13 @@ def _prepare_case(
             '{"component_id":"' + bundle.identity.component_id + '","format":"publisher-test-v1"}\n'
         ).encode()
     )
+    binary_path = "Canonical/Native.PcbLib"
+    binary_source = staging.joinpath(*binary_path.split("/"))
+    normalized_text_path = "Canonical/Native.kicad_sym"
+    normalized_text_source = staging.joinpath(*normalized_text_path.split("/"))
+    if lfs_binary:
+        binary_source.write_bytes(b"native-pcblib\x00" * 32)
+        normalized_text_source.write_bytes(b"(kicad_symbol_lib\r\n  (version 20240101)\r\n)\r\n")
 
     store = WorkflowStore(tmp_path / "Workflow.sqlite3")
     publish_stage, timestamp = _advance_to_publish(
@@ -285,6 +302,17 @@ def _prepare_case(
         staging_root=staging,
         tracked_files=(
             PreparedTarget(canonical_path, _file_digest(canonical_source)),
+            *(
+                (
+                    PreparedTarget(binary_path, _file_digest(binary_source)),
+                    PreparedTarget(
+                        normalized_text_path,
+                        _file_digest(normalized_text_source),
+                    ),
+                )
+                if lfs_binary
+                else ()
+            ),
             PreparedTarget(
                 CATALOG_DIGEST_FILENAME,
                 projection.catalog_digest_document_digest,
@@ -389,6 +417,38 @@ def test_one_part_publication_preserves_foreign_staged_and_unstaged_work(
     )
     installed_dblib = case.machine_local_root / ALTIUM_DBLIB_FILENAME
     assert _file_digest(installed_dblib) == (case.manifest.machine_local_files[0].sha256)
+
+
+@pytest.mark.skipif(not lfs.available()[0], reason="git-lfs not installed")
+def test_publication_verifies_the_exact_payload_behind_a_git_lfs_pointer(
+    tmp_path: Path,
+) -> None:
+    case = _prepare_case(tmp_path, lfs_binary=True)
+
+    receipt = _publisher(case).publish(case.manifest, case.lease, now=case.now)
+
+    binary = next(
+        target for target in case.manifest.tracked_files if target.target_path.endswith(".PcbLib")
+    )
+    committed = _git(case.repo, "show", f"{receipt.git_commit_oid}:{binary.target_path}")
+    assert committed == (
+        "version https://git-lfs.github.com/spec/v1\n"
+        f"oid {binary.sha256}\n"
+        f"size {case.manifest.staging_root.joinpath(*binary.target_path.split('/')).stat().st_size}\n"
+    )
+    normalized_text = next(
+        target
+        for target in case.manifest.tracked_files
+        if target.target_path.endswith(".kicad_sym")
+    )
+    assert _git(
+        case.repo,
+        "show",
+        f"{receipt.git_commit_oid}:{normalized_text.target_path}",
+    ) == "(kicad_symbol_lib\n  (version 20240101)\n)\n"
+    assert case.store.get_publication_operation(receipt.publication_id).state is (
+        PublicationState.COMPLETED
+    )
 
 
 @pytest.mark.parametrize(

@@ -610,8 +610,29 @@ class ScopedComponentPublisher:
             ).stdout
             actual_digest = _sha256_bytes(blob)
             if actual_digest != prepared.sha256:
-                raise PublishAmbiguity("publication commit tree digest does not match its manifest")
-            verified.append((prepared.target_path, actual_digest))
+                # Git LFS clean-filters an exact prepared binary into a pointer before it enters
+                # the commit tree.  The pointer is the committed representation, while the
+                # manifest intentionally proves the original CAD payload.  Accept only the
+                # canonical three-line v1 pointer whose OID and byte size both match that exact
+                # staged payload; every other transform remains an ambiguity.
+                source = _target_under(manifest.staging_root, prepared.target_path)
+                source_bytes = source.read_bytes()
+                expected_pointer = (
+                    "version https://git-lfs.github.com/spec/v1\n"
+                    f"oid {prepared.sha256}\n"
+                    f"size {len(source_bytes)}\n"
+                ).encode("ascii")
+                normalized_text = source_bytes.replace(b"\r\n", b"\n")
+                exact_lf_normalization = (
+                    b"\x00" not in source_bytes
+                    and normalized_text != source_bytes
+                    and blob == normalized_text
+                )
+                if blob != expected_pointer and not exact_lf_normalization:
+                    raise PublishAmbiguity(
+                        "publication commit tree digest does not match its manifest"
+                    )
+            verified.append((prepared.target_path, prepared.sha256))
         if require_reachable and not self.repository.is_ancestor(
             oid,
             self.repository.head(),

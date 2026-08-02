@@ -3324,6 +3324,18 @@ class WorkflowStore:
             if status_row["stage_status"] is not None
         }
         stage_count = sum(status_counts.values())
+        publication_waiting = (
+            connection.execute(
+                """
+                SELECT 1
+                FROM publication_memberships
+                WHERE item_id = ? AND state = ?
+                LIMIT 1
+                """,
+                (item_id, PublicationMembershipState.WAITING.value),
+            ).fetchone()
+            is not None
+        )
         if status_counts.get(StageStatus.FAILED, 0):
             derived = ItemStatus.FAILED
         elif stage_count and status_counts.get(StageStatus.COMPLETED, 0) == stage_count:
@@ -3339,6 +3351,12 @@ class WorkflowStore:
             )
         ):
             derived = ItemStatus.QUEUED
+        elif status_counts.get(StageStatus.BLOCKED, 0) and publication_waiting:
+            # The publish stage is durably blocked only as an internal lease fence while
+            # the publication worker commits Git and activates the catalog. No person can
+            # resolve it, so exposing the item/batch as `blocked` makes clients stop polling
+            # during a healthy release and report a false capture failure.
+            derived = ItemStatus.RUNNING
         elif status_counts.get(StageStatus.BLOCKED, 0):
             derived = ItemStatus.BLOCKED
         elif status_counts.get(StageStatus.CANCELLED, 0):

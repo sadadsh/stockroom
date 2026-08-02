@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)..\..\..\work\Native Cad Converter\Build\Tests\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)..\..\..\work\Native Cad Converter\Obj\Tests\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(MSBuildThisFileDirectory)..\..\..\work\Native Cad Converter\Obj\Tests\</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+</Project>

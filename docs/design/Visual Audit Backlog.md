@@ -246,6 +246,7 @@ and `P2` meaningful fit, finish, or clarity debt.
 | VA-047 | P1 | Projects, Activity | A missing remote ref replaced the complete Activity workbench with the raw backend string `remote ref is unavailable: refs/remotes/origin/branch/projects-library-grammar`. There was no local-work context, recovery action, or usable review/session surface. | Missing or stale remotes degrade to the normal Local Only/Connect Remote state; Activity remains usable for local work and provides one scoped recovery action without exposing raw ref plumbing as the whole page. |
 | VA-048 | P1 | STM Viewer first run | Building the STM index without a configured CubeMX source ends with an implementation-facing instruction to set `stm_cubemx_source` via `PATCH /api/settings` or `STM32_CUBEMX`. The user cannot perform that recovery anywhere in the visible app. | The empty state discovers a safe local CubeMX source or opens one native folder picker, saves the choice in Settings, retries in place, and keeps API/environment details behind diagnostics. |
 | VA-049 | P2 | Settings category navigation | The active category inherits the previous category's inner scroll position. Switching from scrolled Data Sources to Maintenance opened halfway down the Maintenance content and hid its first task row until the user manually scrolled upward. | Category switches restore the selected category's own remembered position or start a first visit at the top; no destination begins at an unrelated category's scroll offset. |
+| VA-050 | P1 | Components, Complete Part | The visible 1,386 × 893 dark WebView2 Proof 7 frame exposed internal requirement keys verbatim in the lead state: `required projected references are absent: kicad_symbol, kicad_footprint, kicad_model, altium_symbol, altium_footprint`. This competes with the otherwise plain-language KiCad/Shared/Altium checklist and makes a normal missing-files state read like a backend exception. | The lead state says which user-facing files are needed without schema keys; exact requirement keys remain available only in diagnostics/evidence. |
 
 ## Resolved Findings
 
@@ -499,3 +500,38 @@ All captures below came from a disposable library/config and the current source 
 | `work/User Facing Acceptance 20260801/Screenshots/33 Embedded Ultra Librarian Dark.jpg` | self-contained WPF host / embedded WebView2 | 1266×833 | `fe4934803515` | The provider stays inside a Stockroom-owned window with a persistent Return To Stockroom control, and login/search remain reachable. VA-045 remains: Ultra Librarian's hero begins beyond the left viewport edge at this width. |
 | `work/User Facing Acceptance 20260801/Screenshots/34 Embedded Provider Search Result.jpg` | self-contained WPF host / Ultra Librarian search | 1266×833 | `edd8b9780875` | Exact MPN search returns Texas Instruments rows with availability, price, compliance, and three visible model-availability icons. Horizontal provider overflow is present but all core result actions and exact identity remain reachable. |
 | `work/User Facing Acceptance 20260801/Screenshots/35 Embedded Provider Part Detail.jpg` | self-contained WPF host / Ultra Librarian part | 1266×833 | `f81cf6264b59` | Exact part detail visibly presents Symbol, Footprint, and 3D Model together under the Stockroom provider frame, proving the intended one-window discovery path. Provider-owned horizontal overflow and login/download below the fold remain, but identity and all three assets are unmistakable. |
+
+## 2026-08-02 Native P-CAD Output Comparison
+
+These live Altium Designer 26.8.1 captures compare the same ABM13W Ultra Librarian
+P-CAD source after Altium's Import Wizard and after Stockroom's native converter.
+They were inspected through Windows Computer Use at 05:00-05:04 EDT; the source
+files and importer log remain under `work/Real ABM13W P-CAD Qualification`.
+
+| Capture | Host / surface | Visual audit |
+| --- | --- | --- |
+| Live window `2026-07-27_20-09-29.SchLib` | Altium Designer 26.8.1 / Import Wizard output | Symbol geometry matches Stockroom's output: four numbered pins, grounded pin 2, central crystal, and outer body. Altium truncates the component name to `ABM13W-32.0000MH`; Stockroom retains the exact MPN and linked `ABM13W_ABR` model. |
+| Live window `2026-07-27_20-09-29.PcbLib` | Altium Designer 26.8.1 / Import Wizard output | P0 conversion defect in the legacy importer, not a Stockroom visual defect: only generic `PCBCOMPONENT_1` is present with 0 pads and 0 primitives after the log reports skipped pattern tokens. This output cannot be the visual gold standard. |
+| Live window `ABM13W-32.0000MHZ-5-DH7G-T5.PcbLib` | Altium Designer 26.8.1 / Stockroom converter output | All three provider variants are visible with four pads each and 52/52/60 primitives. The conspicuous asterisk-like mechanical graphics and diagonal line are also present in Ultra Librarian's same-bundle KiCad files, so they are provider geometry rather than renderer artifacts. |
+
+## 2026-08-02 Live Verified ABM13W Component
+
+The real Windows Stockroom source host was captured after durable publication commit
+`fc26296` and a fresh live-index load.
+
+| Capture | Host / surface | Visual audit |
+| --- | --- | --- |
+| Live window `Stockroom` | pywebview / WebView2, real Stockroom Library | The real ABM13W workspace visibly reports `KiCad Ready · Altium Ready`, renders the provider STEP in the central 3D viewport, and keeps exact identity, sourcing, product media, and specifications visible together. Open polish: the light-theme viewport has weak contrast between a nearly white model and mid-gray canvas; product-data tiles have inconsistent two-line density; and the bottom revision/update/library strip compresses four facts into one visual weight. None blocks CAD use or readiness truth. |
+| Live window `Stockroom`, Symbol | pywebview / WebView2, real Stockroom Library | P0 acceptance regression resolved: the production-scoped ABM13W symbol now renders instead of `Preview unavailable`, reports both EDAs Ready, fits the complete body, and displays each pin designator once. The first successful frame exposed duplicated `1 1`/`2 2`/`3 3`/`4 4` labels; inspection proved the provider KiCad file repeats names while the P-CAD source says names hidden, so the preview now suppresses only exact name/number echoes. Open P2: this shared inspection surface is a KiCad projection even when both tools are Ready; the UI should identify the projection explicitly or offer an EDA comparison before it can serve as visual cross-EDA proof. |
+| Live window `Stockroom`, Footprint | pywebview / WebView2, real Stockroom Library | P0 acceptance regression resolved: the production-scoped footprint and land-pattern endpoints render all four pads from the exact active candidate rather than failing against the old category library. Open P2: the thick courtyard dominates the tile and the preview omits pad numbers, polarity/origin, dimensions, and a visible EDA-projection label, so it proves presence but is a weak inspection tool for a very small four-pad package. |
+
+## 2026-08-02 Live Verified TPD6E05U06RVZR Component
+
+The second real production component was captured after durable publication commit
+`598c4c5` and a fresh source-host restart against the independent Stockroom Library.
+
+| Capture | Host / surface | Visual audit |
+| --- | --- | --- |
+| Live window `Stockroom`, Symbol | pywebview / WebView2, real Stockroom Library | P1 acceptance defect found and resolved: the published KiCad source contains a complete 15.24 × 25.4 mm rectangular body and eight electrical pins, but the preview fitter measured only SVG paths/circles and cropped the body because KiCad emitted it as `<rect>`. The fitter now covers standard SVG primitives, the cache version is advanced, and the live frame shows the complete body, seven visible terminals, and intentionally stacked hidden GND pin 10 without clipping. Open P2: this remains an unlabeled KiCad projection even while both EDAs report Ready. |
+| Live window `Stockroom`, Footprint | pywebview / WebView2, real Stockroom Library | All fourteen provider pads and the complete courtyard are visible and whole-drawing fit is correct. Open P2: the source also contains Silk/Fab body edges, pin-one markers, and pad numbers, but the current copper/courtyard-only projection suppresses them; it proves geometry presence but is weaker than an editor-like inspection surface. |
+| Live window `Stockroom`, 3D Model | pywebview / WebView2, real Stockroom Library | The exact shared STEP is rendered whole and aligned to all fourteen lands while both EDA readiness labels stay green. Open P3: for this very small USON package, the dark carrier/land plane occupies more visual area than the white component body; a component-weighted inspection framing option would improve first-glance recognition without changing geometry truth. |

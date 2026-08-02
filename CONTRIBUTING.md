@@ -11,6 +11,10 @@ Whether you are a person or an agent, this is the shortest path to a clean chang
 ## Set up
 
 ```bash
+# source-pinned native CAD writer (only its required nested abstraction)
+git submodule update --init vendor/AltiumSharp
+git -C vendor/AltiumSharp submodule update --init shared/OriginalCircuit.Eda.Abstractions
+
 # backend (Python, managed with uv)
 uv sync                                   # creates .venv with the pinned deps
 

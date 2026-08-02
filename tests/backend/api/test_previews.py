@@ -103,6 +103,82 @@ def test_footprint_preview_bw_param_reaches_the_renderer(app_ctx):
     assert cli.fp_bw == [False, True]
 
 
+def test_production_previews_use_the_attested_component_scoped_artifacts(app_ctx):
+    """The production publisher does not populate legacy category-wide libraries.
+
+    Reproduce the real PartRecord shape that made a completed component say Ready while both
+    its Symbol and Footprint tabs failed. The catalog row is the durable path contract.
+    """
+    rec = app_ctx.ops.load_record("tps62130")
+    symbol_rel = "EDA/KiCad/Symbols/cmp_exact/candidate/exact.kicad_sym"
+    footprint_rel = "EDA/KiCad/Footprints/cmp_exact/candidate/Exact.pretty/Exact.kicad_mod"
+    rec.extra["production_publication"] = {
+        "schema": "stockroom.production-publication/1",
+        "catalog_row": {
+            "KiCad Symbol Artifact Path": symbol_rel,
+            "KiCad Footprint Artifact Path": footprint_rel,
+        },
+    }
+    symbol_file = app_ctx.profile.library.root / symbol_rel
+    footprint_file = app_ctx.profile.library.root / footprint_rel
+    symbol_file.parent.mkdir(parents=True, exist_ok=True)
+    footprint_file.parent.mkdir(parents=True, exist_ok=True)
+    symbol_file.write_text("(kicad_symbol_lib)", encoding="utf-8")
+    footprint_file.write_text('(footprint "TPS62130")', encoding="utf-8")
+    (app_ctx.profile.library.parts_dir / "tps62130.json").write_text(
+        rec.dumps(), encoding="utf-8"
+    )
+
+    from stockroom.api.routers.previews import _resolve_footprint_file
+
+    _record, resolved_footprint, resolved_pretty = _resolve_footprint_file(
+        app_ctx, "tps62130"
+    )
+    assert resolved_footprint == footprint_file
+    assert resolved_pretty == footprint_file.parent
+
+    class _PathRecordingCli(_RecordingCli):
+        def __init__(self):
+            super().__init__()
+            self.symbol_files = []
+            self.footprint_dirs = []
+
+        def sym_export_svg(self, lib, symbol, out_dir, black_and_white=False):
+            self.symbol_files.append(lib)
+            return super().sym_export_svg(lib, symbol, out_dir, black_and_white)
+
+        def fp_export_svg(
+            self,
+            pretty_dir,
+            footprint,
+            out_dir,
+            layers="F.Cu,F.SilkS,F.Fab",
+            *,
+            black_and_white=False,
+        ):
+            self.footprint_dirs.append(pretty_dir)
+            return super().fp_export_svg(
+                pretty_dir,
+                footprint,
+                out_dir,
+                layers,
+                black_and_white=black_and_white,
+            )
+
+    cli = _PathRecordingCli()
+    with _client_with_cli(app_ctx, cli) as client:
+        assert client.get("/api/previews/symbol/tps62130.svg").status_code == 200
+        assert client.get("/api/previews/footprint/tps62130.svg").status_code == 200
+        assert client.get("/api/previews/land/tps62130.json").status_code == 200
+
+    assert cli.symbol_files == [symbol_file]
+    # The clean-footprint renderer intentionally copies the resolved source into a temporary
+    # .pretty directory after parsing it. The land endpoint assertion above proves the same
+    # component-scoped source was also parsed directly.
+    assert len(cli.footprint_dirs) == 1
+    assert cli.footprint_dirs[0].name == "clean.pretty"
+
+
 def test_bw_and_color_previews_cache_separately(app_ctx):
     # A bw request must not be served the cached color SVG (and vice versa): distinct
     # cache keys mean the renderer runs once per variant, not once total.
@@ -632,6 +708,21 @@ class TestRefitViewBox:
         x, y, w, h = self._box(self._refit(src))
         assert x <= 45 and y <= 45 and x + w >= 55 and y + h >= 55
         assert w < 30 and h < 30
+
+    def test_a_native_rectangle_symbol_body_is_not_cropped_out(self):
+        # KiCad 10 preserves rectangular symbol bodies as SVG <rect> primitives.  The real
+        # TPD6E05U06RVZR preview used to measure only its pin paths, crop about 71% of the body,
+        # and misleadingly look like a sparse/broken CAD source.
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 31">'
+            '<rect x="2" y="2.7" width="15.2" height="25.4"/>'
+            '<path d="M 17.2,5 19.7,5"/>'
+            "</svg>"
+        )
+        x, y, w, h = self._box(self._refit(src))
+        assert x <= 2 and y <= 2.7
+        assert x + w >= 19.7 and y + h >= 28.1
+        assert w < 22 and h < 31
 
     def test_an_svg_with_no_geometry_is_left_alone(self):
         # never emit a degenerate or inverted viewBox; an empty drawing keeps whatever it had.

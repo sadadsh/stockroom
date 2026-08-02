@@ -2432,36 +2432,65 @@ class PlaywrightCaptureBrowser:
             if should_cancel is not None and should_cancel():
                 status = "cancelled"
             else:
+                navigation_terminal = False
                 try:
                     page.goto(
                         url,
-                        wait_until="domcontentloaded",
-                        timeout=max(1, int(timeout * 1000)),
+                        # Provider pages can commit the requested URL and then keep loading
+                        # challenge scripts or subresources indefinitely.  Waiting for
+                        # DOMContentLoaded prevented Stockroom from observing Finish Route (and
+                        # manually selected files) until the full capture timeout elapsed.
+                        wait_until="commit",
+                        # Initial navigation is advisory: the task-bound picker and HUD remain
+                        # useful even when a provider challenge never commits a document. Keep
+                        # the overall route timeout for the polling loop, not this blocking call.
+                        timeout=max(1, int(min(timeout, 10.0) * 1000)),
                     )
-                except Exception:
+                except Exception as exc:  # noqa: BLE001 - recovery remains available off-page
                     final_url = _page_url(page, url)
                     hud_action = hud_state.action if hud_state is not None else None
                     if should_cancel is not None and should_cancel():
                         status = "cancelled"
+                        navigation_terminal = True
                     elif hud_action == "cancel":
                         status = "cancelled"
+                        navigation_terminal = True
                     elif hud_action == "try_another":
                         status = "try_another"
+                        navigation_terminal = True
+                    elif should_finish is not None and should_finish():
+                        # The application may already have task-bound files queued for this
+                        # route.  Navigation failure must not strand that explicit handoff.
+                        status = "completed"
+                        navigation_terminal = True
                     elif hud_action == "finish":
                         status = "completed"
+                        navigation_terminal = True
                     elif broker.receipts:
                         # Navigation can be aborted by the provider as the download response
                         # replaces or closes the document. Completed task-bound receipts are
                         # authoritative and must still advance to ingestion.
                         status = "completed"
+                        navigation_terminal = True
                     elif _page_is_closed(page):
                         status = "completed"
+                        navigation_terminal = True
                     elif time.monotonic() >= deadline:
                         status = "timed_out"
+                        navigation_terminal = True
                     else:
-                        raise
-                else:
-                    final_url = _page_url(page, url)
+                        # Network errors, challenge loops, and pages that never commit must not
+                        # disable Stockroom's own picker. Continue polling the task-bound intent;
+                        # the person can provide already-downloaded files, cancel, or try another
+                        # author route without waiting for the provider page lifecycle.
+                        trace_warning(
+                            "capture.user-window.navigation-pending",
+                            provider=self.provider_key,
+                            url=url_note(final_url),
+                            why=str(exc),
+                        )
+                final_url = _page_url(page, final_url)
+                if not navigation_terminal:
                     receipt_count = len(broker.receipts)
                     if hud_state is not None:
                         self._update_provider_hud(hud_state, receipt_count)

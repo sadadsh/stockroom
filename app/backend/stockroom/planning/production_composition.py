@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -41,6 +42,7 @@ from typing import Protocol, cast
 from stockroom.altium.dblib import render_dblib
 from stockroom.cad_variants import resolve_cad_variant, same_cad_evidence_set
 from stockroom.capture.evidence import record_installed_kicad_role_evidence
+from stockroom.capture.identity import same_manufacturer
 from stockroom.capture.runner import (
     capture_state_root,
     run_guided_capture,
@@ -66,6 +68,7 @@ from stockroom.kicad.lib_table import LibTable
 from stockroom.model.asset import Asset, AssetOrigin, AssetRef
 from stockroom.model.part import PartRecord
 from stockroom.model.part_id import make_part_id, part_id_matches
+from stockroom.model.trust import AssetCheck
 from stockroom.mutation.library_ops import LibraryOps
 from stockroom.planning.distributor_provider import (
     build_configured_distributor_metadata_registrations,
@@ -312,6 +315,43 @@ class ManufacturerDatasheetProviderAdapter:
     provider_key: str = _DATASHEET_PROVIDER
     executable_operations: frozenset[ProviderOperation] = frozenset({DATASHEET_OPERATION})
 
+    @staticmethod
+    def _exact_product_media_binding(
+        record: PartRecord,
+        identity: ExactPartIdentity,
+    ) -> bool:
+        """Prove a series PDF through DigiKey's exact ProductDetails/Media relation.
+
+        Manufacturer datasheets commonly cover a whole product series and therefore do not
+        print every orderable suffix. In that case the PDF text cannot prove the exact MPN by
+        itself. The DigiKey API does expose the missing relation: one exact manufacturer product
+        number and its typed Datasheets media entry. Require that complete stored relation,
+        including the exact HTTPS product-page shape and the exact URL used for this PDF; a loose
+        PDF, product photo, nearby MPN, or hand-entered URL still fails closed.
+        """
+        if record.datasheet is None or not record.datasheet.source_url:
+            return False
+        catalog = record.catalog.get("digikey")
+        if not isinstance(catalog, Mapping):
+            return False
+        if catalog.get("manufacturer_product_number") != identity.mpn_canonical:
+            return False
+        product_url = catalog.get("product_url")
+        if not isinstance(product_url, str) or not product_url.startswith(
+            "https://www.digikey.com/en/products/detail/"
+        ):
+            return False
+        media = catalog.get("media")
+        if not isinstance(media, list):
+            return False
+        return any(
+            isinstance(item, Mapping)
+            and str(item.get("media_type", "")).strip().casefold()
+            in {"datasheet", "datasheets"}
+            and item.get("url") == record.datasheet.source_url
+            for item in media
+        )
+
     def _local_path(self, record: PartRecord) -> Path | None:
         if record.datasheet is None or not record.datasheet.file:
             return None
@@ -380,22 +420,34 @@ class ManufacturerDatasheetProviderAdapter:
         observed_manufacturer = (
             None if extracted.manufacturer is None else extracted.manufacturer.value
         )
-        if (
-            observed_mpn != identity.mpn_canonical
-            or observed_manufacturer != identity.authoritative_manufacturer_key
-        ):
+        pdf_identity_verified = observed_mpn == identity.mpn_canonical and same_manufacturer(
+            observed_manufacturer or "", identity.authoritative_manufacturer_key
+        )
+        media_identity_verified = self._exact_product_media_binding(record, identity)
+        if not pdf_identity_verified and not media_identity_verified:
             return AdapterOutcome.failure(FailureClassification.NEAR_MATCH_REJECTED)
         pdf_digest = self.evidence_store.install_bytes(data)
         package = None if extracted.package is None else extracted.package.value
         payload = {
             "exact_identity_verified": True,
-            "manufacturer": observed_manufacturer,
-            "mpn": observed_mpn,
+            # The evidence payload is keyed to the already-authoritative workflow
+            # identity. Preserve the PDF spelling separately: manufacturer datasheets
+            # routinely omit a legal entity suffix (for example Abracon vs Abracon LLC),
+            # and that is the same exact company, not a near-match downgrade.
+            "manufacturer": identity.authoritative_manufacturer_key,
+            "observed_manufacturer": observed_manufacturer,
+            "observed_mpn": observed_mpn,
+            "mpn": identity.mpn_canonical,
             "package": package,
             "pdf_bytes": len(data),
             "pdf_digest": pdf_digest,
             "schema": "stockroom.exact-manufacturer-datasheet/1",
             "source_url": ("" if record.datasheet is None else record.datasheet.source_url),
+            "verification_mode": (
+                "pdf_text_exact_identity"
+                if pdf_identity_verified
+                else "digikey_exact_product_media_binding"
+            ),
         }
         digest = self.evidence_store.record_provider_success(
             identity=identity,
@@ -636,42 +688,49 @@ class StockroomAcquisitionProviderAdapter:
         last = self._last_acquisition.get(acquisition_key)
         if last is not None and now - last < 30.0:
             return
-        self._last_acquisition[acquisition_key] = now
         self.staging_root.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(
-            prefix=".Acquisition-",
-            dir=self.staging_root,
-        ) as temporary:
-            isolated = _seed_copy_on_write_context(
-                self.context,
-                identity,
-                Path(temporary) / "Repository",
-            )
-            part_id = make_part_id(identity.mpn_canonical)
-            report = run_guided_capture(
-                isolated,
-                part_ids=(part_id,),
-                vendor=request.vendor,
-                headless=request.background,
-                operator_authorized=request.mode == "assisted",
-                finish_first=request.mode == "finish-first",
-                collect_all=request.mode == "collect-all",
-                should_stop=request.should_stop,
-                capture_id=request.report_item_id,
-            )
-            if request.report_item_id is not None:
-                write_durable_capture_report(request.report_item_id, report)
-            record = isolated.ops.load_record(part_id)
-            try:
-                record_installed_kicad_role_evidence(
-                    store=self.evidence_store,
-                    record=record,
-                    profile=isolated.profile,
+        try:
+            with tempfile.TemporaryDirectory(
+                prefix=".Acquisition-",
+                dir=self.staging_root,
+            ) as temporary:
+                isolated = _seed_copy_on_write_context(
+                    self.context,
+                    identity,
+                    Path(temporary) / "Repository",
                 )
-            except Exception:
-                # The guided pair recorder may already have installed stronger evidence,
-                # and a provider that produced no complete KiCad trio is an honest miss.
-                pass
+                part_id = make_part_id(identity.mpn_canonical)
+                report = run_guided_capture(
+                    isolated,
+                    part_ids=(part_id,),
+                    vendor=request.vendor,
+                    headless=request.background,
+                    operator_authorized=request.mode == "assisted",
+                    finish_first=request.mode == "finish-first",
+                    collect_all=request.mode == "collect-all",
+                    should_stop=request.should_stop,
+                    capture_id=request.report_item_id,
+                )
+                if request.report_item_id is not None:
+                    write_durable_capture_report(request.report_item_id, report)
+                record = isolated.ops.load_record(part_id)
+                try:
+                    record_installed_kicad_role_evidence(
+                        store=self.evidence_store,
+                        record=record,
+                        profile=isolated.profile,
+                    )
+                except Exception:
+                    # The guided pair recorder may already have installed stronger evidence,
+                    # and a provider that produced no complete KiCad trio is an honest miss.
+                    pass
+        finally:
+            # KiCad and Altium are separate provider operations for one shared CAD set. A
+            # person-driven capture can legitimately take minutes; measuring the coalescing
+            # window from its start caused the second operation to launch the same workflow
+            # again as soon as the first returned. Measure from completion, including a failed
+            # pass, so both operations consume the same retained evidence without a browser loop.
+            self._last_acquisition[acquisition_key] = time.monotonic()
 
     def _provider_manifest(
         self,
@@ -751,7 +810,12 @@ class StockroomAcquisitionProviderAdapter:
             try:
                 request = self._capture_options(identity)
                 bundle = self._selection(identity)
-                if bundle is None or request.mode in {"finish-first", "collect-all"}:
+                # The normal one-click path is genuinely evidence-first: once one retained,
+                # exact-identity, same-download KiCad/Altium/STEP bundle passes native
+                # cross-verification, opening provider pages cannot improve completion and only
+                # makes the user repeat work. The explicitly exhaustive mode is the sole reason
+                # to keep collecting after a complete bundle already exists.
+                if bundle is None or request.mode == "collect-all":
                     self._acquire(identity, request)
                     bundle = self._selection(identity)
                 if bundle is None:
@@ -1314,6 +1378,166 @@ def _native_artifacts(
     return artifacts
 
 
+def _cross_eda_asset_checks(
+    request: ProductionStageRequest,
+    *,
+    verification_digest: str,
+    native: Mapping[NativeCadRole, tuple[str, str]],
+) -> dict[tuple[str, str], list[AssetCheck]]:
+    """Materialize re-judgable asset facts from the immutable native verification report.
+
+    The cross-EDA stage already proves the files as one coherent set.  Publication must retain
+    the underlying measurements on each asset; otherwise the index correctly sees six present
+    but unchecked assets and refuses to call either EDA ready.
+    """
+
+    try:
+        document = json.loads(request.evidence_store.object_bytes(verification_digest))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ProductionWorkflowError("cross-EDA verification report is invalid") from exc
+    report = _mapping(document, "cross-EDA verification report")
+    schema = _string(report.get("schema"), "cross-EDA verification schema")
+    if schema != "stockroom.cross-eda-verification/1" or report.get("valid") is not True:
+        raise ProductionWorkflowError("cross-EDA verification report is not valid")
+
+    identity = _mapping(report.get("identity"), "cross-EDA identity")
+    expected_mpn = request.identity.mpn_canonical
+    if (
+        identity.get("authoritative_manufacturer_key")
+        != request.identity.authoritative_manufacturer_key
+        or identity.get("mpn_canonical") != expected_mpn
+    ):
+        raise ProductionWorkflowError("cross-EDA verification identity differs")
+
+    kicad = _mapping(report.get("kicad"), "cross-EDA KiCad report")
+    altium = _mapping(report.get("altium"), "cross-EDA Altium report")
+    geometry = _mapping(report.get("geometry"), "cross-EDA geometry report")
+    step = _mapping(report.get("step"), "cross-EDA STEP report")
+
+    def count(source: Mapping[str, object], field: str, label: str) -> int:
+        value = source.get(field)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ProductionWorkflowError(f"{label} is invalid")
+        return value
+
+    def finite_number(source: Mapping[str, object], field: str, label: str) -> float:
+        value = source.get(field)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ProductionWorkflowError(f"{label} is invalid")
+        number = float(value)
+        if not math.isfinite(number) or number < 0:
+            raise ProductionWorkflowError(f"{label} is invalid")
+        return number
+
+    kicad_pads = count(kicad, "pad_count", "KiCad pad count")
+    altium_pads = count(altium, "pad_count", "Altium pad count")
+    geometry_ratio = finite_number(
+        geometry,
+        "max_tolerance_ratio",
+        "cross-EDA geometry tolerance ratio",
+    )
+    if geometry.get("method") != "mapped-pad-distance-and-size-signatures":
+        raise ProductionWorkflowError("cross-EDA geometry method is not supported")
+
+    observed_step_hash = _string(step.get("sha256"), "verified STEP SHA-256")
+    if re.fullmatch(r"[0-9a-f]{64}", observed_step_hash, re.ASCII) is None:
+        raise ProductionWorkflowError("verified STEP SHA-256 is not canonical")
+    observed_step_digest = f"sha256:{observed_step_hash}"
+    expected_step_digest = native[NativeCadRole.STEP_MODEL][0]
+    if observed_step_digest != expected_step_digest:
+        raise ProductionWorkflowError("verified STEP bytes differ from the publication artifact")
+
+    binding_raw = identity.get("altium_binding")
+    binding = _mapping(binding_raw, "Altium identity binding") if binding_raw is not None else None
+    bound_fields = set()
+    if binding is not None:
+        raw_fields = binding.get("fields")
+        if not isinstance(raw_fields, list) or not all(isinstance(field, str) for field in raw_fields):
+            raise ProductionWorkflowError("Altium identity binding fields are invalid")
+        bound_fields = set(raw_fields)
+    kicad_mpn = _string(kicad.get("mpn"), "KiCad native MPN")
+    if "mpn" in bound_fields:
+        assert binding is not None
+        altium_mpn = _string(binding.get("mpn_canonical"), "attested Altium MPN")
+        altium_mpn_check = "provider_attested_symbol_mpn"
+        altium_mpn_note = "Native legacy entry identity was bound to the exact provider detail page."
+    else:
+        altium_mpn = _string(altium.get("mpn"), "Altium native MPN")
+        altium_mpn_check = "native_symbol_mpn"
+        altium_mpn_note = "MPN read from the native Altium symbol."
+
+    authority = f"{schema} {verification_digest}"
+    geometry_note = (
+        "Worst normalized error across mapped pad distances and dimensions; "
+        "1.0 is the recorded verification boundary."
+    )
+    checks: dict[tuple[str, str], list[AssetCheck]] = {
+        ("kicad", "symbol"): [
+            AssetCheck(
+                check="native_symbol_mpn",
+                measured=kicad_mpn,
+                expected=expected_mpn,
+                against=authority,
+                note="MPN read from the native KiCad symbol.",
+            )
+        ],
+        ("altium", "symbol"): [
+            AssetCheck(
+                check=altium_mpn_check,
+                measured=altium_mpn,
+                expected=expected_mpn,
+                against=authority,
+                note=altium_mpn_note,
+            )
+        ],
+        ("kicad", "footprint"): [
+            AssetCheck(
+                check="cross_eda_pad_count",
+                measured=kicad_pads,
+                expected=altium_pads,
+                against=authority,
+                note="Native KiCad pads compared with the mapped native Altium footprint.",
+            ),
+            AssetCheck(
+                check="cross_eda_geometry_tolerance_ratio",
+                measured=geometry_ratio,
+                expected=0.0,
+                against=authority,
+                tolerance=1.0,
+                note=geometry_note,
+            ),
+        ],
+        ("altium", "footprint"): [
+            AssetCheck(
+                check="cross_eda_pad_count",
+                measured=altium_pads,
+                expected=kicad_pads,
+                against=authority,
+                note="Native Altium pads compared with the mapped native KiCad footprint.",
+            ),
+            AssetCheck(
+                check="cross_eda_geometry_tolerance_ratio",
+                measured=geometry_ratio,
+                expected=0.0,
+                against=authority,
+                tolerance=1.0,
+                note=geometry_note,
+            ),
+        ],
+    }
+    for tool in ("kicad", "altium"):
+        checks[(tool, "model")] = [
+            AssetCheck(
+                check="step_content_sha256",
+                measured=observed_step_digest,
+                expected=expected_step_digest,
+                against=authority,
+                note="STEP bytes independently parsed to GLB during native cross-EDA verification.",
+            )
+        ]
+    return checks
+
+
 def _readback_document(
     request: ProductionStageRequest,
     stage: StageName,
@@ -1752,6 +1976,11 @@ class ExactNativePublicationAdapter:
             adapter_candidate.get("verification_digest"),
             "verification digest",
         )
+        asset_checks = _cross_eda_asset_checks(
+            stage,
+            verification_digest=verification_digest,
+            native=native,
+        )
         component_files = {
             component_root / "Component.json": _canonical_bytes(
                 {
@@ -1850,34 +2079,40 @@ class ExactNativePublicationAdapter:
         )
         nickname = f"Stockroom_{identity.component_id}"
         updated_record.assets_for("kicad").symbol = Asset(
-            AssetRef(lib=nickname, name=kicad_symbol_entry),
-            origin,
+            ref=AssetRef(lib=nickname, name=kicad_symbol_entry),
+            origin=origin,
+            checks=asset_checks[("kicad", "symbol")],
         )
         updated_record.assets_for("kicad").footprint = Asset(
-            AssetRef(lib=nickname, name=kicad_footprint_entry),
-            origin,
+            ref=AssetRef(lib=nickname, name=kicad_footprint_entry),
+            origin=origin,
+            checks=asset_checks[("kicad", "footprint")],
         )
         updated_record.assets_for("kicad").model = Asset(
-            AssetRef(file=profile_paths[NativeCadRole.STEP_MODEL].as_posix()),
-            origin,
+            ref=AssetRef(file=profile_paths[NativeCadRole.STEP_MODEL].as_posix()),
+            origin=origin,
+            checks=asset_checks[("kicad", "model")],
         )
         updated_record.assets_for("altium").symbol = Asset(
-            AssetRef(
+            ref=AssetRef(
                 lib=profile_paths[NativeCadRole.ALTIUM_SYMBOL].as_posix(),
                 name=altium_symbol_entry,
             ),
-            origin,
+            origin=origin,
+            checks=asset_checks[("altium", "symbol")],
         )
         updated_record.assets_for("altium").footprint = Asset(
-            AssetRef(
+            ref=AssetRef(
                 lib=profile_paths[NativeCadRole.ALTIUM_FOOTPRINT].as_posix(),
                 name=altium_footprint_entry,
             ),
-            origin,
+            origin=origin,
+            checks=asset_checks[("altium", "footprint")],
         )
         updated_record.assets_for("altium").model = Asset(
-            AssetRef(file=profile_paths[NativeCadRole.STEP_MODEL].as_posix()),
-            origin,
+            ref=AssetRef(file=profile_paths[NativeCadRole.STEP_MODEL].as_posix()),
+            origin=origin,
+            checks=asset_checks[("altium", "model")],
         )
         updated_record.cad_variants.select("kicad", kicad_variant.pointer)
         updated_record.cad_variants.select("altium", altium_variant.pointer)

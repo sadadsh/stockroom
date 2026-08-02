@@ -124,7 +124,10 @@ def test_dispatches_the_real_dag_and_only_joins_publication(tmp_path):
     operation = store.get_publication_operation(membership.publication_id)
     assert operation.git_commit_oid is None
     assert operation.catalog_revision is None
-    assert store.get_batch(batch.id).status is BatchStatus.BLOCKED
+    # Joining the healthy global publication worker is durable progress, not a
+    # terminal/user-blocked state.  The batch must keep polling until that worker
+    # either publishes or reports a real failure.
+    assert store.get_batch(batch.id).status is BatchStatus.RUNNING
 
 
 def test_missing_handler_fails_closed_instead_of_stranding_the_lease(tmp_path):
@@ -353,7 +356,10 @@ def test_a_stage_running_past_its_lease_is_not_reclaimed(tmp_path):
 def test_lease_renewal_never_rotates_the_fence(tmp_path):
     store = WorkflowStore(tmp_path / "workflow.sqlite3")
     store.submit_batch([IntakeIdentity("ACME", "P-1")])
-    claim = store.claim_ready("worker", lease_seconds=0.5, limit=1)[0]
+    # Keep ample wall-clock margin for a loaded Windows runner.  The 50 ms
+    # heartbeat still proves that renewal happened during the 250 ms handler;
+    # making lease expiry itself race the scheduler only makes the test flaky.
+    claim = store.claim_ready("worker", lease_seconds=2.0, limit=1)[0]
     observed: list[Any] = []
 
     def slow(context: StageContext):
@@ -367,7 +373,7 @@ def test_lease_renewal_never_rotates_the_fence(tmp_path):
         heartbeat_seconds=0.05,
     )
 
-    dispatched = runtime.dispatch_claim(claim, "worker", lease_seconds=0.5)
+    dispatched = runtime.dispatch_claim(claim, "worker", lease_seconds=2.0)
 
     assert dispatched is not None
     in_flight = observed[0]
@@ -383,7 +389,7 @@ def test_lease_renewal_never_rotates_the_fence(tmp_path):
 def test_lease_renewal_stays_out_of_the_durable_event_journal(tmp_path):
     store = WorkflowStore(tmp_path / "workflow.sqlite3")
     store.submit_batch([IntakeIdentity("ACME", "P-1")])
-    claim = store.claim_ready("worker", lease_seconds=0.5, limit=1)[0]
+    claim = store.claim_ready("worker", lease_seconds=2.0, limit=1)[0]
     observed: list[Any] = []
 
     def slow(context: StageContext):
@@ -397,7 +403,7 @@ def test_lease_renewal_stays_out_of_the_durable_event_journal(tmp_path):
         heartbeat_seconds=0.02,
     )
 
-    runtime.dispatch_claim(claim, "worker", lease_seconds=0.5)
+    runtime.dispatch_claim(claim, "worker", lease_seconds=2.0)
 
     assert observed[0].lease_expires_at > claim.lease_expires_at
     kinds = [event.kind for event in store.events(claim.batch_id)]

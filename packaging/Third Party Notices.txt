@@ -1,0 +1,49 @@
+Stockroom Native CAD Converter - Third-Party Notices
+
+The native CAD converter is built from source and distributed as a separate
+attested sidecar. Stockroom does not redistribute Altium Designer or any
+Altium-owned executable.
+
+AltiumSharp
+Copyright 2019-2020 Original Circuit Limited / Mark Harris and contributors.
+Source: https://github.com/issus/AltiumSharp
+Pinned commit: ce72437f30cd54f549601d4e0ca5846d21272150
+License: Apache License 2.0. A full copy is included in
+Support/Licenses/AltiumSharp Apache-2.0.txt.
+
+OriginalCircuit.Eda.Abstractions
+Copyright Original Circuit contributors.
+Source: https://github.com/issus/OriginalCircuit.Eda.Abstractions
+Pinned commit: 114b40b94fcde0cd68a0c6a5db4d26b7aa3fb0f3
+License: MIT.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+OpenMcdf 3.1.4
+Copyright 2010-2026 Federico Blaseotto and Jeremy Powell.
+Source: https://github.com/openmcdf/openmcdf/tree/11ffb7cafff6eea99639df6b2b249dcf6bcca3ef
+License: Mozilla Public License 2.0.
+License copy: https://www.mozilla.org/MPL/2.0/
+OpenMcdf remains available in source form at the source URL above under the
+Mozilla Public License 2.0.
+
+System.Text.Encoding.CodePages 9.0.0
+Copyright .NET Foundation and contributors.
+Source: https://github.com/dotnet/runtime
+License: MIT. The MIT terms printed above apply.

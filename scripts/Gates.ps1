@@ -53,27 +53,40 @@ function Resolve-DotNetSdk {
 }
 
 function Enable-KiCadCli {
-    $command = Get-Command kicad-cli -CommandType Application -ErrorAction SilentlyContinue
-    if ($command -and @('.cmd', '.bat') -contains (
-        [System.IO.Path]::GetExtension($command.Source).ToLowerInvariant()
-    )) {
-        # PowerShell classifies batch shims as Application commands. Invoking the workspace
-        # compatibility shim would create a visible cmd.exe for every native smoke test, so only
-        # KiCad's real executable qualifies for the Windows gate.
-        $command = $null
-    }
+    # `Get-Command` can return BOTH KiCad's real executable and the workspace compatibility
+    # `.cmd` shim. Treating that array as one command concatenates their paths and makes the gate
+    # report that a perfectly valid KiCad install is missing. Select one real executable
+    # explicitly; batch shims would also create the visible cmd.exe windows this gate forbids.
+    $command = @(
+        Get-Command kicad-cli -All -CommandType Application -ErrorAction SilentlyContinue |
+            Where-Object {
+                [System.IO.Path]::GetExtension($_.Source).ToLowerInvariant() -eq '.exe'
+            }
+    )[0]
     if (-not $command) {
         $kiCadBin = Join-Path $env:ProgramFiles 'KiCad\10.0\bin'
         $installedCli = Join-Path $kiCadBin 'kicad-cli.exe'
         if (Test-Path -LiteralPath $installedCli -PathType Leaf) {
             $env:PATH = "$kiCadBin;$env:PATH"
-            $command = Get-Command kicad-cli -CommandType Application -ErrorAction SilentlyContinue
+            $command = @(
+                Get-Command kicad-cli -All -CommandType Application -ErrorAction SilentlyContinue |
+                    Where-Object {
+                        [System.IO.Path]::GetExtension($_.Source).ToLowerInvariant() -eq '.exe'
+                    }
+            )[0]
         }
     }
 
     if (-not $command) {
         Write-Warning 'KiCad 10 CLI was not found; tests that require it will report skips.'
         return
+    }
+
+    # Keep the final resolved command fail-closed even if PowerShell command discovery changes.
+    # Batch shims can surface visible cmd.exe windows and are never a valid native KiCad CLI.
+    $commandExtension = [System.IO.Path]::GetExtension($command.Source)
+    if (@('.cmd', '.bat') -contains ($commandExtension.ToLowerInvariant())) {
+        throw "Resolved KiCad CLI is a batch shim, not a native executable: $($command.Source)"
     }
 
     $version = & $command.Source version
@@ -207,6 +220,21 @@ try {
             --no-restore `
             --nologo
     }
+    Invoke-Checked 'Native CAD Converter Tests' {
+        $dotnetSdk = Resolve-DotNetSdk
+        & $dotnetSdk restore `
+            tests\native\Stockroom.CadConverter.Tests\Stockroom.CadConverter.Tests.csproj `
+            --locked-mode `
+            --nologo
+        if ($LASTEXITCODE -ne 0) {
+            return
+        }
+        & $dotnetSdk test `
+            tests\native\Stockroom.CadConverter.Tests\Stockroom.CadConverter.Tests.csproj `
+            --configuration Release `
+            --no-restore `
+            --nologo
+    }
     Invoke-Checked 'Backend Tests - Parallel Safe' {
         & uv run pytest tests\backend -q -p no:randomly `
             -m 'not live_enrich and not global_windows_mutex and not performance_budget and not serial_only' `
@@ -218,7 +246,11 @@ try {
             -n 0
     }
     Invoke-Checked 'Frontend Tests' {
-        & npm.cmd --prefix app\frontend run test:run
+        # A release gate values deterministic whole-suite behavior over browser-test fan-out.
+        # Concurrent jsdom workers have repeatedly starved the durable capture integration test
+        # after the 5,000+ Git-backed backend cases finish. One worker preserves every assertion
+        # and matches the full-frontend qualification used for release evidence.
+        & npm.cmd --prefix app\frontend run test:run -- --maxWorkers=1
     }
     Invoke-Checked 'Frontend Type Check' {
         & npm.cmd --prefix app\frontend run typecheck

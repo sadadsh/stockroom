@@ -39,6 +39,7 @@ $CoordinatorProbeTool = Join-Path $PackagingRoot "coordinator_availability_probe
 $SpecPath = Join-Path $PackagingRoot "stockroom.spec"
 $SourceIcon = Join-Path $RepositoryRoot "app\backend\stockroom\host\assets\stockroom.ico"
 $WindowHostProject = Join-Path $RepositoryRoot "app\desktop\Stockroom.WindowHost\Stockroom.WindowHost.csproj"
+$CadConverterProject = Join-Path $RepositoryRoot "app\desktop\Stockroom.CadConverter\Stockroom.CadConverter.csproj"
 $WorkspaceDotNetPath = [IO.Path]::GetFullPath(
     (Join-Path $RepositoryRoot "..\..\System\Capabilities\Bin\dotnet-sdk.cmd")
 )
@@ -485,9 +486,8 @@ function Build-WindowHost {
             "-p:RestoreLockedMode=true",
             "-p:ContinuousIntegrationBuild=true",
             "-p:Deterministic=true",
-            "-p:BaseOutputPath=$(Join-Path $compileRoot 'Bin')\",
-            "-p:BaseIntermediateOutputPath=$(Join-Path $compileRoot 'Obj')\",
-            "-p:MSBuildProjectExtensionsPath=$(Join-Path $compileRoot 'Obj')\"
+            "-p:UseArtifactsOutput=true",
+            "-p:ArtifactsPath=$compileRoot"
         )
     }
     finally {
@@ -500,8 +500,42 @@ function Build-WindowHost {
     return $publishRoot
 }
 
+function Build-CadConverter {
+    param([Parameter(Mandatory)][string]$Name)
+
+    $buildRoot = Initialize-OutputDirectory -Path (Join-Path $WorkRoot $Name)
+    $compileRoot = Initialize-OutputDirectory -Path (Join-Path $WorkRoot "CAD Converter Compilation")
+    $publishRoot = Join-Path $buildRoot "Publish"
+    Push-Location $RepositoryRoot
+    try {
+        $null = Invoke-Checked -FilePath $DotNetPath -Arguments @(
+            "publish", $CadConverterProject,
+            "--configuration", "Release",
+            "--runtime", "win-x64",
+            "--self-contained", "true",
+            "--output", $publishRoot,
+            "--disable-build-servers",
+            "-p:RestoreLockedMode=true",
+            "-p:ContinuousIntegrationBuild=true",
+            "-p:Deterministic=true",
+            "-p:DebugType=None",
+            "-p:UseArtifactsOutput=true",
+            "-p:ArtifactsPath=$compileRoot"
+        )
+    }
+    finally {
+        Pop-Location
+    }
+    $converterExecutable = Join-Path $publishRoot "Stockroom.CadConverter.exe"
+    if (-not (Test-Path -LiteralPath $converterExecutable -PathType Leaf)) {
+        throw "dotnet publish did not produce Stockroom.CadConverter.exe."
+    }
+    return $publishRoot
+}
+
 $FirstExecutable = Build-Executable -Name "Build 1"
 $FirstWindowHost = Build-WindowHost -Name "Window Host Build 1"
+$FirstCadConverter = Build-CadConverter -Name "CAD Converter Build 1"
 $FirstExecutableHash = Get-Sha256 -Path $FirstExecutable
 $SecondExecutable = $null
 $SecondExecutableHash = $null
@@ -509,6 +543,7 @@ $SecondExecutableHash = $null
 if (-not $SkipReproducibilityProof) {
     $SecondExecutable = Build-Executable -Name "Build 2"
     $SecondWindowHost = Build-WindowHost -Name "Window Host Build 2"
+    $SecondCadConverter = Build-CadConverter -Name "CAD Converter Build 2"
     $SecondExecutableHash = Get-Sha256 -Path $SecondExecutable
     if ($FirstExecutableHash -cne $SecondExecutableHash) {
         throw "PyInstaller reproducibility failed: the two Stockroom.exe digests differ."
@@ -516,6 +551,10 @@ if (-not $SkipReproducibilityProof) {
     if ((Get-DirectoryFingerprint -Root $FirstWindowHost) -cne
         (Get-DirectoryFingerprint -Root $SecondWindowHost)) {
         throw "Native window host reproducibility failed: publish trees differ."
+    }
+    if ((Get-DirectoryFingerprint -Root $FirstCadConverter) -cne
+        (Get-DirectoryFingerprint -Root $SecondCadConverter)) {
+        throw "Native CAD converter reproducibility failed: publish trees differ."
     }
 }
 
@@ -531,6 +570,19 @@ if ($Mode -eq "Production") {
     )
     Invoke-Checked -FilePath $SignTool -Arguments @(
         "verify", "/pa", "/all", $FirstExecutable
+    )
+    $CadConverterExecutable = Join-Path $FirstCadConverter "Stockroom.CadConverter.exe"
+    Invoke-Checked -FilePath $SignTool -Arguments @(
+        "sign",
+        "/fd", "SHA256",
+        "/f", $SigningCertificatePath,
+        "/p", $CertificatePassword,
+        "/tr", $TimestampUri,
+        "/td", "SHA256",
+        $CadConverterExecutable
+    )
+    Invoke-Checked -FilePath $SignTool -Arguments @(
+        "verify", "/pa", "/all", $CadConverterExecutable
     )
 }
 
@@ -548,6 +600,7 @@ function Initialize-PackageStage {
         [Parameter(Mandatory)][string]$Name,
         [Parameter(Mandatory)][string]$Executable,
         [Parameter(Mandatory)][string]$WindowHostRoot,
+        [Parameter(Mandatory)][string]$CadConverterRoot,
         [Parameter(Mandatory)][string]$AppInstallerPath
     )
 
@@ -576,6 +629,7 @@ function Initialize-PackageStage {
         "--mode", $Mode,
         "--executable", (Join-Path $stage "Stockroom.exe"),
         "--window-host-root", (Join-Path $stage "WindowHost"),
+        "--cad-converter-root", $CadConverterRoot,
         "--bundle-root", (Join-Path $stage "Update"),
         "--version", $Version,
         "--minimum-host-version", $MinimumHostVersion,
@@ -605,6 +659,7 @@ $FirstStage = Initialize-PackageStage `
     -Name "Package 1" `
     -Executable $FirstExecutable `
     -WindowHostRoot $FirstWindowHost `
+    -CadConverterRoot $FirstCadConverter `
     -AppInstallerPath $FinalAppInstaller
 
 $PayloadInventory = Join-Path $ArtifactsRoot "Payload Manifest.json"
@@ -672,6 +727,7 @@ if (-not $SkipReproducibilityProof -and $Mode -eq "Fixture") {
         -Name "Package 2" `
         -Executable $SecondExecutable `
         -WindowHostRoot $SecondWindowHost `
+        -CadConverterRoot $SecondCadConverter `
         -AppInstallerPath $SecondAppInstaller
     $secondPackage = Join-Path $WorkRoot $PackageFileName
     Invoke-Checked -FilePath $MakeAppx -Arguments @(
@@ -820,6 +876,7 @@ if (
     -not $WorkerProbeReceipt.adopted -or
     -not $WorkerProbeReceipt.rolled_back -or
     $WorkerProbeReceipt.exact_worker_sha256 -cne (Get-Sha256 -Path $PackagedWorker) -or
+    $WorkerProbeReceipt.exact_cad_converter_sha256 -cne $BundleEvidence.cad_converter_sha256 -or
     [int]$WorkerProbeReceipt.candidate_generation -ne
         ([int]$WorkerProbeReceipt.initial_generation + 1) -or
     [int]$WorkerProbeReceipt.restored_generation -ne
@@ -1019,6 +1076,7 @@ $Evidence = [ordered]@{
         release_manifest_sha256 = $BundleEvidence.manifest_sha256
         pinned_tuf_root_sha256 = $BundleEvidence.root_sha256
         immutable_backend_sha256 = $BundleEvidence.backend_sha256
+        immutable_cad_converter_sha256 = $BundleEvidence.cad_converter_sha256
         rollback_release_id = $BundleEvidence.rollback_release_id
         compatible_from_release_ids = @($CompatibleFromReleaseIds)
         launch_receipt_schema = $ProbeReceipt.schema
@@ -1032,6 +1090,7 @@ $Evidence = [ordered]@{
         worker_candidate_generation = [int]$WorkerProbeReceipt.candidate_generation
         worker_restored_generation = [int]$WorkerProbeReceipt.restored_generation
         worker_exact_executable_sha256 = $WorkerProbeReceipt.exact_worker_sha256
+        worker_exact_cad_converter_sha256 = $WorkerProbeReceipt.exact_cad_converter_sha256
     }
     release_feed = [ordered]@{
         schema = $ReleaseFeedEvidence.schema

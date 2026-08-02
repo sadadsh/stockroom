@@ -10,7 +10,7 @@ import hashlib
 import json
 import re
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
@@ -77,9 +77,15 @@ def _render_at_rev(ctx, part_id: str, kind: str, rev: str, bw: bool) -> str:
         tdp = Path(td)
         if kind == "sym":
             name = kicad.symbol.name if kicad.symbol else ""
-            if not name or not category:
+            if not name:
                 raise FileNotFoundError(f"part {part_id} had no symbol at {rev}")
-            lib_text = ctx.repo.show_file(rev, ctx.profile.library.symbol_lib_path(category))
+            published = _production_artifact_relative(rec, _KICAD_SYMBOL_ARTIFACT_PATH)
+            lib_path = (
+                ctx.profile.library.root / Path(*published.parts)
+                if published is not None
+                else ctx.profile.library.symbol_lib_path(category)
+            )
+            lib_text = ctx.repo.show_file(rev, lib_path)
             if lib_text is None:
                 raise FileNotFoundError(f"symbol library missing at {rev}")
             hist_lib = tdp / "hist.kicad_sym"
@@ -88,9 +94,14 @@ def _render_at_rev(ctx, part_id: str, kind: str, rev: str, bw: bool) -> str:
             text = Path(svgs[0]).read_text(encoding="utf-8")
         else:  # footprint
             name = kicad.footprint.name if kicad.footprint else ""
-            if not name or not category:
+            if not name:
                 raise FileNotFoundError(f"part {part_id} had no footprint at {rev}")
-            fp_rel = ctx.profile.library.footprint_lib_path(category) / f"{name}.kicad_mod"
+            published = _production_artifact_relative(rec, _KICAD_FOOTPRINT_ARTIFACT_PATH)
+            fp_rel = (
+                ctx.profile.library.root / Path(*published.parts)
+                if published is not None
+                else ctx.profile.library.footprint_lib_path(category) / f"{name}.kicad_mod"
+            )
             fp_text = ctx.repo.show_file(rev, fp_rel)
             if fp_text is None:
                 raise FileNotFoundError(f"footprint file missing at {rev}")
@@ -104,6 +115,73 @@ def _render_at_rev(ctx, part_id: str, kind: str, rev: str, bw: bool) -> str:
 
 
 _FP_TOKEN = re.compile(r"^[A-Za-z0-9_.\-]+$")
+
+_PRODUCTION_PUBLICATION_SCHEMA = "stockroom.production-publication/1"
+_KICAD_SYMBOL_ARTIFACT_PATH = "KiCad Symbol Artifact Path"
+_KICAD_FOOTPRINT_ARTIFACT_PATH = "KiCad Footprint Artifact Path"
+
+
+def _production_artifact_relative(rec: PartRecord, column: str) -> PurePosixPath | None:
+    """Return one published artifact path, relative to the active profile root.
+
+    Production composition deliberately stores immutable component-scoped artifacts rather
+    than copying them back into the legacy category-wide libraries. The exact paths already
+    travel with the PartRecord's attested catalog row; preview code must consume that contract
+    instead of guessing a category path and accidentally rendering stale or unrelated CAD.
+    """
+    publication = rec.extra.get("production_publication")
+    if not isinstance(publication, dict) or publication.get("schema") != (
+        _PRODUCTION_PUBLICATION_SCHEMA
+    ):
+        return None
+    row = publication.get("catalog_row")
+    if not isinstance(row, dict):
+        return None
+    raw = row.get(column)
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    relative = PurePosixPath(raw)
+    # These values are persisted data, not request input, but refuse a corrupted record rather
+    # than allowing a preview read to escape the profile root.
+    if relative.is_absolute() or ".." in relative.parts or ":" in relative.parts[0]:
+        raise FileNotFoundError(f"published artifact path is not profile-relative: {raw}")
+    return relative
+
+
+def _production_artifact_file(ctx, rec: PartRecord, column: str) -> Path | None:
+    relative = _production_artifact_relative(rec, column)
+    if relative is None:
+        return None
+    root = ctx.profile.library.root.resolve()
+    candidate = (root / Path(*relative.parts)).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise FileNotFoundError(
+            f"published artifact path escapes the profile root: {relative.as_posix()}"
+        ) from exc
+    return candidate
+
+
+def _resolve_symbol_file(ctx, part_id: str) -> tuple[PartRecord, Path]:
+    rec = ctx.ops.load_record(part_id)
+    kicad = rec.assets_for("kicad")
+    if kicad.symbol is None or not kicad.symbol.name:
+        raise FileNotFoundError(f"part {part_id} has no symbol")
+    if rec.passive:
+        lib = stock_symbol_lib_file(kicad.symbol.lib)
+        if lib is None:
+            raise FileNotFoundError(
+                f"KiCad stock symbol library {kicad.symbol.lib} is not installed"
+            )
+        return rec, lib
+    published = _production_artifact_file(ctx, rec, _KICAD_SYMBOL_ARTIFACT_PATH)
+    lib = published or ctx.profile.library.symbol_lib_path(rec.category)
+    if not lib.exists():
+        if published is not None:
+            raise FileNotFoundError(f"published symbol artifact is missing: {published}")
+        raise FileNotFoundError(f"symbol library missing for {rec.category}")
+    return rec, lib
 
 
 def _split_lib_id(fp: str) -> tuple[str, str]:
@@ -122,7 +200,7 @@ _FP_RENDER_VERSION = "c4"  # C4: refit the viewBox to the drawn art, at a 2% mar
 # Bump when the symbol render changes (hidden fields, ...): the cache is content-hashed on
 # the .kicad_sym, which does NOT change when the RENDER code does. (C1: hide the property
 # fields so the body + pins show, not a smudge of overlapping Value/Footprint/Datasheet -> "c1".)
-_SYM_RENDER_VERSION = "c3"  # C3: the viewBox refit applies to every preview, symbols included.
+_SYM_RENDER_VERSION = "c5"  # C5: include native SVG rectangles when fitting symbol previews.
 # Bump when the MODEL conversion changes: the GLB cache is keyed on the source model file
 # hash, which does NOT change when the converter does. Both GLB keys had no such token at
 # all, so a converter fix reached only a machine with a cold cache while every test passed.
@@ -148,7 +226,9 @@ def _clean_symbol_svg(cli, lib_path: Path, name: str, bw: bool, td: Path) -> lis
     render_lib = lib_path
     try:
         symlib = SymbolLib.load(lib_path)
-        symlib.get_symbol(name).hide_all_properties()
+        symbol = symlib.get_symbol(name)
+        symbol.hide_all_properties()
+        symbol.hide_redundant_pin_names()
         clean_lib = td / "clean.kicad_sym"
         clean_lib.write_text(symlib.serialize(), encoding="utf-8", newline="")
         render_lib = clean_lib
@@ -228,11 +308,12 @@ _REFIT_MARGIN = 0.02
 def _svg_content_bbox(text: str) -> tuple[float, float, float, float] | None:
     """Bounding box of everything the SVG actually DRAWS, or None if it draws nothing.
 
-    kicad-cli emits only `M`/`L`/`Z` paths plus `<circle>` (arcs and rounded pads arrive
-    already tessellated into segments), so scraping coordinate pairs is exact rather than
-    approximate. Taking every number as a coordinate pair stays CORRECT if a future KiCad
-    emits curves too: a bezier is contained by its control points, so the box would be
-    generous rather than wrong, and a generous box only under-zooms."""
+    KiCad commonly emits paths and circles, but symbol bodies may remain native SVG
+    rectangles (the real TPD6E05U06RVZR does).  Omitting those primitives crops a valid
+    body out of the fitted viewBox.  Handle the basic SVG geometry set explicitly.  For
+    paths, taking every number as a coordinate pair stays conservative if a future KiCad
+    emits curves: a bezier is contained by its control points, so the box would be generous
+    rather than wrong, and a generous box only under-zooms."""
     xs: list[float] = []
     ys: list[float] = []
 
@@ -242,18 +323,50 @@ def _svg_content_bbox(text: str) -> tuple[float, float, float, float] | None:
         ys.extend(v - pad for v in py)
         ys.extend(v + pad for v in py)
 
-    for element in re.finditer(r"<(path|circle)\b([^>]*)>", text, re.S):
+    def attr(attrs: str, name: str) -> float | None:
+        match = re.search(rf'\b{name}="(-?[\d.eE+]+)"', attrs)
+        return float(match.group(1)) if match else None
+
+    for element in re.finditer(
+        r"<(path|circle|ellipse|rect|line|polyline|polygon)\b([^>]*)>", text, re.S
+    ):
         kind, attrs = element.group(1), element.group(2)
         # a stroke straddles its path, so half of it lies OUTSIDE the geometry. Refitting to bare
         # coordinates would shave the outer half off every courtyard line at the frame edge.
         stroke = re.search(r"stroke-width:\s*([\d.]+)", attrs)
         half = float(stroke.group(1)) / 2 if stroke and "stroke:none" not in attrs else 0.0
         if kind == "circle":
-            cx = re.search(r'\bcx="(-?[\d.eE+]+)"', attrs)
-            cy = re.search(r'\bcy="(-?[\d.eE+]+)"', attrs)
-            cr = re.search(r'\br="(-?[\d.eE+]+)"', attrs)
-            if cx and cy and cr:
-                add([float(cx.group(1))], [float(cy.group(1))], float(cr.group(1)) + half)
+            cx, cy, radius = attr(attrs, "cx"), attr(attrs, "cy"), attr(attrs, "r")
+            if cx is not None and cy is not None and radius is not None:
+                add([cx], [cy], radius + half)
+            continue
+        if kind == "ellipse":
+            cx, cy = attr(attrs, "cx"), attr(attrs, "cy")
+            rx, ry = attr(attrs, "rx"), attr(attrs, "ry")
+            if cx is not None and cy is not None and rx is not None and ry is not None:
+                add([cx - rx, cx + rx], [cy - ry, cy + ry], half)
+            continue
+        if kind == "rect":
+            x, y = attr(attrs, "x"), attr(attrs, "y")
+            width, height = attr(attrs, "width"), attr(attrs, "height")
+            if x is not None and y is not None and width is not None and height is not None:
+                add([x, x + width], [y, y + height], half)
+            continue
+        if kind == "line":
+            x1, y1 = attr(attrs, "x1"), attr(attrs, "y1")
+            x2, y2 = attr(attrs, "x2"), attr(attrs, "y2")
+            if x1 is not None and y1 is not None and x2 is not None and y2 is not None:
+                add([x1, x2], [y1, y2], half)
+            continue
+        if kind in {"polyline", "polygon"}:
+            points = re.search(r'\bpoints="([^"]*)"', attrs, re.S)
+            if points:
+                nums = [
+                    float(n)
+                    for n in re.findall(r"-?\d+\.?\d*(?:[eE][-+]?\d+)?", points.group(1))
+                ]
+                if len(nums) >= 2 and len(nums) % 2 == 0:
+                    add(nums[0::2], nums[1::2], half)
             continue
         d = re.search(r'\bd="([^"]*)"', attrs, re.S)
         if not d:
@@ -326,6 +439,11 @@ def _resolve_footprint_file(ctx, part_id: str):
                 "is not installed"
             )
         return rec, fp_file, fp_file.parent
+    published = _production_artifact_file(ctx, rec, _KICAD_FOOTPRINT_ARTIFACT_PATH)
+    if published is not None:
+        if not published.exists():
+            raise FileNotFoundError(f"published footprint artifact is missing: {published}")
+        return rec, published, published.parent
     pretty = ctx.profile.library.footprint_lib_path(rec.category)
     if not pretty.exists():
         raise FileNotFoundError(f"footprint library missing for {rec.category}")
@@ -352,31 +470,20 @@ def previews_router(require_token) -> APIRouter:
             raise FileNotFoundError(f"no such part: {part_id}")
         if rev:
             return _svg_response(_svg_at_rev(ctx, part_id, "sym", rev, bw))
-        rec = ctx.ops.load_record(part_id)
+        rec, lib = _resolve_symbol_file(ctx, part_id)
         # Previews render KiCad artifacts (kicad-cli SVG, the footprint's linked STEP), so
         # they read the KiCad bundle by name rather than a tool-neutral-looking field.
         kicad = rec.assets_for("kicad")
-        if kicad.symbol is None or not kicad.symbol.name:
+        symbol = kicad.symbol
+        if symbol is None:  # defensive: _resolve_symbol_file already enforces this invariant
             raise FileNotFoundError(f"part {part_id} has no symbol")
-        # A passive references a KiCad STOCK symbol lib (Device:R) with no owned file,
-        # so render it from the installed KiCad libraries, not the category lib.
-        if rec.passive:
-            lib = stock_symbol_lib_file(kicad.symbol.lib)
-            if lib is None:
-                raise FileNotFoundError(
-                    f"KiCad stock symbol library {kicad.symbol.lib} is not installed"
-                )
-        else:
-            lib = ctx.profile.library.symbol_lib_path(rec.category)
-            if not lib.exists():
-                raise FileNotFoundError(f"symbol library missing for {rec.category}")
         variant = "_bw" if bw else ""
         key = f"sym_{part_id}_{_SYM_RENDER_VERSION}_{_hash_file(lib)}{variant}.svg"
         cached = _cache_dir(ctx) / key
         if cached.exists():
             return _svg_response(cached.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as td:
-            svgs = _clean_symbol_svg(ctx.cli, lib, kicad.symbol.name, bw, Path(td))
+            svgs = _clean_symbol_svg(ctx.cli, lib, symbol.name, bw, Path(td))
             text = Path(svgs[0]).read_text(encoding="utf-8")
         cached.write_text(text, encoding="utf-8")
         return _svg_response(text)

@@ -1,0 +1,34 @@
+ACCEL_ASCII "Stockroom Cad Converter Probe.lia"
+(asciiHeader (asciiVersion 3 0) (fileUnits Mil))
+(library "Stockroom Cad Converter Probe"
+  (padStyleDef "SMD"
+    (holeDiam 0)
+    (padShape (layerNumRef 1) (padShapeType Rect) (shapeWidth 20) (shapeHeight 30)))
+  (textStyleDef "Default"
+    (font (fontType Stroke) (fontFamily SanSerif) (fontFace "QUALITY")
+      (fontHeight 50) (strokeWidth 3)))
+  (patternDef "STOCKROOM_PROBE"
+    (originalName "STOCKROOM_PROBE")
+    (multiLayer
+      (pad (padNum 1) (padStyleRef "SMD") (pt 0 0))
+      (pickpoint (pt 0 0)))
+    (layerContents (layerNumRef 6)
+      (line (pt -20 -20) (pt 20 20) (width 2))))
+  (symbolDef "STOCKROOM_PROBE_SYMBOL"
+    (originalName "STOCKROOM_PROBE_SYMBOL")
+    (pin (pinNum 1) (pt 0 0) (rotation 0) (pinLength 100)
+      (pinDisplay (dispPinDes True) (dispPinName True))
+      (pinDes (text (pt 0 0) "1" (textStyleRef "Default")))
+      (pinName (text (pt 0 0) "PROBE" (textStyleRef "Default")))
+      (defaultPinDes "1"))
+    (line (pt 100 -50) (pt 100 50))
+    (attr "RefDes" "RefDes" (pt 0 0) (textStyleRef "Default")))
+  (compDef "STOCKROOM-CAD-PROBE"
+    (compHeader (SourceLibrary "") (numPins 1) (numParts 1) (refDesPrefix "U"))
+    (compPin "1" (pinName "PROBE") (partNum 1) (symPinNum 1) (pinType Passive))
+    (attachedSymbol (partNum 1) (altType Normal) (symbolName "STOCKROOM_PROBE_SYMBOL"))
+    (attachedPattern (patternNum 1) (patternName "STOCKROOM_PROBE") (numPads 1)
+      (padPinMap (PadNum 1) (CompPinRef "1")))
+    (attr "Manufacturer_Name" "Stockroom" (pt 0 0) (textStyleRef "Default"))
+    (attr "Manufacturer_Part_Number" "STOCKROOM-CAD-PROBE" (pt 0 0)
+      (textStyleRef "Default"))))

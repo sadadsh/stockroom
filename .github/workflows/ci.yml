@@ -28,6 +28,19 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - name: Initialize pinned CAD writer source
+        shell: pwsh
+        run: |
+          git submodule update --init vendor/AltiumSharp
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C vendor/AltiumSharp submodule update --init shared/OriginalCircuit.Eda.Abstractions
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((git -C vendor/AltiumSharp rev-parse HEAD).Trim() -cne "ce72437f30cd54f549601d4e0ca5846d21272150") {
+            throw "AltiumSharp source pin drifted."
+          }
+          if ((git -C vendor/AltiumSharp/shared/OriginalCircuit.Eda.Abstractions rev-parse HEAD).Trim() -cne "114b40b94fcde0cd68a0c6a5db4d26b7aa3fb0f3") {
+            throw "OriginalCircuit.Eda.Abstractions source pin drifted."
+          }
       - name: Install uv
         uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
@@ -48,6 +61,13 @@ jobs:
         shell: pwsh
         run: |
           $project = "tests/native/Stockroom.WindowHost.Tests/Stockroom.WindowHost.Tests.csproj"
+          dotnet restore $project --locked-mode --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test $project --configuration Release --no-restore --nologo
+      - name: Run Native CAD Converter Suite
+        shell: pwsh
+        run: |
+          $project = "tests/native/Stockroom.CadConverter.Tests/Stockroom.CadConverter.Tests.csproj"
           dotnet restore $project --locked-mode --nologo
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet test $project --configuration Release --no-restore --nologo

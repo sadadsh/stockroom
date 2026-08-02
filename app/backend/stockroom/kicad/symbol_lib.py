@@ -73,6 +73,35 @@ class Symbol:
         for prop in self._node.find_all("property"):
             self._ensure_hidden(prop)
 
+    def hide_redundant_pin_names(self) -> bool:
+        """Hide pin names in a rendering copy when every name repeats its number.
+
+        Some provider KiCad exports write pin name ``"1"`` and pin number ``"1"`` even when
+        the sibling P-CAD source explicitly hides pin names. Rendering both produces ``1 1``
+        around every terminal and makes a correct symbol look corrupt. This preview-only cleanup
+        changes no library evidence and leaves meaningful names (GND, VCC, ...) untouched.
+        """
+        pins = [node for node in self._node.iter_descendants() if node.name == "pin"]
+        pairs: list[tuple[str, str]] = []
+        for pin in pins:
+            name = pin.find("name")
+            number = pin.find("number")
+            if name is None or number is None or len(name.children) < 2 or len(number.children) < 2:
+                continue
+            pairs.append((name.children[1].value, number.children[1].value))
+        if not pairs or any(not name or name != number for name, number in pairs):
+            return False
+        pin_names = self._node.find("pin_names")
+        if pin_names is None:
+            self._node.insert_child_text("(pin_names (hide yes))")
+            return True
+        hide = pin_names.find("hide")
+        if hide is None:
+            pin_names.insert_child_text("(hide yes)")
+        elif len(hide.children) >= 2 and hide.children[1].value != "yes":
+            hide.children[1].set_value("yes", quote=False)
+        return True
+
 
 class SymbolLib:
     def __init__(self, doc: SexpDocument):

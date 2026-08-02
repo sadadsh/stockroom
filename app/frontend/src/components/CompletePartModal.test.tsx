@@ -725,7 +725,17 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
     RENDER();
 
     await user.click(await screen.findByRole("button", { name: "Get Files" }));
-    await user.click(await screen.findByRole("button", { name: "Use Downloaded Files" }));
+    // The button appears only after the durable batch and its exact provider route have both
+    // propagated through the capture store. Full-suite Windows runners can be busy with other
+    // WebView/Git fixtures, so use an explicit integration timeout instead of the DOM library's
+    // one-second default. This still fails if any route field never arrives.
+    await user.click(
+      await screen.findByRole(
+        "button",
+        { name: "Use Downloaded Files" },
+        { timeout: 5_000 },
+      ),
+    );
 
     expect(pickFiles).toHaveBeenCalledWith("cad-recovery");
     await waitFor(() =>
@@ -741,7 +751,7 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
     expect(
       await screen.findByText(/queued 1 selected file for validation in this completion task/i),
     ).toBeInTheDocument();
-  });
+  }, 15_000);
 });
 
 // ------------------------------------------------------ the window contract every sibling has

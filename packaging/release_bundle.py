@@ -31,6 +31,9 @@ _HOST_VERSION_PATTERN = re.compile(
     r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\."
     r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
 )
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+_CAD_THIRD_PARTY_NOTICE = Path(__file__).with_name("Third Party Notices.txt")
+_ALTIUMSHARP_LICENSE = _REPOSITORY_ROOT / "vendor" / "AltiumSharp" / "LICENSE"
 
 
 class ReleaseBundleError(ValueError):
@@ -131,6 +134,7 @@ def _spdx_document(
     executable_name: str,
     executable_sha1: str,
     executable_sha256: str,
+    cad_converter_files: Sequence[tuple[str, str, str]],
     release_id: str,
     source_revision: str,
     source_date_epoch: int,
@@ -171,7 +175,22 @@ def _spdx_document(
                     ],
                     "copyrightText": "NOASSERTION",
                     "fileName": f"./Backend/{executable_name}",
-                }
+                },
+                *[
+                    {
+                        "SPDXID": f"SPDXRef-CadConverter-{index}",
+                        "checksums": [
+                            {"algorithm": "SHA1", "checksumValue": sha1},
+                            {"algorithm": "SHA256", "checksumValue": sha256},
+                        ],
+                        "copyrightText": "NOASSERTION",
+                        "fileName": f"./Tools/CadConverter/{name}",
+                    }
+                    for index, (name, sha1, sha256) in enumerate(
+                        cad_converter_files,
+                        start=1,
+                    )
+                ],
             ],
             "name": f"Stockroom {release_id}",
             "packages": [
@@ -184,7 +203,41 @@ def _spdx_document(
                         "packageVerificationCodeValue": verification_code
                     },
                     "versionInfo": release_id.removeprefix("release-"),
-                }
+                },
+                {
+                    "SPDXID": "SPDXRef-Package-AltiumSharp",
+                    "downloadLocation": "https://github.com/issus/AltiumSharp",
+                    "licenseConcluded": "Apache-2.0",
+                    "licenseDeclared": "Apache-2.0",
+                    "name": "AltiumSharp",
+                    "versionInfo": "ce72437f30cd54f549601d4e0ca5846d21272150",
+                },
+                {
+                    "SPDXID": "SPDXRef-Package-EdaAbstractions",
+                    "downloadLocation": (
+                        "https://github.com/issus/OriginalCircuit.Eda.Abstractions"
+                    ),
+                    "licenseConcluded": "MIT",
+                    "licenseDeclared": "MIT",
+                    "name": "OriginalCircuit.Eda.Abstractions",
+                    "versionInfo": "114b40b94fcde0cd68a0c6a5db4d26b7aa3fb0f3",
+                },
+                {
+                    "SPDXID": "SPDXRef-Package-OpenMcdf",
+                    "downloadLocation": "https://github.com/openmcdf/openmcdf",
+                    "licenseConcluded": "MPL-2.0",
+                    "licenseDeclared": "MPL-2.0",
+                    "name": "OpenMcdf",
+                    "versionInfo": "3.1.4",
+                },
+                {
+                    "SPDXID": "SPDXRef-Package-EncodingCodePages",
+                    "downloadLocation": "https://github.com/dotnet/runtime",
+                    "licenseConcluded": "MIT",
+                    "licenseDeclared": "MIT",
+                    "name": "System.Text.Encoding.CodePages",
+                    "versionInfo": "9.0.0",
+                },
             ],
             "relationships": [
                 {
@@ -197,6 +250,27 @@ def _spdx_document(
                     "relationshipType": "CONTAINS",
                     "spdxElementId": "SPDXRef-Package-Stockroom",
                 },
+                *[
+                    {
+                        "relatedSpdxElement": f"SPDXRef-CadConverter-{index}",
+                        "relationshipType": "CONTAINS",
+                        "spdxElementId": "SPDXRef-Package-Stockroom",
+                    }
+                    for index in range(1, len(cad_converter_files) + 1)
+                ],
+                *[
+                    {
+                        "relatedSpdxElement": dependency,
+                        "relationshipType": "DEPENDS_ON",
+                        "spdxElementId": "SPDXRef-Package-Stockroom",
+                    }
+                    for dependency in (
+                        "SPDXRef-Package-AltiumSharp",
+                        "SPDXRef-Package-EdaAbstractions",
+                        "SPDXRef-Package-OpenMcdf",
+                        "SPDXRef-Package-EncodingCodePages",
+                    )
+                ],
             ],
             "spdxVersion": "SPDX-2.3",
         }
@@ -208,6 +282,7 @@ def build_release_bundle(
     mode: str,
     executable: Path,
     window_host_root: Path,
+    cad_converter_root: Path,
     bundle_root: Path,
     version: str,
     minimum_host_version: str,
@@ -241,6 +316,28 @@ def build_release_bundle(
     )
     if any(path.is_symlink() for path in window_host_files):
         raise ReleaseBundleError("window host publish root must not contain symlinks")
+    cad_converter_root = Path(cad_converter_root).resolve(strict=True)
+    if not cad_converter_root.is_dir():
+        raise ReleaseBundleError("CAD converter publish root must be a directory")
+    cad_converter_executable = cad_converter_root / "Stockroom.CadConverter.exe"
+    if not cad_converter_executable.is_file():
+        raise ReleaseBundleError(
+            "CAD converter publish root is missing Stockroom.CadConverter.exe"
+        )
+    cad_converter_files = tuple(
+        sorted(
+            (path for path in cad_converter_root.rglob("*") if path.is_file()),
+            key=lambda path: path.relative_to(cad_converter_root).as_posix().casefold(),
+        )
+    )
+    if any(path.is_symlink() for path in cad_converter_files):
+        raise ReleaseBundleError("CAD converter publish root must not contain symlinks")
+    if len(cad_converter_files) < 2:
+        raise ReleaseBundleError(
+            "CAD converter publish root is incomplete; self-contained runtime files are required"
+        )
+    if not _CAD_THIRD_PARTY_NOTICE.is_file() or not _ALTIUMSHARP_LICENSE.is_file():
+        raise ReleaseBundleError("native CAD converter licensing inputs are unavailable")
     if source_date_epoch < 315532800 or source_date_epoch > 2147483647:
         raise ReleaseBundleError("source date epoch is outside the reproducible range")
     if type(protocol_version) is not int or protocol_version <= 0:
@@ -318,11 +415,36 @@ def build_release_bundle(
         for member in window_host_members
         if member["kind"] == "window-host"
     )
+    cad_converter_members: list[dict[str, object]] = []
+    cad_converter_spdx: list[tuple[str, str, str]] = []
+    for source in cad_converter_files:
+        relative = source.relative_to(cad_converter_root)
+        destination = release_root / "Tools" / "CadConverter" / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+        data = destination.read_bytes()
+        sha1 = hashlib.sha1(data, usedforsecurity=False).hexdigest()  # noqa: S324
+        sha256 = _sha256(data)
+        canonical_path = f"Tools/CadConverter/{relative.as_posix()}"
+        cad_converter_members.append(
+            {
+                "kind": (
+                    "cad-converter"
+                    if canonical_path == "Tools/CadConverter/Stockroom.CadConverter.exe"
+                    else "cad-converter-runtime"
+                ),
+                "path": canonical_path,
+                "sha256": sha256,
+                "size": len(data),
+            }
+        )
+        cad_converter_spdx.append((relative.as_posix(), sha1, sha256))
 
     sbom_bytes = _spdx_document(
         executable_name=backend_name,
         executable_sha1=backend_sha1,
         executable_sha256=backend_sha256,
+        cad_converter_files=cad_converter_spdx,
         release_id=release_id,
         source_revision=source_revision,
         source_date_epoch=source_date_epoch,
@@ -330,8 +452,16 @@ def build_release_bundle(
     sbom_path = release_root / "Support" / "SBOM.spdx.json"
     sbom_path.parent.mkdir(parents=True)
     sbom_path.write_bytes(sbom_bytes)
+    notice_bytes = _CAD_THIRD_PARTY_NOTICE.read_bytes()
+    notice_path = release_root / "Support" / "Third Party Notices.txt"
+    notice_path.write_bytes(notice_bytes)
+    license_bytes = _ALTIUMSHARP_LICENSE.read_bytes()
+    license_path = release_root / "Support" / "Licenses" / "AltiumSharp Apache-2.0.txt"
+    license_path.parent.mkdir(parents=True)
+    license_path.write_bytes(license_bytes)
     members = [
         *window_host_members,
+        *cad_converter_members,
         {
             "kind": "backend",
             "path": f"Backend/{backend_name}",
@@ -343,6 +473,18 @@ def build_release_bundle(
             "path": "Support/SBOM.spdx.json",
             "sha256": _sha256(sbom_bytes),
             "size": len(sbom_bytes),
+        },
+        {
+            "kind": "notice",
+            "path": "Support/Third Party Notices.txt",
+            "sha256": _sha256(notice_bytes),
+            "size": len(notice_bytes),
+        },
+        {
+            "kind": "license",
+            "path": "Support/Licenses/AltiumSharp Apache-2.0.txt",
+            "sha256": _sha256(license_bytes),
+            "size": len(license_bytes),
         },
     ]
     manifest_document = {
@@ -396,6 +538,11 @@ def build_release_bundle(
     )
     return {
         "backend_sha256": backend_sha256,
+        "cad_converter_sha256": next(
+            str(member["sha256"])
+            for member in cad_converter_members
+            if member["kind"] == "cad-converter"
+        ),
         "compatible_from_release_ids": ",".join(compatible_predecessors),
         "manifest_sha256": manifest_sha256,
         "minimum_host_version": host_version_floor,
@@ -411,6 +558,7 @@ def main() -> int:
     parser.add_argument("--mode", required=True, choices=("Fixture", "Production"))
     parser.add_argument("--executable", required=True, type=Path)
     parser.add_argument("--window-host-root", required=True, type=Path)
+    parser.add_argument("--cad-converter-root", required=True, type=Path)
     parser.add_argument("--bundle-root", required=True, type=Path)
     parser.add_argument("--version", required=True)
     parser.add_argument("--minimum-host-version", required=True)
@@ -433,6 +581,7 @@ def main() -> int:
         mode=args.mode,
         executable=args.executable,
         window_host_root=args.window_host_root,
+        cad_converter_root=args.cad_converter_root,
         bundle_root=args.bundle_root,
         version=args.version,
         minimum_host_version=args.minimum_host_version,
