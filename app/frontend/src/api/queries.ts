@@ -64,6 +64,9 @@ export function useRefreshProjectVisuals(projectId: string) {
     onSuccess: (visuals) => {
       queryClient.setQueryData(["project-visuals", projectId], visuals);
       queryClient.invalidateQueries({
+        queryKey: ["project-placement-geometry", projectId],
+      });
+      queryClient.invalidateQueries({
         queryKey: ["project-visual-artifact", projectId],
       });
     },

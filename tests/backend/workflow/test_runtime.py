@@ -299,6 +299,7 @@ def test_exact_replay_is_idempotent_and_a_stale_claim_never_calls_the_handler(tm
     assert calls == 1
 
 
+@pytest.mark.serial_only
 def test_a_stage_running_past_its_lease_is_not_reclaimed(tmp_path):
     # The lease stays sub-second but is deliberately ten heartbeats long: a
     # single synchronous=FULL commit on Windows can stall a few hundred

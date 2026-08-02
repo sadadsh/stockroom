@@ -197,6 +197,70 @@ def _result(
     return body
 
 
+def board_geometry_from_visual_evidence(
+    project: ProjectRecord,
+    *,
+    adapter: str,
+    evidence: dict | None,
+) -> dict:
+    """Build the shared placement DTO from an already-rendered native scene.
+
+    This is deliberately cache-only. Project selection and window-focus reads call this seam,
+    so they must never launch KiCad, Altium, or a command window. The explicit Render PCB action
+    owns native execution and stores the visual bundle that supplies these scenes.
+    """
+
+    source = _source_snapshot(project)
+    runtime = (evidence or {}).get("runtime", {})
+    documents = [
+        document
+        for document in (evidence or {}).get("documents", [])
+        if document.get("kind") == "pcb" and document.get("scene")
+    ]
+    if not documents:
+        return _result(
+            project=project,
+            adapter=adapter,
+            runtime=runtime,
+            status="blocked",
+            placements=[],
+            boards=[],
+            source_before=source,
+            source_after=_source_snapshot(project),
+            detail=(evidence or {}).get("detail")
+            or "Native PCB data is paused. Choose Render PCB to run the selected EDA tool.",
+        )
+
+    placements: list[dict] = []
+    boards: list[str] = []
+    for document in documents:
+        board = str(document["path"])
+        boards.append(board)
+        placements.extend(
+            _placement(
+                reference=component.get("reference"),
+                board=board,
+                x=component.get("x_mm"),
+                y=component.get("y_mm"),
+                rotation=component.get("rotation_deg"),
+                side=component.get("side"),
+                footprint=component.get("package"),
+            )
+            for component in document["scene"].get("components", [])
+        )
+    return _result(
+        project=project,
+        adapter=adapter,
+        runtime=runtime,
+        status="ready",
+        placements=placements,
+        boards=boards,
+        source_before=source,
+        source_after=_source_snapshot(project),
+        detail="Native PCB placement geometry is ready.",
+    )
+
+
 def kicad_board_geometry(
     project: ProjectRecord,
     cli: KiCadCli | None = None,

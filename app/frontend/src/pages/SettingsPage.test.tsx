@@ -835,6 +835,18 @@ describe("SettingsPage - copy adoption", () => {
 });
 
 describe("SettingsPage - grouped IA + Machine Setup band", () => {
+  it("starts each settings category at the top instead of inheriting the prior scroll", async () => {
+    renderPage();
+    await screen.findByTestId("settings.appearance.header");
+    const content = document.querySelector<HTMLElement>('[data-dev-id="settings.content"]');
+    expect(content).not.toBeNull();
+    content!.scrollTop = 420;
+
+    await userEvent.click(screen.getByRole("button", { name: "EDA Tools" }));
+
+    await waitFor(() => expect(content!.scrollTop).toBe(0));
+  });
+
   it("opens on General with both capabilities ready to use", async () => {
     renderPage();
     await screen.findByTestId("settings.appearance.header");

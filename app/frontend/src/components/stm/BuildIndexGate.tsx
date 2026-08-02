@@ -9,14 +9,19 @@
  * running/done/error flow); on success it re-queries the STM surface so the gate clears to the real
  * content.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useBuildStmIndex } from "../../api/stmQueries";
+import { useSettings, useUpdateSettings } from "../../api/queries";
+import { pickHostFolder } from "../../lib/hostFolderPicker";
 import { Button, Card, Eyebrow } from "../primitives";
 
 export function BuildIndexGate() {
   const build = useBuildStmIndex();
   const qc = useQueryClient();
+  const settings = useSettings();
+  const updateSettings = useUpdateSettings();
+  const [pickerError, setPickerError] = useState("");
 
   useEffect(() => {
     if (build.status === "done") {
@@ -27,8 +32,22 @@ export function BuildIndexGate() {
   }, [build.status, qc]);
 
   const running = build.status === "running";
+  const needsSource =
+    build.status === "error" && /cubemx|source configured|source folder/i.test(build.error ?? "");
   const pct =
     build.progress?.pct != null ? Math.min(100, Math.round(build.progress.pct)) : null;
+
+  async function chooseSourceAndBuild() {
+    setPickerError("");
+    try {
+      const source = await pickHostFolder("stm-cubemx");
+      if (!source) return;
+      await updateSettings.mutateAsync({ stm_cubemx_source: source });
+      build.start();
+    } catch (error) {
+      setPickerError(error instanceof Error ? error.message : "Could not save the CubeMX folder.");
+    }
+  }
 
   return (
     <div className="flex flex-1 items-center justify-center px-6 py-10">
@@ -55,12 +74,37 @@ export function BuildIndexGate() {
 
         {build.status === "error" ? (
           <p className="mb-4 text-sm text-err" data-testid="stm-build-error">
-            {build.error}
+            {needsSource
+              ? "Choose the STM32CubeMX data folder to build the index."
+              : build.error}
           </p>
         ) : null}
 
-        <Button variant="accent" onClick={() => build.start()} disabled={running}>
-          {running ? "Building..." : build.status === "error" ? "Try Again" : "Build the Index"}
+        {pickerError ? <p className="mb-4 text-sm text-err">{pickerError}</p> : null}
+
+        {settings.data?.stm_cubemx_source ? (
+          <p
+            className="mb-4 truncate font-mono text-xs text-t3"
+            title={settings.data.stm_cubemx_source}
+          >
+            {settings.data.stm_cubemx_source}
+          </p>
+        ) : null}
+
+        <Button
+          variant="accent"
+          onClick={needsSource ? chooseSourceAndBuild : () => build.start()}
+          disabled={running || updateSettings.isPending}
+        >
+          {running
+            ? "Building..."
+            : updateSettings.isPending
+              ? "Saving..."
+              : needsSource
+                ? "Choose CubeMX Folder"
+                : build.status === "error"
+                  ? "Try Again"
+                  : "Build the Index"}
         </Button>
       </Card>
     </div>

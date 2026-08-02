@@ -6,6 +6,7 @@ import { BoardIcon, CloseIcon, SearchIcon } from "../icons";
 import { Badge, Button, PanelTitle } from "../primitives";
 import { useToast } from "../../lib/toast";
 import { Text, useText } from "../../lib/copy";
+import { pickHostFolder } from "../../lib/hostFolderPicker";
 
 const INPUT =
   "h-9 w-full rounded-control border border-line bg-field px-3 text-sm text-t1 outline-none " +
@@ -278,17 +279,11 @@ function LinkProjectDialog({
   }, [discover.data, results, choice]);
 
   async function chooseFolder() {
-    const host = (
-      window as unknown as {
-        pywebview?: { api?: { pick_project_folder?: () => Promise<string[]> } };
-      }
-    ).pywebview?.api;
-    if (!host?.pick_project_folder) return;
-    const selected = await host.pick_project_folder();
-    if (selected[0]) {
-      setFolder(selected[0]);
+    const selected = await pickHostFolder("project");
+    if (selected) {
+      setFolder(selected);
       setChoice(null);
-      discover.mutate(selected[0]);
+      discover.mutate(selected);
     }
   }
 

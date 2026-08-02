@@ -117,8 +117,11 @@ def inject_script(
 class _HostApi:
     """The narrow native shell API exposed only to the loopback renderer."""
 
-    def pick_project_folder(self) -> list[str]:
-        """Pick one Git repository or EDA project folder for the Projects linker."""
+    def pick_folder(self, purpose: str) -> list[str]:
+        """Pick one folder for an allowlisted Stockroom workflow."""
+
+        if purpose not in {"project", "stm-cubemx"}:
+            return []
 
         import webview
 

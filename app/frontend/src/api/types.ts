@@ -660,6 +660,7 @@ export interface SettingsInfo {
   kicad_cli_path: string;
   kicad_cli_available: boolean;
   kicad_wired: boolean;
+  stm_cubemx_source?: string;
 }
 
 // The PATCH /api/settings body: only the sent fields are touched.
@@ -678,6 +679,7 @@ export interface SettingsPatch {
   samacsys_password?: string;
   kicad_config_override?: string;
   kicad_cli_override?: string;
+  stm_cubemx_source?: string;
 }
 
 // GET /api/profiles, POST /api/profiles
@@ -1144,6 +1146,7 @@ export interface ProjectReviewEvent {
 export interface ProjectReviews {
   base_branch: string;
   candidates: ProjectReviewCandidate[];
+  blocked_reason?: string;
 }
 
 export interface ProjectReviewEvidenceFinding {

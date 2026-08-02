@@ -1018,7 +1018,7 @@ class _Session:
 
 
 class _SessionManager(Protocol):
-    def __exit__(self, typ, value, traceback) -> object: ...
+    def __exit__(self, typ, value, traceback, /) -> object: ...
 
 
 def _exact_catalog_url(adapter, record) -> str:

@@ -58,6 +58,7 @@ from stockroom.projects.collaboration import (
 )
 from stockroom.projects.native_open import open_project_document
 from stockroom.projects.parity import PROJECT_TOOLS, parity_payload
+from stockroom.projects.placement_geometry import board_geometry_from_visual_evidence
 from stockroom.projects.review_evidence import (
     attach_native_validation,
     build_review_evidence,
@@ -253,12 +254,18 @@ def projects_router(require_token) -> APIRouter:
 
     @r.get("/{project_id}/board-geometry")
     def project_board_geometry(request: Request, project_id: str) -> dict:
-        """Read native placement geometry through the selected EDA adapter."""
+        """Read placement geometry from the explicit native-render cache only."""
 
-        rec = request.app.state.ctx.project_ops.get(project_id)
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
         if rec is None:
             raise FileNotFoundError(f"no such project: {project_id}")
-        return get_adapter(rec.eda or "kicad").board_geometry(rec)
+        bundle = project_visual_bundle(ctx, project_id)
+        return board_geometry_from_visual_evidence(
+            rec,
+            adapter=rec.eda or "kicad",
+            evidence=bundle.evidence if bundle is not None else None,
+        )
 
     @r.post("/{project_id}/documents/{document_id:path}/open")
     def open_linked_project_document(
@@ -500,7 +507,31 @@ def projects_router(require_token) -> APIRouter:
         repo = _project_repo(rec)
         session = ctx.work_session_store.active(project_id)
         base_branch = session.base_branch if session is not None else repo.current_branch()
-        candidates = ReviewManager(repo).list_candidates(base_branch=base_branch)
+        try:
+            candidates = ReviewManager(repo).list_candidates(base_branch=base_branch)
+        except CollaborationError as exc:
+            # Activity is a read surface. A stale saved base branch, an offline remote, or an
+            # unavailable review-event ref must not replace the whole workspace with raw Git
+            # output. Preserve the repository/session facts and expose one recoverable queue.
+            reasons = {
+                "base_missing": (
+                    "The saved work session's shared branch is no longer available. "
+                    "Start a new work session from a current shared branch."
+                ),
+                "fetch_failed": (
+                    "The review queue is temporarily offline. Local work remains available."
+                ),
+                "review_event_fetch_failed": (
+                    "Review decisions could not be refreshed. Local work remains available."
+                ),
+            }
+            if exc.code not in reasons:
+                raise
+            return {
+                "base_branch": base_branch,
+                "candidates": [],
+                "blocked_reason": reasons[exc.code],
+            }
         return {
             "base_branch": base_branch,
             "candidates": [asdict(candidate) for candidate in candidates],

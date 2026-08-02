@@ -1,10 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { StmViewerPage } from "./StmViewerPage";
-import { ApiError } from "../api/client";
+import { ApiError, api } from "../api/client";
 import type { McuSpecRow } from "../api/types";
 
 // The page reads its server state through these hooks; mock the module so the page (and its
@@ -147,6 +147,40 @@ describe("StmViewerPage", () => {
     expect(screen.getByRole("button", { name: "Build the Index" })).toBeInTheDocument();
     expect(screen.queryByText("STM32F407VETx")).toBeNull();
     expect(screen.queryByText("STM index not built")).toBeNull();
+  });
+
+  it("recovers a missing CubeMX source with one native folder choice and retries", async () => {
+    const start = vi.fn();
+    mockStatus.mockReturnValue(query({ data: { built: false } }));
+    mockMcus.mockReturnValue(query({ error: new ApiError(409, "STM index not built") }));
+    mockBuild.mockReturnValue({
+      ...IDLE_BUILD,
+      status: "error",
+      error: "No STM32CubeMX source folder is configured or discoverable.",
+      start,
+    });
+    vi.spyOn(api, "getSettings").mockResolvedValue({ stm_cubemx_source: "" } as never);
+    vi.spyOn(api, "updateSettings").mockResolvedValue({
+      stm_cubemx_source: "C:\\ST\\CubeMX",
+    } as never);
+    const pickFolder = vi.fn().mockResolvedValue(["C:\\ST\\CubeMX"]);
+    Object.defineProperty(window, "pywebview", {
+      configurable: true,
+      value: { api: { pick_folder: pickFolder } },
+    });
+
+    wrap(<StmViewerPage />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Choose CubeMX Folder" }),
+    );
+
+    await waitFor(() =>
+      expect(api.updateSettings).toHaveBeenCalledWith({
+        stm_cubemx_source: "C:\\ST\\CubeMX",
+      }),
+    );
+    expect(pickFolder).toHaveBeenCalledWith("stm-cubemx");
+    expect(start).toHaveBeenCalledOnce();
   });
 
   it("composes the family picker and spec matrix on success, showing mpn_example (never ref_name)", () => {

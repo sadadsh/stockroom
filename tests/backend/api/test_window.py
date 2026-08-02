@@ -47,13 +47,13 @@ def test_should_inject_only_on_the_loopback_spa_origin():
     assert should_inject("", base) is False
 
 
-def test_host_api_exposes_only_the_project_folder_picker():
+def test_host_api_exposes_only_the_purpose_scoped_folder_picker():
     methods = {
         name
         for name, value in vars(_HostApi).items()
         if callable(value) and not name.startswith("__")
     }
-    assert methods == {"pick_project_folder"}
+    assert methods == {"pick_folder"}
 
 
 def test_webview_start_kwargs_persist_the_shell_profile_when_supported(tmp_path):

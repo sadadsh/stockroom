@@ -51,7 +51,9 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // the same control stops the pass.
 // 280 after the obsolete profile switch/menu pair became one noninteractive active-library label.
 // 278 after the one Get Files workflow removed the provider picker and separate open-provider link.
-const EXPECTED_ENTRIES = 278;
+// 280 with the active Settings content scroller and STM32CubeMX source disclosure directly
+// addressable for first-run and scroll-position acceptance.
+const EXPECTED_ENTRIES = 280;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

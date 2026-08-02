@@ -48,6 +48,7 @@ import {
   type UpdateStanding,
 } from "../lib/updateStanding";
 import { useUpdateStanding } from "../lib/useUpdateStanding";
+import { pickHostFolder } from "../lib/hostFolderPicker";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -156,6 +157,11 @@ export function SettingsPage() {
   const { theme } = useTheme();
 
   const [group, setGroup] = useState<GroupId>("general");
+  const settingsContentRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (settingsContentRef.current) settingsContentRef.current.scrollTop = 0;
+  }, [group]);
 
   // Hidden dev combo (Ctrl+Alt+K): load API keys / logins from the per-machine
   // dev-creds.json so live validation is not blocked on retyping them. It lives at
@@ -447,7 +453,11 @@ export function SettingsPage() {
               <p className="mt-0.5 text-xs text-t3">{activeMeta.description}</p>
             </div>
           </div>
-          <div className="grid min-h-0 flex-1 auto-rows-max grid-cols-1 gap-3 overflow-y-auto p-3 @3xl:grid-cols-2">
+          <div
+            ref={settingsContentRef}
+            data-dev-id="settings.content"
+            className="grid min-h-0 flex-1 auto-rows-max grid-cols-1 gap-3 overflow-y-auto p-3 @3xl:grid-cols-2"
+          >
             {group === "general" ? (
               <>
                 <SettingsDisclosure
@@ -589,6 +599,21 @@ export function SettingsPage() {
                   data-dev-id="settings.altium"
                 >
                   <AltiumDbLibSection />
+                </SettingsDisclosure>
+                <SettingsDisclosure
+                  title="STM32CubeMX Data"
+                  hint="Choose the local CubeMX data folder once. Stockroom remembers it and builds the searchable MCU index on demand."
+                  summary={
+                    s?.stm_cubemx_source ? (
+                      <Text id="settings.summary.cubemx-ready">Configured</Text>
+                    ) : (
+                      <Badge tone="neutral">Optional</Badge>
+                    )
+                  }
+                  className="@3xl:col-span-2"
+                  data-dev-id="settings.cubemx"
+                >
+                  <CubeMxSection />
                 </SettingsDisclosure>
               </>
             ) : group === "sources" ? (
@@ -1416,6 +1441,78 @@ function KiCadSection() {
         </div>
       </div>
     </>
+  );
+}
+
+function CubeMxSection() {
+  const settings = useSettings();
+  const save = useUpdateSettings();
+  const { toast } = useToast();
+  const [draft, setDraft] = useState<string | null>(null);
+  const saved = settings.data?.stm_cubemx_source ?? "";
+  const value = draft ?? saved;
+  const dirty = value.trim() !== saved;
+
+  async function chooseFolder() {
+    try {
+      const folder = await pickHostFolder("stm-cubemx");
+      if (!folder) return;
+      const result = await save.mutateAsync({ stm_cubemx_source: folder });
+      setDraft(null);
+      toast(
+        result.stm_cubemx_source
+          ? "CubeMX data folder saved."
+          : "CubeMX data folder was not saved.",
+        result.stm_cubemx_source ? "ok" : "err",
+      );
+    } catch (error) {
+      toast(errMsg(error), "err");
+    }
+  }
+
+  function saveDraft() {
+    if (!dirty || save.isPending) return;
+    save.mutate(
+      { stm_cubemx_source: value.trim() },
+      {
+        onSuccess: () => {
+          setDraft(null);
+          toast("CubeMX data folder saved.", "ok");
+        },
+        onError: (error) => toast(errMsg(error), "err"),
+      },
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-t2">
+        Stockroom uses the STM32CubeMX MCU data as the native source for its spec matrix,
+        pinouts, and compatibility tools.
+      </p>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <label htmlFor="stm-cubemx-source" className="w-40 flex-none text-xs text-t3">
+          CubeMX Data Folder
+        </label>
+        <input
+          id="stm-cubemx-source"
+          value={value}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder="Choose the CubeMX data folder"
+          className={INPUT_CLS}
+        />
+        <Button onClick={chooseFolder} disabled={save.isPending}>
+          Choose Folder
+        </Button>
+      </div>
+      {dirty ? (
+        <div>
+          <Button onClick={saveDraft} disabled={save.isPending}>
+            {save.isPending ? "Saving..." : "Save Folder"}
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
