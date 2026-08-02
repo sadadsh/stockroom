@@ -27,6 +27,8 @@ def _windows_gate_violations(text: str) -> list[str]:
             "            --locked-mode",
         ),
         ("native-no-restore-test", "--configuration Release `\n            --no-restore"),
+        ("kicad-native-only", "@('.cmd', '.bat') -contains ("),
+        ("kicad-extension-check", "[System.IO.Path]::GetExtension($command.Source)"),
     )
     for name, contract in required:
         if contract not in text:
@@ -108,6 +110,8 @@ def test_windows_detector_rejects_label_only_known_bad_gate() -> None:
         "native-test-stage",
         "native-locked-restore",
         "native-no-restore-test",
+        "kicad-native-only",
+        "kicad-extension-check",
     ]
 
 

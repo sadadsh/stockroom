@@ -27,6 +27,8 @@ from uuid import uuid4
 from stockroom.api.context import AppContext
 from stockroom.launcher.exit_codes import EXIT_RESTART
 
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 # EXIT_RESTART (the self-update restart exit code the launcher relaunches on) lives in the
 # leaf module stockroom.launcher.exit_codes so the frozen launcher can import it without
 # dragging this whole host/API module into the bundle (M9d). Re-exported here for the host.
@@ -830,7 +832,10 @@ def _spawn_self() -> int:
     relaunch whatever python happens to be first, which on a machine with several is not the
     install's venv.
     """
-    return subprocess.call([sys.executable, "-m", "stockroom.host.run"])
+    return subprocess.call(
+        [sys.executable, "-m", "stockroom.host.run"],
+        creationflags=_NO_WINDOW,
+    )
 
 
 def main() -> None:

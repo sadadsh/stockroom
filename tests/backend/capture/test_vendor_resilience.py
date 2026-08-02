@@ -90,7 +90,7 @@ def test_digikey_enumerates_distinct_measured_author_routes() -> None:
         "DigiKey · CADENAS",
     ]
     assert adapter.capability.browser_access == "user_driven"
-    assert adapter.capability.operator_automation is True
+    assert adapter.capability.operator_automation is False
     assert adapter.capability.supported_formats == {"kicad", "model", "altium"}
     assert routes[0].capability.supported_formats == {"kicad", "model", "altium"}
     assert routes[1].capability.supported_formats == {"kicad", "model", "altium"}
@@ -100,8 +100,10 @@ def test_digikey_enumerates_distinct_measured_author_routes() -> None:
     assert routes[2].supplementary_only is True
     assert routes[3].supplementary_only is True
     assert routes[4].supplementary_only is True
-    assert routes[3].capability.operator_automation is True
-    assert routes[4].capability.operator_automation is True
+    assert routes[3].capability.operator_automation is False
+    assert routes[3].capability.browser_access == "user_driven"
+    assert routes[4].capability.operator_automation is False
+    assert routes[4].capability.browser_access == "user_driven"
     assert adapter.resolve_url("MCP4728-E/UN").endswith("keywords=MCP4728-E%2FUN")
 
 

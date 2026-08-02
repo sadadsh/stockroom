@@ -236,7 +236,7 @@ describe("CaptureProvider store", () => {
 
     expect(result.current.active.status).toBe("error");
     expect(result.current.active.message).toContain(
-      "Complete the security step in Stockroom's provider browser",
+      "Clear the provider gate, then select Get Files again",
     );
     expect(result.current.active.providerOutcomes[0]?.status).toBe("requires-human");
     expect(readUiSession().selected_ids.workflow_batch).toBeNull();
@@ -425,7 +425,7 @@ describe("CaptureProvider store", () => {
     expect(stream).not.toHaveBeenCalled();
   });
 
-  it("holds one active capture and replaces it when a different part starts", async () => {
+  it("allows a different part only after the previous capture reaches a terminal state", async () => {
     mockSource();
     mockCapture();
     const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
@@ -444,15 +444,9 @@ describe("CaptureProvider store", () => {
     });
     expect(result.current.active.partId).toBe("p2"); // replaced, never two at once
     expect(result.current.active.partName).toBe("Part Two");
-    // The first run had already settled, so nothing was displaced and nothing is claimed to be.
-    expect(result.current.active.superseded).toBeNull();
   });
 
-  it("names the part it displaced when a second part takes the single capture slot", async () => {
-    // The one global slot means starting part B abandons part A's follow loop. That used to happen
-    // in total silence: `partIdRef`/`batchIdRef`/`followGenerationRef` were overwritten, A's loop
-    // ended at its next generation check, and the saved workflow pointer moved to B. Following
-    // both would need a real per-part job manager; the floor is that A is never dropped unnamed.
+  it("refuses a second part instead of orphaning the active durable workflow", async () => {
     mockSource();
     // Neither submission resolves, so p1's capture is genuinely still in flight when p2 starts.
     vi.spyOn(api, "runCapture").mockImplementation(
@@ -465,21 +459,48 @@ describe("CaptureProvider store", () => {
       await Promise.resolve();
     });
     expect(result.current.active.partId).toBe("p1");
-    expect(result.current.active.superseded).toBeNull();
-
-    await act(async () => {
-      void result.current.start("p2", "Part Two", ["kicad_symbol"]);
-      await Promise.resolve();
-    });
-
-    expect(result.current.active.partId).toBe("p2");
-    expect(result.current.active.superseded).toEqual({
-      partId: "p1",
-      partName: "Part One",
-    });
+    await expect(
+      result.current.start("p2", "Part Two", ["kicad_symbol"]),
+    ).rejects.toThrow("Finish the active completion for Part One");
+    expect(result.current.active.partId).toBe("p1");
+    expect(api.runCapture).toHaveBeenCalledTimes(1);
   });
 
-  it("does not claim a supersede when the same part is started again", async () => {
+  it("refuses a new part while a durable workflow restored after reload is still running", async () => {
+    const restored = defaultUiSession();
+    restored.selected_ids.workflow_batch = "batch-restored-running";
+    restored.selected_ids.workflow_item = "item-restored-running";
+    restored.event_sequence = 7;
+    resetUiSessionForTests(restored);
+    vi.spyOn(api, "captureWorkflow").mockResolvedValue({
+      workflow_batch_id: "batch-restored-running",
+      workflow_item_id: "item-restored-running",
+      part_id: "p1",
+      mode: "automatic",
+      vendor: null,
+      background: true,
+      initial_needs: ["kicad_symbol"],
+      report: null,
+    } as never);
+    vi.spyOn(api, "partDetail").mockResolvedValue({
+      id: "p1",
+      derived: { display_name: "Part One" },
+    } as never);
+    vi.spyOn(api, "workflowEvents").mockReturnValue(new Promise(() => undefined));
+    const run = vi.spyOn(api, "runCapture");
+    const { result } = renderHook(() => useCapture(), {
+      wrapper: wrap(new QueryClient()),
+    });
+
+    await waitFor(() => expect(result.current.active.status).toBe("receiving"));
+    await expect(
+      result.current.start("p2", "Part Two", ["kicad_symbol"]),
+    ).rejects.toThrow("Finish the active completion for Part One");
+    expect(result.current.active.partId).toBe("p1");
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("single-flights the same command and refuses a different command for the active part", async () => {
     mockSource();
     vi.spyOn(api, "runCapture").mockImplementation(
       () => new Promise(() => undefined),
@@ -490,13 +511,11 @@ describe("CaptureProvider store", () => {
       void result.current.start("p1", "Part One", ["kicad_symbol"]);
       await Promise.resolve();
     });
-    await act(async () => {
-      void result.current.start("p1", "Part One", ["kicad_symbol"], "ultralibrarian");
-      await Promise.resolve();
-    });
-
+    await expect(
+      result.current.start("p1", "Part One", ["kicad_symbol"], "ultralibrarian"),
+    ).rejects.toThrow("Finish the active completion for Part One");
     expect(result.current.active.partId).toBe("p1");
-    expect(result.current.active.superseded).toBeNull();
+    expect(api.runCapture).toHaveBeenCalledTimes(1);
   });
 
   it("keepWorking backgrounds the active capture so the pill can take over", async () => {
@@ -552,37 +571,6 @@ describe("CaptureProvider store", () => {
     expect(result.current.active.status).toBe("idle");
   });
 
-  it("remembers the decision a capture accepted, not just the one in flight", async () => {
-    // `intentPending` is cleared the instant the request comes back, so by the time the capture
-    // reaches a terminal state it says nothing at all. A surface working through a list of
-    // components has to tell a route that ended by itself from one the person deliberately
-    // stopped, and that answer has to still be there when the run finishes.
-    mockSource();
-    vi.spyOn(api, "runCapture").mockImplementation(
-      () => new Promise(() => undefined),
-    );
-    const intent = vi.spyOn(api, "captureIntent").mockResolvedValue({
-      part_id: "p1",
-      action: "skip-part",
-      accepted: true,
-    });
-    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
-
-    await act(async () => {
-      void result.current.start("p1", "Part One", ["kicad_symbol"], "ultralibrarian", "assisted");
-      await Promise.resolve();
-    });
-    expect(result.current.active.intentSent).toBeNull();
-
-    await act(async () => {
-      await result.current.skipPart();
-    });
-
-    expect(intent).toHaveBeenCalledWith("p1", "skip-part");
-    expect(result.current.active.intentPending).toBeNull();
-    expect(result.current.active.intentSent).toBe("skip-part");
-  });
-
   // -- The behaviours that still matter now the host callback is gone -----------------------
   //
   // The old tests here drove `window.__STOCKROOM_CAD_DOWNLOAD__`: a token-guarded "done" signal
@@ -611,24 +599,13 @@ describe("CaptureProvider store", () => {
     expect((window as { pywebview?: unknown }).pywebview).toBeUndefined();
   });
 
-  it("a capture whose part was replaced mid-flight never marks the new part", async () => {
-    // The B4 guard, preserved. Its mechanism changed (a token from the host -> comparing the part
-    // the run was started for) but the failure it prevents is identical: one part's result landing
-    // on another part's checklist.
+  it("a delayed capture submission cannot be replaced by another part", async () => {
     mockSource();
-    let release: (() => void) | null = null;
     const firstReference = new Promise<{
       workflow_batch_id: string;
       workflow_item_id: string;
       event_cursor: number;
-    }>((resolve) => {
-      release = () =>
-        resolve({
-          workflow_batch_id: "batch-stale",
-          workflow_item_id: "item-stale",
-          event_cursor: 0,
-        });
-    });
+    }>(() => undefined);
     vi.spyOn(api, "runCapture")
       .mockImplementationOnce(() => firstReference)
       .mockResolvedValueOnce({
@@ -683,24 +660,21 @@ describe("CaptureProvider store", () => {
       })[0].data.result,
     } as never);
 
-    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
-    let first: Promise<void>;
+    const { result, unmount } = renderHook(() => useCapture(), {
+      wrapper: wrap(new QueryClient()),
+    });
     await act(async () => {
-      first = result.current.start("p1", "Part One", ["kicad_symbol"]);
+      void result.current.start("p1", "Part One", ["kicad_symbol"]);
       await Promise.resolve();
     });
-    // a second part takes over while the first submission response is delayed
-    await act(async () => {
-      await result.current.start("p2", "Part Two", ["kicad_symbol"]);
-    });
-    await act(async () => {
-      release?.();
-      await first!;
-    });
-
-    expect(result.current.active.partId).toBe("p2");
-    expect(result.current.active.partName).toBe("Part Two");
+    await expect(
+      result.current.start("p2", "Part Two", ["kicad_symbol"]),
+    ).rejects.toThrow("Finish the active completion for Part One");
+    expect(result.current.active.partId).toBe("p1");
+    expect(result.current.active.partName).toBe("Part One");
+    expect(api.runCapture).toHaveBeenCalledTimes(1);
     expect(readUiSession().selected_ids.workflow_batch).toBeNull();
+    unmount();
   });
 
   it("an error frame from the run surfaces as an error, never a silent done", async () => {

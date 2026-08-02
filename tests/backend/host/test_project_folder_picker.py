@@ -75,3 +75,12 @@ def test_folder_picker_refuses_unknown_workflow_before_opening_a_dialog(monkeypa
         lambda: (_ for _ in ()).throw(AssertionError("dialog must stay closed")),
     )
     assert host_window._HostApi().pick_folder("arbitrary") == []
+
+
+def test_legacy_project_picker_delegates_to_the_allowlisted_bridge(monkeypatch, tmp_path):
+    from stockroom.host import window as host_window
+
+    api = host_window._HostApi()
+    monkeypatch.setattr(api, "pick_folder", lambda purpose: [str(tmp_path), purpose])
+
+    assert api.pick_project_folder() == [str(tmp_path), "project"]

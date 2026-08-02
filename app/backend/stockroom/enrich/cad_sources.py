@@ -2,7 +2,7 @@
 
 DigiKey Product Information V4 Media is durable route evidence, not an Ultra Librarian preference.
 Stockroom retains the complete Media payload, recognizes every known CAD author it names, and the
-single Get Files workflow walks DigiKey's multi-author surface plus direct fallbacks. A partial
+single Get Files workflow walks DigiKey's multi-author surface plus exact standalone pages. A partial
 result from one author never ends collection: valid files are retained and later routes fill gaps
 or become selectable alternatives.
 

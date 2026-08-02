@@ -358,7 +358,7 @@ def _choose_product(body: dict | None, mpn: str) -> dict:
             for product in products
             if normalize_mpn(_obj_str(product.get("ManufacturerProductNumber"))) == target
         ),
-        products[0],
+        {},
     )
 
 
@@ -650,15 +650,13 @@ def parse_digikey_payload(body: dict | None, mpn: str) -> EnrichmentResult:
         None,
     )
     detailed = _details_product(body, mpn)
-    chosen = detailed or (exact if exact is not None else products[0])
+    chosen = detailed or exact
     if not isinstance(chosen, dict):
         return EnrichmentResult()
     result = _parse_digikey_part(chosen)
     catalog = digikey_catalog_from_payload(body, mpn)
     if catalog:
         result.catalog["digikey"] = catalog
-    if exact is None and result.mpn is not None:
-        result.mpn = Sourced(result.mpn.value, "digikey", "low")  # flag for manual review
     return result
 
 

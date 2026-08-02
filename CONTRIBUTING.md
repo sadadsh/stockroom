@@ -54,8 +54,10 @@ never sufficient for a visual or Windows-specific change.
   fabricated. Errors say what happened and how to fix it.
 - **Copy voice.** Interactive labels (buttons, headings, tabs) are Title Case; body prose is
   sentence case; no em dashes.
-- **New behaviour gets a test.** Backend seams are built test-first. UI changes get looked at in
-  both light and dark themes.
+- **New behaviour gets an outcome test.** A mock proving that a button was clicked or a function
+  was called is only a contract test. Acceptance must also observe the user-facing boundary: saved
+  bytes, preserved state, a returned host result, or the absence of an unwanted process. UI changes
+  get looked at in both light and dark themes.
 - **Scoped commits.** `git add <path>`, never `git add -A`. Plain one-line commit messages.
 
 ## Local guardrails (optional but recommended)

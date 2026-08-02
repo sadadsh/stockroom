@@ -17,7 +17,6 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../api/client";
 import type {
-  CapturePersonIntentAction,
   CompletionEvidence,
   CompletionResult,
   CadSourceResponse,
@@ -43,6 +42,13 @@ export type GuidedStatus =
 
 export type CaptureMode = "automatic" | "assisted" | "collect-all";
 
+export class CaptureBusyError extends Error {
+  constructor(partName: string) {
+    super(`Finish the active completion for ${partName || "the current part"} before starting another.`);
+    this.name = "CaptureBusyError";
+  }
+}
+
 export const KICAD_REQS: Requirement[] = [
   "kicad_symbol",
   "kicad_footprint",
@@ -63,8 +69,6 @@ export const REQ_LABELS: Record<Requirement, string> = {
 
 type Received = Partial<Record<Requirement, boolean>>;
 
-export type { CapturePersonIntentAction };
-
 export interface CaptureState {
   partId: string | null;
   partName: string | null;
@@ -75,15 +79,6 @@ export interface CaptureState {
   // Which lane this run is in. Only the person-driven lanes open a provider page a person can be
   // standing in front of, so only they may offer Finish Route and Skip This Part.
   mode: CaptureMode | null;
-  // The person-driven decision currently being sent, and what came back. Kept apart from
-  // `message`, which the durable follow loop rewrites on every poll and would erase this.
-  intentPending: CapturePersonIntentAction | null;
-  intentNote: string | null;
-  // The last decision this capture ACCEPTED, which outlives `intentPending` on purpose. A surface
-  // working a list of components has to know the difference between a route that ended by itself
-  // and one the person deliberately stopped, and by the time the capture is terminal the pending
-  // flag is long cleared. Reset with the rest of the state when a new capture takes the slot.
-  intentSent: CapturePersonIntentAction | null;
   needs: Requirement[];
   received: Received;
   backgrounded: boolean;
@@ -91,10 +86,6 @@ export interface CaptureState {
   collectionComplete: boolean | null;
   completionEvidence: CompletionEvidence | null;
   completionEvidenceReported: boolean;
-  // The part this capture displaced, when a different part was still mid-capture as it started.
-  // There is exactly one capture slot, so that earlier run stops being followed; naming it here is
-  // what keeps the surface honest instead of letting the work disappear without a word.
-  superseded: { partId: string; partName: string } | null;
 }
 
 const IDLE: CaptureState = {
@@ -105,9 +96,6 @@ const IDLE: CaptureState = {
   url: null,
   vendor: null,
   mode: null,
-  intentPending: null,
-  intentNote: null,
-  intentSent: null,
   needs: [],
   received: {},
   backgrounded: false,
@@ -115,7 +103,6 @@ const IDLE: CaptureState = {
   collectionComplete: null,
   completionEvidence: null,
   completionEvidenceReported: false,
-  superseded: null,
 };
 
 // A capture that has not reached a terminal verdict yet. Starting a different part while one of
@@ -131,16 +118,6 @@ const IN_FLIGHT: GuidedStatus[] = ["resolving", "window-open", "receiving", "att
  */
 export function captureInFlight(state: CaptureState): boolean {
   return IN_FLIGHT.includes(state.status);
-}
-
-/**
- * Can the person say "I am finished with this route" or "skip this component" right now?
- *
- * Only a provider route waiting for human input opens the embedded provider surface, so only that
- * state has a route in front of anybody to finish. The automatic stages keep these controls hidden.
- */
-export function captureAwaitsPerson(state: CaptureState): boolean {
-  return captureInFlight(state) && state.mode !== null && state.mode !== "automatic";
 }
 
 const EVENT_PAGE_LIMIT = 200;
@@ -261,8 +238,10 @@ function durableMessage(
     return "Completion is paused. Resume it from Library Completion when you are ready.";
   }
   if (batch.status === "blocked") {
-    return "Automatic collection paused before a complete CAD package was available. " +
-      "Complete the security step in Stockroom's provider browser to resume.";
+    return (
+      "Collection stopped before a complete CAD package was available. Clear the provider gate, " +
+      "then select Get Files again; Stockroom will reuse the retained evidence and provider session."
+    );
   }
   if (batch.status === "cancelled") return "Completion was cancelled before publication.";
   if (batch.status === "failed") {
@@ -341,11 +320,6 @@ export interface CaptureApi {
   ) => Promise<void>;
   reset: () => void;
   keepWorking: () => void;
-  // The person's own two answers about the page in front of them. `finishRoute` says no more files
-  // are coming from it (what already landed is kept); `skipPart` stops this component's remaining
-  // provider routes. Neither touches the provider page - they describe the person's intent.
-  finishRoute: () => Promise<void>;
-  skipPart: () => Promise<void>;
   reopenPartId: string | null;
   requestReopen: () => void;
   requestOpenFor: (partId: string) => void;
@@ -394,6 +368,8 @@ function completionEvidenceMessage(evidence: CompletionEvidence | null): string 
 
 export function CaptureProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<CaptureState>(IDLE);
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const [reopenPartId, setReopenPartId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const partIdRef = useRef<string | null>(null);
@@ -697,18 +673,8 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       needsRef.current = needs;
       batchIdRef.current = null;
       itemIdRef.current = null;
-      setState((current) => ({
+      setState(() => ({
         ...IDLE,
-        // ONE global capture slot. The refs above have just been repointed, so the previous part's
-        // follow loop ends at its next generation check and its durable pointer is overwritten by
-        // the first `persistWorkflow` below. Following both at once would need a real per-part job
-        // manager (one state, one saved workflow pointer, and one status pill all assume a single
-        // run), which is not a contained change. What this must never do is drop the earlier part
-        // in silence, so the displaced part travels with the new state for the surface to report.
-        superseded:
-          current.partId && current.partId !== partId && IN_FLIGHT.includes(current.status)
-            ? { partId: current.partId, partName: current.partName ?? "" }
-            : null,
         partId,
         partName,
         needs,
@@ -805,14 +771,27 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     ): Promise<void> => {
       const commandKey = captureCommandKey(partId, sourceKey, mode);
       const pending = pendingStartRef.current;
-      if (pending?.commandKey === commandKey) return pending.promise;
+      if (pending) {
+        if (pending.commandKey === commandKey) return pending.promise;
+        return Promise.reject(new CaptureBusyError(stateRef.current.partName ?? ""));
+      }
+      const currentCapture = stateRef.current;
+      if (captureInFlight(currentCapture)) {
+        // Also covers a workflow restored from durable UI state, which has no pending promise in
+        // this renderer but is still the one capture slot being followed.
+        return Promise.reject(new CaptureBusyError(currentCapture.partName ?? ""));
+      }
 
       const promise = runStart(partId, partName, needs, sourceKey, mode);
-      const active = { commandKey, promise };
-      pendingStartRef.current = active;
-      void promise.finally(() => {
-        if (pendingStartRef.current === active) pendingStartRef.current = null;
-      });
+      const pendingEntry = { commandKey, promise };
+      pendingStartRef.current = pendingEntry;
+      const clearPending = () => {
+        if (pendingStartRef.current === pendingEntry) pendingStartRef.current = null;
+      };
+      // Do not use an ignored `finally()` here. It creates a second promise that rejects whenever
+      // `runStart` rejects, even when the caller correctly handles the original promise, which
+      // surfaces as an unrelated unhandled rejection in the renderer.
+      void promise.then(clearPending, clearPending);
       return promise;
     },
     [runStart],
@@ -832,55 +811,6 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     setState((current) => ({ ...current, backgrounded: true }));
   }, []);
 
-  // The person's own decision about the provider page in front of them, sent to the running
-  // capture. It is deliberately NOT optimistic: the backend refuses a signal for a component it is
-  // not capturing, and a control that claimed success anyway would be exactly the control nobody
-  // could trust. `intentNote` reports the outcome without touching `message`, which the durable
-  // follow loop rewrites every 750 ms.
-  const sendIntent = useCallback(
-    async (action: CapturePersonIntentAction, sent: string): Promise<void> => {
-      const partId = partIdRef.current;
-      if (!partId) return;
-      setState((current) => ({ ...current, intentPending: action, intentNote: null }));
-      try {
-        await api.captureIntent(partId, action);
-        if (partIdRef.current !== partId) return;
-        setState((current) => ({
-          ...current,
-          intentPending: null,
-          intentNote: sent,
-          intentSent: action,
-        }));
-      } catch (error) {
-        if (partIdRef.current !== partId) return;
-        setState((current) => ({
-          ...current,
-          intentPending: null,
-          intentNote: errorMessage(error, "Stockroom could not reach this capture."),
-        }));
-      }
-    },
-    [],
-  );
-
-  const finishRoute = useCallback(
-    () =>
-      sendIntent(
-        "finish-route",
-        "Stockroom is closing out this provider route. Anything already downloaded is kept.",
-      ),
-    [sendIntent],
-  );
-
-  const skipPart = useCallback(
-    () =>
-      sendIntent(
-        "skip-part",
-        "Stockroom is stopping this component's remaining provider routes.",
-      ),
-    [sendIntent],
-  );
-
   const requestReopen = useCallback(() => {
     setReopenPartId(partIdRef.current);
     setState((current) => ({ ...current, backgrounded: false }));
@@ -899,8 +829,6 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         start,
         reset,
         keepWorking,
-        finishRoute,
-        skipPart,
         reopenPartId,
         requestReopen,
         requestOpenFor,

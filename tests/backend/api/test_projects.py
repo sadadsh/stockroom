@@ -138,7 +138,18 @@ def test_discover_previews_every_project_before_linking(client, tmp_path):
     assert rows[1]["boards"] == ["Amp.PcbDoc"]
 
 
-def test_workspace_has_the_same_tools_and_document_shape_for_both_edas(client, tmp_path):
+def test_workspace_has_the_same_tools_and_document_shape_for_both_edas(
+    client, tmp_path, monkeypatch
+):
+    from stockroom.projects.adapters import get_adapter
+
+    def native_call(*args, **kwargs):
+        raise AssertionError("project selection must not start or probe a native tool")
+
+    monkeypatch.setattr(get_adapter("kicad").cli, "version", native_call)
+    monkeypatch.setattr(get_adapter("altium").driver, "busy_titles", native_call)
+    monkeypatch.setattr(get_adapter("altium").driver, "run_script", native_call)
+
     kicad = _register(client, _make_project(tmp_path / "kicad"))
     altium_root = tmp_path / "altium"
     altium_root.mkdir()
@@ -742,7 +753,8 @@ def test_review_listing_turns_a_missing_saved_remote_base_into_recovery_state(
         "candidates": [],
         "blocked_reason": (
             "The saved work session's shared branch is no longer available. "
-            "Start a new work session from a current shared branch."
+            "Your active work remains preserved. Restore that branch, or share and "
+            "finish the current session before starting another."
         ),
     }
     assert "refs/remotes" not in response.text

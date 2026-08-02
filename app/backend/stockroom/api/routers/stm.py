@@ -53,7 +53,7 @@ def _configured_source(ctx) -> str:
     EXPECTED location (source_present says whether it exists) instead of an empty string."""
     configured = (getattr(ctx.config, "stm_cubemx_source", "") or "").strip()
     if configured:
-        return configured
+        return str(stm_source.normalize_cubemx_source(Path(configured)))
     return str(stm_source.expected_cubemx_source())
 
 
@@ -330,7 +330,7 @@ def stm_router(require_token) -> APIRouter:
                     "building": building,
                     "source_path": configured_source,
                     "source_present": bool(configured_source)
-                    and Path(configured_source).is_dir(),
+                    and stm_source.has_device_xml(Path(configured_source)),
                     "all_families": False,
                     "device_xml_count": 0,
                     "family_count": 0,
@@ -361,7 +361,8 @@ def stm_router(require_token) -> APIRouter:
                 "built": True,
                 "building": building,
                 "source_path": source_path,
-                "source_present": bool(source_path) and Path(source_path).is_dir(),
+                "source_present": bool(source_path)
+                and stm_source.has_device_xml(Path(source_path)),
                 "all_families": meta.get("all_families") == "true",
                 "device_xml_count": meta.get("device_xml_count", 0),
                 "family_count": meta.get("family_count", 0),

@@ -725,6 +725,10 @@ class StmIndex:
         """
         cubemx_source = Path(cubemx_source)
         availability = source_mod.check_availability(cubemx_source)
+        if availability.device_xml_count == 0:
+            raise ValueError(
+                f"CubeMX source at {cubemx_source} contains no STM32 device XML files."
+            )
         if require_all_families and not availability.all_families:
             raise StmSourceCoverageError(
                 f"source at {cubemx_source} looks F-only "

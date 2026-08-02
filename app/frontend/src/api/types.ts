@@ -2894,6 +2894,8 @@ export interface CaptureBatchWorklist {
   pending_items: number;
   // Bounded rows; `*_total` is the true count behind each bounded list.
   worklist: CaptureWorklistRow[];
+  // Missing on older backends, where rows/totals were provider-route scoped.
+  worklist_unit?: "components";
   worklist_total: number;
   unattended: CaptureWorklistCompleted[];
   unattended_total: number;
@@ -2912,17 +2914,6 @@ export interface CaptureWorkflowSession {
   background: boolean;
   initial_needs: Requirement[];
   report: CompletionResult | null;
-}
-
-// What the PERSON decided about the person-driven capture in front of them. De-automation
-// removed the provider HUD, so Finish and Skip live in Stockroom's own window and travel to the
-// running capture as one of these two words. Neither ever touches a provider page.
-export type CapturePersonIntentAction = "finish-route" | "skip-part";
-
-export interface CapturePersonIntentResult {
-  part_id: string;
-  action: CapturePersonIntentAction;
-  accepted: boolean;
 }
 
 // A progress frame from a completion run's SSE stream.

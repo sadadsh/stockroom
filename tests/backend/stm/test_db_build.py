@@ -9,6 +9,8 @@ Fixtures (tests/backend/fixtures/stm/, real CubeMX XML, cited in the phase CONTE
 
 from pathlib import Path
 
+import pytest
+
 from stockroom.stm import db as db_mod
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "stm"
@@ -109,6 +111,26 @@ def test_load_round_trips_a_file_backed_build(tmp_path):
     assert loaded is not None
     assert loaded.mcu_count() == built_count
     loaded.close()
+
+
+def test_empty_source_is_rejected_before_an_existing_index_is_replaced(tmp_path):
+    db_path = tmp_path / "index.sqlite"
+    existing = db_mod.StmIndex.build(FIXTURES, db_path=db_path)
+    existing_count = existing.mcu_count()
+    existing.close()
+    before = db_path.read_bytes()
+    empty_source = tmp_path / "empty-source"
+    empty_source.mkdir()
+    (empty_source / "families.xml").write_text("<Families />", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="contains no STM32 device XML files"):
+        db_mod.StmIndex.build(empty_source, db_path=db_path)
+
+    assert db_path.read_bytes() == before
+    preserved = db_mod.StmIndex.load(db_path)
+    assert preserved is not None
+    assert preserved.mcu_count() == existing_count
+    preserved.close()
 
 
 def test_load_returns_none_on_classifier_rev_mismatch(tmp_path, monkeypatch):

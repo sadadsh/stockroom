@@ -27,8 +27,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useCaptureWorklist } from "../api/queries";
 import type { CaptureWorklistRow, Requirement } from "../api/types";
-import { captureAwaitsPerson, captureInFlight, REQ_LABELS, useCapture } from "../lib/capture";
-import { CaptureRouteControls } from "./CaptureRouteControls";
+import { captureInFlight, REQ_LABELS, useCapture } from "../lib/capture";
 import { Badge, Button } from "./primitives";
 
 // A worklist is a sitting, not an inbox: the rows a person can realistically work through before
@@ -41,28 +40,46 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
   const data = worklist.data;
   // Bounded here rather than after the early return below, because `useAutoAdvance` is a hook and
   // cannot sit behind one. An absent projection simply gives it nothing to work through.
-  const rows = (data?.worklist ?? []).slice(0, VISIBLE_ROWS);
+  // Rolling updates can briefly pair this frontend with an older backend that projected one row
+  // per person-owned provider route. Get Files is component-scoped, so defend here as well: never
+  // queue or render the same component more than once.
+  const rawRows = data?.worklist ?? [];
+  const groupedRows = new Map<string, CaptureWorklistRow[]>();
+  for (const row of rawRows) {
+    groupedRows.set(row.part_id, [...(groupedRows.get(row.part_id) ?? []), row]);
+  }
+  const distinctRows = Array.from(groupedRows.values(), (routes) => {
+    const primary = routes[0];
+    if (routes.length === 1) return primary;
+    return {
+      ...primary,
+      label: Array.from(new Set(routes.map((route) => route.label))).join(" + "),
+      reason: routes.map((route) => `${route.label}: ${route.reason}`).join("; "),
+      remaining: Array.from(new Set(routes.flatMap((route) => route.remaining))),
+    };
+  });
+  const rows = distinctRows.slice(0, VISIBLE_ROWS);
   const auto = useAutoAdvance(rows);
   // No projection yet, or a batch this route does not own: say nothing rather than claim a
   // library is finished. The run's own status block above is still authoritative.
   if (!data) return null;
 
-  const hidden = data.worklist_total - rows.length;
+  const projectedRouteRows = data.worklist_unit !== "components";
+  // An older backend's total counts provider routes, not components, and the returned list may be
+  // capped. Never pretend the visible sample is the global total. Name that old unit honestly
+  // while still grouping its duplicate actions; the current backend reports component totals.
+  const actionableTotal = data.worklist_total;
+  const actionableLabel = projectedRouteRows ? "Routes Need You" : "Needs You";
+  const hidden = Math.max(0, actionableTotal - rows.length);
+  const oldProjectionHasMore =
+    projectedRouteRows &&
+    (data.worklist_total > rawRows.length || distinctRows.length > rows.length);
   // ONE capture slot, so a start on any row is a start for all of them. Read once here and handed
   // down, rather than each row asking and the answers drifting apart mid-render. A pass that is
   // between rows holds the slot just as firmly as one mid-capture, so it counts as busy too.
   const capturing = captureInFlight(capture.active);
   const busy = capturing || auto.running;
   const runningPartId = capturing ? capture.active.partId : null;
-  // A capture started from here is always person-driven, but the same slot can be holding an
-  // automatic pass started from the Complete Part window, and that opens no page to finish.
-  const awaitsPerson = captureAwaitsPerson(capture.active);
-  // One slot, so a capture started anywhere can displace one started here. Rows are disabled while
-  // a capture is in flight, so this list can never cause a supersession - but it can be on the
-  // receiving end of one, and a row whose run stopped being followed must not go quiet about it.
-  const displaced = capture.active.superseded;
-  const superseded =
-    displaced && rows.some((row) => row.part_id === displaced.partId) ? displaced : null;
 
   return (
     <div
@@ -71,8 +88,8 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
       className="mt-4 flex flex-col gap-2 border-t border-line pt-3"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone={data.worklist_total ? "warn" : "ok"}>
-          {data.worklist_total} Needs You
+        <Badge tone={actionableTotal ? "warn" : "ok"}>
+          {actionableTotal} {actionableLabel}
         </Badge>
         {data.unattended_total > 0 ? (
           <Badge tone="ok">{data.unattended_total} Done For You</Badge>
@@ -85,7 +102,7 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
         ) : null}
       </div>
 
-      {data.worklist_total === 0 ? (
+      {actionableTotal === 0 ? (
         <p className="text-sm text-t2">
           {data.pending_items > 0
             ? "Nothing needs you yet. This fills in as each component settles."
@@ -137,16 +154,6 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
               {auto.ended}
             </p>
           ) : null}
-          {superseded ? (
-            <p
-              data-testid="completion-worklist-superseded"
-              className="text-sm text-[var(--c-warn-text)]"
-            >
-              Completion for {superseded.partName || "an earlier component"} was superseded when
-              the running capture started, so that run is no longer being followed. Start it again
-              when this one finishes.
-            </p>
-          ) : null}
           <ul className="flex max-h-80 flex-col divide-y divide-line overflow-y-auto">
             {rows.map((row) => (
               <WorklistRow
@@ -154,12 +161,16 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
                 row={row}
                 busy={busy}
                 runningPartId={runningPartId}
-                awaitsPerson={awaitsPerson}
                 incomplete={auto.incomplete.includes(row.part_id)}
               />
             ))}
           </ul>
-          {hidden > 0 ? (
+          {oldProjectionHasMore ? (
+            <p className="text-sm text-t3">
+              More provider routes remain beyond this compatibility view. Work through these
+              components first, then run it again so Stockroom re-reads what is genuinely left.
+            </p>
+          ) : !projectedRouteRows && hidden > 0 ? (
             <p className="text-sm text-t3">
               {hidden} more {hidden === 1 ? "component needs" : "components need"} a person. Work
               through these first, then run it again: the next run re-reads what is genuinely left.
@@ -190,13 +201,11 @@ function WorklistRow({
   row,
   busy,
   runningPartId,
-  awaitsPerson,
   incomplete,
 }: {
   row: CaptureWorklistRow;
   busy: boolean;
   runningPartId: string | null;
-  awaitsPerson: boolean;
   // This row was started by the one-click pass and reached a terminal state without completing.
   // The row stays exactly where it is and says so: a row that quietly disappeared once its capture
   // failed would be a row nobody ever goes back to.
@@ -240,11 +249,6 @@ function WorklistRow({
           ))}
         </div>
       ) : null}
-      {running && awaitsPerson ? (
-        <div className="col-span-2 mt-1 rounded-control border border-line bg-field px-2.5 py-2">
-          <CaptureRouteControls partId={row.part_id} />
-        </div>
-      ) : null}
     </li>
   );
 }
@@ -283,8 +287,8 @@ interface AutoAdvance {
  * It stops, and says why, in every case where continuing would be wrong:
  *  - the person presses Stop Advancing;
  *  - the person presses Skip This Part, which is them taking the list back by hand;
- *  - another surface takes the capture slot, which is the existing `superseded` concept rather
- *    than a second notion of "the run that stopped being followed";
+ *  - the active capture identity changes unexpectedly, which is treated as a broken ownership
+ *    boundary instead of silently following a different component;
  *  - a capture that never opened a page, or a runtime that reports capture unavailable, because
  *    that fault repeats identically for every remaining row and would walk the whole list.
  * A capture that DID open and then ended incomplete is a real trip: the pass moves on and names
@@ -318,18 +322,16 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
         if (!heldRef.current) return;
         setPass({
           ...pass,
-          ended: `Working through the list stopped: the capture for ${open.name} was superseded when another one started.`,
+          ended: `Working through the list stopped: Stockroom lost ownership of the active capture for ${open.name}.`,
         });
         return;
       }
       const incomplete =
         active.status === "done" ? pass.incomplete : [...pass.incomplete, open.partId];
       const stopped =
-        active.intentSent === "skip-part"
-          ? `You skipped ${open.name}, so working through the list stopped there.`
-          : active.status === "unavailable" || !openedRef.current
-            ? `${open.name} could not be started, so working through the list stopped rather than opening every remaining page on the same fault.`
-            : null;
+        active.status === "unavailable" || !openedRef.current
+          ? `${open.name} could not be started, so working through the list stopped rather than opening every remaining page on the same fault.`
+          : null;
       setPass({ ...pass, open: null, incomplete, ended: stopped });
       return;
     }
@@ -349,7 +351,19 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
     heldRef.current = false;
     openedRef.current = false;
     setPass({ ...pass, queue: pass.queue.slice(1), open: next });
-    void start(next.partId, next.name, next.remaining, undefined, "collect-all");
+    void start(next.partId, next.name, next.remaining, undefined, "collect-all").catch(
+      (error) => {
+        const detail = error instanceof Error ? error.message : "the capture slot was unavailable";
+        setPass((current) =>
+          current?.open?.partId === next.partId && current.ended === null
+            ? {
+                ...current,
+                ended: `Working through the list stopped before ${next.name}: ${detail}`,
+              }
+            : current,
+        );
+      },
+    );
   }, [pass, active, start]);
 
   return {
@@ -428,7 +442,9 @@ function StartCapture({
       }
       aria-label={`Get files for ${name}`}
       onClick={() =>
-        void capture.start(row.part_id, name, row.remaining, undefined, "collect-all")
+        void capture
+          .start(row.part_id, name, row.remaining, undefined, "collect-all")
+          .catch(() => capture.requestReopen())
       }
     >
       {running ? "Getting Files" : "Get Files"}

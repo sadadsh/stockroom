@@ -54,6 +54,14 @@ function Resolve-DotNetSdk {
 
 function Enable-KiCadCli {
     $command = Get-Command kicad-cli -CommandType Application -ErrorAction SilentlyContinue
+    if ($command -and @('.cmd', '.bat') -contains (
+        [System.IO.Path]::GetExtension($command.Source).ToLowerInvariant()
+    )) {
+        # PowerShell classifies batch shims as Application commands. Invoking the workspace
+        # compatibility shim would create a visible cmd.exe for every native smoke test, so only
+        # KiCad's real executable qualifies for the Windows gate.
+        $command = $null
+    }
     if (-not $command) {
         $kiCadBin = Join-Path $env:ProgramFiles 'KiCad\10.0\bin'
         $installedCli = Join-Path $kiCadBin 'kicad-cli.exe'

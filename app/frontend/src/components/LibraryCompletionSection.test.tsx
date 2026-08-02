@@ -109,6 +109,7 @@ function worklist(): CaptureBatchWorklist {
         remaining: ["kicad_model"],
       },
     ],
+    worklist_unit: "components",
     worklist_total: 1,
     unattended: [],
     unattended_total: 2,
@@ -466,7 +467,7 @@ describe("running", () => {
     expect(submit).toHaveBeenCalledTimes(1);
     expect(submit).toHaveBeenCalledWith({
       limit: 1_000,
-      mode: "collect-all",
+      mode: "automatic",
       idempotencyKey: expect.stringMatching(/^library-completion-/),
     });
     expect(submit.mock.calls[0][0]).not.toHaveProperty("partIds");

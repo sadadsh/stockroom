@@ -272,7 +272,6 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "complete.cad-actions", label: "Get CAD Files buttons", area: "complete" },
   { id: "complete.cad-provider-outcomes", label: "CAD provider results", area: "complete" },
   { id: "complete.cad-live-status", label: "CAD capture live status", area: "complete" },
-  { id: "complete.superseded", label: "Superseded capture notice", area: "complete" },
   { id: "complete.requirements", label: "Requirements list", area: "complete" },
   { id: "complete.requirement-row", label: "Requirement row", area: "complete" },
   { id: "complete.done", label: "Done button", area: "complete" },

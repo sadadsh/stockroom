@@ -159,11 +159,11 @@ def test_quantity_pricing_is_normalized_and_sorted_without_losing_raw_variants()
     ]
 
 
-def test_lookup_downgrades_confidence_without_exact_match():
+def test_lookup_refuses_a_near_match_instead_of_storing_the_wrong_part():
     body = {"Products": [{"ManufacturerProductNumber": "CLOSE-BUT-NOT-IT",
                           "Manufacturer": {"Name": "TI"}}]}
     r = DigiKeyAdapter("id", "secret", requester=lambda mpn: body).lookup("WANTED")
-    assert r.mpn.value == "CLOSE-BUT-NOT-IT" and r.mpn.confidence == "low"
+    assert r.mpn is None
 
 
 def test_lookup_disabled_without_creds_makes_no_call():

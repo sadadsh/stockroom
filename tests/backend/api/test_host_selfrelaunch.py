@@ -80,6 +80,7 @@ def test_the_relaunch_reuses_this_interpreter_and_module(monkeypatch):
 
     host_run._spawn_self()
 
-    (cmd, _kw) = calls[0]
+    (cmd, kwargs) = calls[0]
     assert cmd[0] == sys.executable
     assert cmd[1:3] == ["-m", "stockroom.host.run"]
+    assert kwargs["creationflags"] == getattr(host_run.subprocess, "CREATE_NO_WINDOW", 0)

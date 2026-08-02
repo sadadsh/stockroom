@@ -133,6 +133,21 @@ class NativeWindowObservation:
     exported: NativeWindowExport
 
 
+@dataclass(slots=True)
+class ProviderBrowserLease:
+    """A hidden, verified provider surface that becomes visible only when armed."""
+
+    endpoint: str
+    _show: Callable[[], None]
+    _shown: bool = False
+
+    def show(self) -> None:
+        if self._shown:
+            return
+        self._show()
+        self._shown = True
+
+
 def _strict_mapping(
     value: object,
     *,
@@ -451,8 +466,8 @@ class SupervisorWindowHandoffPorts(WindowHandoffPorts):
             exported=exported,
         )
 
-    def open_provider_browser(self) -> str:
-        """Show and return the active window's one embedded provider surface."""
+    def prepare_provider_browser(self) -> str:
+        """Return the active window's hidden, verified provider endpoint."""
 
         with self._lock:
             client = self._active
@@ -461,8 +476,16 @@ class SupervisorWindowHandoffPorts(WindowHandoffPorts):
                 "active native provider browser is unavailable"
             )
         endpoint = client.provider_endpoint()
-        client.show_provider()
         return endpoint
+
+    def show_provider_browser(self) -> None:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError(
+                "active native provider browser is unavailable"
+            )
+        client.show_provider()
 
     def close_provider_browser(self) -> None:
         with self._lock:
@@ -697,12 +720,16 @@ class ProductionWindowReplacement:
 
     @contextmanager
     def provider_browser_surface(self):
-        """Lease the embedded browser so an update cannot replace it mid-capture."""
+        """Lease a hidden embedded browser until capture has armed its listeners."""
 
         with self._provider_lock:
-            endpoint = self._ports.open_provider_browser()
+            endpoint = self._ports.prepare_provider_browser()
+            lease = ProviderBrowserLease(
+                endpoint=endpoint,
+                _show=self._ports.show_provider_browser,
+            )
             try:
-                yield endpoint
+                yield lease
             finally:
                 self._ports.close_provider_browser()
 

@@ -19,8 +19,7 @@ import type {
 } from "../api/types";
 import { useCadSourceQuery } from "../api/queries";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
-import { captureAwaitsPerson, useCapture } from "../lib/capture";
-import { CaptureRouteControls } from "./CaptureRouteControls";
+import { captureInFlight, useCapture } from "../lib/capture";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
@@ -427,18 +426,19 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
   // required. Missing/unverified evidence remains incomplete even when every list is empty.
   const isDone = completionProven;
   const collectionPartial = download.collectionComplete === false;
-  const cadBusy =
+  const captureBusy =
     download.status === "resolving" ||
     download.status === "window-open" ||
     download.status === "receiving" ||
     download.status === "attaching";
+  const anotherCaptureBusy =
+    captureInFlight(capture.active) && capture.active.partId !== detail.id;
+  const cadBusy = captureBusy || anotherCaptureBusy;
   // Only a route waiting for human input opens the embedded provider page and can be finished or
   // skipped by the person.
-  const awaitsPerson =
-    capture.active.partId === detail.id && captureAwaitsPerson(capture.active);
   const [captureElapsed, setCaptureElapsed] = useState(0);
   useEffect(() => {
-    if (!cadBusy) {
+    if (!captureBusy) {
       setCaptureElapsed(0);
       return;
     }
@@ -448,15 +448,15 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
       setCaptureElapsed(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
     }, 1_000);
     return () => window.clearInterval(timer);
-  }, [cadBusy]);
+  }, [captureBusy]);
   // "Keep Working" only makes sense while a capture is actually in flight through the host.
-  const canBackground = cadBusy;
+  const canBackground = captureBusy;
 
   // Closing the window while a capture is still in flight must not lose it: hand it to the
   // background pill instead of dropping it. Every close path (Escape, backdrop, the X, Done)
   // goes here.
   function handleClose() {
-    if (cadBusy) download.keepWorking();
+    if (captureBusy) download.keepWorking();
     onClose();
   }
 
@@ -587,10 +587,6 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
         : needs.length === 0
           ? "No completion evidence is recorded. Run verification before treating this part as complete."
           : needsSubline();
-  // Stockroom holds ONE capture slot, so starting this part's capture stops the previous part's
-  // run from being followed. The store names the part that was displaced; this window says it out
-  // loud on the surface that caused it, rather than letting the earlier work vanish.
-  const superseded = capture.active.partId === detail.id ? capture.active.superseded : null;
   const showDownloadMessage =
     Boolean(download.message) &&
     (!isDone ||
@@ -749,23 +745,12 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                   <p className={"mt-3 text-xs " + statusTone}>{download.message}</p>
                 ) : null}
 
-                {superseded ? (
-                  <p
-                    data-dev-id="complete.superseded"
-                    className="mt-3 text-xs leading-snug text-[var(--c-warn-text)]"
-                  >
-                    Completion for {superseded.partName || "the previous part"} was superseded when
-                    this capture started. Stockroom follows one completion at a time, so that run is
-                    no longer being followed here. Reopen that part to start it again.
-                  </p>
-                ) : null}
-
                 <ProviderRouteOutcomes
                   outcomes={download.providerOutcomes}
                   collectionComplete={download.collectionComplete}
                 />
 
-                {cadBusy ? (
+                {captureBusy ? (
                   <div
                     className="mt-3 rounded-control border border-line bg-field px-3 py-2"
                     data-dev-id="complete.cad-live-status"
@@ -780,16 +765,9 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                     </div>
                     <p className="mt-1 text-2xs leading-snug text-t2">
                       Stockroom is checking saved evidence and every eligible source. If a
-                      provider needs your sign-in or security check, its exact page appears inside
-                      Stockroom; clearing it resumes the same automatic run.
+                      provider needs your sign-in, security check, format choice, or download
+                      click, its exact page and instructions appear inside Stockroom.
                     </p>
-                    {/* The person's own end-of-route controls. Without them a route a person
-                        cannot finish runs to its 600 s timeout, once per author route. */}
-                    {awaitsPerson ? (
-                      <div className="mt-2 border-t border-line pt-2">
-                        <CaptureRouteControls partId={detail.id} />
-                      </div>
-                    ) : null}
                   </div>
                 ) : null}
 
@@ -803,9 +781,22 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                       small
                       icon={<DownloadIcon className="h-3.5 w-3.5" />}
                       disabled={cadBusy}
-                      onClick={() => void download.start(undefined, "collect-all")}
+                      title={
+                        anotherCaptureBusy
+                          ? `Finish the active completion for ${capture.active.partName || "the current part"} first.`
+                          : undefined
+                      }
+                      onClick={() =>
+                        void download
+                          .start(undefined, "collect-all")
+                          .catch((error) =>
+                            toast(error instanceof Error ? error.message : "Could not start completion.", "err"),
+                          )
+                      }
                     >
-                      {isDone ? (
+                      {anotherCaptureBusy ? (
+                        "Another Part Is Running"
+                      ) : isDone ? (
                         "Refresh Sources"
                       ) : (
                         <Text id={cadButtonId(download.status)}>{cadLabel(download.status)}</Text>

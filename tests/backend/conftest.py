@@ -83,7 +83,9 @@ def tmp_fixture(tmp_path):
 
 
 def _has_kicad_cli() -> bool:
-    return shutil.which("kicad-cli") is not None
+    from stockroom.kicad.cli import find_kicad_cli
+
+    return find_kicad_cli() is not None
 
 
 requires_kicad_cli = pytest.mark.skipif(

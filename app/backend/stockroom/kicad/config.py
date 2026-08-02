@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 _EDITOR_TOKENS = ("kicad", "pcbnew", "eeschema", "kicad-cli")
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def _os_name() -> str:
@@ -111,6 +112,7 @@ def _default_lister() -> str:
         text=True,
         errors="replace",
         timeout=10,
+        creationflags=_NO_WINDOW,
     )
     return proc.stdout
 

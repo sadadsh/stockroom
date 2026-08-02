@@ -1051,7 +1051,7 @@ describe("ProjectsPage shared workspace", () => {
       base_branch: "deleted-shared-branch",
       candidates: [],
       blocked_reason:
-        "The saved work session's shared branch is no longer available. Start a new work session from a current shared branch.",
+        "The saved work session's shared branch is no longer available. Your active work remains preserved. Restore that branch, or share and finish the current session before starting another.",
     });
 
     renderPage();
@@ -1060,7 +1060,7 @@ describe("ProjectsPage shared workspace", () => {
 
     expect(
       await screen.findByText(
-        "The saved work session's shared branch is no longer available. Start a new work session from a current shared branch.",
+        "The saved work session's shared branch is no longer available. Your active work remains preserved. Restore that branch, or share and finish the current session before starting another.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("No shared work yet")).toBeInTheDocument();

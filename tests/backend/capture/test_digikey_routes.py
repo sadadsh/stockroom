@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from stockroom.capture.browser import PlaywrightCaptureBrowser, chromium_unavailable_reason
+from stockroom.capture.guided import drive_formats
 from stockroom.capture.vendors import DigiKeyUltraLibrarianAdapter
 
 _MODELS_HTML = """
@@ -137,6 +138,16 @@ _TRANSIENT_ULTRA_HTML = """
 _MANUFACTURER_EMBEDDED_HTML = """
 <!doctype html>
 <html>
+  <head>
+    <script>
+      function exportEdaModel(event) {
+        event.preventDefault();
+        const selected = document.querySelector('input[name="mfr-format-selection-3d"]:checked');
+        const link = document.createElement('a');
+        window.open(selected.value, '_blank');
+      }
+    </script>
+  </head>
   <body>
     <section id="mfr-media-active">Manufacturer Provided</section>
     <div id="mfr-model">
@@ -391,6 +402,28 @@ def test_digikey_manufacturer_route_automates_each_measured_shape(
             model_url,
             lambda route: route.fulfill(status=200, content_type="text/html", body=html),
         )
+        page.route(
+            "https://search.kemet.com/**",
+            lambda route: route.fulfill(
+                status=200,
+                body="ISO-10303-21;\nEND-ISO-10303-21;\n",
+                headers={
+                    "Content-Type": "application/step",
+                    "Content-Disposition": 'attachment; filename="manufacturer.stp"',
+                },
+            ),
+        )
+        page.context.route(
+            "https://mm.digikey.com/models/**",
+            lambda route: route.fulfill(
+                status=200,
+                body="ISO-10303-21;\nEND-ISO-10303-21;\n",
+                headers={
+                    "Content-Type": "application/step",
+                    "Content-Disposition": 'attachment; filename="manufacturer.stp"',
+                },
+            ),
+        )
         page.goto(model_url)
         report = manufacturer_route.drive(
             page,
@@ -404,6 +437,156 @@ def test_digikey_manufacturer_route_automates_each_measured_shape(
     assert report.blocked is False
     assert report.missed == ([] if submitted else ["model"])
     assert message in report.message
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_manufacturer_waits_for_every_offered_original(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    surface._exact_product_url = (
+        "https://www.digikey.com/en/products/detail/codaca/"
+        "VSEB0630H-2R2MC/16731489"
+    )
+    manufacturer = surface.capture_routes()[3]
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+    model_url = "https://www.digikey.com/en/models/16731489"
+
+    def deliver_original(route):
+        filename = route.request.url.rsplit("/", 1)[-1].replace("%20", "-")
+        route.fulfill(
+            status=200,
+            body="ISO-10303-21;\nEND-ISO-10303-21;\n",
+            headers={
+                "Content-Type": "application/step",
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
+
+    with browser.session() as page:
+        page.route(
+            model_url,
+            lambda route: route.fulfill(
+                status=200,
+                content_type="text/html",
+                body=_MANUFACTURER_EMBEDDED_HTML,
+            ),
+        )
+        page.context.route("https://mm.digikey.com/models/**", deliver_original)
+        page.goto(model_url)
+        report, failure = drive_formats(
+            browser,
+            page,
+            manufacturer,
+            ["model"],
+            model_url,
+            timeout_s=5,
+            expected_manufacturer="CODACA",
+            expected_mpn="VSEB0630H-2R2MC",
+        )
+
+    assert failure is None
+    assert report.expected_downloads == 3
+    assert len(browser.captured) == 3
+    assert {item.path.suffix.casefold() for item in browser.captured} == {".stp"}
+
+
+def test_digikey_manufacturer_waits_only_for_originals_it_successfully_submitted(
+    monkeypatch,
+):
+    surface = DigiKeyUltraLibrarianAdapter()
+    manufacturer = surface.capture_routes()[3]
+    controls = {
+        "first": ("First.stp", "https://mm.digikey.com/models/first.stp"),
+        "broken": ("Broken.stp", "https://mm.digikey.com/models/broken.stp"),
+        "third": ("Third.stp", "https://mm.digikey.com/models/third.stp"),
+    }
+    submitted: list[str] = []
+
+    class Label:
+        def __init__(self, control_id):
+            self.control_id = control_id
+
+        def get_attribute(self, name):
+            if name == "data-original":
+                return controls[self.control_id][0]
+            if name == "for":
+                return self.control_id
+            return ""
+
+        def inner_text(self):
+            return controls[self.control_id][0]
+
+    class Labels:
+        def count(self):
+            return len(controls)
+
+        def nth(self, index):
+            return Label(tuple(controls)[index])
+
+    class Control:
+        def __init__(self, control_id):
+            self.control_id = control_id
+            self.first = self
+
+        def count(self):
+            return 1
+
+        def get_attribute(self, name):
+            return controls[self.control_id][1] if name == "value" else ""
+
+        def check(self, **_kwargs):
+            if self.control_id == "broken":
+                raise RuntimeError("control disappeared")
+            submitted.append(self.control_id)
+
+    class Submit:
+        first = None
+
+        def __init__(self):
+            self.first = self
+
+        def count(self):
+            return 1
+
+        def click(self, **_kwargs):
+            return None
+
+    class Modal:
+        first = None
+
+        def __init__(self):
+            self.first = self
+            self.submit = Submit()
+
+        def locator(self, selector):
+            if selector == "label[data-original]":
+                return Labels()
+            if selector == "#btn-download-mfr":
+                return self.submit
+            control_id = selector.removeprefix('[id="').removesuffix('"]')
+            return Control(control_id)
+
+    modal = Modal()
+
+    class Page:
+        def locator(self, selector):
+            assert selector == "#mfr-export-options"
+            return modal
+
+    monkeypatch.setattr(surface, "open_panel", lambda *_args, **_kwargs: "")
+
+    report = manufacturer.drive(
+        Page(),
+        ["model"],
+        expected_manufacturer="ACME",
+        expected_mpn="ABC-1",
+    )
+
+    assert submitted == ["first", "third"]
+    assert report.submitted is True
+    assert report.expected_downloads == 2
 
 
 @pytest.mark.skipif(
@@ -440,14 +623,14 @@ def test_digikey_visible_cadenas_row_is_explicitly_unresolved_without_a_guess(tm
     assert report.route_unavailable is False
     assert report.blocked is False
     assert report.missed == ["model"]
-    assert "exposed no format selector" in report.message
+    assert "no positive live CADENAS format/download contract" in report.message
 
 
 @pytest.mark.skipif(
     chromium_unavailable_reason() is not None,
     reason=str(chromium_unavailable_reason()),
 )
-def test_digikey_cadenas_route_uses_the_shared_automatic_download_contract(tmp_path):
+def test_digikey_cadenas_fixture_does_not_enable_unmeasured_automation(tmp_path):
     surface = DigiKeyUltraLibrarianAdapter()
     surface._exact_product_url = (
         "https://www.digikey.com/en/products/detail/omron-automation-and-safety/"
@@ -473,9 +656,10 @@ def test_digikey_cadenas_route_uses_the_shared_automatic_download_contract(tmp_p
             expected_mpn="E2E-X5Y1",
         )
 
-        assert page.locator("#cadenas-step").is_checked()
-    assert report.selected == ["model"]
-    assert report.submitted is True
+        assert page.locator("#cadenas-step").is_checked() is False
+    assert report.missed == ["model"]
+    assert report.submitted is False
+    assert "no positive live CADENAS format/download contract" in report.message
 
 
 @pytest.mark.skipif(
