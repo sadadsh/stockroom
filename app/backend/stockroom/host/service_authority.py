@@ -194,11 +194,14 @@ class _PublicationWorker:
         fence: GenerationFence,
         store: WorkflowStore,
         executor: _PublicationExecutionPort,
+        after_publication: Callable[[], None] | None = None,
     ) -> None:
         self._control = control
         self._fence = fence
         self._store = store
         self._executor = executor
+        self._after_publication = after_publication
+        self._refresh_pending = False
         self._stop = threading.Event()
         self._thread = threading.Thread(
             target=self._run,
@@ -243,6 +246,9 @@ class _PublicationWorker:
         while not self._stop.is_set():
             try:
                 self._require_active_fence()
+                if self._refresh_pending and self._after_publication is not None:
+                    self._after_publication()
+                    self._refresh_pending = False
                 leases = self._store.claim_publications(
                     worker_id,
                     lease_seconds=60.0,
@@ -255,6 +261,15 @@ class _PublicationWorker:
                 # begins immediately after its durable claim. Demotion waits for
                 # this call and refuses to release the service fence on timeout.
                 self._executor.execute_publication(leases[0])
+                # Publication mutates canonical files and completes durably inside the
+                # executor. Refresh the process-local derived index before claiming more
+                # work; retain a pending flag so a transient refresh error is retried instead
+                # of leaving the running UI stale until restart.
+                self._refresh_pending = self._after_publication is not None
+                if self._refresh_pending:
+                    assert self._after_publication is not None
+                    self._after_publication()
+                    self._refresh_pending = False
             except CoordinatorConflict:
                 return
             except BaseException:
@@ -511,11 +526,13 @@ class ContextServiceLifecycle:
             coordinator.start()
             setattr(self._context, "workflow_coordinator", coordinator)
             if typed_publication_executor is not None:
+                rebuild_index = getattr(self._context, "rebuild_index", None)
                 publication_worker = _PublicationWorker(
                     control,
                     fence,
                     store,
                     typed_publication_executor,
+                    rebuild_index if callable(rebuild_index) else None,
                 )
                 publication_worker.start()
 

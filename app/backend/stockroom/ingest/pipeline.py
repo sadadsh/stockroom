@@ -55,6 +55,20 @@ def _with_origin(ref: AssetRef, origin: AssetOrigin | None, now_iso: str):
     )
 
 
+def _native_footprint_entry(candidate: StagingCandidate) -> str:
+    """Read the selected KiCad footprint's logical name from its native payload.
+
+    Capture materialization deliberately uses neutral temporary filenames such as
+    ``Variant.kicad_mod``.  The filename is therefore not an identity binding.  The
+    footprint declaration inside the provider payload is the exact entry already
+    cross-verified against the Altium package and remains valid even when a download
+    contains several package variants.
+    """
+
+    selected = candidate.chosen_footprint
+    return "" if selected is None else Footprint.load(selected).name.strip()
+
+
 class IngestPipeline:
     def __init__(
         self,
@@ -328,6 +342,7 @@ class IngestPipeline:
             )
         with Transaction(self.repo) as txn:
             record = self.ops.load_record(part_id)
+            native_footprint_entry = _native_footprint_entry(candidate)
             current_symbol = record.assets_for("kicad").symbol
             entry_name = candidate.entry_name or (
                 current_symbol.name if current_symbol is not None else ""
@@ -364,21 +379,38 @@ class IngestPipeline:
                 origin=altium_origin,
                 now_iso=now_iso,
                 active_variant=altium_active_variant,
+                preferred_footprint=native_footprint_entry,
                 _transaction=txn,
                 _record=record,
             )
             if self.auto_embed_altium_models:
                 # The provider STEP has already passed candidate/evidence verification and now
-                # exists at its canonical KiCad path. Embed that exact file into the exact selected
-                # PcbLib footprint before the shared transaction commits. Any Altium, identity, or
-                # native readback failure therefore restores both EDA projections with zero trace.
-                self.ops.embed_altium_model(
-                    part_id,
-                    driver=self.altium_driver,
-                    _transaction=txn,
-                    _record=record,
-                    _require_native_readback=True,
+                # exists at its canonical KiCad path. A built-in conversion may already have put
+                # those exact bytes in the native PcbLib; independently read that payload first so
+                # completion never launches Altium merely to embed the same model twice. Provider
+                # PcbLibs that omit or alter the model retain the existing fail-closed native embed.
+                from stockroom.altium.embed3d import read_model_index
+                from stockroom.altium.native_authoring import read_embedded_model_payloads
+
+                model_source = Path(candidate.model_path or "")
+                pcblib = (
+                    self.profile.library.parts_dir.parent
+                    / "altium"
+                    / f"{part_id}.PcbLib"
                 )
+                already_embedded = (
+                    model_source.is_file()
+                    and bool(read_model_index(pcblib))
+                    and read_embedded_model_payloads(pcblib) == (model_source.read_bytes(),)
+                )
+                if not already_embedded:
+                    self.ops.embed_altium_model(
+                        part_id,
+                        driver=self.altium_driver,
+                        _transaction=txn,
+                        _record=record,
+                        _require_native_readback=True,
+                    )
             txn.commit(f"Attach coherent KiCad and Altium assets to {part_id}")
         return record
 

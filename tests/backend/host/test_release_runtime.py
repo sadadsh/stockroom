@@ -28,6 +28,7 @@ from stockroom.host.release_runtime import (
     HostReleaseRouteError,
     HostUpdateMode,
     ProductionUpdateRuntime,
+    _cad_converter_path,
     _numeric_version,
     _prefer_newer_packaged_release,
     create_production_update_runtime,
@@ -242,6 +243,7 @@ def _release(
     compatible_from_release_ids: tuple[str, ...] | None = None,
     minimum_host_version: str = "0.1.0",
     package_version: str = "0.1.0",
+    include_cad_converter: bool = False,
 ) -> VerifiedReleaseSet:
     directory = releases / release_id
     backend = (
@@ -254,6 +256,11 @@ def _release(
         "Frontend/Assets.txt": (f"frontend-{release_id}".encode(), "frontend"),
         "SBOM.json": (b'{"bomFormat":"CycloneDX"}', "sbom"),
     }
+    if include_cad_converter:
+        payloads["Tools/CadConverter/Stockroom.CadConverter.exe"] = (
+            b"MZcad-converter",
+            "cad-converter",
+        )
     members = [
         {
             "kind": kind,
@@ -301,6 +308,22 @@ def _release(
         directory,
         expected_release_id=release_id,
         expected_manifest_sha256=hashlib.sha256(manifest).hexdigest(),
+    )
+
+
+def test_release_cad_converter_resolves_only_the_manifest_bound_executable(
+    tmp_path: Path,
+) -> None:
+    candidate = _release(
+        tmp_path / "Releases",
+        "release-with-converter",
+        rollback_release_id="release-prior",
+        mode="healthy",
+        include_cad_converter=True,
+    )
+
+    assert _cad_converter_path(candidate) == (
+        candidate.directory / "Tools" / "CadConverter" / "Stockroom.CadConverter.exe"
     )
 
 

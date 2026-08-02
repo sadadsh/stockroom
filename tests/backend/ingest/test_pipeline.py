@@ -267,6 +267,34 @@ def test_end_to_end_ingest_each_vendor_layout(tmp_path, fixtures_dir, vendor):
     assert record.id
 
 
+def test_current_ultralibrarian_bundle_uses_symbol_bound_footprint(tmp_path, fixtures_dir):
+    pipe = _pipeline(tmp_path)
+    archive = tmp_path / "ul-current.zip"
+    symbol = (fixtures_dir / "one_symbol.kicad_sym").read_text(encoding="utf-8")
+    symbol = symbol.replace(
+        '(property "Footprint" ""',
+        '(property "Footprint" "ABM13W_ABR"',
+        1,
+    )
+    footprint = (fixtures_dir / "one_footprint.kicad_mod").read_bytes()
+    with zipfile.ZipFile(archive, "w") as package:
+        package.writestr("KiCADv6/current.kicad_sym", symbol)
+        for name in ("ABM13W_ABR-L", "ABM13W_ABR-M", "ABM13W_ABR"):
+            package.writestr(f"KiCADv6/footprints.pretty/{name}.kicad_mod", footprint)
+        package.writestr("ABM13W_ABR.step", b"ISO-10303-21;\nEND-ISO-10303-21;\n")
+
+    [candidate] = pipe.inspect(inputs=[archive], workdir=tmp_path / "work-current-ul")
+
+    assert candidate.vendor == "ultralibrarian"
+    assert [path.name for path in candidate.footprint_variants] == [
+        "ABM13W_ABR-L.kicad_mod",
+        "ABM13W_ABR-M.kicad_mod",
+        "ABM13W_ABR.kicad_mod",
+    ]
+    assert candidate.chosen_footprint is not None
+    assert candidate.chosen_footprint.name == "ABM13W_ABR.kicad_mod"
+
+
 def test_second_add_only_adds_to_target_lib(tmp_path, fixtures_dir):
     """Adding a second part must not rewrite the first part's symbol node: the
     target category lib changes only by ADDITION (byte preservation via the M1

@@ -105,6 +105,27 @@ def _symbol_metadata(sym_lib: SymbolLib, name: str) -> tuple[str, list[str]]:
     return description, tags
 
 
+def _preferred_footprint_index(
+    sym_lib: SymbolLib,
+    symbol_name: str,
+    variants: list[Path],
+) -> int:
+    """Select the footprint explicitly bound by the provider symbol when unambiguous."""
+
+    if not variants:
+        return 0
+    raw = (sym_lib.get_symbol(symbol_name).get_property("Footprint") or "").strip()
+    preferred = raw.replace("\\", "/").rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+    if not preferred:
+        return 0
+    matches = [
+        index
+        for index, variant in enumerate(variants)
+        if variant.stem.casefold() == preferred.casefold()
+    ]
+    return matches[0] if len(matches) == 1 else 0
+
+
 def build_candidates(
     cli: KiCadCli | None,
     detected: DetectedSource,
@@ -157,6 +178,7 @@ def build_candidates(
                 symbol_lib_path=normalized_sym,
                 symbol_name=name,
                 footprint_variants=list(variants),
+                chosen_footprint_index=_preferred_footprint_index(sym_lib, name, variants),
                 model_path=detected.model_path,
                 datasheet_path=detected.datasheet_path,
                 display_name=propose_display_name(name),

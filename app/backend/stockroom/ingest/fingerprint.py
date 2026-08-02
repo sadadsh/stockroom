@@ -6,6 +6,7 @@ they must match real vendor output (spec section 5)."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -50,6 +51,21 @@ def _find_dir(root: Path, exact_name: str) -> Path | None:
     return None
 
 
+def _find_ultralibrarian_kicad_dir(root: Path) -> Path | None:
+    """Find Ultra Librarian's versioned KiCad export directory.
+
+    Current downloads use ``KiCADv6`` while older bundles used ``KiCAD``.  The exact
+    capitalization remains the useful discriminator from SamacSys' ``KiCad`` directory,
+    but treating the version suffix as part of the vendor fingerprint made real current
+    downloads fall through to the one-footprint SnapMagic fallback.
+    """
+
+    for path in _walk(root):
+        if path.is_dir() and re.fullmatch(r"KiCAD(?:v\d+)?", path.name):
+            return path
+    return None
+
+
 def _first_footprint_lib(root: Path) -> Path | None:
     for p in _walk(root):
         if p.is_dir() and p.name.endswith(".pretty"):
@@ -91,10 +107,10 @@ def detect_source(root: Path) -> DetectedSource:
             datasheet,
         )
 
-    # 3. UltraLibrarian: a folder named exactly "KiCAD" (capitalization is the
-    #    discriminator from Samacsys) with a real .pretty inside it. The symbol
-    #    file is often timestamp-named, so identity is never the filename.
-    kicad_dir = _find_dir(root, "KiCAD")
+    # 3. UltraLibrarian: a folder named "KiCAD" or its current versioned form
+    #    (for example "KiCADv6"). Capitalization is the discriminator from SamacSys.
+    #    The symbol file is often timestamp-named, so identity is never the filename.
+    kicad_dir = _find_ultralibrarian_kicad_dir(root)
     if kicad_dir is not None:
         pretty = _first_footprint_lib(kicad_dir)
         fps = _find_all(pretty, ".kicad_mod") if pretty else _find_all(kicad_dir, ".kicad_mod")

@@ -52,6 +52,23 @@ def test_ultralibrarian_detected_by_exact_KiCAD_folder_and_pretty(tmp_path):
     assert d.model_path.name == "MyPart.stp"
 
 
+def test_current_ultralibrarian_kicadv6_keeps_every_footprint_variant(tmp_path):
+    base = tmp_path / "KiCADv6"
+    _touch(base / "2026-08-02_03-58-06.kicad_sym", "(kicad_symbol_lib)")
+    for name in ("ABM13W_ABR-L", "ABM13W_ABR-M", "ABM13W_ABR"):
+        _touch(base / "footprints.pretty" / f"{name}.kicad_mod", "(footprint)")
+    _touch(tmp_path / "ABM13W_ABR.step")
+
+    detected = detect_source(tmp_path)
+
+    assert detected.vendor == "ultralibrarian"
+    assert [path.name for path in detected.footprint_paths] == [
+        "ABM13W_ABR-L.kicad_mod",
+        "ABM13W_ABR-M.kicad_mod",
+        "ABM13W_ABR.kicad_mod",
+    ]
+
+
 def test_snapeda_fallback_loose_files(tmp_path):
     _touch(tmp_path / "MyPart.kicad_sym", "(kicad_symbol_lib)")
     _touch(tmp_path / "MyPart.kicad_mod", "(footprint)")

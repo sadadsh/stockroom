@@ -923,6 +923,52 @@ def test_download_survives_provider_navigation_abort(tmp_path):
     assert broker.receipts[0].path.read_bytes() == b"complete-cad-archive"
 
 
+def test_finish_request_survives_provider_navigation_failure(tmp_path):
+    """A task-bound manual file handoff must not wait for provider page readiness."""
+
+    finish_requested = False
+
+    class FailingPage(_EventPage):
+        url = "about:blank"
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.waits = 0
+
+        def goto(self, url: str, **options) -> None:
+            assert options["wait_until"] == "commit"
+            assert options["timeout"] == 10_000
+            self.url = url
+            assert self.handlers, "download interception must be wired before navigation"
+            raise RuntimeError("provider never reached a stable document lifecycle")
+
+        def wait_for_timeout(self, _milliseconds: int) -> None:
+            nonlocal finish_requested
+            self.waits += 1
+            finish_requested = True
+
+        def is_closed(self) -> bool:
+            return False
+
+    staging = tmp_path / "Staging"
+    staging.mkdir()
+    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
+    page = FailingPage()
+    browser._context = SimpleNamespace(new_page=lambda: page)
+
+    result = browser.capture_user_downloads(
+        "https://vendor.example.test/search?query=MPN-A",
+        broker,
+        should_finish=lambda: finish_requested,
+        timeout_s=600,
+    )
+
+    assert result.status == "completed"
+    assert result.files == ()
+    assert page.waits == 1
+
+
 @pytest.mark.parametrize(
     ("action", "expected_status"),
     [

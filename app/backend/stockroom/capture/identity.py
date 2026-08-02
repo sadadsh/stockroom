@@ -112,7 +112,7 @@ def exact_observation_error(record: object, observed: PageIdentity) -> str:
                 "the provider exposed no exact candidate with manufacturer "
                 f"{requested_manufacturer!r}"
             )
-        if not _same_manufacturer(observed.manufacturer, requested_manufacturer):
+        if not same_manufacturer(observed.manufacturer, requested_manufacturer):
             return (
                 "the provider exact-MPN candidate identifies manufacturer "
                 f"{observed.manufacturer!r}, not {requested_manufacturer!r}"
@@ -239,7 +239,7 @@ def _manufacturer_key(value: str) -> str:
     return "".join(_manufacturer_tokens(value))
 
 
-def _same_manufacturer(left: str, right: str) -> bool:
+def same_manufacturer(left: str, right: str) -> bool:
     """Accept only an exact spelling or a provable abbreviation relationship.
 
     Distributor catalogues routinely identify Texas Instruments as ``TI``. Stockroom already has
@@ -411,7 +411,7 @@ def select_exact_candidate(
                     f"{detail.mpn!r}, not requested MPN {requested_mpn!r}"
                 )
             )
-        if requested_manufacturer and not _same_manufacturer(
+        if requested_manufacturer and not same_manufacturer(
             detail.manufacturer,
             requested_manufacturer,
         ):
@@ -458,7 +458,7 @@ def select_exact_candidate(
         if (
             requested_manufacturer_key
             and candidate_manufacturer
-            and not _same_manufacturer(candidate_manufacturer, requested_manufacturer)
+            and not same_manufacturer(candidate_manufacturer, requested_manufacturer)
         ):
             manufacturer_conflicts.append(candidate_manufacturer)
             continue

@@ -823,6 +823,7 @@ class LibraryOps:
         origin: AssetOrigin | None = None, now_iso: str = "",
         active_variant: CadVariantPointer | None = None,
         compatible_kicad_variant: CadVariantPointer | None = None,
+        preferred_footprint: str = "",
         auto_embed_model: bool = False,
         altium_driver=None,
         _transaction: Transaction | None = None,
@@ -889,8 +890,18 @@ class LibraryOps:
                 pick_entry(read_symbol_names(sch_src), "symbol", prefer=record.mpn)
                 if sch_src is not None else None
             )
+            # A coherent provider bundle may legitimately contain several package variants while
+            # its symbol binds exactly one of them (for example ABM13W_ABR beside -M and -L).
+            # The same-set KiCad candidate has already resolved that binding, so use its exact
+            # footprint name when supplied. Direct Altium-only attachment retains the stricter
+            # historical MPN/unique-entry behavior rather than choosing by file order.
+            footprint_preference = preferred_footprint.strip() or record.mpn
             fp_name = (
-                pick_entry(read_footprint_names(pcb_src), "footprint", prefer=record.mpn)
+                pick_entry(
+                    read_footprint_names(pcb_src),
+                    "footprint",
+                    prefer=footprint_preference,
+                )
                 if pcb_src is not None else None
             )
 

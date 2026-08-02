@@ -7,12 +7,14 @@ import hashlib
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
 from fastapi import FastAPI
 
+from stockroom.altium.converter import convert_pcad_ascii
 from stockroom.api.serve import pick_free_port
 from stockroom.host.proxy import SwitchableBackendProxy
 from stockroom.host.release_runtime import HostReleaseBoundary
@@ -83,6 +85,38 @@ def run_packaged_worker_probe(
         raise PackagedWorkerProbeError(
             "release manifest does not bind the probed worker executable"
         )
+    converter_members = [
+        candidate.members[member.path]
+        for member in candidate.manifest.members
+        if member.kind == "cad-converter"
+    ]
+    if len(converter_members) != 1:
+        raise PackagedWorkerProbeError(
+            "release manifest does not bind exactly one native CAD converter"
+        )
+    converter_executable = converter_members[0]
+    expected_converter = (
+        release_directory / "Tools" / "CadConverter" / "Stockroom.CadConverter.exe"
+    ).resolve(strict=True)
+    if converter_executable != expected_converter:
+        raise PackagedWorkerProbeError(
+            "release manifest binds the native CAD converter at an unexpected path"
+        )
+    probe_lia = Path(__file__).with_name("Cad Converter Probe.lia").resolve(strict=True)
+    with tempfile.TemporaryDirectory(prefix="Stockroom Packaged CAD Probe ") as temporary:
+        converted = convert_pcad_ascii(
+            probe_lia,
+            Path(temporary) / "Native Altium",
+            converter_executable=converter_executable,
+        )
+        if (
+            converted.symbol_entries != ("STOCKROOM-CAD-PROBE",)
+            or converted.footprint_entries != ("STOCKROOM_PROBE",)
+        ):
+            raise PackagedWorkerProbeError(
+                "packaged native CAD converter failed its deterministic conversion canary"
+            )
+        converter_sha256 = hashlib.sha256(converter_executable.read_bytes()).hexdigest()
 
     os.environ["STOCKROOM_CONFIG_DIR"] = str(Path(config_root).resolve(strict=True))
     os.environ["LOCALAPPDATA"] = str(Path(local_app_data).resolve(strict=True))
@@ -210,6 +244,7 @@ def run_packaged_worker_probe(
                 "adopted": True,
                 "candidate_generation": adopted.candidate_service_generation,
                 "candidate_release_id": release_id,
+                "exact_cad_converter_sha256": converter_sha256,
                 "exact_worker_sha256": hashlib.sha256(
                     worker_executable.read_bytes()
                 ).hexdigest(),

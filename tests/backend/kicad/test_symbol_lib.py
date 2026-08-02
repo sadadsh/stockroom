@@ -128,3 +128,30 @@ def test_hide_all_properties_hides_every_visible_field(tmp_fixture):
     # at least the core fields that exist are now hidden (not still visible)
     assert sym.property_hidden("Value") is True
     assert sym.property_hidden("MPN") is True
+
+
+def test_hide_redundant_pin_names_only_hides_number_echoes(tmp_path):
+    duplicate = tmp_path / "duplicate.kicad_sym"
+    duplicate.write_text(
+        '(kicad_symbol_lib (version 20231120) (symbol "X" '
+        '(pin_names (offset 1.016)) '
+        '(symbol "X_1_1" '
+        '(pin passive line (at 0 0 0) (length 2.54) '
+        '(name "1" (effects (font (size 1.27 1.27)))) '
+        '(number "1" (effects (font (size 1.27 1.27))))))))',
+        encoding="utf-8",
+    )
+    library = SymbolLib.load(duplicate)
+
+    assert library.get_symbol("X").hide_redundant_pin_names() is True
+    rendered = " ".join(library.serialize().split())
+    assert "(pin_names (offset 1.016) (hide yes))" in rendered
+
+    meaningful = tmp_path / "meaningful.kicad_sym"
+    meaningful.write_text(
+        duplicate.read_text(encoding="utf-8").replace('(name "1"', '(name "GND"'),
+        encoding="utf-8",
+    )
+    library = SymbolLib.load(meaningful)
+    assert library.get_symbol("X").hide_redundant_pin_names() is False
+    assert "hide yes" not in library.serialize()

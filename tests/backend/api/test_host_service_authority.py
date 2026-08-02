@@ -504,8 +504,10 @@ def test_real_app_context_mounts_every_stage_before_authority_and_api_reaches_te
     workflow_database = (tmp_path / "Service" / "Workflow.sqlite").resolve()
     _mutex, shadow_factory, coordinator_factory = _control_factories(database)
     registry_holder: list[_CompletingRegistry] = []
+    index_refreshed = threading.Event()
 
     monkeypatch.setattr(app_ctx, "sync_on_launch", lambda: None)
+    monkeypatch.setattr(app_ctx, "rebuild_index", index_refreshed.set)
     monkeypatch.setattr(
         app_ctx,
         "start_background_sync",
@@ -545,6 +547,7 @@ def test_real_app_context_mounts_every_stage_before_authority_and_api_reaches_te
         assert coordinator is not None
         assert coordinator.status().state.value == "running"
         assert coordinator.status().thread_alive
+        index_refreshed.clear()
 
         submitted = client.post(
             "/api/library/completion/run",
@@ -560,6 +563,7 @@ def test_real_app_context_mounts_every_stage_before_authority_and_api_reaches_te
         ):
             time.sleep(0.01)
         assert coordinator.get_batch(batch_id).status is BatchStatus.COMPLETED
+        assert index_refreshed.wait(2.0)
 
         released = authority.demote(expected_generation=initial.generation)
         assert released.mode is ServiceMode.SHADOW

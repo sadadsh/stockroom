@@ -122,6 +122,138 @@ def test_metadata_light_altium_identity_requires_exact_external_attestation() ->
         _verify_identity(conflicting, expected, "Altium", expected)
 
 
+def test_pcad_truncated_altium_entry_requires_exact_external_attestation() -> None:
+    expected = ExactPartIdentity("Abracon LLC", "ABM13W-32.0000MHZ-5-DH7G-T5")
+    converted = _SymbolReadback(
+        entry="ABM13W-32.0000MH",
+        manufacturer="",
+        mpn="ABM13W-32.0000MH",
+        pins=(),
+        mpn_from_entry=True,
+    )
+
+    with pytest.raises(CrossEdaVerificationError, match="does not carry both"):
+        _verify_identity(converted, expected, "Altium")
+
+    assert _verify_identity(converted, expected, "Altium", expected) == (
+        "manufacturer",
+        "mpn",
+    )
+
+    wrong = _SymbolReadback(
+        entry="ABM13W-32.0000XX",
+        manufacturer="",
+        mpn="ABM13W-32.0000XX",
+        pins=(),
+        mpn_from_entry=True,
+    )
+    with pytest.raises(CrossEdaVerificationError, match="does not equal"):
+        _verify_identity(wrong, expected, "Altium", expected)
+
+
+def test_cross_eda_identity_accepts_only_the_canonical_legal_suffix_difference() -> None:
+    expected = ExactPartIdentity("Abracon LLC", "ABM13W-32.0000MHZ-5-DH7G-T5")
+    provider_symbol = _SymbolReadback(
+        entry=expected.mpn_canonical,
+        manufacturer="Abracon",
+        mpn=expected.mpn_canonical,
+        pins=(),
+    )
+
+    assert _verify_identity(provider_symbol, expected, "Altium", expected) == ()
+
+    wrong_mpn = _SymbolReadback(
+        entry="ABM13W-32.0000MHZ-5-DH7G-T6",
+        manufacturer="Abracon",
+        mpn="ABM13W-32.0000MHZ-5-DH7G-T6",
+        pins=(),
+    )
+    with pytest.raises(CrossEdaVerificationError, match="MPN .* does not equal"):
+        _verify_identity(wrong_mpn, expected, "Altium", expected)
+
+
+def test_cross_eda_selects_the_altium_footprint_bound_by_kicad(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    identity = ExactPartIdentity("Abracon LLC", "ABM13W-32.0000MHZ-5-DH7G-T5")
+    paths = {
+        name: tmp_path / name
+        for name in ("part.kicad_sym", "ABM13W_ABR.kicad_mod", "part.step", "part.SchLib", "part.PcbLib")
+    }
+    for path in paths.values():
+        path.write_bytes(b"fixture")
+    pins = (_Pin("1", "1"), _Pin("2", "2"))
+    pads = (
+        _PadGeometry("1", -0.4, 0.0, 0.5, 0.5),
+        _PadGeometry("2", 0.4, 0.0, 0.5, 0.5),
+    )
+    observed_preferred = []
+
+    monkeypatch.setattr(
+        "stockroom.capture.cross_eda._resolve_altium_sources",
+        lambda _sources, _temporary: (paths["part.SchLib"], paths["part.PcbLib"]),
+    )
+    monkeypatch.setattr(
+        "stockroom.capture.cross_eda.read_kicad_symbol",
+        lambda _path, _preferred: _SymbolReadback(
+            identity.mpn_canonical,
+            "Abracon LLC",
+            identity.mpn_canonical,
+            pins,
+        ),
+    )
+    monkeypatch.setattr(
+        "stockroom.capture.cross_eda.read_altium_symbol",
+        lambda _path, _preferred: _SymbolReadback(
+            identity.mpn_canonical,
+            "Abracon",
+            identity.mpn_canonical,
+            pins,
+        ),
+    )
+    monkeypatch.setattr(
+        "stockroom.capture.cross_eda.read_kicad_footprint",
+        lambda _path, _model: type(
+            "_Footprint",
+            (),
+            {"entry": "ABM13W_ABR", "pads": pads, "model_path": "part.step"},
+        )(),
+    )
+
+    def _altium_footprint(_path, preferred):
+        observed_preferred.append(preferred)
+        return type(
+            "_Footprint",
+            (),
+            {"entry": preferred, "pads": pads, "model_path": "part.step"},
+        )()
+
+    monkeypatch.setattr(
+        "stockroom.capture.cross_eda.read_altium_footprint",
+        _altium_footprint,
+    )
+    monkeypatch.setattr(
+        "stockroom.capture.cross_eda.verify_kicad_component",
+        lambda **_kwargs: {"valid": True, "step": {"valid": True}},
+    )
+    monkeypatch.setattr(
+        "stockroom.capture.cross_eda.read_embedded_model_payloads",
+        lambda _path: (),
+    )
+
+    report = verify_cross_eda_component(
+        identity=identity,
+        kicad_symbol=paths["part.kicad_sym"],
+        kicad_footprint=paths["ABM13W_ABR.kicad_mod"],
+        step_model=paths["part.step"],
+        altium_sources=(paths["part.SchLib"], paths["part.PcbLib"]),
+    )
+
+    assert observed_preferred == ["ABM13W_ABR"]
+    assert report["altium"]["footprint_entry"] == "ABM13W_ABR"
+
+
 def test_symbol_may_omit_explicit_no_connect_pins_when_both_footprints_keep_them() -> None:
     kicad = _SymbolReadback(
         entry="PART",

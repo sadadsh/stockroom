@@ -37,10 +37,11 @@ from stockroom.workflow import IntakeIdentity
 # is reachable.
 _HISTORY_MAX = 100
 _AUTOMATIC_CAPTURE_INSTRUCTION = (
-    "Stockroom checks retained evidence and permitted machine sources first. If a provider needs "
-    "you, its exact page opens inside Stockroom with the remaining files named. Start the offered "
-    "downloads there, or select files you already downloaded; Stockroom intercepts, validates, "
-    "and activates only a complete coherent set."
+    "Stockroom checks retained evidence and automatic sources first. If a provider needs "
+    "you, Stockroom opens the exact result inside the app, chooses the required formats, and "
+    "names any remaining files. Clear a provider security check only if one appears, then start "
+    "the offered downloads or select files you already downloaded; Stockroom intercepts, "
+    "validates, and attaches only a complete coherent set."
 )
 _COMPLETION_MAX_BATCH = 1000
 _COMPLETION_BODY_FIELDS = frozenset({"part_ids", "limit", "idempotency_key"})
@@ -1126,7 +1127,7 @@ def library_router(require_token) -> APIRouter:
                     f"{mode} capture does not accept a batch limit; select exactly one part"
                 )
             if background:
-                raise ValueError(f"{mode} capture requires visible provider handoffs")
+                raise ValueError(f"{mode} capture requires visible sequential provider handoffs")
         records = (
             [_current_completion_record(ctx, part_id) for part_id in part_ids]
             if part_ids is not None

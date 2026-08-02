@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from stockroom.altium import ul_import as ul_import_module
+from stockroom.altium.converter import NativeAltiumConversion
 from stockroom.altium.driver import RunOutcome
 from stockroom.altium.oleread import read_footprint_names, read_symbol_names
 from stockroom.altium.ul_import import (
@@ -16,6 +17,7 @@ from stockroom.altium.ul_import import (
     convert_ul_altium_package,
     render_stockroom_wrapper,
 )
+from tests.backend.pcad.test_normalize import SYNTHETIC as PCAD_LIBRARY
 
 FIX = Path(__file__).parent / "fixtures"
 SCHEMA = "stockroom.ul-altium-import/1"
@@ -183,6 +185,70 @@ def test_ul_script_package_converts_a_sandbox_copy_to_native_libraries(
     assert result.workdir.exists()
     result.cleanup()
     assert not result.workdir.exists()
+
+
+def test_pcad_package_converts_without_launching_altium(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    source = tmp_path / "P-CAD Source"
+    source.mkdir()
+    lia = source / "EXACT-LONG-MPN.lia"
+    lia.write_text(PCAD_LIBRARY, encoding="ascii")
+    step = source / "DEFAULT.step"
+    step.write_text("ISO-10303-21;\nEND-ISO-10303-21;\n", encoding="ascii")
+    archive = tmp_path / "EXACT-LONG-MPN.zip"
+    with zipfile.ZipFile(archive, "w") as output:
+        output.write(lia, f"AltiumV15/{lia.name}")
+        output.write(step, step.name)
+
+    calls: list[tuple[Path, Path, Path | None]] = []
+
+    def convert_pcad_ascii(
+        source_lia: Path,
+        output_directory: Path,
+        *,
+        step_model: Path | None = None,
+    ) -> NativeAltiumConversion:
+        output_directory.mkdir(parents=True)
+        schlib = output_directory / "EXACT-LONG-MPN.SchLib"
+        pcblib = output_directory / "EXACT-LONG-MPN.PcbLib"
+        shutil.copy2(FIX / "sample.SchLib", schlib)
+        shutil.copy2(FIX / "sample.PcbLib", pcblib)
+        calls.append((source_lia, output_directory, step_model))
+        return NativeAltiumConversion(
+            symbol_library=schlib,
+            footprint_library=pcblib,
+            symbol_entries=("EXACT-LONG-MPN",),
+            footprint_entries=("DEFAULT", "MEDIUM", "LARGE"),
+            source_sha256=hashlib.sha256(source_lia.read_bytes()).hexdigest(),
+        )
+
+    monkeypatch.setattr(
+        "stockroom.altium.converter.convert_pcad_ascii",
+        convert_pcad_ascii,
+    )
+    driver = _Driver()
+
+    result = convert_ul_altium_package(
+        [archive],
+        expected_manufacturer="Maker LLC",
+        expected_mpn="EXACT-LONG-MPN",
+        driver=driver,
+    )
+
+    assert result is not None
+    assert [path.suffix for path in result.libraries] == [".SchLib", ".PcbLib"]
+    assert len(calls) == 1
+    assert calls[0][0].name == lia.name
+    assert calls[0][2] is not None and calls[0][2].name == step.name
+    assert driver.calls == []
+    assert json.loads(result.marker.read_text(encoding="utf-8")) == {
+        "schema": "stockroom.pcad-native-conversion/1",
+        "source_sha256": hashlib.sha256(calls[0][0].read_bytes()).hexdigest(),
+        "status": "ok",
+    }
+    result.cleanup()
 
 
 def test_no_ul_importer_is_not_misclassified_as_executable_provider_code(tmp_path: Path):

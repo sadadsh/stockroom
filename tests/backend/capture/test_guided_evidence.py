@@ -693,6 +693,96 @@ def test_provider_script_conversion_feeds_the_normal_verified_altium_attach(
     assert Requirement.ALTIUM_FOOTPRINT in outcome.satisfied
 
 
+def test_digikey_selected_ul_package_converts_after_author_route_advanced(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Recovery keys off recognized bytes, not the DigiKey row visible when the picker returns."""
+
+    candidate = _candidate(tmp_path)
+    record = _InstalledRecord()
+    provider_zip = tmp_path / "Ultra Librarian.zip"
+    with zipfile.ZipFile(provider_zip, "w") as archive:
+        archive.writestr("AltiumV15/Provider.lia", "ACCEL_ASCII fixture")
+    native = tmp_path / "Native"
+    native.mkdir()
+    schlib = native / "S1M.SchLib"
+    pcblib = native / "S1M.PcbLib"
+    shutil.copy2(_ALTIUM_FIXTURES / "sample.SchLib", schlib)
+    shutil.copy2(_ALTIUM_FIXTURES / "sample.PcbLib", pcblib)
+    conversion_calls = []
+
+    class _Pipeline:
+        def inspect(self, inputs):
+            assert inputs == [provider_zip]
+            return [candidate]
+
+        def attach_coherent_cad_assets(self, _part_id, _selected, *_sources, **_kwargs):
+            record.assets["kicad"] = EdaAssets(
+                symbol=AssetRef(lib="Diodes", name="S1M"),
+                footprint=AssetRef(lib="Diodes", name="D_SMA"),
+                model=AssetRef(file="models/S1M.step"),
+            )
+            record.assets["altium"] = EdaAssets(
+                symbol=AssetRef(lib="S1M.SchLib", name="S1M"),
+                footprint=AssetRef(lib="S1M.PcbLib", name="S1M"),
+            )
+            return record
+
+        def cleanup(self):
+            return None
+
+    def _convert(inputs, manufacturer, mpn):
+        conversion_calls.append((inputs, manufacturer, mpn))
+        return SimpleNamespace(libraries=(schlib, pcblib), cleanup=lambda: None)
+
+    monkeypatch.setattr(
+        "stockroom.capture.guided.get_adapter",
+        lambda _key: SimpleNamespace(
+            evidence_provider_key="digikey-ultralibrarian",
+            capability=SimpleNamespace(label="DigiKey CAD Models"),
+        ),
+    )
+    source = GuidedCaptureSource(
+        lambda: _Pipeline(),
+        vendor="digikey",
+        download_root=tmp_path / "Downloads",
+        convert_altium=_convert,
+        evidence_store=EvidenceStore(tmp_path / "Evidence"),
+        cross_eda_verifier=lambda **_kwargs: {
+            "valid": True,
+            "terminal_equivalence": True,
+            "pad_equivalence": True,
+            "package_equivalence": True,
+        },
+    )
+    receipt = SimpleNamespace(
+        path=provider_zip,
+        task_id=record.id,
+        manufacturer_key=record.manufacturer,
+        mpn_canonical=record.mpn,
+        surface_key="digikey",
+        evidence_provider_key="digikey-snapmagic",
+    )
+
+    outcome = source._attach(
+        record,
+        [receipt],
+        _DETAIL_URL,
+        detail_url=_DETAIL_URL,
+        evidence_provider_key="digikey-snapmagic",
+    )
+
+    assert conversion_calls == [((provider_zip,), "ON Semiconductor", "S1M")]
+    assert set(outcome.satisfied) == {
+        Requirement.KICAD_SYMBOL,
+        Requirement.KICAD_FOOTPRINT,
+        Requirement.KICAD_MODEL,
+        Requirement.ALTIUM_SYMBOL,
+        Requirement.ALTIUM_FOOTPRINT,
+    }, outcome.error
+
+
 def _installed_kicad(
     tmp_path: Path,
     candidate: StagingCandidate,

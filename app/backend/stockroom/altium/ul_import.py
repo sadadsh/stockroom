@@ -33,6 +33,7 @@ from unicodedata import normalize
 from stockroom.altium.driver import AltiumDriver
 from stockroom.altium.embed3d import delphi_quote
 from stockroom.altium.oleread import read_footprint_names, read_symbol_names
+from stockroom.capture.identity import same_manufacturer
 from stockroom.ingest.sandbox import unpack_inputs
 
 _SCHEMA = "stockroom.ul-altium-import/1"
@@ -194,6 +195,92 @@ class UltraLibrarianImportResult:
         shutil.rmtree(self.workdir, ignore_errors=True)
 
 
+def _convert_pcad_package(
+    roots,
+    *,
+    workdir: Path,
+    expected_manufacturer: str,
+    expected_mpn: str,
+) -> UltraLibrarianImportResult | None:
+    """Convert one exact P-CAD library and its same-download STEP without Altium."""
+
+    from stockroom.altium.converter import convert_pcad_ascii
+    from stockroom.pcad import normalize as normalize_pcad
+    from stockroom.pcad import parse_file
+
+    files = [
+        path
+        for root in roots
+        for path in root.rglob("*")
+        if path.is_file()
+    ]
+    libraries = sorted(
+        (path for path in files if path.suffix.casefold() == ".lia"),
+        key=lambda path: str(path).casefold(),
+    )
+    if not libraries:
+        return None
+    if len(libraries) != 1:
+        raise UltraLibrarianImportError(
+            f"the download contains {len(libraries)} P-CAD libraries; expected one"
+        )
+    lia = libraries[0]
+    try:
+        normalized = normalize_pcad(parse_file(lia))
+    except Exception as exc:
+        raise UltraLibrarianImportError(f"could not read the P-CAD library: {exc}") from exc
+    if not same_manufacturer(normalized.manufacturer, expected_manufacturer):
+        raise UltraLibrarianImportError(
+            "the P-CAD manufacturer "
+            f"{normalized.manufacturer!r} does not match {expected_manufacturer!r}"
+        )
+    if _identity_key(normalized.mpn) != _identity_key(expected_mpn):
+        raise UltraLibrarianImportError(
+            f"the P-CAD MPN {normalized.mpn!r} does not match {expected_mpn!r}"
+        )
+
+    steps = sorted(
+        (
+            path
+            for path in files
+            if path.suffix.casefold() in {".step", ".stp"}
+        ),
+        key=lambda path: str(path).casefold(),
+    )
+    if len(steps) != 1:
+        raise UltraLibrarianImportError(
+            f"the P-CAD download contains {len(steps)} STEP models; expected one"
+        )
+
+    output = workdir / "Native Altium"
+    try:
+        converted = convert_pcad_ascii(lia, output, step_model=steps[0])
+    except Exception as exc:
+        raise UltraLibrarianImportError(
+            f"could not convert the P-CAD library to native Altium files: {exc}"
+        ) from exc
+    marker = workdir / "Evidence" / "P-CAD Native Conversion Result.json"
+    marker.write_text(
+        json.dumps(
+            {
+                "schema": "stockroom.pcad-native-conversion/1",
+                "source_sha256": converted.source_sha256,
+                "status": "ok",
+            },
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    return UltraLibrarianImportResult(
+        schlib=converted.symbol_library,
+        pcblib=converted.footprint_library,
+        marker=marker,
+        workdir=workdir,
+    )
+
+
 def _identity_key(value: str) -> str:
     return normalize("NFKC", value).strip().casefold()
 
@@ -253,7 +340,7 @@ def _payload_contract(
         raise UltraLibrarianImportError(
             f"the Ultra Librarian embedded MPN {mpn!r} does not match {expected_mpn!r}"
         )
-    if _identity_key(manufacturer) != _identity_key(expected_manufacturer):
+    if not same_manufacturer(manufacturer, expected_manufacturer):
         raise UltraLibrarianImportError(
             "the Ultra Librarian embedded manufacturer "
             f"{manufacturer!r} does not match {expected_manufacturer!r}"
@@ -612,6 +699,15 @@ def convert_ul_altium_package(
             raise UltraLibrarianImportError(
                 f"could not unpack the Ultra Librarian download: {exc}"
             ) from exc
+        converted_pcad = _convert_pcad_package(
+            (item.root for item in unpacked),
+            workdir=workdir,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+        )
+        if converted_pcad is not None:
+            retain_workdir = True
+            return converted_pcad
         package = _recognize_package(
             (item.root for item in unpacked),
             expected_manufacturer=expected_manufacturer,

@@ -820,7 +820,7 @@ def test_exact_native_choice_clears_stale_legacy_state_and_brokers_every_downloa
     chromium_unavailable_reason() is not None,
     reason=str(chromium_unavailable_reason()),
 )
-def test_native_unavailable_downloads_kicad_and_step_but_never_legacy_altium(tmp_path):
+def test_native_unavailable_uses_exact_pcad_v15_fallback(tmp_path):
     base, shutdown = serve_fixture_vendor()
     browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
     try:
@@ -847,11 +847,10 @@ def test_native_unavailable_downloads_kicad_and_step_but_never_legacy_altium(tmp
     finally:
         shutdown()
 
-    assert report.selected == ["kicad", "model"]
-    assert report.missed == ["altium"]
-    assert "does not offer Altium Designer (Native)" in report.message
-    assert "legacy Altium script, .lia, and P-CAD exports were not selected" in report.message
-    assert sorted(checked) == ["KiCADv6", "MfrThreeDModel"]
+    assert report.selected == ["kicad", "model", "altium"]
+    assert report.missed == []
+    assert report.message == "Requested kicad and model and altium from Ultra Librarian."
+    assert sorted(checked) == ["AltiumPCADV15", "KiCADv6", "MfrThreeDModel"]
 
 
 # ---------------------------------------------------------------------------
