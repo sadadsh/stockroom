@@ -535,3 +535,17 @@ The second real production component was captured after durable publication comm
 | Live window `Stockroom`, Symbol | pywebview / WebView2, real Stockroom Library | P1 acceptance defect found and resolved: the published KiCad source contains a complete 15.24 × 25.4 mm rectangular body and eight electrical pins, but the preview fitter measured only SVG paths/circles and cropped the body because KiCad emitted it as `<rect>`. The fitter now covers standard SVG primitives, the cache version is advanced, and the live frame shows the complete body, seven visible terminals, and intentionally stacked hidden GND pin 10 without clipping. Open P2: this remains an unlabeled KiCad projection even while both EDAs report Ready. |
 | Live window `Stockroom`, Footprint | pywebview / WebView2, real Stockroom Library | All fourteen provider pads and the complete courtyard are visible and whole-drawing fit is correct. Open P2: the source also contains Silk/Fab body edges, pin-one markers, and pad numbers, but the current copper/courtyard-only projection suppresses them; it proves geometry presence but is weaker than an editor-like inspection surface. |
 | Live window `Stockroom`, 3D Model | pywebview / WebView2, real Stockroom Library | The exact shared STEP is rendered whole and aligned to all fourteen lands while both EDA readiness labels stay green. Open P3: for this very small USON package, the dark carrier/land plane occupies more visual area than the white component body; a component-weighted inspection framing option would improve first-glance recognition without changing geometry truth. |
+
+## 2026-08-02 Packaged Main App Acceptance
+
+The normal `Stockroom.exe` launcher updated its clean continuous-runtime checkout to
+GitHub `main` at `873fd8be5ca9`, preserved the live `Stockroom Library` selection, and
+opened the real two-component library without launching KiCad or Altium.
+
+| Capture | Host / surface | Visual audit |
+| --- | --- | --- |
+| Live window `Stockroom`, TPD6E05U06RVZR 3D Model | packaged launcher / continuous-runtime WebView2 | Exact shared STEP, fourteen lands, `KiCad Ready · Altium Ready`, two-component count, canonical library name, and `Current` update standing are simultaneously visible. The component-weighted framing observation remains the already-tracked P3; no release-blocking defect is present. |
+| Live window `Stockroom`, ABM13W Symbol | packaged launcher / continuous-runtime WebView2 | The complete four-pin crystal drawing, unique pin designators, grounded pin 2, both EDA readiness badges, and `Current` update standing remain visible after the GitHub update. The existing unlabeled-projection P2 remains; no new finding. |
+| Live window `Stockroom`, ABM13W Footprint | packaged launcher / continuous-runtime WebView2 | Four lands and the complete provider outline remain whole-drawing fitted after update. The existing thick-outline/pad-label P2 remains; no new finding. |
+| Live window `Stockroom`, TPD6E05U06RVZR Symbol | packaged launcher / continuous-runtime WebView2 | The formerly cropped body is fully visible with all intended terminals and the complete lower GND region. Both EDA readiness badges and `Current` remain stable; no new finding. |
+| Live window `Stockroom`, TPD6E05U06RVZR Footprint | packaged launcher / continuous-runtime WebView2 | All fourteen lands and the full rectangular outline remain visible after the continuous-runtime update. The existing copper-only projection P2 remains; no new finding. |
