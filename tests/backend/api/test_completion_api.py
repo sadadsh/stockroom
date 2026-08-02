@@ -516,6 +516,7 @@ def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
         "mode": "assisted",
         "vendor": "ultralibrarian",
         "background": False,
+        "active_route": None,
         "initial_needs": [
             "kicad_symbol",
             "kicad_footprint",
@@ -990,14 +991,18 @@ def test_a_person_can_finish_the_open_route_or_skip_the_part_from_stockrooms_own
     from stockroom.capture.intent import PersonCaptureIntent, person_capture_intent
 
     intent = PersonCaptureIntent()
-    with person_capture_intent("tps62130", intent):
+    with person_capture_intent("tps62130", intent, capture_id="item-person-capture"):
         finished = client.post(
             "/api/library/capture/parts/tps62130/intent",
-            json={"action": "finish-route"},
+            json={
+                "action": "finish-route",
+                "workflow_item_id": "item-person-capture",
+            },
         )
         assert finished.status_code == 200
         assert finished.json() == {
             "part_id": "tps62130",
+            "workflow_item_id": "item-person-capture",
             "action": "finish-route",
             "accepted": True,
         }
@@ -1007,7 +1012,10 @@ def test_a_person_can_finish_the_open_route_or_skip_the_part_from_stockrooms_own
 
         skipped = client.post(
             "/api/library/capture/parts/tps62130/intent",
-            json={"action": "skip-part"},
+            json={
+                "action": "skip-part",
+                "workflow_item_id": "item-person-capture",
+            },
         )
         assert skipped.status_code == 200
         assert intent.part_skipped() is True
@@ -1017,19 +1025,89 @@ def test_a_person_driven_signal_for_a_component_with_no_running_capture_is_refus
     # Remembering it would silently end the next run the person started.
     response = client.post(
         "/api/library/capture/parts/tps62130/intent",
-        json={"action": "finish-route"},
+        json={"action": "finish-route", "workflow_item_id": "item-no-longer-running"},
     )
 
     assert response.status_code == 409
 
 
+def test_selected_recovery_files_must_match_the_exact_provider_route(
+    client, tmp_path
+):
+    from stockroom.capture.intent import PersonCaptureIntent, person_capture_intent
+
+    selected = tmp_path / "TPS62130.step"
+    selected.write_bytes(b"selected model")
+    intent = PersonCaptureIntent()
+    active_url = "https://www.digikey.com/en/products/detail/example/TPS62130"
+    with person_capture_intent(
+        "tps62130",
+        intent,
+        capture_id="item-selected-recovery",
+    ):
+        route_token = intent.set_active_route(
+            "digikey", active_url, "digikey-snapmagic"
+        )
+
+        stale = client.post(
+            "/api/library/capture/parts/tps62130/selected-files",
+            json={
+                "paths": [str(selected)],
+                "vendor": "digikey",
+                "detail_url": "https://www.digikey.com/en/products/detail/example/OLD",
+                "route_token": route_token,
+                "workflow_item_id": "item-selected-recovery",
+            },
+        )
+        assert stale.status_code == 409
+        assert intent.take_route_finish() is False
+
+        accepted = client.post(
+            "/api/library/capture/parts/tps62130/selected-files",
+            json={
+                "paths": [str(selected)],
+                "vendor": "digikey",
+                "detail_url": active_url,
+                "route_token": route_token,
+                "workflow_item_id": "item-selected-recovery",
+            },
+        )
+        assert accepted.status_code == 200
+        assert accepted.json() == {
+            "part_id": "tps62130",
+            "workflow_item_id": "item-selected-recovery",
+            "accepted": True,
+            "queued_files": 1,
+        }
+        assert intent.take_route_finish() is True
+        assert intent.take_selected_files(
+            "digikey", active_url, "digikey-snapmagic", route_token
+        ) == (selected.resolve(),)
+
+
 @pytest.mark.parametrize(
     ("part_id", "body", "expected_status"),
     [
-        ("tps62130", {"action": "finish-everything"}, 400),
+        (
+            "tps62130",
+            {"action": "finish-everything", "workflow_item_id": "item-1"},
+            400,
+        ),
         ("tps62130", {}, 400),
-        ("tps62130", {"action": "skip-part", "vendor": "digikey"}, 400),
-        ("not a part id", {"action": "skip-part"}, 400),
+        (
+            "tps62130",
+            {
+                "action": "skip-part",
+                "workflow_item_id": "item-1",
+                "vendor": "digikey",
+            },
+            400,
+        ),
+        (
+            "not a part id",
+            {"action": "skip-part", "workflow_item_id": "item-1"},
+            400,
+        ),
     ],
 )
 def test_an_invalid_person_driven_signal_is_refused(client, part_id, body, expected_status):
@@ -1044,7 +1122,7 @@ def test_an_invalid_person_driven_signal_is_refused(client, part_id, body, expec
 def test_a_person_driven_signal_needs_a_token(anon_client):
     response = anon_client.post(
         "/api/library/capture/parts/tps62130/intent",
-        json={"action": "skip-part"},
+        json={"action": "skip-part", "workflow_item_id": "item-1"},
     )
 
     assert response.status_code == 401

@@ -1102,7 +1102,7 @@ export const api = {
       partIds?: string[];
       vendor?: string;
       limit?: number;
-      mode?: "automatic" | "assisted" | "collect-all";
+      mode?: "automatic" | "assisted" | "finish-first" | "collect-all";
       background?: boolean;
       idempotencyKey?: string;
     } = {},
@@ -1115,6 +1115,30 @@ export const api = {
         mode: input.mode,
         background: input.background,
         idempotency_key: input.idempotencyKey,
+      },
+    });
+  },
+
+  attachSelectedCaptureFiles(input: {
+    partId: string;
+    workflowItemId: string;
+    paths: string[];
+    vendor: string;
+    detailUrl: string;
+    routeToken: string;
+  }): Promise<{
+    part_id: string;
+    workflow_item_id: string;
+    accepted: boolean;
+    queued_files: number;
+  }> {
+    return request("POST", `/api/library/capture/parts/${encodeURIComponent(input.partId)}/selected-files`, {
+      body: {
+        paths: input.paths,
+        workflow_item_id: input.workflowItemId,
+        vendor: input.vendor,
+        detail_url: input.detailUrl,
+        route_token: input.routeToken,
       },
     });
   },

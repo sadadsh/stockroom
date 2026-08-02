@@ -35,7 +35,7 @@ import inspect
 import tempfile
 import time
 from collections.abc import Callable
-from contextlib import ExitStack, nullcontext
+from contextlib import ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
@@ -723,6 +723,7 @@ def _unattempted_route_outcome(
     author_key: str,
     label: str,
     reason: str,
+    status: ProviderOutcomeStatus = "not-attempted",
 ) -> SourceOutcome:
     base = SourceOutcome(skipped=reason)
     return _with_route_outcome(
@@ -731,7 +732,7 @@ def _unattempted_route_outcome(
         author_key=author_key,
         label=label,
         attempted=False,
-        status="not-attempted",
+        status=status,
         reason=reason,
     )
 
@@ -1121,6 +1122,9 @@ class GuidedCaptureSource:
         models_ids=None,
         strict_catalog_urls: bool = False,
         provider_surface=None,
+        publish_active_route: Callable[[str, str, str], str] | None = None,
+        clear_active_route: Callable[[str, str, str, str], None] | None = None,
+        take_selected_files: Callable[[str, str, str, str], tuple[Path, ...]] | None = None,
     ) -> None:
         self._make_pipeline = make_pipeline
         self._vendor_key = vendor
@@ -1173,6 +1177,9 @@ class GuidedCaptureSource:
         self._models_ids = models_ids
         self._strict_catalog_urls = bool(strict_catalog_urls)
         self._provider_surface = provider_surface
+        self._publish_active_route = publish_active_route
+        self._clear_active_route = clear_active_route
+        self._take_selected_files = take_selected_files
         self._sign_in_attempted = False
         self._session: _Session | None = None
 
@@ -1269,6 +1276,82 @@ class GuidedCaptureSource:
             session.ctx_manager.__exit__(None, None, None)
         except Exception:  # noqa: BLE001 - teardown is best effort
             pass
+
+    @contextmanager
+    def _active_route(self, detail_url: str, evidence_provider_key: str):
+        route_token = ""
+        if self._publish_active_route is not None:
+            route_token = self._publish_active_route(
+                self._vendor_key,
+                detail_url,
+                evidence_provider_key,
+            )
+        try:
+            yield route_token
+        finally:
+            if self._clear_active_route is not None:
+                self._clear_active_route(
+                    self._vendor_key,
+                    detail_url,
+                    evidence_provider_key,
+                    route_token,
+                )
+
+    def attach_selected_files(
+        self,
+        record,
+        paths: tuple[Path, ...],
+        *,
+        detail_url: str,
+        evidence_provider_key: str | None = None,
+    ) -> SourceOutcome:
+        """Validate person-selected downloads through the normal capture attachment path.
+
+        The native picker supplies only paths.  This method copies each file into the same
+        task-bound broker used by browser downloads, then runs the unchanged exact-identity,
+        cross-EDA, evidence, and atomic activation gates.  It is a recovery transport, not a
+        weaker attachment mode.
+        """
+
+        adapter = get_adapter(self._vendor_key)
+        if adapter is None:
+            return SourceOutcome(error=f"no capture adapter for vendor {self._vendor_key!r}")
+        if not paths:
+            return SourceOutcome(error="no files were selected")
+        manufacturer = (getattr(record, "manufacturer", "") or "").strip()
+        mpn = (getattr(record, "mpn", "") or "").strip()
+        if not manufacturer or not mpn:
+            return SourceOutcome(error="manual recovery requires an exact manufacturer and MPN")
+        author_key = evidence_provider_key or self._evidence_provider_key
+        broker = DownloadBroker(
+            DownloadTask(
+                task_id=record.id,
+                manufacturer_key=manufacturer,
+                mpn_canonical=mpn,
+                staging_root=self._download_root,
+                surface_key=self._vendor_key,
+                evidence_provider_key=author_key,
+            )
+        )
+        try:
+            receipts = tuple(
+                broker.capture_local_file(
+                    path,
+                    source_url=detail_url,
+                    transport="manual-file-picker",
+                )
+                for path in paths
+            )
+        except Exception as exc:  # noqa: BLE001 - return one honest recovery result
+            return SourceOutcome(error=f"could not stage the selected files: {exc}")
+        return self._attach(
+            record,
+            list(receipts),
+            detail_url,
+            detail_url=detail_url,
+            evidence_provider_key=author_key,
+            provider_note="files selected by the person from the active provider task",
+        )
 
     # -- the source contract ---------------------------------------------------------------
 
@@ -1480,6 +1563,22 @@ class GuidedCaptureSource:
         if self._user_driven:
             outcomes: list[tuple[str, SourceOutcome]] = []
             for route_index, route in enumerate(routes):
+                if self._user_cancelled is not None and self._user_cancelled():
+                    reason = "not attempted because the capture was cancelled"
+                    for later_route in routes[route_index:]:
+                        outcomes.append(
+                            (
+                                later_route.capability.label,
+                                _unattempted_route_outcome(
+                                    provider_key=self._vendor_key,
+                                    author_key=_author_key(self._vendor_key, later_route),
+                                    label=later_route.capability.label,
+                                    reason=reason,
+                                    status="cancelled",
+                                ),
+                            )
+                        )
+                    break
                 route_formats = _provider_formats(
                     route,
                     self.provides() if self._collect_variants else needs,
@@ -1523,6 +1622,24 @@ class GuidedCaptureSource:
                         label=route.capability.label,
                     )
                 outcomes.append((route.capability.label, outcome))
+                if not self._collect_variants and set(needs).issubset(outcome.satisfied):
+                    reason = (
+                        f"not attempted after {route.capability.label} completed the first "
+                        "validated source set"
+                    )
+                    for later_route in routes[route_index + 1 :]:
+                        outcomes.append(
+                            (
+                                later_route.capability.label,
+                                _unattempted_route_outcome(
+                                    provider_key=self._vendor_key,
+                                    author_key=_author_key(self._vendor_key, later_route),
+                                    label=later_route.capability.label,
+                                    reason=reason,
+                                ),
+                            )
+                        )
+                    break
                 if outcome.blocked:
                     reason = (
                         f"not attempted after {route.capability.label} blocked the provider session"
@@ -1547,6 +1664,22 @@ class GuidedCaptureSource:
 
         outcomes: list[tuple[str, SourceOutcome]] = []
         for route_index, route in enumerate(routes):
+            if self._user_cancelled is not None and self._user_cancelled():
+                reason = "not attempted because the capture was cancelled"
+                for later_route in routes[route_index:]:
+                    outcomes.append(
+                        (
+                            later_route.capability.label,
+                            _unattempted_route_outcome(
+                                provider_key=self._vendor_key,
+                                author_key=_author_key(self._vendor_key, later_route),
+                                label=later_route.capability.label,
+                                reason=reason,
+                                status="cancelled",
+                            ),
+                        )
+                    )
+                break
             route_formats = _provider_formats(
                 route,
                 self.provides() if self._collect_variants else needs,
@@ -1588,6 +1721,24 @@ class GuidedCaptureSource:
                     label=route.capability.label,
                 )
             outcomes.append((route.capability.label, outcome))
+            if not self._collect_variants and set(needs).issubset(outcome.satisfied):
+                reason = (
+                    f"not attempted after {route.capability.label} completed the first "
+                    "validated source set"
+                )
+                for later_route in routes[route_index + 1 :]:
+                    outcomes.append(
+                        (
+                            later_route.capability.label,
+                            _unattempted_route_outcome(
+                                provider_key=self._vendor_key,
+                                author_key=_author_key(self._vendor_key, later_route),
+                                label=later_route.capability.label,
+                                reason=reason,
+                            ),
+                        )
+                    )
+                break
             if outcome.blocked:
                 reason = (
                     f"not attempted after {route.capability.label} blocked the provider session"
@@ -2333,46 +2484,79 @@ class GuidedCaptureSource:
                 evidence_provider_key=evidence_provider_key,
             )
         )
+        result = None
+        capture_error: Exception | None = None
+        selected_receipts = ()
         try:
-            result = session.browser.capture_user_downloads(
-                open_url,
-                broker,
-                hud=ProviderHudSpec(
-                    provider_label=provider_label,
-                    author_route=_provider_hud_author_route(adapter),
-                    manufacturer=manufacturer,
-                    mpn=mpn,
-                    required_file_labels=_provider_hud_labels(adapter, formats),
-                ),
-                should_finish=self._user_finished,
-                should_cancel=self._user_cancelled,
-                timeout_s=self._user_capture_timeout_s,
-            )
+            with self._active_route(open_url, evidence_provider_key) as route_token:
+                try:
+                    result = session.browser.capture_user_downloads(
+                        open_url,
+                        broker,
+                        hud=ProviderHudSpec(
+                            provider_label=provider_label,
+                            author_route=_provider_hud_author_route(adapter),
+                            manufacturer=manufacturer,
+                            mpn=mpn,
+                            required_file_labels=_provider_hud_labels(adapter, formats),
+                        ),
+                        should_finish=self._user_finished,
+                        should_cancel=self._user_cancelled,
+                        timeout_s=self._user_capture_timeout_s,
+                    )
+                except Exception as exc:  # noqa: BLE001 - an accepted inbox must still drain
+                    capture_error = exc
+                finally:
+                    selected_paths = (
+                        self._take_selected_files(
+                            self._vendor_key,
+                            open_url,
+                            evidence_provider_key,
+                            route_token,
+                        )
+                        if self._take_selected_files is not None
+                        else ()
+                    )
+                    selected_receipts = tuple(
+                        broker.capture_local_file(
+                            path,
+                            source_url=open_url,
+                            transport="manual-file-picker",
+                        )
+                        for path in selected_paths
+                    )
         except Exception as exc:  # noqa: BLE001 - one part's failure is a row, not a dead run
             return SourceOutcome(error=f"{provider_label}: {exc}")
 
-        received = len(result.files)
-        learned = self._learn_models_id(manufacturer, mpn, result.final_url)
+        if result is None and not selected_receipts:
+            return SourceOutcome(error=f"{provider_label}: {capture_error}")
+        result_files = () if result is None else result.files
+        result_status = "browser-error-recovered" if result is None else result.status
+        result_url = open_url if result is None else result.final_url
+        landed = [*result_files, *selected_receipts]
+        received = len(landed)
+        evidence_url = result_url or open_url
+        learned = self._learn_models_id(manufacturer, mpn, evidence_url)
         trace(
             "capture.route.user-result",
             provider=self._vendor_key,
             route=evidence_provider_key,
-            status=result.status,
+            status=result_status,
             files=received,
-            names=[file_note(getattr(item, "path", "")) for item in result.files],
-            final_url=url_note(result.final_url),
+            names=[file_note(getattr(item, "path", "")) for item in landed],
+            final_url=url_note(evidence_url),
             models_id=learned,
         )
-        cancelled = result.status == "cancelled"
+        cancelled = result_status == "cancelled"
         if cancelled:
             if self._cancel_workflow is not None:
                 self._cancel_workflow()
-            if not result.files:
+            if not landed:
                 return SourceOutcome(
                     skipped=f"{provider_label} capture was cancelled before any file arrived",
                     blocked=True,
                 )
-        if result.status == "try_another" and not result.files:
+        if result_status == "try_another" and not landed:
             suffix = f" after receiving {counted(received, 'file')}" if received else ""
             return SourceOutcome(
                 skipped=(
@@ -2380,31 +2564,36 @@ class GuidedCaptureSource:
                 ),
                 blocked=True,
             )
-        if result.status == "timed_out" and not result.files:
+        if result_status == "timed_out" and not landed:
             suffix = f" after receiving {counted(received, 'file')}" if received else ""
             return SourceOutcome(
                 error=f"{provider_label} capture timed out{suffix}; nothing was attached"
             )
-        if not result.files:
+        if not landed:
             return SourceOutcome(error="the vendor download did not produce a file")
 
         if getattr(adapter, "supplementary_only", False):
             outcome = self._retain_supplementary(
                 record,
-                list(result.files),
-                detail_url=result.final_url,
+                landed,
+                detail_url=evidence_url,
                 surface_key=self._vendor_key,
                 evidence_provider_key=evidence_provider_key,
             )
         else:
             outcome = self._attach(
                 record,
-                list(result.files),
+                landed,
                 # The page actually opened, which is the deep link when one was used. Provenance
                 # must record where the bytes came from, not the fallback URL.
                 open_url,
-                detail_url=result.final_url,
+                detail_url=evidence_url,
                 evidence_provider_key=evidence_provider_key,
+                provider_note=(
+                    "files selected by the person from the active provider task"
+                    if selected_receipts
+                    else ""
+                ),
             )
         # Cancel stops subsequent routes/workflow work. It does not erase bytes that crossed the
         # task-bound broker before the click; those retain their normal validation outcome.

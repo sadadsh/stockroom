@@ -154,7 +154,7 @@ describe("CaptureProvider store", () => {
     });
 
     expect(result.current.active.status).toBe("done");
-    expect(result.current.active.message).toContain("Every eligible route completed");
+    expect(result.current.active.message).toContain("KiCad, Altium, and STEP are verified");
     expect(stream).not.toHaveBeenCalled();
     expect(readUiSession().selected_ids.workflow_batch).toBeNull();
   });
@@ -591,7 +591,7 @@ describe("CaptureProvider store", () => {
       expect.objectContaining({
         partIds: ["p1"],
         vendor: undefined,
-        mode: "collect-all",
+        mode: "finish-first",
         idempotencyKey: expect.stringMatching(/^guided-capture-/),
       }),
     );

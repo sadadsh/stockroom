@@ -4,8 +4,8 @@
  * assets in one pass, watching a two-track checklist fill) and DETAILS (datasheet, part number,
  * manufacturer, value). The capture runs through the global CaptureProvider store, so "Keep
  * Working" can hand it off to the background status pill and the user can close this and keep
- * moving while the files land. Metadata rows use the normal edit-field seam; CAD assets can only
- * arrive through the network capture workflow, so the record stays the single source of truth.
+ * moving while the files land. A person can also select files downloaded from the active provider
+ * task; those bytes enter the exact same validation and atomic activation pipeline.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
@@ -18,8 +18,10 @@ import type {
   Requirement,
 } from "../api/types";
 import { useCadSourceQuery } from "../api/queries";
+import { api } from "../api/client";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
 import { captureInFlight, useCapture } from "../lib/capture";
+import { pickHostFiles } from "../lib/hostFilePicker";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
@@ -176,8 +178,8 @@ function CaptureRow({ label, copyId, done }: { label: string; copyId: string; do
 // A needs-accurate one-liner: never promise KiCad when only Altium is missing (or vice versa).
 function needsSubline(): string {
   return (
-    "One automatic run reuses verified evidence, collects every eligible source, and builds the " +
-    "shared KiCad + Altium + STEP package."
+    "One automatic run reuses verified evidence and stops at the first complete validated " +
+    "KiCad + Altium + STEP package."
   );
 }
 
@@ -437,6 +439,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
   // Only a route waiting for human input opens the embedded provider page and can be finished or
   // skipped by the person.
   const [captureElapsed, setCaptureElapsed] = useState(0);
+  const [selectedFilesBusy, setSelectedFilesBusy] = useState(false);
   useEffect(() => {
     if (!captureBusy) {
       setCaptureElapsed(0);
@@ -451,6 +454,44 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
   }, [captureBusy]);
   // "Keep Working" only makes sense while a capture is actually in flight through the host.
   const canBackground = captureBusy;
+  const canSelectDownloadedFiles =
+    capture.active.partId === detail.id &&
+    captureBusy &&
+    Boolean(
+      capture.active.workflowItemId &&
+        capture.active.vendor &&
+        capture.active.url &&
+        capture.active.routeToken,
+    );
+
+  async function useDownloadedFiles() {
+    const vendor = capture.active.vendor;
+    const detailUrl = capture.active.url;
+    const workflowItemId = capture.active.workflowItemId;
+    const routeToken = capture.active.routeToken;
+    if (!vendor || !detailUrl || !workflowItemId || !routeToken) return;
+    setSelectedFilesBusy(true);
+    try {
+      const paths = await pickHostFiles("cad-recovery");
+      if (paths.length === 0) return;
+      const result = await api.attachSelectedCaptureFiles({
+        partId: detail.id,
+        workflowItemId,
+        paths,
+        vendor,
+        detailUrl,
+        routeToken,
+      });
+      toast(
+        `Stockroom queued ${result.queued_files} selected ${result.queued_files === 1 ? "file" : "files"} for validation in this completion task.`,
+        "ok",
+      );
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not use the selected files.", "err");
+    } finally {
+      setSelectedFilesBusy(false);
+    }
+  }
 
   // Closing the window while a capture is still in flight must not lose it: hand it to the
   // background pill instead of dropping it. Every close path (Escape, backdrop, the X, Done)
@@ -764,9 +805,10 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                       </span>
                     </div>
                     <p className="mt-1 text-2xs leading-snug text-t2">
-                      Stockroom is checking saved evidence and every eligible source. If a
+                      Stockroom is checking saved evidence and the fastest eligible source. If a
                       provider needs your sign-in, security check, format choice, or download
-                      click, its exact page and instructions appear inside Stockroom.
+                      click, its exact page and instructions appear inside Stockroom. Completion
+                      stops as soon as one validated KiCad, Altium, and STEP set is ready.
                     </p>
                   </div>
                 ) : null}
@@ -788,7 +830,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                       }
                       onClick={() =>
                         void download
-                          .start(undefined, "collect-all")
+                          .start(undefined, "finish-first")
                           .catch((error) =>
                             toast(error instanceof Error ? error.message : "Could not start completion.", "err"),
                           )
@@ -806,6 +848,16 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                     <p className="text-xs text-[var(--c-warn-text)]">
                       Add the manufacturer and exact part number before collecting files.
                     </p>
+                  ) : null}
+                  {canSelectDownloadedFiles ? (
+                    <Button
+                      variant="default"
+                      small
+                      disabled={selectedFilesBusy}
+                      onClick={() => void useDownloadedFiles()}
+                    >
+                      {selectedFilesBusy ? "Checking Files..." : "Use Downloaded Files"}
+                    </Button>
                   ) : null}
                   {canBackground ? (
                     <button

@@ -22,6 +22,7 @@ def test_durable_capture_options_cross_the_provider_worker_thread(tmp_path: Path
     context = cast(
         StageContext,
         SimpleNamespace(
+            should_stop=lambda: True,
             item=SimpleNamespace(
                 id="item-capture-1",
                 payload={
@@ -44,8 +45,10 @@ def test_durable_capture_options_cross_the_provider_worker_thread(tmp_path: Path
         assert request.vendor == "ultralibrarian"
         assert request.background is False
         assert request.report_item_id == "item-capture-1"
+        assert request.should_stop() is True
 
     default = adapter._capture_options(identity)
     assert default.mode == "automatic"
     assert default.vendor is None
     assert default.report_item_id is None
+    assert default.should_stop() is False

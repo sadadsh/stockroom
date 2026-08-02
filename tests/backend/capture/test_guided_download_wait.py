@@ -665,6 +665,60 @@ def test_user_hud_action_advances_or_cancels_without_attaching(
     assert bool(cancel_calls) is workflow_cancelled
 
 
+def test_selected_files_survive_a_browser_failure_and_keep_the_exact_route_binding(
+    monkeypatch,
+    tmp_path,
+):
+    from stockroom.capture.intent import PersonCaptureIntent
+
+    browser = _FakeBrowser()
+    _install_adapter(monkeypatch, browser, on_drive=lambda _browser: None)
+    selected = tmp_path / "Recovered.zip"
+    selected.write_bytes(b"selected CAD")
+    intent = PersonCaptureIntent("part-1")
+
+    def capture_user_downloads(url, _broker, **options):
+        active = intent.active_route()
+        assert active is not None
+        intent.queue_selected_files(
+            vendor="faketron",
+            detail_url=url,
+            route_token=active["route_token"],
+            paths=(selected,),
+        )
+        assert options["should_finish"]() is True
+        raise RuntimeError("provider page crashed after the selection was accepted")
+
+    browser.capture_user_downloads = capture_user_downloads
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="faketron",
+        download_root=tmp_path / "Downloads",
+        user_driven=True,
+        user_finished=intent.take_route_finish,
+        publish_active_route=intent.set_active_route,
+        clear_active_route=intent.clear_active_route,
+        take_selected_files=intent.take_selected_files,
+    )
+    source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+    observed = {}
+
+    def attach(_record, landed, _url, **options):
+        observed["receipt"] = landed[0]
+        observed["options"] = options
+        return SourceOutcome(satisfied=(Requirement.KICAD_SYMBOL,))
+
+    monkeypatch.setattr(source, "_attach", attach)
+
+    outcome = source.supply(_Record())
+
+    assert outcome.satisfied == (Requirement.KICAD_SYMBOL,)
+    assert observed["receipt"].transport == "manual-file-picker"
+    assert observed["receipt"].evidence_provider_key == "faketron"
+    assert observed["options"]["evidence_provider_key"] == "faketron"
+    assert intent.active_route() is None
+
+
 def test_guided_supply_refuses_ambiguous_identity_before_opening_a_browser(monkeypatch, tmp_path):
     browser = _FakeBrowser()
     _install_adapter(monkeypatch, browser, on_drive=lambda _browser: None)
@@ -1131,6 +1185,7 @@ def test_digikey_collects_every_embedded_author_route_after_first_success(
         vendor="digikey",
         download_root=tmp_path / "Downloads",
         machine_access_check=lambda: True,
+        collect_variants=True,
     )
     source._session = guided._Session(browser=_FakeBrowser(), ctx_manager=None, page=_FakePage())
     captured_routes: list[str] = []
@@ -1170,6 +1225,135 @@ def test_digikey_collects_every_embedded_author_route_after_first_success(
     assert [row.status for row in outcome.provider_outcomes] == [
         "activated",
         "succeeded-retained",
+    ]
+
+
+def test_finish_first_stops_after_the_first_complete_author_route(monkeypatch, tmp_path):
+    capability = VendorCapability(
+        key="digikey",
+        label="DigiKey CAD Models",
+        tools=("kicad", "altium"),
+        formats_exclusive=True,
+        aggregator=True,
+        needs_login=True,
+        instruction="",
+        machine_format_labels={"kicad": "KiCad v6+", "altium": "Altium Designer"},
+        browser_access="machine_allowed",
+    )
+    routes = tuple(
+        type(
+            "_Route",
+            (),
+            {
+                "capability": capability,
+                "evidence_provider_key": author,
+            },
+        )()
+        for author in ("digikey-ultralibrarian", "digikey-snapmagic")
+    )
+
+    class _DigiKey:
+        evidence_provider_key = "digikey-ultralibrarian"
+
+        def resolve_url(self, mpn):
+            return f"https://www.digikey.com/en/products/result?keywords={mpn}"
+
+        def capture_routes(self):
+            return routes
+
+    parent = _DigiKey()
+    parent.capability = capability
+    monkeypatch.setattr(guided, "get_adapter", lambda _key: parent)
+    monkeypatch.setattr(
+        guided,
+        "capture_needs",
+        lambda _record: [Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT],
+    )
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="digikey",
+        download_root=tmp_path / "Downloads",
+        machine_access_check=lambda: True,
+    )
+    source._session = guided._Session(browser=_FakeBrowser(), ctx_manager=None, page=_FakePage())
+    attempted: list[str] = []
+
+    def capture_route(_record, _session, route, *_args):
+        attempted.append(route.evidence_provider_key)
+        return SourceOutcome(
+            satisfied=(Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT)
+        )
+
+    source._supply_automated_route = capture_route
+
+    outcome = source.supply(_Record())
+
+    assert attempted == ["digikey-ultralibrarian"]
+    assert [row.status for row in outcome.provider_outcomes] == [
+        "activated",
+        "not-attempted",
+    ]
+    assert "first validated source set" in outcome.provider_outcomes[1].reason
+
+
+def test_cancellation_between_author_routes_prevents_the_next_route(monkeypatch, tmp_path):
+    capability = VendorCapability(
+        key="digikey",
+        label="DigiKey CAD Models",
+        tools=("kicad",),
+        formats_exclusive=True,
+        aggregator=True,
+        needs_login=True,
+        instruction="",
+        machine_format_labels={"kicad": "KiCad v6+"},
+        browser_access="machine_allowed",
+    )
+    routes = tuple(
+        type(
+            "_Route",
+            (),
+            {"capability": capability, "evidence_provider_key": author},
+        )()
+        for author in ("digikey-ultralibrarian", "digikey-snapmagic")
+    )
+
+    class _DigiKey:
+        evidence_provider_key = "digikey-ultralibrarian"
+
+        def resolve_url(self, mpn):
+            return f"https://www.digikey.com/en/products/result?keywords={mpn}"
+
+        def capture_routes(self):
+            return routes
+
+    parent = _DigiKey()
+    parent.capability = capability
+    monkeypatch.setattr(guided, "get_adapter", lambda _key: parent)
+    cancelled = False
+    attempted: list[str] = []
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="digikey",
+        download_root=tmp_path / "Downloads",
+        machine_access_check=lambda: True,
+        user_cancelled=lambda: cancelled,
+    )
+    source._session = guided._Session(browser=_FakeBrowser(), ctx_manager=None, page=_FakePage())
+
+    def capture_route(_record, _session, route, *_args):
+        nonlocal cancelled
+        attempted.append(route.evidence_provider_key)
+        cancelled = True
+        return SourceOutcome(skipped="first route ended")
+
+    source._supply_automated_route = capture_route
+
+    outcome = source.supply(_Record())
+
+    assert attempted == ["digikey-ultralibrarian"]
+    assert [row.status for row in outcome.provider_outcomes] == [
+        "unavailable",
+        "cancelled",
     ]
 
 

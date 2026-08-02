@@ -21,6 +21,25 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-01 — Current Capture Reliability Source Host
+
+- Capture layer: Computer Use against the exact current source in the real
+  pywebview/WebView2 host, using task-owned configuration and fixture library.
+- Surfaces: empty Components and Add Parts in dark and light themes. Every
+  point-in-time Windows capture was 1,386 × 872; Computer Use did not retain
+  standalone image files or stable image digests.
+- Intended claim: the current frontend distribution boots in a native WebView2
+  window, Add Parts opens and closes through accessible controls, the saved
+  intake draft survives the modal lifecycle, and both themes retain their
+  intended hierarchy without overflow or compositor artifacts.
+- Acceptance result: pass. The source host, loopback backend, and WebView2
+  renderer were healthy; the detached audit launch initially left Stockroom
+  behind the foreground apps, and activating its existing taskbar window
+  surfaced it without a relaunch. A first-frame capture appeared to show page
+  content through the bulk-import textarea, but a settled follow-up proved this
+  was only the modal's intentional opacity transition; the opaque popover and
+  field rendered correctly in both themes. No new product finding was opened.
+
 ### 2026-08-01 — Embedded Provider Surface
 
 - Capture layer: Computer Use against the isolated self-contained native

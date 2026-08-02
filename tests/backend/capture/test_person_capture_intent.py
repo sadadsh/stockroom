@@ -25,7 +25,9 @@ from stockroom.capture.intent import (
     SKIP_PART,
     PersonCaptureIntent,
     PersonCaptureIntentError,
+    active_person_capture,
     person_capture_intent,
+    queue_person_capture_files,
     running_person_captures,
     signal_person_capture,
 )
@@ -62,6 +64,110 @@ def test_a_running_capture_is_published_under_its_part_for_exactly_its_run():
         assert running_person_captures() == ("lm317",)
         assert intent.part_id == "lm317"
     assert running_person_captures() == ()
+
+
+def test_the_active_provider_route_is_visible_only_for_its_exact_running_capture():
+    intent = PersonCaptureIntent()
+
+    assert active_person_capture("item-1", part_id="lm317") is None
+    with person_capture_intent("lm317", intent, capture_id="item-1"):
+        assert active_person_capture("item-1", part_id="lm317") is None
+        route_token = intent.set_active_route(
+            "digikey",
+            "https://www.digikey.com/en/products/detail/example",
+            "digikey-snapmagic",
+        )
+        assert active_person_capture("item-1", part_id="lm317") == {
+            "vendor": "digikey",
+            "detail_url": "https://www.digikey.com/en/products/detail/example",
+            "route_token": route_token,
+        }
+        intent.clear_active_route(
+            "digikey",
+            "https://www.digikey.com/en/products/detail/example",
+            "digikey-snapmagic",
+            route_token,
+        )
+        assert active_person_capture("item-1", part_id="lm317") is None
+    assert active_person_capture("item-1", part_id="lm317") is None
+
+
+def test_selected_files_wake_only_the_exact_capture_generation_and_author_route(tmp_path):
+    selected = tmp_path / "LM317.step"
+    selected.write_bytes(b"model")
+    intent = PersonCaptureIntent()
+    url = "https://www.digikey.com/en/products/detail/example"
+
+    with person_capture_intent("lm317", intent, capture_id="item-current"):
+        route_token = intent.set_active_route("digikey", url, "digikey-snapmagic")
+        with pytest.raises(PersonCaptureIntentError):
+            queue_person_capture_files(
+                "item-stale",
+                part_id="lm317",
+                vendor="digikey",
+                detail_url=url,
+                route_token=route_token,
+                paths=(selected,),
+            )
+        with pytest.raises(PersonCaptureIntentError):
+            queue_person_capture_files(
+                "item-current",
+                part_id="lm317",
+                vendor="digikey",
+                detail_url=url,
+                route_token="stale-route-token",
+                paths=(selected,),
+            )
+        intent.finish_route()
+        queue_person_capture_files(
+            "item-current",
+            part_id="lm317",
+            vendor="digikey",
+            detail_url=url,
+            route_token=route_token,
+            paths=(selected,),
+        )
+        assert intent.take_route_finish() is True
+        assert intent.take_selected_files(
+            "digikey", url, "digikey-ultralibrarian", route_token
+        ) == ()
+        assert intent.take_selected_files(
+            "digikey", url, "digikey-snapmagic", route_token
+        ) == (selected,)
+        assert intent.take_route_finish() is False
+        with pytest.raises(PersonCaptureIntentError):
+            queue_person_capture_files(
+                "item-current",
+                part_id="lm317",
+                vendor="digikey",
+                detail_url=url,
+                route_token=route_token,
+                paths=(selected,),
+            )
+
+
+def test_an_empty_route_drain_closes_intake_before_cleanup(tmp_path):
+    selected = tmp_path / "late.step"
+    selected.write_bytes(b"late")
+    intent = PersonCaptureIntent()
+    url = "https://www.digikey.com/en/products/detail/example"
+
+    with person_capture_intent("lm317", intent, capture_id="item-current"):
+        route_token = intent.set_active_route(
+            "digikey", url, "digikey-ultralibrarian"
+        )
+        assert intent.take_selected_files(
+            "digikey", url, "digikey-ultralibrarian", route_token
+        ) == ()
+        with pytest.raises(PersonCaptureIntentError):
+            queue_person_capture_files(
+                "item-current",
+                part_id="lm317",
+                vendor="digikey",
+                detail_url=url,
+                route_token=route_token,
+                paths=(selected,),
+            )
 
 
 def test_a_library_wide_run_publishes_nothing_a_person_could_signal():

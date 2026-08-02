@@ -252,20 +252,14 @@ class AppContext:
             old_stm_index.close()
 
     def auto_push(self) -> None:
-        """After a library write, push it through the user's Git credential helper when sync is
-        enabled, first rebasing to pick up any collaborator changes. Non-fatal: an offline /
-        no-remote / auth / conflict failure never breaks the write (the change is already committed
-        locally, and the next launch's pull + a Sync push it). So a part add lands in git
-        immediately and reaches every collaborator on their next launch."""
-        if not getattr(self.config, "sync_enabled", True):
-            return
-        try:
-            if not self.repo.has_remote():
-                return
-            self.repo.pull_rebase()  # reconcile local commits with collaborators' changes first
-            self.repo.push()
-        except Exception:  # noqa: BLE001 - auto-push is best-effort; never break the write
-            pass
+        """Converge a committed library write and retain the honest result for the UI.
+
+        The write itself remains successful when the network, credentials, or remote history
+        blocks synchronization.  Unlike the retired best-effort path, the failure is not swallowed:
+        :meth:`reconcile` records it in ``last_sync`` and rebuilds derived indexes after a pull.
+        """
+
+        self.reconcile()
 
     def reconcile(self) -> bool:
         """Sync with the remote and REBUILD the derived indexes when a pull brought anything in.

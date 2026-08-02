@@ -4,11 +4,11 @@
  * decides what the part needs. A passive (R/C/L) needs no provider download because qualified
  * built-in representations project into both tools. A non-passive lands as an identity/spec
  * record, then Complete Part runs
- * the network capture that must verify one same-source KiCad + Altium + STEP set. Local ZIP
- * ingest is deliberately absent so a single-tool or mixed-author set cannot enter here.
+ * the network capture that must verify one same-source KiCad + Altium + STEP set. Files selected
+ * during that task use the same identity and cross-EDA gates as intercepted downloads.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import type { EnrichmentResult, StagingCandidate } from "../api/types";
+import type { EnrichmentResult, PartDetail, StagingCandidate } from "../api/types";
 import { useEnrichLookup, useSettings } from "../api/queries";
 import { useCapture } from "../lib/capture";
 import { useAddPart } from "../lib/addPart";
@@ -131,6 +131,7 @@ export function IngestPage() {
   // pass. Adding is no longer a dead end that leaves the part file-less.
   const capture = useCapture();
   const addPart = useAddPart();
+  const lastCommittedPart = useRef<PartDetail | null>(null);
   // Copy layer: strings that fire from callbacks/attributes resolve here (stable hook order);
   // everything visible below is a <Text> so the whole window is dev-mode editable.
   const inputAria = useText("ingest.input-aria", "Product link or part number");
@@ -264,7 +265,15 @@ export function IngestPage() {
   useEffect(() => {
     const wasNonEmpty = (prevStagedLen.current ?? 0) > 0;
     prevStagedLen.current = staged?.length ?? null;
-    if (staged && staged.length === 0 && wasNonEmpty) reset();
+    if (staged && staged.length === 0 && wasNonEmpty) {
+      const created = lastCommittedPart.current;
+      lastCommittedPart.current = null;
+      reset();
+      if (created) {
+        capture.requestOpenFor(created.id);
+        addPart.close();
+      }
+    }
     // reset is recreated each render; listing it would re-run this on every render. The transition
     // to empty is the only intended trigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -449,13 +458,8 @@ export function IngestPage() {
               conflicts={conflicts}
               initialDatasheetUrl={datasheetUrl}
               onCommitted={(created) => {
+                lastCommittedPart.current = created;
                 removeStaged(id);
-                // Continue into Complete Part only when this emptied the staging list.
-                const remaining = (staged ?? []).filter((x) => x.id !== id).length;
-                if (remaining === 0) {
-                  capture.requestOpenFor(created.id);
-                  addPart.close();
-                }
               }}
               toast={toast}
             />

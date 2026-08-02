@@ -43,6 +43,7 @@ def test_auto_push_pushes_a_write_when_a_token_is_set(app_ctx, tmp_path):
     before = _head(origin)
     app_ctx.auto_push()
     assert _head(origin) != before  # the commit reached the remote
+    assert app_ctx.last_sync.pushed is True
 
 
 def test_auto_push_uses_git_without_a_legacy_token(app_ctx, tmp_path):

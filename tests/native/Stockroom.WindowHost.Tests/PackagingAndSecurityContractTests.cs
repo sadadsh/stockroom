@@ -105,7 +105,7 @@ public sealed class PackagingAndSecurityContractTests
             allSource.Replace("\r\n", "\n", StringComparison.Ordinal),
             StringComparison.Ordinal);
         Assert.Equal(
-            1,
+            2,
             allSource.Split(
                 "webview.postMessage({",
                 StringSplitOptions.None).Length - 1);
@@ -120,6 +120,18 @@ public sealed class PackagingAndSecurityContractTests
             StringComparison.Ordinal);
         Assert.Contains(
             "stockroom.host.folder-result",
+            allSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "stockroom.host.file-request",
+            allSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "stockroom.host.file-result",
+            allSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "value.schema !== request.expectedSchema",
             allSource,
             StringComparison.Ordinal);
         Assert.DoesNotContain(

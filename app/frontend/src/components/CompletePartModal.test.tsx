@@ -117,6 +117,7 @@ function mockCadSource(
 afterEach(() => {
   vi.restoreAllMocks();
   delete (window as { pywebview?: unknown }).pywebview;
+  Reflect.deleteProperty(window, "__STOCKROOM_HOST__");
   // Token edits set inline CSS vars on <html>; clear them so tests do not leak into each other.
   document.documentElement.removeAttribute("style");
   document.documentElement.removeAttribute("data-theme");
@@ -161,7 +162,7 @@ describe("CompletePartModal - automatic capture", () => {
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
     expect(
       await screen.findByText(
-        "One automatic run reuses verified evidence, collects every eligible source, and builds the shared KiCad + Altium + STEP package.",
+        "One automatic run reuses verified evidence and stops at the first complete validated KiCad + Altium + STEP package.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Preferred Source")).toBeNull();
@@ -200,7 +201,7 @@ describe("CompletePartModal - automatic capture", () => {
     expect(onEditField).toHaveBeenCalledWith("datasheet", "https://example.test/bq24074.pdf");
   });
 
-  it("keeps exhaustive network collection available after the active files are complete", async () => {
+  it("can refresh with the first complete validated network set after files are complete", async () => {
     const user = userEvent.setup();
     mockCadSource([]);
     const capture = mockCapture([
@@ -269,7 +270,7 @@ describe("CompletePartModal - automatic capture", () => {
       expect.objectContaining({
         partIds: [DETAIL.id],
         vendor: undefined,
-        mode: "collect-all",
+        mode: "finish-first",
       }),
     );
     expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
@@ -621,7 +622,7 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
       expect.objectContaining({
         partIds: [DETAIL.id],
         vendor: undefined,
-        mode: "collect-all",
+        mode: "finish-first",
       }),
     );
   });
@@ -644,6 +645,102 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
     expect(screen.queryByText(/separate window/i)).toBeNull();
     expect(screen.queryByRole("button", { name: "Finish Route" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Skip This Part" })).toBeNull();
+  });
+
+  it("queues selected downloads into the exact active durable provider task", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol", "altium_symbol"]);
+    const pickFiles = vi.fn().mockResolvedValue(["D:\\Downloads\\BQ24074.zip"]);
+    Object.defineProperty(window, "__STOCKROOM_HOST__", {
+      configurable: true,
+      value: { pickFiles },
+    });
+    vi.spyOn(api, "runCapture").mockResolvedValue({
+      workflow_batch_id: "batch-selected-files",
+      workflow_item_id: "item-selected-files",
+      event_cursor: 0,
+    });
+    let eventCalls = 0;
+    vi.spyOn(api, "workflowEvents").mockImplementation(async () => {
+      eventCalls += 1;
+      if (eventCalls > 1) return new Promise(() => undefined);
+      return {
+        schema_version: 1,
+        batch: {
+          id: "batch-selected-files",
+          kind: "guided_capture",
+          status: "running",
+          created_at: 1,
+          updated_at: 2,
+          total_items: 1,
+          item_counts: { running: 1 },
+          cancellation: null,
+          actions: {
+            can_pause: false,
+            can_resume: false,
+            can_retry: false,
+            can_cancel: true,
+          },
+        },
+        events: [
+          {
+            sequence: 1,
+            item_id: "item-selected-files",
+            stage_id: null,
+            kind: "stage_started",
+            details: { stage: "cad_acquisition" },
+            created_at: 2,
+          },
+        ],
+        cursor: {
+          after_sequence: 0,
+          next_sequence: 1,
+          limit: 200,
+          has_more: false,
+        },
+      } as never;
+    });
+    const activeUrl = "https://www.digikey.com/en/products/detail/ti/BQ24074";
+    vi.spyOn(api, "captureWorkflow").mockResolvedValue({
+      workflow_batch_id: "batch-selected-files",
+      workflow_item_id: "item-selected-files",
+      part_id: DETAIL.id,
+      mode: "finish-first",
+      vendor: null,
+      background: false,
+      active_route: {
+        vendor: "digikey",
+        detail_url: activeUrl,
+        route_token: "route-selected-files",
+      },
+      initial_needs: ["kicad_symbol", "altium_symbol"],
+      report: null,
+    });
+    const attach = vi.spyOn(api, "attachSelectedCaptureFiles").mockResolvedValue({
+      part_id: DETAIL.id,
+      workflow_item_id: "item-selected-files",
+      accepted: true,
+      queued_files: 1,
+    });
+    RENDER();
+
+    await user.click(await screen.findByRole("button", { name: "Get Files" }));
+    await user.click(await screen.findByRole("button", { name: "Use Downloaded Files" }));
+
+    expect(pickFiles).toHaveBeenCalledWith("cad-recovery");
+    await waitFor(() =>
+      expect(attach).toHaveBeenCalledWith({
+        partId: DETAIL.id,
+        workflowItemId: "item-selected-files",
+        paths: ["D:\\Downloads\\BQ24074.zip"],
+        vendor: "digikey",
+        detailUrl: activeUrl,
+        routeToken: "route-selected-files",
+      }),
+    );
+    expect(
+      await screen.findByText(/queued 1 selected file for validation in this completion task/i),
+    ).toBeInTheDocument();
   });
 });
 

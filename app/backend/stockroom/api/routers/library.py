@@ -37,16 +37,17 @@ from stockroom.workflow import IntakeIdentity
 # is reachable.
 _HISTORY_MAX = 100
 _AUTOMATIC_CAPTURE_INSTRUCTION = (
-    "Stockroom tries permitted automatic sources first. When you select this provider, Stockroom "
-    "opens the exact result, chooses the required formats, captures, validates, and attaches every "
-    "delivered file automatically. It stops only for a provider security check."
+    "Stockroom checks retained evidence and permitted machine sources first. If a provider needs "
+    "you, its exact page opens inside Stockroom with the remaining files named. Start the offered "
+    "downloads there, or select files you already downloaded; Stockroom intercepts, validates, "
+    "and activates only a complete coherent set."
 )
 _COMPLETION_MAX_BATCH = 1000
 _COMPLETION_BODY_FIELDS = frozenset({"part_ids", "limit", "idempotency_key"})
 _CAPTURE_BODY_FIELDS = frozenset(
     {"part_ids", "limit", "idempotency_key", "mode", "vendor", "background"}
 )
-_CAPTURE_MODES = frozenset({"automatic", "assisted", "collect-all"})
+_CAPTURE_MODES = frozenset({"automatic", "assisted", "finish-first", "collect-all"})
 _CAPTURE_REQUIREMENTS = frozenset(
     {
         "kicad_symbol",
@@ -244,7 +245,9 @@ def _capture_command(
 
     mode = payload.get("mode", "automatic")
     if mode not in _CAPTURE_MODES:
-        raise ValueError("capture mode must be 'automatic', 'assisted', or 'collect-all'")
+        raise ValueError(
+            "capture mode must be 'automatic', 'assisted', 'finish-first', or 'collect-all'"
+        )
     background = payload.get("background", False)
     if type(background) is not bool:
         raise ValueError("background must be a boolean")
@@ -1115,23 +1118,21 @@ def library_router(require_token) -> APIRouter:
                 raise ValueError(
                     f"{adapter.capability.label} requires a visible person-driven provider page"
                 )
-        if mode == "collect-all":
+        if mode in {"finish-first", "collect-all"}:
             if part_ids is None or len(part_ids) != 1:
-                raise ValueError("collect-all capture requires exactly one selected part")
+                raise ValueError(f"{mode} capture requires exactly one selected part")
             if limit_supplied:
                 raise ValueError(
-                    "collect-all capture does not accept a batch limit; select exactly one part"
+                    f"{mode} capture does not accept a batch limit; select exactly one part"
                 )
             if background:
-                raise ValueError(
-                    "collect-all capture requires visible sequential provider handoffs"
-                )
+                raise ValueError(f"{mode} capture requires visible provider handoffs")
         records = (
             [_current_completion_record(ctx, part_id) for part_id in part_ids]
             if part_ids is not None
             else None
         )
-        if mode == "collect-all":
+        if mode in {"finish-first", "collect-all"}:
             from stockroom.capture.evidence import exact_identity
 
             assert records is not None
@@ -1139,7 +1140,7 @@ def library_router(require_token) -> APIRouter:
                 exact_identity(records[0])
             except (TypeError, ValueError) as exc:
                 raise ValueError(
-                    "collect-all capture requires one exact manufacturer and MPN"
+                    f"{mode} capture requires one exact manufacturer and MPN"
                 ) from exc
 
         coordinator = ctx.workflow_coordinator
@@ -1185,6 +1186,7 @@ def library_router(require_token) -> APIRouter:
                 limit=limit,
                 headless=background,
                 operator_authorized=mode == "assisted",
+                finish_first=mode == "finish-first",
                 collect_all=mode == "collect-all",
             )
 
@@ -1216,33 +1218,112 @@ def library_router(require_token) -> APIRouter:
         if not is_valid_part_id(part_id):
             raise ValueError(f"invalid part identifier: {part_id!r}")
         payload = {} if body is None else body
-        unexpected = sorted(str(key) for key in payload if key != "action")
+        expected = {"action", "workflow_item_id"}
+        unexpected = sorted(str(key) for key in payload if key not in expected)
         if unexpected:
             raise ValueError("unknown capture intent fields: " + ", ".join(unexpected))
         action = payload.get("action")
         if action not in PERSON_CAPTURE_ACTIONS:
             raise ValueError("action must be 'finish-route' or 'skip-part'")
+        workflow_item_id = payload.get("workflow_item_id")
+        if (
+            type(workflow_item_id) is not str
+            or _OPAQUE_WORKFLOW_REFERENCE.fullmatch(workflow_item_id) is None
+        ):
+            raise ValueError("workflow_item_id must name the exact running capture")
         try:
-            signal_person_capture(part_id, action)
+            signal_person_capture(part_id, action, capture_id=workflow_item_id)
         except PersonCaptureIntentError as exc:
             raise ApiError(409, str(exc)) from exc
-        return {"part_id": part_id, "action": action, "accepted": True}
+        return {
+            "part_id": part_id,
+            "workflow_item_id": workflow_item_id,
+            "action": action,
+            "accepted": True,
+        }
+
+    @r.post("/capture/parts/{part_id}/selected-files")
+    def capture_selected_files(request: Request, part_id: str, body: dict | None = None) -> dict:
+        """Queue native-picker files for the exact durable provider task that validates them."""
+
+        from pathlib import Path
+
+        from stockroom.capture.intent import (
+            PersonCaptureIntentError,
+            queue_person_capture_files,
+        )
+
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        payload = {} if body is None else body
+        expected = {
+            "paths",
+            "vendor",
+            "detail_url",
+            "route_token",
+            "workflow_item_id",
+        }
+        unexpected = sorted(str(key) for key in payload if key not in expected)
+        if unexpected:
+            raise ValueError("unknown selected-file fields: " + ", ".join(unexpected))
+        workflow_item_id = payload.get("workflow_item_id")
+        if (
+            type(workflow_item_id) is not str
+            or _OPAQUE_WORKFLOW_REFERENCE.fullmatch(workflow_item_id) is None
+        ):
+            raise ValueError("workflow_item_id must name the exact running capture")
+        raw_paths = payload.get("paths")
+        if (
+            type(raw_paths) is not list
+            or not 1 <= len(raw_paths) <= 20
+            or any(type(path) is not str or not path.strip() for path in raw_paths)
+        ):
+            raise ValueError("paths must contain between 1 and 20 selected files")
+        try:
+            paths = tuple(Path(path).resolve(strict=True) for path in raw_paths)
+        except (OSError, RuntimeError) as exc:
+            raise ValueError("a selected file is no longer available") from exc
+        if any(path.is_symlink() or not path.is_file() for path in paths):
+            raise ValueError("every selected path must be a real file")
+        vendor = payload.get("vendor")
+        detail_url = payload.get("detail_url")
+        route_token = payload.get("route_token")
+        if type(vendor) is not str or not vendor.strip():
+            raise ValueError("vendor must name the active provider")
+        if type(detail_url) is not str or not detail_url.strip():
+            raise ValueError("detail_url must name the active exact provider page")
+        if type(route_token) is not str or not route_token.strip():
+            raise ValueError("route_token must name the exact active provider route")
+        try:
+            queue_person_capture_files(
+                workflow_item_id,
+                part_id=part_id,
+                vendor=vendor.strip().lower(),
+                detail_url=detail_url.strip(),
+                route_token=route_token.strip(),
+                paths=paths,
+            )
+        except PersonCaptureIntentError as exc:
+            raise ApiError(409, str(exc)) from exc
+        return {
+            "part_id": part_id,
+            "workflow_item_id": workflow_item_id,
+            "accepted": True,
+            "queued_files": len(paths),
+        }
 
     @r.get("/capture/batches/{batch_id}")
     def capture_batch(request: Request, batch_id: str) -> dict:
         """Project one durable guided-capture request, its handoff guidance, and its report.
 
-        `handoff` carries what the provider HUD used to say, for the routes where that HUD can no
-        longer exist. A person-driven provider page now opens in the PERSON'S own browser - which
-        is the point, because an automation-controlled session is exactly what a bot check was
-        catching while a person did the clicking - and Stockroom cannot draw an overlay inside a
-        window it does not own. So the ordered required-file checklist and the provider's own
-        instruction are published here instead, for Stockroom's own window to show while the person
-        is away. It is null when no single provider was named, because guidance for "whichever
-        provider the chain reaches" would be a guess.
+        `handoff` carries the ordered required-file checklist and provider instructions shown beside
+        the embedded provider surface. Provider security choices remain person-owned while task-
+        bound downloads and selected-file recovery remain Stockroom-owned. It is null until the
+        running chain names one exact provider route.
         """
 
         from stockroom.capture.handoff import handoff_guidance
+        from stockroom.capture.intent import active_person_capture
         from stockroom.capture.runner import read_durable_capture_report
 
         if _OPAQUE_WORKFLOW_REFERENCE.fullmatch(batch_id) is None:
@@ -1274,6 +1355,10 @@ def library_router(require_token) -> APIRouter:
         return {
             "workflow_batch_id": batch_id,
             **projection,
+            "active_route": active_person_capture(
+                item.id,
+                part_id=projection["part_id"],
+            ),
             "handoff": handoff,
             "report": report,
         }
