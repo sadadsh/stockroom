@@ -1406,6 +1406,9 @@ export interface UpdateCheck {
   target_release_id?: string;
   current_revision?: string;
   target_revision?: string;
+  // Revision baked into the exact frontend bundle this backend is serving. It differs from the
+  // checkout HEAD when committed generated assets are built from the preceding source commit.
+  frontend_revision?: string;
   channel?: string;
   automatic_on_launch?: boolean;
   check_interval_seconds?: number;

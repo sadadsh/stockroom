@@ -240,6 +240,23 @@ describe("deriveUpdateStanding", () => {
     });
   });
 
+  it("does not confuse a committed bundle build with a stale window", () => {
+    expect(
+      deriveUpdateStanding({
+        data: {
+          update_available: false,
+          state: "up_to_date",
+          current_revision: "3333333333333",
+          target_revision: "3333333333333",
+          frontend_revision: "2222222222222",
+        },
+        checking: false,
+        failed: false,
+        buildVersion: "0.1.0+2222222",
+      }).standing,
+    ).toBe("current");
+  });
+
   it("claims a mismatch only between identities that are comparable", () => {
     // The same short revision at two lengths is one revision, and a production release ID is not a
     // Git revision at all - "disagreeing" with either would be an invented fact, not a reported one.

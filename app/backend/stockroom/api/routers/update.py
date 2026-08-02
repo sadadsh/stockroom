@@ -9,10 +9,33 @@ honest DIVERGED state. Token-guarded like every route.
 from __future__ import annotations
 
 import json
+import re
 
 from fastapi import APIRouter, Depends, Request
 
 from stockroom.api.updater import AppUpdater, UpdateState
+
+
+def _frontend_revision() -> str:
+    """Revision baked into the exact SPA bundle served by this backend."""
+
+    from stockroom.api.app import _FRONTEND_DIST
+
+    try:
+        document = json.loads(
+            (_FRONTEND_DIST / "build-identity.json").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        return ""
+    version = document.get("version") if isinstance(document, dict) else None
+    if not isinstance(version, str):
+        return ""
+    match = re.search(r"\+([0-9a-f]{7,})$", version.strip(), flags=re.IGNORECASE)
+    return match.group(1) if match is not None else ""
+
+
+def _with_frontend_revision(status: dict) -> dict:
+    return {**status, "frontend_revision": _frontend_revision()}
 
 
 def update_router(require_token) -> APIRouter:
@@ -23,17 +46,17 @@ def update_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         convergence = getattr(ctx, "update_convergence", None)
         if convergence is not None:
-            return convergence.status()
+            return _with_frontend_revision(convergence.status())
         mirrored_status = getattr(ctx, "convergence_status_path", None)
         if mirrored_status is not None:
             try:
                 document = json.loads(mirrored_status.read_text(encoding="utf-8"))
                 if isinstance(document, dict):
-                    return document
+                    return _with_frontend_revision(document)
             except (OSError, ValueError):
                 pass
         if ctx.app_repo is None:
-            return {
+            return _with_frontend_revision({
                 "update_available": False,
                 "state": UpdateState.NO_REMOTE,
                 "detail": "this installation is not managed by an application checkout",
@@ -42,8 +65,8 @@ def update_router(require_token) -> APIRouter:
                 "channel": "unmanaged",
                 "automatic_on_launch": False,
                 "check_interval_seconds": 120,
-            }
-        return AppUpdater(ctx.app_repo).check()
+            })
+        return _with_frontend_revision(AppUpdater(ctx.app_repo).check())
 
     @r.post("/apply")
     def apply(request: Request) -> dict:

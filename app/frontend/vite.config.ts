@@ -21,14 +21,28 @@ function buildVersion(): string {
   }
 }
 
+const appVersion = buildVersion();
+
 // The backend serves the built SPA from app/frontend-dist/ (see
 // stockroom.api.app._FRONTEND_DIST), so emit there. Relative asset base so the
 // bundle works whether the host loads it from the API mount or from file://.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: "stockroom-build-identity",
+      generateBundle() {
+        this.emitFile({
+          type: "asset",
+          fileName: "build-identity.json",
+          source: `${JSON.stringify({ version: appVersion })}\n`,
+        });
+      },
+    },
+  ],
   base: "./",
   define: {
-    __APP_VERSION__: JSON.stringify(buildVersion()),
+    __APP_VERSION__: JSON.stringify(appVersion),
   },
   build: {
     outDir: "../frontend-dist",
