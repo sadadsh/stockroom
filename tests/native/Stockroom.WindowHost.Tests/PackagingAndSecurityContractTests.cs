@@ -97,11 +97,29 @@ public sealed class PackagingAndSecurityContractTests
             allSource,
             StringComparison.Ordinal);
         Assert.Contains(
-            "IsWebMessageEnabled = false",
+            "IsWebMessageEnabled = true",
             allSource,
             StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "postMessage",
+        Assert.Contains(
+            "eventArguments.Source,\n                _bootstrap.BaseUri",
+            allSource.Replace("\r\n", "\n", StringComparison.Ordinal),
+            StringComparison.Ordinal);
+        Assert.Equal(
+            1,
+            allSource.Split(
+                "webview.postMessage({",
+                StringSplitOptions.None).Length - 1);
+        Assert.Equal(
+            1,
+            allSource.Split(
+                "PostWebMessageAsJson",
+                StringSplitOptions.None).Length - 1);
+        Assert.Contains(
+            "stockroom.host.folder-request",
+            allSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "stockroom.host.folder-result",
             allSource,
             StringComparison.Ordinal);
         Assert.DoesNotContain(

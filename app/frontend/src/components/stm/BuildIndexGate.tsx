@@ -11,13 +11,14 @@
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useBuildStmIndex } from "../../api/stmQueries";
+import { useBuildStmIndex, useStmStatus } from "../../api/stmQueries";
 import { useSettings, useUpdateSettings } from "../../api/queries";
 import { pickHostFolder } from "../../lib/hostFolderPicker";
 import { Button, Card, Eyebrow } from "../primitives";
 
 export function BuildIndexGate() {
   const build = useBuildStmIndex();
+  const status = useStmStatus();
   const qc = useQueryClient();
   const settings = useSettings();
   const updateSettings = useUpdateSettings();
@@ -32,8 +33,10 @@ export function BuildIndexGate() {
   }, [build.status, qc]);
 
   const running = build.status === "running";
+  const checkingSource = status.isLoading && !status.data;
   const needsSource =
-    build.status === "error" && /cubemx|source configured|source folder/i.test(build.error ?? "");
+    status.data?.source_present === false ||
+    (build.status === "error" && /cubemx|source configured|source folder/i.test(build.error ?? ""));
   const pct =
     build.progress?.pct != null ? Math.min(100, Math.round(build.progress.pct)) : null;
 
@@ -94,9 +97,11 @@ export function BuildIndexGate() {
         <Button
           variant="accent"
           onClick={needsSource ? chooseSourceAndBuild : () => build.start()}
-          disabled={running || updateSettings.isPending}
+          disabled={running || checkingSource || updateSettings.isPending}
         >
-          {running
+          {checkingSource
+            ? "Checking Source..."
+            : running
             ? "Building..."
             : updateSettings.isPending
               ? "Saving..."

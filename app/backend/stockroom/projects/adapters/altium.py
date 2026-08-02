@@ -103,6 +103,8 @@ class AltiumProjectAdapter:
         )
 
     def runtime(self, project: ProjectRecord) -> RuntimeReport:
+        """Report passive install readiness without probing running processes."""
+
         del project
         if not self.driver.installed:
             return RuntimeReport(
@@ -112,14 +114,6 @@ class AltiumProjectAdapter:
                 detail=(
                     "Install Altium Designer to render, validate, edit, and release this project."
                 ),
-            )
-        busy = self.driver.busy_titles()
-        if busy:
-            return RuntimeReport(
-                self.key,
-                False,
-                "busy",
-                detail=f"Altium is already open: {busy[0]}",
             )
         version = self.driver.x2.parent.name if self.driver.x2 else ""
         return RuntimeReport(self.key, True, "ready", version=version)

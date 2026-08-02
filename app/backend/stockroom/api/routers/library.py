@@ -1366,8 +1366,25 @@ def library_router(require_token) -> APIRouter:
                     }
                 )
             if human_routes:
-                worklist_total += len(human_routes)
-                worklist.extend(human_routes[: max(0, _WORKLIST_MAX_ROWS - len(worklist))])
+                # Get Files is component-scoped and exhausts every eligible route. One row per
+                # provider would make the same part run repeatedly and mark every sibling row as
+                # active at once. Keep one actionable component row and summarize its additional
+                # person-owned routes inside that row.
+                primary = human_routes[0]
+                if len(human_routes) > 1:
+                    combined_label = " + ".join(
+                        dict.fromkeys(route["label"] for route in human_routes)
+                    )
+                    combined_reason = sanitize_provider_reason(
+                        "; ".join(
+                            f"{route['label']}: {route['reason']}" for route in human_routes
+                        )
+                    )
+                    primary["label"] = combined_label
+                    primary["reason"] = combined_reason
+                worklist_total += 1
+                if len(worklist) < _WORKLIST_MAX_ROWS:
+                    worklist.append(primary)
                 continue
             if status in {"completed", "already-complete"}:
                 unattended_total += 1
@@ -1407,6 +1424,9 @@ def library_router(require_token) -> APIRouter:
             "total_items": len(items),
             "pending_items": pending,
             "worklist": worklist,
+            # Added so a rolling frontend can distinguish this component-scoped projection from
+            # older releases whose identical field names counted provider routes.
+            "worklist_unit": "components",
             "worklist_total": worklist_total,
             "unattended": unattended,
             "unattended_total": unattended_total,

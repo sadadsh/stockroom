@@ -2562,12 +2562,16 @@ class PlaywrightCaptureBrowser:
         if lock is not None:
             lock.acquire()
         try:
-            if self.engine == "camoufox":
+            # A verified CDP endpoint is the already-open Stockroom WebView2 surface. It owns the
+            # visible provider session regardless of the adapter's standalone fallback engine;
+            # choosing Camoufox/Cloak first would open a second external browser and leave the
+            # embedded one disconnected from download capture.
+            if self._cdp_endpoint is None and self.engine == "camoufox":
                 self.launched_browser = "Camoufox"
                 with self._camoufox_session() as page:
                     yield page
                 return
-            if self.engine == "cloak":
+            if self._cdp_endpoint is None and self.engine == "cloak":
                 self.launched_browser = f"CloakBrowser Chromium {_CLOAK_BROWSER_VERSION}"
                 with self._cloak_session() as page:
                     yield page

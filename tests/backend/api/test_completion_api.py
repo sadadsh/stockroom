@@ -685,11 +685,11 @@ def test_batch_worklist_separates_unattended_parts_from_the_routes_needing_a_per
                     "provider_key": "digikey",
                     "author_key": "samacsys",
                     "label": "DigiKey - SamacSys",
-                    "status": "unavailable",
+                    "status": "requires-human",
                     "attempted": True,
                     "retained": 0,
                     "activated": False,
-                    "reason": "does not offer Altium Designer (Native) for this exact part",
+                    "reason": "SamacSys needs a person-driven download choice",
                 },
             ],
         ),
@@ -702,10 +702,10 @@ def test_batch_worklist_separates_unattended_parts_from_the_routes_needing_a_per
     assert projected["workflow_batch_id"] == batch_id
     assert projected["total_items"] == 2
     assert projected["pending_items"] == 0
+    assert projected["worklist_unit"] == "components"
     assert [row["part_id"] for row in projected["unattended"]] == ["tps62130"]
-    # Exactly one row: only the `requires-human` route needs a person. The unavailable route
-    # was genuinely evaluated and has nothing to offer, so sending someone there would waste
-    # the trip.
+    # Exactly one actionable row per component even when several provider routes need a person.
+    # Get Files exhausts all of them; route rows would rerun this component repeatedly.
     assert projected["worklist_total"] == 1
     assert projected["worklist"] == [
         {
@@ -714,9 +714,12 @@ def test_batch_worklist_separates_unattended_parts_from_the_routes_needing_a_per
             "display_name": "LM317",
             "route_id": "ultralibrarian:ultralibrarian",
             "provider_key": "ultralibrarian",
-            "label": "Ultra Librarian",
+            "label": "Ultra Librarian + DigiKey - SamacSys",
             "status": "requires-human",
-            "reason": "no Ultra Librarian sign-in is saved on this PC",
+            "reason": (
+                "Ultra Librarian: no Ultra Librarian sign-in is saved on this PC; "
+                "DigiKey - SamacSys: SamacSys needs a person-driven download choice"
+            ),
             "remaining": ["kicad_model", "altium_symbol"],
         }
     ]

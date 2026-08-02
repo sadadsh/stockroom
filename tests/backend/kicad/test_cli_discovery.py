@@ -37,6 +37,20 @@ def test_windows_discovery_prefers_the_real_executable_over_a_cmd_shim(
     assert find_kicad_cli() == str(installed)
 
 
+@pytest.mark.parametrize("suffix", [".CMD", ".bat"])
+def test_windows_discovery_rejects_a_batch_shim_even_when_it_is_the_only_result(
+    suffix, tmp_path, monkeypatch
+):
+    shim = tmp_path / f"kicad-cli{suffix}"
+    shim.write_text("@echo off\r\n")
+    monkeypatch.setattr(cli_mod.sys, "platform", "win32")
+    monkeypatch.setattr(cli_mod.shutil, "which", lambda _name: str(shim))
+    monkeypatch.setattr(cli_mod, "_standard_kicad_cli_paths", lambda: [])
+
+    assert find_kicad_cli() is None
+    assert find_kicad_cli(str(shim)) is None
+
+
 def test_kicad_commands_never_create_a_console_window(tmp_path, monkeypatch):
     binary = tmp_path / "kicad-cli.exe"
     binary.write_bytes(b"MZ")

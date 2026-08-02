@@ -34,6 +34,7 @@ function worklist(over: Partial<CaptureBatchWorklist> = {}): CaptureBatchWorklis
         remaining: ["kicad_model", "altium_symbol"],
       },
     ],
+    worklist_unit: "components",
     worklist_total: 1,
     unattended: [],
     unattended_total: 2,
@@ -98,7 +99,11 @@ function Displacer() {
   return (
     <button
       type="button"
-      onClick={() => void capture.start("ne555", "NE555 Timer", [], undefined, "collect-all")}
+      onClick={() =>
+        void capture
+          .start("ne555", "NE555 Timer", [], undefined, "collect-all")
+          .catch(() => undefined)
+      }
     >
       Start Elsewhere
     </button>
@@ -209,9 +214,7 @@ describe("completion worklist", () => {
     ).toHaveTextContent("Getting Files");
   });
 
-  it("names the row whose capture another surface displaced, rather than losing it quietly", async () => {
-    // One slot. The store already carries the displaced part as `superseded`; this surface reuses
-    // that rather than inventing a second notion of "the run that stopped being followed".
+  it("refuses another surface instead of displacing the active worklist capture", async () => {
     vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
     vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
     vi.spyOn(api, "runCapture").mockReturnValue(new Promise(() => {}));
@@ -222,24 +225,19 @@ describe("completion worklist", () => {
         name: "Get files for LM317 Regulator",
       }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "Start Elsewhere" }));
-
-    expect(
-      await screen.findByTestId("completion-worklist-superseded"),
-    ).toHaveTextContent("Completion for LM317 Regulator was superseded");
+    await expect(
+      userEvent.click(screen.getByRole("button", { name: "Start Elsewhere" })),
+    ).resolves.toBeUndefined();
+    expect(api.runCapture).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Get files for LM317 Regulator" })).toHaveTextContent(
+      "Getting Files",
+    );
   });
 
-  it("lets the person end the open route from the row that is running it", async () => {
-    // De-automation removed the provider HUD, so without this the route ends only on cancel, on
-    // ~25 s of quiet after a file landed, or on the 600 s timeout - five times over for DigiKey.
+  it("does not show provider decisions before an embedded provider page asks for them", async () => {
     vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
     vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
     vi.spyOn(api, "runCapture").mockReturnValue(new Promise(() => {}));
-    const intent = vi.spyOn(api, "captureIntent").mockResolvedValue({
-      part_id: "lm317",
-      action: "finish-route",
-      accepted: true,
-    });
     renderWorklist();
 
     await userEvent.click(
@@ -247,12 +245,8 @@ describe("completion worklist", () => {
         name: "Get files for LM317 Regulator",
       }),
     );
-    await userEvent.click(await screen.findByRole("button", { name: "Finish Route" }));
-
-    await waitFor(() => expect(intent).toHaveBeenCalledWith("lm317", "finish-route"));
-    expect(
-      await screen.findByText(/Anything already downloaded is kept/),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Finish Route" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Skip This Part" })).toBeNull();
   });
 
   it("does not expose a provider-only link beside Get Files", async () => {
@@ -389,44 +383,42 @@ describe("completion worklist", () => {
     expect(await screen.findByTestId("completion-worklist-auto-ended")).toHaveTextContent(
       "LM317 Regulator is still active in Stockroom",
     );
-    // Stopping the pass is not cancelling the capture: the person still finishes or skips the page
-    // they are standing in front of.
-    expect(screen.getByRole("button", { name: "Finish Route" })).toBeInTheDocument();
+    // Stopping the pass is not cancelling the capture. Provider decisions remain inside the
+    // embedded browser HUD instead of appearing early on every automatic stage.
+    expect(screen.queryByRole("button", { name: "Finish Route" })).toBeNull();
     expect(run).toHaveBeenCalledTimes(1);
   });
 
-  it("stops the pass when the person skips the component rather than finishing it", async () => {
-    // Skip This Part is the person taking the list back by hand. Marching on to the next provider
-    // page would be Stockroom overruling the one decision it just asked them for.
+  it("deduplicates several person-owned routes for the same component", async () => {
     vi.spyOn(api, "captureWorklist").mockResolvedValue(twoRows());
     vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
-    vi.spyOn(api, "captureIntent").mockResolvedValue({
-      part_id: "lm317",
-      action: "skip-part",
-      accepted: true,
+    const samePart = worklist().worklist[0];
+    vi.spyOn(api, "captureWorklist").mockResolvedValue({
+      ...worklist(),
+      worklist: [
+        samePart,
+        {
+          ...samePart,
+          route_id: "digikey:snapmagic",
+          provider_key: "digikey",
+          label: "DigiKey - SnapMagic",
+        },
+      ],
+      worklist_unit: undefined,
+      worklist_total: 2,
     });
     const capture = mockCapture();
-    // Hold the first submission open so the row is genuinely in flight when Skip is pressed.
-    const submit = capture.run.getMockImplementation();
-    let release = () => {};
-    const held = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    capture.run.mockImplementation(async (body: unknown) => {
-      await held;
-      return (submit as (input: unknown) => Promise<unknown>)(body);
-    });
     renderWorklist();
 
+    expect(await screen.findAllByRole("button", { name: "Get files for LM317 Regulator" })).toHaveLength(1);
+    expect(screen.getByText("2 Routes Need You")).toBeInTheDocument();
+    expect(screen.getByText("Ultra Librarian + DigiKey - SnapMagic")).toBeInTheDocument();
+    expect(screen.getByText(/DigiKey - SnapMagic: no Ultra Librarian sign-in/)).toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: WORK_THROUGH_ALL }));
-    await userEvent.click(await screen.findByRole("button", { name: "Skip This Part" }));
-    await waitFor(() => expect(api.captureIntent).toHaveBeenCalledWith("lm317", "skip-part"));
-    release();
-
-    expect(await screen.findByTestId("completion-worklist-auto-ended")).toHaveTextContent(
-      "You skipped LM317 Regulator",
-    );
     expect(capture.run).toHaveBeenCalledTimes(1);
+    expect(capture.run).toHaveBeenCalledWith(
+      expect.objectContaining({ partIds: ["lm317"], mode: "collect-all" }),
+    );
   });
 
   it("stops instead of opening every remaining page when a start fails outright", async () => {

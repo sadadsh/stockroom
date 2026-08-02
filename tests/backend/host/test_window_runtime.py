@@ -247,8 +247,11 @@ def test_provider_browser_surface_is_one_scoped_in_app_lease(
     runtime, old, _new, _candidate = _runtime(tmp_path)
     runtime.start_initial()
 
-    with runtime.provider_browser_surface() as endpoint:
-        assert endpoint == "http://127.0.0.1:43127"
+    with runtime.provider_browser_surface() as lease:
+        assert lease.endpoint == "http://127.0.0.1:43127"
+        assert old.commands[-1:] == ["provider-endpoint"]
+        lease.show()
+        lease.show()
         assert old.commands[-2:] == ["provider-endpoint", "provider-show"]
 
     assert old.commands[-1] == "provider-hide"

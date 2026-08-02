@@ -19,6 +19,15 @@ def _version_key(name: str) -> tuple[int, ...]:
     return tuple(int(p) if p.isdigit() else -1 for p in name.split("."))
 
 
+def _is_windows_batch_shim(path: str | Path) -> bool:
+    """Whether ``path`` needs cmd.exe rather than native process semantics."""
+
+    return sys.platform.startswith("win") and Path(path).suffix.casefold() in {
+        ".bat",
+        ".cmd",
+    }
+
+
 def _standard_kicad_cli_paths() -> list[Path]:
     """The standard per-OS KiCad install locations, newest version first, so kicad-cli
     is found even when KiCad's installer did not add its bin/ to PATH (the common
@@ -58,21 +67,18 @@ def find_kicad_cli(override: str | None = None) -> str | None:
     previews/import and surfaces an honest error only when a KiCad op is requested."""
     if override:
         try:
-            if Path(override).is_file():
+            if Path(override).is_file() and not _is_windows_batch_shim(override):
                 return str(override)
         except OSError:
             pass
         on_path = shutil.which(override)
-        if on_path:
+        if on_path and not _is_windows_batch_shim(on_path):
             return on_path
     on_path = shutil.which("kicad-cli")
     # A workspace may put a kicad-cli.CMD compatibility shim on PATH. Passing a batch file to
     # subprocess makes Windows create a visible cmd.exe and cannot provide the native process
     # semantics the desktop app needs. Prefer KiCad's real installed executable on Windows.
-    if on_path and not (
-        sys.platform.startswith("win")
-        and Path(on_path).suffix.casefold() in {".bat", ".cmd"}
-    ):
+    if on_path and not _is_windows_batch_shim(on_path):
         return on_path
     for cand in _standard_kicad_cli_paths():
         try:
@@ -80,8 +86,6 @@ def find_kicad_cli(override: str | None = None) -> str | None:
                 return str(cand)
         except OSError:
             continue
-    if on_path:
-        return on_path
     return None
 
 

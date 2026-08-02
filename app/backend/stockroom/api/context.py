@@ -229,7 +229,11 @@ class AppContext:
         (the JobRunner work closure surfaces it as an SSE error event) - never
         swallowed here."""
         from stockroom.stm.db import StmIndex
-        from stockroom.stm.source import default_cubemx_source, default_index_path
+        from stockroom.stm.source import (
+            default_cubemx_source,
+            default_index_path,
+            normalize_cubemx_source,
+        )
 
         resolved_source = (
             source
@@ -241,6 +245,7 @@ class AppContext:
                 "No STM32CubeMX source folder is configured or discoverable. "
                 "Choose the CubeMX data folder in Stockroom."
             )
+        resolved_source = normalize_cubemx_source(Path(resolved_source))
         old_stm_index = self.stm_index
         self.stm_index = StmIndex.build(resolved_source, default_index_path(), progress=progress)
         if old_stm_index is not None:

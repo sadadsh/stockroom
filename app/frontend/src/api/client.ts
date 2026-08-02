@@ -28,8 +28,6 @@ import type {
   OdbcStatus,
   CadSourceResponse,
   CaptureBatchWorklist,
-  CapturePersonIntentAction,
-  CapturePersonIntentResult,
   CaptureWorkflowSession,
   ConnectProjectRemoteResult,
   DiffResponse,
@@ -1090,8 +1088,8 @@ export const api = {
     );
   },
 
-  // ONE ACQUISITION WORKFLOW. Direct/keyless sources run first, then Stockroom drives exact
-  // provider results and falls through automatically. A provider page appears inside Stockroom
+  // ONE ACQUISITION WORKFLOW. Verified local evidence runs first, then Stockroom works exact
+  // provider results in order. A provider page appears inside Stockroom
   // only when a security gate or download choice genuinely requires a person.
   //
   // `partIds: [one]` is per-component; omitting it captures every part still missing files. Both
@@ -1124,20 +1122,6 @@ export const api = {
   captureWorkflow(batchId: string): Promise<CaptureWorkflowSession> {
     return apiGet<CaptureWorkflowSession>(
       `/api/library/capture/batches/${encodeURIComponent(batchId)}`,
-    );
-  },
-
-  // What the person decided about the embedded provider page in front of them: "no more files are
-  // coming from this page" (finish-route), or "stop this component" (skip-part). These are
-  // statements to Stockroom about their intent; a 409 means no such capture is running.
-  captureIntent(
-    partId: string,
-    action: CapturePersonIntentAction,
-  ): Promise<CapturePersonIntentResult> {
-    return request<CapturePersonIntentResult>(
-      "POST",
-      `/api/library/capture/parts/${encodeURIComponent(partId)}/intent`,
-      { body: { action } },
     );
   },
 

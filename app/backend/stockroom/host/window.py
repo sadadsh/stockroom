@@ -138,6 +138,11 @@ class _HostApi:
         )
         return list(result) if result else []
 
+    def pick_project_folder(self) -> list[str]:
+        """Compatibility bridge for a renderer that predates the purpose-based picker."""
+
+        return self.pick_folder("project")
+
 
 def _set_signature(function, argument_types, result_type) -> None:
     """Declare a ctypes Win32 signature when ``function`` is a real DLL export."""

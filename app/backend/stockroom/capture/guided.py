@@ -115,10 +115,11 @@ def _wait_for_capture(
     timeout_s: float,
     gap: float = 0.25,
     *,
+    minimum: int = 1,
     errors_before: int | None = None,
     stop_when: Callable[[], bool] | None = None,
 ) -> bool:
-    """True once a NEW file has actually been SAVED. Polls the saved list, not the event.
+    """True once the expected NEW files have actually been SAVED. Poll the list, not the event.
 
     The saved list is the observation; the download event is only a promise. See the call site for
     the race this exists to avoid.
@@ -148,7 +149,7 @@ def _wait_for_capture(
         errors = getattr(browser, "download_errors", ())
         if len(errors) > error_mark:
             raise errors[error_mark]
-        if len(browser.captured) > before:
+        if len(browser.captured) >= before + minimum:
             return True
         if stop_when is not None and stop_when():
             return False
@@ -157,7 +158,7 @@ def _wait_for_capture(
     errors = getattr(browser, "download_errors", ())
     if len(errors) > error_mark:
         raise errors[error_mark]
-    return len(browser.captured) > before
+    return len(browser.captured) >= before + minimum
 
 
 def sign_in_adapter(adapter, page, credentials) -> str:
@@ -327,6 +328,7 @@ def drive_formats(
             page,
             mark,
             wait_s,
+            minimum=max(1, int(report.expected_downloads)),
             errors_before=error_mark,
             stop_when=lambda: bool(_user_clearance_issue(adapter, page)),
         ):
@@ -356,7 +358,7 @@ def drive_formats(
         )
         return report, None
 
-    combined = DriveReport()
+    combined = DriveReport(expected_downloads=0)
     reuse_page = bool(getattr(adapter.capability, "reuse_page_between_formats", False))
     for format_index, fmt in enumerate(formats):
         attempts = max(1, min(3, int(getattr(adapter, "max_download_attempts", 1))))
@@ -446,6 +448,7 @@ def drive_formats(
                 page,
                 mark,
                 wait_s,
+                minimum=max(1, int(one.expected_downloads)),
                 errors_before=error_mark,
                 stop_when=lambda: bool(
                     _user_clearance_issue(adapter, page)
@@ -454,6 +457,7 @@ def drive_formats(
             ):
                 combined.selected.extend(one.selected or [fmt])
                 combined.submitted = True
+                combined.expected_downloads += max(1, int(one.expected_downloads))
                 delivered = True
                 trace("capture.drive.format.delivered", provider=label, format=fmt, attempt=attempt)
                 break
@@ -1207,9 +1211,14 @@ class GuidedCaptureSource:
                 return self._session
         stack = ExitStack()
         try:
-            cdp_endpoint = (
+            provider_lease = (
                 stack.enter_context(self._provider_surface())
                 if self._provider_surface is not None and not self._headless
+                else None
+            )
+            cdp_endpoint = (
+                str(getattr(provider_lease, "endpoint", provider_lease))
+                if provider_lease is not None
                 else None
             )
             browser = PlaywrightCaptureBrowser(
@@ -1222,6 +1231,11 @@ class GuidedCaptureSource:
                 cdp_endpoint=cdp_endpoint,
             )
             page = stack.enter_context(browser.session())
+            show_provider = getattr(provider_lease, "show", None)
+            if callable(show_provider):
+                # `browser.session()` wires the page/context download handlers before it
+                # yields.  Only then may a person see and click the provider surface.
+                show_provider()
         except BaseException:
             stack.close()
             raise
@@ -1466,7 +1480,10 @@ class GuidedCaptureSource:
         if self._user_driven:
             outcomes: list[tuple[str, SourceOutcome]] = []
             for route_index, route in enumerate(routes):
-                route_formats = _provider_formats(route, needs)
+                route_formats = _provider_formats(
+                    route,
+                    self.provides() if self._collect_variants else needs,
+                )
                 trace(
                     "capture.route.start",
                     provider=self._vendor_key,
@@ -1530,7 +1547,10 @@ class GuidedCaptureSource:
 
         outcomes: list[tuple[str, SourceOutcome]] = []
         for route_index, route in enumerate(routes):
-            route_formats = _provider_formats(route, needs)
+            route_formats = _provider_formats(
+                route,
+                self.provides() if self._collect_variants else needs,
+            )
             trace(
                 "capture.route.start",
                 provider=self._vendor_key,
@@ -1625,6 +1645,10 @@ class GuidedCaptureSource:
         )
         before = len(session.browser.captured)
         detail_url = ""
+        report = None
+        route_error = ""
+        route_blocked = False
+        task_page = None
         trace(
             "capture.route.binding",
             provider=self._vendor_key,
@@ -1684,8 +1708,9 @@ class GuidedCaptureSource:
                         blocked=bool(report.blocked),
                         why=failure,
                     )
-                    return SourceOutcome(error=failure, blocked=report.blocked)
-                if not report.submitted:
+                    route_error = failure
+                    route_blocked = bool(report.blocked)
+                elif not report.submitted:
                     why = report.message or "the vendor offered no download"
                     if self._sign_in_error:
                         # Everything up to the Download button works signed out, so a refused
@@ -1702,14 +1727,14 @@ class GuidedCaptureSource:
                     if report.blocked:
                         return SourceOutcome(error=why, blocked=True)
                     return SourceOutcome(skipped=why)
-                if broker is not None:
+                elif broker is not None:
                     # Keep the exact task binding through a short quiet period. One provider click
                     # can legitimately emit symbol, footprint, and model as separate downloads;
                     # unbinding after the first file would misfile a late sibling under the next
                     # component in a batch.
                     broker.wait_for_playwright(
                         task_page,
-                        minimum=1,
+                        minimum=max(1, int(report.expected_downloads)),
                         settle_seconds=0.75,
                     )
                 detail_url = getattr(task_page, "url", "") or ""
@@ -1727,7 +1752,19 @@ class GuidedCaptureSource:
                 route=evidence_provider_key,
                 why=str(exc),
             )
-            return SourceOutcome(error=f"{adapter.capability.label}: {exc}")
+            route_error = f"{adapter.capability.label}: {exc}"
+            if task_page is not None:
+                detail_url = str(getattr(task_page, "url", "") or detail_url)
+                evidence_detail_url = getattr(adapter, "evidence_detail_url", None)
+                if callable(evidence_detail_url):
+                    try:
+                        detail_url = evidence_detail_url(
+                            task_page,
+                            expected_manufacturer=manufacturer,
+                            expected_mpn=mpn,
+                        )
+                    except Exception:  # noqa: BLE001 - the observed page URL remains usable
+                        pass
 
         landed = list(broker.receipts) if broker is not None else session.browser.captured[before:]
         trace(
@@ -1739,6 +1776,17 @@ class GuidedCaptureSource:
             detail_url=url_note(detail_url),
             broker_bound=broker is not None,
         )
+        if route_error:
+            if landed:
+                retained = self._retain_incomplete_cad_set(
+                    record,
+                    landed,
+                    detail_url=detail_url,
+                    evidence_provider_key=evidence_provider_key,
+                    reason=route_error,
+                )
+                return retained.as_blocked() if route_blocked else retained
+            return SourceOutcome(error=route_error, blocked=route_blocked)
         if not landed:
             trace_warning(
                 "capture.route.no-file",
@@ -1767,7 +1815,7 @@ class GuidedCaptureSource:
             # whose provider simply does not publish a native Altium row came back as the generic
             # "not one complete dual-EDA source set; missing native Altium symbol/footprint",
             # which reads like a Stockroom rejection rather than an absent provider export.
-            provider_note=report.message,
+            provider_note=getattr(report, "message", ""),
         )
 
     def _retain_supplementary(
@@ -2315,14 +2363,15 @@ class GuidedCaptureSource:
             final_url=url_note(result.final_url),
             models_id=learned,
         )
-        if result.status == "cancelled":
+        cancelled = result.status == "cancelled"
+        if cancelled:
             if self._cancel_workflow is not None:
                 self._cancel_workflow()
-            suffix = f" after receiving {counted(received, 'file')}" if received else ""
-            return SourceOutcome(
-                skipped=f"{provider_label} capture was cancelled{suffix}; nothing was attached",
-                blocked=True,
-            )
+            if not result.files:
+                return SourceOutcome(
+                    skipped=f"{provider_label} capture was cancelled before any file arrived",
+                    blocked=True,
+                )
         if result.status == "try_another" and not result.files:
             suffix = f" after receiving {counted(received, 'file')}" if received else ""
             return SourceOutcome(
@@ -2340,22 +2389,26 @@ class GuidedCaptureSource:
             return SourceOutcome(error="the vendor download did not produce a file")
 
         if getattr(adapter, "supplementary_only", False):
-            return self._retain_supplementary(
+            outcome = self._retain_supplementary(
                 record,
                 list(result.files),
                 detail_url=result.final_url,
                 surface_key=self._vendor_key,
                 evidence_provider_key=evidence_provider_key,
             )
-        return self._attach(
-            record,
-            list(result.files),
-            # The page actually opened, which is the deep link when one was used. Provenance must
-            # record where the bytes came from, not the URL that would have been used instead.
-            open_url,
-            detail_url=result.final_url,
-            evidence_provider_key=evidence_provider_key,
-        )
+        else:
+            outcome = self._attach(
+                record,
+                list(result.files),
+                # The page actually opened, which is the deep link when one was used. Provenance
+                # must record where the bytes came from, not the fallback URL.
+                open_url,
+                detail_url=result.final_url,
+                evidence_provider_key=evidence_provider_key,
+            )
+        # Cancel stops subsequent routes/workflow work. It does not erase bytes that crossed the
+        # task-bound broker before the click; those retain their normal validation outcome.
+        return outcome.as_blocked() if cancelled else outcome
 
     def _attach(
         self,

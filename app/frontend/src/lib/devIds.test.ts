@@ -40,7 +40,6 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 273 after restoring the shared Projects rail, shell, picker, workbenches, and native PCB stage.
 // 275 with the About window's stale-frontend note, which appears only when the running bundle and
 // the backend disagree about the installed revision.
-// 276 with the superseded-capture notice, which names the part a newly started capture displaced.
 // 279 with the completion worklist: the block itself, one row per provider route a run could not
 // finish alone, and the control that opens that provider on that exact component.
 // 280 with `settings.completion-worklist-start`, the row's new PRIMARY control. It starts the real
@@ -53,7 +52,8 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 278 after the one Get Files workflow removed the provider picker and separate open-provider link.
 // 280 with the active Settings content scroller and STM32CubeMX source disclosure directly
 // addressable for first-run and scroll-position acceptance.
-const EXPECTED_ENTRIES = 280;
+// 279 after the single-slot capture contract removed the obsolete superseded-capture notice.
+const EXPECTED_ENTRIES = 279;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

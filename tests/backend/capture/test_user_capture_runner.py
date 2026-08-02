@@ -177,9 +177,9 @@ def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_expl
     assert digikey["vendor"] == "digikey"
     assert digikey["engine"] == "camoufox"
     assert digikey["convert_altium"] is runner._convert_ul_altium_package
-    assert digikey["user_driven"] is False
-    assert digikey["operator_authorized"] is True
-    assert digikey["credentials"] is runner._saved_credentials
+    assert digikey["user_driven"] is True
+    assert digikey["operator_authorized"] is False
+    assert digikey["credentials"] is None
     assert digikey["collect_variants"] is True
     pipeline_factories[-1]()
     assert pipeline_options[-1] == {"auto_embed_altium_models": True}
@@ -310,13 +310,13 @@ def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
     assert [options["user_driven"] for options in constructed] == [
         False,
         False,
-        False,
+        True,
         True,
     ]
     assert [options["operator_authorized"] for options in constructed] == [
         False,
         True,
-        True,
+        False,
         False,
     ]
     assert complete_options[0]["exhaustive"] is True
@@ -428,11 +428,11 @@ def test_collect_all_finishes_every_automated_route_before_asking_a_person(
     order = [options["vendor"] for options in constructed]
     driven = [options["user_driven"] for options in constructed]
 
-    # Every DigiKey author now stays in the operator-automated lane; only a provider without an
-    # implemented ordinary-control adapter needs the raw person-driven fallback.
-    assert order == ["ultralibrarian", "digikey", "snapmagic", "samacsys"]
-    assert driven == [False, False, False, True]
-    assert order.index("digikey") < order.index("samacsys")
+    # DigiKey's site controls remain person-driven. Every route Stockroom can drive is exhausted
+    # before either person-driven provider is opened.
+    assert order == ["ultralibrarian", "snapmagic", "digikey", "samacsys"]
+    assert driven == [False, False, True, True]
+    assert order.index("snapmagic") < order.index("digikey")
     # Stated as the invariant, not as one hard-coded list: no automated route may follow a
     # person-driven one.
     assert driven == sorted(driven)
@@ -541,7 +541,7 @@ def test_collect_all_preference_reorders_only_within_the_automation_lane(
 
     order = [options["vendor"] for options in constructed]
 
-    assert order == ["ultralibrarian", "digikey", "snapmagic", "samacsys"]
+    assert order == ["ultralibrarian", "snapmagic", "digikey", "samacsys"]
     # Every registered provider is still visited: preference demotes nobody out of the run.
     assert sorted(order) == sorted(runner._VENDOR_CHAIN)
 

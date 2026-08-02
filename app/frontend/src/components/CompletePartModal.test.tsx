@@ -626,7 +626,7 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
     );
   });
 
-  it("keeps provider work inside Stockroom and exposes only security handoff controls", async () => {
+  it("keeps provider work inside Stockroom without duplicating the embedded browser HUD", async () => {
     const user = userEvent.setup();
     mockCadSource(["kicad_symbol"]);
     vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => {}));
@@ -638,13 +638,12 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
     expect(await screen.findByText("Provider Work Is Active")).toBeInTheDocument();
     expect(screen.getByText("Starting")).toBeInTheDocument();
     expect(
-      screen.getByText(/its exact page appears inside Stockroom/i),
+      screen.getByText(/provider needs your sign-in, security check, format choice/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/default browser/i)).toBeNull();
     expect(screen.queryByText(/separate window/i)).toBeNull();
-    expect(screen.getByTestId("capture-route-controls")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Finish Route" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Skip This Part" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Finish Route" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Skip This Part" })).toBeNull();
   });
 });
 
@@ -829,11 +828,11 @@ describe("CompletePartModal - per-file toasts", () => {
 });
 
 describe("CompletePartModal - one capture slot", () => {
-  it("says which part's capture this one superseded", async () => {
+  it("disables another part instead of orphaning the active capture", async () => {
     const user = userEvent.setup();
     mockCadSource(["kicad_symbol"]);
     // No submission resolves, so the first part's capture is genuinely still in flight.
-    vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => undefined));
+    const run = vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => undefined));
     const other: PartDetail = makePartDetail({
       ...DETAIL,
       id: "part2",
@@ -849,22 +848,8 @@ describe("CompletePartModal - one capture slot", () => {
     await screen.findByText("Provider Work Is Active");
 
     rerender(<CompletePartModal detail={other} hasModel={true} onClose={() => {}} />);
-    await user.click(await screen.findByRole("button", { name: "Get Files" }));
-
-    expect(
-      await screen.findByText(/Completion for BQ24074 was superseded when this capture started/),
-    ).toBeInTheDocument();
-  });
-
-  it("says nothing about a supersede when no other capture was displaced", async () => {
-    const user = userEvent.setup();
-    mockCadSource(["kicad_symbol"]);
-    vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => undefined));
-    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
-
-    await user.click(await screen.findByRole("button", { name: "Get Files" }));
-    await screen.findByText("Provider Work Is Active");
-
-    expect(screen.queryByText(/was superseded when this capture started/)).toBeNull();
+    expect(await screen.findByRole("button", { name: "Another Part Is Running" })).toBeDisabled();
+    expect(screen.getByTitle(/Finish the active completion for BQ24074 first/)).toBeInTheDocument();
+    expect(run).toHaveBeenCalledTimes(1);
   });
 });

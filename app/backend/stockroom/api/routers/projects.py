@@ -171,6 +171,13 @@ def _bom_evidence(rec, rows: list[dict]) -> dict:
 def projects_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/projects", dependencies=[Depends(require_token)])
     visual_cache: dict[str, tuple[tuple, object]] = {}
+    visual_generations: dict[str, int] = {}
+    visual_locks: dict[str, threading.RLock] = {}
+    visual_locks_guard = threading.Lock()
+
+    def visual_lock(project_id: str) -> threading.RLock:
+        with visual_locks_guard:
+            return visual_locks.setdefault(project_id, threading.RLock())
 
     def visual_source_key(rec) -> tuple:
         """Fingerprint native documents without changing their contents."""
@@ -190,30 +197,41 @@ def projects_router(require_token) -> APIRouter:
         if rec is None:
             raise FileNotFoundError(f"no such project: {project_id}")
         source_key = visual_source_key(rec)
-        cached = visual_cache.get(project_id)
-        if not refresh and cached is not None and cached[0] == source_key:
-            return cached[1]
-        if not refresh:
-            return None
-        adapter = get_adapter(rec.eda or "kicad")
-        if (rec.eda or "kicad") == "kicad":
-            # KiCad CLI may write a .kicad_prl preference sidecar while exporting.
-            # Render a complete mirror so viewing a board cannot dirty the Git checkout.
-            with tempfile.TemporaryDirectory(prefix="stockroom-kicad-render-") as raw:
-                mirror_root = Path(raw) / "project"
-                shutil.copytree(
-                    Path(rec.root),
-                    mirror_root,
-                    symlinks=True,
-                    ignore=shutil.ignore_patterns(".git", "Project Outputs for *"),
-                )
-                bundle = adapter.render(
-                    replace(rec, root=mirror_root.as_posix(), git_root=None)
-                )
-        else:
-            bundle = adapter.render(rec)
-        visual_cache[project_id] = (source_key, bundle)
-        return bundle
+        observed_generation = visual_generations.get(project_id, 0)
+        with visual_lock(project_id):
+            cached = visual_cache.get(project_id)
+            if not refresh and cached is not None and cached[0] == source_key:
+                return cached[1]
+            if not refresh:
+                return None
+            # Two refresh requests that overlapped before the first native render completed share
+            # its result. A later deliberate refresh still renders again.
+            if (
+                visual_generations.get(project_id, 0) != observed_generation
+                and cached is not None
+                and cached[0] == source_key
+            ):
+                return cached[1]
+            adapter = get_adapter(rec.eda or "kicad")
+            if (rec.eda or "kicad") == "kicad":
+                # KiCad CLI may write a .kicad_prl preference sidecar while exporting.
+                # Render a complete mirror so viewing a board cannot dirty the Git checkout.
+                with tempfile.TemporaryDirectory(prefix="stockroom-kicad-render-") as raw:
+                    mirror_root = Path(raw) / "project"
+                    shutil.copytree(
+                        Path(rec.root),
+                        mirror_root,
+                        symlinks=True,
+                        ignore=shutil.ignore_patterns(".git", "Project Outputs for *"),
+                    )
+                    bundle = adapter.render(
+                        replace(rec, root=mirror_root.as_posix(), git_root=None)
+                    )
+            else:
+                bundle = adapter.render(rec)
+            visual_cache[project_id] = (source_key, bundle)
+            visual_generations[project_id] = observed_generation + 1
+            return bundle
 
     @r.get("")
     def list_projects(request: Request) -> list:
@@ -516,7 +534,8 @@ def projects_router(require_token) -> APIRouter:
             reasons = {
                 "base_missing": (
                     "The saved work session's shared branch is no longer available. "
-                    "Start a new work session from a current shared branch."
+                    "Your active work remains preserved. Restore that branch, or share and "
+                    "finish the current session before starting another."
                 ),
                 "fetch_failed": (
                     "The review queue is temporarily offline. Local work remains available."
@@ -753,8 +772,12 @@ def projects_router(require_token) -> APIRouter:
             raise ValueError(
                 "complete the active assembly run before unlinking this project"
             )
-        ctx.project_ops.delete(project_id)
-        visual_cache.pop(project_id, None)
+        with visual_lock(project_id):
+            # A native render owns this same lock. Delete the project only after that reader has
+            # finished so the render cannot traverse a directory while it is being removed.
+            ctx.project_ops.delete(project_id)
+            visual_cache.pop(project_id, None)
+            visual_generations.pop(project_id, None)
         ctx.checks_cache.pop(project_id, None)  # the cached ERC/DRC is now stale
         ctx.bom_cache.pop(project_id, None)  # the cached BOM is now stale too
         ctx.rebuild_project_index()

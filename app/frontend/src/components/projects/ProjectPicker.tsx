@@ -279,11 +279,15 @@ function LinkProjectDialog({
   }, [discover.data, results, choice]);
 
   async function chooseFolder() {
-    const selected = await pickHostFolder("project");
-    if (selected) {
-      setFolder(selected);
-      setChoice(null);
-      discover.mutate(selected);
+    try {
+      const selected = await pickHostFolder("project");
+      if (selected) {
+        setFolder(selected);
+        setChoice(null);
+        discover.mutate(selected);
+      }
+    } catch (error) {
+      toast(error instanceof Error ? error.message : linkFailed, "err");
     }
   }
 

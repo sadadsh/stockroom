@@ -76,6 +76,8 @@ class KiCadProjectAdapter:
         )
 
     def runtime(self, project: ProjectRecord) -> RuntimeReport:
+        """Report passive install readiness without starting KiCad or its CLI."""
+
         del project
         if not self.cli.available:
             return RuntimeReport(
@@ -84,11 +86,7 @@ class KiCadProjectAdapter:
                 "unavailable",
                 detail="Install KiCad to render, validate, edit, and release this project.",
             )
-        try:
-            version = self.cli.version()
-        except Exception as exc:
-            return RuntimeReport(self.key, False, "error", detail=str(exc))
-        return RuntimeReport(self.key, True, "ready", version=version)
+        return RuntimeReport(self.key, True, "ready")
 
     def documents(self, project: ProjectRecord) -> list[ProjectDocument]:
         root = Path(project.root)

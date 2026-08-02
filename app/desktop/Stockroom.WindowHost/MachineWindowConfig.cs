@@ -139,55 +139,6 @@ internal sealed record MachineWindowConfig(
         return directory;
     }
 
-    internal int ProviderCdpPort(Func<int> portFactory)
-    {
-        ArgumentNullException.ThrowIfNull(portFactory);
-        var root = ProviderProfileDirectory();
-        var path = Path.Combine(root, "CDP Port.txt");
-        if (File.Exists(path))
-        {
-            var saved = File.ReadAllText(path).Trim();
-            if (int.TryParse(saved, out var port)
-                && port is > 0 and <= 65535)
-            {
-                return port;
-            }
-            throw new WindowHostException(
-                "provider browser CDP port is invalid");
-        }
-
-        var selected = portFactory();
-        if (selected is < 1 or > 65535)
-        {
-            throw new WindowHostException(
-                "provider browser CDP port factory returned an invalid port");
-        }
-        try
-        {
-            using var stream = new FileStream(
-                path,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.Read);
-            using var writer = new StreamWriter(stream);
-            writer.Write(selected.ToString(
-                System.Globalization.CultureInfo.InvariantCulture));
-            writer.Flush();
-            stream.Flush(flushToDisk: true);
-            return selected;
-        }
-        catch (IOException) when (File.Exists(path))
-        {
-            var saved = File.ReadAllText(path).Trim();
-            if (int.TryParse(saved, out var raced)
-                && raced is > 0 and <= 65535)
-            {
-                return raced;
-            }
-            throw;
-        }
-    }
-
     private static string ResolveConfigRoot(
         IReadOnlyDictionary<string, string?> environment)
     {

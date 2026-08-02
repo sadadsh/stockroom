@@ -149,14 +149,12 @@ describe("StmViewerPage", () => {
     expect(screen.queryByText("STM index not built")).toBeNull();
   });
 
-  it("recovers a missing CubeMX source with one native folder choice and retries", async () => {
+  it("opens the native folder picker on the first click when no CubeMX source is present", async () => {
     const start = vi.fn();
-    mockStatus.mockReturnValue(query({ data: { built: false } }));
+    mockStatus.mockReturnValue(query({ data: { built: false, source_present: false } }));
     mockMcus.mockReturnValue(query({ error: new ApiError(409, "STM index not built") }));
     mockBuild.mockReturnValue({
       ...IDLE_BUILD,
-      status: "error",
-      error: "No STM32CubeMX source folder is configured or discoverable.",
       start,
     });
     vi.spyOn(api, "getSettings").mockResolvedValue({ stm_cubemx_source: "" } as never);
@@ -181,6 +179,26 @@ describe("StmViewerPage", () => {
     );
     expect(pickFolder).toHaveBeenCalledWith("stm-cubemx");
     expect(start).toHaveBeenCalledOnce();
+  });
+
+  it("builds directly on the first click when CubeMX was auto-discovered", async () => {
+    const start = vi.fn();
+    mockStatus.mockReturnValue(
+      query({ data: { built: false, source_present: true, source_path: "C:\\ST\\CubeMX" } }),
+    );
+    mockMcus.mockReturnValue(query({ error: new ApiError(409, "STM index not built") }));
+    mockBuild.mockReturnValue({ ...IDLE_BUILD, start });
+    const pickFolder = vi.fn();
+    Object.defineProperty(window, "pywebview", {
+      configurable: true,
+      value: { api: { pick_folder: pickFolder } },
+    });
+
+    wrap(<StmViewerPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Build the Index" }));
+
+    expect(start).toHaveBeenCalledOnce();
+    expect(pickFolder).not.toHaveBeenCalled();
   });
 
   it("composes the family picker and spec matrix on success, showing mpn_example (never ref_name)", () => {

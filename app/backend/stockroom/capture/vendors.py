@@ -171,6 +171,11 @@ class DriveReport:
     selected: list[str] = field(default_factory=list)
     missed: list[str] = field(default_factory=list)
     submitted: bool = False
+    # Number of task-bound browser downloads the submitted action is expected to produce. Most
+    # provider actions emit one file; manufacturer-original routes can intentionally submit several
+    # independent files for the same ``model`` format. The driver must observe this many saved
+    # receipts before calling the format delivered.
+    expected_downloads: int = 1
     # A provider-wide challenge/auth/account gate, not a fact about this MPN. The batch engine
     # treats this as deferred and trips its circuit breaker instead of burning every remaining row.
     blocked: bool = False
@@ -1697,7 +1702,9 @@ _DIGIKEY_CADENAS_ROUTE = DigiKeyProviderRoute(
     row_ids=("cadenas-media-active",),
     modal_id="cadenas-export-options",
     altium_label="",
-    model_label="3d model",
+    # No positive live format/download contract has been measured for this polymorphic row.
+    # Keep it observation-only instead of deriving a selector from a synthetic fixture.
+    model_label="",
     supported_formats=("model",),
     model_only=True,
 )
@@ -1760,11 +1767,10 @@ def _digikey_format_label_matches(
 class DigiKeyUltraLibrarianAdapter:
     """DigiKey's exact product/model pages with independently attributed CAD-author routes.
 
-    DigiKey is the browser surface, not the CAD author. One explicit Get Files action is scoped to
-    one exact part and authorizes Stockroom to operate the ordinary download controls in its
-    embedded provider window. Login, consent, CAPTCHA, MFA, passkeys, and every security challenge
-    remain person-owned handoffs. Each delivered file retains its author route and passes through
-    the same evidence, validation, and attachment pipeline.
+    DigiKey is the browser surface, not the CAD author. Its site controls remain person-driven;
+    Stockroom opens the exact route in its embedded provider window and automatically intercepts,
+    validates, retains, and activates the files the person downloads. Login, consent, CAPTCHA, MFA,
+    passkeys, and every other provider-side decision remain person-owned.
     """
 
     evidence_provider_key = "digikey-ultralibrarian"
@@ -1794,9 +1800,7 @@ class DigiKeyUltraLibrarianAdapter:
             "altium": "Altium Designer",
         },
         browser_access="user_driven",
-        # One explicit Get Files action authorizes Stockroom to operate ordinary controls for
-        # every author on this exact DigiKey models page. Security challenges still pause.
-        operator_automation=True,
+        operator_automation=False,
         # The parent surface opens on its preferred coherent author, Ultra Librarian, so its
         # outlines are that route's measured row, opener, and modal-scoped Download control.
         control_hints=_digikey_route_control_hints(_DIGIKEY_ULTRALIBRARIAN_ROUTE),
@@ -2401,7 +2405,7 @@ class DigiKeyUltraLibrarianAdapter:
         modal = page.locator("#mfr-export-options").first
         labels = modal.locator("label[data-original]")
         submit = modal.locator("#btn-download-mfr").first
-        submitted = 0
+        exact_controls: list[str] = []
         for index in range(labels.count()):
             label = labels.nth(index)
             raw = " ".join(
@@ -2417,16 +2421,23 @@ class DigiKeyUltraLibrarianAdapter:
                 continue
             escaped = control_id.replace("\\", "\\\\").replace('"', '\\"')
             control = modal.locator(f'[id="{escaped}"]').first
+            if control.count() != 1:
+                continue
             value = (control.get_attribute("value") or "").strip()
             parsed = urlparse(value)
             if (
-                control.count() != 1
-                or parsed.scheme.casefold() != "https"
+                parsed.scheme.casefold() != "https"
                 or (parsed.hostname or "").casefold() != "mm.digikey.com"
                 or not unquote(parsed.path).casefold().endswith((".step", ".stp"))
                 or submit.count() != 1
             ):
                 continue
+            exact_controls.append(control_id)
+
+        submitted = 0
+        for control_id in exact_controls:
+            escaped = control_id.replace("\\", "\\\\").replace('"', '\\"')
+            control = modal.locator(f'[id="{escaped}"]').first
             try:
                 control.check(force=True, timeout=5_000)
                 submit.click(force=True, timeout=5_000)
@@ -2437,6 +2448,7 @@ class DigiKeyUltraLibrarianAdapter:
             return DriveReport(
                 selected=["model"],
                 submitted=True,
+                expected_downloads=submitted,
                 message=(
                     f"Requested {submitted} Manufacturer Provided STEP "
                     f"{'original' if submitted == 1 else 'originals'} through DigiKey."
@@ -2932,10 +2944,7 @@ class _DigiKeyObservedSupplementaryRouteAdapter(_DigiKeyProviderRouteAdapter):
         )
 
     def retryable_download_issue(self, page) -> str:
-        # A visible but unmeasured/person-driven route is a terminal ledger fact, not a failed
-        # fragment load. Retrying it would only turn one honest observation into a loop.
-        del page
-        return ""
+        return self._surface.retryable_download_issue(page, self._route)
 
 
 class DigiKeyManufacturerProvidedRouteAdapter(
@@ -2964,8 +2973,8 @@ class DigiKeyManufacturerProvidedRouteAdapter(
             download_control="#btn-download-mfr",
         ),
         machine_format_labels={"model": "3D Model"},
-        browser_access="machine_allowed",
-        operator_automation=True,
+        browser_access="user_driven",
+        operator_automation=False,
         browser_engine="camoufox",
         reuse_page_between_formats=True,
     )
@@ -2983,17 +2992,41 @@ class DigiKeyCadenasRouteAdapter(_DigiKeyObservedSupplementaryRouteAdapter):
         aggregator=True,
         needs_login=True,
         instruction=(
-            "When DigiKey offers CADENAS for the exact part, Stockroom selects its exact 3D "
-            "Model choice and retains the delivered original as supplementary evidence."
+            "When DigiKey offers CADENAS for the exact part, Stockroom records the route "
+            "honestly. No download control is operated until its live contract is measured."
         ),
-        machine_format_labels={"model": "3D Model"},
         user_format_labels={"model": "3D Model"},
-        control_hints=_digikey_route_control_hints(_DIGIKEY_CADENAS_ROUTE),
-        browser_access="machine_allowed",
-        operator_automation=True,
+        control_hints=_digikey_route_control_hints(
+            _DIGIKEY_CADENAS_ROUTE,
+            download_control="",
+        ),
+        browser_access="user_driven",
+        operator_automation=False,
         browser_engine="camoufox",
         reuse_page_between_formats=True,
     )
+
+    def drive(
+        self,
+        page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+    ) -> DriveReport:
+        return self._surface.observe_supplementary_route(
+            page,
+            formats,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+            _route=self._route,
+        )
+
+    def retryable_download_issue(self, page) -> str:
+        # This route is observation-only. A visible unmeasured row is a terminal ledger fact, not
+        # a failed automatic download, so do not turn it into a retry loop.
+        del page
+        return ""
 
 
 class SamacSysAssistedAdapter:

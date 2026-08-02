@@ -231,13 +231,21 @@ def test_person_driven_route_uses_the_embedded_provider_surface(monkeypatch, tmp
 
         @contextmanager
         def session(self):
+            surface_events.append("listeners-attached")
             yield _FakePage()
+
+    class _Lease:
+        endpoint = "http://127.0.0.1:48123"
+
+        @staticmethod
+        def show():
+            surface_events.append("shown")
 
     @contextmanager
     def provider_surface():
-        surface_events.append("shown")
+        surface_events.append("prepared-hidden")
         try:
-            yield "http://127.0.0.1:48123"
+            yield _Lease()
         finally:
             surface_events.append("hidden")
 
@@ -261,9 +269,14 @@ def test_person_driven_route_uses_the_embedded_provider_surface(monkeypatch, tmp
 
     assert session.page is not None
     assert browser_arguments[0]["cdp_endpoint"] == "http://127.0.0.1:48123"
-    assert surface_events == ["shown"]
+    assert surface_events == ["prepared-hidden", "listeners-attached", "shown"]
     source.close()
-    assert surface_events == ["shown", "hidden"]
+    assert surface_events == [
+        "prepared-hidden",
+        "listeners-attached",
+        "shown",
+        "hidden",
+    ]
 
 
 def test_a_download_consumed_by_the_session_handler_still_counts_as_delivered(
@@ -498,7 +511,10 @@ def test_reusable_exclusive_route_downloads_all_formats_without_reloading():
     assert report.selected == ["kicad", "model", "altium"]
 
 
-@pytest.mark.parametrize("capture_status", ["completed", "timed_out", "try_another"])
+@pytest.mark.parametrize(
+    "capture_status",
+    ["completed", "timed_out", "try_another", "cancelled"],
+)
 def test_user_driven_guided_supply_never_discards_captured_files(
     monkeypatch,
     tmp_path,
@@ -571,6 +587,7 @@ def test_user_driven_guided_supply_never_discards_captured_files(
     )
     finished = lambda: True
     cancelled = lambda: False
+    cancel_calls: list[bool] = []
     source = guided.GuidedCaptureSource(
         lambda: pipeline,
         vendor="faketron",
@@ -580,6 +597,7 @@ def test_user_driven_guided_supply_never_discards_captured_files(
         user_finished=finished,
         user_cancelled=cancelled,
         user_capture_timeout_s=5,
+        cancel_workflow=lambda: cancel_calls.append(True),
     )
 
     try:
@@ -605,6 +623,8 @@ def test_user_driven_guided_supply_never_discards_captured_files(
     }
     assert pipeline.inputs == [landed]
     assert "no exact KiCad symbol, footprint, and STEP" in (outcome.error or "")
+    assert bool(cancel_calls) is (capture_status == "cancelled")
+    assert outcome.blocked is (capture_status == "cancelled")
 
 
 @pytest.mark.parametrize(
@@ -1235,6 +1255,89 @@ def test_blocked_digikey_route_ledgers_every_later_route_as_not_attempted(
     ]
 
 
+def test_collect_variants_visits_model_only_routes_for_a_two_d_gap(monkeypatch, tmp_path):
+    def capability(label: str, formats: dict[str, str]) -> VendorCapability:
+        return VendorCapability(
+            key="digikey",
+            label=label,
+            tools=("kicad", "altium"),
+            formats_exclusive=True,
+            aggregator=True,
+            needs_login=False,
+            instruction="",
+            machine_format_labels=formats,
+            browser_access="machine_allowed",
+        )
+
+    coherent = type(
+        "_Route",
+        (),
+        {
+            "capability": capability(
+                "DigiKey CAD Models",
+                {"kicad": "KiCad v6+", "model": "STEP", "altium": "Altium Designer"},
+            ),
+            "evidence_provider_key": "digikey-ultralibrarian",
+        },
+    )()
+    model_only = type(
+        "_Route",
+        (),
+        {
+            "capability": capability(
+                "DigiKey · Manufacturer Provided",
+                {"model": "3D Model"},
+            ),
+            "evidence_provider_key": "digikey-manufacturer",
+            "supplementary_only": True,
+        },
+    )()
+
+    class _DigiKey:
+        capability = coherent.capability
+        evidence_provider_key = coherent.evidence_provider_key
+
+        def resolve_url(self, mpn):
+            return f"https://www.digikey.com/en/products/result?keywords={mpn}"
+
+        def capture_routes(self):
+            return coherent, model_only
+
+    parent = _DigiKey()
+    monkeypatch.setattr(guided, "get_adapter", lambda _key: parent)
+    monkeypatch.setattr(
+        guided,
+        "capture_needs",
+        lambda _record: [Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT],
+    )
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="digikey",
+        download_root=tmp_path / "Downloads",
+        collect_variants=True,
+        operator_authorized=True,
+    )
+    source._session = guided._Session(
+        browser=_FakeBrowser(),
+        ctx_manager=None,
+        page=_FakePage(),
+    )
+    requested: list[tuple[str, list[str]]] = []
+
+    def capture_route(_record, _session, route, _manufacturer, _mpn, _url, formats):
+        requested.append((route.evidence_provider_key, list(formats)))
+        return SourceOutcome(skipped="fixture route settled")
+
+    source._supply_automated_route = capture_route
+
+    source.supply(_Record())
+
+    assert requested == [
+        ("digikey-ultralibrarian", ["kicad", "model", "altium"]),
+        ("digikey-manufacturer", ["model"]),
+    ]
+
+
 def test_unavailable_digikey_route_does_not_skip_the_next_author(
     monkeypatch,
     tmp_path,
@@ -1502,6 +1605,48 @@ def test_digikey_transient_download_failure_reopens_and_retries_exact_format(tmp
     assert report.submitted is True
 
 
+def test_exclusive_drive_waits_for_the_reported_download_count(tmp_path):
+    browser = _FakeBrowser()
+
+    class _MultiDownload:
+        max_download_attempts = 1
+        capability = VendorCapability(
+            key="digikey",
+            label="DigiKey · Manufacturer Provided",
+            tools=("kicad",),
+            formats_exclusive=True,
+            aggregator=True,
+            needs_login=False,
+            instruction="",
+            machine_format_labels={"model": "3D Model"},
+            browser_access="machine_allowed",
+        )
+
+        def drive(self, _page, formats):
+            browser.captured.extend(
+                _CapturedFile(tmp_path / f"original-{index}.stp")
+                for index in range(2)
+            )
+            return DriveReport(
+                selected=list(formats),
+                submitted=True,
+                expected_downloads=3,
+            )
+
+    report, failure = guided.drive_formats(
+        browser,
+        _FakePage(),
+        _MultiDownload(),
+        ["model"],
+        "https://www.digikey.com/en/products/result?keywords=ABC-1",
+        timeout_s=0.05,
+    )
+
+    assert report.submitted is False
+    assert len(browser.captured) == 2
+    assert failure == "DigiKey · Manufacturer Provided did not deliver model within 0s"
+
+
 def test_a_submitted_format_that_never_arrives_is_an_error_not_a_skip(monkeypatch, tmp_path):
     """MEASURED LIVE, 2026-07-27: SnapMagic clicked its Altium button and delivered nothing.
 
@@ -1559,6 +1704,65 @@ def test_a_submitted_format_that_never_arrives_is_an_error_not_a_skip(monkeypatc
     assert outcome.error, f"a vanished download must be an ERROR, got {outcome!r}"
     assert "did not deliver" in outcome.error
     assert not outcome.skipped, "reporting it as a skip hides a lost file"
+
+
+def test_a_late_format_failure_retains_files_that_already_landed(monkeypatch, tmp_path):
+    browser = _FakeBrowser()
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="faketron",
+        download_root=tmp_path / "downloads",
+        headless=True,
+        machine_access_check=lambda: True,
+    )
+    session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+    retained: list[tuple[list[_CapturedFile], str]] = []
+
+    class _Adapter:
+        capability = VendorCapability(
+            key="faketron",
+            label="Faketron",
+            tools=("kicad", "altium"),
+            formats_exclusive=True,
+            aggregator=False,
+            needs_login=False,
+            instruction="",
+            browser_access="machine_allowed",
+        )
+
+    def fail_after_two_files(*_args, **_kwargs):
+        browser.captured.extend(
+            [
+                _CapturedFile(tmp_path / "symbol.zip"),
+                _CapturedFile(tmp_path / "model.step"),
+            ]
+        )
+        return (
+            DriveReport(selected=["kicad", "model"], submitted=False),
+            "Faketron did not deliver altium within 1s",
+        )
+
+    def retain(_record, landed, *, reason, **_kwargs):
+        retained.append((list(landed), reason))
+        return SourceOutcome(retained=len(landed), skipped=f"{reason}; retained")
+
+    monkeypatch.setattr(source, "_prepare_sign_in", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(source, "_drive_automated", fail_after_two_files)
+    monkeypatch.setattr(source, "_retain_incomplete_cad_set", retain)
+
+    outcome = source._supply_automated_route(
+        _Record(),
+        session,
+        _Adapter(),
+        _Record.manufacturer,
+        _Record.mpn,
+        "https://example.invalid/exact-part",
+        ["kicad", "model", "altium"],
+    )
+
+    assert outcome.retained == 2
+    assert [item.path.name for item in retained[0][0]] == ["symbol.zip", "model.step"]
+    assert "did not deliver altium" in retained[0][1]
 
 
 def test_the_kicad_chooser_waits_for_its_member_instead_of_sleeping():

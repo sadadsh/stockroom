@@ -313,6 +313,18 @@ def test_status_names_the_expected_source_on_a_bare_machine(client, monkeypatch)
     assert body["source_present"] is False
 
 
+def test_status_rejects_an_existing_folder_without_device_xml(client, app_ctx, tmp_path):
+    empty_source = tmp_path / "empty-cubemx"
+    empty_source.mkdir()
+    (empty_source / "families.xml").write_text("<Families />", encoding="utf-8")
+    app_ctx.config.stm_cubemx_source = str(empty_source)
+
+    body = client.get("/api/stm/status").json()
+
+    assert body["source_path"] == str(empty_source)
+    assert body["source_present"] is False
+
+
 def test_status_reports_built_and_echoes_stamp(client, app_ctx):
     _seed_stm_index(app_ctx)
     r = client.get("/api/stm/status")
@@ -395,6 +407,20 @@ def test_rebuild_stm_index_builds_a_queryable_index_and_forwards_progress(app_ct
     assert app_ctx.stm_index is not None
     assert app_ctx.stm_index.mcu_count() > 0
     assert progress_events  # at least one progress callback fired
+
+
+def test_rebuild_stm_index_accepts_a_cubemx_install_root(app_ctx, tmp_path):
+    import shutil
+
+    install_root = tmp_path / "STM32CubeMX"
+    source = install_root / "db" / "mcu"
+    shutil.copytree(_FIXTURE_CUBEMX_SOURCE, source)
+
+    app_ctx.rebuild_stm_index(install_root)
+
+    assert app_ctx.stm_index is not None
+    assert app_ctx.stm_index.mcu_count() > 0
+    assert Path(app_ctx.stm_index.meta()["source_path"]) == source
 
 
 def test_rebuild_stm_index_closes_the_old_index_and_swaps_in_the_new_one(app_ctx):

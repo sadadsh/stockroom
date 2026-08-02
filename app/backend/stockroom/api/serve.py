@@ -14,6 +14,8 @@ from stockroom.api.context import build_context as _build_context
 from stockroom.api.security import mint_token
 from stockroom.store.machine_config import MachineConfig
 
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 # The app repo (the CODE/UI/DATA repo that contains THIS package) is four parents
 # up: serve.py -> api -> stockroom -> backend -> app -> <repo root>. The in-repo
 # library lives beside the `app/` tree at <repo root>/libraries.
@@ -32,7 +34,12 @@ def _uv_sync() -> None:  # pragma: no cover - shells out to the bundled uv
     locked deps are installed before the restart. Frozen so the update never
     silently re-resolves the lockfile; a real failure raises (honest degradation,
     spec section 2.2) rather than being swallowed."""
-    subprocess.run(["uv", "sync", "--frozen"], check=True, cwd=str(_APP_REPO_ROOT))
+    subprocess.run(
+        ["uv", "sync", "--frozen"],
+        check=True,
+        cwd=str(_APP_REPO_ROOT),
+        creationflags=_NO_WINDOW,
+    )
 
 
 def build_context(

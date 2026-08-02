@@ -4,24 +4,20 @@ The CubeMX database (ST's own STM32CubeMX install, or a synced copy of it) is th
 read-only ground truth every STM32 device XML is parsed from. It is NOT bundled with
 this app and NOT committed: the user (or an env var, in tests/CI) points at it.
 
-default_cubemx_source() prefers a real all-families tree over the WSL fixture: the
-fixture at ~/git/STMP/src/cubemx_db/mcu is F0-F7 only (~427 XML) and is never the
-right answer for "all families" - it is a last-resort, loudly-logged fallback so a
-Linux dev/CI box without the Windows-side tree can still run something.
+default_cubemx_source() uses only a configured source or a real Windows all-families tree.
+Tests inject their own fixture explicitly; production discovery never crosses into WSL or
+silently substitutes a partial development database.
 """
 
 from __future__ import annotations
 
 import hashlib
-import logging
 import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from stockroom.store.machine_config import config_dir
-
-logger = logging.getLogger(__name__)
 
 # The F0-F7 families alone (Hardware's whole prior scope) are exactly six:
 # STM32F0, F1, F2, F3, F4, F7 (confirmed against legacy/tools/stm32_authority.py's
@@ -31,16 +27,26 @@ logger = logging.getLogger(__name__)
 # Family values against the real Windows-side source this session).
 _F_ONLY_FAMILY_CEILING = 6
 
-# The two confirmed Windows-side all-families candidates (verified 2026-07-23: each
-# reports 2,136 device XML, spanning every STM32 family CubeMX ships). Order: the
-# synced STMP copy first (stable, versioned), then the live CubeMX install.
-_WINDOWS_CANDIDATES = (
-    "/mnt/c/Users/Sadad Haidari/STMP/cubemx_db/mcu",
-    "/mnt/c/Users/Sadad Haidari/AppData/Local/Programs/STM32CubeMX/db/mcu",
+# The confirmed Windows all-families candidates. Order: the synced STMP copy first (stable,
+# versioned), then the per-user and system-wide CubeMX installs. Resolve these from Windows
+# environment roots; `/mnt/c/...` is a WSL path and is never valid in the Windows-only app.
+_WINDOWS_HOME = Path(os.environ.get("USERPROFILE") or Path.home())
+_LOCAL_APP_DATA = Path(
+    os.environ.get("LOCALAPPDATA") or (_WINDOWS_HOME / "AppData" / "Local")
 )
-# The WSL-native fixture: F0-F7 only (~427 XML), a test/dev fallback, never
-# presented as "all families" (DATA-01's whole point).
-_FIXTURE_FALLBACK = Path.home() / "git" / "STMP" / "src" / "cubemx_db" / "mcu"
+_PROGRAM_FILES = Path(os.environ.get("ProgramFiles") or "C:/Program Files")
+_WINDOWS_CANDIDATES = (
+    str(_WINDOWS_HOME / "STMP" / "cubemx_db" / "mcu"),
+    str(_LOCAL_APP_DATA / "Programs" / "STM32CubeMX" / "db" / "mcu"),
+    str(
+        _PROGRAM_FILES
+        / "STMicroelectronics"
+        / "STM32Cube"
+        / "STM32CubeMX"
+        / "db"
+        / "mcu"
+    ),
+)
 
 
 def default_cubemx_source() -> Path | None:
@@ -49,31 +55,23 @@ def default_cubemx_source() -> Path | None:
     MachineConfig.stm_cubemx_source (the settings-page-less, PATCH /api/settings
     -settable override, Phase 3 API-02) wins outright when set and valid.
     Otherwise STM32_CUBEMX (or the legacy HWKIT_CUBEMX) wins when set and valid.
-    Otherwise the confirmed Windows-side all-families candidates are tried first;
-    only if neither exists does this fall back to the WSL F-only fixture, with a
-    loud warning log line so the fallback is never silently mistaken for coverage
-    of every family.
+    Otherwise the confirmed Windows all-families candidates are tried. A missing source remains
+    missing; tests and development tools must inject fixtures explicitly.
     """
     from stockroom.store.machine_config import MachineConfig
 
     configured = (MachineConfig.load().stm_cubemx_source or "").strip()
-    if configured and Path(configured).is_dir():
-        return Path(configured)
+    configured_source = normalize_cubemx_source(Path(configured)) if configured else None
+    if configured_source is not None and has_device_xml(configured_source):
+        return configured_source
     env = os.environ.get("STM32_CUBEMX") or os.environ.get("HWKIT_CUBEMX")
-    if env and Path(env).is_dir():
-        return Path(env)
+    env_source = normalize_cubemx_source(Path(env)) if env else None
+    if env_source is not None and has_device_xml(env_source):
+        return env_source
     for candidate in _WINDOWS_CANDIDATES:
         c = Path(candidate)
-        if c.is_dir() and any(c.glob("*.xml")):
+        if has_device_xml(c):
             return c
-    if _FIXTURE_FALLBACK.is_dir() and any(_FIXTURE_FALLBACK.glob("*.xml")):
-        logger.warning(
-            "STM32 CubeMX source: falling back to the WSL F-only fixture at %s "
-            "(F0-F7 only, ~427 device XML). This is NOT an all-families source - "
-            "point STM32_CUBEMX at the real CubeMX mcu/ tree for full coverage.",
-            _FIXTURE_FALLBACK,
-        )
-        return _FIXTURE_FALLBACK
     return None
 
 
@@ -113,9 +111,48 @@ def _is_device_xml(path: Path) -> bool:
     try:
         for _, el in ET.iterparse(path, events=("start",)):
             return el.tag.rsplit("}", 1)[-1] == "Mcu"
-    except ET.ParseError:
+    except (ET.ParseError, OSError):
         return False
     return False
+
+
+def has_device_xml(source_dir: Path) -> bool:
+    """Whether ``source_dir`` contains at least one real CubeMX device XML.
+
+    A directory, or even a directory containing auxiliary CubeMX XML, is not a usable source.
+    Keep this short-circuiting predicate shared by discovery and the status API so the UI never
+    calls an empty folder authoritative and destroys a previously working derived index.
+    """
+
+    source_dir = Path(source_dir)
+    try:
+        if not source_dir.is_dir():
+            return False
+        return any(
+            path.name != "families.xml" and _is_device_xml(path)
+            for path in source_dir.glob("*.xml")
+            if path.is_file()
+        )
+    except OSError:
+        return False
+
+
+def normalize_cubemx_source(selected: Path) -> Path:
+    """Resolve a person-selected CubeMX folder to the device-XML directory it owns.
+
+    The native picker cannot reasonably expect a person to know CubeMX's internal ``db/mcu``
+    layout. Accept either that data directory itself or the application install root, preferring
+    the selected folder when it is already usable. An unrecognized selection is returned unchanged
+    so status can name it honestly and the build can reject it without touching an existing index.
+    """
+
+    selected = Path(selected)
+    if has_device_xml(selected):
+        return selected
+    for nested in (selected / "mcu", selected / "db" / "mcu"):
+        if has_device_xml(nested):
+            return nested
+    return selected
 
 
 def device_xml_files(source_dir: Path) -> list[Path]:

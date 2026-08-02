@@ -137,6 +137,47 @@ def test_embedded_webview_connection_reuses_its_existing_context(tmp_path):
     assert "RTCPeerConnection" in context.init_scripts[0]
 
 
+@pytest.mark.parametrize("standalone_engine", ["camoufox", "cloak"])
+def test_embedded_webview_overrides_every_standalone_provider_engine(
+    monkeypatch,
+    tmp_path,
+    standalone_engine,
+):
+    events: list[str] = []
+
+    class Runtime:
+        @staticmethod
+        def get():
+            events.append("runtime")
+            return object()
+
+    @contextmanager
+    def embedded_session(_runtime):
+        events.append("embedded")
+        yield "embedded-page"
+
+    @contextmanager
+    def forbidden_standalone_session():
+        pytest.fail("a standalone provider browser was launched beside the embedded WebView")
+        yield  # pragma: no cover
+
+    browser = PlaywrightCaptureBrowser(
+        download_dir=tmp_path / "downloads",
+        engine=standalone_engine,
+        provider_key="digikey",
+        playwright_runtime=Runtime(),
+        cdp_endpoint="http://127.0.0.1:43127",
+    )
+    monkeypatch.setattr(browser, "_playwright_session", embedded_session)
+    monkeypatch.setattr(browser, "_camoufox_session", forbidden_standalone_session)
+    monkeypatch.setattr(browser, "_cloak_session", forbidden_standalone_session)
+
+    with browser.session() as page:
+        assert page == "embedded-page"
+
+    assert events == ["runtime", "embedded"]
+
+
 def test_automatic_download_permission_preserves_existing_profile_preferences(tmp_path):
     profile = tmp_path / "snapmagic"
     preferences_path = profile / "Default" / "Preferences"
@@ -1991,7 +2032,6 @@ def test_control_hints_are_derived_from_the_measured_pins_and_routes_not_invente
     """Every outlined selector traces back to data an automated path already measured."""
 
     from stockroom.capture.vendors import (
-        _DIGIKEY_CADENAS_ROUTE,
         _DIGIKEY_MANUFACTURER_ROUTE,
         _DIGIKEY_ULTRALIBRARIAN_ROUTE,
         SnapMagicAdapter,
@@ -2033,12 +2073,9 @@ def test_control_hints_are_derived_from_the_measured_pins_and_routes_not_invente
         f"#{_DIGIKEY_MANUFACTURER_ROUTE.modal_id} #btn-download-mfr",
     )
 
-    # CADENAS now uses the same measured modal/download contract as the other DigiKey rows.
+    # CADENAS remains observation-only until a live download contract is measured.
     cadenas = by_label["DigiKey · CADENAS"]
-    cadenas_hints = {hint.label: hint.selectors for hint in cadenas.control_hints}
-    assert cadenas_hints["Download from CADENAS"] == (
-        f'#{_DIGIKEY_CADENAS_ROUTE.modal_id} [id^="btn-download-"]',
-    )
+    assert all("Download" not in hint.label for hint in cadenas.control_hints)
 
 
 def test_a_provider_without_a_measured_control_is_left_hint_less():

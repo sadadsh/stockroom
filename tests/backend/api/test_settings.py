@@ -390,6 +390,27 @@ def test_patch_sets_stm_cubemx_source_live_and_persists(client, app_ctx, tmp_pat
     assert saved["stm_cubemx_source"] == str(target)
 
 
+def test_patch_normalizes_a_cubemx_install_root_to_its_device_data(client, app_ctx, tmp_path):
+    install_root = tmp_path / "STM32CubeMX"
+    device_data = install_root / "db" / "mcu"
+    device_data.mkdir(parents=True)
+    (device_data / "STM32TEST.xml").write_text(
+        '<Mcu Family="STM32F4" RefName="STM32TEST" />',
+        encoding="utf-8",
+    )
+
+    response = client.patch(
+        "/api/settings",
+        json={"stm_cubemx_source": str(install_root)},
+    )
+
+    assert response.status_code == 200
+    assert app_ctx.config.stm_cubemx_source == str(device_data)
+    assert response.json()["stm_cubemx_source"] == str(device_data)
+    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
+    assert saved["stm_cubemx_source"] == str(device_data)
+
+
 def test_patch_clears_stm_cubemx_source_to_blank(client, app_ctx, tmp_path):
     client.patch("/api/settings", json={"stm_cubemx_source": str(tmp_path)})
     assert app_ctx.config.stm_cubemx_source != ""
@@ -415,6 +436,10 @@ def test_default_cubemx_source_prefers_the_configured_setting(monkeypatch, tmp_p
 
     configured = tmp_path / "configured-cubemx"
     configured.mkdir()
+    (configured / "STM32TEST.xml").write_text(
+        '<Mcu Family="STM32F4" RefName="STM32TEST" />',
+        encoding="utf-8",
+    )
     MachineConfig(stm_cubemx_source=str(configured)).save()
     monkeypatch.setenv("STM32_CUBEMX", str(tmp_path))  # would win if the setting were ignored
 

@@ -447,7 +447,7 @@ def run_completion(ctx, *, progress=None, should_stop=None, part_ids=None, limit
 
     `part_ids` narrows the run to a chosen set (one part, or a filtered list); omitted, the
     worklist is DERIVED from the library, which is what makes a stopped run resumable by
-    simply running it again. Direct/keyless sources run before managed-browser providers, so the
+    simply running it again. Verified local evidence runs before managed-browser providers, so the
     bulk surface and Complete Part cannot disagree about which gaps are fillable.
     """
     return run_guided_capture(
@@ -476,8 +476,8 @@ def run_guided_capture(
 ) -> dict:
     """Complete CAD automatically, with person-controlled capture only as an explicit fallback.
 
-    The default path performs the least-expensive work first: keyless direct catalogue retrieval,
-    deterministic generators, and any provider transport with a reviewed machine-access contract.
+    The default path performs the least-expensive work first: verified local evidence, then any
+    provider transport with a reviewed machine-access contract.
     Commercial browser providers remain available only through the explicit assisted fallback when
     their policy requires user control; Stockroom still opens the exact page, intercepts every
     download, validates it, and attaches it. A preferred ``vendor`` changes provider order where
@@ -762,7 +762,7 @@ def run_guided_capture(
         automatic_provider_keys=automatic_provider_keys,
         deferred_keys=deferred_keys,
     )
-    # Direct/keyless acquisition is the zero-interaction first lane. If it fills the remaining
+    # Verified local evidence is the zero-interaction first lane. If it fills the remaining
     # KiCad requirements, GuidedCaptureSource is never asked and no browser window opens.
     sources = (
         [*guided_sources]

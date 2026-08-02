@@ -4,19 +4,19 @@ from a project's .kicad_pcb via kicad-cli.
 The subprocess runner is exercised with kicad-cli faked (monkeypatched subprocess.run),
 exactly like test_checks.py, so the honest-completion guards stay deterministic and
 cross-platform: a missing cli / a failed plot / an empty output is NEVER a fabricated or
-empty zip. One real-cli smoke test (guarded by shutil.which) proves the actual flags.
+empty zip. One real-cli smoke test (guarded by Stockroom's native discovery) proves the flags.
 """
 
 from __future__ import annotations
 
 import io
-import shutil
 import types
 import zipfile
 from pathlib import Path
 
 import pytest
 
+from stockroom.kicad.cli import find_kicad_cli
 from stockroom.kicad.errors import KiCadCliError
 from stockroom.projects import fab_export
 
@@ -236,12 +236,12 @@ def test_a_decode_error_is_a_kicadcli_error_not_a_500(tmp_path, monkeypatch):
 # ---- a real kicad-cli smoke test (skipped where the cli is absent, e.g. Windows CI) --
 
 
-@pytest.mark.skipif(shutil.which("kicad-cli") is None, reason="kicad-cli not installed")
+@pytest.mark.skipif(find_kicad_cli() is None, reason="kicad-cli not installed")
 def test_real_cli_produces_a_gerber_drill_and_job(tmp_path):
     fixture = Path(__file__).parent.parent / "fixtures" / "kicad" / "minimal.kicad_pcb"
     board = tmp_path / "smoke.kicad_pcb"
     board.write_text(fixture.read_text(encoding="utf-8"), encoding="utf-8")
-    bundle = fab_export.build_fab_bundle(board, shutil.which("kicad-cli"))
+    bundle = fab_export.build_fab_bundle(board, find_kicad_cli())
     names = _names(bundle)
     assert any(n.endswith(".gbrjob") for n in names), names
     assert any(n.endswith(".drl") for n in names), names
@@ -249,7 +249,7 @@ def test_real_cli_produces_a_gerber_drill_and_job(tmp_path):
     assert bundle["filename"] == "smoke-fab.zip"
 
 
-@pytest.mark.skipif(shutil.which("kicad-cli") is None, reason="kicad-cli not installed")
+@pytest.mark.skipif(find_kicad_cli() is None, reason="kicad-cli not installed")
 def test_real_cli_leaves_the_project_tree_untouched(tmp_path):
     # READ-ONLY guarantee: kicad-cli writes a <board>.kicad_prl next to the board it opens, so a
     # naive run would drop that (and dirty a git-tracked project). The export must run against a
@@ -259,5 +259,5 @@ def test_real_cli_leaves_the_project_tree_untouched(tmp_path):
     proj.mkdir()
     board = proj / "board.kicad_pcb"
     board.write_text(fixture.read_text(encoding="utf-8"), encoding="utf-8")
-    fab_export.build_fab_bundle(board, shutil.which("kicad-cli"))
+    fab_export.build_fab_bundle(board, find_kicad_cli())
     assert [p.name for p in proj.iterdir()] == ["board.kicad_pcb"]

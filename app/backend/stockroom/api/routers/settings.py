@@ -8,9 +8,12 @@ remain in ``config.json``."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Request
 
 from stockroom.kicad.common_json import read_env_var
+from stockroom.stm.source import normalize_cubemx_source
 
 
 def _hint(key: str) -> str:
@@ -217,7 +220,10 @@ def settings_router(require_token) -> APIRouter:
         if "stm_cubemx_source" in body:
             # No live-apply side effect: changing the source path does not rebuild the
             # STM index - the user separately POSTs /api/stm/build.
-            ctx.config.stm_cubemx_source = str(body["stm_cubemx_source"] or "").strip().strip('"')
+            selected = str(body["stm_cubemx_source"] or "").strip().strip('"')
+            ctx.config.stm_cubemx_source = (
+                str(normalize_cubemx_source(Path(selected))) if selected else ""
+            )
             ctx.config.save()
         return _settings_dto(ctx)
 

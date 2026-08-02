@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -205,3 +208,84 @@ def test_native_visuals_reject_unknown_artifacts(client, tmp_path, monkeypatch):
 
     response = client.get(f"/api/projects/{record['id']}/visuals/nope")
     assert response.status_code == 404
+
+
+def test_overlapping_visual_refreshes_share_one_native_render(
+    client,
+    tmp_path,
+    monkeypatch,
+):
+    root = _make_altium_api_project(tmp_path / "ext" / "amp")
+    (root / "Amp.PcbDoc").write_bytes(b"native-altium-board")
+    record = _register(client, root)
+    started = threading.Event()
+    release = threading.Event()
+    calls: list[str] = []
+
+    class Adapter:
+        def render(self, project):
+            calls.append(project.id)
+            started.set()
+            assert release.wait(5), "test did not release the native render"
+            return SimpleNamespace(
+                evidence={"status": "ready", "documents": []},
+                artifacts={},
+            )
+
+    monkeypatch.setattr(
+        "stockroom.api.routers.projects.get_adapter",
+        lambda _key: Adapter(),
+    )
+    url = f"/api/projects/{record['id']}/visuals?refresh=true"
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(client.get, url)
+        assert started.wait(5), "first native render did not start"
+        second = pool.submit(client.get, url)
+        time.sleep(0.05)
+        release.set()
+        responses = [first.result(timeout=5), second.result(timeout=5)]
+
+    assert [response.status_code for response in responses] == [200, 200]
+    assert calls == [record["id"]]
+
+
+def test_project_delete_waits_for_its_active_native_render(
+    client,
+    tmp_path,
+    monkeypatch,
+):
+    root = _make_altium_api_project(tmp_path / "ext" / "amp-delete")
+    (root / "Amp.PcbDoc").write_bytes(b"native-altium-board")
+    record = _register(client, root)
+    started = threading.Event()
+    release = threading.Event()
+
+    class Adapter:
+        def render(self, _project):
+            started.set()
+            assert release.wait(5), "test did not release the native render"
+            return SimpleNamespace(
+                evidence={"status": "ready", "documents": []},
+                artifacts={},
+            )
+
+    monkeypatch.setattr(
+        "stockroom.api.routers.projects.get_adapter",
+        lambda _key: Adapter(),
+    )
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        render = pool.submit(
+            client.get,
+            f"/api/projects/{record['id']}/visuals?refresh=true",
+        )
+        assert started.wait(5), "native render did not start"
+        deletion = pool.submit(client.delete, f"/api/projects/{record['id']}")
+        time.sleep(0.05)
+        assert not deletion.done(), "project deletion raced the active native render"
+        release.set()
+        rendered = render.result(timeout=5)
+        deleted = deletion.result(timeout=5)
+
+    assert rendered.status_code == 200
+    assert deleted.status_code == 204
+    assert client.get(f"/api/projects/{record['id']}").status_code == 404
