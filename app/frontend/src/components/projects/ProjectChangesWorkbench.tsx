@@ -117,14 +117,14 @@ export function ProjectChangesWorkbench({
               collaboration={collaboration.data}
             />
           </section>
-          <ReviewQueueEmpty />
+          <ReviewQueueEmpty reason={reviews.data?.blocked_reason} />
         </div>
       )}
     </div>
   );
 }
 
-function ReviewQueueEmpty() {
+function ReviewQueueEmpty({ reason = "" }: { reason?: string }) {
   return (
     <section className="min-h-0 overflow-y-auto">
       <div className="flex h-[34px] items-center gap-2 border-b border-line bg-band px-4">
@@ -138,10 +138,14 @@ function ReviewQueueEmpty() {
           <Text id="projects.activity.no-reviews-title">No shared work yet</Text>
         </p>
         <p className="mt-1.5 text-xs leading-5 text-t3">
-          <Text id="projects.activity.no-reviews">
-            A teammate's shared branch appears here with its changed files, BOM links,
-            and native design checks.
-          </Text>
+          {reason ? (
+            reason
+          ) : (
+            <Text id="projects.activity.no-reviews">
+              A teammate's shared branch appears here with its changed files, BOM links,
+              and native design checks.
+            </Text>
+          )}
         </p>
         <div className="mt-5 divide-y divide-line border-y border-line">
           <WorkflowStep

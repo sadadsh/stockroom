@@ -698,6 +698,56 @@ def test_review_listing_uses_the_active_sessions_base_branch(
     assert seen == ["release"]
 
 
+def test_review_listing_turns_a_missing_saved_remote_base_into_recovery_state(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from stockroom.projects.collaboration import CollaborationError, WorkSession
+
+    project_root, head = _make_git_project(tmp_path / "stale-session-reviews", _UNANNOTATED)
+    project = _register(client, project_root)
+    app_ctx.work_session_store.save(
+        project["id"],
+        WorkSession(
+            id="session-stale",
+            owner="Mina",
+            branch="work/mina/old",
+            base_branch="deleted-release",
+            base_commit=head,
+            documents=("board.kicad_sch",),
+            locks=(),
+            started_at="2026-07-28T12:00:00Z",
+            shared_commit="",
+        ),
+    )
+
+    class Manager:
+        def __init__(self, repo):
+            pass
+
+        def list_candidates(self, *, base_branch):
+            raise CollaborationError(
+                "base_missing",
+                f"remote ref is unavailable: refs/remotes/origin/{base_branch}",
+            )
+
+    monkeypatch.setattr("stockroom.api.routers.projects.ReviewManager", Manager)
+    response = client.get(f"/api/projects/{project['id']}/reviews")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "base_branch": "deleted-release",
+        "candidates": [],
+        "blocked_reason": (
+            "The saved work session's shared branch is no longer available. "
+            "Start a new work session from a current shared branch."
+        ),
+    }
+    assert "refs/remotes" not in response.text
+
+
 def test_review_approval_refuses_a_commit_other_than_the_one_displayed(
     client, tmp_path, monkeypatch
 ):

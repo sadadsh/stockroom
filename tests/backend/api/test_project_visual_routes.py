@@ -12,7 +12,7 @@ from tests.backend.api.test_projects import (
 )
 
 
-def test_board_geometry_delegates_both_edas_to_one_adapter_contract(
+def test_board_geometry_is_passive_for_both_edas_until_explicit_render(
     client, tmp_path, monkeypatch
 ):
     kicad_root = _make_project(tmp_path / "ext" / "board")
@@ -27,25 +27,32 @@ def test_board_geometry_delegates_both_edas_to_one_adapter_contract(
         def __init__(self, key):
             self.key = key
 
-        def board_geometry(self, project):
+        def render(self, project):
             calls.append((self.key, project.id))
-            return {
-                "schema_version": 1,
-                "adapter": self.key,
-                "status": "ready",
-                "boards": project.board_paths,
-                "placements": [
-                    {
-                        "reference": "R1",
-                        "board": project.board_paths[0],
-                        "x_mm": 10.25,
-                        "y_mm": 18.5,
-                        "rotation_deg": 90.0,
-                        "side": "top",
-                        "footprint": "R_0402_1005Metric",
-                    }
-                ],
-            }
+            return SimpleNamespace(
+                evidence={
+                    "runtime": {"name": self.key, "version": "test"},
+                    "documents": [
+                        {
+                            "kind": "pcb",
+                            "path": project.board_paths[0],
+                            "scene": {
+                                "components": [
+                                    {
+                                        "reference": "R1",
+                                        "x_mm": 10.25,
+                                        "y_mm": 18.5,
+                                        "rotation_deg": 90.0,
+                                        "side": "top",
+                                        "package": "R_0402_1005Metric",
+                                    }
+                                ]
+                            },
+                        }
+                    ],
+                },
+                artifacts={},
+            )
 
     monkeypatch.setattr(
         "stockroom.api.routers.projects.get_adapter",
@@ -59,9 +66,21 @@ def test_board_geometry_delegates_both_edas_to_one_adapter_contract(
         f"/api/projects/{altium['id']}/board-geometry"
     )
     assert kicad_geometry.status_code == altium_geometry.status_code == 200
-    assert set(kicad_geometry.json()["placements"][0]) == set(
-        altium_geometry.json()["placements"][0]
-    )
+    assert kicad_geometry.json()["status"] == "blocked"
+    assert altium_geometry.json()["status"] == "blocked"
+    assert calls == []
+
+    for record in (kicad, altium):
+        rendered = client.get(
+            f"/api/projects/{record['id']}/visuals",
+            params={"refresh": "true"},
+        )
+        assert rendered.status_code == 200, rendered.text
+        geometry = client.get(f"/api/projects/{record['id']}/board-geometry")
+        assert geometry.status_code == 200, geometry.text
+        assert geometry.json()["status"] == "ready"
+        assert geometry.json()["placements"][0]["reference"] == "R1"
+
     assert calls == [("kicad", kicad["id"]), ("altium", altium["id"])]
 
 

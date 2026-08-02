@@ -1045,6 +1045,28 @@ describe("ProjectsPage shared workspace", () => {
     );
   });
 
+  it("keeps Activity usable when the saved shared branch no longer exists", async () => {
+    const user = userEvent.setup();
+    mockApi.projectReviews.mockResolvedValue({
+      base_branch: "deleted-shared-branch",
+      candidates: [],
+      blocked_reason:
+        "The saved work session's shared branch is no longer available. Start a new work session from a current shared branch.",
+    });
+
+    renderPage();
+    await screen.findByRole("heading", { name: "Power Board" });
+    await user.click(screen.getByRole("tab", { name: "Activity" }));
+
+    expect(
+      await screen.findByText(
+        "The saved work session's shared branch is no longer available. Start a new work session from a current shared branch.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("No shared work yet")).toBeInTheDocument();
+    expect(screen.queryByText(/refs\/remotes/)).not.toBeInTheDocument();
+  });
+
   it("presents a shared review as one evidence sheet instead of dashboard cards", async () => {
     const user = userEvent.setup();
     const candidate = {

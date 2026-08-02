@@ -216,6 +216,25 @@ _CADENAS_VISIBLE_UNMEASURED_HTML = """
 </html>
 """
 
+_CADENAS_EMBEDDED_HTML = """
+<!doctype html>
+<html>
+  <body>
+    <section id="mfr-media-active" hidden></section>
+    <section id="cadenas-media-active">
+      <button onclick="document.getElementById('cadenas-export-options').hidden=false">
+        Select Download Format
+      </button>
+    </section>
+    <div id="cadenas-export-options" hidden>
+      <input id="cadenas-step" type="radio" name="cadenas-format-selection-3d">
+      <label for="cadenas-step" data-original="3D Model">3D Model</label>
+      <button id="btn-download-cadenas">Download</button>
+    </div>
+  </body>
+</html>
+"""
+
 
 @pytest.mark.skipif(
     chromium_unavailable_reason() is not None,
@@ -321,37 +340,41 @@ def test_digikey_hidden_supplementary_rows_are_terminal_ledger_misses(
     reason=str(chromium_unavailable_reason()),
 )
 @pytest.mark.parametrize(
-    ("model_id", "manufacturer", "mpn", "html", "message"),
+    ("model_id", "manufacturer", "mpn", "html", "submitted", "message"),
     (
         (
             "16731489",
             "CODACA",
             "VSEB0630H-2R2MC",
             _MANUFACTURER_EMBEDDED_HTML,
-            "3 exact DigiKey-hosted STEP originals",
+            True,
+            "Requested 3 Manufacturer Provided STEP originals",
         ),
         (
             "8600948",
             "KEMET",
             "C0603C105K4RACAUTO7411",
             _MANUFACTURER_EXTERNAL_HTML,
-            "external manufacturer STEP link on search.kemet.com",
+            True,
+            "Requested the Manufacturer Provided STEP original",
         ),
         (
             "13559621",
             "Molex",
             "0424750451",
             _MANUFACTURER_EMPTY_HTML,
+            False,
             "supplementary route remains explicitly unresolved",
         ),
     ),
 )
-def test_digikey_manufacturer_route_classifies_each_measured_shape_without_clicking(
+def test_digikey_manufacturer_route_automates_each_measured_shape(
     tmp_path,
     model_id,
     manufacturer,
     mpn,
     html,
+    submitted,
     message,
 ):
     surface = DigiKeyUltraLibrarianAdapter()
@@ -376,10 +399,10 @@ def test_digikey_manufacturer_route_classifies_each_measured_shape_without_click
             expected_mpn=mpn,
         )
 
-    assert report.submitted is False
+    assert report.submitted is submitted
     assert report.route_unavailable is False
     assert report.blocked is False
-    assert report.missed == ["model"]
+    assert report.missed == ([] if submitted else ["model"])
     assert message in report.message
 
 
@@ -417,8 +440,42 @@ def test_digikey_visible_cadenas_row_is_explicitly_unresolved_without_a_guess(tm
     assert report.route_unavailable is False
     assert report.blocked is False
     assert report.missed == ["model"]
-    assert "no positive live CADENAS format/download contract" in report.message
-    assert "no selector was guessed" in report.message
+    assert "exposed no format selector" in report.message
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_cadenas_route_uses_the_shared_automatic_download_contract(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    surface._exact_product_url = (
+        "https://www.digikey.com/en/products/detail/omron-automation-and-safety/"
+        "E2E-X5Y1/1776201"
+    )
+    cadenas = surface.capture_routes()[4]
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+
+    with browser.session() as page:
+        page.route(
+            "https://www.digikey.com/en/models/1776201",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="text/html",
+                body=_CADENAS_EMBEDDED_HTML,
+            ),
+        )
+        page.goto("https://www.digikey.com/en/models/1776201")
+        report = cadenas.drive(
+            page,
+            ["model"],
+            expected_manufacturer="Omron Automation and Safety",
+            expected_mpn="E2E-X5Y1",
+        )
+
+        assert page.locator("#cadenas-step").is_checked()
+    assert report.selected == ["model"]
+    assert report.submitted is True
 
 
 @pytest.mark.skipif(

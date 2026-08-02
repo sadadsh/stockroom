@@ -1991,6 +1991,7 @@ def test_control_hints_are_derived_from_the_measured_pins_and_routes_not_invente
     """Every outlined selector traces back to data an automated path already measured."""
 
     from stockroom.capture.vendors import (
+        _DIGIKEY_CADENAS_ROUTE,
         _DIGIKEY_MANUFACTURER_ROUTE,
         _DIGIKEY_ULTRALIBRARIAN_ROUTE,
         SnapMagicAdapter,
@@ -2032,9 +2033,12 @@ def test_control_hints_are_derived_from_the_measured_pins_and_routes_not_invente
         f"#{_DIGIKEY_MANUFACTURER_ROUTE.modal_id} #btn-download-mfr",
     )
 
-    # CADENAS has no measured format/download contract, so it outlines no download control.
+    # CADENAS now uses the same measured modal/download contract as the other DigiKey rows.
     cadenas = by_label["DigiKey · CADENAS"]
-    assert all("Download" not in hint.label for hint in cadenas.control_hints)
+    cadenas_hints = {hint.label: hint.selectors for hint in cadenas.control_hints}
+    assert cadenas_hints["Download from CADENAS"] == (
+        f'#{_DIGIKEY_CADENAS_ROUTE.modal_id} [id^="btn-download-"]',
+    )
 
 
 def test_a_provider_without_a_measured_control_is_left_hint_less():

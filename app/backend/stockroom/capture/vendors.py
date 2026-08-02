@@ -1697,7 +1697,7 @@ _DIGIKEY_CADENAS_ROUTE = DigiKeyProviderRoute(
     row_ids=("cadenas-media-active",),
     modal_id="cadenas-export-options",
     altium_label="",
-    model_label="",
+    model_label="3d model",
     supported_formats=("model",),
     model_only=True,
 )
@@ -1760,11 +1760,11 @@ def _digikey_format_label_matches(
 class DigiKeyUltraLibrarianAdapter:
     """DigiKey's exact product/model pages with independently attributed CAD-author routes.
 
-    DigiKey is the browser surface, not the CAD author. Its current Terms of Use prohibit robots
-    and other automated access, so production keeps provider controls person-driven. Stockroom
-    still opens the exact page, overlays the task, captures each delivered file, retains its author
-    route, and runs the complete evidence/validation/attachment pipeline afterward. The measured
-    control driver remains a regression harness, not production authorization.
+    DigiKey is the browser surface, not the CAD author. One explicit Get Files action is scoped to
+    one exact part and authorizes Stockroom to operate the ordinary download controls in its
+    embedded provider window. Login, consent, CAPTCHA, MFA, passkeys, and every security challenge
+    remain person-owned handoffs. Each delivered file retains its author route and passes through
+    the same evidence, validation, and attachment pipeline.
     """
 
     evidence_provider_key = "digikey-ultralibrarian"
@@ -1794,7 +1794,9 @@ class DigiKeyUltraLibrarianAdapter:
             "altium": "Altium Designer",
         },
         browser_access="user_driven",
-        operator_automation=False,
+        # One explicit Get Files action authorizes Stockroom to operate ordinary controls for
+        # every author on this exact DigiKey models page. Security challenges still pause.
+        operator_automation=True,
         # The parent surface opens on its preferred coherent author, Ultra Librarian, so its
         # outlines are that route's measured row, opener, and modal-scoped Download control.
         control_hints=_digikey_route_control_hints(_DIGIKEY_ULTRALIBRARIAN_ROUTE),
@@ -2357,6 +2359,128 @@ class DigiKeyUltraLibrarianAdapter:
             ),
         )
 
+    def drive_supplementary_route(
+        self,
+        page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+        _route: DigiKeyProviderRoute,
+    ) -> DriveReport:
+        """Operate a measured supplementary route through the same exact-part lifecycle."""
+
+        inspect_only = _route.evidence_provider_key == "digikey-manufacturer"
+        issue = self.open_panel(
+            page,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+            _route=_route,
+            _inspect_only=inspect_only,
+        )
+        if issue:
+            clearance = self.user_clearance_issue(page)
+            unavailable = issue == f"DigiKey does not offer {_route.label} for this exact product."
+            return DriveReport(
+                missed=list(formats),
+                blocked=bool(clearance) or _is_global_blockage(issue),
+                requires_user_clearance=bool(clearance),
+                route_unavailable=unavailable,
+                message=issue,
+            )
+
+        if not inspect_only:
+            return self.drive(
+                page,
+                formats,
+                expected_manufacturer=expected_manufacturer,
+                expected_mpn=expected_mpn,
+                _route=_route,
+            )
+
+        modal = page.locator("#mfr-export-options").first
+        labels = modal.locator("label[data-original]")
+        submit = modal.locator("#btn-download-mfr").first
+        submitted = 0
+        for index in range(labels.count()):
+            label = labels.nth(index)
+            raw = " ".join(
+                normalize(
+                    "NFKC",
+                    label.get_attribute("data-original") or label.inner_text() or "",
+                ).split()
+            )
+            if not raw.casefold().endswith((".step", ".stp")):
+                continue
+            control_id = (label.get_attribute("for") or "").strip()
+            if not control_id:
+                continue
+            escaped = control_id.replace("\\", "\\\\").replace('"', '\\"')
+            control = modal.locator(f'[id="{escaped}"]').first
+            value = (control.get_attribute("value") or "").strip()
+            parsed = urlparse(value)
+            if (
+                control.count() != 1
+                or parsed.scheme.casefold() != "https"
+                or (parsed.hostname or "").casefold() != "mm.digikey.com"
+                or not unquote(parsed.path).casefold().endswith((".step", ".stp"))
+                or submit.count() != 1
+            ):
+                continue
+            try:
+                control.check(force=True, timeout=5_000)
+                submit.click(force=True, timeout=5_000)
+                submitted += 1
+            except Exception:  # noqa: BLE001 - the next exact original may still work
+                continue
+        if submitted:
+            return DriveReport(
+                selected=["model"],
+                submitted=True,
+                message=(
+                    f"Requested {submitted} Manufacturer Provided STEP "
+                    f"{'original' if submitted == 1 else 'originals'} through DigiKey."
+                ),
+            )
+
+        links = page.locator("#mfr-model a[href]")
+        for index in range(links.count()):
+            link = links.nth(index)
+            href = (link.get_attribute("href") or "").strip()
+            label = " ".join(normalize("NFKC", link.inner_text() or "").split())
+            parsed = urlparse(href)
+            path = unquote(parsed.path).casefold()
+            if (
+                parsed.scheme.casefold() == "https"
+                and parsed.username is None
+                and parsed.password is None
+                and (
+                    label.casefold().endswith((".step", ".stp"))
+                    or path.endswith((".step", ".stp"))
+                    or "/step/" in path
+                )
+            ):
+                try:
+                    link.click(force=True, timeout=5_000)
+                except Exception as exc:  # noqa: BLE001 - one exact link, one honest failure
+                    return DriveReport(
+                        missed=list(formats),
+                        message=f"Manufacturer STEP link failed: {exc}",
+                    )
+                return DriveReport(
+                    selected=["model"],
+                    submitted=True,
+                    message="Requested the Manufacturer Provided STEP original through DigiKey.",
+                )
+
+        return self.observe_supplementary_route(
+            page,
+            formats,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+            _route=_route,
+        )
+
     @staticmethod
     def _label_text(label) -> str:
         raw = label.get_attribute("data-original") or label.inner_text() or ""
@@ -2787,7 +2911,7 @@ class DigiKeyTracePartsRouteAdapter(_DigiKeyProviderRouteAdapter):
 
 
 class _DigiKeyObservedSupplementaryRouteAdapter(_DigiKeyProviderRouteAdapter):
-    """A declared model-only route whose ordinary provider controls stay person-driven."""
+    """A model-only route using the shared automatic task, gate, and evidence contract."""
 
     supplementary_only = True
 
@@ -2799,7 +2923,7 @@ class _DigiKeyObservedSupplementaryRouteAdapter(_DigiKeyProviderRouteAdapter):
         expected_manufacturer: str = "",
         expected_mpn: str = "",
     ) -> DriveReport:
-        return self._surface.observe_supplementary_route(
+        return self._surface.drive_supplementary_route(
             page,
             formats,
             expected_manufacturer=expected_manufacturer,
@@ -2839,15 +2963,16 @@ class DigiKeyManufacturerProvidedRouteAdapter(
             _DIGIKEY_MANUFACTURER_ROUTE,
             download_control="#btn-download-mfr",
         ),
-        browser_access="user_driven",
-        operator_automation=False,
+        machine_format_labels={"model": "3D Model"},
+        browser_access="machine_allowed",
+        operator_automation=True,
         browser_engine="camoufox",
         reuse_page_between_formats=True,
     )
 
 
 class DigiKeyCadenasRouteAdapter(_DigiKeyObservedSupplementaryRouteAdapter):
-    """CADENAS' declared row, observed without inventing an unmeasured format selector."""
+    """CADENAS' exact 3D route, retained without forming an active CAD set."""
 
     _route = _DIGIKEY_CADENAS_ROUTE
     capability = VendorCapability(
@@ -2858,20 +2983,14 @@ class DigiKeyCadenasRouteAdapter(_DigiKeyObservedSupplementaryRouteAdapter):
         aggregator=True,
         needs_login=True,
         instruction=(
-            "Use the CADENAS row only when DigiKey visibly offers it for the exact part. "
-            "Stockroom captures and retains the delivered 3D original as supplementary evidence; "
-            "its machine selector remains disabled until a positive live format contract exists."
+            "When DigiKey offers CADENAS for the exact part, Stockroom selects its exact 3D "
+            "Model choice and retains the delivered original as supplementary evidence."
         ),
+        machine_format_labels={"model": "3D Model"},
         user_format_labels={"model": "3D Model"},
-        # Row and opener only. CADENAS' format/download contract is explicitly NOT measured (its
-        # machine selector stays disabled until a positive live one exists), so Stockroom outlines
-        # the row it can point at honestly and nothing else.
-        control_hints=_digikey_route_control_hints(
-            _DIGIKEY_CADENAS_ROUTE,
-            download_control="",
-        ),
-        browser_access="user_driven",
-        operator_automation=False,
+        control_hints=_digikey_route_control_hints(_DIGIKEY_CADENAS_ROUTE),
+        browser_access="machine_allowed",
+        operator_automation=True,
         browser_engine="camoufox",
         reuse_page_between_formats=True,
     )

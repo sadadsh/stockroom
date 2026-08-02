@@ -238,8 +238,8 @@ class AppContext:
         )
         if resolved_source is None:
             raise ValueError(
-                "no STM32 CubeMX source configured or discoverable - set "
-                "stm_cubemx_source via PATCH /api/settings or STM32_CUBEMX"
+                "No STM32CubeMX source folder is configured or discoverable. "
+                "Choose the CubeMX data folder in Stockroom."
             )
         old_stm_index = self.stm_index
         self.stm_index = StmIndex.build(resolved_source, default_index_path(), progress=progress)

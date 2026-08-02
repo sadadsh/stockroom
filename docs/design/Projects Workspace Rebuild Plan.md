@@ -188,6 +188,10 @@ differ and require reconciliation.
 - Altium Designer 26 runs one serialized scene export followed by one native PDF
   publication. The public WiFi example returns two schematics, two PCB documents,
   six verified artifacts, and source-preservation evidence.
+- Project selection, tab changes, and placement-map reads are cache-only. They
+  consume the last explicit native visual bundle and cannot launch `kicad-cli` or
+  Altium. `Render PCB` is the single action that acquires a native tool, refreshes
+  the bundle, and invalidates the shared placement geometry.
 - Both adapters feed the same board selector, Top/Bottom control, pan/zoom canvas,
   package-sized hit targets, BOM cross-probe, and guided-build stage.
 - Both real IPC-2581 dialects now feed the same selected-footprint pin contract.
@@ -232,6 +236,10 @@ differ and require reconciliation.
   diff, and the exact commit decision. Its split responds to the workbench rather
   than the outer window; the audited 1024 px layout is 230 px of session/review
   context plus a 515 px evidence pane with no document overflow.
+- A stale saved base branch or temporarily unavailable remote now leaves Activity
+  usable. It preserves the local repository and work-session facts, shows one
+  recovery reason in the normal empty queue, and never replaces the page with raw
+  `refs/remotes` output.
 - Repository setup is part of that same workbench instead of a centered onboarding
   card. Local branch, state, and commit facts remain visible beside the remote URL
   action; the sheet stacks at 621 px of usable width and splits into 291/454 px at

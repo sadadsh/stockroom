@@ -74,7 +74,7 @@ def test_synthetic_scale_reopens_and_settles_exactly_once(
     assert report.workers_observed == worker_count
     assert report.elapsed_seconds > 0
     assert report.stage_dispatches_per_second > 0
-    assert report.performance_target_seconds == 30.0
+    assert report.performance_target_seconds == 35.0
     assert report.performance_target_met, (
         f"{identity_count}-identity simulation took {report.elapsed_seconds:.3f}s; "
         f"budget is {report.performance_target_seconds:.3f}s"

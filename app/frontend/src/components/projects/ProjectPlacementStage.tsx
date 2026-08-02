@@ -322,8 +322,7 @@ export function ProjectPlacementStage({
             </Badge>
           ) : null}
           {!nativeRenderPending &&
-          !nativeBoardUrl &&
-          geometry?.status === "ready" ? (
+          !nativeBoardUrl ? (
             <Button
               small
               disabled={refreshVisuals.isPending}
