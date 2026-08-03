@@ -82,6 +82,18 @@ Pick the smallest recipe that fits — most features are one or two of these com
   `const label = useText("area.name", "Default")` and pass `label`.
 - Saved rewordings ship from `lib/copy.overrides.ts` for everyone. Use a stable, unique `id`.
 
+## Make an element editable in Dev Mode
+
+- Give the meaningful layout or control boundary a stable `data-dev-id` and register the same ID in
+  `lib/devIds.ts`. This enables selection, catalogue search, and the complete Box editor.
+- For a single-choice control whose presentation may change, use `AdaptiveChoice` instead of a raw
+  `<select>`. Pass the existing value, options, disabled state, and change handler unchanged. Dev
+  Mode can then switch it among Dropdown, Segmented Control, Radio Group, and Searchable Picker
+  without changing its semantics.
+- Add the ID to the parity tests. Confirm the live edit in the real Windows host, in both themes,
+  and exercise Undo/Redo before saving.
+- The full source and publishing contract is in [Dev Mode](design/Dev%20Mode.md).
+
 ## Add a parametric spec / attribute
 
 No code change — these are registries:

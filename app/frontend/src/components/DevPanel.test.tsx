@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider } from "../lib/devMode";
@@ -15,6 +15,14 @@ vi.mock("../api/client", async (importActual) => {
     api: {
       ...actual.api,
       devSave: vi.fn().mockResolvedValue({ ok: true, written: [], tokens: 0, copy: 0 }),
+      devStatus: vi.fn().mockResolvedValue({
+        available: true,
+        branch: "main",
+        revision: "a".repeat(40),
+        dirty: [],
+        can_publish: false,
+        publish_blocker: "Save a Dev Mode change before publishing.",
+      }),
     },
   };
 });
@@ -90,6 +98,15 @@ function inspectClick(el: Element) {
 }
 
 describe("DevPanel inspect-first shell", () => {
+  it("does not offer an empty publish and explains the source boundary", async () => {
+    render(<Harness />);
+    toggleDevMode();
+    await waitFor(() =>
+      expect(screen.getByText("Save a Dev Mode change before publishing.")).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: "Publish To Main" })).toBeDisabled();
+  });
+
   it("with NO selection the Tokens tab shows the full grouped editable list", () => {
     render(<Harness />);
     toggleDevMode();

@@ -51,6 +51,38 @@ _uv = _required_file("STOCKROOM_UV_EXECUTABLE")
 _datas.append((_uv, "."))
 _datas += collect_data_files("webview")
 
+# Owner Dev Mode builds the source-backed frontend before committing it. Carry
+# a pinned portable Node/npm runtime so that action works on a clean Windows PC
+# without a machine-wide Node installation.
+_node = os.environ.get("STOCKROOM_NODE_ROOT")
+if _node:
+    _node = os.path.abspath(_node)
+    if not os.path.isfile(os.path.join(_node, "node.exe")) or not os.path.isfile(
+        os.path.join(_node, "npm.cmd")
+    ):
+        raise SystemExit(
+            "packaging/stockroom.spec: STOCKROOM_NODE_ROOT must contain node.exe and npm.cmd"
+        )
+    _datas.append((_node, "node"))
+
+# The continuously updated source host cannot build the native P-CAD converter
+# on a user's machine.  Carry the exact self-contained publish in the stable
+# launcher so first launch can provision it under LocalAppData before capture
+# starts.  This is required in every distributable build, including unsigned
+# owner fixtures; putting it only in the sibling MSIX release tree left the
+# standalone EXE unable to publish Ultra Librarian `.lia` packages.
+_cad_converter = os.environ.get("STOCKROOM_CAD_CONVERTER_ROOT")
+if not _cad_converter:
+    raise SystemExit(
+        "packaging/stockroom.spec: STOCKROOM_CAD_CONVERTER_ROOT must name the native converter publish"
+    )
+_cad_converter = os.path.abspath(_cad_converter)
+if not os.path.isfile(os.path.join(_cad_converter, "Stockroom.CadConverter.exe")):
+    raise SystemExit(
+        "packaging/stockroom.spec: STOCKROOM_CAD_CONVERTER_ROOT has no Stockroom.CadConverter.exe"
+    )
+_datas.append((_cad_converter, "cad-converter"))
+
 # Git is a product dependency for the user's library repository, independent
 # of application delivery.  Production carries a pinned MinGit so a clean
 # Windows machine never depends on PATH.  WebView2's Evergreen bootstrapper is

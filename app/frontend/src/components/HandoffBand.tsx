@@ -24,6 +24,7 @@ import { assetRef, assetsFor } from "../lib/edaTarget";
 import { compactUrl } from "../lib/compactUrl";
 import { Text } from "../lib/copy";
 import { EditableText } from "./EditableText";
+import { AdaptiveChoice } from "./AdaptiveChoice";
 import { EYEBROW_DENSE } from "./primitives";
 
 /**
@@ -284,27 +285,16 @@ function HandoffValue({
   busy?: boolean;
 }): ReactNode {
   if (edit?.kind === "select") {
-    // The same transparent-native-select idiom the Filing row uses, so the category is changed the
-    // one way everywhere rather than two.
     return (
-      <div className="group relative min-w-0">
-        <span className="block truncate text-xs font-medium text-t1">{value.text}</span>
-        <select
-          aria-label={label}
-          value={value.text}
-          disabled={busy}
-          onChange={(e) => {
-            if (e.target.value !== value.text) edit.onSave(e.target.value);
-          }}
-          className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
-        >
-          {edit.options.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-      </div>
+      <AdaptiveChoice
+        devId="detail.category-control"
+        label={label}
+        value={value.text}
+        disabled={busy}
+        onChange={(next) => next !== value.text && edit.onSave(next)}
+        options={edit.options.map((option) => ({ value: option, label: option }))}
+        className="h-7 w-full"
+      />
     );
   }
 

@@ -55,7 +55,8 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 279 after the single-slot capture contract removed the obsolete superseded-capture notice.
 // 273 after each asset opens only its own viewer and the four combined-preview tab controls were
 // removed.
-const EXPECTED_ENTRIES = 273;
+// 283 with the ten source-backed AdaptiveChoice controls spanning Category, intake, Projects, and STM.
+const EXPECTED_ENTRIES = 283;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

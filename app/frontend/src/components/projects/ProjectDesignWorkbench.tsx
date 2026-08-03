@@ -15,6 +15,7 @@ import { Badge, Button, Dot } from "../primitives";
 import { BoardIcon, GitIcon } from "../icons";
 import { ProjectPlacementStage } from "./ProjectPlacementStage";
 import { ProjectInspectorFacts } from "./ProjectInspectorFacts";
+import { AdaptiveChoice } from "../AdaptiveChoice";
 
 export function ProjectDesignWorkbench({
   workspace,
@@ -169,18 +170,14 @@ export function ProjectDesignWorkbench({
           <span className="mb-1.5 block text-xs font-medium text-t2">
             {compactDocumentLabel}
           </span>
-          <select
-            aria-label={compactDocumentLabel}
+          <AdaptiveChoice
+            devId="projects.document-control"
+            label={compactDocumentLabel}
             value={selectedDocumentId}
-            onChange={(event) => selectDocument(event.target.value)}
-            className="h-9 w-full rounded-control border border-line bg-field px-2.5 text-xs text-t1 outline-none focus:border-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc"
-          >
-            {workspace.documents.map((document) => (
-              <option key={document.document_id} value={document.document_id}>
-                {document.label}
-              </option>
-            ))}
-          </select>
+            onChange={selectDocument}
+            className="h-9 w-full"
+            options={workspace.documents.map((document) => ({ value: document.document_id, label: document.label }))}
+          />
         </label>
         {selectedPlacement ? (
           <PlacementInspector

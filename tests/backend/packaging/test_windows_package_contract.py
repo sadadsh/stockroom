@@ -25,6 +25,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 TEMPLATE_DIRECTORY = REPOSITORY_ROOT / "packaging"
 SOURCE_ICON = REPOSITORY_ROOT / "app/backend/stockroom/host/assets/stockroom.ico"
 BUILD_SCRIPT = REPOSITORY_ROOT / "packaging/Build-Windows-Package.ps1"
+PORTABLE_BUILD_SCRIPT = REPOSITORY_ROOT / "packaging/build_exe.ps1"
 
 
 def fixture_configuration() -> PackageConfiguration:
@@ -369,6 +370,59 @@ def test_pyinstaller_build_uses_a_neutral_working_directory() -> None:
     assert '"--directory", $buildRoot' in function
     assert function.index('"--project", $RepositoryRoot') < function.index('"pyinstaller"')
     assert function.index('"--directory", $buildRoot') < function.index('"pyinstaller"')
+    assert "STOCKROOM_CAD_CONVERTER_ROOT" in function
+    assert "[Parameter(Mandatory)][string]$CadConverterRoot" in function
+
+
+def test_standalone_executable_carries_the_complete_native_cad_converter() -> None:
+    spec = (REPOSITORY_ROOT / "packaging" / "stockroom.spec").read_text(
+        encoding="utf-8"
+    )
+    script = BUILD_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'os.environ.get("STOCKROOM_CAD_CONVERTER_ROOT")' in spec
+    assert '"Stockroom.CadConverter.exe"' in spec
+    assert '(_cad_converter, "cad-converter")' in spec
+    assert script.index("$FirstCadConverter = Build-CadConverter") < script.index(
+        "$FirstExecutable = Build-Executable"
+    )
+    assert "-CadConverterRoot $FirstCadConverter" in script
+    assert "-CadConverterRoot $SecondCadConverter" in script
+    assert "tree_sha256 = Get-TextSha256 -Text" in script
+
+
+def test_standalone_executable_carries_portable_node_for_owner_dev_mode() -> None:
+    spec = (REPOSITORY_ROOT / "packaging" / "stockroom.spec").read_text(
+        encoding="utf-8"
+    )
+    script = BUILD_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'os.environ.get("STOCKROOM_NODE_ROOT")' in spec
+    assert 'os.path.join(_node, "node.exe")' in spec
+    assert 'os.path.join(_node, "npm.cmd")' in spec
+    assert '(_node, "node")' in spec
+    assert "Production mode requires pinned Node/npm" in script
+    assert "STOCKROOM_NODE_ROOT" in script
+    assert "bundled_node =" in script
+
+
+def test_owner_portable_build_pins_every_fresh_pc_launcher_input() -> None:
+    script = PORTABLE_BUILD_SCRIPT.read_text(encoding="utf-8")
+
+    assert "MinGit-2.55.0.3-64-bit.zip" in script
+    assert "f48e2d2dc74a24454adc6d8fd0ac25bf9c2386f19cfb06202b9465aaad4f9f05" in script
+    assert "git-lfs-windows-amd64-v3.7.1.zip" in script
+    assert "8683cdc3d6c029b49393dcebbaa6265bd6efd9abdcf837be855b4cd42e5e80b6" in script
+    assert "node-v24.19.0-win-x64.zip" in script
+    assert "57f71ab3652e797d84acddc79c81cc9ff1c6ddb2a1974cdb83f00fee9bff4c73" in script
+    assert "MicrosoftEdgeWebView2Setup.exe" in script
+    assert "e99838c51bb3379b244654aa77e33032d42fc2b5d224c5babce432d9fd3dcb28" in script
+    assert "Get-AuthenticodeSignature" in script
+    assert 'Join-Path $minGitRoot "mingw64\\bin\\git-lfs.exe"' in script
+    assert "MinGitRoot = $minGitRoot" in script
+    assert "NodeRoot = $nodeRoot" in script
+    assert "WebView2BootstrapperPath = $webView2Bootstrapper" in script
+    assert "$buildArguments.SkipReproducibilityProof = $true" in script
 
 
 def test_window_host_publish_returns_only_its_publish_root():

@@ -25,6 +25,7 @@ import {
 } from "../primitives";
 import { ProjectInspectorFacts } from "./ProjectInspectorFacts";
 import { ProjectPlacementStage } from "./ProjectPlacementStage";
+import { AdaptiveChoice } from "../AdaptiveChoice";
 
 type BomFilter = "all" | "unlinked" | "ready";
 
@@ -329,35 +330,29 @@ export function ProjectBomWorkbench({
                   className="h-8 w-full rounded-control border border-line bg-field pl-8 pr-2 text-xs text-t1 outline-none placeholder:text-t3 focus:border-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc"
                 />
               </label>
-              <select
-                aria-label={compactFilterLabel}
+              <AdaptiveChoice
+                devId="projects.bom-filter-control"
+                label={compactFilterLabel}
                 value={filter}
-                onChange={(event) => setFilter(event.target.value as BomFilter)}
-                className="h-8 w-[108px] rounded-control border border-line bg-field px-2 text-xs text-t1 outline-none focus:border-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc"
-              >
-                {filters.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(next) => setFilter(next as BomFilter)}
+                className="h-8 w-[108px]"
+                options={filters.map((option) => ({ value: option.id, label: option.label }))}
+              />
             </div>
             <label className="mt-2 grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2">
               <span className="text-xs font-medium text-t2">{lineLabel}</span>
-              <select
-                aria-label={lineLabel}
+              <AdaptiveChoice
+                devId="projects.bom-line-control"
+                label={lineLabel}
                 value={selectedKey}
-                onChange={(event) => setSelectedKey(event.target.value)}
+                onChange={setSelectedKey}
                 disabled={!filtered.length}
-                className="h-8 min-w-0 rounded-control border border-line bg-field px-2 text-xs font-medium text-t1 outline-none focus:border-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc disabled:opacity-50"
-              >
-                {filtered.map((line) => (
-                  <option key={lineKey(line)} value={lineKey(line)}>
-                    {line.final_qty} × {line.mpn || line.value || identityNeeded} ·{" "}
-                    {line.in_library ? linkedLabel : needsLinkLabel}
-                  </option>
-                ))}
-              </select>
+                className="h-8 w-full"
+                options={filtered.map((line) => ({
+                  value: lineKey(line),
+                  label: `${line.final_qty} × ${line.mpn || line.value || identityNeeded} · ${line.in_library ? linkedLabel : needsLinkLabel}`,
+                }))}
+              />
             </label>
           </div>
           <ProjectPlacementStage

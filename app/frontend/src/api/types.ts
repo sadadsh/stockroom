@@ -1705,6 +1705,13 @@ export interface DevSaveBody {
   copy: Record<string, string>;
   icons?: Record<string, DevIconOverride>;
   elements?: Record<string, Record<string, string>>;
+  behaviors?: Record<
+    string,
+    {
+      preset?: "dropdown" | "segmented" | "radio" | "searchable";
+      disabled?: boolean;
+    }
+  >;
 }
 
 // The write outcome: the relative source paths written, and how many token / copy / icon / element
@@ -1717,6 +1724,25 @@ export interface DevSaveResult {
   copy: number;
   icons: number;
   elements: number;
+  behaviors: number;
+}
+
+export interface DevWorkspaceStatus {
+  available: boolean;
+  branch: string;
+  revision: string;
+  dirty: string[];
+  can_publish: boolean;
+  publish_blocker: string;
+}
+
+export interface DevPublishResult {
+  ok: boolean;
+  commit: string;
+  branch: string;
+  message: string;
+  checks: string[];
+  pushed: boolean;
 }
 
 // --- STM Viewer DTOs (Phase 3 contract, consumed verbatim; INTERFACES.md section 4) ---

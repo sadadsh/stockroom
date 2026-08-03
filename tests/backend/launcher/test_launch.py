@@ -202,17 +202,42 @@ def test_supervise_signals_the_browsers_splash_phase(tmp_path):
     assert phases.index("browsers") < phases.index("starting")  # before the window opens
 
 
-def test_supervise_survives_a_browser_provision_failure(tmp_path):
-    # The render tier is optional (LCSC resolves over plain HTTP without a browser), so a
-    # failed browser download must degrade honestly, never block the whole app from opening.
+def test_supervise_surfaces_a_browser_provision_failure_before_opening(tmp_path):
+    # A fresh install must not look healthy when Get Files lacks its browser runtime.
+    spawned = []
+
     def boom(_wd):
         raise RuntimeError("offline: could not fetch Chromium")
 
-    code = supervise(
-        tmp_path, spawn=lambda _wd: 5, uv_sync=lambda _wd: None, ensure=lambda _wd: None,
-        update=lambda _wd: None, webview2=lambda: None, ensure_browsers=boom,
-    )
-    assert code == 5  # the host still launched and its exit code was returned
+    with pytest.raises(RuntimeError, match="could not fetch Chromium"):
+        supervise(
+            tmp_path,
+            spawn=lambda _wd: spawned.append(True) or 0,
+            uv_sync=lambda _wd: None,
+            ensure=lambda _wd: None,
+            update=lambda _wd: None,
+            webview2=lambda: None,
+            ensure_browsers=boom,
+        )
+    assert spawned == []
+
+
+def test_browser_provision_retries_and_attempts_both_runtimes(monkeypatch, tmp_path):
+    commands = []
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        is_chromium = "playwright" in command
+        code = 1 if is_chromium else 0
+        return subprocess.CompletedProcess(command, code, stdout="", stderr="network")
+
+    monkeypatch.setattr(launch.subprocess, "run", run)
+
+    with pytest.raises(RuntimeError, match="Chromium"):
+        launch._ensure_browsers(tmp_path)
+
+    assert sum("playwright" in command for command in commands) == 2
+    assert sum("camoufox" in command for command in commands) == 1
 
 
 # -- uv resolution (the bundled-uv WinError 2 fix) + git preflight --------------
@@ -282,13 +307,17 @@ def test_require_git_ok_with_bundled_git_even_without_path_git(monkeypatch, tmp_
 
 
 def test_child_env_prepends_bundled_git_dirs_when_frozen(monkeypatch, tmp_path):
+    (tmp_path / "node").mkdir(parents=True)
     (tmp_path / "mingit" / "cmd").mkdir(parents=True)
     (tmp_path / "mingit" / "bin").mkdir(parents=True)
+    (tmp_path / "mingit" / "mingw64" / "bin").mkdir(parents=True)
     monkeypatch.setattr(launch.sys, "frozen", True, raising=False)
     monkeypatch.setattr(launch.sys, "_MEIPASS", str(tmp_path), raising=False)
     monkeypatch.setenv("PATH", "/orig")
     env = launch._child_env()
     assert str(tmp_path / "mingit" / "cmd") in env["PATH"]
+    assert str(tmp_path / "mingit" / "mingw64" / "bin") in env["PATH"]
+    assert str(tmp_path / "node") in env["PATH"]
     assert env["PATH"].endswith("/orig")  # the machine PATH is preserved after the bundle dirs
 
 
@@ -296,6 +325,55 @@ def test_child_env_unchanged_on_a_source_run(monkeypatch):
     monkeypatch.setattr(launch.sys, "frozen", False, raising=False)
     monkeypatch.setenv("PATH", "/orig")
     assert launch._child_env()["PATH"] == "/orig"
+
+
+def test_git_clone_uses_child_env_so_bundled_git_lfs_is_visible(monkeypatch, tmp_path):
+    observed = []
+    child_env = {"PATH": "BUNDLED-LFS"}
+
+    def run(command, **kwargs):
+        observed.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(launch, "_require_git", lambda: None)
+    monkeypatch.setattr(launch, "_git_bin", lambda: "BUNDLED-GIT")
+    monkeypatch.setattr(launch, "_child_env", lambda: child_env)
+    monkeypatch.setattr(launch.subprocess, "run", run)
+
+    launch._git_clone("REMOTE", tmp_path / "App")
+
+    assert observed[0][0] == ["BUNDLED-GIT", "clone", "REMOTE", str(tmp_path / "App")]
+    assert observed[0][1]["env"] is child_env
+
+
+def test_git_pull_uses_child_env_so_bundled_git_lfs_is_visible(monkeypatch, tmp_path):
+    observed = []
+    child_env = {"PATH": "BUNDLED-LFS"}
+
+    def run(command, **kwargs):
+        observed.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(launch, "_child_env", lambda: child_env)
+    monkeypatch.setattr(launch.subprocess, "run", run)
+
+    launch._reconcile_pull(tmp_path, "BUNDLED-GIT")
+
+    assert observed[0][0] == ["BUNDLED-GIT", "-C", str(tmp_path), "pull", "--ff-only", "--quiet"]
+    assert observed[0][1]["env"] is child_env
+
+
+def test_uv_sync_installs_only_locked_runtime_dependencies(monkeypatch, tmp_path):
+    observed = []
+
+    def run(command, **kwargs):
+        observed.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(launch.subprocess, "run", run)
+    launch._uv_sync(tmp_path)
+
+    assert observed[0][0][1:] == ["sync", "--frozen", "--no-dev"]
 
 
 # -- WebView2 runtime guarantee (the last bare-Windows blocker) -----------------
@@ -324,10 +402,60 @@ def test_supervise_guarantees_webview2_after_clone_before_sync(tmp_path):
         tmp_path,
         ensure=lambda _wd: order.append("ensure"),
         webview2=lambda: order.append("webview2"),
+        cad_converter=lambda: order.append("cad_converter"),
         uv_sync=lambda _wd: order.append("sync"),
         spawn=lambda _wd: (order.append("spawn"), 0)[1],
     )
-    assert order == ["ensure", "webview2", "sync", "spawn"]
+    assert order == ["ensure", "webview2", "cad_converter", "sync", "spawn"]
+
+
+def test_bundled_cad_converter_is_atomically_provisioned_for_child(
+    monkeypatch, tmp_path
+):
+    bundle = tmp_path / "bundle"
+    source = bundle / "cad-converter"
+    source.mkdir(parents=True)
+    (source / "Stockroom.CadConverter.exe").write_bytes(b"MZconverter")
+    (source / "Stockroom.CadConverter.dll").write_bytes(b"runtime")
+    tools = tmp_path / "tools"
+    monkeypatch.setattr(launch.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(launch.sys, "_MEIPASS", str(bundle), raising=False)
+    monkeypatch.setenv("STOCKROOM_TOOLS_DIR", str(tools))
+    monkeypatch.delenv("STOCKROOM_CAD_CONVERTER", raising=False)
+
+    launch.ensure_cad_converter()
+
+    installed = Path(os.environ["STOCKROOM_CAD_CONVERTER"])
+    assert installed.is_file()
+    assert installed.read_bytes() == b"MZconverter"
+    assert installed.parent.parent == tools
+    assert (installed.parent / "Stockroom.CadConverter.dll").read_bytes() == b"runtime"
+    assert not list(tools.glob(".CadConverter-*"))
+    assert launch._child_env()["STOCKROOM_CAD_CONVERTER"] == str(installed)
+
+
+def test_bundled_cad_converter_repairs_a_corrupt_installed_tree(
+    monkeypatch, tmp_path
+):
+    bundle = tmp_path / "bundle"
+    source = bundle / "cad-converter"
+    source.mkdir(parents=True)
+    (source / "Stockroom.CadConverter.exe").write_bytes(b"MZgood")
+    tools = tmp_path / "tools"
+    monkeypatch.setattr(launch.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(launch.sys, "_MEIPASS", str(bundle), raising=False)
+    monkeypatch.setenv("STOCKROOM_TOOLS_DIR", str(tools))
+    fingerprint = launch._cad_converter_tree_fingerprint(source)
+    corrupt = tools / f"CadConverter-{fingerprint}"
+    corrupt.mkdir(parents=True)
+    (corrupt / "Stockroom.CadConverter.exe").write_bytes(b"MZbad")
+
+    launch.ensure_cad_converter()
+
+    installed = Path(os.environ["STOCKROOM_CAD_CONVERTER"])
+    assert installed == corrupt / "Stockroom.CadConverter.exe"
+    assert installed.read_bytes() == b"MZgood"
+    assert launch._cad_converter_tree_fingerprint(corrupt) == fingerprint
 
 
 # -- first-run splash: progress plumbing + safe fallback ------------------------
@@ -340,7 +468,15 @@ def test_supervise_emits_progress_phases_in_order(tmp_path):
         uv_sync=lambda _wd: None, ensure_browsers=lambda _wd: None, spawn=lambda _wd: 0,
         progress=phases.append,
     )
-    assert phases == ["clone", "update", "webview2", "sync", "browsers", "starting"]
+    assert phases == [
+        "clone",
+        "update",
+        "webview2",
+        "cad_converter",
+        "sync",
+        "browsers",
+        "starting",
+    ]
 
 
 def test_supervise_signals_starting_only_once_across_restarts(tmp_path):
@@ -358,7 +494,16 @@ def test_supervise_signals_starting_only_once_across_restarts(tmp_path):
     )
     assert phases.count("starting") == 1  # only before the FIRST spawn
     assert phases.count("browsers") == 1  # provisioned once, not on the self-update restart
-    assert phases == ["clone", "update", "webview2", "sync", "browsers", "starting", "sync"]
+    assert phases == [
+        "clone",
+        "update",
+        "webview2",
+        "cad_converter",
+        "sync",
+        "browsers",
+        "starting",
+        "sync",
+    ]
 
 
 def test_supervise_updates_on_every_launch_after_clone(tmp_path):
@@ -368,11 +513,20 @@ def test_supervise_updates_on_every_launch_after_clone(tmp_path):
         ensure=lambda _wd: order.append("clone"),
         update=lambda _wd: order.append("update"),
         webview2=lambda: order.append("webview2"),
+        cad_converter=lambda: order.append("cad_converter"),
         uv_sync=lambda _wd: order.append("sync"),
         ensure_browsers=lambda _wd: order.append("browsers"),
         spawn=lambda _wd: (order.append("spawn"), 0)[1],
     )
-    assert order == ["clone", "update", "webview2", "sync", "browsers", "spawn"]
+    assert order == [
+        "clone",
+        "update",
+        "webview2",
+        "cad_converter",
+        "sync",
+        "browsers",
+        "spawn",
+    ]
 
 
 def test_update_to_latest_pulls_when_a_checkout_exists(tmp_path):
@@ -391,7 +545,7 @@ def test_update_to_latest_skips_before_the_first_clone(tmp_path):
 def test_splash_run_falls_back_to_plain_run_when_no_display(monkeypatch):
     # If the GUI path fails for any reason, the app must STILL launch (work runs, code returned).
     def boom(_work):
-        raise RuntimeError("no display")
+        raise splash._SplashUnavailable("no display")
 
     monkeypatch.setattr(splash, "_run_with_splash", boom)
     seen = []
@@ -403,6 +557,36 @@ def test_splash_run_falls_back_to_plain_run_when_no_display(monkeypatch):
 
     assert splash.run(work) == 7
     assert seen == ["ran"]
+
+
+def test_splash_never_retries_work_after_a_worker_failure(monkeypatch):
+    calls = []
+
+    def fail_after_start(work):
+        return work(lambda _phase: None)
+
+    monkeypatch.setattr(splash, "_run_with_splash", fail_after_start)
+
+    def work(_progress):
+        calls.append("ran")
+        raise RuntimeError("provision failed")
+
+    with pytest.raises(RuntimeError, match="provision failed"):
+        splash.run(work)
+    assert calls == ["ran"]
+
+
+def test_default_host_spawn_surfaces_a_nonzero_exit(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        launch.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0], returncode=9, stdout="", stderr="host setup failed"
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="code 9: host setup failed"):
+        launch._spawn_host(tmp_path)
 
 
 def test_splash_run_uses_the_splash_result_when_available(monkeypatch):

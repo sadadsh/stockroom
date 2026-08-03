@@ -312,8 +312,12 @@ def _retry_checkpoint(context: StageContext) -> _RetryCheckpoint | None:
     if context.stage.attempt_count <= 1:
         return None
     error = context.stage.error
+    # Attempt numbers advance for both deliberate provider retries and recovered worker leases.
+    # A worker that exits while a provider page is open leaves no provider outcome/checkpoint;
+    # the replacement worker must safely re-plan from the exact identity and retained evidence.
+    # Only a document that explicitly identifies itself as a provider retry is a checkpoint.
     if not isinstance(error, dict) or error.get("kind") != "provider_stage_retry":
-        raise ProviderWorkflowError("retry has no provider plan checkpoint")
+        return None
     policy_digest = error.get("policy_semantic_digest")
     plan_digest = error.get("plan_semantic_digest")
     if (

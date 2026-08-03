@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -68,7 +69,32 @@ def test_normal_launch_dispatches_the_continuous_real_app(
         launcher._dispatch()
 
     assert stopped.value.code == 7
-    assert prepared == [True]
+    assert prepared == [False]
+
+
+def test_frozen_runtime_path_exposes_bundled_node_npm_and_git_lfs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    bundle = tmp_path / "Bundle"
+    for directory in (
+        bundle / "mingit" / "cmd",
+        bundle / "mingit" / "bin",
+        bundle / "mingit" / "mingw64" / "bin",
+        bundle / "node",
+    ):
+        directory.mkdir(parents=True)
+    (bundle / "mingit" / "cmd" / "git.exe").write_bytes(b"git")
+    (bundle / "node" / "node.exe").write_bytes(b"node")
+    (bundle / "node" / "npm.cmd").write_text("npm", encoding="utf-8")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", str(bundle), raising=False)
+    monkeypatch.setenv("PATH", "WINDOWS")
+
+    launcher._prepare_runtime(needs_window=False)
+
+    entries = os.environ["PATH"].split(os.pathsep)
+    assert str(bundle / "node") in entries
+    assert str(bundle / "mingit" / "mingw64" / "bin") in entries
 
 
 def test_malformed_window_host_argv_fails_before_webview_runtime_preparation(

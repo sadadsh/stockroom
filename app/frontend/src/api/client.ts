@@ -24,6 +24,8 @@ import type {
   AltiumSetupResult,
   DevSaveBody,
   DevSaveResult,
+  DevWorkspaceStatus,
+  DevPublishResult,
   AltiumStatus,
   OdbcStatus,
   CadSourceResponse,
@@ -556,6 +558,14 @@ export const api = {
   // saved change ships for everyone. Honest error when there is no source tree (a frozen exe).
   devSave(body: DevSaveBody): Promise<DevSaveResult> {
     return request<DevSaveResult>("POST", "/api/dev/save", { body });
+  },
+
+  devStatus(): Promise<DevWorkspaceStatus> {
+    return request<DevWorkspaceStatus>("GET", "/api/dev/status");
+  },
+
+  devPublish(message: string): Promise<DevPublishResult> {
+    return request<DevPublishResult>("POST", "/api/dev/publish", { body: { message } });
   },
 
   // Filter dimensions generated from the parts' spec bags (the modular search rail), scoped by the

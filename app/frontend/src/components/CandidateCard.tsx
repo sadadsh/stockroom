@@ -13,6 +13,7 @@ import type { SpecConflict } from "../lib/candidateFromResult";
 import { distributorLabel } from "../lib/sourced";
 import { Badge, Button, Card, Dot } from "./primitives";
 import { PhotoTrigger, productPhotoUrl } from "./ProductPhoto";
+import { AdaptiveChoice } from "./AdaptiveChoice";
 
 // Where a shown conflict value came from.
 // `files` is in the shared label table now, so this no longer carries its own copy of that
@@ -202,18 +203,13 @@ export function CandidateCard({
             <span className="w-[116px] flex-none text-xs text-t3">
               <Text id="ingest.field-footprint">Footprint</Text>
             </span>
-            <select
-              aria-label="Footprint"
-              value={c.chosen_footprint_index}
-              onChange={(e) => set("chosen_footprint_index", Number(e.target.value))}
-              className="rounded-control border border-line2 bg-field px-2 py-1 text-base text-t1 outline-none focus:border-acc"
-            >
-              {c.footprint_variants.map((fp, i) => (
-                <option key={fp} value={i}>
-                  {baseName(fp)}
-                </option>
-              ))}
-            </select>
+            <AdaptiveChoice
+              devId="ingest.footprint-control"
+              label="Footprint"
+              value={String(c.chosen_footprint_index)}
+              onChange={(next) => set("chosen_footprint_index", Number(next))}
+              options={c.footprint_variants.map((fp, i) => ({ value: String(i), label: baseName(fp) }))}
+            />
           </div>
         ) : null}
       </div>

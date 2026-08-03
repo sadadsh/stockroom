@@ -4,6 +4,9 @@ no source tree. The write path is redirected to a tmp dir so the suite never tou
 
 from __future__ import annotations
 
+import subprocess
+from types import SimpleNamespace
+
 import stockroom.api.routers.dev as dev_mod
 
 
@@ -15,20 +18,20 @@ def test_dev_save_writes_validated_token_and_copy_overrides(client, tmp_path, mo
     body = {
         "tokens": {
             "root": {
-                "--c-acc": "#e0a458",           # valid colour
-                "--r-card": "22px",             # valid length
-                "bad key": "#fff",              # invalid var name -> dropped
+                "--c-acc": "#e0a458",  # valid colour
+                "--r-card": "22px",  # valid length
+                "bad key": "#fff",  # invalid var name -> dropped
                 "--c-evil": "</script>alert(1)",  # invalid value (has < >) -> dropped
             },
             "light": {"--c-acc": "#1b1b1e"},
         },
         "copy": {
             "detail.complete-part": "Finish setup",  # valid
-            "bad id!": "x",                            # invalid id -> dropped
+            "bad id!": "x",  # invalid id -> dropped
         },
     }
     res = client.post("/api/dev/save", json=body)
-    assert res.status_code == 200
+    assert res.status_code == 200, res.text
     data = res.json()
     assert data["ok"] is True
     # 2 valid root tokens + 1 valid light token; the bad key and the injection value were dropped
@@ -66,7 +69,7 @@ def test_dev_save_accepts_shadow_and_unitless_number_tokens(client, tmp_path, mo
         "tokens": {
             "root": {
                 "--icon-stroke": "2.6",  # unitless number
-                "--fs-sm": "13.5px",     # fractional length
+                "--fs-sm": "13.5px",  # fractional length
             },
             "light": {
                 "--shadow-card": shadow,  # a full box-shadow string, including a var() reference
@@ -115,7 +118,7 @@ def test_dev_save_writes_validated_icon_overrides(client, tmp_path, monkeypatch)
         "icons": {
             "nav.parts": {
                 "body": '<path d="M4 4 L20 20" stroke="currentColor" stroke-width="2"/>'
-                "<circle cx=\"12\" cy=\"12\" r=\"6\" fill=\"none\"/>",
+                '<circle cx="12" cy="12" r="6" fill="none"/>',
             },
             "nav.home": {"swapToId": "nav.projects"},
             "bad id!": {"body": '<path d="M0 0"/>'},  # malformed key -> dropped, not a 400
@@ -145,25 +148,31 @@ def test_dev_save_empty_icons_reproduces_the_committed_file(client, tmp_path, mo
     assert res.status_code == 200
     assert res.json()["icons"] == 0
     icon_ts = (src / "lib" / "icon.overrides.ts").read_text(encoding="utf-8")
-    assert icon_ts.rstrip().endswith("export const ICON_OVERRIDES: Record<string, IconOverride> = {};")
+    assert icon_ts.rstrip().endswith(
+        "export const ICON_OVERRIDES: Record<string, IconOverride> = {};"
+    )
 
 
 def test_dev_save_rejects_malicious_svg_bodies(client, tmp_path, monkeypatch):
     # every classic SVG-injection vector is a 4xx, and nothing is written on rejection
     src = _src_with_lib(tmp_path, monkeypatch)
     malicious = [
-        "<script>alert(1)</script>",                       # script element
-        '<path d="M0 0" onload="alert(1)"/>',              # on* event handler
-        "<foreignObject><div>x</div></foreignObject>",     # foreignObject
-        '<use href="https://evil.example/x#a"/>',          # external href
-        '<rect fill="url(https://evil.example/x)"/>',       # remote url() ref
-        '<image href="#a"/>',                              # non-whitelisted element
-        "<!DOCTYPE svg><path d=\"M0 0\"/>",                # DOCTYPE / entities vector
+        "<script>alert(1)</script>",  # script element
+        '<path d="M0 0" onload="alert(1)"/>',  # on* event handler
+        "<foreignObject><div>x</div></foreignObject>",  # foreignObject
+        '<use href="https://evil.example/x#a"/>',  # external href
+        '<rect fill="url(https://evil.example/x)"/>',  # remote url() ref
+        '<image href="#a"/>',  # non-whitelisted element
+        '<!DOCTYPE svg><path d="M0 0"/>',  # DOCTYPE / entities vector
     ]
     for m in malicious:
         res = client.post(
             "/api/dev/save",
-            json={"tokens": {"root": {}, "light": {}}, "copy": {}, "icons": {"nav.parts": {"body": m}}},
+            json={
+                "tokens": {"root": {}, "light": {}},
+                "copy": {},
+                "icons": {"nav.parts": {"body": m}},
+            },
         )
         assert res.status_code == 400, f"expected 400 for {m!r}, got {res.status_code}"
         # a rejected payload leaves the override files untouched (validated before any write)
@@ -199,6 +208,9 @@ def test_dev_save_writes_validated_element_overrides(client, tmp_path, monkeypat
                 "padding": "8px",
                 "order": "2",
                 "grid-column": "1 / 3",
+                "border-radius": "4px 8px 12px 16px",
+                "line-height": "1.4",
+                "letter-spacing": "normal",
             },
             "bad id!": {"width": "10px"},  # malformed dev id -> dropped, not a 400
         },
@@ -216,6 +228,8 @@ def test_dev_save_writes_validated_element_overrides(client, tmp_path, monkeypat
     assert '"padding": "8px"' in elem_ts
     assert '"order": "2"' in elem_ts
     assert '"grid-column": "1 / 3"' in elem_ts
+    assert '"border-radius": "4px 8px 12px 16px"' in elem_ts
+    assert '"line-height": "1.4"' in elem_ts
     assert "bad id!" not in elem_ts
 
 
@@ -235,14 +249,14 @@ def test_dev_save_rejects_malicious_css_values(client, tmp_path, monkeypatch):
     # a non-length value, and a non-whitelisted property.
     src = _src_with_lib(tmp_path, monkeypatch)
     cases = [
-        {"width": "url(https://evil.example/x)"},   # remote url()
-        {"width": "expression(alert(1))"},          # legacy IE expression()
-        {"width": "240px; color: red"},             # ;-injection past the value
-        {"width": "red"},                            # not a length / keyword
-        {"padding": "10px<script>"},                # angle-bracket injection
-        {"color": "red"},                            # property not on the whitelist
-        {"grid-column": "1 / 2 / 3"},               # malformed grid slot
-        {"order": "99999"},                          # not a small integer
+        {"width": "url(https://evil.example/x)"},  # remote url()
+        {"width": "expression(alert(1))"},  # legacy IE expression()
+        {"width": "240px; color: red"},  # ;-injection past the value
+        {"width": "red"},  # not a length / keyword
+        {"padding": "10px<script>"},  # angle-bracket injection
+        {"color": "red"},  # property not on the whitelist
+        {"grid-column": "1 / 2 / 3"},  # malformed grid slot
+        {"order": "99999"},  # not a small integer
     ]
     for props in cases:
         res = client.post(
@@ -272,3 +286,163 @@ def test_dev_save_refuses_new_blocks_without_a_source_tree(client, tmp_path, mon
     )
     assert res.status_code == 409
     assert "packaged build" in res.json()["detail"]
+
+
+def test_dev_save_writes_only_supported_behavior_presets(client, tmp_path, monkeypatch):
+    src = _src_with_lib(tmp_path, monkeypatch)
+    res = client.post(
+        "/api/dev/save",
+        json={
+            "tokens": {"root": {}, "light": {}},
+            "copy": {},
+            "behaviors": {
+                "projects.board-control": {"preset": "segmented", "disabled": False},
+            },
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()["behaviors"] == 1
+    written = (src / "lib" / "behavior.overrides.ts").read_text(encoding="utf-8")
+    assert '"preset": "segmented"' in written
+    assert '"disabled": false' in written
+
+
+def test_dev_save_rejects_unknown_behavior_preset(client, tmp_path, monkeypatch):
+    src = _src_with_lib(tmp_path, monkeypatch)
+    res = client.post(
+        "/api/dev/save",
+        json={
+            "tokens": {"root": {}, "light": {}},
+            "copy": {},
+            "behaviors": {"projects.board-control": {"preset": "mystery-widget"}},
+        },
+    )
+    assert res.status_code == 400
+    assert not (src / "lib" / "behavior.overrides.ts").exists()
+
+
+def test_dev_status_is_honest_without_matching_managed_application_checkout(
+    client, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(dev_mod, "_FRONTEND_SRC", tmp_path / "unrelated" / "frontend" / "src")
+    res = client.get("/api/dev/status")
+    assert res.status_code == 200, res.text
+    assert res.json()["available"] is False
+    assert res.json()["can_publish"] is False
+
+
+class _PublishRepo:
+    def __init__(self, root, dirty):
+        self.root = root
+        self._dirty = dirty
+        self.committed = []
+
+    def current_branch(self):
+        return "main"
+
+    def dirty_paths(self):
+        return [self.root / path for path in self._dirty]
+
+    def fetch(self):
+        return True, ""
+
+    def head(self):
+        return "a" * 40
+
+    def resolve_ref(self, ref):
+        assert ref == "origin/main"
+        return "a" * 40
+
+    def commit(self, message, paths):
+        self.committed.append((message, paths))
+        return "b" * 40
+
+    def push(self):
+        return SimpleNamespace(ok=True, reason="")
+
+
+def _publish_request(repo):
+    return SimpleNamespace(
+        app=SimpleNamespace(state=SimpleNamespace(ctx=SimpleNamespace(app_repo=repo)))
+    )
+
+
+def test_dev_status_requires_owned_changes_and_refuses_foreign_dirt(tmp_path, monkeypatch):
+    root = tmp_path / "repo"
+    src = root / "app" / "frontend" / "src"
+    src.mkdir(parents=True)
+    monkeypatch.setattr(dev_mod, "_FRONTEND_SRC", src)
+
+    ready = dev_mod._dev_status(
+        _publish_request(_PublishRepo(root, ["app/frontend/src/lib/behavior.overrides.ts"]))
+    )
+    assert ready["can_publish"] is True
+    assert ready["publish_blocker"] == ""
+
+    clean = dev_mod._dev_status(_publish_request(_PublishRepo(root, [])))
+    assert clean["can_publish"] is False
+    assert "Save a Dev Mode change" in clean["publish_blocker"]
+
+    foreign = dev_mod._dev_status(
+        _publish_request(_PublishRepo(root, ["app/backend/stockroom/api/app.py"]))
+    )
+    assert foreign["can_publish"] is False
+    assert "Unrelated source changes" in foreign["publish_blocker"]
+
+
+def test_dev_publish_verifies_build_and_commits_only_owned_paths(tmp_path, monkeypatch):
+    root = tmp_path / "repo"
+    src = root / "app" / "frontend" / "src"
+    src.mkdir(parents=True)
+    (root / "app" / "frontend-dist").mkdir(parents=True)
+    monkeypatch.setattr(dev_mod, "_FRONTEND_SRC", src)
+    checks = []
+    monkeypatch.setattr(dev_mod, "_run_frontend", lambda repo, command: checks.append(command))
+    repo = _PublishRepo(root, ["app/frontend/src/lib/behavior.overrides.ts"])
+
+    result = dev_mod._publish(_publish_request(repo), {"message": "Tune interface"})
+
+    assert result["pushed"] is True
+    assert checks == ["install", "typecheck", "build"]
+    assert repo.committed[0][0] == "Tune interface"
+    committed = {path.relative_to(root).as_posix() for path in repo.committed[0][1]}
+    assert "app/frontend/src/lib/behavior.overrides.ts" in committed
+    assert "app/frontend-dist" in committed
+
+
+def test_dev_frontend_install_uses_locked_noninteractive_npm_ci(tmp_path, monkeypatch):
+    observed = []
+
+    def run(command, **kwargs):
+        observed.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(dev_mod.subprocess, "run", run)
+    repo = SimpleNamespace(root=tmp_path)
+
+    dev_mod._run_frontend(repo, "install")
+
+    assert observed[0][0] == [
+        "npm.cmd",
+        "--prefix",
+        "app/frontend",
+        "ci",
+        "--no-audit",
+        "--no-fund",
+    ]
+    assert observed[0][1]["timeout"] == 600
+
+
+def test_dev_publish_refuses_foreign_dirty_source_before_running_build(tmp_path, monkeypatch):
+    root = tmp_path / "repo"
+    src = root / "app" / "frontend" / "src"
+    src.mkdir(parents=True)
+    monkeypatch.setattr(dev_mod, "_FRONTEND_SRC", src)
+    repo = _PublishRepo(root, ["app/backend/stockroom/api/app.py"])
+    try:
+        dev_mod._publish(_publish_request(repo), {"message": "Tune interface"})
+    except dev_mod.ApiError as exc:
+        assert exc.status == 409
+        assert "unrelated files" in exc.detail
+    else:
+        raise AssertionError("foreign source must block Dev Mode publish")

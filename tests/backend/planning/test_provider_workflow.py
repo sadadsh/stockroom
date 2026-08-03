@@ -545,3 +545,67 @@ def test_retry_reopens_with_same_plan_and_reuses_the_durable_checkpoint(
     assert metadata.status is StageStatus.COMPLETED
     assert metadata.attempt_count == 2
     assert replacement.calls == [METADATA_OPERATION]
+
+
+def test_lease_recovered_attempt_without_provider_retry_checkpoint_replans(tmp_path) -> None:
+    store = WorkflowStore(tmp_path / "Workflow.sqlite3")
+    batch = store.submit_batch([IntakeIdentity("raw manufacturer", "raw mpn")], now=1)
+
+    def identity_handler(_context: StageContext) -> ExactIdentityOutcome:
+        return ExactIdentityOutcome(
+            authoritative_manufacturer_key=_IDENTITY.authoritative_manufacturer_key,
+            mpn_canonical=_IDENTITY.mpn_canonical,
+            registry_revision="registry-v1",
+            rule_revision="rule-v1",
+            evidence={"source": "test"},
+        )
+
+    adapter = _Adapter("lease_recovery_api", frozenset({METADATA_OPERATION}))
+    registrations = (_registration(adapter),)
+    handlers = _handlers(registrations, _policy(registrations))
+    runtime = WorkflowRuntime(
+        store,
+        {
+            StageName.IDENTITY_DEDUPE: identity_handler,
+            **handlers,
+        },
+    )
+
+    identity = runtime.poll_once("identity-worker", now=2, lease_seconds=5)
+    assert identity is not None
+    assert identity.stage_name is StageName.IDENTITY_DEDUPE
+
+    abandoned = store.claim_ready("crashed-worker", now=3, lease_seconds=5, limit=1)[0]
+    assert abandoned.name is StageName.METADATA
+    assert abandoned.attempt_count == 1
+    assert store.recover_expired_leases(now=8) == 1
+
+    resumed = runtime.poll_once("replacement-worker", now=8, lease_seconds=5)
+
+    assert resumed is not None
+    assert resumed.stage_name is StageName.METADATA
+    assert isinstance(resumed.outcome, CompletionOutcome)
+    item_id = store.list_items(batch.id)[0].id
+    metadata = next(
+        stage for stage in store.list_stages(item_id) if stage.name is StageName.METADATA
+    )
+    assert metadata.status is StageStatus.COMPLETED
+    assert metadata.attempt_count == 2
+    assert adapter.calls == [METADATA_OPERATION]
+
+
+def test_explicit_provider_retry_checkpoint_still_requires_valid_digests() -> None:
+    adapter = _Adapter("malformed_retry_api", frozenset({METADATA_OPERATION}))
+    registrations = (_registration(adapter),)
+
+    outcome = _handlers(registrations, _policy(registrations))[StageName.METADATA](
+        _context(
+            StageName.METADATA,
+            attempt_count=2,
+            error={"kind": "provider_stage_retry"},
+        )
+    )
+
+    assert isinstance(outcome, PermanentFailureOutcome)
+    assert _outcome_document(outcome)["kind"] == "provider_identity_or_checkpoint_invalid"
+    assert adapter.calls == []

@@ -264,7 +264,10 @@ describe("CaptureProvider store", () => {
     expect(result.current.active.status).toBe("error");
     expect(result.current.active.received.kicad_symbol).not.toBe(true);
     expect(result.current.active.completionEvidence).toBeNull();
-    expect(result.current.active.message).toContain("before the package could be verified and published");
+    expect(result.current.active.message).toContain(
+      "verified package could not be published to the library",
+    );
+    expect(result.current.active.message).toContain("retained evidence");
   });
 
   it("turns a blocked automatic handoff into an actionable partial result", async () => {
@@ -880,8 +883,8 @@ describe("CaptureProvider store", () => {
     });
 
     expect(result.current.active.status).toBe("error");
-    expect(result.current.active.message).toContain("stopped before");
-    expect(result.current.active.message).toContain("Retry");
+    expect(result.current.active.message).toContain("CAD collection was interrupted");
+    expect(result.current.active.message).toContain("retained evidence");
   });
 
   it("an unchanged completion report never reports verified completion", async () => {

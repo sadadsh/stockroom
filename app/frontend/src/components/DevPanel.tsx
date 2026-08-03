@@ -30,6 +30,8 @@ import {
 import { Button } from "./primitives";
 import { Icon, resolveIcon, sanitizeIconBody } from "./Icon";
 import { ICON_BY_ID, ICON_IDS_BY_CATEGORY } from "../lib/iconRegistry";
+import { api, ApiError } from "../api/client";
+import type { DevWorkspaceStatus } from "../api/types";
 
 // A best-effort hex for the native colour picker. A hex passes through; an rgb/rgba collapses to
 // its opaque hex (the picker cannot show alpha, but the text field below stays authoritative).
@@ -226,7 +228,7 @@ function CopyEditor() {
   );
 }
 
-type Facet = "tokens" | "copy" | "icon" | "box";
+type Facet = "tokens" | "copy" | "icon" | "box" | "behavior";
 
 // A small pressed-state toolbar toggle (Inspect / Show IDs).
 function ToggleButton({
@@ -258,7 +260,7 @@ function ToggleButton({
 function Toolbar({ search, setSearch }: { search: string; setSearch: (s: string) => void }) {
   const dev = useDevMode();
   return (
-    <div className="flex items-center gap-1.5 border-b border-line px-3.5 py-2">
+    <div className="flex shrink-0 items-center gap-1.5 border-b border-line px-3.5 py-2">
       <ToggleButton pressed={dev.inspect} onClick={dev.toggleInspect} label="Inspect" />
       <ToggleButton pressed={dev.showIds} onClick={dev.toggleShowIds} label="Show IDs" />
       <input
@@ -565,6 +567,27 @@ const BOX_SPACING_PROPS: readonly { prop: string; label: string }[] = [
   { prop: "padding-left", label: "Padding Left" },
   { prop: "gap", label: "Gap" },
 ];
+const BOX_APPEARANCE_PROPS: readonly { prop: string; label: string }[] = [
+  { prop: "display", label: "Display" },
+  { prop: "visibility", label: "Visibility" },
+  { prop: "opacity", label: "Opacity" },
+  { prop: "color", label: "Text Color" },
+  { prop: "background-color", label: "Fill Color" },
+  { prop: "border-color", label: "Border Color" },
+  { prop: "border-radius", label: "Corner Radius" },
+  { prop: "font-size", label: "Font Size" },
+  { prop: "font-weight", label: "Font Weight" },
+  { prop: "line-height", label: "Line Height" },
+  { prop: "letter-spacing", label: "Letter Spacing" },
+  { prop: "text-align", label: "Text Align" },
+];
+const BOX_ALIGNMENT_PROPS: readonly { prop: string; label: string }[] = [
+  { prop: "flex-direction", label: "Direction" },
+  { prop: "flex-wrap", label: "Wrap" },
+  { prop: "justify-content", label: "Justify" },
+  { prop: "align-items", label: "Align Items" },
+  { prop: "align-content", label: "Align Content" },
+];
 
 // One box-property row (D-04): reuses the ColorRow/ScaleRow shape - a truncating label, an optional
 // ResetDot, and the mono value field styled like the token fields. The field's value is the working
@@ -795,9 +818,37 @@ function BoxTab() {
   const overrides = dev.elementOverridesFor(selectedDevId);
   const hasAny = overrides != null && Object.keys(overrides).length > 0;
   const placeholderFor = (prop: string) => computed?.getPropertyValue(prop) ?? "";
+  const applyPreset = (preset: "fill" | "hide" | "row" | "stack" | "wrap") => {
+    if (preset === "fill") dev.setElementProp(selectedDevId, "width", "100%");
+    if (preset === "hide") dev.setElementProp(selectedDevId, "display", "none");
+    if (preset === "row") {
+      dev.setElementProp(selectedDevId, "display", "flex");
+      dev.setElementProp(selectedDevId, "flex-direction", "row");
+      dev.setElementProp(selectedDevId, "align-items", "center");
+    }
+    if (preset === "stack") {
+      dev.setElementProp(selectedDevId, "display", "flex");
+      dev.setElementProp(selectedDevId, "flex-direction", "column");
+    }
+    if (preset === "wrap") {
+      dev.setElementProp(selectedDevId, "display", "flex");
+      dev.setElementProp(selectedDevId, "flex-wrap", "wrap");
+    }
+  };
 
   return (
     <div className="px-3.5 py-2">
+      <section className="py-1.5">
+        <div className="mb-1.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Presets</div>
+        <div className="flex flex-wrap gap-1">
+          {([[
+            "fill", "Fill Width"], ["row", "Row"], ["stack", "Stack"], ["wrap", "Wrap"], ["hide", "Hide"]] as const).map(([preset, label]) => (
+            <button key={preset} type="button" onClick={() => applyPreset(preset)} className="rounded-control border border-line bg-field px-2 py-1 text-2xs font-semibold text-t2 hover:text-t1">
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
       <section className="py-1.5">
         <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
           Resize
@@ -826,6 +877,22 @@ function BoxTab() {
           />
         ))}
       </section>
+      <section className="py-1.5">
+        <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+          Appearance And Type
+        </div>
+        {BOX_APPEARANCE_PROPS.map((p) => (
+          <BoxRow key={p.prop} id={selectedDevId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} />
+        ))}
+      </section>
+      <section className="py-1.5">
+        <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+          Container Alignment
+        </div>
+        {BOX_ALIGNMENT_PROPS.map((p) => (
+          <BoxRow key={p.prop} id={selectedDevId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} />
+        ))}
+      </section>
       <LayoutSection id={selectedDevId} />
       {hasAny ? (
         <button
@@ -840,7 +907,66 @@ function BoxTab() {
   );
 }
 
-// The collapsible Catalogue: the 196 ids filtered by the toolbar search and grouped by area. Clicking
+function BehaviorTab() {
+  const dev = useDevMode();
+  const id = dev.selectedDevId;
+  if (!id) return <div className="px-3.5 py-3 text-2xs text-t3">Select a control to edit its behavior.</div>;
+  const node = document.querySelector(`[data-dev-id="${id}"]`);
+  if (!node?.hasAttribute("data-dev-control")) {
+    return (
+      <div className="px-3.5 py-3 text-2xs leading-relaxed text-t3">
+        This element has visual controls. Behavior presets appear for semantic controls whose value
+        contract can be preserved safely.
+      </div>
+    );
+  }
+  const current = dev.behaviorOverrideFor(id);
+  const presets = [
+    ["dropdown", "Dropdown"],
+    ["segmented", "Segmented Control"],
+    ["radio", "Radio Group"],
+    ["searchable", "Searchable Picker"],
+  ] as const;
+  return (
+    <div className="px-3.5 py-3">
+      <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Control Preset</div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {presets.map(([preset, label]) => (
+          <button
+            key={preset}
+            type="button"
+            aria-pressed={(current?.preset ?? "dropdown") === preset}
+            onClick={() => dev.setBehaviorOverride(id, { preset })}
+            className={
+              "rounded-control border px-2 py-2 text-left text-xs transition-colors " +
+              ((current?.preset ?? "dropdown") === preset
+                ? "border-acc bg-acc-soft text-t1"
+                : "border-line bg-field text-t2 hover:text-t1")
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <label className="mt-3 flex items-center justify-between gap-3 text-xs text-t2">
+        Disabled
+        <input
+          type="checkbox"
+          checked={current?.disabled === true}
+          onChange={(event) => dev.setBehaviorOverride(id, { disabled: event.target.checked })}
+          className="accent-[var(--c-acc)]"
+        />
+      </label>
+      {current ? (
+        <button type="button" onClick={() => dev.resetBehaviorOverride(id)} className="mt-3 text-2xs font-semibold text-t2 hover:text-t1">
+          Reset Behavior
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+// The collapsible Catalogue: all registered ids filtered by the toolbar search and grouped by area. Clicking
 // an entry selects it and locates the live element (scrollIntoView + a transient flash outline).
 function Catalogue({
   search,
@@ -995,12 +1121,14 @@ function SelectionPane({
         <FacetTab id="box" active={facet} onSelect={setFacet}>
           Box
         </FacetTab>
+        <FacetTab id="behavior" active={facet} onSelect={setFacet}>Behavior</FacetTab>
       </div>
 
       {facet === "tokens" ? <TokensTab showAll={showAll} setShowAll={setShowAll} /> : null}
       {facet === "copy" ? <CopyTab /> : null}
       {facet === "icon" ? <IconTab /> : null}
       {facet === "box" ? <BoxTab /> : null}
+      {facet === "behavior" ? <BehaviorTab /> : null}
     </div>
   );
 }
@@ -1012,6 +1140,49 @@ export function DevPanel() {
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [catalogueOpen, setCatalogueOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishMessage, setPublishMessage] = useState("Refine Stockroom interface");
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishedCommit, setPublishedCommit] = useState("");
+  const [publishStatus, setPublishStatus] = useState<DevWorkspaceStatus | null>(null);
+
+  useEffect(() => {
+    if (!dev.enabled || dev.dirty || dev.saving) {
+      setPublishStatus(null);
+      return;
+    }
+    let current = true;
+    api.devStatus()
+      .then((status) => {
+        if (current) setPublishStatus(status);
+      })
+      .catch(() => {
+        if (current) setPublishStatus(null);
+      });
+    return () => {
+      current = false;
+    };
+  }, [dev.enabled, dev.dirty, dev.saving, publishedCommit]);
+
+  async function publish() {
+    setPublishing(true);
+    setPublishError(null);
+    setPublishedCommit("");
+    try {
+      if (dev.dirty) throw new Error("Save the current design to source before publishing.");
+      const status = await api.devStatus();
+      if (!status.available) throw new Error("This app is not running from a managed source checkout.");
+      if (!status.can_publish) throw new Error(status.publish_blocker || "This design is not ready to publish.");
+      const result = await api.devPublish(publishMessage);
+      setPublishedCommit(result.commit.slice(0, 12));
+      setPublishOpen(false);
+    } catch (error) {
+      setPublishError(error instanceof ApiError || error instanceof Error ? error.message : "Could not publish the design");
+    } finally {
+      setPublishing(false);
+    }
+  }
 
   // A NEW copy selection (a direct <Text> click) surfaces the Copy tab, preserving the one-click-to
   // -edit-copy shortcut inside the new shell.
@@ -1050,10 +1221,10 @@ export function DevPanel() {
 
   return (
     <aside
-      className="fixed right-0 top-0 z-[200] flex h-full w-[300px] flex-col border-l border-line bg-popover shadow-pop"
+      className="fixed right-0 top-0 z-[200] flex h-full w-[340px] max-w-[calc(100vw-16px)] flex-col border-l border-line bg-popover shadow-pop"
       aria-label="Dev mode"
     >
-      <header className="flex items-center gap-2 border-b border-line px-3.5 py-3">
+      <header className="flex shrink-0 items-center gap-2 border-b border-line px-3.5 py-3">
         <span className="rounded-control bg-acc px-1.5 py-0.5 text-2xs font-bold tracking-wide text-acc-on">
           DEV
         </span>
@@ -1090,27 +1261,67 @@ export function DevPanel() {
         <Catalogue search={search} open={catalogueOpen} setOpen={setCatalogueOpen} />
       </div>
 
-      <footer className="border-t border-line px-3.5 py-3">
+      <footer className="max-h-[55vh] shrink-0 overflow-y-auto border-t border-line bg-popover px-3.5 py-3">
         {dev.lastError ? (
           <div className="mb-2 text-2xs text-err">{dev.lastError}</div>
         ) : null}
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="accent"
-            small
-            disabled={!dev.dirty || dev.saving}
-            onClick={dev.save}
-          >
-            {dev.saving ? "Saving..." : "Save to source"}
-          </Button>
+        {publishError ? <div className="mb-2 text-2xs text-err">{publishError}</div> : null}
+        {!dev.dirty && publishStatus?.publish_blocker ? (
+          <div className="mb-2 text-2xs text-t3">{publishStatus.publish_blocker}</div>
+        ) : null}
+        {publishedCommit ? <div className="mb-2 text-2xs text-ok">Published {publishedCommit} to main.</div> : null}
+        {publishOpen ? (
+          <div className="mb-3 rounded-card border border-line bg-field p-2.5">
+            <label className="block text-2xs font-semibold text-t2">
+              Commit Message
+              <input
+                value={publishMessage}
+                maxLength={120}
+                onChange={(event) => setPublishMessage(event.target.value)}
+                className="mt-1 w-full rounded-control border border-line bg-popover px-2 py-1.5 text-xs text-t1 outline-none focus:border-acc"
+              />
+            </label>
+            <p className="mt-2 text-2xs leading-relaxed text-t3">
+              Stockroom will verify TypeScript, rebuild the production interface, commit only Dev Mode files, and push main.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <Button variant="accent" small disabled={publishing || !publishMessage.trim()} onClick={publish}>
+                {publishing ? "Publishing..." : "Verify And Push"}
+              </Button>
+              <Button small disabled={publishing} onClick={() => setPublishOpen(false)}>Cancel</Button>
+            </div>
+          </div>
+        ) : null}
+        <div className="mb-2 flex items-center gap-3">
+          <button type="button" disabled={!dev.canUndo} onClick={dev.undo} className="text-2xs font-semibold text-t2 disabled:opacity-35">Undo</button>
+          <button type="button" disabled={!dev.canRedo} onClick={dev.redo} className="text-2xs font-semibold text-t2 disabled:opacity-35">Redo</button>
           <button
             type="button"
             onClick={dev.resetAll}
             className="text-2xs text-t3 transition-colors hover:text-err"
           >
-            Reset all
+            Reset All
           </button>
           <span className="ml-auto text-2xs text-t3">{dev.dirty ? "Unsaved" : "Saved"}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="accent"
+            small
+            aria-label="Save to source"
+            disabled={!dev.dirty || dev.saving}
+            onClick={dev.save}
+          >
+            {dev.saving ? "Saving..." : "Save To Source"}
+          </Button>
+          <Button
+            type="button"
+            small
+            disabled={dev.dirty || publishing || publishStatus?.can_publish !== true}
+            onClick={() => setPublishOpen(true)}
+          >
+            Publish To Main
+          </Button>
         </div>
       </footer>
     </aside>
