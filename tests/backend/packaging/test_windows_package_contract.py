@@ -389,6 +389,10 @@ def test_standalone_executable_carries_the_complete_native_cad_converter() -> No
     assert "-CadConverterRoot $FirstCadConverter" in script
     assert "-CadConverterRoot $SecondCadConverter" in script
     assert "tree_sha256 = Get-TextSha256 -Text" in script
+    assert "[Security.Cryptography.SHA256]::Create()" in script
+    assert ".ComputeHash($bytes)" in script
+    assert "::HashData(" not in script
+    assert "[Convert]::ToHexString" not in script
 
 
 def test_standalone_executable_carries_portable_node_for_owner_dev_mode() -> None:
