@@ -35,11 +35,13 @@ from pathlib import Path
 from typing import Any, Literal, cast
 from urllib.parse import urlsplit
 
+from stockroom.capture.classify import classify_asset
 from stockroom.capture.download_broker import (
     DownloadBroker,
     DownloadBrokerError,
     DownloadReceipt,
 )
+from stockroom.capture.requirements import Requirement
 from stockroom.capture.trace import file_note, trace, trace_debug, trace_warning, url_note
 
 
@@ -47,9 +49,30 @@ class CaptureBrowserError(RuntimeError):
     """Something the caller must fix, phrased so the message names the actual blocker."""
 
 
+class ProviderPageTerminalError(CaptureBrowserError):
+    """The provider rendered a known terminal page instead of its CAD controls."""
+
+
 UserCaptureStatus = Literal["completed", "try_another", "cancelled", "timed_out"]
 ProviderHudAction = Literal["finish", "try_another", "cancel"]
 _PROVIDER_HUD_ACTIONS = frozenset({"finish", "try_another", "cancel"})
+_PROVIDER_FORMAT_REQUIREMENTS = {
+    "kicad": frozenset({Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT}),
+    "kicad_symbol": frozenset({Requirement.KICAD_SYMBOL}),
+    "kicad_footprint": frozenset({Requirement.KICAD_FOOTPRINT}),
+    "model": frozenset({Requirement.KICAD_MODEL}),
+    "altium": frozenset({Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT}),
+    "altium_symbol": frozenset({Requirement.ALTIUM_SYMBOL}),
+    "altium_footprint": frozenset({Requirement.ALTIUM_FOOTPRINT}),
+}
+_DEFAULT_PROVIDER_FORMATS = (
+    "kicad_symbol",
+    "kicad_footprint",
+    "model",
+    "altium_symbol",
+    "altium_footprint",
+)
+_OPERATOR_SUBMISSION_WINDOW_SECONDS = 30.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +120,11 @@ class ProviderHudSpec:
     manufacturer: str
     mpn: str
     required_file_labels: tuple[str, ...]
+    # Stable machine keys corresponding one-for-one with ``required_file_labels``. The browser
+    # counts download receipts, but completion is determined from the contents of those receipts:
+    # one provider archive can carry every format, while several unrelated downloads can carry
+    # none. Keeping both answers prevents the HUD from pretending ZIP count is CAD completeness.
+    required_formats: tuple[str, ...] = ()
     automated_step: str = "Listening for provider downloads."
     human_action: str = "Start this part's download with every required format shown here."
     # Leading context for the checklist: the provider's own `capability.instruction`. Left empty
@@ -125,6 +153,17 @@ class ProviderHudSpec:
             )
         ):
             raise ValueError("required_file_labels must be a non-empty tuple of exact labels")
+        formats = self.required_formats or _DEFAULT_PROVIDER_FORMATS[: len(labels)]
+        if (
+            type(formats) is not tuple
+            or len(formats) != len(labels)
+            or len(set(formats)) != len(formats)
+            or any(value not in _PROVIDER_FORMAT_REQUIREMENTS for value in formats)
+        ):
+            raise ValueError(
+                "required_formats must uniquely identify every required_file_labels entry"
+            )
+        object.__setattr__(self, "required_formats", formats)
         instruction = self.provider_instruction
         if type(instruction) is not str or instruction != instruction.strip():
             raise ValueError("provider_instruction must be exact text")
@@ -153,6 +192,28 @@ class UserCaptureResult:
     status: UserCaptureStatus
     files: tuple[DownloadReceipt, ...]
     final_url: str
+
+
+def _completed_provider_formats(
+    receipts: tuple[DownloadReceipt, ...],
+    required_formats: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Return CAD format groups actually present in the task-bound downloaded bytes.
+
+    Receipt count is intentionally not used as a proxy. Providers variously deliver one archive
+    containing every asset, two complementary archives, or a download that contains no CAD at
+    all. The existing content classifier safely inspects loose files and nested vendor ZIPs, so
+    the HUD and its auto-finish decision can speak the same format truth as downstream ingest.
+    """
+
+    requirements: set[Requirement] = set()
+    for receipt in receipts:
+        requirements.update(classify_asset(Path(receipt.path)).requirements)
+    return tuple(
+        format_key
+        for format_key in required_formats
+        if _PROVIDER_FORMAT_REQUIREMENTS[format_key] <= requirements
+    )
 
 
 @dataclass(frozen=True)
@@ -238,6 +299,47 @@ _HUD_SECURITY_CONTROL_MARKERS = (
     "input[type=password]",
 )
 
+
+_EMBEDDED_PROVIDER_NAVIGATION_BOOTSTRAP = r"""
+() => {
+  if (globalThis !== globalThis.top) return;
+  const marker = Symbol.for("stockroom.provider-contained-navigation.v1");
+  if (globalThis[marker]) return;
+  globalThis[marker] = true;
+
+  // pywebview hands target=_blank links to the Windows default browser before Playwright can
+  // observe a popup. Contain only the exact HTTPS/HTTP link the person clicked. Downloads keep
+  // their native path, modified clicks keep their normal browser meaning, and unsafe or
+  // credential-bearing targets are left for the native host's fail-closed policy.
+  globalThis.addEventListener("click", (event) => {
+    if (
+      event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey ||
+      event.shiftKey || event.altKey
+    ) return;
+    const anchor = event.composedPath().find(
+      (node) => node instanceof HTMLAnchorElement,
+    );
+    if (!anchor || anchor.target.toLowerCase() !== "_blank" || anchor.hasAttribute("download")) {
+      return;
+    }
+    let destination;
+    try {
+      destination = new URL(anchor.href, globalThis.location.href);
+    } catch {
+      return;
+    }
+    if (
+      !["http:", "https:"].includes(destination.protocol) ||
+      destination.username || destination.password
+    ) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    globalThis.location.assign(destination.href);
+  }, true);
+}
+"""
+
+
 _PROVIDER_HUD_BOOTSTRAP = r"""
 async (payload) => {
   if (!payload || globalThis !== globalThis.top || globalThis[payload.namespace]) {
@@ -248,12 +350,14 @@ async (payload) => {
   // carries is only ever the one that was true at bind time. Read the live one back from Stockroom
   // the way the security handoff does, and keep the snapshot when that read cannot be served.
   let downloadCount = payload.downloadCount;
+  let completedFormats = Array.isArray(payload.completedFormats) ? payload.completedFormats : [];
   // Fail SAFE, not open: an unreadable state leaves the hold on, so a remount during a security
   // handoff never draws an outline before Stockroom's next push arrives.
   let securityHold = true;
   try {
     const state = await globalThis[payload.stateBinding](payload.stateToken);
     if (state && Number.isInteger(state.downloadCount)) downloadCount = state.downloadCount;
+    if (state && Array.isArray(state.completedFormats)) completedFormats = state.completedFormats;
     if (state && typeof state.securityHold === "boolean") securityHold = state.securityHold;
   } catch {}
 
@@ -279,7 +383,7 @@ async (payload) => {
       :host {
         all: initial;
         position: fixed;
-        inset: 12px 12px auto auto;
+        inset: 56px 12px auto auto;
         z-index: 2147483647;
         display: block;
         width: min(368px, calc(100vw - 24px));
@@ -688,6 +792,76 @@ async (payload) => {
       }
     `;
 
+    // The provider is a temporary second Stockroom tab, not a free-form browser. The native
+    // WebView stays the same; this narrow chrome makes that ownership visible and deliberately
+    // exposes no address bar or arbitrary navigation surface.
+    const browserHost = document.createElement("aside");
+    browserHost.setAttribute("popover", "manual");
+    browserHost.setAttribute("aria-label", "Stockroom provider tabs");
+    browserHost.style.cssText = [
+      "position:fixed", "inset:0 0 auto 0", "z-index:2147483647", "display:block",
+      "width:100%", "height:44px", "max-width:none", "margin:0", "padding:0",
+      "border:0", "background:transparent", "color-scheme:light dark",
+    ].join(";");
+    const browserShadow = browserHost.attachShadow({ mode: "closed" });
+    const browserStyle = document.createElement("style");
+    browserStyle.textContent = `
+      :host { all: initial; font: 12px/1.3 "Segoe UI", system-ui, sans-serif; }
+      *, *::before, *::after { box-sizing: border-box; }
+      .browser-bar {
+        display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto;
+        align-items: end; gap: 4px; width: 100%; height: 44px; padding: 6px 8px 0;
+        color: #17181b; background: #e2e4e9; border-bottom: 1px solid rgb(17 18 20 / 18%);
+        box-shadow: 0 2px 8px rgb(17 18 20 / 12%);
+      }
+      .nav-button, .tab {
+        height: 32px; padding: 0 10px; color: inherit; background: rgb(255 255 255 / 45%);
+        border: 1px solid rgb(17 18 20 / 14%); border-bottom: 0; border-radius: 3px 3px 0 0;
+        cursor: pointer; font: 600 11px/1 "Segoe UI", system-ui, sans-serif;
+      }
+      .nav-button { width: 32px; padding: 0; border-bottom: 1px solid rgb(17 18 20 / 14%); }
+      .tabs { display: flex; align-items: end; min-width: 0; height: 38px; gap: 3px; }
+      .tab { min-width: 116px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .tab.active { height: 38px; background: #fff; border-color: rgb(17 18 20 / 22%); cursor: default; }
+      .task-note { align-self: center; padding: 0 8px 6px; color: rgb(23 24 27 / 62%); font-size: 10px; white-space: nowrap; }
+      button:hover:not(:disabled) { background: #fff; }
+      button:focus-visible { outline: 2px solid #17181b; outline-offset: 1px; }
+      @media (prefers-color-scheme: dark) {
+        .browser-bar { color: #f4f4f4; background: #2b2b30; border-color: rgb(255 255 255 / 15%); box-shadow: 0 2px 8px rgb(0 0 0 / 45%); }
+        .nav-button, .tab { background: rgb(255 255 255 / 7%); border-color: rgb(255 255 255 / 12%); }
+        .tab.active, button:hover:not(:disabled) { background: #33333a; }
+        .task-note { color: rgb(244 244 244 / 62%); }
+        button:focus-visible { outline-color: #f4f4f5; }
+      }
+      @media (max-width: 720px) { .task-note { display: none; } .tab { min-width: 92px; } }
+    `;
+    const browserBar = make("nav", "browser-bar");
+    browserBar.setAttribute("aria-label", "Provider navigation");
+    const back = make("button", "nav-button", "←");
+    back.type = "button";
+    back.setAttribute("aria-label", "Back");
+    const forward = make("button", "nav-button", "→");
+    forward.type = "button";
+    forward.setAttribute("aria-label", "Forward");
+    const tabs = make("div", "tabs");
+    tabs.setAttribute("role", "tablist");
+    const stockroomTab = make("button", "tab", "Stockroom");
+    stockroomTab.type = "button";
+    stockroomTab.setAttribute("role", "tab");
+    stockroomTab.setAttribute("aria-selected", "false");
+    stockroomTab.setAttribute("aria-label", "Return to Stockroom");
+    const providerTab = make("button", "tab active", payload.providerLabel);
+    providerTab.type = "button";
+    providerTab.disabled = true;
+    providerTab.setAttribute("role", "tab");
+    providerTab.setAttribute("aria-selected", "true");
+    tabs.append(stockroomTab, providerTab);
+    const taskNote = make(
+      "span", "task-note", `Capturing ${payload.mpn} · downloads stay with this part`,
+    );
+    browserBar.append(back, forward, tabs, taskNote);
+    browserShadow.append(browserStyle, browserBar);
+
     const panel = make("section", "panel");
     panel.setAttribute("role", "region");
     panel.setAttribute("aria-labelledby", `${payload.namespace}-title`);
@@ -927,7 +1101,22 @@ async (payload) => {
       overlayHost.removeAttribute("popover");
     }
 
-    document.documentElement.append(host);
+    document.documentElement.append(browserHost, host);
+
+    let browserChromeInTopLayer = false;
+    if (typeof browserHost.showPopover === "function") {
+      try {
+        browserHost.showPopover();
+        browserChromeInTopLayer = true;
+      } catch {}
+    }
+    if (!browserChromeInTopLayer) browserHost.removeAttribute("popover");
+    Object.defineProperty(globalThis, "__stockroom_provider_browser_chrome", {
+      value: true,
+      configurable: false,
+      enumerable: false,
+      writable: false,
+    });
 
     let shownInTopLayer = false;
     if (typeof host.showPopover === "function") {
@@ -992,7 +1181,7 @@ async (payload) => {
       };
       if (event.key === "Home") {
         event.preventDefault();
-        place(globalThis.innerWidth - host.offsetWidth - 12, 12);
+        place(globalThis.innerWidth - host.offsetWidth - 12, 56);
         return;
       }
       const offset = offsets[event.key];
@@ -1003,6 +1192,9 @@ async (payload) => {
 
     let pendingAction = null;
     let currentDownloadCount = 0;
+    let unavailableFormats = Array.isArray(payload.unavailableFormats)
+      ? payload.unavailableFormats
+      : [];
     const pendingSteps = {
       finish: "Finishing capture after downloaded files settle.",
       try_another: "Closing this route and preparing the next provider.",
@@ -1013,29 +1205,45 @@ async (payload) => {
     const renderChecklist = () => {
       const labels = payload.requiredFileLabels;
       const total = labels.length;
-      const landed = Math.min(currentDownloadCount, total);
+      const completed = new Set(completedFormats);
+      const unavailable = new Set(unavailableFormats);
       steps.forEach((step, index) => {
-        const done = index < landed;
-        const next = !done && index === landed;
-        step.item.className = done ? "step done" : next ? "step next" : "step";
-        step.mark.textContent = done ? "✓" : next ? "▸" : "○";
-        step.state.textContent = done ? "Captured" : next ? "Next" : "Waiting";
+        const format = payload.requiredFormats[index];
+        const done = completed.has(format);
+        const notOffered = unavailable.has(format);
+        step.item.className = done ? "step done" : "step";
+        step.mark.textContent = done ? "✓" : notOffered ? "–" : "○";
+        step.state.textContent = done
+          ? "Verified in download"
+          : notOffered
+            ? "Not offered"
+            : "Required";
       });
-      if (total > 0 && landed >= total) {
+      const availableFormats = payload.requiredFormats.filter((format) => !unavailable.has(format));
+      const availableComplete = availableFormats.every((format) => completed.has(format));
+      if (total > 0 && availableComplete && completed.size > 0) {
         outstanding.className = "outstanding done";
         outstanding.textContent =
-          `All ${total} required ${total === 1 ? "format has" : "formats have"} landed. ` +
-          "Nothing is outstanding; Stockroom resumes automatically.";
+          unavailable.size > 0
+            ? "Every format this provider offers has been received. Stockroom will preserve it " +
+              "and continue with another provider for anything still missing."
+            : `All ${total} required ${total === 1 ? "format is" : "formats are"} present in the ` +
+              "downloaded package. Stockroom resumes automatically.";
         return;
       }
       outstanding.className = "outstanding";
-      const remaining = labels.slice(landed).join(", ");
+      const remaining = labels.filter(
+        (_label, index) =>
+          !completed.has(payload.requiredFormats[index]) &&
+          !unavailable.has(payload.requiredFormats[index]),
+      ).join(", ");
       outstanding.textContent =
-        landed === 0
-          ? `Nothing captured yet. Still outstanding: ${remaining}.`
-          : `${landed} of ${total} captured. Still outstanding: ${remaining}. One provider ` +
-            "archive can carry several formats, so Stockroom checks the delivered files and " +
-            "resumes on its own.";
+        currentDownloadCount === 0
+          ? `No download received yet. Required: ${remaining}.`
+          : `${currentDownloadCount} ${currentDownloadCount === 1 ? "package" : "packages"} ` +
+            `safely received. Still missing from ${currentDownloadCount === 1 ? "its" : "their"} ` +
+            `contents: ${remaining}. Download another ` +
+            "package if this provider offers it, or let Stockroom try the next provider.";
     };
 
     // ---- Tier 2: position-only outlines over the real controls -------------------------------
@@ -1043,7 +1251,7 @@ async (payload) => {
     // and whether it is worth drawing over. No page text, markup, attribute value, form value, or
     // credential is read, kept, or reported anywhere - a rect is not content.
     const drawableRect = (node) => {
-      if (node === host || node === overlayHost) return null;
+      if (node === host || node === overlayHost || node === browserHost) return null;
       const rect = node.getBoundingClientRect();
       if (rect.width < 6 || rect.height < 6) return null;
       if (rect.bottom <= 0 || rect.right <= 0) return null;
@@ -1111,7 +1319,7 @@ async (payload) => {
         hintState.textContent = "";
         return;
       }
-      if (total > 0 && currentDownloadCount >= total) {
+      if (total > 0 && completedFormats.length >= total) {
         clearOutlines();
         hintState.textContent = "Every required file has landed; nothing is left to outline.";
         return;
@@ -1197,6 +1405,22 @@ async (payload) => {
       render();
       actionStatus.textContent = "Stockroom could not accept that action. Try again.";
     };
+    const requestTransientAction = async (action, spokenLabel) => {
+      // Returning to the app changes only native visibility. It must not occupy the route's
+      // terminal action slot or disable Finish/Try Another/Cancel when the provider is shown
+      // again.
+      actionStatus.textContent = `${spokenLabel} requested.`;
+      try {
+        const accepted = await globalThis[payload.actionBinding](action, payload.actionToken);
+        if (accepted) return;
+      } catch {}
+      actionStatus.textContent = "Stockroom could not accept that action. Try again.";
+    };
+    back.addEventListener("click", () => globalThis.history.back());
+    forward.addEventListener("click", () => globalThis.history.forward());
+    stockroomTab.addEventListener("click", () =>
+      requestTransientAction("hide", "Return to Stockroom"),
+    );
     for (const [button, action] of [
       [finish, "finish"],
       [another, "try_another"],
@@ -1211,10 +1435,12 @@ async (payload) => {
       if (Number.isInteger(next.downloadCount) && next.downloadCount >= 0) {
         currentDownloadCount = next.downloadCount;
       }
+      if (Array.isArray(next.completedFormats)) completedFormats = next.completedFormats;
+      if (Array.isArray(next.unavailableFormats)) unavailableFormats = next.unavailableFormats;
       if (typeof next.securityHold === "boolean") securityHold = next.securityHold;
       render();
     };
-    updateState({ downloadCount, securityHold });
+    updateState({ downloadCount, completedFormats, securityHold });
 
     // Provider layouts move under the person constantly. The animation frame keeps a visible tab
     // exact; the bounded interval covers a backgrounded tab, where animation frames do not fire
@@ -1247,10 +1473,10 @@ async (payload) => {
 }
 """
 _PROVIDER_HUD_UPDATE = r"""
-({ namespace, downloadCount, securityHold }) => {
+({ namespace, downloadCount, completedFormats, securityHold }) => {
   const hud = globalThis[namespace];
   if (hud && typeof hud.updateState === "function") {
-    hud.updateState({ downloadCount, securityHold });
+    hud.updateState({ downloadCount, completedFormats, securityHold });
   }
 }
 """
@@ -1272,12 +1498,103 @@ async (payload) => {
     return node;
   };
 
+  // Automated capture can reach a security gate before the ordinary provider HUD is mounted.
+  // Supply the same constrained Stockroom/provider tabs in that state, but never mount a second
+  // copy when the task HUD already owns the chrome.
+  let browserHost = null;
+  if (!globalThis.__stockroom_provider_browser_chrome) {
+    browserHost = document.createElement("aside");
+    browserHost.setAttribute("popover", "manual");
+    browserHost.setAttribute("aria-label", "Stockroom provider tabs");
+    browserHost.style.cssText = [
+      "position:fixed", "inset:0 0 auto 0", "z-index:2147483647", "display:block",
+      "width:100%", "height:44px", "max-width:none", "margin:0", "padding:0",
+      "border:0", "background:transparent", "color-scheme:light dark",
+    ].join(";");
+    const browserShadow = browserHost.attachShadow({ mode: "closed" });
+    const browserStyle = document.createElement("style");
+    browserStyle.textContent = `
+      :host { all: initial; font: 12px/1.3 "Segoe UI", system-ui, sans-serif; }
+      *, *::before, *::after { box-sizing: border-box; }
+      .browser-bar { display:grid; grid-template-columns:auto auto minmax(0,1fr) auto;
+        align-items:end; gap:4px; width:100%; height:44px; padding:6px 8px 0;
+        color:#17181b; background:#e2e4e9; border-bottom:1px solid rgb(17 18 20 / 18%);
+        box-shadow:0 2px 8px rgb(17 18 20 / 12%); }
+      .nav-button,.tab { height:32px; padding:0 10px; color:inherit;
+        background:rgb(255 255 255 / 45%); border:1px solid rgb(17 18 20 / 14%);
+        border-bottom:0; border-radius:3px 3px 0 0; cursor:pointer;
+        font:600 11px/1 "Segoe UI",system-ui,sans-serif; }
+      .nav-button { width:32px; padding:0; border-bottom:1px solid rgb(17 18 20 / 14%); }
+      .tabs { display:flex; align-items:end; min-width:0; height:38px; gap:3px; }
+      .tab { min-width:116px; max-width:260px; overflow:hidden; text-overflow:ellipsis;
+        white-space:nowrap; }
+      .tab.active { height:38px; background:#fff; border-color:rgb(17 18 20 / 22%);
+        cursor:default; }
+      .task-note { align-self:center; padding:0 8px 6px; color:rgb(23 24 27 / 62%);
+        font-size:10px; white-space:nowrap; }
+      button:hover:not(:disabled) { background:#fff; }
+      button:focus-visible { outline:2px solid #17181b; outline-offset:1px; }
+      @media (prefers-color-scheme:dark) {
+        .browser-bar { color:#f4f4f4; background:#2b2b30; border-color:rgb(255 255 255 / 15%);
+          box-shadow:0 2px 8px rgb(0 0 0 / 45%); }
+        .nav-button,.tab { background:rgb(255 255 255 / 7%);
+          border-color:rgb(255 255 255 / 12%); }
+        .tab.active,button:hover:not(:disabled) { background:#33333a; }
+        .task-note { color:rgb(244 244 244 / 62%); }
+        button:focus-visible { outline-color:#f4f4f5; }
+      }
+      @media (max-width:720px) { .task-note { display:none; } .tab { min-width:92px; } }
+    `;
+    const browserBar = make("nav", "browser-bar");
+    browserBar.setAttribute("aria-label", "Provider navigation");
+    const back = make("button", "nav-button", "←");
+    back.type = "button";
+    back.setAttribute("aria-label", "Back");
+    const forward = make("button", "nav-button", "→");
+    forward.type = "button";
+    forward.setAttribute("aria-label", "Forward");
+    const tabs = make("div", "tabs");
+    tabs.setAttribute("role", "tablist");
+    const stockroomTab = make("button", "tab", "Stockroom");
+    stockroomTab.type = "button";
+    stockroomTab.setAttribute("role", "tab");
+    stockroomTab.setAttribute("aria-selected", "false");
+    stockroomTab.setAttribute("aria-label", "Return to Stockroom");
+    const providerTab = make("button", "tab active", state.providerLabel);
+    providerTab.type = "button";
+    providerTab.disabled = true;
+    providerTab.setAttribute("role", "tab");
+    providerTab.setAttribute("aria-selected", "true");
+    tabs.append(stockroomTab, providerTab);
+    const taskNote = make("span", "task-note", `Capturing ${state.mpn} · security check paused`);
+    browserBar.append(back, forward, tabs, taskNote);
+    browserShadow.append(browserStyle, browserBar);
+    back.addEventListener("click", () => globalThis.history.back());
+    forward.addEventListener("click", () => globalThis.history.forward());
+    stockroomTab.addEventListener("click", async () => {
+      stockroomTab.disabled = true;
+      stockroomTab.textContent = "Returning…";
+      try {
+        const accepted = await globalThis[payload.actionBinding]("hide", payload.actionToken);
+        if (accepted) return;
+      } catch {}
+      stockroomTab.disabled = false;
+      stockroomTab.textContent = "Stockroom";
+    });
+    document.documentElement.append(browserHost);
+    if (typeof browserHost.showPopover === "function") {
+      try { browserHost.showPopover(); } catch { browserHost.removeAttribute("popover"); }
+    } else {
+      browserHost.removeAttribute("popover");
+    }
+  }
+
   const host = document.createElement("aside");
   host.setAttribute("aria-label", "Stockroom security handoff");
   host.setAttribute("popover", "manual");
   host.style.cssText = [
     "position:fixed",
-    "inset:12px 12px auto auto",
+    "inset:56px 12px auto auto",
     "z-index:2147483647",
     "display:block",
     "width:min(368px,calc(100vw - 24px))",
@@ -1343,11 +1660,34 @@ async (payload) => {
       font: 700 9px/1.3 Consolas, "Cascadia Mono", ui-monospace, monospace;
       letter-spacing: .06em;
     }
+    .header-actions {
+      display: flex;
+      flex: none;
+      align-items: center;
+      gap: 5px;
+    }
+    .toggle {
+      min-width: 48px;
+      min-height: 26px;
+      padding: 3px 7px;
+      color: var(--sr-t1);
+      background: var(--sr-surface);
+      border: 1px solid var(--sr-line-strong);
+      border-radius: 2px;
+      font: 600 10px/1.2 "Segoe UI", system-ui, sans-serif;
+      cursor: pointer;
+    }
+    .toggle:hover { border-color: var(--sr-warn); }
+    .toggle:focus-visible {
+      outline: 2px solid var(--sr-warn);
+      outline-offset: 1px;
+    }
     .content {
       display: grid;
       gap: 8px;
       padding: 8px;
     }
+    .content[hidden] { display: none; }
     .identity {
       display: grid;
       grid-template-columns: max-content minmax(0, 1fr);
@@ -1487,7 +1827,12 @@ async (payload) => {
   const header = make("header", "header");
   const title = make("h1", "", "Stockroom Capture");
   const mode = make("span", "mode", "PAUSED");
-  header.append(title, mode);
+  const headerActions = make("div", "header-actions");
+  const toggle = make("button", "toggle", "Details");
+  toggle.type = "button";
+  toggle.setAttribute("aria-label", "Show Stockroom capture guidance");
+  headerActions.append(mode, toggle);
+  header.append(title, headerActions);
 
   const content = make("div", "content");
   const identity = make("dl", "identity");
@@ -1545,6 +1890,21 @@ async (payload) => {
   contentNodes.push(automation, gate, resume);
   content.append(...contentNodes);
   panel.append(header, content);
+  const setCollapsed = (collapsed) => {
+    content.hidden = collapsed;
+    toggle.textContent = collapsed ? "Details" : "Hide";
+    toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    toggle.setAttribute(
+      "aria-label",
+      collapsed
+        ? "Show Stockroom capture guidance"
+        : "Hide Stockroom capture guidance",
+    );
+  };
+  toggle.addEventListener("click", () => setCollapsed(!content.hidden));
+  // Security challenges are commonly centered in narrow embedded panes. Keep the
+  // handoff visible without covering the control the person must operate.
+  setCollapsed(true);
   shadow.append(style, panel);
   document.documentElement.append(host);
   let shownInTopLayer = false;
@@ -1561,7 +1921,7 @@ async (payload) => {
       update(next) {
         if (typeof next === "string" && next) message.textContent = next;
       },
-      dismiss() { host.remove(); },
+      dismiss() { host.remove(); if (browserHost) browserHost.remove(); },
     }),
     configurable: false,
     enumerable: false,
@@ -1600,6 +1960,8 @@ class _ProviderHudState:
     state_token: str = field(default_factory=lambda: secrets.token_hex(24))
     _action: ProviderHudAction | None = None
     _download_count: int = 0
+    _completed_formats: tuple[str, ...] = ()
+    _unavailable_formats: tuple[str, ...] = ()
     # True while Stockroom's own `user_clearance_issue` detection says this page belongs to the
     # person. The HUD draws no control outline at all while it is set.
     _security_hold: bool = False
@@ -1629,16 +1991,58 @@ class _ProviderHudState:
             self._action = cast(ProviderHudAction, action)
             return True
 
-    def update_download_count(self, count: int) -> None:
+    def authorizes_visibility_action(self, action: object, token: object) -> bool:
+        """Authorize a reversible browser-tab switch without ending the capture route."""
+
+        return (
+            action == "hide"
+            and type(token) is str
+            and secrets.compare_digest(token, self.action_token)
+        )
+
+    def update_download_count(
+        self,
+        count: int,
+        completed_formats: tuple[str, ...] | None = None,
+        unavailable_formats: tuple[str, ...] | None = None,
+    ) -> None:
         if type(count) is not int or count < 0:
             raise ValueError("download count must be a non-negative integer")
+        if completed_formats is not None and (
+            type(completed_formats) is not tuple
+            or any(value not in self.spec.required_formats for value in completed_formats)
+        ):
+            raise ValueError("completed formats must be required provider format keys")
+        if unavailable_formats is not None and (
+            type(unavailable_formats) is not tuple
+            or any(value not in self.spec.required_formats for value in unavailable_formats)
+        ):
+            raise ValueError("unavailable formats must be required provider format keys")
         with self._lock:
             self._download_count = count
+            if completed_formats is not None:
+                self._completed_formats = tuple(
+                    key for key in self.spec.required_formats if key in completed_formats
+                )
+            if unavailable_formats is not None:
+                self._unavailable_formats = tuple(
+                    key for key in self.spec.required_formats if key in unavailable_formats
+                )
 
     @property
     def download_count(self) -> int:
         with self._lock:
             return self._download_count
+
+    @property
+    def completed_formats(self) -> tuple[str, ...]:
+        with self._lock:
+            return self._completed_formats
+
+    @property
+    def unavailable_formats(self) -> tuple[str, ...]:
+        with self._lock:
+            return self._unavailable_formats
 
     @property
     def security_hold(self) -> bool:
@@ -1667,6 +2071,8 @@ class _ProviderHudState:
         with self._lock:
             return {
                 "downloadCount": self._download_count,
+                "completedFormats": list(self._completed_formats),
+                "unavailableFormats": list(self._unavailable_formats),
                 "securityHold": self._security_hold,
             }
 
@@ -1684,10 +2090,13 @@ class _ProviderHudState:
                 "manufacturer": self.spec.manufacturer,
                 "mpn": self.spec.mpn,
                 "requiredFileLabels": list(self.spec.required_file_labels),
+                "requiredFormats": list(self.spec.required_formats),
                 "automatedStep": self.spec.automated_step,
                 "humanAction": self.spec.human_action,
                 "sessionPersistent": self.persistent_session,
                 "downloadCount": self._download_count,
+                "completedFormats": list(self._completed_formats),
+                "unavailableFormats": list(self._unavailable_formats),
                 "securityHold": self._security_hold,
                 "providerInstruction": instruction,
                 # Only what the surface needs to DRAW. The measured provenance of each selector
@@ -1810,6 +2219,73 @@ def _allow_automatic_downloads(profile_dir: Path) -> None:
         ) from exc
 
 
+def _allow_embedded_downloads(
+    browser,
+    download_dir: Path,
+    *,
+    on_will_begin: Callable[[dict[str, object]], None] | None = None,
+    on_progress: Callable[[dict[str, object]], None] | None = None,
+):
+    """Make the already-running WebView2 save downloads instead of opening ``Save As``.
+
+    ``accept_downloads=True`` is a context-creation option.  It cannot be applied when
+    Playwright attaches to WebView2's pre-existing default context, so a page download event can
+    fire while the native browser still blocks on its Save As dialog.  The event handler then
+    waits on ``download.save_as`` until the person cancels the dialog and reports the download as
+    failed.  Configure the equivalent browser-domain policy before any provider navigation; the
+    normal task-bound broker still chooses the final verified destination.
+    """
+
+    destination = Path(download_dir).resolve()
+    destination.mkdir(parents=True, exist_ok=True)
+    try:
+        session = browser.new_browser_cdp_session()
+        if on_will_begin is not None:
+            session.on("Browser.downloadWillBegin", on_will_begin)
+        if on_progress is not None:
+            session.on("Browser.downloadProgress", on_progress)
+        session.send(
+            "Browser.setDownloadBehavior",
+            {
+                "behavior": "allowAndName",
+                "downloadPath": str(destination),
+                "eventsEnabled": True,
+            },
+        )
+    except Exception as exc:
+        raise CaptureBrowserError(
+            "could not arm Stockroom's embedded download interception"
+        ) from exc
+    return session
+
+
+@dataclass(slots=True)
+class _EmbeddedDownload:
+    """One browser-domain download owned by an exact capture generation."""
+
+    guid: str
+    generation: int
+    broker: DownloadBroker | None
+    suggested_name: str
+    source_url: str
+    state: str = "inProgress"
+    captured: bool = False
+
+
+@dataclass(slots=True)
+class _NativeSurfaceDownload:
+    """One host-observed download that remains visible while CDP is detached."""
+
+    operation_id: str
+    generation: int
+    broker: DownloadBroker | None
+    suggested_name: str
+    source_url: str
+    result_path: Path
+    state: str = "in_progress"
+    captured: bool = False
+
+
 class ProviderProfileLock:
     """Fail-fast process and OS lock protecting one provider's browser profile.
 
@@ -1912,6 +2388,11 @@ class SharedPlaywrightRuntime:
         self._manager = None
         self._playwright = None
         self._thread_id: int | None = None
+        self._generation = 0
+
+    @property
+    def generation(self) -> int:
+        return self._generation
 
     def get(self):
         thread_id = threading.get_ident()
@@ -1931,6 +2412,7 @@ class SharedPlaywrightRuntime:
         self._playwright = manager.__enter__()
         self._manager = manager
         self._thread_id = thread_id
+        self._generation += 1
         return self._playwright
 
     def close(self) -> None:
@@ -1945,6 +2427,57 @@ class SharedPlaywrightRuntime:
         self._playwright = None
         self._thread_id = None
         manager.__exit__(None, None, None)
+
+
+class _ReconnectablePage:
+    """Stable page identity across a deliberate CDP detach/reconnect.
+
+    Provider adapters keep the same small Playwright-shaped object while Stockroom removes the
+    automation transport for a visible security check.  Once the native WebView reports the gate
+    gone, the handle is rebound to the same live WebView page and ordinary provider work resumes.
+    """
+
+    def __init__(self, page) -> None:
+        self._page = page
+
+    @property
+    def raw_page(self):
+        return self._page
+
+    def replace(self, page) -> None:
+        self._page = page
+
+    def __getattr__(self, name):
+        return getattr(self._page, name)
+
+
+def _raw_page(page):
+    return page.raw_page if isinstance(page, _ReconnectablePage) else page
+
+
+def _native_surface_page(pages, native_surface):
+    """Return the CDP page that belongs to the native Stockroom window.
+
+    A provider can leave a popup target beside the real pywebview target. CDP does not promise
+    context page ordering, so taking ``pages[0]`` can bind the next task's broker/HUD to a stale
+    popup while the person is looking at the native Stockroom window. The native shell already
+    exposes its exact current URL without provider content; use that stable identity and retain
+    the old first-page fallback only when a lightweight/test surface cannot report it.
+    """
+
+    current_url = getattr(native_surface, "current_url", None)
+    if not callable(current_url):
+        return None
+    try:
+        expected = str(current_url() or "")
+    except Exception:  # noqa: BLE001 - unreadable native state keeps the legacy fallback
+        return None
+    if not expected:
+        return None
+    return next(
+        (candidate for candidate in pages if _page_url(candidate, "") == expected),
+        None,
+    )
 
 
 class PlaywrightCaptureBrowser:
@@ -1982,6 +2515,7 @@ class PlaywrightCaptureBrowser:
         provider_key: str | None = None,
         playwright_runtime: SharedPlaywrightRuntime | None = None,
         cdp_endpoint: str | None = None,
+        native_surface: object | None = None,
     ) -> None:
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
@@ -1990,6 +2524,9 @@ class PlaywrightCaptureBrowser:
         self.engine = engine
         self._playwright_runtime = playwright_runtime
         self._cdp_endpoint = cdp_endpoint
+        self._native_surface = native_surface
+        self._runtime_generation = 0
+        self._browser = None
         self.provider_key = (
             _normalise_provider_key(provider_key)
             if provider_key is not None
@@ -2004,6 +2541,13 @@ class PlaywrightCaptureBrowser:
         self._page_brokers: list[tuple[object, DownloadBroker]] = []
         self._page_huds: list[tuple[Any, _ProviderHudState]] = []
         self._context = None
+        self._embedded_download_session = None
+        self._embedded_downloads: dict[str, _EmbeddedDownload] = {}
+        self._embedded_download_generation = 0
+        self._embedded_active_generation = 0
+        self._embedded_finalized_generations: set[int] = set()
+        self._native_download_cursor = 0
+        self._native_surface_downloads: dict[str, _NativeSurfaceDownload] = {}
         # Playwright's synchronous API may re-enter the download callback while ``save_as`` for
         # the previous file pumps protocol events.  A provider action that emits a symbol,
         # footprint, and model together therefore nests callbacks on the same thread.  A plain
@@ -2013,6 +2557,7 @@ class PlaywrightCaptureBrowser:
 
     @property
     def captured(self) -> list[CapturedFile]:
+        self._drain_native_downloads()
         return list(self._captured)
 
     @property
@@ -2048,6 +2593,10 @@ class PlaywrightCaptureBrowser:
             context = self._context
         if context is None:
             raise CaptureBrowserError("the capture browser session is not open")
+        with self._download_lock:
+            self._embedded_download_generation += 1
+            embedded_generation = self._embedded_download_generation
+            self._embedded_active_generation = embedded_generation
         # A persistent Playwright context normally starts with one about:blank page. Opening a
         # second page here left that inert first window visible beside the task-bound one, which
         # made Stockroom appear to launch duplicate browsers even though only one could capture.
@@ -2055,36 +2604,59 @@ class PlaywrightCaptureBrowser:
         with self._download_lock:
             bound_pages = {id(wired) for wired, _bound in self._page_brokers}
         pages = list(getattr(context, "pages", ()) or ())
+        reusable_pages = [
+            candidate
+            for candidate in pages
+            if id(candidate) not in bound_pages and not _page_is_closed(candidate)
+        ]
         page = next(
             (
                 candidate
-                for candidate in pages
-                if id(candidate) not in bound_pages
-                and not _page_is_closed(candidate)
-                and _page_url(candidate, "about:blank") in {"", "about:blank"}
+                for candidate in reusable_pages
+                if _page_url(candidate, "about:blank") in {"", "about:blank"}
             ),
             None,
         )
+        # A CDP session is the WebView that already renders Stockroom. It will not be blank, and
+        # opening a new Playwright page creates a second native WebView window beside the app.
+        # Claim the existing page instead: the surface lease restores the Stockroom SPA after the
+        # provider task ends, while this task keeps download listeners bound to that exact page.
+        if page is None and self._cdp_endpoint is not None and reusable_pages:
+            page = _native_surface_page(reusable_pages, self._native_surface) or reusable_pages[0]
         # Claiming a pre-existing page avoids a stray blank window, but that page is the one
         # `session()` yields and keeps for the whole session. Only a page this task actually
         # opened may be closed with it; closing a claimed one ends the session's own surface.
         task_opened_page = page is None
         if page is None:
             page = context.new_page()
+        original_page = page
+        page_handle = _ReconnectablePage(page) if self._cdp_endpoint is not None else page
         self._wire_downloads(page)
         with self._download_lock:
             self._page_brokers.append((page, broker))
         try:
             if hud_state is not None:
                 self._bind_provider_hud(page, hud_state)
-            yield page
+            yield page_handle
         finally:
+            page = _raw_page(page_handle)
+            with self._download_lock:
+                context = self._context or context
             # Provider download actions can open child tabs/windows. They inherit the broker
             # binding through their opener, so they are part of this task and must close with it.
             # Leaving them behind produces stale windows whose controls no longer attach files.
             owned_pages = [page]
             for candidate in list(getattr(context, "pages", ()) or ()):
                 if candidate is page:
+                    continue
+                if self._cdp_endpoint is not None:
+                    # The embedded provider context is exclusive to this task while ``task_page``
+                    # is active. Chromium deliberately removes the opener from ``noopener``
+                    # download tabs, so an opener walk can never reclaim those native popup
+                    # WebViews. Close every non-primary target in this exclusive context at the
+                    # task boundary; the managed host receives WindowCloseRequested and removes
+                    # the matching lease-owned popup without ending the reusable provider root.
+                    owned_pages.append(candidate)
                     continue
                 current = candidate
                 seen: set[int] = set()
@@ -2106,7 +2678,7 @@ class PlaywrightCaptureBrowser:
                     owned.close()
                 except Exception:  # noqa: BLE001 - teardown is best effort
                     pass
-            owned_ids = {id(owned) for owned in owned_pages}
+            owned_ids = {id(owned) for owned in owned_pages} | {id(original_page)}
             with self._download_lock:
                 self._page_brokers = [
                     (wired, bound)
@@ -2129,6 +2701,251 @@ class PlaywrightCaptureBrowser:
                 self._wired_pages = [
                     wired for wired in self._wired_pages if id(wired) not in owned_ids
                 ]
+                if self._embedded_active_generation == embedded_generation:
+                    self._embedded_active_generation = 0
+
+    def ensure_connected(self, page) -> None:
+        """Reconnect a CDP page after another provider temporarily detached the shared runtime."""
+
+        if self._cdp_endpoint is None or self._playwright_runtime is None:
+            return
+        if (
+            self._context is not None
+            and self._runtime_generation == self._playwright_runtime.generation
+        ):
+            return
+        self._reconnect_cdp_page(page)
+
+    def navigate_provider(
+        self,
+        page,
+        url: str,
+        *,
+        wait_until: str = "domcontentloaded",
+        detached: bool = False,
+        ready_selectors: tuple[str, ...] = (),
+        ready_texts: tuple[str, ...] = (),
+        timeout_s: float = 120.0,
+    ) -> None:
+        """Navigate a provider page, optionally with CDP fully detached.
+
+        Some security providers treat an attached CDP client as the bot signal even when the
+        visible WebView, profile, and person are otherwise trusted.  For those reviewed routes the
+        native Stockroom WebView performs only the top-level navigation while Playwright is
+        disconnected.  Stockroom polls booleans for document readiness, provider readiness, and a
+        visible security gate; it reconnects only after the real provider page is ready.
+        """
+
+        _validate_capture_url(url)
+        raw = _raw_page(page)
+        native_navigate = getattr(self._native_surface, "navigate", None)
+        native_state = getattr(self._native_surface, "document_state", None)
+        show = getattr(self._native_surface, "show", None)
+        if (
+            not detached
+            or self._cdp_endpoint is None
+            or self._playwright_runtime is None
+            or not callable(native_navigate)
+            or not callable(native_state)
+        ):
+            raw.goto(url, wait_until=wait_until)
+            return
+
+        timeout = _bounded_seconds(timeout_s, "timeout_s", maximum=600.0)
+        broker = self._broker_for_page(raw)
+        hud_state = self._hud_for_page(raw)
+        if callable(show):
+            show()
+        trace(
+            "capture.navigation.detached",
+            provider=self.provider_key or "",
+            url=url_note(url),
+            ready_selectors=len(ready_selectors),
+            ready_texts=len(ready_texts),
+            timeout_s=timeout,
+        )
+        self._playwright_runtime.close()
+        with self._download_lock:
+            self._embedded_download_session = None
+            self._context = None
+            self._browser = None
+        native_navigate(url)
+
+        deadline = time.monotonic() + timeout
+        ready_polls = 0
+        ready = False
+        challenge_seen = False
+        provider_error = False
+        while time.monotonic() < deadline:
+            try:
+                state = native_state(
+                    ready_selectors=tuple(ready_selectors),
+                    ready_texts=tuple(ready_texts),
+                )
+            except Exception:  # noqa: BLE001 - a navigating document is temporarily unreadable
+                state = {
+                    "ready": False,
+                    "challenge": True,
+                    "provider_ready": False,
+                }
+            challenge = bool(state.get("challenge"))
+            if bool(state.get("provider_error")):
+                provider_error = True
+                trace(
+                    "capture.navigation.provider-error",
+                    provider=self.provider_key or "",
+                    url=url_note(url),
+                )
+                break
+            if challenge and not challenge_seen:
+                challenge_seen = True
+                trace(
+                    "capture.navigation.security",
+                    provider=self.provider_key or "",
+                    url=url_note(url),
+                    visible=True,
+                )
+            if bool(state.get("ready")) and bool(state.get("provider_ready")) and not challenge:
+                ready_polls += 1
+                if ready_polls >= 3:
+                    ready = True
+                    break
+            else:
+                ready_polls = 0
+            time.sleep(0.25)
+
+        reconnect_error: Exception | None = None
+        try:
+            self._reconnect_cdp_page(page, broker=broker, hud_state=hud_state)
+        except Exception as exc:  # noqa: BLE001 - report the readiness failure first when present
+            reconnect_error = exc
+        trace(
+            "capture.navigation.reconnected",
+            provider=self.provider_key or "",
+            url=url_note(url),
+            ready=ready,
+            challenge_seen=challenge_seen,
+            reconnected=reconnect_error is None,
+        )
+        if provider_error:
+            raise ProviderPageTerminalError(
+                "the embedded provider reported a terminal page error before its CAD controls loaded"
+            )
+        if not ready:
+            raise CaptureBrowserError(
+                "the embedded provider page did not become ready before the bounded wait ended"
+            )
+        if reconnect_error is not None:
+            raise CaptureBrowserError(
+                "the embedded provider page became ready but automation could not reconnect"
+            ) from reconnect_error
+
+    def _reconnect_cdp_page(self, page, *, broker=None, hud_state=None):
+        if self._playwright_runtime is None or self._cdp_endpoint is None:
+            raise CaptureBrowserError("the embedded provider page cannot be reconnected")
+        pw = self._playwright_runtime.get()
+        context, browser = self._launch_playwright(pw)
+        pages = [candidate for candidate in context.pages if not _page_is_closed(candidate)]
+        candidates = [
+            candidate
+            for candidate in pages
+            if not _page_url(candidate, "").casefold().startswith("edge://")
+        ]
+        if candidates:
+            replacement = _native_surface_page(candidates, self._native_surface) or candidates[0]
+        elif pages:
+            replacement = pages[0]
+        else:
+            replacement = context.new_page()
+        with self._download_lock:
+            self._context = context
+            self._browser = browser
+            self._runtime_generation = self._playwright_runtime.generation
+            self._wired_pages.clear()
+            self._page_brokers.clear()
+            self._page_huds.clear()
+        context.on("page", self._wire_downloads)
+        self._wire_downloads(replacement)
+        if broker is not None:
+            with self._download_lock:
+                self._page_brokers.append((replacement, broker))
+        if hud_state is not None:
+            try:
+                self._bind_provider_hud(replacement, hud_state)
+            except CaptureBrowserError:
+                # The pre-detach bootstrap can remain in the live document. A duplicate binding
+                # is cosmetic; task ownership and intercepted bytes are restored above.
+                pass
+        if isinstance(page, _ReconnectablePage):
+            page.replace(replacement)
+        return replacement
+
+    def _detach_until_security_clears(
+        self,
+        page,
+        *,
+        should_cancel: Callable[[], bool] | None,
+        timeout: float,
+        poll: float,
+    ) -> bool:
+        """Leave a visible WebView security page running with no Playwright connection."""
+
+        native_state = getattr(self._native_surface, "security_state", None)
+        show = getattr(self._native_surface, "show", None)
+        if (
+            self._cdp_endpoint is None
+            or self._playwright_runtime is None
+            or not callable(native_state)
+        ):
+            return False
+        raw = _raw_page(page)
+        broker = self._broker_for_page(raw)
+        hud_state = self._hud_for_page(raw)
+        if callable(show):
+            show()
+        # Stopping the Playwright manager closes only its protocol transport. The WebView2 process,
+        # profile, visible page, and human input remain owned by Stockroom's native host.
+        self._playwright_runtime.close()
+        with self._download_lock:
+            self._embedded_download_session = None
+            self._context = None
+            self._browser = None
+        deadline = time.monotonic() + timeout
+        clear_polls = 0
+        cleared = False
+        account_verification = False
+        while time.monotonic() < deadline:
+            if should_cancel is not None and should_cancel():
+                break
+            try:
+                state = native_state()
+            except Exception:  # noqa: BLE001 - navigation stays blocked until readable
+                state = {"ready": False, "challenge": True}
+            if bool(state.get("account_verification")):
+                # A transient security challenge can become a durable account restriction only
+                # after a provider download click. Do not spend the remaining capture timeout on
+                # a gate that requires the account owner to enter a phone number and one-time code.
+                account_verification = True
+                trace(
+                    "capture.security.account-verification",
+                    provider=self.provider_key or "",
+                )
+                break
+            if bool(state.get("ready")) and not bool(state.get("challenge")):
+                clear_polls += 1
+                if clear_polls >= 3:
+                    cleared = True
+                    break
+            else:
+                clear_polls = 0
+            time.sleep(poll)
+        if not account_verification:
+            try:
+                self._reconnect_cdp_page(page, broker=broker, hud_state=hud_state)
+            except Exception:
+                if cleared:
+                    raise
+        return cleared
 
     def wait_for_user_clearance(
         self,
@@ -2141,6 +2958,7 @@ class PlaywrightCaptureBrowser:
         issue_detector: Callable[[], str],
         author_route: str | None = None,
         should_cancel: Callable[[], bool] | None = None,
+        cancel_workflow: Callable[[], None] | None = None,
         timeout_s: float = 600.0,
         poll_interval_s: float = 0.25,
     ) -> bool:
@@ -2173,6 +2991,8 @@ class PlaywrightCaptureBrowser:
             raise TypeError("issue_detector must be callable")
         if should_cancel is not None and not callable(should_cancel):
             raise TypeError("should_cancel must be callable")
+        if cancel_workflow is not None and not callable(cancel_workflow):
+            raise TypeError("cancel_workflow must be callable")
         timeout = _bounded_seconds(timeout_s, "timeout_s", maximum=3600.0)
         poll = _bounded_seconds(poll_interval_s, "poll_interval_s", maximum=1.0)
 
@@ -2200,7 +3020,10 @@ class PlaywrightCaptureBrowser:
         with self._provider_hud_security_hold(page):
             namespace = f"__stockroom_security_handoff_{secrets.token_hex(12)}"
             state_binding = f"__stockroom_security_state_{secrets.token_hex(12)}"
+            action_binding = f"__stockroom_security_action_{secrets.token_hex(12)}"
             state_token = secrets.token_hex(24)
+            action_token = secrets.token_hex(24)
+            cancel_requested = False
             state: dict[str, object] = {
                 "active": True,
                 "providerLabel": provider_label,
@@ -2216,10 +3039,28 @@ class PlaywrightCaptureBrowser:
                     return {"active": False}
                 return dict(state)
 
+            def receive_action(_source, action, token) -> bool:
+                nonlocal cancel_requested
+                if (
+                    action not in {"hide", "cancel"}
+                    or type(token) is not str
+                    or not secrets.compare_digest(token, action_token)
+                ):
+                    return False
+                if action == "hide":
+                    self._defer_native_surface_hide()
+                    return True
+                cancel_requested = True
+                if cancel_workflow is not None:
+                    cancel_workflow()
+                return True
+
             payload = {
                 "namespace": namespace,
                 "stateBinding": state_binding,
                 "stateToken": state_token,
+                "actionBinding": action_binding,
+                "actionToken": action_token,
             }
             bootstrap = (
                 f"({_HANDOFF_HUD_BOOTSTRAP})("
@@ -2228,6 +3069,7 @@ class PlaywrightCaptureBrowser:
             )
             try:
                 page.expose_binding(state_binding, provide_state)
+                page.expose_binding(action_binding, receive_action)
                 page.add_init_script(bootstrap)
                 page.evaluate(_HANDOFF_HUD_BOOTSTRAP, payload)
             except Exception as exc:  # noqa: BLE001 - a hidden handoff is not a safe handoff
@@ -2236,9 +3078,51 @@ class PlaywrightCaptureBrowser:
                     "could not show the Stockroom security handoff before pausing automation"
                 ) from exc
 
+            if (
+                self._cdp_endpoint is not None
+                and self._playwright_runtime is not None
+                and callable(getattr(self._native_surface, "security_state", None))
+            ):
+                cleared = self._detach_until_security_clears(
+                    page,
+                    should_cancel=should_cancel,
+                    timeout=timeout,
+                    poll=poll,
+                )
+                state["active"] = False
+                try:
+                    page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
+                except Exception:  # noqa: BLE001 - a provider navigation may remove the HUD
+                    pass
+                trace(
+                    "capture.clearance.result",
+                    provider=provider_label,
+                    cleared=cleared,
+                    ended="native-gate-gone" if cleared else "native-gate-not-cleared",
+                )
+                return cleared
+
             deadline = time.monotonic() + timeout
             last_issue = current_issue
             while time.monotonic() < deadline:
+                provider_hud = self._hud_for_page(page)
+                if provider_hud is not None and provider_hud.action == "cancel":
+                    cancel_requested = True
+                    if cancel_workflow is not None:
+                        cancel_workflow()
+                if cancel_requested:
+                    state["active"] = False
+                    try:
+                        page.evaluate(_HANDOFF_HUD_DISMISS, namespace)
+                    except Exception:  # noqa: BLE001 - the return request is authoritative
+                        pass
+                    trace(
+                        "capture.clearance.result",
+                        provider=provider_label,
+                        cleared=False,
+                        ended="returned-to-stockroom",
+                    )
+                    return False
                 if should_cancel is not None and should_cancel():
                     state["active"] = False
                     try:
@@ -2323,10 +3207,14 @@ class PlaywrightCaptureBrowser:
         settle_seconds: float = 0.75,
         auto_finish_seconds: float = 2.0,
         auto_finish_idle_seconds: float = 25.0,
+        retryable_render_issue: Callable[[object], str] | None = None,
+        operate_controls: Callable[[object], object] | None = None,
+        max_render_reloads: int = 0,
+        render_reload_delay_seconds: float = 5.0,
     ) -> UserCaptureResult:
         """Open one provider page and observe downloads while the person controls it.
 
-        This is deliberately a small browser lifecycle, not a provider driver. Production code
+        This is deliberately a small browser lifecycle, not a generic provider driver. Production code
         wires the task-bound download handler and optional Stockroom HUD *before* navigation, opens
         exactly ``url``, pumps Playwright, and observes only explicit HUD/caller actions, page
         closure, or timeout. The HUD is a closed-shadow, top-layer Stockroom surface whose exact
@@ -2338,9 +3226,12 @@ class PlaywrightCaptureBrowser:
         draw a Stockroom-owned outline over it. That is the entire allowance. Neither Python nor
         that surface reads, collects, stores, transmits, or returns page text, markup, attribute
         values, form values, credentials, prices, or any other page CONTENT; a rect is not content,
-        and that distinction is the whole basis for this being acceptable. Nothing here clicks,
+        and that distinction is the whole basis for this being acceptable. By default nothing here clicks,
         focuses, scrolls, fills, selects a result or format, accepts terms, or otherwise operates
-        any provider control - the person performs every interaction. Selectors come only from
+        any provider control - the person performs every interaction. The optional
+        ``operate_controls`` seam is injected only for a route with an explicit measured ordinary-
+        export adapter; it never handles login, phone verification, CAPTCHA, MFA, or passkeys.
+        Selectors come only from
         measured per-provider hints, a hint that does not match exactly one visible element draws
         nothing at all, and a page showing a challenge, CAPTCHA, or sign-in draws nothing at all
         and defers to the existing person-handoff.
@@ -2350,10 +3241,12 @@ class PlaywrightCaptureBrowser:
         bounded quiet period passes; the quiet period resets for every companion file. A capture
         still missing a required format keeps waiting for the person, because finishing on the
         first file truncates multi-asset providers and the partial set is then rejected downstream.
-        ``auto_finish_idle_seconds`` bounds that wait so a provider that packs every required
-        format into one archive still completes without a click. Closing the page also completes
-        the session. Try Another Provider, cancellation, and timeout return every file already
-        intercepted; staging never depends on a second click.
+        A provider that packs every required format into one archive completes after the normal
+        quiet period because completion is classified from that archive's contents. An incomplete
+        first package never completes merely because it has been idle; that would cut off a later
+        complementary KiCad or Altium package. Closing the page also completes the session. Try
+        Another Provider, cancellation, and timeout return every file already intercepted;
+        staging never depends on a second click.
         """
 
         if type(broker) is not DownloadBroker:
@@ -2372,6 +3265,8 @@ class PlaywrightCaptureBrowser:
         for callback, label in (
             (should_finish, "should_finish"),
             (should_cancel, "should_cancel"),
+            (retryable_render_issue, "retryable_render_issue"),
+            (operate_controls, "operate_controls"),
         ):
             if callback is not None and not callable(callback):
                 raise TypeError(f"{label} must be callable")
@@ -2401,16 +3296,27 @@ class PlaywrightCaptureBrowser:
             maximum=30.0,
             allow_zero=True,
         )
-        auto_finish_idle = _bounded_seconds(
+        _bounded_seconds(
             auto_finish_idle_seconds,
             "auto_finish_idle_seconds",
             maximum=600.0,
             allow_zero=True,
         )
-        # The HUD names exactly the formats this route must come home with, so it is also the
-        # only completeness signal available here. Without a HUD there is nothing to be complete
-        # against and the first quiet period stands.
-        expected_files = len(hud.required_file_labels) if hud is not None else 0
+        if type(max_render_reloads) is not int or not 0 <= max_render_reloads <= 2:
+            raise ValueError("max_render_reloads must be between zero and two")
+        render_reload_delay = _bounded_seconds(
+            render_reload_delay_seconds,
+            "render_reload_delay_seconds",
+            maximum=30.0,
+            allow_zero=True,
+        )
+        # The HUD carries the stable format keys corresponding to its human labels. Completion is
+        # classified from the downloaded bytes, never inferred from archive count.
+        required_formats = hud.required_formats if hud is not None else ()
+        all_formats_unavailable = False
+        operator_submitted_at = 0.0
+        operator_submission_receipts = -1
+        operator_expected_receipts = 0
 
         deadline = time.monotonic() + timeout
         status: UserCaptureStatus = "timed_out"
@@ -2420,36 +3326,223 @@ class PlaywrightCaptureBrowser:
             _ProviderHudState(hud, self.persistent_digikey_session) if hud is not None else None
         )
         if hud_state is not None:
-            hud_state.update_download_count(len(broker.receipts))
+            receipts = broker.receipts
+            hud_state.update_download_count(
+                len(receipts),
+                _completed_provider_formats(receipts, required_formats),
+            )
+
+        embedded_detached_navigation = (
+            self._cdp_endpoint is not None
+            and self._playwright_runtime is not None
+            and callable(getattr(self._native_surface, "navigate", None))
+            and callable(getattr(self._native_surface, "document_state", None))
+        )
 
         with (
             _exclusive_user_capture_window(),
             self.task_page(
                 broker,
-                hud_state=hud_state,
+                # Do not register Stockroom's document bootstrap in the destination before a
+                # native security gate has run. The broker is still armed first; the HUD is bound
+                # immediately after the detached navigation returns and then survives ordinary
+                # provider navigations exactly as before.
+                hud_state=None if embedded_detached_navigation else hud_state,
             ) as page,
         ):
+            show_native_surface = getattr(self._native_surface, "show", None)
+            if callable(show_native_surface):
+                # A person may return to Stockroom while this provider finalizes. Reusing the
+                # browser session must still show the next task-bound route after its broker is
+                # armed; visibility is route state, not session-construction state.
+                show_native_surface()
+
+            def run_ordinary_export_controls() -> None:
+                """Run the route's measured export step whenever its document becomes usable."""
+
+                nonlocal all_formats_unavailable, final_url, required_formats
+                nonlocal operator_submitted_at, operator_submission_receipts
+                nonlocal operator_expected_receipts
+                if operate_controls is None:
+                    return
+                receipt_count = len(broker.receipts)
+                if (
+                    operator_submitted_at > 0
+                    and receipt_count
+                    < operator_submission_receipts + operator_expected_receipts
+                    and time.monotonic() - operator_submitted_at
+                    < _OPERATOR_SUBMISSION_WINDOW_SECONDS
+                ):
+                    # The provider accepted one export. Browser.downloadWillBegin is asynchronous;
+                    # clicking again during that gap creates duplicate ZIPs or windows. Retry only
+                    # after the typed submission window expires or a receipt changes the state.
+                    return
+                try:
+                    reports = operate_controls(page)
+                except Exception as exc:  # noqa: BLE001 - the visible fallback remains usable
+                    trace_warning(
+                        "capture.user-window.operator-controls-failed",
+                        provider=self.provider_key or "",
+                        url=url_note(_page_url(page, final_url)),
+                        why=str(exc),
+                    )
+                    reports = ()
+                if not isinstance(reports, (list, tuple)):
+                    reports = ()
+                usable_reports = tuple(
+                    report
+                    for report in reports
+                    if not bool(getattr(report, "blocked", False))
+                    and not bool(getattr(report, "requires_user_clearance", False))
+                )
+                submitted_reports = tuple(
+                    report
+                    for report in usable_reports
+                    if bool(getattr(report, "submitted", False))
+                )
+                if submitted_reports:
+                    operator_submitted_at = time.monotonic()
+                    operator_submission_receipts = receipt_count
+                    operator_expected_receipts = sum(
+                        value
+                        if type(value := getattr(report, "expected_downloads", 1)) is int
+                        and value > 0
+                        else 1
+                        for report in submitted_reports
+                    )
+                # Provider adapters do their own hydration and exact-part checks before returning
+                # a DriveReport. Treat that report as the verdict instead of requiring an
+                # unrelated sibling download to prove that a missing format is really missing.
+                # The old second-guessing branch made an all-unavailable part wait ten minutes.
+                confirmed_unavailable = {
+                    value
+                    for report in usable_reports
+                    for value in tuple(getattr(report, "missed", ()) or ())
+                    if value in required_formats
+                }
+                if confirmed_unavailable:
+                    required_formats = tuple(
+                        value for value in required_formats if value not in confirmed_unavailable
+                    )
+                    all_formats_unavailable = not required_formats
+                    trace(
+                        "capture.user-window.formats-unavailable",
+                        provider=self.provider_key or "",
+                        unavailable=sorted(confirmed_unavailable),
+                        remaining=list(required_formats),
+                    )
+                    if hud_state is not None:
+                        self._update_provider_hud(
+                            hud_state,
+                            len(broker.receipts),
+                            _completed_provider_formats(
+                                broker.receipts,
+                                hud_state.spec.required_formats,
+                            ),
+                            unavailable_formats=tuple(
+                                {
+                                    *hud_state.unavailable_formats,
+                                    *confirmed_unavailable,
+                                }
+                            ),
+                        )
+                final_url = _page_url(page, final_url)
+
+            def operator_submission_in_flight(now: float | None = None) -> bool:
+                """Whether an accepted export can still emit its first browser event."""
+
+                observed_at = time.monotonic() if now is None else now
+                return (
+                    operator_submitted_at > 0
+                    and len(broker.receipts)
+                    < operator_submission_receipts + operator_expected_receipts
+                    and observed_at - operator_submitted_at
+                    < _OPERATOR_SUBMISSION_WINDOW_SECONDS
+                )
+
+            def downloads_are_terminal(now: float | None = None) -> bool:
+                """Seal native intake only when operations and observed bytes are both idle."""
+
+                if operator_submission_in_flight(now):
+                    return False
+                return self._finalize_native_downloads_if_idle()
+
+            def drain_navigation_terminal_downloads() -> None:
+                """Hold a terminal navigation until its native download edge is quiescent."""
+
+                quiet_period = max(settle, 0.25)
+                observed_receipts = len(broker.receipts)
+                quiet_until = time.monotonic() + quiet_period
+                while True:
+                    native_pending, _ = self._drain_native_downloads()
+                    now = time.monotonic()
+                    current_receipts = len(broker.receipts)
+                    if current_receipts != observed_receipts:
+                        observed_receipts = current_receipts
+                        quiet_until = now + quiet_period
+                    if (
+                        native_pending == 0
+                        and now >= quiet_until
+                        and downloads_are_terminal(now)
+                    ):
+                        return
+                    wait_seconds = min(
+                        poll_interval,
+                        max(0.001, quiet_until - now)
+                        if native_pending == 0
+                        else poll_interval,
+                    )
+                    if _page_is_closed(page):
+                        time.sleep(wait_seconds)
+                    else:
+                        page.wait_for_timeout(max(1, int(wait_seconds * 1000)))
+
             if should_cancel is not None and should_cancel():
                 status = "cancelled"
             else:
                 navigation_terminal = False
+                navigation_terminal_can_download = True
                 try:
-                    page.goto(
-                        url,
-                        # Provider pages can commit the requested URL and then keep loading
-                        # challenge scripts or subresources indefinitely.  Waiting for
-                        # DOMContentLoaded prevented Stockroom from observing Finish Route (and
-                        # manually selected files) until the full capture timeout elapsed.
-                        wait_until="commit",
-                        # Initial navigation is advisory: the task-bound picker and HUD remain
-                        # useful even when a provider challenge never commits a document. Keep
-                        # the overall route timeout for the polling loop, not this blocking call.
-                        timeout=max(1, int(min(timeout, 10.0) * 1000)),
-                    )
+                    if embedded_detached_navigation:
+                        # A person-driven provider route still needs CDP briefly so its exact
+                        # task broker and download listener can be armed. Keeping CDP attached
+                        # during the first cross-origin navigation can keep DigiKey's Cloudflare
+                        # verification on an automation-observable path even after a real person
+                        # completes it. Use the same native detached-navigation seam
+                        # as the reviewed provider adapters, then reconnect only after the gate
+                        # is visibly gone. The broker/HUD are rebound to the same native page by
+                        # ``navigate_provider`` before this method resumes.
+                        self.navigate_provider(
+                            page,
+                            url,
+                            wait_until="commit",
+                            detached=True,
+                            timeout_s=timeout,
+                        )
+                    else:
+                        page.goto(
+                            url,
+                            # Provider pages can commit the requested URL and then keep loading
+                            # challenge scripts or subresources indefinitely.  Waiting for
+                            # DOMContentLoaded prevented Stockroom from observing Finish Route
+                            # (and manually selected files) until the full capture timeout elapsed.
+                            wait_until="commit",
+                            # Initial navigation is advisory: the task-bound picker and HUD remain
+                            # useful even when a provider challenge never commits a document. Keep
+                            # the overall route timeout for the polling loop, not this blocking call.
+                            timeout=max(1, int(min(timeout, 10.0) * 1000)),
+                        )
                 except Exception as exc:  # noqa: BLE001 - recovery remains available off-page
                     final_url = _page_url(page, url)
                     hud_action = hud_state.action if hud_state is not None else None
-                    if should_cancel is not None and should_cancel():
+                    if isinstance(exc, ProviderPageTerminalError):
+                        # A known provider error document cannot become useful by continuing to
+                        # poll it. Advance to the next independent author route immediately; the
+                        # manual picker remains available from Stockroom outside this dead page.
+                        status = "try_another"
+                        navigation_terminal = True
+                        navigation_terminal_can_download = False
+                    elif should_cancel is not None and should_cancel():
                         status = "cancelled"
                         navigation_terminal = True
                     elif hud_action == "cancel":
@@ -2489,14 +3582,44 @@ class PlaywrightCaptureBrowser:
                             url=url_note(final_url),
                             why=str(exc),
                         )
+                finally:
+                    if embedded_detached_navigation and hud_state is not None:
+                        self._bind_provider_hud(_raw_page(page), hud_state)
                 final_url = _page_url(page, final_url)
+                if navigation_terminal and navigation_terminal_can_download:
+                    drain_navigation_terminal_downloads()
                 if not navigation_terminal:
+                    run_ordinary_export_controls()
+                    operator_retry_delay = max(1.0, poll_interval * 4)
+                    next_operator_attempt = time.monotonic() + operator_retry_delay
                     receipt_count = len(broker.receipts)
+                    completed_formats = _completed_provider_formats(
+                        broker.receipts,
+                        required_formats,
+                    )
                     if hud_state is not None:
-                        self._update_provider_hud(hud_state, receipt_count)
+                        self._update_provider_hud(
+                            hud_state,
+                            receipt_count,
+                            completed_formats,
+                        )
                     quiet_since = time.monotonic()
                     finish_requested = False
+                    render_reloads = 0
+                    next_render_check = quiet_since + render_reload_delay
+                    requested_status: UserCaptureStatus | None = None
+                    requested_at: float | None = None
                     while True:
+                        native_pending, _ = self._drain_native_downloads()
+                        if (
+                            all_formats_unavailable
+                            and native_pending == 0
+                            and downloads_are_terminal()
+                        ):
+                            # The exact provider route has no requested deliverable. There is
+                            # nothing a person can download, so advance to the next route now.
+                            status = "try_another"
+                            break
                         errors = self.download_errors
                         if len(errors) > error_mark:
                             # A failing companion does not invalidate files already staged.
@@ -2507,55 +3630,266 @@ class PlaywrightCaptureBrowser:
                             # downstream verification judges whether the set is complete.
                             if not broker.receipts:
                                 raise errors[error_mark]
-                            status = "completed"
-                            break
+                            if downloads_are_terminal():
+                                status = "completed"
+                                break
+                            continue
 
                         now = time.monotonic()
                         current_count = len(broker.receipts)
                         if current_count != receipt_count:
                             receipt_count = current_count
+                            completed_formats = _completed_provider_formats(
+                                broker.receipts,
+                                required_formats,
+                            )
                             quiet_since = now
                         if hud_state is not None:
                             # This cheap Stockroom-namespace update also restores the current count
                             # after an in-page navigation remounts the init-script HUD.
-                            self._update_provider_hud(hud_state, current_count)
+                            self._update_provider_hud(
+                                hud_state,
+                                current_count,
+                                completed_formats,
+                            )
 
                         if should_cancel is not None and should_cancel():
-                            status = "cancelled"
-                            break
+                            requested_status = "cancelled"
                         hud_action = hud_state.action if hud_state is not None else None
                         if hud_action == "cancel":
-                            status = "cancelled"
-                            break
-                        if hud_action == "try_another":
-                            status = "try_another"
-                            break
-                        if _page_is_closed(page):
+                            requested_status = "cancelled"
+                        elif hud_action == "try_another":
+                            requested_status = "try_another"
+                        if requested_status is not None:
+                            requested_at = requested_at or now
+                            # A browser-domain download can be accepted by WebView2 just before
+                            # its willBegin event reaches this protocol connection. Give that
+                            # event one bounded settle window before sealing a zero-receipt route.
+                            if (
+                                self._embedded_download_session is not None
+                                and current_count == 0
+                                and now - requested_at < max(settle, 0.25)
+                            ):
+                                wait_seconds = min(
+                                    poll_interval,
+                                    max(settle, 0.25) - (now - requested_at),
+                                )
+                                if _page_is_closed(page):
+                                    time.sleep(wait_seconds)
+                                else:
+                                    page.wait_for_timeout(max(1, int(wait_seconds * 1000)))
+                                continue
+                            if native_pending == 0 and downloads_are_terminal(now):
+                                status = requested_status
+                                break
+                            if now - requested_at >= 30.0:
+                                # The native operation can become READY after this iteration's
+                                # initial snapshot. Drain once more at the exact cutoff so lease
+                                # teardown cannot delete a ZIP that finished before we returned.
+                                if downloads_are_terminal(now):
+                                    status = requested_status
+                                    break
+                                # A route is not terminal while WebView2 still owns bytes. Keep
+                                # the durable item draining instead of returning a receipt snapshot
+                                # that cannot include this operation.
+                                if _page_is_closed(page):
+                                    time.sleep(poll_interval)
+                                else:
+                                    page.wait_for_timeout(max(1, int(poll_interval * 1000)))
+                                continue
+                            remaining = min(deadline - now, 30.0 - (now - requested_at))
+                            if remaining <= 0:
+                                if downloads_are_terminal(now):
+                                    status = requested_status
+                                    break
+                                if _page_is_closed(page):
+                                    time.sleep(poll_interval)
+                                else:
+                                    page.wait_for_timeout(max(1, int(poll_interval * 1000)))
+                                continue
+                            wait_seconds = min(poll_interval, remaining)
+                            if _page_is_closed(page):
+                                time.sleep(wait_seconds)
+                            else:
+                                page.wait_for_timeout(max(1, int(wait_seconds * 1000)))
+                            continue
+                        native_security_state = getattr(
+                            self._native_surface,
+                            "security_state",
+                            None,
+                        )
+                        if (
+                            self._cdp_endpoint is not None
+                            and self._playwright_runtime is not None
+                            and callable(native_security_state)
+                        ):
+                            try:
+                                security_state = native_security_state()
+                            except Exception:  # noqa: BLE001 - unreadable is not a gate verdict
+                                security_state = {}
+                            if bool(security_state.get("challenge")):
+                                # DigiKey can present another Turnstile step after a person clicks
+                                # Sign In. Continuing to poll it with CDP attached makes a valid
+                                # completion restart. Drop the transport for the whole visible
+                                # gate, preserve the native page/profile, then restore this exact
+                                # task's download binding after it clears.
+                                trace(
+                                    "capture.user-window.security-detach",
+                                    provider=self.provider_key or "",
+                                    url=url_note(_page_url(page, final_url)),
+                                )
+                                if bool(security_state.get("account_verification")):
+                                    # A provider-owned account restriction is not a transient
+                                    # CAPTCHA. Waiting the entire ten-minute person-capture window
+                                    # cannot clear it without the account owner entering a phone
+                                    # number and one-time code. Leave that native page visible,
+                                    # detach automation immediately, and let the guided layer turn
+                                    # its exact final URL into a resumable blocked verdict.
+                                    native_current_url = getattr(
+                                        self._native_surface,
+                                        "current_url",
+                                        None,
+                                    )
+                                    if callable(native_current_url):
+                                        try:
+                                            final_url = native_current_url() or final_url
+                                        except Exception:  # noqa: BLE001 - stale URL is advisory
+                                            final_url = _page_url(page, final_url)
+                                    self._playwright_runtime.close()
+                                    with self._download_lock:
+                                        self._context = None
+                                        self._browser = None
+                                    trace(
+                                        "capture.user-window.account-verification",
+                                        provider=self.provider_key or "",
+                                        url=url_note(final_url),
+                                    )
+                                    requested_status = "timed_out"
+                                    requested_at = requested_at or now
+                                    if downloads_are_terminal(now):
+                                        status = "timed_out"
+                                        break
+                                    time.sleep(min(poll_interval, max(0.001, deadline - now)))
+                                    continue
+                                cleared = self._detach_until_security_clears(
+                                    page,
+                                    should_cancel=should_cancel,
+                                    timeout=max(0.001, deadline - now),
+                                    poll=poll_interval,
+                                )
+                                native_current_url = getattr(
+                                    self._native_surface,
+                                    "current_url",
+                                    None,
+                                )
+                                if callable(native_current_url):
+                                    try:
+                                        final_url = native_current_url() or final_url
+                                    except Exception:  # noqa: BLE001 - stale URL is advisory
+                                        final_url = _page_url(page, final_url)
+                                else:
+                                    final_url = _page_url(page, final_url)
+                                if not cleared:
+                                    status = (
+                                        "cancelled"
+                                        if should_cancel is not None and should_cancel()
+                                        else "timed_out"
+                                    )
+                                    requested_status = status
+                                    requested_at = requested_at or now
+                                    if downloads_are_terminal(now):
+                                        break
+                                    continue
+                                # The first operator attempt may have stopped at this exact gate.
+                                # Once the person clears it and CDP reconnects, resume ordinary
+                                # format selection instead of waiting for manual download clicks.
+                                run_ordinary_export_controls()
+                                next_operator_attempt = time.monotonic() + operator_retry_delay
+                                continue
+                        if _page_is_closed(page) and downloads_are_terminal(now):
                             status = "completed"
                             break
+                        if (
+                            operate_controls is not None
+                            and native_pending == 0
+                            and now >= next_operator_attempt
+                        ):
+                            # Login can be an ordinary provider navigation rather than a security
+                            # challenge. Retry the measured export action on the newly usable page;
+                            # the guided callback filters out formats already received.
+                            run_ordinary_export_controls()
+                            next_operator_attempt = time.monotonic() + operator_retry_delay
                         if should_finish is not None and should_finish():
                             finish_requested = True
                         if hud_action == "finish":
                             finish_requested = True
-                        if finish_requested and (current_count == 0 or now - quiet_since >= settle):
+                        if (
+                            retryable_render_issue is not None
+                            and current_count == 0
+                            and render_reloads < max_render_reloads
+                            and now >= next_render_check
+                        ):
+                            try:
+                                render_issue = str(retryable_render_issue(page) or "")
+                            except Exception:  # noqa: BLE001 - unreadable state cannot trigger reload
+                                render_issue = ""
+                            if render_issue:
+                                render_reloads += 1
+                                trace(
+                                    "capture.user-window.render-reload",
+                                    provider=self.provider_key,
+                                    attempt=render_reloads,
+                                    of=max_render_reloads,
+                                    why=render_issue,
+                                )
+                                try:
+                                    page.reload(
+                                        wait_until="commit",
+                                        timeout=max(1, int(min(timeout, 10.0) * 1000)),
+                                    )
+                                except Exception as exc:  # noqa: BLE001 - polling/picker stay usable
+                                    trace_warning(
+                                        "capture.user-window.render-reload-pending",
+                                        provider=self.provider_key,
+                                        attempt=render_reloads,
+                                        why=str(exc),
+                                    )
+                                final_url = _page_url(page, final_url)
+                                # A hydrated replacement document needs the same measured export
+                                # operation that ran on the original blank fragment.
+                                run_ordinary_export_controls()
+                                next_operator_attempt = time.monotonic() + operator_retry_delay
+                                next_render_check = time.monotonic() + render_reload_delay
+                                continue
+                            next_render_check = now + render_reload_delay
+                        if (
+                            finish_requested
+                            and native_pending == 0
+                            and (current_count == 0 or now - quiet_since >= settle)
+                            and downloads_are_terminal(now)
+                        ):
                             status = "completed"
                             break
                         if (
                             current_count > 0
+                            and native_pending == 0
                             and now - quiet_since >= auto_finish
-                            and current_count >= expected_files
+                            and set(required_formats) <= set(completed_formats)
+                            and downloads_are_terminal(now)
                         ):
                             status = "completed"
                             break
-                        # A provider that ships every required format in one archive produces
-                        # fewer receipts than labels and would otherwise wait for a click the
-                        # HUD's own copy promises is unnecessary. Finish on a longer idle gap.
-                        if current_count > 0 and now - quiet_since >= auto_finish_idle:
-                            status = "completed"
-                            break
                         if now >= deadline:
-                            status = "timed_out"
-                            break
+                            # Timeout is a terminal capture boundary, not permission to discard a
+                            # native download that completed since the poll at the top of the loop.
+                            if downloads_are_terminal(now):
+                                status = "timed_out"
+                                break
+                            if _page_is_closed(page):
+                                time.sleep(poll_interval)
+                            else:
+                                page.wait_for_timeout(max(1, int(poll_interval * 1000)))
+                            continue
 
                         remaining = deadline - now
                         wait_ms = max(1, int(min(poll_interval, remaining) * 1000))
@@ -2563,8 +3897,11 @@ class PlaywrightCaptureBrowser:
                             page.wait_for_timeout(wait_ms)
                         except Exception:
                             if _page_is_closed(page):
-                                status = "completed"
-                                break
+                                if downloads_are_terminal():
+                                    status = "completed"
+                                    break
+                                time.sleep(wait_ms / 1000.0)
+                                continue
                             raise
                         final_url = _page_url(page, final_url)
 
@@ -2631,10 +3968,16 @@ class PlaywrightCaptureBrowser:
             context, browser = self._launch_playwright(pw)
             with self._download_lock:
                 self._context = context
+                self._browser = browser
+                self._runtime_generation = (
+                    self._playwright_runtime.generation
+                    if self._playwright_runtime is not None
+                    else 0
+                )
             context.on("page", self._wire_downloads)
             page = context.pages[0] if context.pages else context.new_page()
             self._wire_downloads(page)
-            yield page
+            yield _ReconnectablePage(page) if self._cdp_endpoint is not None else page
         finally:
             closables = () if self._cdp_endpoint is not None else (context, browser)
             for closable in closables:
@@ -2644,10 +3987,18 @@ class PlaywrightCaptureBrowser:
                     except Exception:  # noqa: BLE001 - teardown is best effort
                         pass
             with self._download_lock:
+                download_session = self._embedded_download_session
+                self._embedded_download_session = None
                 self._context = None
+                self._browser = None
                 self._page_brokers.clear()
                 self._page_huds.clear()
                 self._wired_pages.clear()
+            if download_session is not None:
+                try:
+                    download_session.detach()
+                except Exception:  # noqa: BLE001 - protocol teardown is best effort
+                    pass
 
     def _launch_playwright(self, pw):
         """Launch the requested browser policy and return ``(context, browser)``.
@@ -2666,18 +4017,33 @@ class PlaywrightCaptureBrowser:
                 )
                 contexts = list(browser.contexts)
                 if not contexts:
-                    raise CaptureBrowserError(
-                        "the embedded provider browser exposed no context"
-                    )
+                    raise CaptureBrowserError("the embedded provider browser exposed no context")
                 self.launched_browser = "Stockroom Embedded WebView2"
                 context = contexts[0]
-                _disable_webrtc(context)
+                download_session = _allow_embedded_downloads(
+                    browser,
+                    self.download_dir,
+                    on_will_begin=self._on_embedded_download_will_begin,
+                    on_progress=self._on_embedded_download_progress,
+                )
+                with self._download_lock:
+                    previous_session = self._embedded_download_session
+                    self._embedded_download_session = download_session
+                if previous_session is not None and previous_session is not download_session:
+                    try:
+                        previous_session.detach()
+                    except Exception:  # noqa: BLE001 - the replacement session owns new events
+                        pass
+                # This is the person's already-running native WebView, not a browser process
+                # Stockroom launched for automation. Rewriting RTCPeerConnection across its
+                # future documents changes the browser fingerprint before a Cloudflare gate and
+                # can invalidate an otherwise legitimate human verification. Standalone capture
+                # contexts retain the firewall-safe WebRTC guard below; the embedded browser must
+                # keep its native web-platform surface intact.
                 return context, browser
             except Exception as exc:
                 detail = (
-                    str(exc).strip().splitlines()[0]
-                    if str(exc).strip()
-                    else type(exc).__name__
+                    str(exc).strip().splitlines()[0] if str(exc).strip() else type(exc).__name__
                 )
                 raise CaptureBrowserError(
                     f"could not attach to Stockroom's embedded provider browser: {detail}"
@@ -2909,7 +4275,15 @@ class PlaywrightCaptureBrowser:
         payload = state.payload()
 
         def receive_action(_source, action, token) -> bool:
-            return state.request_action(action, token)
+            visibility_only = state.authorizes_visibility_action(action, token)
+            accepted = visibility_only or state.request_action(action, token)
+            if accepted:
+                # A page binding is completing on WebView2's renderer/UI command path. Sending a
+                # synchronous native hide command here can deadlock that path: the page waits for
+                # this binding to return while the host waits for the page command to finish. Let
+                # the binding acknowledge first, then switch the native surface on a worker.
+                self._defer_native_surface_hide()
+            return accepted
 
         def provide_state(_source, token) -> dict[str, object]:
             return state.read_state(token)
@@ -2920,6 +4294,13 @@ class PlaywrightCaptureBrowser:
             ");"
         )
         try:
+            if self._cdp_endpoint is not None:
+                # The managed host owns CoreWebView2.NewWindowRequested directly. The source
+                # pywebview host does not expose that event, so a target=_blank provider link
+                # otherwise escapes into Vivaldi/Chrome before a Playwright popup exists. Install
+                # this only after detached security navigation has cleared, alongside the HUD.
+                page.add_init_script(_EMBEDDED_PROVIDER_NAVIGATION_BOOTSTRAP)
+                page.evaluate(_EMBEDDED_PROVIDER_NAVIGATION_BOOTSTRAP)
             page.expose_binding(state.action_binding, receive_action)
             # Bound before the init script that reads it, so a HUD that remounts on the very first
             # provider navigation already has a live count to ask for.
@@ -2940,6 +4321,38 @@ class PlaywrightCaptureBrowser:
                 "could not install the Stockroom capture panel before provider navigation"
             ) from exc
 
+    def _defer_native_surface_hide(self) -> None:
+        """Return from a page binding before asking WebView2 to switch native surfaces."""
+
+        hide_native_surface = getattr(self._native_surface, "hide", None)
+        if not callable(hide_native_surface):
+            return
+
+        def hide() -> None:
+            try:
+                hide_native_surface()
+            except Exception as exc:  # noqa: BLE001 - the native button remains a safe fallback
+                trace_warning(
+                    "capture.provider-surface.hide-failed",
+                    provider=self.provider_key or "",
+                    why=str(exc),
+                )
+
+        threading.Thread(
+            target=hide,
+            name="stockroom-provider-surface-hide",
+            daemon=True,
+        ).start()
+
+    def retain_provider_surface(self) -> bool:
+        """Keep the native provider document when this capture ends incomplete."""
+
+        retain = getattr(self._native_surface, "retain", None)
+        if not callable(retain):
+            return False
+        retain()
+        return True
+
     @contextmanager
     def _provider_hud_security_hold(self, page):
         """Suppress this task's control outlines while the person owns a provider gate.
@@ -2950,7 +4363,7 @@ class PlaywrightCaptureBrowser:
         timeout, so a cleared gate restores the guidance without a second detector.
         """
 
-        state = self._hud_for_page(page)
+        state = self._hud_for_page(_raw_page(page))
         if state is None:
             yield
             return
@@ -2962,15 +4375,24 @@ class PlaywrightCaptureBrowser:
             state.set_security_hold(False)
             self._update_provider_hud(state, state.download_count)
 
-    def _update_provider_hud(self, state: _ProviderHudState, download_count: int) -> None:
+    def _update_provider_hud(
+        self,
+        state: _ProviderHudState,
+        download_count: int,
+        completed_formats: tuple[str, ...] | None = None,
+        *,
+        unavailable_formats: tuple[str, ...] | None = None,
+    ) -> None:
         """Push Stockroom's receipt count and outline hold into every page showing this HUD."""
 
-        state.update_download_count(download_count)
+        state.update_download_count(download_count, completed_formats, unavailable_formats)
         with self._download_lock:
             pages = [page for page, bound in self._page_huds if bound is state]
         payload = {
             "namespace": state.namespace,
             "downloadCount": download_count,
+            "completedFormats": list(state.completed_formats),
+            "unavailableFormats": list(state.unavailable_formats),
             "securityHold": state.security_hold,
         }
         for page in pages:
@@ -2980,6 +4402,295 @@ class PlaywrightCaptureBrowser:
                 # The registered init script remounts the HUD; the capture loop retries this
                 # Stockroom-namespace update on its next bounded poll.
                 pass
+
+    def _drain_native_downloads(
+        self,
+        *,
+        finalize_if_idle: bool = False,
+    ) -> tuple[int, bool]:
+        """Move browser-domain WebView2 files through the exact task broker."""
+
+        self._poll_native_surface_downloads()
+        native_pending = self._drain_native_surface_downloads()
+        embedded_pending, embedded_finalized = self._drain_embedded_downloads(
+            finalize_if_idle=finalize_if_idle and native_pending == 0,
+        )
+        pending = native_pending + embedded_pending
+        return pending, pending == 0 and embedded_finalized
+
+    def _poll_native_surface_downloads(self) -> None:
+        """Reconcile host download events that survive CDP/security detachment."""
+
+        read_events = getattr(self._native_surface, "download_events", None)
+        if not callable(read_events):
+            return
+        try:
+            events = tuple(read_events(after_sequence=self._native_download_cursor))
+        except Exception as exc:  # noqa: BLE001 - a broken native ledger is a capture failure
+            with self._download_lock:
+                self._download_errors.append(
+                    CaptureBrowserError(
+                        "the embedded provider download ledger could not be read "
+                        f"({type(exc).__name__})"
+                    )
+                )
+            return
+        for event in events:
+            sequence = getattr(event, "sequence", None)
+            operation_id = str(getattr(event, "operation_id", "") or "")
+            phase = str(getattr(event, "phase", "") or "")
+            state = str(getattr(event, "state", "") or "")
+            if type(sequence) is not int or sequence <= self._native_download_cursor:
+                continue
+            self._native_download_cursor = sequence
+            if not operation_id or phase not in {"started", "terminal"}:
+                continue
+            result_path = Path(str(getattr(event, "result_file_path", "") or ""))
+            suggested_name = _safe_filename(
+                str(getattr(event, "suggested_file_name", "") or "cad-download")
+            )
+            source_url = str(getattr(event, "uri", "") or "")
+            with self._download_lock:
+                generation = self._embedded_active_generation
+                brokers = {id(broker): broker for _page, broker in self._page_brokers}
+                broker = next(iter(brokers.values())) if generation > 0 and len(brokers) == 1 else None
+                download = self._native_surface_downloads.get(operation_id)
+                if download is None:
+                    download = _NativeSurfaceDownload(
+                        operation_id=operation_id,
+                        generation=generation,
+                        broker=broker,
+                        suggested_name=suggested_name,
+                        source_url=source_url,
+                        result_path=result_path,
+                    )
+                    self._native_surface_downloads[operation_id] = download
+                if result_path != Path(""):
+                    download.result_path = result_path
+                if source_url:
+                    download.source_url = source_url
+                if suggested_name != "cad-download":
+                    download.suggested_name = suggested_name
+                download.state = state
+                if broker is None and download.broker is None:
+                    self._download_errors.append(
+                        CaptureBrowserError(
+                            "the native download began without one exact Stockroom task binding"
+                        )
+                    )
+
+    def _drain_native_surface_downloads(self) -> int:
+        """Adopt terminal host paths when browser-domain events were unavailable."""
+
+        with self._download_lock:
+            generation = self._embedded_active_generation
+            active = [
+                item
+                for item in self._native_surface_downloads.values()
+                if item.generation == generation and not item.captured
+            ]
+        pending = sum(item.state in {"in_progress", "unknown"} for item in active)
+        for download in active:
+            if download.state == "interrupted":
+                download.captured = True
+                continue
+            if download.state != "completed":
+                continue
+            source = download.result_path
+            if not source.is_file() or source.is_symlink() or source.stat().st_size <= 0:
+                pending += 1
+                continue
+
+            # When browser-domain observation remained attached, it owns the richer original
+            # filename. Mark it terminal and let the existing exact-task path perform one copy.
+            with self._download_lock:
+                # ``allowAndName`` makes the result filename the browser-domain GUID. Provider
+                # endpoints commonly emit several distinct files from the same URL, so URL-only
+                # matching can collapse an entire multi-download batch into its first operation.
+                embedded = next(
+                    (
+                        item
+                        for item in self._embedded_downloads.values()
+                        if not item.captured and item.guid == source.name
+                    ),
+                    None,
+                )
+                if embedded is not None:
+                    embedded.state = "completed"
+                    download.captured = True
+                    continue
+
+            if download.broker is None:
+                download.captured = True
+                source.unlink(missing_ok=True)
+                continue
+            try:
+                receipt = download.broker.capture_local_file(
+                    source,
+                    source_url=download.source_url,
+                    transport="webview2-native",
+                    suggested_filename=download.suggested_name,
+                )
+                with self._download_lock:
+                    download.captured = True
+                    if all(captured.path != receipt.path for captured in self._captured):
+                        self._captured.append(
+                            CapturedFile(
+                                path=receipt.path,
+                                suggested_name=(
+                                    download.suggested_name
+                                    if download.suggested_name != "cad-download"
+                                    else receipt.suggested_name
+                                ),
+                                url=receipt.source_url,
+                            )
+                        )
+                trace(
+                    "capture.download.saved",
+                    provider=self.provider_key or "",
+                    via="webview2-native",
+                    saved=file_note(receipt.path),
+                    path=receipt.path,
+                )
+            finally:
+                source.unlink(missing_ok=True)
+        with self._download_lock:
+            self._native_surface_downloads = {
+                operation_id: item
+                for operation_id, item in self._native_surface_downloads.items()
+                if not item.captured
+            }
+        return pending
+
+    def _on_embedded_download_will_begin(self, event: dict[str, object]) -> None:
+        """Bind a managed WebView2 download to the active task before bytes arrive."""
+
+        guid = str(event.get("guid") or "")
+        if not guid or Path(guid).name != guid:
+            return
+        suggested_name = _safe_filename(str(event.get("suggestedFilename") or "cad-download"))
+        source_url = str(event.get("url") or "")
+        with self._download_lock:
+            generation = self._embedded_active_generation
+            brokers = {id(broker): broker for _page, broker in self._page_brokers}
+            if generation in self._embedded_finalized_generations:
+                generation = 0
+            broker = next(iter(brokers.values())) if generation > 0 and len(brokers) == 1 else None
+            if broker is None:
+                generation = 0
+            self._embedded_downloads[guid] = _EmbeddedDownload(
+                guid=guid,
+                generation=generation,
+                broker=broker,
+                suggested_name=suggested_name,
+                source_url=source_url,
+            )
+            if broker is None:
+                self._download_errors.append(
+                    CaptureBrowserError(
+                        "the embedded download began without one exact Stockroom task binding"
+                    )
+                )
+        trace(
+            "capture.download.browser-begin",
+            provider=self.provider_key or "",
+            file=suggested_name,
+            task_bound=generation > 0,
+        )
+
+    def _on_embedded_download_progress(self, event: dict[str, object]) -> None:
+        """Record the browser's terminal verdict; the capture loop moves completed bytes."""
+
+        guid = str(event.get("guid") or "")
+        state = str(event.get("state") or "")
+        if not guid or state not in {"inProgress", "completed", "canceled"}:
+            return
+        with self._download_lock:
+            download = self._embedded_downloads.get(guid)
+            if download is not None:
+                download.state = state
+        if download is not None and state in {"completed", "canceled"}:
+            if download.broker is None:
+                (self.download_dir / download.guid).unlink(missing_ok=True)
+                with self._download_lock:
+                    self._embedded_downloads.pop(download.guid, None)
+                return
+            try:
+                self._drain_embedded_downloads()
+            except CaptureBrowserError as exc:
+                with self._download_lock:
+                    self._download_errors.append(exc)
+
+    def _drain_embedded_downloads(
+        self,
+        *,
+        finalize_if_idle: bool = False,
+    ) -> tuple[int, bool]:
+        """Move browser-domain downloads through the exact task broker."""
+
+        with self._download_lock:
+            generation = self._embedded_active_generation
+            downloads = [
+                download
+                for download in self._embedded_downloads.values()
+                if download.broker is not None and not download.captured
+            ]
+        active = [download for download in downloads if download.generation == generation]
+        pending = sum(download.state == "inProgress" for download in active)
+        ready = [download for download in downloads if download.state == "completed"]
+        canceled = [download for download in downloads if download.state == "canceled"]
+        for download in ready:
+            guid_path = (self.download_dir / download.guid).resolve()
+            if guid_path.parent != self.download_dir.resolve():
+                continue
+            if not guid_path.is_file() or guid_path.stat().st_size <= 0:
+                pending += 1
+                continue
+            named_path = _unique(self.download_dir, download.suggested_name)
+            os.replace(guid_path, named_path)
+            try:
+                assert download.broker is not None
+                receipt = download.broker.capture_local_file(
+                    named_path,
+                    source_url=download.source_url,
+                    transport="webview2-browser-domain",
+                )
+                with self._download_lock:
+                    download.captured = True
+                    if all(captured.path != receipt.path for captured in self._captured):
+                        self._captured.append(
+                            CapturedFile(
+                                path=receipt.path,
+                                suggested_name=receipt.suggested_name,
+                                url=receipt.source_url,
+                            )
+                        )
+                trace(
+                    "capture.download.saved",
+                    provider=self.provider_key or "",
+                    via="webview2-browser-domain",
+                    saved=file_note(receipt.path),
+                    path=receipt.path,
+                )
+            finally:
+                named_path.unlink(missing_ok=True)
+        with self._download_lock:
+            for download in (*ready, *canceled):
+                if download.captured or download.state == "canceled":
+                    self._embedded_downloads.pop(download.guid, None)
+        for download in canceled:
+            (self.download_dir / download.guid).unlink(missing_ok=True)
+        finalized = pending == 0
+        if finalize_if_idle and finalized and generation > 0:
+            with self._download_lock:
+                self._embedded_finalized_generations.add(generation)
+        return pending, finalized
+
+    def _finalize_native_downloads_if_idle(self) -> bool:
+        """Atomically drain and close the native intake only when no byte stream is in flight."""
+
+        pending, finalized = self._drain_native_downloads(finalize_if_idle=True)
+        return pending == 0 and finalized
 
     def _wire_downloads(self, page) -> None:
         with self._download_lock:
@@ -3020,7 +4731,7 @@ class PlaywrightCaptureBrowser:
         unchanged.
         """
 
-        current = page
+        current = _raw_page(page)
         depth = 0
         seen: set[int] = set()
         while current is not None and id(current) not in seen:
@@ -3049,7 +4760,7 @@ class PlaywrightCaptureBrowser:
         return None, "unbound"
 
     def _hud_for_page(self, page) -> _ProviderHudState | None:
-        current = page
+        current = _raw_page(page)
         seen: set[int] = set()
         while current is not None and id(current) not in seen:
             seen.add(id(current))
@@ -3085,6 +4796,16 @@ class PlaywrightCaptureBrowser:
             broker=broker is not None,
             via=route,
         )
+        if self._embedded_download_session is not None:
+            # Managed WebView2 is armed at Browser-domain level, which covers child WebViews and
+            # late page events. The GUID-backed file is drained through the exact task broker.
+            trace(
+                "capture.download.deferred",
+                provider=self.provider_key,
+                file=name,
+                via="webview2-browser-domain",
+            )
+            return
         if broker is not None:
             try:
                 receipt = broker.capture_playwright(download)

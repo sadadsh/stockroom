@@ -551,6 +551,96 @@ class WindowHostHealth:
             raise ValueError("health close-request state is invalid")
 
 
+@dataclass(frozen=True, slots=True)
+class ProviderLeaseHandshake:
+    lease_id: str
+    generation: int
+    endpoint: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderDownloadEvent:
+    sequence: int
+    lease_id: str
+    generation: int
+    operation_id: str
+    phase: str
+    state: str
+    uri: str
+    suggested_file_name: str
+    result_file_path: str
+    mime_type: str
+    interrupt_reason: str
+    total_bytes: int
+    bytes_received: int
+
+
+_PROVIDER_DOWNLOAD_EVENT_KEYS = frozenset(
+    {
+        "sequence",
+        "lease_id",
+        "generation",
+        "operation_id",
+        "phase",
+        "state",
+        "uri",
+        "suggested_file_name",
+        "result_file_path",
+        "mime_type",
+        "interrupt_reason",
+        "total_bytes",
+        "bytes_received",
+    }
+)
+
+
+def _parse_provider_download_event(
+    value: object,
+    lease_id: str,
+    generation: int,
+) -> ProviderDownloadEvent:
+    if type(value) is not dict or frozenset(value) != _PROVIDER_DOWNLOAD_EVENT_KEYS:
+        raise WindowSupervisorProtocolError("provider download event fields are invalid")
+    item = cast(dict[str, object], value)
+    if item["lease_id"] != lease_id or item["generation"] != generation:
+        raise WindowSupervisorProtocolError("provider download event lease is invalid")
+    integer_names = ("sequence", "generation", "total_bytes", "bytes_received")
+    if any(type(item[name]) is not int for name in integer_names):
+        raise WindowSupervisorProtocolError("provider download event numbers are invalid")
+    if (
+        cast(int, item["sequence"]) <= 0
+        or cast(int, item["generation"]) <= 0
+        or cast(int, item["total_bytes"]) < -1
+        or cast(int, item["bytes_received"]) < 0
+    ):
+        raise WindowSupervisorProtocolError("provider download event numbers are invalid")
+    text_names = _PROVIDER_DOWNLOAD_EVENT_KEYS - frozenset(integer_names)
+    if any(type(item[name]) is not str for name in text_names):
+        raise WindowSupervisorProtocolError("provider download event text is invalid")
+    if item["phase"] not in {"started", "terminal"} or item["state"] not in {
+        "in_progress",
+        "completed",
+        "interrupted",
+        "unknown",
+    }:
+        raise WindowSupervisorProtocolError("provider download event state is invalid")
+    return ProviderDownloadEvent(
+        sequence=cast(int, item["sequence"]),
+        lease_id=cast(str, item["lease_id"]),
+        generation=cast(int, item["generation"]),
+        operation_id=cast(str, item["operation_id"]),
+        phase=cast(str, item["phase"]),
+        state=cast(str, item["state"]),
+        uri=cast(str, item["uri"]),
+        suggested_file_name=cast(str, item["suggested_file_name"]),
+        result_file_path=cast(str, item["result_file_path"]),
+        mime_type=cast(str, item["mime_type"]),
+        interrupt_reason=cast(str, item["interrupt_reason"]),
+        total_bytes=cast(int, item["total_bytes"]),
+        bytes_received=cast(int, item["bytes_received"]),
+    )
+
+
 class _OwnedWindowProcess:
     def __init__(
         self,
@@ -848,6 +938,8 @@ class WindowHostClient:
         name: str,
         expected_response: str,
         parse: Callable[[HandoffMessage, int], _T],
+        *,
+        payload: Mapping[str, object] | None = None,
     ) -> _T:
         with self._lock:
             self._require_active()
@@ -856,7 +948,7 @@ class WindowHostClient:
                 deadline = self._wall_clock() + math.ceil(self._command_timeout * 1000)
                 request = self._channel.send(
                     name,
-                    {},
+                    {} if payload is None else payload,
                     deadline_unix_ms=deadline,
                 )
                 response = self._channel.receive(
@@ -965,7 +1057,103 @@ class WindowHostClient:
             parse,
         )
 
-    def show_provider(self) -> None:
+    def begin_provider_lease(self, lease_id: str) -> ProviderLeaseHandshake:
+        if type(lease_id) is not str or not lease_id or lease_id != lease_id.strip():
+            raise ValueError("provider lease id must be exact non-empty text")
+
+        def parse(response: HandoffMessage, sequence: int) -> ProviderLeaseHandshake:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"lease_id", "generation", "port"}),
+            )
+            generation = result["generation"]
+            port = result["port"]
+            if result["lease_id"] != lease_id:
+                raise WindowSupervisorProtocolError("provider lease id changed")
+            if type(generation) is not int or generation <= 0:
+                raise WindowSupervisorProtocolError("provider lease generation is invalid")
+            if type(port) is not int or not 0 < port <= 65535:
+                raise WindowSupervisorProtocolError("provider browser endpoint is invalid")
+            return ProviderLeaseHandshake(
+                lease_id=lease_id,
+                generation=generation,
+                endpoint=f"http://127.0.0.1:{port}",
+            )
+
+        return self._command(
+            "provider-lease-begin",
+            "provider-lease-begun",
+            parse,
+            payload={"lease_id": lease_id},
+        )
+
+    def release_provider_lease(self, lease_id: str, generation: int) -> bool:
+        def parse(response: HandoffMessage, sequence: int) -> bool:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"lease_id", "generation", "released"}),
+            )
+            if result["lease_id"] != lease_id or result["generation"] != generation:
+                raise WindowSupervisorProtocolError("provider lease release identity changed")
+            if type(result["released"]) is not bool:
+                raise WindowSupervisorProtocolError("provider lease release state is invalid")
+            return result["released"]
+
+        return self._command(
+            "provider-lease-release",
+            "provider-lease-released",
+            parse,
+            payload={"lease_id": lease_id, "generation": generation},
+        )
+
+    def provider_download_events(
+        self,
+        lease_id: str,
+        generation: int,
+        *,
+        after_sequence: int = 0,
+    ) -> tuple[ProviderDownloadEvent, ...]:
+        if type(after_sequence) is not int or after_sequence < 0:
+            raise ValueError("provider download cursor is invalid")
+
+        def parse(
+            response: HandoffMessage,
+            sequence: int,
+        ) -> tuple[ProviderDownloadEvent, ...]:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"lease_id", "generation", "events"}),
+            )
+            if result["lease_id"] != lease_id or result["generation"] != generation:
+                raise WindowSupervisorProtocolError("provider download lease identity changed")
+            raw_events = result["events"]
+            if type(raw_events) is not list:
+                raise WindowSupervisorProtocolError("provider download events are invalid")
+            parsed = tuple(
+                _parse_provider_download_event(item, lease_id, generation)
+                for item in cast(list[object], raw_events)
+            )
+            if any(item.sequence <= after_sequence for item in parsed) or any(
+                left.sequence >= right.sequence for left, right in zip(parsed, parsed[1:])
+            ):
+                raise WindowSupervisorProtocolError("provider download event order is invalid")
+            return parsed
+
+        return self._command(
+            "provider-download-events",
+            "provider-download-events",
+            parse,
+            payload={
+                "lease_id": lease_id,
+                "generation": generation,
+                "after_sequence": after_sequence,
+            },
+        )
+
+    def show_provider(self, lease_id: str, generation: int) -> None:
         def parse(response: HandoffMessage, sequence: int) -> None:
             result = _strict_result(
                 response,
@@ -977,9 +1165,14 @@ class WindowHostClient:
                     "provider browser did not report visible"
                 )
 
-        self._command("provider-show", "provider-shown", parse)
+        self._command(
+            "provider-show",
+            "provider-shown",
+            parse,
+            payload={"lease_id": lease_id, "generation": generation},
+        )
 
-    def hide_provider(self) -> None:
+    def hide_provider(self, lease_id: str, generation: int) -> None:
         def parse(response: HandoffMessage, sequence: int) -> None:
             result = _strict_result(
                 response,
@@ -991,7 +1184,89 @@ class WindowHostClient:
                     "provider browser did not report hidden"
                 )
 
-        self._command("provider-hide", "provider-hidden", parse)
+        self._command(
+            "provider-hide",
+            "provider-hidden",
+            parse,
+            payload={"lease_id": lease_id, "generation": generation},
+        )
+
+    def provider_current_url(self, lease_id: str, generation: int) -> str:
+        def parse(response: HandoffMessage, sequence: int) -> str:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"url"}),
+            )
+            url = result["url"]
+            if type(url) is not str:
+                raise WindowSupervisorProtocolError("provider browser URL is invalid")
+            return url
+
+        return self._command(
+            "provider-current-url",
+            "provider-current-url",
+            parse,
+            payload={"lease_id": lease_id, "generation": generation},
+        )
+
+    def navigate_provider(self, lease_id: str, generation: int, url: str) -> None:
+        if type(url) is not str or not url or url != url.strip():
+            raise ValueError("provider URL must be exact non-empty text")
+
+        def parse(response: HandoffMessage, sequence: int) -> None:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"navigated"}),
+            )
+            if result["navigated"] is not True:
+                raise WindowSupervisorProtocolError("provider browser did not navigate")
+
+        self._command(
+            "provider-navigate",
+            "provider-navigated",
+            parse,
+            payload={"lease_id": lease_id, "generation": generation, "url": url},
+        )
+
+    def provider_document_state(
+        self,
+        lease_id: str,
+        generation: int,
+        *,
+        ready_selectors: tuple[str, ...] = (),
+        ready_texts: tuple[str, ...] = (),
+    ) -> dict[str, object]:
+        def parse(response: HandoffMessage, sequence: int) -> dict[str, object]:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset(
+                    {
+                        "ready",
+                        "challenge",
+                        "account_verification",
+                        "provider_error",
+                        "provider_ready",
+                    }
+                ),
+            )
+            if any(type(result[key]) is not bool for key in result):
+                raise WindowSupervisorProtocolError("provider document state is invalid")
+            return result
+
+        return self._command(
+            "provider-document-state",
+            "provider-document-state",
+            parse,
+            payload={
+                "lease_id": lease_id,
+                "generation": generation,
+                "ready_selectors": list(ready_selectors),
+                "ready_texts": list(ready_texts),
+            },
+        )
 
     def health(self) -> WindowHostHealth:
         def parse(response: HandoffMessage, sequence: int) -> WindowHostHealth:
@@ -1481,6 +1756,8 @@ __all__ = [
     "ProcessJobPort",
     "ProcessLauncher",
     "ProcessPort",
+    "ProviderDownloadEvent",
+    "ProviderLeaseHandshake",
     "WindowHostClient",
     "WindowHostHealth",
     "WindowHostIdentity",

@@ -64,7 +64,9 @@ import { CompactPinoutCard, parsePinout } from "./PinoutViewer";
 import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { HandoffBand } from "./HandoffBand";
-import { ComponentInspectionStage } from "./ComponentInspectionStage";
+import { PreviewImage } from "./PreviewImage";
+import { PreviewModal, type PreviewKind } from "./PreviewModal";
+import { Glb3DView } from "./Glb3DView";
 import {
   type PinnedSpecs,
   effectiveKeySpecKeys,
@@ -82,6 +84,8 @@ import {
   useAltiumEmbedModel,
   useCadSourceQuery,
   useDetachAsset,
+  useLandPattern,
+  usePreviewGlb,
   useRefreshSourcing,
 } from "../api/queries";
 import { useToast } from "../lib/toast";
@@ -89,9 +93,15 @@ import { CompletePartModal } from "./CompletePartModal";
 import { CadVariantSection } from "./CadVariantSection";
 import { CatalogProductDataBlock } from "./PulledDepth";
 import {
+  CubeArt,
+  DownloadIcon,
+  EyeIcon,
   ExternalIcon,
+  FootprintArt,
   RefreshIcon,
+  SymbolArt,
   TrashIcon,
+  UploadIcon,
   WarnIcon,
 } from "./icons";
 import {
@@ -626,15 +636,18 @@ export function DetailPanel({
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [preview, setPreview] = useState<PreviewKind | null>(null);
   // The one Complete-Part window (adds every missing file + data field in one place) - open flag.
   const [completeOpen, setCompleteOpen] = useState(
     () => readUiSession().open_surface === "complete_part",
   );
+  const [completeAutoStart, setCompleteAutoStart] = useState(false);
   // Finish the background-pill reopen handoff: when the pill asked to reopen THIS part (the page
   // already selected it), open the Complete-Part window and clear the intent.
   const { reopenPartId, clearReopen } = useCapture();
   useEffect(() => {
     if (reopenPartId && detail?.id === reopenPartId) {
+      setCompleteAutoStart(false);
       setCompleteOpen(true);
       clearReopen();
     }
@@ -702,11 +715,12 @@ export function DetailPanel({
   // different photograph was preserved in `alternates["Image"]` and shown to nobody. Still hidden
   // until clicked - it is the trigger that got bigger, not the default state.
   const partPhotoSet = partPhotos(detail?.derived.specs, detail?.alternates);
-  // Warm the cad-source (DigiKey URL) cache so the Complete Part window opens instantly; its
-  // result is NOT a readiness verdict. Verified tool state arrives through the list summary,
-  // while the raw record below is used only to plan missing-asset actions. Prefetch only; a
-  // failure never affects the readiness display.
-  useCadSourceQuery(detail?.id ?? null, true);
+  const modelGlb = usePreviewGlb(detail?.id ?? "", hasModel);
+  const landPattern = useLandPattern(detail?.id ?? "", hasModel);
+  // One bounded canonical read serves both the Complete Part window and this selected part's
+  // readiness chip. It reverifies the active immutable CAD pair; the list summary remains the
+  // fail-closed fallback while that per-part read is loading or unavailable.
+  const cadSource = useCadSourceQuery(detail?.id ?? null, true);
   // The per-part sourcing refresh (POST .../refresh): a write-lane job re-pulling
   // price/stock/lifecycle from the distributor APIs. Its outcome reports through the
   // quiet toasts like every other background mutation.
@@ -772,8 +786,27 @@ export function DetailPanel({
   // verification. Declared before the needs derivation, which reads altium.missing.
   const kicad = assetReadiness(detail, "kicad");
   const altium = assetReadiness(detail, "altium");
-  const kicadEvidence = summaryReadiness({ eda_readiness: edaReadiness }, "kicad");
-  const altiumEvidence = summaryReadiness({ eda_readiness: edaReadiness }, "altium");
+  const completionVerified = cadSource.data?.completion_evidence?.state === "verified";
+  // The selected part already has one authoritative, bounded completion read. When it has just
+  // reverified the active immutable pair, use that result for the readiness chip instead of the
+  // list index's older per-asset check projection. Keeping those two reads independent made the
+  // same screen say both "5 / 5 reverified" and "KiCad / Altium unverified".
+  const verifiedReadiness: SummaryReadiness = {
+    ready: true,
+    coverageComplete: true,
+    trust: "pass",
+    missing: [],
+  };
+  const kicadEvidence = completionVerified
+    ? verifiedReadiness
+    : summaryReadiness({ eda_readiness: edaReadiness }, "kicad");
+  const altiumEvidence = completionVerified
+    ? verifiedReadiness
+    : summaryReadiness({ eda_readiness: edaReadiness }, "altium");
+  // A trusted list projection can render Ready immediately. With no trusted fallback, the
+  // canonical read is still deciding the verdict and must not be presented as a failure.
+  const completionVerifying =
+    cadSource.isPending && !kicadEvidence.ready && !altiumEvidence.ready;
 
   // The Altium 3D embed affordance. Every precondition is a real one, and each has its own
   // message: a 3D body is written INTO the footprint's .PcbLib, so there must be a footprint to
@@ -920,17 +953,40 @@ export function DetailPanel({
             aria-label="Part views"
           />
         </div>
-        {canComplete && needsList.length > 0 ? (
+        {canComplete ? (
           <button
             data-dev-id="detail.complete-part"
             type="button"
-            aria-label={`Complete Part. Add ${needsList.join(", ")}`}
-            title={`Add ${needsList.join(", ")}`}
-            onClick={() => setCompleteOpen(true)}
-            className="inline-flex h-6 flex-none items-center gap-1.5 rounded-control border border-warn/50 bg-warn/[0.08] px-2.5 text-ui-caption font-semibold text-t1 transition-colors hover:border-warn hover:bg-warn/[0.14] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+            aria-label={
+              needsList.length > 0
+                ? `Complete Part. Add ${needsList.join(", ")}`
+                : "Get CAD Files from one provider"
+            }
+            title={
+              needsList.length > 0
+                ? `Add ${needsList.join(", ")}`
+                : "Get one verified provider CAD set"
+            }
+            onClick={() => {
+              setCompleteAutoStart(true);
+              setCompleteOpen(true);
+            }}
+            className={`inline-flex h-6 flex-none items-center gap-1.5 rounded-control border px-2.5 text-ui-caption font-semibold text-t1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc ${
+              needsList.length > 0
+                ? "border-warn/50 bg-warn/[0.08] hover:border-warn hover:bg-warn/[0.14]"
+                : "border-line bg-field hover:border-line2 hover:bg-raise2"
+            }`}
           >
-            <WarnIcon className="h-3.5 w-3.5 flex-none text-warn" />
-            <Text id="detail.complete-part">Complete Part</Text>
+            {needsList.length > 0 ? (
+              <WarnIcon className="h-3.5 w-3.5 flex-none text-warn" />
+            ) : (
+              <DownloadIcon className="h-3.5 w-3.5 flex-none text-t2" />
+            )}
+            {needsList.length > 0 ? (
+              <Text id="detail.complete-part">Complete Part</Text>
+            ) : (
+              "Get CAD Files"
+            )}
           </button>
         ) : null}
         {onDelete ? (
@@ -1032,19 +1088,73 @@ export function DetailPanel({
               tiles to 17 visible pixels and left ~288x330px of dead space beneath them. At three
               columns there is only one row, so the span is released. */}
           <div className="flex min-h-0 flex-col gap-2.5 overflow-y-auto px-4 @xl:row-span-2 @4xl:row-span-1">
-          {/* One inspection instrument. Projection changes and expansion preserve the same
-              mounted canvases, so a camera or pan state cannot regress simply because the
-              presentation changes size. */}
-          <div data-dev-id="detail.canvas" className="flex-none">
-            <ComponentInspectionStage
-              partId={detail.id}
-              partName={canonicalName}
-              available={{
-                model: hasModel,
-                symbol: assetPresent(kicadAssets?.symbol),
-                footprint: assetPresent(kicadAssets?.footprint),
-              }}
+          {/* The physical object is the hero; Symbol and Footprint are separate supporting
+              representations. They stay simultaneously visible so comparing them never becomes
+              a tab-navigation task. The 3D stage is interactive in place and only its eye action
+              opens the full inspector. */}
+          <div data-dev-id="detail.canvas" className="flex flex-none flex-col gap-2.5">
+            <AssetTile
+              devId="detail.asset-hero"
+              stageDevId="detail.asset-stage"
+              name="3D Model"
+              present={hasModel}
+              className={hasModel ? "h-[340px]" : "h-[142px]"}
+              art={<CubeArt />}
+              thumb={
+                hasModel ? (
+                  <div className="h-full w-full">
+                    <Glb3DView
+                      data={modelGlb.data}
+                      isLoading={modelGlb.isLoading}
+                      isError={modelGlb.isError}
+                      error={modelGlb.error}
+                      land={landPattern.data ?? null}
+                      showViews
+                      showShading
+                      compact
+                    />
+                  </div>
+                ) : undefined
+              }
+              onOpen={hasModel ? () => setPreview("model") : undefined}
+              interactiveStage
             />
+            <div className="grid grid-cols-2 gap-2.5">
+              <AssetTile
+                devId="detail.asset-symbol"
+                name="Symbol"
+                present={assetPresent(kicadAssets?.symbol)}
+                className="h-[142px]"
+                art={<SymbolArt />}
+                thumb={
+                  assetPresent(kicadAssets?.symbol) ? (
+                    <PreviewImage kind="symbol" partId={detail.id} fallback={<SymbolArt />} />
+                  ) : undefined
+                }
+                onOpen={assetPresent(kicadAssets?.symbol) ? () => setPreview("symbol") : undefined}
+              />
+              <AssetTile
+                devId="detail.asset-footprint"
+                name="Footprint"
+                present={assetPresent(kicadAssets?.footprint)}
+                className="h-[142px]"
+                art={<FootprintArt />}
+                thumb={
+                  assetPresent(kicadAssets?.footprint) ? (
+                    <PreviewImage
+                      kind="footprint"
+                      partId={detail.id}
+                      fallback={<FootprintArt />}
+                    />
+                  ) : undefined
+                }
+                onOpen={
+                  assetPresent(kicadAssets?.footprint)
+                    ? () => setPreview("footprint")
+                    : undefined
+                }
+              />
+            </div>
           </div>
 
           {/* THE PHOTOGRAPH, directly above the CAD row (owner 2026-07-26: "place product photo above
@@ -1076,6 +1186,7 @@ export function DetailPanel({
               altium={altium}
               kicadEvidence={kicadEvidence}
               altiumEvidence={altiumEvidence}
+              verifying={completionVerifying}
               altiumNeeds={altiumNeeds}
               embed3d={embed3d}
               removable={
@@ -1341,10 +1452,22 @@ export function DetailPanel({
           detail={detail}
           hasModel={hasModel}
           busy={busy}
-          onClose={() => setCompleteOpen(false)}
+          autoStart={completeAutoStart}
+          onClose={() => {
+            setCompleteAutoStart(false);
+            setCompleteOpen(false);
+          }}
           onEditField={onEditField}
         />
       ) : null}
+
+      <PreviewModal
+        open={preview !== null}
+        partId={detail.id}
+        partName={canonicalName}
+        initialKind={preview ?? "symbol"}
+        onClose={() => setPreview(null)}
+      />
 
       <ConfirmDialog
         open={pendingDetach !== null}
@@ -1398,6 +1521,114 @@ export function DetailPanel({
           onCancel={() => setConfirmDelete(false)}
         />
       ) : null}
+    </div>
+  );
+}
+
+function AssetTile({
+  name,
+  present,
+  art,
+  thumb,
+  onOpen,
+  interactiveStage,
+  className,
+  devId,
+  stageDevId,
+}: {
+  name: string;
+  present: boolean;
+  art: ReactNode;
+  thumb?: ReactNode;
+  onOpen?: () => void;
+  interactiveStage?: boolean;
+  className?: string;
+  devId?: string;
+  stageDevId?: string;
+}) {
+  const stage = (
+    <div
+      data-dev-id={stageDevId}
+      className={
+        "relative flex min-h-0 flex-1 items-center justify-center overflow-hidden " +
+        (present ? "bg-stage" : "flex-col gap-2 bg-stage text-t3")
+      }
+    >
+      <div className="absolute inset-0 flex items-center justify-center">
+        {present ? (
+          thumb ?? art
+        ) : (
+          <div className="flex flex-col items-center gap-1.5">
+            <UploadIcon />
+            <span className="text-2xs">No {name}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+  const footer = (
+    <div className="flex items-center gap-2 px-3 py-2">
+      <span className="min-w-0 truncate text-2xs font-semibold text-t1">{name}</span>
+      <span className="ml-auto inline-flex flex-none items-center gap-1.5 whitespace-nowrap text-2xs text-t3">
+        {present ? (
+          onOpen ? (
+            interactiveStage ? (
+              <button
+                type="button"
+                data-dev-id={devId ? `${devId}-open` : undefined}
+                onClick={onOpen}
+                aria-label={`Open ${name} Preview`}
+                className="-m-1 flex items-center rounded-control p-1 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+              >
+                <EyeIcon className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <EyeIcon className="h-3.5 w-3.5" />
+            )
+          ) : (
+            <>Linked</>
+          )
+        ) : (
+          <>
+            <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden="true" />
+            Not Linked
+          </>
+        )}
+      </span>
+    </div>
+  );
+  const base =
+    "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border border-line bg-raise " +
+    (className ?? "");
+  if (onOpen && present && interactiveStage) {
+    return (
+      <div data-dev-id={devId} className={base}>
+        {stage}
+        {footer}
+      </div>
+    );
+  }
+  if (onOpen && present) {
+    return (
+      <button
+        data-dev-id={devId}
+        type="button"
+        onClick={onOpen}
+        aria-label={`Open ${name} Preview`}
+        className={
+          base +
+          " cursor-pointer text-left transition-colors hover:border-line2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+        }
+      >
+        {stage}
+        {footer}
+      </button>
+    );
+  }
+  return (
+    <div data-dev-id={devId} className={base}>
+      {stage}
+      {footer}
     </div>
   );
 }
@@ -1568,6 +1799,7 @@ function ReadinessBlock({
   altium,
   kicadEvidence,
   altiumEvidence,
+  verifying,
   altiumNeeds,
   embed3d,
   removable = [],
@@ -1577,6 +1809,7 @@ function ReadinessBlock({
   altium: AssetReadiness;
   kicadEvidence: SummaryReadiness;
   altiumEvidence: SummaryReadiness;
+  verifying: boolean;
   altiumNeeds: string[];
   embed3d: Embed3dState | null;
   // The elements this part carries that can be removed one by one (owner 2026-07-24:
@@ -1592,10 +1825,12 @@ function ReadinessBlock({
     altiumNeeds.length > 0
       ? altiumNeeds.map((n) => n.replace(/^Altium /, ""))
       : altium.missing.filter((m) => m !== "3D Model");
-  const allReady = kicadEvidence.ready && altiumEvidence.ready;
-  const readinessLabel = `CAD readiness: KiCad ${
-    kicadEvidence.ready ? "ready" : "unverified"
-  }; Altium ${altiumEvidence.ready ? "ready" : "unverified"}`;
+  const allReady = !verifying && kicadEvidence.ready && altiumEvidence.ready;
+  const readinessLabel = verifying
+    ? "CAD readiness: verifying KiCad and Altium"
+    : `CAD readiness: KiCad ${
+        kicadEvidence.ready ? "ready" : "unverified"
+      }; Altium ${altiumEvidence.ready ? "ready" : "unverified"}`;
   // Readiness is tucked behind a button: a compact status chip that opens the KiCad + Altium
   // evidence detail. Component-wide completion stays in the title strip instead of hiding inside
   // this projection-scoped popover.
@@ -1610,18 +1845,20 @@ function ReadinessBlock({
         aria-label={readinessLabel}
         className="flex h-8 w-full items-center gap-2.5 rounded-control border border-line bg-field px-3 text-left transition-colors hover:border-line2 hover:bg-raise2"
       >
-        {allReady ? (
+        {verifying ? (
+          <Icon id="detail.sourcing-refresh" className="h-3.5 w-3.5 flex-none animate-spin text-t3 motion-reduce:animate-none" />
+        ) : allReady ? (
           <Icon id="detail.ready-check" className="h-3.5 w-3.5 flex-none" />
         ) : (
           <WarnIcon className="h-3.5 w-3.5 flex-none text-warn" />
         )}
         <span className="flex min-w-0 flex-1 items-center justify-end gap-2 text-2xs font-medium">
-          <span className={kicadEvidence.ready ? "text-ok" : "text-t2"}>
-            KiCad {kicadEvidence.ready ? "Ready" : "Unverified"}
+          <span className={verifying ? "text-t2" : kicadEvidence.ready ? "text-ok" : "text-t2"}>
+            KiCad {verifying ? "Verifying" : kicadEvidence.ready ? "Ready" : "Unverified"}
           </span>
           <span aria-hidden className="text-t3">·</span>
-          <span className={altiumEvidence.ready ? "text-ok" : "text-t2"}>
-            Altium {altiumEvidence.ready ? "Ready" : "Unverified"}
+          <span className={verifying ? "text-t2" : altiumEvidence.ready ? "text-ok" : "text-t2"}>
+            Altium {verifying ? "Verifying" : altiumEvidence.ready ? "Ready" : "Unverified"}
           </span>
         </span>
         <Icon
@@ -1640,11 +1877,12 @@ function ReadinessBlock({
         // action and the Remove chips had ALL been unreachable. Anchoring to the bottom gives the
         // popover the whole rail height above it, which is always available here.
         <div className="absolute inset-x-0 bottom-[calc(100%+6px)] z-[70] rounded-card border border-line2 bg-popover p-3 shadow-pop">
-          <ReadinessRow label="KiCad" readiness={kicadEvidence} localNeeds={kicadNeeds} />
+          <ReadinessRow label="KiCad" readiness={kicadEvidence} localNeeds={kicadNeeds} verifying={verifying} />
           <ReadinessRow
             label="Altium"
             readiness={altiumEvidence}
             localNeeds={altiumBlocking}
+            verifying={verifying}
           />
           {embed3d ? <Embed3dRow state={embed3d} /> : null}
           {onRemove && removable.length > 0 ? (
@@ -1744,14 +1982,18 @@ function ReadinessRow({
   label,
   readiness,
   localNeeds,
+  verifying = false,
 }: {
   label: string;
   readiness: SummaryReadiness;
   // Local presence can explain what the repair action will collect, but it
   // never grants Ready. Prefer the backend diagnosis whenever one exists.
   localNeeds: string[];
+  verifying?: boolean;
 }) {
-  const status = readiness.ready
+  const status = verifying
+    ? "Verifying"
+    : readiness.ready
     ? "Ready"
     : readiness.trust === "fail"
       ? "Verification failed"
@@ -1766,7 +2008,9 @@ function ReadinessRow({
     <DataRow
       label={
         <span className="flex items-center gap-2">
-          {readiness.ready ? (
+          {verifying ? (
+            <Icon id="detail.sourcing-refresh" className="h-3.5 w-3.5 flex-none animate-spin text-t3 motion-reduce:animate-none" />
+          ) : readiness.ready ? (
             <Icon id="detail.ready-check" className="h-3.5 w-3.5 flex-none" />
           ) : (
             <span
@@ -1778,7 +2022,7 @@ function ReadinessRow({
         </span>
       }
     >
-      <span className={readiness.ready ? "text-ok" : "text-t2"}>
+      <span className={!verifying && readiness.ready ? "text-ok" : "text-t2"}>
         {status}
       </span>
     </DataRow>

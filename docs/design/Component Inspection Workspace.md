@@ -171,26 +171,31 @@ The primary action is never a fixed button. Examples:
 Delete, raw-file operations, and administrative actions live in the overflow menu,
 not as an isolated red icon at the bottom of the window.
 
-## Unified Inspection Stage
+## Representation Gallery
 
-Symbol, Footprint, and 3D are tabs in one stage:
+The opened component keeps all three representations visible at once: a large,
+interactive 3D hero with separate Symbol and Footprint viewers beneath it.
 
 ```text
-┌ Symbol  Footprint  3D ───────────── Compare  Fit  More ┐
-│                                                        │
-│                  active projection                     │
-│                                                        │
-├ projection controls ───────────────────────────────────┤
-│ PASS 8   WARN 1   FAIL 0       source / revision / hash│
+┌ 3D Model ───────────────────── Layers  Spin  Settings ┐
+│              interactive physical model               │
 └────────────────────────────────────────────────────────┘
+┌ Symbol ─────────────────────┐ ┌ Footprint ────────────┐
+│ logical representation      │ │ physical land pattern │
+└─────────────────────────────┘ └───────────────────────┘
 ```
 
-Switching projection preserves the selected pin/pad, comparison target, issue
-filter, and component context. Expanding the stage preserves its camera/view state
-and must not create a second renderer.
+The 3D tile orbits and zooms in place. Its compact toolbar keeps Model, Pads,
+PCB, and Auto Rotate visible; one settings control exposes Isometric/Top/Front,
+Fit, Source Color/Studio/X-Ray, and Auto/Source/Model placement. Symbol and
+Footprint remain direct preview targets instead of becoming mutually exclusive
+tabs. Each representation can open the large shared inspection modal directly on
+the representation the user chose.
 
-The inline stage exposes the same capabilities as the expanded workspace through
-progressive disclosure, not by squeezing every control into one icon row.
+This simultaneous gallery is the accepted comparison contract. A single inline
+projection stage is rejected because it hides two representations and turns
+comparison into navigation. The expanded modal may use tabs because expansion is
+an explicit deep-inspection context, not the component's at-a-glance overview.
 
 ## Symbol Inspector
 

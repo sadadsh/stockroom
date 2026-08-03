@@ -162,7 +162,7 @@ describe("CompletePartModal - automatic capture", () => {
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
     expect(
       await screen.findByText(
-        "One automatic run reuses verified evidence and stops at the first complete validated KiCad + Altium + STEP package.",
+        "One automatic run reuses verified evidence and completes the part from one provider's symbol, footprint, and 3D model set.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Preferred Source")).toBeNull();
@@ -279,14 +279,14 @@ describe("CompletePartModal - automatic capture", () => {
     expect(screen.getByRole("button", { name: "Refresh Sources" })).toBeInTheDocument();
     expect(
       await screen.findByText(
-        "Collection Complete. Every route is settled. Unavailable means it was checked and had no exact deliverable.",
+        "Part Ready. One provider supplied a complete verified CAD package.",
       ),
     ).toHaveClass("text-t2");
     expect(screen.getByText("Source Results")).toHaveClass("text-t2");
-    expect(screen.getByText("Complete")).toHaveClass("text-[var(--c-ok-text)]");
+    expect(screen.getByText("Ready")).toHaveClass("text-[var(--c-ok-text)]");
   });
 
-  it("shows each DigiKey author route independently and calls blocked work partial", async () => {
+  it("keeps a verified part ready when later DigiKey author routes are not used", async () => {
     const user = userEvent.setup();
     mockCadSource([]);
     mockCapture([
@@ -372,18 +372,19 @@ describe("CompletePartModal - automatic capture", () => {
     expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
     expect(
       await screen.findByText(
-        "Collection Partial. A route requires human input, is blocked or failed, was cancelled, or was not attempted.",
+        "Part Ready. One provider supplied a complete verified CAD package.",
       ),
-    ).toHaveClass("text-[var(--c-warn-text)]");
-    expect(screen.getByText("Partial")).toHaveClass("text-[var(--c-warn-text)]");
+    ).toHaveClass("text-t2");
+    expect(screen.getByText("Ready")).toHaveClass("text-[var(--c-ok-text)]");
+    expect(screen.queryByText(/Some optional provider variants were not collected/)).toBeNull();
     expect(screen.getByText("DigiKey / Ultra Librarian")).toBeInTheDocument();
     expect(screen.getByText("DigiKey / SnapMagic")).toBeInTheDocument();
-    expect(screen.getByText("DigiKey / TraceParts")).toBeInTheDocument();
+    expect(screen.queryByText("DigiKey / TraceParts")).toBeNull();
     expect(screen.getByText("Unavailable")).toHaveClass("text-t2");
     expect(screen.getByText("Security Check Required")).toHaveClass(
       "text-[var(--c-warn-text)]",
     );
-    expect(screen.getByText("Not Attempted")).toHaveClass("text-[var(--c-warn-text)]");
+    expect(screen.queryByText("Not Attempted")).toBeNull();
     expect(screen.getByText("No exact deliverable was offered.")).toHaveClass("text-t2");
   });
 
@@ -545,7 +546,7 @@ describe("CompletePartModal - copy + icon adoption", () => {
     // Subtitle + CAD section render their default text (no override).
     expect(
       await screen.findByText(
-        "Stockroom completes remaining data and one verified KiCad + Altium + STEP package.",
+        "Stockroom completes the part from one verified provider set. Choose another source only when you want a different variant.",
       ),
     ).toBeInTheDocument();
     expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
@@ -589,7 +590,7 @@ describe("CompletePartModal - copy + icon adoption", () => {
       wrapper: devWrapper,
     });
     await screen.findByText(
-      "Stockroom completes remaining data and one verified KiCad + Altium + STEP package.",
+      "Stockroom completes the part from one verified provider set. Choose another source only when you want a different variant.",
     );
 
     expect(screen.getByRole("dialog", { name: "Complete this part" })).toBeInTheDocument();
@@ -636,10 +637,10 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
 
     await user.click(screen.getByRole("button", { name: "Get Files" }));
 
-    expect(await screen.findByText("Provider Work Is Active")).toBeInTheDocument();
+    expect(await screen.findByText("Processing Downloaded Files")).toBeInTheDocument();
     expect(screen.getByText("Starting")).toBeInTheDocument();
     expect(
-      screen.getByText(/provider needs your sign-in, security check, format choice/i),
+      screen.getByText(/received the route output and is validating, converting, and attaching/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/default browser/i)).toBeNull();
     expect(screen.queryByText(/separate window/i)).toBeNull();
@@ -722,6 +723,11 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
       accepted: true,
       queued_files: 1,
     });
+    const showProvider = vi.spyOn(api, "showCaptureProvider").mockResolvedValue({
+      workflow_batch_id: "batch-selected-files",
+      part_id: DETAIL.id,
+      visible: true,
+    });
     RENDER();
 
     await user.click(await screen.findByRole("button", { name: "Get Files" }));
@@ -729,13 +735,14 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
     // propagated through the capture store. Full-suite Windows runners can be busy with other
     // WebView/Git fixtures, so use an explicit integration timeout instead of the DOM library's
     // one-second default. This still fails if any route field never arrives.
-    await user.click(
-      await screen.findByRole(
-        "button",
-        { name: "Use Downloaded Files" },
-        { timeout: 5_000 },
-      ),
+    const useDownloadedFiles = await screen.findByRole(
+      "button",
+      { name: "Add Files" },
+      { timeout: 5_000 },
     );
+    await user.click(screen.getByRole("button", { name: "Show Provider" }));
+    await waitFor(() => expect(showProvider).toHaveBeenCalledWith("batch-selected-files"));
+    await user.click(useDownloadedFiles);
 
     expect(pickFiles).toHaveBeenCalledWith("cad-recovery");
     await waitFor(() =>
@@ -749,9 +756,42 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
       }),
     );
     expect(
-      await screen.findByText(/queued 1 selected file for validation in this completion task/i),
+      await screen.findByText(/Stockroom added 1 selected file to this provider task/i),
     ).toBeInTheDocument();
   }, 15_000);
+
+  it("can recover already-downloaded files before a provider route is active", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol", "altium_symbol"]);
+    const pickFiles = vi.fn().mockResolvedValue(["D:\\Downloads\\Recovered.zip"]);
+    Object.defineProperty(window, "__STOCKROOM_HOST__", {
+      configurable: true,
+      value: { pickFiles },
+    });
+    const add = vi.spyOn(api, "addPartFiles").mockResolvedValue({
+      part_id: DETAIL.id,
+      selected_files: 1,
+      attached: ["kicad_symbol"],
+      ignored: ["readme.txt: ignored"],
+      remaining: ["altium_symbol"],
+      complete: false,
+    });
+    RENDER();
+
+    await user.click(await screen.findByRole("button", { name: "Add Files" }));
+
+    expect(pickFiles).toHaveBeenCalledWith("cad-recovery");
+    await waitFor(() =>
+      expect(add).toHaveBeenCalledWith({
+        partId: DETAIL.id,
+        paths: ["D:\\Downloads\\Recovered.zip"],
+      }),
+    );
+    expect(
+      await screen.findByText(/Stockroom attached 1 CAD role; 1 still needed/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Files" })).toBeEnabled();
+  });
 });
 
 // ------------------------------------------------------ the window contract every sibling has
@@ -830,7 +870,7 @@ describe("CompletePartModal - dismiss, focus, and close paths", () => {
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={onClose} />, { wrapper });
 
     await user.click(await screen.findByRole("button", { name: "Get Files" }));
-    await screen.findByText("Provider Work Is Active");
+    await screen.findByText("Processing Downloaded Files");
     fireEvent.keyDown(window, { key: "Escape" });
 
     // Escape is a close path like every other, so it must go through the same hand-off, not drop
@@ -952,7 +992,7 @@ describe("CompletePartModal - one capture slot", () => {
       { wrapper },
     );
     await user.click(await screen.findByRole("button", { name: "Get Files" }));
-    await screen.findByText("Provider Work Is Active");
+    await screen.findByText("Processing Downloaded Files");
 
     rerender(<CompletePartModal detail={other} hasModel={true} onClose={() => {}} />);
     expect(await screen.findByRole("button", { name: "Another Part Is Running" })).toBeDisabled();

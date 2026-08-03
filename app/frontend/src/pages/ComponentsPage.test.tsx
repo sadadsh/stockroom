@@ -484,6 +484,7 @@ describe("ComponentsPage", () => {
       by_manufacturer: {},
       complete: 1,
       incomplete: 0,
+      category_catalog: ["ICs", "Passives", "Fuses"],
     });
     mockApi.partDetail.mockResolvedValue(DETAIL);
     mockApi.moveCategory.mockResolvedValue(
@@ -494,6 +495,11 @@ describe("ComponentsPage", () => {
     const user = userEvent.setup();
 
     const select = await screen.findByLabelText("Category");
+    await waitFor(() => {
+      expect(Array.from((select as HTMLSelectElement).options, (option) => option.value)).toContain(
+        "Fuses",
+      );
+    });
     await user.selectOptions(select, "Passives");
 
     expect(mockApi.moveCategory).toHaveBeenCalledWith("lm358", "Passives");

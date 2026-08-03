@@ -24,7 +24,31 @@ def _report(
     provider: str,
     roles: tuple[str, ...],
     source_manifests: tuple[str, ...] = (),
+    cross_proved: bool = True,
 ) -> bytes:
+    cross_eda = {}
+    if cross_proved and {
+        "symbol",
+        "footprint",
+        "model",
+        "altium_symbol",
+        "altium_footprint",
+    }.issubset(roles):
+        cross_eda = {
+            "cross_eda": {
+                "status": "verified",
+                "report": {
+                    "valid": True,
+                    "terminal_equivalence": True,
+                    "pad_equivalence": True,
+                    "package_equivalence": True,
+                    "altium": {
+                        "symbol_entry": "S1M",
+                        "footprint_entry": "DIOM5227X270N",
+                    },
+                },
+            }
+        }
     return json.dumps(
         {
             "identity": {
@@ -37,6 +61,7 @@ def _report(
             "schema": "stockroom.cad-role-validation/1",
             "source_manifests": sorted(source_manifests),
             "valid": True,
+            **cross_eda,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -125,6 +150,7 @@ def _record_pair(
     provider: str,
     marker: str,
     symbol_names: tuple[str, ...] = ("TPS62130",),
+    cross_proved: bool = True,
 ) -> str:
     roles = ("symbol", "footprint", "model", "altium_symbol", "altium_footprint")
     return store.record_role_artifact_success(
@@ -141,6 +167,7 @@ def _record_pair(
             operation=KICAD_CAD_OPERATION.label,
             provider=provider,
             roles=roles,
+            cross_proved=cross_proved,
         ),
     )
 
@@ -542,6 +569,38 @@ def test_same_provider_and_source_reference_cannot_substitute_for_one_download(
 
     assert response.status_code == 409
     assert "one exact provider download evidence set" in response.json()["detail"]
+    assert app_ctx.ops.load_record("tps62130").cad_variants.is_empty()
+
+
+def test_pair_activation_refuses_unproved_evidence_before_mutation(
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    store, identity = _evidence(app_ctx, tmp_path, monkeypatch)
+    digest = _record_pair(
+        store,
+        identity,
+        provider="ultralibrarian",
+        marker="unproved",
+        cross_proved=False,
+    )
+    head = app_ctx.repo.head()
+
+    with pytest.raises(ValueError, match="no proved cross-EDA validation report"):
+        _activate_pair(
+            app_ctx,
+            "tps62130",
+            ActivateCadPairBody(
+                kicadVariantId=digest,
+                altiumVariantId=digest,
+                expectedActiveKicadVariantId=None,
+                expectedActiveAltiumVariantId=None,
+            ),
+            store,
+        )
+
+    assert app_ctx.repo.head() == head
     assert app_ctx.ops.load_record("tps62130").cad_variants.is_empty()
 
 

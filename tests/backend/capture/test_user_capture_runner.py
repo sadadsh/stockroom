@@ -111,6 +111,7 @@ def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_expl
     monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
 
     stop = lambda: False
+    in_app_provider_surface = lambda: None
     ctx = SimpleNamespace(
         ops=SimpleNamespace(load_record=lambda _part_id: None),
         jobs=SimpleNamespace(run_write=lambda fn: fn()),
@@ -120,6 +121,7 @@ def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_expl
         repo=object(),
         cli=object(),
         config=SimpleNamespace(ul_private_evaluation_automation=False),
+        provider_browser_surface=in_app_provider_surface,
     )
 
     result = runner.run_guided_capture(
@@ -157,6 +159,7 @@ def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_expl
     assert all(options["user_driven"] is False for options in assisted)
     assert all(options["operator_authorized"] is True for options in assisted)
     assert all(options["collect_variants"] is True for options in assisted)
+    assert assisted[0]["provider_surface"] is in_app_provider_surface
     cancel_checks = [options["user_cancelled"] for options in assisted]
     assert cancel_checks[0]() is False
     assisted[0]["cancel_workflow"]()
@@ -177,9 +180,9 @@ def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_expl
     assert digikey["vendor"] == "digikey"
     assert digikey["engine"] == "camoufox"
     assert digikey["convert_altium"] is runner._convert_ul_altium_package
-    assert digikey["user_driven"] is True
-    assert digikey["operator_authorized"] is False
-    assert digikey["credentials"] is None
+    assert digikey["user_driven"] is False
+    assert digikey["operator_authorized"] is True
+    assert digikey["credentials"] is runner._saved_credentials
     assert digikey["collect_variants"] is True
     pipeline_factories[-1]()
     assert pipeline_options[-1] == {"auto_embed_altium_models": True}
@@ -322,13 +325,13 @@ def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
     assert [options["user_driven"] for options in constructed] == [
         False,
         False,
-        True,
+        False,
         True,
     ]
     assert [options["operator_authorized"] for options in constructed] == [
         False,
         True,
-        False,
+        True,
         False,
     ]
     assert complete_options[0]["exhaustive"] is True
@@ -337,17 +340,15 @@ def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
     assert all(source.closed for source in source_batches[0] if hasattr(source, "closed"))
 
 
-def test_collect_all_finishes_every_automated_route_before_asking_a_person(
+def test_collect_all_finishes_every_operable_route_before_asking_a_person(
     monkeypatch,
     tmp_path,
 ):
     """Person-driven providers run LAST, after every route Stockroom can drive itself.
 
-    Collect All Sources is exhaustive, so DigiKey and SamacSys are still visited.  But a
-    person-driven route can be cancelled, and cancelling one cancels the rest of the run
-    (`guided.py::_supply_user_driven_route` calls `cancel_workflow`).  With DigiKey ahead of
-    SnapMagic in `_VENDOR_CHAIN`, closing DigiKey's window threw away a SnapMagic route that
-    needed no person at all.  Automation therefore has to be exhausted before the handoff.
+    Collect All Sources is exhaustive. DigiKey and SnapMagic have measured ordinary controls for
+    this exact-part job; SamacSys remains raw person-driven. Every operable route must therefore
+    finish before the one remaining handoff.
     """
 
     import stockroom.evidence as evidence_module
@@ -440,11 +441,8 @@ def test_collect_all_finishes_every_automated_route_before_asking_a_person(
     order = [options["vendor"] for options in constructed]
     driven = [options["user_driven"] for options in constructed]
 
-    # DigiKey's site controls remain person-driven. Every route Stockroom can drive is exhausted
-    # before either person-driven provider is opened.
-    assert order == ["ultralibrarian", "snapmagic", "digikey", "samacsys"]
-    assert driven == [False, False, True, True]
-    assert order.index("snapmagic") < order.index("digikey")
+    assert order == ["ultralibrarian", "digikey", "snapmagic", "samacsys"]
+    assert driven == [False, False, False, True]
     # Stated as the invariant, not as one hard-coded list: no automated route may follow a
     # person-driven one.
     assert driven == sorted(driven)
@@ -553,7 +551,7 @@ def test_collect_all_preference_reorders_only_within_the_automation_lane(
 
     order = [options["vendor"] for options in constructed]
 
-    assert order == ["ultralibrarian", "snapmagic", "digikey", "samacsys"]
+    assert order == ["ultralibrarian", "digikey", "snapmagic", "samacsys"]
     # Every registered provider is still visited: preference demotes nobody out of the run.
     assert sorted(order) == sorted(runner._VENDOR_CHAIN)
 
@@ -610,7 +608,7 @@ def test_runner_uses_one_immutable_evidence_resolver_for_selection_and_completio
     monkeypatch.setattr(
         verified_cache,
         "record_completion_evidence",
-        lambda store, current: ("verified-by", store, current.id),
+        lambda store, current, **_kwargs: ("verified-by", store, current.id),
     )
     monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
     monkeypatch.setattr(runner, "_automatic_provider_keys", lambda *_args, **_kwargs: [])

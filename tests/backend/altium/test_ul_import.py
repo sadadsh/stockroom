@@ -169,6 +169,7 @@ def test_ul_script_package_converts_a_sandbox_copy_to_native_libraries(
     assert result is not None
     assert read_symbol_names(result.schlib) == ["S1M"]
     assert read_footprint_names(result.pcblib) == ["DIOM5227X270N"]
+    assert result.preferred_footprint == "DIOM5227X270N"
     assert archive.read_bytes() == original
     assert driver.calls[0]["proc"] == "UL_Import.pas>StockroomImport"
     assert driver.calls[0]["project"].name == "Stockroom UL Import.PrjScr"
@@ -187,6 +188,26 @@ def test_ul_script_package_converts_a_sandbox_copy_to_native_libraries(
     assert not result.workdir.exists()
 
 
+def test_manual_intake_does_not_launch_altium_for_a_script_only_package(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    archive = _package(tmp_path)
+    _approve_archive(monkeypatch, archive)
+    driver = _Driver()
+
+    with pytest.raises(UltraLibrarianImportError, match="requires Altium"):
+        convert_ul_altium_package(
+            [archive],
+            expected_manufacturer=MANUFACTURER,
+            expected_mpn=MPN,
+            driver=driver,
+            allow_altium=False,
+        )
+
+    assert driver.calls == []
+
+
 def test_pcad_package_converts_without_launching_altium(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -201,6 +222,12 @@ def test_pcad_package_converts_without_launching_altium(
     with zipfile.ZipFile(archive, "w") as output:
         output.write(lia, f"AltiumV15/{lia.name}")
         output.write(step, step.name)
+    kicad_archive = tmp_path / "EXACT-LONG-MPN-KiCad.zip"
+    with zipfile.ZipFile(kicad_archive, "w") as output:
+        output.writestr(
+            "EXACT-LONG-MPN.step",
+            "ISO-10303-21;\n/* KiCad companion */\nEND-ISO-10303-21;\n",
+        )
 
     calls: list[tuple[Path, Path, Path | None]] = []
 
@@ -231,7 +258,7 @@ def test_pcad_package_converts_without_launching_altium(
     driver = _Driver()
 
     result = convert_ul_altium_package(
-        [archive],
+        [kicad_archive, archive],
         expected_manufacturer="Maker LLC",
         expected_mpn="EXACT-LONG-MPN",
         driver=driver,
@@ -239,6 +266,7 @@ def test_pcad_package_converts_without_launching_altium(
 
     assert result is not None
     assert [path.suffix for path in result.libraries] == [".SchLib", ".PcbLib"]
+    assert result.preferred_footprint == "DEFAULT"
     assert len(calls) == 1
     assert calls[0][0].name == lia.name
     assert calls[0][2] is not None and calls[0][2].name == step.name
@@ -384,7 +412,7 @@ End;
         )
 
 
-def test_extra_archive_member_is_rejected_before_the_driver_runs(
+def test_unrecognized_extra_archive_member_is_rejected_before_the_driver_runs(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ):
@@ -397,7 +425,7 @@ def test_extra_archive_member_is_rejected_before_the_driver_runs(
         output.writestr("README.md", "unexpected")
     driver = _Driver()
 
-    with pytest.raises(UltraLibrarianImportError, match="7 files; expected six"):
+    with pytest.raises(UltraLibrarianImportError, match="does not match the reviewed script shape"):
         convert_ul_altium_package(
             [rewritten],
             expected_manufacturer=MANUFACTURER,
@@ -406,6 +434,29 @@ def test_extra_archive_member_is_rejected_before_the_driver_runs(
         )
 
     assert driver.calls == []
+
+
+def test_one_altium_step_companion_is_accepted(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    archive = _package(tmp_path)
+    rewritten = tmp_path / "with-altium-step.zip"
+    with zipfile.ZipFile(archive) as source, zipfile.ZipFile(rewritten, "w") as output:
+        for name in source.namelist():
+            output.writestr(name, source.read(name))
+        output.writestr("AltiumDesigner/provider-model.step", b"provider step")
+    _approve_archive(monkeypatch, rewritten)
+
+    result = convert_ul_altium_package(
+        [rewritten],
+        expected_manufacturer=MANUFACTURER,
+        expected_mpn=MPN,
+        driver=_Driver(),
+    )
+
+    assert result.schlib.name == f"{MPN}.SchLib"
+    assert result.pcblib.name == f"{MPN}.PcbLib"
 
 
 def test_identity_comparison_preserves_meaningful_punctuation(

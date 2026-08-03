@@ -132,6 +132,42 @@ public sealed class CadLibraryConverterTests
     }
 
     [Fact]
+    public async Task UnmappedPhysicalThermalPadIsPreservedWithoutInventingASymbolPin()
+    {
+        using var scope = new TestScope();
+        var request = scope.Request();
+        var thermalVia = new PadDefinition
+        {
+            Designator = "18",
+            Xmm = 0,
+            Ymm = 0,
+            SizeXmm = 0.5,
+            SizeYmm = 0.5,
+            HoleSizeMm = 0.25,
+            Layer = 74,
+            Shape = "round",
+            HoleType = "round",
+            Plated = true,
+        };
+        request = request with
+        {
+            Footprints = request.Footprints
+                .Select(item => item with { Pads = [.. item.Pads, thermalVia] })
+                .ToArray(),
+        };
+
+        var result = await CadLibraryConverter.ConvertAsync(request);
+
+        var schlib = await new SchLibReader().ReadAsync(result.Schlib!.Path);
+        var symbol = Assert.IsType<SchComponent>(Assert.Single(schlib.Components));
+        Assert.Equal(4, Assert.Single(symbol.Implementations).MapDefiners.Count);
+        var pcblib = await new PcbLibReader().ReadAsync(result.Pcblib!.Path);
+        var footprint = Assert.IsType<PcbComponent>(pcblib[request.DefaultFootprint]);
+        Assert.Equal(5, footprint.Pads.Count);
+        Assert.Contains(footprint.Pads, pad => pad.Designator == "18");
+    }
+
+    [Fact]
     public async Task InvalidUtf8StepFailsCleanlyWithoutWritingLibraries()
     {
         using var scope = new TestScope();

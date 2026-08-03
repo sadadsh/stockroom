@@ -13,7 +13,7 @@ import type { GuidedStatus } from "../lib/capture";
 const STATUS_LABEL: Record<GuidedStatus, string> = {
   idle: "",
   resolving: "Looking up",
-  "window-open": "Waiting for files",
+  "window-open": "Needs your input",
   receiving: "Capturing",
   attaching: "Attaching",
   done: "Complete",

@@ -21,6 +21,10 @@ from stockroom.host.run import (
     _start_restart_watchdog,
     run_windowed,
 )
+from stockroom.model.part import PartRecord
+from stockroom.model.part_id import make_part_id
+from stockroom.planning.production_composition import _seed_copy_on_write_context
+from stockroom.planning.provider_policy import ExactPartIdentity
 
 
 def test_embedded_server_starts_without_console_streams(monkeypatch):
@@ -88,6 +92,24 @@ def test_run_windowed_wires_the_default_webview2_fetcher_when_absent(app_ctx):
 
     run_windowed(ctx=app_ctx, open_window=fake_window)
     assert captured["is_webview"] is True
+
+
+def test_durable_acquisition_copy_keeps_the_live_provider_surface(app_ctx, tmp_path) -> None:
+    surface = object()
+    app_ctx.provider_browser_surface = surface
+    legacy = app_ctx.profile.library.parts_dir / "tps62130.json"
+    canonical = app_ctx.profile.library.parts_dir / f"{make_part_id('TPS62130')}.json"
+    record = PartRecord.loads(legacy.read_text(encoding="utf-8"))
+    record.id = make_part_id("TPS62130")
+    canonical.write_text(record.dumps(), encoding="utf-8")
+
+    isolated = _seed_copy_on_write_context(
+        app_ctx,
+        ExactPartIdentity("TI", "TPS62130"),
+        tmp_path / "Isolated Acquisition",
+    )
+
+    assert isolated.provider_browser_surface is surface
 
 
 def test_run_windowed_serves_index_with_the_token_injected(app_ctx):

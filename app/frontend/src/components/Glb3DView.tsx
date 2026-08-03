@@ -85,8 +85,8 @@ export function Glb3DView({
    * with the one group that is genuinely per-part, the layers.
    */
   showShading?: boolean;
-  /** Narrow host (the detail tile): a passive, auto-rotating specimen with no embedded controls.
-   *  All deliberate inspection controls live in the expanded viewer where they have room. */
+  /** Narrow host (the detail tile): controls become compact icons and advanced controls move
+   *  behind one settings button. Orbit, zoom, layers, motion and inspection remain available. */
   compact?: boolean;
   /**
    * Reports rendered truth, not file presence. `visible` is emitted only after
@@ -104,9 +104,9 @@ export function Glb3DView({
   // control can show the CURRENT answer rather than just issuing commands into the scene.
   const [view, setView] = useState<ViewMode | null>("iso");
   const [showLand, setShowLand] = useState(DEFAULT_LAYERS.pads);
-  // Technical/studio is the neutral inspection default. Source-authored colour is
-  // still available as an explicit mode; it is not silently used as decoration.
-  const [renderMode, setRenderMode] = useState<RenderMode>("studio");
+  // Start with the source-authored materials. Studio remains available for shape inspection, but
+  // it must be an explicit choice rather than making every newly opened part look like a clay model.
+  const [renderMode, setRenderMode] = useState<RenderMode>("realistic");
   // The idle spin. Owner 2026-07-26 asked for "an option to stop rotation" - and the same switch closes
   // a logged accessibility defect, since the perpetual rotation ignored prefers-reduced-motion while
   // the 300ms view tween honoured it. `setSpin` returns the state actually in force, which is false
@@ -120,6 +120,7 @@ export function Glb3DView({
   const [selectedPlacementSource, setSelectedPlacementSource] = useState<"kicad" | "model">(
     "model",
   );
+  const [compactControlsOpen, setCompactControlsOpen] = useState(false);
   const renderableLand = usableLandPattern(land);
   const landRef = useRef<LandPattern | null>(renderableLand);
   landRef.current = renderableLand;
@@ -244,18 +245,14 @@ export function Glb3DView({
     // that bet is what the camera-fit work exists to lose.
     //
     // The full inspection bar deliberately spends space on visible grouping and credible targets.
-    // Compact is a passive auto-rotating specimen; opening the inspection modal is its one action.
+    // Compact keeps the same capabilities through icon controls and one advanced-settings popover.
     <div className="relative flex h-full w-full flex-col">
       <div
         ref={mountRef}
         data-testid="model-canvas"
-        tabIndex={compact ? -1 : 0}
-        role={compact ? undefined : "application"}
-        aria-label={
-          compact
-            ? undefined
-            : "3D model inspection canvas. Drag to orbit, scroll to zoom, and press 0 or F to fit."
-        }
+        tabIndex={0}
+        role="application"
+        aria-label="3D model inspection canvas. Drag to orbit, scroll to zoom, and press 0 or F to fit."
         onKeyDown={(event) => {
           if (event.key === "0" || event.key.toLowerCase() === "f") {
             event.preventDefault();
@@ -265,7 +262,6 @@ export function Glb3DView({
         className="relative min-h-0 w-full flex-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc"
       />
       {!compact && showViews ? <div aria-hidden="true" className="h-[82px] flex-none" /> : null}
-      {!compact ? (
       <div
         onClick={(e) => e.stopPropagation()}
         // pointer-events-auto is LOAD-BEARING: the detail panel wraps this whole view in a
@@ -415,15 +411,63 @@ export function Glb3DView({
               />
             </div>
           </div>
-          <div
-            className="flex flex-col items-start gap-1 border-l border-line pl-3"
-            role="group"
-            aria-label="Camera view"
-          >
-            <ControlLabel>View</ControlLabel>
+          {compact ? (
+            <button
+              type="button"
+              data-dev-id="detail.model-settings"
+              aria-label="3D view settings"
+              aria-expanded={compactControlsOpen}
+              title="View, appearance, placement, and fit settings"
+              onClick={() => setCompactControlsOpen((open) => !open)}
+              className={
+                "flex h-[30px] w-[30px] items-center justify-center rounded-control border border-line2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+                (compactControlsOpen
+                  ? "bg-raise2 text-t1 shadow-card"
+                  : "bg-field text-t2 hover:bg-raise hover:text-t1")
+              }
+            >
+              <Icon id="action.settings" className="h-4 w-4" />
+            </button>
+          ) : (
+            <div
+              className="flex flex-col items-start gap-1 border-l border-line pl-3"
+              role="group"
+              aria-label="Camera view"
+            >
+              <ControlLabel>View</ControlLabel>
+              <div className="flex items-center gap-1">
+                <ViewControls
+                  active={view}
+                  onPick={(mode) => {
+                    setView(mode);
+                    sceneRef.current?.setView(mode);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => sceneRef.current?.fit()}
+                  title="Frame the whole visible model (0 or F)"
+                  className="inline-flex min-h-[32px] items-center rounded-control border border-line2 bg-field px-2.5 text-xs font-semibold text-t2 transition-[transform,background-color,color] active:scale-[0.97] hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+                >
+                  Fit
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
+      </div>
+      {compact && compactControlsOpen ? (
+        <div
+          data-dev-id="detail.model-settings-popover"
+          onClick={(event) => event.stopPropagation()}
+          className="pointer-events-auto absolute bottom-10 right-2 z-20 w-[270px] rounded-card border border-line2 bg-popover p-2 shadow-pop"
+        >
+          <ControlSection label="View">
             <div className="flex items-center gap-1">
               <ViewControls
                 active={view}
+                compact
                 onPick={(mode) => {
                   setView(mode);
                   sceneRef.current?.setView(mode);
@@ -432,17 +476,66 @@ export function Glb3DView({
               <button
                 type="button"
                 onClick={() => sceneRef.current?.fit()}
+                aria-label="Fit model"
                 title="Frame the whole visible model (0 or F)"
-                className="inline-flex min-h-[32px] items-center rounded-control border border-line2 bg-field px-2.5 text-xs font-semibold text-t2 transition-[transform,background-color,color] active:scale-[0.97] hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+                className="flex h-[32px] min-w-[42px] items-center justify-center rounded-control border border-line2 bg-field px-2 text-xs font-semibold text-t2 hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
               >
                 Fit
               </button>
             </div>
-          </div>
+          </ControlSection>
+          {showShading ? (
+            <ControlSection label="Appearance">
+              <div className="flex items-center gap-0.5 rounded-control border border-line2 bg-field p-0.5">
+                {SHADING.map((item) => (
+                  <LayerToggle
+                    key={item.mode}
+                    devId={item.devId}
+                    label={item.label}
+                    icon={item.icon}
+                    compact
+                    on={renderMode === item.mode}
+                    hint={item.hint}
+                    onToggle={() => {
+                      setRenderMode(item.mode);
+                      sceneRef.current?.setRenderMode(item.mode);
+                    }}
+                  />
+                ))}
+              </div>
+            </ControlSection>
+          ) : null}
+          {renderableLand?.model_placement ? (
+            <ControlSection label="Placement">
+              <PlacementControls
+                active={placementMode}
+                assessment={placementAssessment}
+                selectedSource={selectedPlacementSource}
+                showLabel={false}
+                onPick={(mode) => {
+                  setPlacementMode(mode);
+                  sceneRef.current?.setPlacementMode(mode);
+                }}
+              />
+            </ControlSection>
+          ) : null}
         </div>
       ) : null}
-      </div>
-      ) : null}
+    </div>
+  );
+}
+
+function ControlSection({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-2 border-b border-line py-2 last:border-b-0">
+      <span className="flex-none pt-2 text-2xs font-semibold text-t3">{label}</span>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }

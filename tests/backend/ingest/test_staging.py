@@ -2,7 +2,12 @@ import shutil
 from pathlib import Path
 
 from stockroom.ingest.fingerprint import DetectedSource
-from stockroom.ingest.staging import StagingCandidate, build_candidates, merge_candidates
+from stockroom.ingest.staging import (
+    StagingCandidate,
+    _preferred_footprint_index,
+    build_candidates,
+    merge_candidates,
+)
 from stockroom.model.part import Provenance, Purchase
 from tests.backend.conftest import requires_kicad_cli
 
@@ -30,6 +35,24 @@ def test_chosen_footprint_defaults_to_first():
 def test_chosen_footprint_honors_index():
     c = _candidate(chosen_footprint_index=1)
     assert c.chosen_footprint == Path("/tmp/b.kicad_mod")
+
+
+def test_preferred_footprint_decodes_ultralibrarian_plus_filename_escape():
+    class _Symbol:
+        def get_property(self, name):
+            return "21-0664_TD1233+1C_MXM" if name == "Footprint" else ""
+
+    class _SymbolLibrary:
+        def get_symbol(self, _name):
+            return _Symbol()
+
+    variants = [
+        Path("21-0664_TD1233&plus_1C_MXM-L.kicad_mod"),
+        Path("21-0664_TD1233&plus_1C_MXM-M.kicad_mod"),
+        Path("21-0664_TD1233&plus_1C_MXM.kicad_mod"),
+    ]
+
+    assert _preferred_footprint_index(_SymbolLibrary(), "MAX17608ATC+", variants) == 2
 
 
 def test_to_staged_part_maps_all_fields():

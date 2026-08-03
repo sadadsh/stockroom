@@ -7,6 +7,7 @@ import pytest
 
 from stockroom.capture.cross_eda import (
     CrossEdaVerificationError,
+    _geometry_tolerance_ratio,
     _PadGeometry,
     _Pin,
     _SymbolReadback,
@@ -316,6 +317,45 @@ def test_both_symbols_may_omit_the_same_package_only_pads() -> None:
 
     assert mapping == {"2": "2", "3": "3"}
     assert physical == {"1": "1", "2": "2", "3": "3"}
+
+
+def test_provider_specific_thermal_vias_do_not_reject_shared_electrical_geometry() -> None:
+    kicad = _SymbolReadback(
+        entry="PART",
+        manufacturer="Acme",
+        mpn="PART",
+        pins=(_Pin("1", "VIN"), _Pin("2", "GND")),
+    )
+    altium = _SymbolReadback(
+        entry="PART",
+        manufacturer="Acme",
+        mpn="PART",
+        pins=kicad.pins,
+    )
+    shared = (
+        _PadGeometry("1", -1.0, 0.0, 0.5, 0.5),
+        _PadGeometry("2", 1.0, 0.0, 0.5, 0.5),
+    )
+    altium_pads = (
+        *shared,
+        _PadGeometry("3", -0.2, 0.0, 0.2, 0.2),
+        _PadGeometry("4", 0.2, 0.0, 0.2, 0.2),
+    )
+
+    mapping, kicad_nc, altium_nc = _terminal_map(kicad, altium)
+
+    assert _verify_geometry(
+        shared,
+        altium_pads,
+        mapping,
+        kicad_no_connects=kicad_nc,
+        altium_no_connects=altium_nc,
+    ) == {"1": "1", "2": "2"}
+    assert _geometry_tolerance_ratio(
+        shared,
+        altium_pads,
+        {"1": "1", "2": "2"},
+    ) == 0.0
 
 
 def test_standalone_kicad_rejects_unrepresented_pads_without_cross_eda_proof(

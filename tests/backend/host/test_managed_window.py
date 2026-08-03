@@ -32,9 +32,11 @@ class _Window:
         self.hidden_calls = 0
         self.show_calls = 0
         self.restore_calls = 0
+        self.focus_calls = 0
         self.destroy_calls = 0
         self.destroyed = threading.Event()
         self.evaluations: list[str] = []
+        self.loaded_urls: list[str] = []
         self.session = {"route": "components", "event_sequence": 17}
 
     def get_current_url(self) -> str:
@@ -49,6 +51,13 @@ class _Window:
     def restore(self) -> None:
         self.restore_calls += 1
 
+    def focus(self) -> None:
+        self.focus_calls += 1
+
+    def load_url(self, url: str) -> None:
+        self.current_url = url
+        self.loaded_urls.append(url)
+
     def evaluate_js(self, script: str) -> object:
         self.evaluations.append(script)
         return self.session
@@ -56,6 +65,52 @@ class _Window:
     def destroy(self) -> None:
         self.destroy_calls += 1
         self.destroyed.set()
+
+
+def test_in_app_provider_surface_reuses_and_restores_the_original_window(monkeypatch) -> None:
+    window = _Window("http://127.0.0.1:8123/components")
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", window)
+    surface = W.InAppProviderBrowserSurface(
+        "http://127.0.0.1:8123",
+        debug_port=43127,
+    )
+
+    with surface.lease() as lease:
+        assert lease.endpoint == "http://127.0.0.1:43127"
+        lease.show()
+        assert window.show_calls == 1
+        assert window.focus_calls == 1
+        assert window.loaded_urls == []
+        lease.navigate("https://www.snapeda.com/parts/ABC/Maker/view-part/")
+        state = lease.document_state(
+            ready_selectors=('a[name="download-modal"]',),
+            ready_texts=("request 3d model",),
+        )
+        assert state == {
+            "ready": False,
+            "challenge": False,
+            "account_verification": False,
+            "provider_error": False,
+            "provider_ready": False,
+        }
+        assert "getBoundingClientRect" in window.evaluations[-1]
+        assert 'a[name=\\"download-modal\\"]' in window.evaluations[-1]
+        assert '"verify your phone number"' in window.evaluations[-1]
+        assert '"phone verification is required"' in window.evaluations[-1]
+        assert '"oh snap! we' in window.evaluations[-1]
+        lease.hide()
+        assert window.loaded_urls[-1] == "http://127.0.0.1:8123"
+        surface.show_active_provider_browser()
+        assert window.loaded_urls[-1] == (
+            "https://www.snapeda.com/parts/ABC/Maker/view-part/"
+        )
+
+    assert window.loaded_urls == [
+        "https://www.snapeda.com/parts/ABC/Maker/view-part/",
+        "http://127.0.0.1:8123",
+        "https://www.snapeda.com/parts/ABC/Maker/view-part/",
+        "http://127.0.0.1:8123",
+    ]
 
 
 class _Webview:

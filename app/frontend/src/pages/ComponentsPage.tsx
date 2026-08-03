@@ -192,6 +192,10 @@ export function ComponentsPage() {
     ? allParts.filter((p) => duplicateIds.has(p.id))
     : allParts;
   const categories = Object.keys(facetsQuery.data?.by_category ?? {}).sort();
+  const categoryOptions =
+    facetsQuery.data?.category_catalog?.length
+      ? facetsQuery.data.category_catalog
+      : categories;
   const detailBusy =
     editField.isPending ||
     moveCategory.isPending ||
@@ -454,7 +458,7 @@ export function ComponentsPage() {
               edaReadiness={selectedSummary?.eda_readiness}
               onEditField={handleEditField}
               onMoveCategory={handleMoveCategory}
-              categories={categories}
+              categories={categoryOptions}
               onDelete={handleDelete}
               onApplyPinout={handleApplyPinout}
               onUseSpecValue={handleUseSpecValue}

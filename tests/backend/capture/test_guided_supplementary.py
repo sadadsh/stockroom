@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -139,3 +140,46 @@ def test_route_outcomes_report_retention_separately_from_satisfaction():
 
     assert combined.retained == 3
     assert combined.satisfied == ()
+
+
+def test_catalog_authorized_step_only_snapmagic_download_survives_slug_punctuation_loss(tmp_path):
+    class MaximRecord:
+        id = "max17608atc-373c"
+        manufacturer = "Analog Devices / Maxim Integrated"
+        mpn = "MAX17608ATC+"
+
+    staged = tmp_path / "MAX17608ATC.step"
+    staged.write_bytes(_STEP)
+    store = EvidenceStore((tmp_path / "Evidence").resolve())
+    source = GuidedCaptureSource(
+        lambda: _Pipeline(staged),
+        vendor="digikey",
+        download_root=tmp_path / "Downloads",
+        evidence_store=store,
+    )
+    receipt = replace(
+        _receipt(staged, provider="digikey-snapmagic"),
+        task_id=MaximRecord.id,
+        manufacturer_key=MaximRecord.manufacturer,
+        mpn_canonical=MaximRecord.mpn,
+    )
+
+    outcome = source._retain_incomplete_cad_set(
+        MaximRecord(),
+        [receipt],
+        detail_url=(
+            "https://www.snapeda.com/parts/MAX17608ATC-/"
+            "Analog-Devices-Maxim-Integrated/view-part/"
+        ),
+        evidence_provider_key="digikey-snapmagic",
+        reason="provider offered only a STEP model",
+        catalog_identity_authorized=True,
+    )
+
+    assert outcome.retained == 1
+    assert outcome.error == ""
+    retained = store.list_supplementary_artifacts(
+        identity=ExactPartIdentity(MaximRecord.manufacturer, MaximRecord.mpn)
+    )
+    assert len(retained) == 1
+    assert retained[0].provider_key == "digikey-snapmagic"

@@ -9,6 +9,7 @@ browser is touched.
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 
 from stockroom.cad_variants import (
@@ -30,6 +31,7 @@ from stockroom.capture.requirements import (
     capture_requirements,
     split_requirement,
 )
+from stockroom.capture.verified_pair import resolve_verified_pair
 
 _KICAD_REQUIREMENTS = (
     Requirement.KICAD_SYMBOL,
@@ -56,7 +58,30 @@ def _unverified(reason: str) -> CompletionEvidence:
     return CompletionEvidence.unverified(reason)
 
 
-def record_completion_evidence(store, record: object) -> CompletionEvidence:
+def _verify_projection(
+    verifier,
+    record: object,
+    resolved: dict[str, ResolvedCadVariant],
+    validation_reports: dict[str, dict[str, object]],
+) -> None:
+    """Pass immutable reports to new verifiers without breaking older injected seams."""
+
+    parameters = inspect.signature(verifier).parameters.values()
+    accepts_reports = "validation_reports" in {
+        parameter.name for parameter in parameters
+    } or any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters)
+    if accepts_reports:
+        verifier(record, resolved, validation_reports=validation_reports)
+        return
+    verifier(record, resolved)
+
+
+def record_completion_evidence(
+    store,
+    record: object,
+    *,
+    projection_verifier: Callable[..., None],
+) -> CompletionEvidence:
     """Reverify the exact active projection against immutable local evidence.
 
     The part-class/override requirement registry decides which tools are owned.
@@ -90,6 +115,7 @@ def record_completion_evidence(store, record: object) -> CompletionEvidence:
         )
 
     resolved: dict[str, ResolvedCadVariant] = {}
+    validation_reports: dict[str, dict[str, object]] = {}
     for tool in _required_tools(record):
         pointer = selection_for(tool)
         if pointer is None:
@@ -111,6 +137,19 @@ def record_completion_evidence(store, record: object) -> CompletionEvidence:
                 f"the active {tool} pointer does not match the reverified manifest"
             )
         resolved[tool] = variant
+        try:
+            validation = store.verified_cad_validation_report(
+                variant.descriptor.manifest_digest,
+                identity=identity,
+            )
+        except Exception as exc:  # noqa: BLE001 - installed proof must remain immutable
+            return _unverified(
+                f"the active {tool} validation report could not be reverified "
+                f"({type(exc).__name__})"
+            )
+        if not isinstance(validation, dict):
+            return _unverified(f"the active {tool} validation report is not an object")
+        validation_reports[tool] = validation
 
     if set(resolved) == {"kicad", "altium"}:
         if not same_cad_evidence_set(
@@ -119,6 +158,27 @@ def record_completion_evidence(store, record: object) -> CompletionEvidence:
         ):
             return _unverified(
                 "the active KiCad and Altium pointers do not share one evidence set"
+            )
+        manifest_digest = resolved["kicad"].descriptor.manifest_digest
+        try:
+            verified_pair = resolve_verified_pair(
+                store,
+                identity=identity,
+                manifest_digest=manifest_digest,
+            )
+            validation_reports["kicad"] = verified_pair.validation
+            validation_reports["altium"] = verified_pair.validation
+        except Exception as exc:  # noqa: BLE001 - missing/tampered proof fails closed
+            return _unverified(
+                "the active cross-EDA pair could not be reverified "
+                f"({type(exc).__name__})"
+            )
+        if (
+            verified_pair.kicad.pointer != resolved["kicad"].pointer
+            or verified_pair.altium.pointer != resolved["altium"].pointer
+        ):
+            return _unverified(
+                "the active KiCad and Altium pointers do not match the proved pair"
             )
     elif len(resolved) > 1:
         descriptors = tuple(item.descriptor for item in resolved.values())
@@ -135,6 +195,19 @@ def record_completion_evidence(store, record: object) -> CompletionEvidence:
                 "the active CAD pointers do not share one immutable evidence set"
             )
 
+    try:
+        _verify_projection(
+            projection_verifier,
+            record,
+            resolved,
+            validation_reports,
+        )
+    except Exception as exc:  # noqa: BLE001 - missing/tampered installed files fail closed
+        return _unverified(
+            "the active installed CAD projection could not be reverified "
+            f"({type(exc).__name__})"
+        )
+
     manifest_digest = next(iter(resolved.values())).descriptor.manifest_digest
     return CompletionEvidence(
         state="verified",
@@ -143,12 +216,22 @@ def record_completion_evidence(store, record: object) -> CompletionEvidence:
     )
 
 
-def active_pair_is_verified(store, record: object) -> bool:
+def active_pair_is_verified(
+    store,
+    record: object,
+    *,
+    projection_verifier: Callable[[object, dict[str, ResolvedCadVariant]], None],
+) -> bool:
     """Whether both owned EDA tools point at one reverified evidence set."""
 
     return (
         set(_required_tools(record)) == {"kicad", "altium"}
-        and record_completion_evidence(store, record).state == "verified"
+        and record_completion_evidence(
+            store,
+            record,
+            projection_verifier=projection_verifier,
+        ).state
+        == "verified"
     )
 
 
@@ -174,12 +257,14 @@ class VerifiedEvidenceSource:
         ],
         run_write: Callable[[Callable[[], object]], object] | None = None,
         preserve_active_pair: bool = False,
+        projection_verifier: Callable[[object, dict[str, ResolvedCadVariant]], None],
     ) -> None:
         self._store = store
         self._materialize_kicad = materialize_kicad
         self._materialize_pair = materialize_pair
         self._run_write = run_write or (lambda operation: operation())
         self._preserve_active_pair = preserve_active_pair
+        self._projection_verifier = projection_verifier
 
     def provides(self) -> frozenset[Requirement]:
         return frozenset(_PAIR_REQUIREMENTS)
@@ -210,7 +295,11 @@ class VerifiedEvidenceSource:
         except (TypeError, ValueError) as exc:
             return SourceOutcome(skipped=self._safe_error(exc))
 
-        if self._preserve_active_pair and active_pair_is_verified(self._store, record):
+        if self._preserve_active_pair and active_pair_is_verified(
+            self._store,
+            record,
+            projection_verifier=self._projection_verifier,
+        ):
             message = (
                 "the current active KiCad and Altium pair was reverified from one evidence set; "
                 "its pointers are unchanged"
@@ -240,23 +329,16 @@ class VerifiedEvidenceSource:
         failures: list[str] = []
         for kicad_item, altium_item in self._compatible_pairs(kicad, altium):
             try:
-                kicad_resolved = resolve_cad_variant(
+                verified_pair = resolve_verified_pair(
                     self._store,
                     identity=identity,
-                    tool="kicad",
                     manifest_digest=kicad_item.manifest_digest,
-                )
-                altium_resolved = resolve_cad_variant(
-                    self._store,
-                    identity=identity,
-                    tool="altium",
-                    manifest_digest=altium_item.manifest_digest,
                 )
                 self._run_write(
                     lambda: self._materialize_pair(
                         record,
-                        kicad_resolved,
-                        altium_resolved,
+                        verified_pair.kicad,
+                        verified_pair.altium,
                     )
                 )
                 return SourceOutcome(satisfied=_PAIR_REQUIREMENTS)

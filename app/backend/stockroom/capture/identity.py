@@ -39,6 +39,10 @@ _PROVIDER_HOSTS = {
         {
             "digikey.com",
             "www.digikey.com",
+            # DigiKey's measured SnapMagic row currently hands the task-bound browser to the
+            # author's canonical part page for the actual export.
+            "snapeda.com",
+            "www.snapeda.com",
         }
     ),
     "digikey-traceparts": frozenset(
@@ -117,6 +121,40 @@ def exact_observation_error(record: object, observed: PageIdentity) -> str:
                 "the provider exact-MPN candidate identifies manufacturer "
                 f"{observed.manufacturer!r}, not {requested_manufacturer!r}"
             )
+    return ""
+
+
+def exact_catalog_observation_error(record: object, observed: PageIdentity) -> str:
+    """Verify a provider URL identity carried by an exact distributor-catalog route.
+
+    DigiKey Product Information binds its Media URLs to an exact manufacturer part number, but
+    provider URL slugs are lossy.  For example, DigiKey's exact ``MAX17608ATC+`` record links to
+    Ultra Librarian's ``MAX17608ATC-`` slug and DigiKey's own ``MAX17608ATC`` slug.  This bounded
+    comparison may therefore ignore punctuation in the URL-carried MPN only after the caller has
+    established that the URL came from that exact catalog record.  The normal MPN comparison,
+    archive identity, and component IDs remain punctuation preserving.
+    """
+
+    strict_error = exact_observation_error(record, observed)
+    if not strict_error:
+        return ""
+
+    requested_mpn = getattr(record, "mpn", "") or ""
+    requested_manufacturer = getattr(record, "manufacturer", "") or ""
+
+    def lossy_slug_key(value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value or "").strip().casefold()
+        return "".join(character for character in normalized if character.isalnum())
+
+    requested_key = lossy_slug_key(requested_mpn)
+    observed_key = lossy_slug_key(observed.mpn)
+    if not requested_key or observed_key != requested_key:
+        return strict_error
+    if requested_manufacturer:
+        if not observed.manufacturer.strip():
+            return strict_error
+        if not same_manufacturer(observed.manufacturer, requested_manufacturer):
+            return strict_error
     return ""
 
 
@@ -258,7 +296,16 @@ def same_manufacturer(left: str, right: str) -> bool:
         # right for reconciling a canonical field and wrong here: this comparison decides whether
         # another manufacturer's footprint may be attached to a board.
         return False
-    return is_abbreviation_of(left, right) or is_abbreviation_of(right, left)
+    # Provider detail URLs commonly slug a multi-word manufacturer with punctuation instead of
+    # spaces (``Texas-Instruments``). The shared abbreviation proof intentionally operates on
+    # words, so give it the already-normalized identifying tokens rather than the lossy URL
+    # spelling. This keeps the proof narrow (``TI`` is exactly the initials of two words) while
+    # still rejecting unrelated short names such as ``TI``/``Toshiba``.
+    left_words = " ".join(_manufacturer_tokens(left))
+    right_words = " ".join(_manufacturer_tokens(right))
+    return is_abbreviation_of(left_words, right_words) or is_abbreviation_of(
+        right_words, left_words
+    )
 
 
 def _is_single_token_truncation(left: str, right: str) -> bool:
@@ -350,7 +397,11 @@ def page_identity(
                 mpn=detail_segments[-1],
                 manufacturer=detail_segments[-2],
             )
-        if vendor_key == "snapmagic":
+        if vendor_key == "snapmagic" or (
+            vendor_key == "digikey-snapmagic"
+            and (urlparse(url or "").hostname or "").casefold()
+            in {"snapeda.com", "www.snapeda.com"}
+        ):
             index = segments.index("parts")
             # /parts/<mpn>/<manufacturer>/view-part/
             return PageIdentity(mpn=segments[index + 1], manufacturer=segments[index + 2])
@@ -390,37 +441,47 @@ def select_exact_candidate(
     *,
     vendor_key: str,
     detail_url: str,
+    trust_detail_url: bool = True,
+    catalog_identity_authorized: bool = False,
 ) -> CandidateSelection:
-    """Return the one candidate demonstrably belonging to ``record``, else an error.
+    """Choose CAD from the task-bound provider archive.
 
-    An empty candidate list is not an identity failure: it may be an Altium-only download handled
-    by the separate native-library seam. Once KiCad candidates exist, however, choosing by list
-    order is forbidden.
+    The canonical exact-detail page is the identity gate. Once that page passes and Stockroom
+    catches its download event, internal filenames are presentation details rather than a second
+    identity authority. Local/unrecognized inputs still require exact embedded identity.
     """
     requested_mpn = getattr(record, "mpn", "") or ""
     requested_manufacturer = getattr(record, "manufacturer", "") or ""
     if not requested_mpn.strip():
         return CandidateSelection(error="cannot attach downloaded CAD without a requested MPN")
 
-    detail = page_identity(vendor_key, detail_url)
+    # A browser download is causally bound to the exact provider page that emitted it. A local
+    # file picker is not: the person can select any archive on disk while that page remains open.
+    # Its caller therefore disables page trust and requires the archive's own identity fields.
+    detail = page_identity(vendor_key, detail_url) if trust_detail_url else None
     if detail is not None:
-        if not same_mpn(detail.mpn, requested_mpn):
-            return CandidateSelection(
-                error=(
-                    "the vendor detail page identifies "
-                    f"{detail.mpn!r}, not requested MPN {requested_mpn!r}"
+        if catalog_identity_authorized:
+            catalog_error = exact_catalog_observation_error(record, detail)
+            if catalog_error:
+                return CandidateSelection(error=catalog_error)
+        else:
+            if not same_mpn(detail.mpn, requested_mpn):
+                return CandidateSelection(
+                    error=(
+                        "the vendor detail page identifies "
+                        f"{detail.mpn!r}, not requested MPN {requested_mpn!r}"
+                    )
                 )
-            )
-        if requested_manufacturer and not same_manufacturer(
-            detail.manufacturer,
-            requested_manufacturer,
-        ):
-            return CandidateSelection(
-                error=(
-                    "the vendor detail page identifies manufacturer "
-                    f"{detail.manufacturer!r}, not {requested_manufacturer!r}"
+            if requested_manufacturer and not same_manufacturer(
+                detail.manufacturer,
+                requested_manufacturer,
+            ):
+                return CandidateSelection(
+                    error=(
+                        "the vendor detail page identifies manufacturer "
+                        f"{detail.manufacturer!r}, not {requested_manufacturer!r}"
+                    )
                 )
-            )
 
     if not candidates:
         # A native Altium-only archive has no ingest candidate to interrogate. For the implemented
@@ -444,6 +505,29 @@ def select_exact_candidate(
                 )
             )
         return CandidateSelection()
+
+    if detail is not None:
+        # Prefer an internal exact-MPN name when the archive supplies one. Otherwise take the most
+        # complete candidate from this exact page's task-bound ZIP. All candidates in that ZIP
+        # belong to the verified part; a generic package name or stale generator field must not
+        # discard the provider's successful download.
+        exact = [
+            candidate
+            for candidate in candidates
+            if any(same_mpn(value, requested_mpn) for value in _candidate_mpn_values(candidate))
+        ]
+        pool = exact or candidates
+
+        def completeness(candidate: StagingCandidate) -> int:
+            return sum(
+                (
+                    getattr(candidate, "symbol_lib_path", None) is not None,
+                    bool(getattr(candidate, "footprint_variants", None)),
+                    getattr(candidate, "model_path", None) is not None,
+                )
+            )
+
+        return CandidateSelection(candidate=max(pool, key=completeness))
 
     requested_mpn_key = _mpn_key(requested_mpn)
     requested_manufacturer_key = _manufacturer_key(requested_manufacturer)

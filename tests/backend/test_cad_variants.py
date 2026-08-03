@@ -44,8 +44,7 @@ def _role_report(
     operation: str,
     source_manifests: tuple[str, ...] = (),
 ) -> bytes:
-    return json.dumps(
-        {
+    report = {
             "identity": {
                 "authoritative_manufacturer_key": _IDENTITY.authoritative_manufacturer_key,
                 "mpn_canonical": _IDENTITY.mpn_canonical,
@@ -56,7 +55,25 @@ def _role_report(
             "schema": "stockroom.cad-role-validation/1",
             "source_manifests": sorted(source_manifests),
             "valid": True,
-        },
+        }
+    if {"symbol", "footprint", "model", "altium_symbol", "altium_footprint"}.issubset(
+        roles
+    ):
+        report["cross_eda"] = {
+            "status": "verified",
+            "report": {
+                "valid": True,
+                "terminal_equivalence": True,
+                "pad_equivalence": True,
+                "package_equivalence": True,
+                "altium": {
+                    "symbol_entry": "S1M",
+                    "footprint_entry": "S1M",
+                },
+            },
+        }
+    return json.dumps(
+        report,
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
@@ -286,7 +303,7 @@ def test_same_provider_but_split_manifests_cannot_be_materialized_as_one_pair(
     assert not same_cad_evidence_set(kicad.descriptor, altium.descriptor)
     record = PartRecord(id="s1m-0000", mpn="S1M", manufacturer="ON Semiconductor")
     with pytest.raises(ValueError, match="one provider evidence set"):
-        materialize_pair(object(), record, kicad, altium)
+        materialize_pair(object(), record, kicad, altium, evidence_store=store)
 
 
 def test_a_broken_store_cannot_mix_roles_from_different_manifests() -> None:

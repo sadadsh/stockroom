@@ -53,7 +53,9 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 280 with the active Settings content scroller and STM32CubeMX source disclosure directly
 // addressable for first-run and scroll-position acceptance.
 // 279 after the single-slot capture contract removed the obsolete superseded-capture notice.
-const EXPECTED_ENTRIES = 279;
+// 273 after each asset opens only its own viewer and the four combined-preview tab controls were
+// removed.
+const EXPECTED_ENTRIES = 273;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

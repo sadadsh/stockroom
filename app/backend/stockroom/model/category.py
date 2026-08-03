@@ -18,6 +18,7 @@ CATEGORIES: tuple[str, ...] = (
     "ICs",
     "Connectors",
     "Switches",
+    "Fuses",
     "Crystals & Oscillators",
     "Sensors",
     "Modules",

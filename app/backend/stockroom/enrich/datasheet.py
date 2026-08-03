@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.schema import EnrichmentResult, Sourced
@@ -20,6 +21,32 @@ from stockroom.enrich.schema import EnrichmentResult, Sourced
 # only when the %PDF- magic bytes also confirm a PDF, so an HTML error page served
 # as octet-stream can never be stored as a .pdf (research: reject the HTML wrapper).
 _PDF_CONTENT_TYPES = ("application/pdf", "application/x-pdf")
+
+
+def _transport_url(url: str) -> str:
+    """Resolve a distributor's explicit datasheet redirect to its public HTTPS target.
+
+    DigiKey's Product Information Media response can name TI's ``suppproductinfo.tsp`` wrapper,
+    whose HTTP body is HTML even though its ``gotoUrl`` is the real PDF endpoint. Browsers execute
+    the wrapper; the deterministic fetcher must unwrap it itself. Only a public HTTPS target is
+    accepted, so a remote query parameter cannot turn datasheet fetching into a local-network
+    request.
+    """
+
+    try:
+        parsed = urlparse(url)
+        targets = parse_qs(parsed.query).get("gotoUrl") or parse_qs(parsed.query).get("goto")
+        candidate = targets[0] if targets else ""
+        if candidate.startswith("//"):
+            candidate = f"https:{candidate}"
+        if candidate:
+            from stockroom.enrich.image_proxy import allowed_image_url
+
+            if allowed_image_url(candidate):
+                return candidate
+    except (IndexError, TypeError, ValueError):
+        pass
+    return url
 
 
 def looks_like_pdf(content: bytes) -> bool:
@@ -36,11 +63,12 @@ def fetch_datasheet(url, dst: Path, fetcher=None, referer: str = "") -> Path:
 
     fetcher = fetcher or HttpFetcher()
     dst = Path(dst)
+    transport_url = _transport_url(url)
     last_exc: Exception | None = None
     result = None
     for _ in range(2):  # one retry over the same HTTP/1.1 path on a transport blip
         try:
-            result = fetcher.get(url, referer=referer)
+            result = fetcher.get(transport_url, referer=referer)
             break
         except EnrichError as exc:
             last_exc = exc

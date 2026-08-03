@@ -50,3 +50,4 @@ def test_selected_files_are_copied_into_the_task_bound_broker(monkeypatch, tmp_p
     assert receipt.transport == "manual-file-picker"
     assert observed["url"] == detail_url
     assert observed["options"]["detail_url"] == detail_url
+    assert observed["options"]["manual_identity_paths"] == (receipt.path,)

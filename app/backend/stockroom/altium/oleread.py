@@ -93,9 +93,18 @@ def pick_entry(names: list[str], kind: str, prefer: str | None = None) -> str:
     if not names:
         raise ValueError(f"no {kind} entry found in the library")
     if prefer:
-        if prefer in names:
-            return prefer
-        containing = [n for n in names if prefer.lower() in n.lower()]
+        # Ultra Librarian spells a literal ``+`` as ``&plus_`` in some generated
+        # library entry names.  It is transport escaping, not a different logical
+        # footprint.  Compare the decoded spelling while returning the original
+        # native entry name that actually exists inside the Altium library.
+        def entry_key(value: str) -> str:
+            return value.casefold().replace("&plus_", "+")
+
+        preferred_key = entry_key(prefer)
+        exact = [name for name in names if entry_key(name) == preferred_key]
+        if len(exact) == 1:
+            return exact[0]
+        containing = [name for name in names if preferred_key in entry_key(name)]
         if len(containing) == 1:
             return containing[0]
         if len(containing) > 1:

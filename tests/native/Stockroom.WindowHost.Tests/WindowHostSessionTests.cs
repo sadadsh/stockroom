@@ -46,14 +46,52 @@ public sealed class WindowHostSessionTests
                 8,
                 "provider-show",
                 Now + 30_000,
-                new Dictionary<string, object?>()),
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = "lease-1",
+                    ["generation"] = 7,
+                }),
             HandoffProtocolTests.BuildMessage(
                 9,
                 "provider-hide",
                 Now + 30_000,
-                new Dictionary<string, object?>()),
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = "lease-1",
+                    ["generation"] = 7,
+                }),
             HandoffProtocolTests.BuildMessage(
                 10,
+                "provider-current-url",
+                Now + 30_000,
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = "lease-1",
+                    ["generation"] = 7,
+                }),
+            HandoffProtocolTests.BuildMessage(
+                11,
+                "provider-navigate",
+                Now + 30_000,
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = "lease-1",
+                    ["generation"] = 7,
+                    ["url"] = "https://provider.example.test/next",
+                }),
+            HandoffProtocolTests.BuildMessage(
+                12,
+                "provider-document-state",
+                Now + 30_000,
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = "lease-1",
+                    ["generation"] = 7,
+                    ["ready_selectors"] = new[] { "#download" },
+                    ["ready_texts"] = new[] { "download" },
+                }),
+            HandoffProtocolTests.BuildMessage(
+                13,
                 "shutdown",
                 Now + 30_000,
                 new Dictionary<string, object?>()));
@@ -80,8 +118,11 @@ public sealed class WindowHostSessionTests
                 "show",
                 "focus",
                 "provider-endpoint",
-                "provider-show",
-                "provider-hide",
+                "provider-show:lease-1:7",
+                "provider-hide:lease-1:7",
+                "provider-current-url:lease-1:7",
+                "provider-navigate:lease-1:7:https://provider.example.test/next",
+                "provider-document-state:lease-1:7",
                 "shutdown",
             ],
             controller.Operations);
@@ -97,11 +138,14 @@ public sealed class WindowHostSessionTests
                 "provider-endpoint",
                 "provider-shown",
                 "provider-hidden",
+                "provider-current-url",
+                "provider-navigated",
+                "provider-document-state",
                 "stopping",
             ],
             responses.Select(static item => item.Name));
         Assert.Equal(
-            Enumerable.Range(1, 10).Select(static item => (long)item),
+            Enumerable.Range(1, 13).Select(static item => (long)item),
             responses.Select(static item => item.Sequence));
 
         var hello = responses[0].Payload.GetProperty("result");
@@ -229,6 +273,77 @@ public sealed class WindowHostSessionTests
             responses.Select(static item => item.Name));
     }
 
+    [Fact]
+    public void ProviderLeaseCommandsPreserveGenerationAndTypedDownloadIdentity()
+    {
+        const string leaseId = "11111111-1111-4111-8111-111111111111";
+        var incoming = Concatenate(
+            Frame(HandoffProtocolTests.PythonCanonicalBootstrap()),
+            HandoffProtocolTests.BuildMessage(
+                2,
+                "provider-lease-begin",
+                Now + 30_000,
+                new Dictionary<string, object?> { ["lease_id"] = leaseId }),
+            HandoffProtocolTests.BuildMessage(
+                3,
+                "provider-download-events",
+                Now + 30_000,
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = leaseId,
+                    ["generation"] = 7,
+                    ["after_sequence"] = 0,
+                }),
+            HandoffProtocolTests.BuildMessage(
+                4,
+                "provider-lease-release",
+                Now + 30_000,
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = leaseId,
+                    ["generation"] = 7,
+                }),
+            HandoffProtocolTests.BuildMessage(
+                5,
+                "shutdown",
+                Now + 30_000,
+                new Dictionary<string, object?>()));
+        using var stream = new ScriptedDuplexStream(incoming);
+        using var channel = new HandoffChannel(stream, () => Now);
+        using var bootstrap = BootstrapParser.Parse(channel.Receive("bootstrap"));
+        var controller = new FakeController();
+
+        new WindowHostSession(channel, bootstrap, controller, 111, 222).Run();
+
+        Assert.Equal(
+            [
+                $"provider-lease-begin:{leaseId}",
+                $"provider-download-events:{leaseId}:7:0",
+                $"provider-lease-release:{leaseId}:7",
+                "shutdown",
+            ],
+            controller.Operations);
+        var responses = DecodeFrames(stream.Written);
+        Assert.Equal(
+            [
+                "hello-hidden",
+                "provider-lease-begun",
+                "provider-download-events",
+                "provider-lease-released",
+                "stopping",
+            ],
+            responses.Select(static item => item.Name));
+        var download = responses[2].Payload
+            .GetProperty("result")
+            .GetProperty("events")[0];
+        Assert.Equal(leaseId, download.GetProperty("lease_id").GetString());
+        Assert.Equal(7, download.GetProperty("generation").GetInt64());
+        Assert.Equal("download-1", download.GetProperty("operation_id").GetString());
+        Assert.Equal("terminal", download.GetProperty("phase").GetString());
+        Assert.Equal("completed", download.GetProperty("state").GetString());
+        Assert.Equal(@"C:\Capture\model.zip", download.GetProperty("result_file_path").GetString());
+    }
+
     private static byte[] Frame(byte[] body)
     {
         var framed = new byte[body.Length + 4];
@@ -299,11 +414,79 @@ public sealed class WindowHostSessionTests
             return 43127;
         }
 
-        public void ShowProviderBrowser() =>
-            Operations.Add("provider-show");
+        public IReadOnlyDictionary<string, object?> BeginProviderLease(string leaseId)
+        {
+            Operations.Add($"provider-lease-begin:{leaseId}");
+            return new Dictionary<string, object?>
+            {
+                ["lease_id"] = leaseId,
+                ["generation"] = 7L,
+                ["port"] = 43127,
+            };
+        }
 
-        public void HideProviderBrowser() =>
-            Operations.Add("provider-hide");
+        public bool ReleaseProviderLease(string leaseId, long generation)
+        {
+            Operations.Add($"provider-lease-release:{leaseId}:{generation}");
+            return true;
+        }
+
+        public IReadOnlyList<ProviderDownloadEvent> ProviderDownloadEvents(
+            string leaseId,
+            long generation,
+            long afterSequence)
+        {
+            Operations.Add($"provider-download-events:{leaseId}:{generation}:{afterSequence}");
+            return
+            [
+                new ProviderDownloadEvent(
+                    19,
+                    leaseId,
+                    generation,
+                    "download-1",
+                    "terminal",
+                    "completed",
+                    "https://provider.example.test/model.zip",
+                    "model.zip",
+                    @"C:\Capture\model.zip",
+                    "application/zip",
+                    string.Empty,
+                    120,
+                    120),
+            ];
+        }
+
+        public void ShowProviderBrowser(string leaseId, long generation) =>
+            Operations.Add($"provider-show:{leaseId}:{generation}");
+
+        public void HideProviderBrowser(string leaseId, long generation) =>
+            Operations.Add($"provider-hide:{leaseId}:{generation}");
+
+        public string ProviderCurrentUrl(string leaseId, long generation)
+        {
+            Operations.Add($"provider-current-url:{leaseId}:{generation}");
+            return "https://provider.example.test/part";
+        }
+
+        public void NavigateProviderBrowser(string leaseId, long generation, string url) =>
+            Operations.Add($"provider-navigate:{leaseId}:{generation}:{url}");
+
+        public IReadOnlyDictionary<string, object?> ProviderDocumentState(
+            string leaseId,
+            long generation,
+            IReadOnlyList<string> readySelectors,
+            IReadOnlyList<string> readyTexts)
+        {
+            Operations.Add($"provider-document-state:{leaseId}:{generation}");
+            return new Dictionary<string, object?>
+            {
+                ["ready"] = true,
+                ["challenge"] = false,
+                ["account_verification"] = false,
+                ["provider_error"] = false,
+                ["provider_ready"] = true,
+            };
+        }
 
         public IReadOnlyDictionary<string, object?> Health()
         {

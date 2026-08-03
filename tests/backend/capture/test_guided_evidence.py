@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import zipfile
@@ -9,6 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from stockroom.cad_variants import list_cad_variants
 from stockroom.capture import evidence as evidence_module
 from stockroom.capture.cross_eda import CrossEdaVerificationError
 from stockroom.capture.evidence import (
@@ -147,6 +149,9 @@ def test_browser_cad_installs_exact_actual_files_with_provider_per_artifact(
     store = EvidenceStore(tmp_path / "Evidence")
     candidate = _candidate(tmp_path)
     altium = _altium_pair(tmp_path)
+    receipt = tmp_path / "SnapMagic Download.zip"
+    receipt.write_bytes(b"PK\x03\x04original-provider-archive")
+    receipt_digest = "sha256:" + hashlib.sha256(receipt.read_bytes()).hexdigest()
 
     digest, cross_eda_verified = record_browser_cad_evidence(
         store=store,
@@ -155,6 +160,8 @@ def test_browser_cad_installs_exact_actual_files_with_provider_per_artifact(
         provider_key="snapmagic",
         detail_url=_DETAIL_URL,
         altium_sources=altium,
+        source_receipt_digests=(receipt_digest,),
+        source_receipts=(receipt,),
     )
 
     manifest = store.verify_provider_success(
@@ -171,10 +178,13 @@ def test_browser_cad_installs_exact_actual_files_with_provider_per_artifact(
         "footprint",
         "model",
         "symbol",
+        "source_receipt_1",
+        "source_receipt_set",
         "validation_report",
     }
     assert {item["provider"] for item in objects.values()} == {"snapmagic"}
     assert store.object_bytes(objects["model"]["digest"]) == candidate.model_path.read_bytes()
+    assert store.object_bytes(objects["source_receipt_1"]["digest"]) == receipt.read_bytes()
     report = json.loads(store.object_bytes(objects["validation_report"]["digest"]))
     assert report["identity"] == {
         "authoritative_manufacturer_key": "ON Semiconductor",
@@ -183,6 +193,49 @@ def test_browser_cad_installs_exact_actual_files_with_provider_per_artifact(
     assert report["cross_eda"]["status"] == "not_verified"
     assert report["kicad_readback"]["valid"] is True
     assert cross_eda_verified is False
+
+
+def test_receipt_digest_without_immutable_download_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="require the immutable downloaded files"):
+        record_browser_cad_evidence(
+            store=EvidenceStore(tmp_path / "Evidence"),
+            record=_Record(),
+            candidate=_candidate(tmp_path),
+            provider_key="snapmagic",
+            detail_url=_DETAIL_URL,
+            source_receipt_digests=("sha256:" + "a" * 64,),
+        )
+
+
+def test_duplicate_download_paths_are_one_immutable_receipt(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path / "Evidence")
+    first = tmp_path / "first.zip"
+    duplicate = tmp_path / "duplicate.zip"
+    first.write_bytes(b"PK\x03\x04same-provider-download")
+    duplicate.write_bytes(first.read_bytes())
+    receipt_digest = "sha256:" + hashlib.sha256(first.read_bytes()).hexdigest()
+
+    digest, verified = record_browser_cad_evidence(
+        store=store,
+        record=_Record(),
+        candidate=_candidate(tmp_path),
+        provider_key="snapmagic",
+        detail_url=_DETAIL_URL,
+        source_receipt_digests=(receipt_digest, receipt_digest),
+        source_receipts=(first, duplicate),
+    )
+
+    manifest = store.verify_provider_success(
+        digest,
+        identity=ExactPartIdentity("ON Semiconductor", "S1M"),
+        operation=KICAD_CAD_OPERATION,
+        provider_key="snapmagic",
+        adapter_version=BROWSER_CAPTURE_ADAPTER_VERSION,
+    )
+    roles = {item["role"] for item in manifest["objects"]}
+    assert "source_receipt_1" in roles
+    assert "source_receipt_2" not in roles
+    assert verified is False
 
 
 def test_exact_provider_page_binds_metadata_light_kicad_symbol(tmp_path: Path) -> None:
@@ -226,6 +279,74 @@ def test_exact_provider_page_binds_metadata_light_kicad_symbol(tmp_path: Path) -
     assert verified is False
 
 
+def test_catalog_authorized_provider_slug_loss_survives_the_evidence_boundary(
+    tmp_path: Path,
+) -> None:
+    candidate = _candidate(tmp_path)
+    candidate.symbol_lib_path.write_text(
+        candidate.symbol_lib_path.read_text(encoding="utf-8")
+        .replace("S1M", "MAX17608ATC+")
+        .replace("ON Semiconductor", "Analog Devices / Maxim Integrated"),
+        encoding="utf-8",
+    )
+    candidate.symbol_name = "MAX17608ATC+"
+    candidate.entry_name = "MAX17608ATC+"
+    candidate.mpn = "MAX17608ATC+"
+    candidate.manufacturer = "Analog Devices / Maxim Integrated"
+    record = _Record(
+        id="max17608atc-373c",
+        manufacturer="Analog Devices / Maxim Integrated",
+        mpn="MAX17608ATC+",
+    )
+    detail_url = (
+        "https://app.ultralibrarian.com/details/catalog/"
+        "Analog-Devices-Inc/MAX17608ATC-"
+    )
+
+    with pytest.raises(ValueError, match="vendor detail page identifies"):
+        record_browser_cad_evidence(
+            store=EvidenceStore(tmp_path / "Strict Evidence"),
+            record=record,
+            candidate=candidate,
+            provider_key="ultralibrarian",
+            detail_url=detail_url,
+        )
+
+    digest, verified = record_browser_cad_evidence(
+        store=EvidenceStore(tmp_path / "Catalog Evidence"),
+        record=record,
+        candidate=candidate,
+        provider_key="ultralibrarian",
+        detail_url=detail_url,
+        catalog_identity_authorized=True,
+    )
+
+    assert digest.startswith("sha256:")
+    assert verified is False
+
+
+def test_cross_eda_boundary_forwards_the_provider_default_footprint() -> None:
+    observed: dict[str, object] = {}
+
+    def verifier(*, altium_footprint_entry: str = "", **_kwargs):
+        observed["entry"] = altium_footprint_entry
+        return {"valid": True}
+
+    evidence_module._verify_cross_eda_with_provider_identity(
+        verifier,
+        identity=ExactPartIdentity("ON Semiconductor", "S1M"),
+        provider_key="snapmagic",
+        detail_url=_DETAIL_URL,
+        kicad_symbol=Path("S1M.kicad_sym"),
+        kicad_footprint=Path("S1M.kicad_mod"),
+        step_model=Path("S1M.step"),
+        altium_sources=(Path("S1M.SchLib"), Path("S1M.PcbLib")),
+        altium_footprint_entry="PROVIDER_DEFAULT",
+    )
+
+    assert observed == {"entry": "PROVIDER_DEFAULT"}
+
+
 def test_provider_identity_binding_never_overwrites_conflicting_symbol_metadata(
     tmp_path: Path,
 ) -> None:
@@ -248,7 +369,9 @@ def test_provider_identity_binding_never_overwrites_conflicting_symbol_metadata(
     assert "Other Manufacturer" in candidate.symbol_lib_path.read_text(encoding="utf-8")
 
 
-def test_browser_cad_cannot_record_a_partial_or_near_match(tmp_path: Path) -> None:
+def test_browser_cad_requires_complete_files_but_not_redundant_archive_identity(
+    tmp_path: Path,
+) -> None:
     store = EvidenceStore(tmp_path / "Evidence")
     incomplete = _candidate(tmp_path, model=False)
     with pytest.raises(ValueError, match="missing STEP model"):
@@ -263,14 +386,16 @@ def test_browser_cad_cannot_record_a_partial_or_near_match(tmp_path: Path) -> No
     near = _candidate(tmp_path)
     near.mpn = "S1M-13-F"
     near.symbol_name = "S1M-13-F"
-    with pytest.raises(ValueError, match="exact candidate"):
-        record_browser_cad_evidence(
-            store=store,
-            record=_Record(),
-            candidate=near,
-            provider_key="snapmagic",
-            detail_url=_DETAIL_URL,
-        )
+    digest, verified = record_browser_cad_evidence(
+        store=store,
+        record=_Record(),
+        candidate=near,
+        provider_key="snapmagic",
+        detail_url=_DETAIL_URL,
+    )
+
+    assert digest.startswith("sha256:")
+    assert verified is False
 
 
 def test_browser_cad_validity_requires_native_kicad_readback(tmp_path: Path) -> None:
@@ -353,10 +478,104 @@ def test_cross_eda_success_requires_explicit_equivalence_proof(tmp_path: Path) -
             "terminal_equivalence": True,
             "pad_equivalence": True,
             "package_equivalence": True,
+            "altium": {
+                "symbol_entry": "S1M",
+                "footprint_entry": "DIOM5227X270N",
+            },
         },
     )
     assert digest.startswith("sha256:")
     assert verified is True
+
+
+def test_distinct_receipts_and_native_altium_bytes_remain_distinct_variants(
+    tmp_path: Path,
+) -> None:
+    store = EvidenceStore(tmp_path / "Evidence")
+    candidate = _candidate(tmp_path)
+    candidate.footprint_variants[0].write_text(
+        candidate.footprint_variants[0]
+        .read_text(encoding="utf-8")
+        .replace(
+            '(version 20240108)',
+            '(version 20240108)\n  (uuid "11111111-1111-1111-1111-111111111111")',
+        ),
+        encoding="utf-8",
+    )
+    altium = _altium_pair(tmp_path)
+    verification = {
+        "valid": True,
+        "terminal_equivalence": True,
+        "pad_equivalence": True,
+        "package_equivalence": True,
+        "altium": {"symbol_entry": "S1M", "footprint_entry": "S1M"},
+    }
+
+    first_receipt = tmp_path / "first.zip"
+    first_receipt.write_bytes(b"first provider receipt")
+    second_receipt = tmp_path / "second.zip"
+    second_receipt.write_bytes(b"second provider receipt")
+
+    first, first_verified = record_browser_cad_evidence(
+        store=store,
+        record=_Record(),
+        candidate=candidate,
+        provider_key="snapmagic",
+        detail_url=_DETAIL_URL,
+        altium_sources=altium,
+        cross_eda_verifier=lambda **_kwargs: verification,
+        source_receipt_digests=(
+            "sha256:" + hashlib.sha256(first_receipt.read_bytes()).hexdigest(),
+        ),
+        source_receipts=(first_receipt,),
+    )
+
+    candidate.footprint_variants[0].write_text(
+        candidate.footprint_variants[0]
+        .read_text(encoding="utf-8")
+        .replace(
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+        ),
+        encoding="utf-8",
+    )
+    reused, reused_verified = record_browser_cad_evidence(
+        store=store,
+        record=_Record(),
+        candidate=candidate,
+        provider_key="snapmagic",
+        detail_url=_DETAIL_URL,
+        altium_sources=altium,
+        cross_eda_verifier=lambda **_kwargs: verification,
+        source_receipt_digests=(
+            "sha256:" + hashlib.sha256(first_receipt.read_bytes()).hexdigest(),
+        ),
+        source_receipts=(first_receipt,),
+    )
+    assert reused == first
+    assert reused_verified is True
+
+    altium[0].write_bytes(_CFB_MAGIC + b"symbol with a regenerated native GUID")
+    altium[1].write_bytes(_CFB_MAGIC + b"footprint with a regenerated native GUID")
+    second, second_verified = record_browser_cad_evidence(
+        store=store,
+        record=_Record(),
+        candidate=candidate,
+        provider_key="snapmagic",
+        detail_url=_DETAIL_URL,
+        altium_sources=altium,
+        cross_eda_verifier=lambda **_kwargs: verification,
+        source_receipt_digests=(
+            "sha256:" + hashlib.sha256(second_receipt.read_bytes()).hexdigest(),
+        ),
+        source_receipts=(second_receipt,),
+    )
+
+    assert first_verified is True
+    assert second_verified is True
+    assert second != first
+    assert len(list_cad_variants(store, identity=ExactPartIdentity("ON Semiconductor", "S1M"), tool="kicad")) == 2
+    assert len(list_cad_variants(store, identity=ExactPartIdentity("ON Semiconductor", "S1M"), tool="altium")) == 2
 
 
 def test_guided_attach_never_projects_a_one_tool_provider_download(
@@ -478,13 +697,12 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
     intlib = tmp_path / "S1M.IntLib"
     shutil.copyfile(_ALTIUM_FIXTURES / "sample.IntLib", intlib)
     pair_calls = []
+    verification_calls = []
 
     class _Pipeline:
         def inspect(self, inputs):
-            if inputs == [kicad_zip]:
+            if inputs == [kicad_zip, intlib]:
                 return [candidate]
-            if inputs == [intlib]:
-                raise ValueError("native Altium library is not a KiCad ingest package")
             raise AssertionError(inputs)
 
         def attach_coherent_cad_assets(
@@ -497,6 +715,7 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
             now_iso="",
             kicad_active_variant=None,
             altium_active_variant=None,
+            preferred_altium_footprint="",
         ):
             pair_calls.append(
                 (
@@ -508,6 +727,7 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
                     now_iso,
                     kicad_active_variant,
                     altium_active_variant,
+                    preferred_altium_footprint,
                 )
             )
             record.assets["kicad"] = EdaAssets(
@@ -538,17 +758,24 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
             {"capability": type("_Capability", (), {"label": "SnapMagic"})()},
         )(),
     )
+    evidence_store = EvidenceStore(tmp_path / "Evidence")
     source = GuidedCaptureSource(
         lambda: _Pipeline(),
         vendor="snapmagic",
         download_root=tmp_path / "Downloads",
-        evidence_store=EvidenceStore(tmp_path / "Evidence"),
-        cross_eda_verifier=lambda **_kwargs: {
+        evidence_store=evidence_store,
+        cross_eda_verifier=lambda **kwargs: verification_calls.append(kwargs)
+        or {
             "valid": True,
             "terminal_equivalence": True,
             "pad_equivalence": True,
             "package_equivalence": True,
+            "altium": {
+                "symbol_entry": "S1M",
+                "footprint_entry": "DIOM5227X270N",
+            },
         },
+        projection_verifier=lambda _record, _resolved: None,
     )
 
     outcome = source._attach(
@@ -570,7 +797,8 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
     }, outcome.error
     assert outcome.error == ""
     assert len(pair_calls) == 1
-    _, _, _, _, _, _, kicad_variant, altium_variant = pair_calls[0]
+    _, _, _, _, _, _, kicad_variant, altium_variant, preferred_footprint = pair_calls[0]
+    assert preferred_footprint == "DIOM5227X270N"
     assert kicad_variant.manifest_digest == altium_variant.manifest_digest
     kicad_variant.validate_for_tool("kicad")
     altium_variant.validate_for_tool("altium")
@@ -597,6 +825,10 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
         record.cad_variants.active["kicad"].manifest_digest
         == record.cad_variants.active["altium"].manifest_digest
     )
+    assert len(verification_calls) == 1
+    identity = ExactPartIdentity(record.manufacturer, record.mpn)
+    assert len(list_cad_variants(evidence_store, identity=identity, tool="kicad")) == 1
+    assert len(list_cad_variants(evidence_store, identity=identity, tool="altium")) == 1
 
 
 def test_provider_script_conversion_feeds_the_normal_verified_altium_attach(
@@ -652,6 +884,7 @@ def test_provider_script_conversion_feeds_the_normal_verified_altium_attach(
             (),
             {
                 "libraries": (schlib, pcblib),
+                "preferred_footprint": "PROVIDER_DEFAULT",
                 "cleanup": lambda _self: cleanup_calls.append("cleaned"),
             },
         )()
@@ -671,6 +904,10 @@ def test_provider_script_conversion_feeds_the_normal_verified_altium_attach(
         convert_altium=_convert,
         evidence_store=EvidenceStore(tmp_path / "Evidence"),
         cross_eda_verifier=lambda **_kwargs: {
+            "altium": {
+                "footprint_entry": "PROVIDER_DEFAULT",
+                "symbol_entry": "S1M",
+            },
             "valid": True,
             "terminal_equivalence": True,
             "pad_equivalence": True,
@@ -689,6 +926,7 @@ def test_provider_script_conversion_feeds_the_normal_verified_altium_attach(
     assert cleanup_calls == ["cleaned"]
     assert len(pair_calls) == 1
     assert pair_calls[0][2] == (schlib, pcblib)
+    assert pair_calls[0][3]["preferred_altium_footprint"] == "PROVIDER_DEFAULT"
     assert Requirement.ALTIUM_SYMBOL in outcome.satisfied
     assert Requirement.ALTIUM_FOOTPRINT in outcome.satisfied
 
@@ -750,6 +988,10 @@ def test_digikey_selected_ul_package_converts_after_author_route_advanced(
         convert_altium=_convert,
         evidence_store=EvidenceStore(tmp_path / "Evidence"),
         cross_eda_verifier=lambda **_kwargs: {
+            "altium": {
+                "footprint_entry": "S1M",
+                "symbol_entry": "S1M",
+            },
             "valid": True,
             "terminal_equivalence": True,
             "pad_equivalence": True,
@@ -903,7 +1145,7 @@ def test_altium_only_download_never_composes_with_an_independent_active_kicad_se
     )
 
     assert outcome.satisfied == ()
-    assert "no exact KiCad symbol, footprint, and STEP" in outcome.error
+    assert "missing KiCad symbol, KiCad footprint" in outcome.error
     assert conversion_cleanups == ["cleaned"]
     assert record.assets_for("kicad") is original_kicad
     assert store.list_role_variants(

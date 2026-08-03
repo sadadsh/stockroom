@@ -16,16 +16,23 @@ from __future__ import annotations
 import json
 import logging
 import os
+import socket
 import threading
 import time
 from collections.abc import Callable
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 _log = logging.getLogger("stockroom.host.window")
 
 _ACTIVE_WINDOW = None
 _FETCH_WINDOW = None
+_NATIVE_DOWNLOAD_GUARD = threading.RLock()
+_NATIVE_DOWNLOAD_LEASE: str | None = None
+_NATIVE_DOWNLOAD_SEQUENCE = 0
+_NATIVE_DOWNLOAD_EVENTS: list["InAppProviderDownloadEvent"] = []
 
 UNPACKAGED_APP_USER_MODEL_ID = "Stockroom.Desktop.Unpackaged"
 
@@ -50,6 +57,272 @@ def _is_windows() -> bool:
 
 def active_window():
     return _ACTIVE_WINDOW
+
+
+def _free_loopback_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+@dataclass(slots=True)
+class InAppProviderDownloadEvent:
+    sequence: int
+    operation_id: str
+    phase: str
+    state: str
+    uri: str
+    suggested_file_name: str
+    result_file_path: str
+
+
+@dataclass(slots=True)
+class InAppProviderBrowserLease:
+    """One task-bound lease of the visible Stockroom WebView.
+
+    Playwright attaches over the loopback CDP endpoint before provider navigation begins. The
+    existing top-level Stockroom window is then the browser: provider pages, HUD, and downloads do
+    not escape into Chrome, Vivaldi, or a second automation window.
+    """
+
+    endpoint: str
+    _show: Callable[[], None]
+    _hide: Callable[[], None]
+    _navigate: Callable[[str], None]
+    _current_url: Callable[[], str]
+    _security_state: Callable[[], dict[str, object]]
+    _document_state: Callable[[tuple[str, ...], tuple[str, ...]], dict[str, object]]
+    _download_events: Callable[[int], tuple[InAppProviderDownloadEvent, ...]]
+
+    def show(self) -> None:
+        self._show()
+
+    def hide(self) -> None:
+        """Return to the Stockroom SPA without ending the active capture route."""
+
+        self._hide()
+
+    def current_url(self) -> str:
+        """Return only the native WebView's current URL while automation is detached."""
+
+        return self._current_url()
+
+    def navigate(self, url: str) -> None:
+        """Navigate the native WebView while no automation transport is connected."""
+
+        self._navigate(url)
+
+    def security_state(self) -> dict[str, object]:
+        """Read the minimum native page state needed to wait out a visible security gate.
+
+        This deliberately does not expose provider controls or page content.  It answers only
+        whether the document is ready and whether a common visible browser-verification surface
+        remains, so Playwright can stay completely disconnected while the person owns the gate.
+        """
+
+        return self._security_state()
+
+    def document_state(
+        self,
+        *,
+        ready_selectors: tuple[str, ...] = (),
+        ready_texts: tuple[str, ...] = (),
+    ) -> dict[str, object]:
+        """Return only native readiness/security signals for a detached navigation."""
+
+        return self._document_state(ready_selectors, ready_texts)
+
+    def download_events(
+        self,
+        *,
+        after_sequence: int = 0,
+    ) -> tuple[InAppProviderDownloadEvent, ...]:
+        return self._download_events(after_sequence)
+
+class InAppProviderBrowserSurface:
+    """Temporarily lend the original Stockroom WebView to provider capture."""
+
+    def __init__(self, app_url: str, *, debug_port: int | None = None) -> None:
+        if not should_inject(app_url, app_url):
+            raise ValueError("app_url must have a complete origin")
+        self._app_url = app_url
+        self._debug_port = debug_port or _free_loopback_port()
+        self._lock = threading.RLock()
+        self._active_show: Callable[[], None] | None = None
+
+    def __call__(self):
+        """Open one provider lease; keeps the surface itself available to the API."""
+
+        return self.lease()
+
+    def show_active_provider_browser(self) -> None:
+        """Restore the provider route hidden by Return to Stockroom."""
+
+        show = self._active_show
+        if show is None:
+            raise RuntimeError("there is no active provider route")
+        show()
+
+    @property
+    def debug_port(self) -> int:
+        return self._debug_port
+
+    @contextmanager
+    def lease(self):
+        """Yield one CDP attachment and always restore the SPA afterward."""
+
+        with self._lock:
+            window = active_window()
+            if window is None:
+                raise RuntimeError("the Stockroom provider browser is not ready")
+            lease_token = _begin_native_webview_download_lease()
+            resume_url = ""
+
+            def show() -> None:
+                if resume_url:
+                    # pywebview navigation is asynchronous. Reload the remembered provider URL
+                    # even when get_current_url still reports the old document, so a queued SPA
+                    # navigation cannot win a fast Return/Show race.
+                    window.load_url(resume_url)
+                try:
+                    window.show()
+                except Exception:  # noqa: BLE001 - an already-visible window is usable
+                    pass
+
+            def hide() -> None:
+                nonlocal resume_url
+                try:
+                    current = current_url()
+                    if current and not should_inject(current, self._app_url):
+                        resume_url = current
+                    window.load_url(self._app_url)
+                except Exception:  # noqa: BLE001 - a navigating WebView retries from its tab
+                    _log.exception("could not return to Stockroom during provider capture")
+
+            def navigate(url: str) -> None:
+                if type(url) is not str or not url or url != url.strip():
+                    raise ValueError("provider URL must be exact non-empty text")
+                window.load_url(url)
+
+            def current_url() -> str:
+                try:
+                    return str(window.get_current_url() or "")
+                except Exception:  # noqa: BLE001 - a navigating page has no stable URL yet
+                    return ""
+
+            def document_state(
+                ready_selectors: tuple[str, ...],
+                ready_texts: tuple[str, ...],
+            ) -> dict[str, object]:
+                selectors = json.dumps(list(ready_selectors), ensure_ascii=True)
+                texts = json.dumps([value.casefold() for value in ready_texts], ensure_ascii=True)
+                script = r"""
+                (() => {
+                  const title = String(document.title || "").toLowerCase();
+                  const body = String(document.body?.innerText || "").toLowerCase();
+                  const selectors = __STOCKROOM_READY_SELECTORS__;
+                  const readyTexts = __STOCKROOM_READY_TEXTS__;
+                  const isVisible = (element) => {
+                    if (!element) return false;
+                    const style = window.getComputedStyle(element);
+                    const rect = element.getBoundingClientRect();
+                    return style.display !== "none" && style.visibility !== "hidden"
+                      && Number(style.opacity || "1") > 0 && rect.width > 4 && rect.height > 4;
+                  };
+                  const challengeFrame = Array.from(document.querySelectorAll(
+                    'iframe[src*="challenges.cloudflare.com"], iframe[title*="challenge" i]'
+                  )).some(isVisible);
+                  const accountVerification = [
+                    "verify your phone number",
+                    "phone verification is required",
+                  ].some((value) => title.includes(value) || body.includes(value));
+                  const providerError = [
+                    "oh snap! we've experienced an error",
+                    "oh snap! we’ve experienced an error",
+                  ].some((value) => title.includes(value) || body.includes(value));
+                  const challengeText = [
+                    "verify you are human",
+                    "verifying you are human",
+                    "performing security verification",
+                    "checking your browser",
+                    "security verification",
+                  ].some((value) => title.includes(value) || body.includes(value));
+                  const selectorReady = selectors.some((selector) => {
+                    try { return Array.from(document.querySelectorAll(selector)).some(isVisible); }
+                    catch (_) { return false; }
+                  });
+                  const textReady = readyTexts.some((value) => body.includes(value));
+                  return {
+                    ready: document.readyState === "interactive" || document.readyState === "complete",
+                    challenge: challengeFrame || accountVerification
+                      || (challengeText && !(selectorReady || textReady)),
+                    accountVerification,
+                    providerError,
+                    providerReady: selectors.length === 0 && readyTexts.length === 0
+                      ? true
+                      : selectorReady || textReady,
+                  };
+                })()
+                """
+                script = script.replace("__STOCKROOM_READY_SELECTORS__", selectors).replace(
+                    "__STOCKROOM_READY_TEXTS__", texts
+                )
+                try:
+                    result = window.evaluate_js(script)
+                except Exception:  # noqa: BLE001 - navigation is temporarily unreadable
+                    return {"ready": False, "challenge": True}
+                if not isinstance(result, dict):
+                    return {"ready": False, "challenge": True}
+                return {
+                    "ready": bool(result.get("ready")),
+                    "challenge": bool(result.get("challenge")),
+                    "account_verification": bool(result.get("accountVerification")),
+                    "provider_error": bool(result.get("providerError")),
+                    "provider_ready": bool(result.get("providerReady")),
+                }
+
+            def security_state() -> dict[str, object]:
+                state = document_state((), ())
+                return {
+                    "ready": bool(state.get("ready")),
+                    "challenge": bool(state.get("challenge")),
+                    "account_verification": bool(state.get("account_verification")),
+                }
+
+            def download_events(after_sequence: int) -> tuple[InAppProviderDownloadEvent, ...]:
+                if type(after_sequence) is not int or after_sequence < 0:
+                    raise ValueError("provider download cursor is invalid")
+                with _NATIVE_DOWNLOAD_GUARD:
+                    return tuple(
+                        event
+                        for event in _NATIVE_DOWNLOAD_EVENTS
+                        if event.sequence > after_sequence
+                    )
+
+            try:
+                window.focus()
+            except Exception:  # noqa: BLE001 - focus is helpful, not an ownership proof
+                pass
+
+            try:
+                self._active_show = show
+                yield InAppProviderBrowserLease(
+                    endpoint=f"http://127.0.0.1:{self._debug_port}",
+                    _show=show,
+                    _hide=hide,
+                    _navigate=navigate,
+                    _current_url=current_url,
+                    _security_state=security_state,
+                    _document_state=document_state,
+                    _download_events=download_events,
+                )
+            finally:
+                self._active_show = None
+                _end_native_webview_download_lease(lease_token)
+                try:
+                    window.load_url(self._app_url)
+                except Exception:  # noqa: BLE001 - teardown must not mask capture evidence
+                    _log.exception("could not restore Stockroom after provider capture")
 
 
 def fetch_window():
@@ -672,6 +945,189 @@ def _webview_start_kwargs(start_fn, profile_dir) -> dict:
     return kwargs
 
 
+def _begin_native_webview_download_lease() -> str:
+    """Mark the one WebView whose downloads are owned by the browser-domain broker."""
+
+    global _NATIVE_DOWNLOAD_LEASE, _NATIVE_DOWNLOAD_SEQUENCE
+    token = os.urandom(16).hex()
+    with _NATIVE_DOWNLOAD_GUARD:
+        if _NATIVE_DOWNLOAD_LEASE is not None:
+            raise RuntimeError("a native provider download lease is already active")
+        _NATIVE_DOWNLOAD_LEASE = token
+        _NATIVE_DOWNLOAD_SEQUENCE = 0
+        _NATIVE_DOWNLOAD_EVENTS.clear()
+    return token
+
+
+def _end_native_webview_download_lease(lease_token: str) -> None:
+    """Release the host-side Save-As suppression for one provider task."""
+
+    global _NATIVE_DOWNLOAD_LEASE
+    with _NATIVE_DOWNLOAD_GUARD:
+        if _NATIVE_DOWNLOAD_LEASE == lease_token:
+            _NATIVE_DOWNLOAD_LEASE = None
+
+
+def _discard_native_webview_downloads() -> None:
+    """Clear provider Save-As suppression during host teardown."""
+
+    global _NATIVE_DOWNLOAD_LEASE
+    with _NATIVE_DOWNLOAD_GUARD:
+        _NATIVE_DOWNLOAD_LEASE = None
+        _NATIVE_DOWNLOAD_EVENTS.clear()
+
+
+def _record_in_app_download(
+    *,
+    operation_id: str,
+    phase: str,
+    state: str,
+    uri: str,
+    result_file_path: str,
+    suggested_file_name: str = "",
+) -> None:
+    global _NATIVE_DOWNLOAD_SEQUENCE
+    with _NATIVE_DOWNLOAD_GUARD:
+        if _NATIVE_DOWNLOAD_LEASE is None:
+            return
+        _NATIVE_DOWNLOAD_SEQUENCE += 1
+        _NATIVE_DOWNLOAD_EVENTS.append(
+            InAppProviderDownloadEvent(
+                sequence=_NATIVE_DOWNLOAD_SEQUENCE,
+                operation_id=operation_id,
+                phase=phase,
+                state=state,
+                uri=uri,
+                suggested_file_name=suggested_file_name or Path(result_file_path).name,
+                result_file_path=result_file_path,
+            )
+        )
+
+
+def _in_app_download_state(operation) -> str:
+    name = str(getattr(operation, "State", "")).lower()
+    if "completed" in name:
+        return "completed"
+    if "interrupted" in name:
+        return "interrupted"
+    return "in_progress"
+
+
+def _in_app_download_name(operation, result_file_path: str) -> str:
+    from email.message import Message
+
+    disposition = str(getattr(operation, "ContentDisposition", "") or "")
+    if disposition:
+        message = Message()
+        message["Content-Disposition"] = disposition
+        declared = message.get_filename()
+        if declared:
+            return Path(declared).name
+    uri = str(getattr(operation, "Uri", "") or "")
+    path_name = Path(unquote(urlsplit(uri).path)).name
+    if path_name and Path(path_name).suffix:
+        return path_name
+    return Path(result_file_path).name or "cad-download"
+
+
+def _install_silent_webview2_download_handler(
+    webview_module,
+    edge_cls=None,
+) -> None:
+    """Suppress pywebview's Save-As dialog while the CDP broker owns downloads.
+
+    The capture browser configures one browser-domain ``allowAndName`` directory and observes
+    ``downloadWillBegin`` / ``downloadProgress`` for the exact active task.  The host has one job:
+    keep pywebview from opening a competing native Save-As dialog.  It must not choose another
+    path or maintain a second completion state machine.
+    """
+
+    if edge_cls is None:
+        try:
+            from webview.platforms.edgechromium import EdgeChrome
+        except (ImportError, ModuleNotFoundError):
+            # Test doubles and non-Windows pywebview backends do not expose EdgeChrome. They have
+            # no WinForms Save As handler to replace; the real Windows WebView2 import remains the
+            # only production installation path.
+            return
+
+        edge_cls = EdgeChrome
+    if bool(getattr(edge_cls, "_stockroom_silent_downloads", False)):
+        return
+
+    settings = webview_module.settings
+    original_handler = edge_cls.on_download_starting
+
+    def on_download_starting(self, sender, args) -> None:
+        with _NATIVE_DOWNLOAD_GUARD:
+            lease_token = _NATIVE_DOWNLOAD_LEASE
+        if lease_token is None:
+            original_handler(self, sender, args)
+            return
+        if not bool(settings["ALLOW_DOWNLOADS"]):
+            args.Cancel = True
+            return
+        # Do not touch ResultFilePath. Browser.setDownloadBehavior already selected the task's
+        # private GUID path, and its terminal event is the single completion authority.
+        setter = getattr(args, "set_Handled", None)
+        if callable(setter):
+            setter(True)
+        else:
+            args.Handled = True
+        # WebView2 can still open its Download Hub even when the host handled the event. The
+        # browser-domain broker has already retained the bytes and exposes progress in Stockroom's
+        # own HUD, so close that redundant native flyout without taking ownership of the file.
+        close_download_dialog = getattr(sender, "CloseDefaultDownloadDialog", None)
+        if callable(close_download_dialog):
+            try:
+                close_download_dialog()
+            except Exception:  # noqa: BLE001 - a missing/closing flyout is already the goal
+                pass
+        operation = getattr(args, "DownloadOperation", None)
+        if operation is None:
+            return
+        operation_id = os.urandom(16).hex()
+        result_file_path = str(getattr(args, "ResultFilePath", "") or "")
+        uri = str(getattr(operation, "Uri", "") or "")
+        _record_in_app_download(
+            operation_id=operation_id,
+            phase="started",
+            state=_in_app_download_state(operation),
+            uri=uri,
+            result_file_path=result_file_path,
+            suggested_file_name=_in_app_download_name(operation, result_file_path),
+        )
+        terminal_recorded = False
+
+        def state_changed(_sender, _event_args) -> None:
+            nonlocal terminal_recorded
+            state = _in_app_download_state(operation)
+            if state not in {"completed", "interrupted"} or terminal_recorded:
+                return
+            terminal_recorded = True
+            try:
+                operation.StateChanged -= state_changed
+            except Exception:  # noqa: BLE001 - terminal evidence is already retained
+                pass
+            _record_in_app_download(
+                operation_id=operation_id,
+                phase="terminal",
+                state=state,
+                uri=uri,
+                result_file_path=result_file_path,
+                suggested_file_name=_in_app_download_name(operation, result_file_path),
+            )
+
+        try:
+            operation.StateChanged += state_changed
+        except Exception:  # noqa: BLE001 - browser-domain events remain the primary path
+            return
+        state_changed(operation, None)
+
+    edge_cls.on_download_starting = on_download_starting
+    setattr(edge_cls, "_stockroom_silent_downloads", True)
+
+
 class ManagedWindowController:
     """Native-only command surface for one replacement WebView window.
 
@@ -834,6 +1290,8 @@ def run_managed_window(
     _configure_windows_process_identity()
     import webview  # pywebview, WebView2 backend on Windows
 
+    _install_silent_webview2_download_handler(webview)
+
     try:
         webview.settings["ALLOW_DOWNLOADS"] = True
     except Exception:  # noqa: BLE001 - older pywebview versions still launch
@@ -939,6 +1397,8 @@ def run_window(base_url: str, token: str) -> None:
     _configure_windows_process_identity()
     import webview  # pywebview, WebView2 backend on Windows; lazy so Linux imports
 
+    _install_silent_webview2_download_handler(webview)
+
     from stockroom.store.machine_config import config_dir
 
     # pywebview blocks downloads by default. Stockroom's own CSV, fabrication,
@@ -978,12 +1438,20 @@ def run_window(base_url: str, token: str) -> None:
             current_url = None
         return should_inject(current_url, base_url)
 
+    # Recovery belongs only to the initial renderer handoff. Once the Stockroom SPA has loaded,
+    # later off-origin navigation can be an intentional provider-browser lease and must remain on
+    # that provider until its asynchronous download lands.
     startup_recovery = {"remaining": 2}
+    startup_complete = False
 
     def _on_loaded() -> None:
+        nonlocal startup_complete
         # Re-authenticate after reload/update, but never inject into remote content.
         if _spa_is_current():
+            startup_complete = True
             window.evaluate_js(inject_script(base_url, token))
+            return
+        if startup_complete:
             return
         if startup_recovery["remaining"] <= 0:
             return

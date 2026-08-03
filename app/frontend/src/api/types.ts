@@ -57,6 +57,8 @@ export interface DuplicatesResponse {
 // GET /api/library/facets
 export interface Facets {
   by_category: Record<string, number>;
+  /** Every filing destination Stockroom supports, including currently empty categories. */
+  category_catalog?: string[];
   by_manufacturer: Record<string, number>;
   complete: number;
   incomplete: number;

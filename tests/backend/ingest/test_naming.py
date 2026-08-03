@@ -34,6 +34,10 @@ def test_category_keyword_heuristic():
     assert propose_category("something with no hint") == "Other"
 
 
+def test_category_keyword_heuristic_recognizes_fuses():
+    assert propose_category("Cartridge Fuses") == "Fuses"
+
+
 def test_category_result_is_always_valid():
     assert propose_category("anything") in CATEGORIES
 

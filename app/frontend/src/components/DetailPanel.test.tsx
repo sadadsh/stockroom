@@ -159,51 +159,52 @@ const VERIFIED_EDA = {
 describe("DetailPanel files previews (M6d)", () => {
   it("puts the 3D canvas on the theme-aware stage instead of painting a local backdrop", () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    const stage = screen.getByTestId("inspection-stage");
+    const stage = document.querySelector('[data-dev-id="detail.asset-stage"]');
 
+    expect(stage).not.toBeNull();
     expect(stage).toHaveClass("bg-stage");
-    expect(stage.style.background).toBe("");
-    expect(stage.style.backgroundColor).toBe("");
+    expect((stage as HTMLElement).style.background).toBe("");
+    expect((stage as HTMLElement).style.backgroundColor).toBe("");
   });
 
-  it("expands the same inspection stage on the selected projection", async () => {
+  it("shows 3D, Symbol, and Footprint as three simultaneous viewers", () => {
+    wrap(<DetailPanel detail={detail()} {...BASE} />);
+    expect(document.querySelector('[data-dev-id="detail.asset-hero"]')).not.toBeNull();
+    expect(document.querySelector('[data-dev-id="detail.asset-symbol"]')).not.toBeNull();
+    expect(document.querySelector('[data-dev-id="detail.asset-footprint"]')).not.toBeNull();
+    expect(screen.queryByRole("tablist", { name: /inspection projection/i })).not.toBeInTheDocument();
+  });
+
+  it("opens the separate symbol viewer directly on Symbol", async () => {
     mockApi.previewSvg.mockResolvedValue(new Blob(["<svg/>"], { type: "image/svg+xml" }));
     wrap(<DetailPanel detail={detail()} {...BASE} />);
 
-    // no modal until a card is clicked
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("tab", { name: "Symbol" }));
-    await userEvent.click(screen.getByRole("button", { name: "Expand Inspection" }));
+    await userEvent.click(screen.getByRole("button", { name: "Open Symbol Preview" }));
 
     const dialog = await screen.findByRole("dialog", { name: "Inspect LM358" });
     expect(dialog).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Symbol" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(within(dialog).getByText("Symbol")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab")).not.toBeInTheDocument();
   });
 
   it("opens directly on the model projection when 3D is available", async () => {
     mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
     wrap(<DetailPanel detail={detail()} {...BASE} />);
 
-    expect(screen.getByRole("tab", { name: "3D Model" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Expand Inspection" }));
+    await userEvent.click(screen.getByRole("button", { name: "Open 3D Model Preview" }));
 
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "3D Model" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("3D Model")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab")).not.toBeInTheDocument();
   });
 
-  it("disables a missing model projection", () => {
+  it("keeps Symbol and Footprint visible when the model is missing", () => {
     wrap(<DetailPanel detail={detail({ assets: { kicad: { symbol: SYM, footprint: FP, model: null } } })} {...BASE} />);
-    expect(screen.getByRole("tab", { name: "3D Model" })).toBeDisabled();
+    expect(screen.getByText("No 3D Model")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open 3D Model Preview" })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-dev-id="detail.asset-symbol"]')).not.toBeNull();
+    expect(document.querySelector('[data-dev-id="detail.asset-footprint"]')).not.toBeNull();
   });
 
   it("lists the record's parametric specs in a Specifications section, hiding asset keys (B1)", () => {
@@ -268,7 +269,7 @@ describe("DetailPanel files previews (M6d)", () => {
         {...BASE}
       />,
     );
-    expect(screen.getByRole("tab", { name: "3D Model" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Open 3D Model Preview" })).toBeEnabled();
   });
 });
 
@@ -376,7 +377,9 @@ describe("DetailPanel network-only completion affordance", () => {
     await userEvent.click(screen.getByRole("button", { name: /Complete Part/ }));
     const dialog = await screen.findByRole("dialog", { name: /complete this part/i });
 
-    expect(within(dialog).getByRole("button", { name: "Get Files" })).toBeInTheDocument();
+    // The title-strip action is the one user click: opening this dialog has already started the
+    // all-provider collection, so the old second "Get Files" click must not return.
+    expect(within(dialog).queryByRole("button", { name: "Get Files" })).toBeNull();
     expect(within(dialog).queryByRole("button", { name: "Collect All Sources" })).toBeNull();
     expect(within(dialog).queryByLabelText("Library")).toBeNull();
     expect(within(dialog).queryByLabelText("Name")).toBeNull();
@@ -410,8 +413,9 @@ describe("DetailPanel network-only completion affordance", () => {
     expect(
       screen.queryByRole("button", { name: /Complete Part/ }),
     ).not.toBeInTheDocument();
-    // The inspector never fabricates a preview for an absent representation.
-    expect(screen.getByRole("tab", { name: "Symbol" })).toBeDisabled();
+    // The gallery never fabricates a preview action for an absent representation.
+    expect(screen.getByText("No Symbol")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Symbol Preview" })).not.toBeInTheDocument();
   });
 
   it("offers Complete Part for a KiCad-complete part that still needs Altium assets", async () => {
@@ -424,7 +428,7 @@ describe("DetailPanel network-only completion affordance", () => {
     expect(trigger).toHaveAccessibleName(/Altium Symbol.*Altium Footprint/);
   });
 
-  it("does not claim readiness from local KiCad and Altium presence alone", () => {
+  it("does not claim readiness from local KiCad and Altium presence alone", async () => {
     const complete = detail({
       assets: {
         kicad: { symbol: SYM, footprint: FP, model: MODEL },
@@ -436,10 +440,33 @@ describe("DetailPanel network-only completion affordance", () => {
       },
     });
     wrap(<DetailPanel detail={complete} {...BASE} onEditField={vi.fn()} />);
-    const trigger = screen.getByRole("button", { name: /CAD readiness/ });
+    const trigger = await screen.findByRole("button", {
+      name: /CAD readiness: KiCad unverified; Altium unverified/i,
+    });
     expect(trigger).toHaveTextContent("KiCad Unverified");
     expect(trigger).toHaveTextContent("Altium Unverified");
     expect(screen.queryByText(/^Complete$/)).not.toBeInTheDocument();
+  });
+
+  it("shows verification in progress instead of a false unverified verdict while evidence loads", () => {
+    mockApi.partCadSource.mockReturnValue(new Promise(() => undefined));
+    const complete = detail({
+      assets: {
+        kicad: { symbol: SYM, footprint: FP, model: MODEL },
+        altium: {
+          symbol: makeAsset({ lib: "p.SchLib", name: "P", file: "" }),
+          footprint: makeAsset({ lib: "p.PcbLib", name: "P", file: "" }),
+          model: null,
+        },
+      },
+    });
+
+    wrap(<DetailPanel detail={complete} {...BASE} onEditField={vi.fn()} />);
+
+    const trigger = screen.getByRole("button", { name: /CAD readiness: verifying/i });
+    expect(trigger).toHaveTextContent("KiCad Verifying");
+    expect(trigger).toHaveTextContent("Altium Verifying");
+    expect(trigger).not.toHaveTextContent("Unverified");
   });
 
   it("names both tools as ready only when backend coverage and trust pass", () => {
@@ -455,6 +482,28 @@ describe("DetailPanel network-only completion affordance", () => {
     expect(trigger).toHaveTextContent("KiCad Ready");
     expect(trigger).toHaveTextContent("Altium Ready");
     expect(screen.queryByText(/^Complete$/)).not.toBeInTheDocument();
+  });
+
+  it("uses the selected part's reverified completion evidence instead of a stale list verdict", async () => {
+    mockApi.partCadSource.mockResolvedValue({
+      url: null,
+      mpn: "MAX17608ATC+",
+      vendor: "Ultra Librarian",
+      needs: [],
+      completion_evidence: {
+        state: "verified",
+        manifest_digest: `sha256:${"a".repeat(64)}`,
+        reason: "The active CAD projection was reverified from immutable evidence.",
+      },
+    } as never);
+
+    wrap(<DetailPanel detail={detail()} {...BASE} onEditField={vi.fn()} />);
+
+    const trigger = await screen.findByRole("button", {
+      name: /CAD readiness: KiCad ready; Altium ready/i,
+    });
+    expect(trigger).toHaveTextContent("KiCad Ready");
+    expect(trigger).toHaveTextContent("Altium Ready");
   });
 });
 
@@ -1290,12 +1339,10 @@ describe("DetailPanel links row anatomy", () => {
     expect(cell.textContent).toMatch(/Not Set|Add Datasheet/);
   });
 
-  it("uses one labelled inspection command over the asset stage", () => {
+  it("uses the labelled eye command to expand the interactive 3D stage", () => {
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    const inspector = screen.getByRole("region", { name: "Inspect LM358" });
-    expect(within(inspector).getByRole("button", { name: "Expand Inspection" })).toHaveTextContent(
-      "Inspect",
-    );
+    expect(screen.getAllByRole("button", { name: "Open 3D Model Preview" })).toHaveLength(1);
+    expect(document.querySelector('[data-dev-id="detail.asset-stage"]')).not.toBeNull();
   });
 });
 
@@ -1353,48 +1400,6 @@ describe("the description lede", () => {
     );
     const block = document.querySelector('[data-dev-id="detail.description-lede"]');
     expect(block?.textContent).toMatch(/2 Sources/);
-  });
-});
-
-// --- One inspection instrument owns projection and expansion (owner, 2026-07-29). ----------------
-
-describe("the unified inspection stage", () => {
-  it("does not expand when the stage surface is clicked", () => {
-    wrap(<DetailPanel detail={detail()} {...BASE} />);
-    fireEvent.click(screen.getByTestId("inspection-stage"));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-
-  it("changes projection without expanding or replacing the instrument", async () => {
-    wrap(<DetailPanel detail={detail()} {...BASE} />);
-    const inspector = screen.getByRole("region", { name: "Inspect LM358" });
-    const projectionTabs = within(inspector).getByRole("tablist", {
-      name: /inspection projection/i,
-    });
-    await userEvent.click(within(projectionTabs).getByRole("tab", { name: "Symbol" }));
-    expect(within(projectionTabs).getByRole("tab", { name: "Symbol" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-
-  it("expands only from the labelled command", async () => {
-    wrap(<DetailPanel detail={detail()} {...BASE} />);
-    await userEvent.click(screen.getByRole("button", { name: "Expand Inspection" }));
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-  });
-
-  it("offers all three present representations through one selector and one command", () => {
-    wrap(<DetailPanel detail={detail()} {...BASE} />);
-    const inspector = screen.getByRole("region", { name: "Inspect LM358" });
-    const projectionTabs = within(inspector).getByRole("tablist", {
-      name: /inspection projection/i,
-    });
-    expect(
-      within(projectionTabs).getAllByRole("tab").map((tab) => tab.textContent),
-    ).toEqual(["Symbol", "Footprint", "3D Model"]);
-    expect(within(inspector).getAllByRole("button", { name: "Expand Inspection" })).toHaveLength(1);
   });
 });
 
@@ -1474,7 +1479,7 @@ describe("the Complete-Part needs line respects the part's class (cold-eyes find
     // renders and every assertion below passes vacuously regardless of what
     // missingAssets/needsList computed.
     wrap(<DetailPanel detail={detail(over)} {...BASE} onEditField={vi.fn()} />);
-    await userEvent.click(await screen.findByRole("button", { name: /CAD/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^CAD readiness:/i }));
     return document.body.textContent ?? "";
   }
 

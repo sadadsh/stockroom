@@ -17,6 +17,8 @@ from stockroom.cad_variants import (
     ResolvedCadVariant,
     same_cad_evidence_set,
 )
+from stockroom.capture.evidence import exact_identity
+from stockroom.capture.verified_pair import resolve_verified_pair
 from stockroom.ingest.naming import propose_entry_name
 from stockroom.ingest.pipeline import IngestPipeline
 from stockroom.ingest.staging import StagingCandidate
@@ -125,6 +127,8 @@ def materialize_pair(
     record: PartRecord,
     kicad_resolved: ResolvedCadVariant,
     altium_resolved: ResolvedCadVariant,
+    *,
+    evidence_store,
 ) -> PartRecord:
     """Install one same-download dual-EDA set through one rollback-safe transaction."""
 
@@ -135,6 +139,22 @@ def materialize_pair(
         raise ValueError(
             "the selected KiCad and Altium projections do not share one provider evidence set"
         )
+
+    # The validation report is the durable binding between KiCad's package label and the
+    # converter-declared native Altium entry.  Provider exports legitimately use different names
+    # for the same proved geometry, so replaying immutable evidence must carry that exact binding
+    # instead of guessing from file order or from the KiCad name.
+    verified_pair = resolve_verified_pair(
+        evidence_store,
+        identity=exact_identity(record),
+        manifest_digest=kicad_resolved.descriptor.manifest_digest,
+    )
+    if (
+        verified_pair.kicad.pointer != kicad_resolved.pointer
+        or verified_pair.altium.pointer != altium_resolved.pointer
+    ):
+        raise ValueError("selected CAD pair does not match the reverified evidence pair")
+    preferred_altium_footprint = verified_pair.altium_footprint_entry
 
     with tempfile.TemporaryDirectory(prefix="Stockroom-CAD-Pair-") as temporary:
         root = Path(temporary)
@@ -182,6 +202,7 @@ def materialize_pair(
             now_iso=datetime.now(UTC).isoformat(),
             kicad_active_variant=kicad_resolved.pointer,
             altium_active_variant=altium_resolved.pointer,
+            preferred_altium_footprint=preferred_altium_footprint,
         )
 
 

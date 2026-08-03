@@ -6,6 +6,7 @@
  * watchdog, the session-token gate, both-format attach - lives in the provider now.
  */
 import {
+  captureInFlight,
   useCapture,
   subsetComplete,
   KICAD_REQS,
@@ -19,17 +20,18 @@ export type { GuidedStatus } from "./capture";
 
 export function useGuidedCapture(partId: string, needs: Requirement[] = [], partName = "") {
   const cap = useCapture();
-  const isActive = cap.active.partId === partId;
+  const ownsState = cap.active.partId === partId;
+  const isActive = ownsState && captureInFlight(cap.active);
 
-  const status = isActive ? cap.active.status : "idle";
-  const message = isActive ? cap.active.message : null;
-  const url = isActive ? cap.active.url : null;
-  const vendor = isActive ? cap.active.vendor : null;
+  const status = ownsState ? cap.active.status : "idle";
+  const message = ownsState ? cap.active.message : null;
+  const url = ownsState ? cap.active.url : null;
+  const vendor = ownsState ? cap.active.vendor : null;
   const activeNeeds = isActive ? cap.active.needs : needs;
-  const received = isActive ? cap.active.received : {};
-  const backgrounded = isActive ? cap.active.backgrounded : false;
-  const providerOutcomes = isActive ? cap.active.providerOutcomes : [];
-  const collectionComplete = isActive ? cap.active.collectionComplete : null;
+  const received = ownsState ? cap.active.received : {};
+  const backgrounded = ownsState ? cap.active.backgrounded : false;
+  const providerOutcomes = ownsState ? cap.active.providerOutcomes : [];
+  const collectionComplete = ownsState ? cap.active.collectionComplete : null;
 
   return {
     status,

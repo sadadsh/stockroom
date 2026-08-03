@@ -41,6 +41,7 @@ from typing import Protocol, cast
 
 from stockroom.altium.dblib import render_dblib
 from stockroom.cad_variants import resolve_cad_variant, same_cad_evidence_set
+from stockroom.capture.complete import completion_needs
 from stockroom.capture.evidence import record_installed_kicad_role_evidence
 from stockroom.capture.identity import same_manufacturer
 from stockroom.capture.runner import (
@@ -48,6 +49,7 @@ from stockroom.capture.runner import (
     run_guided_capture,
     write_durable_capture_report,
 )
+from stockroom.capture.verified_cache import record_completion_evidence
 from stockroom.catalog import (
     CATALOG_APPLICATION_ID,
     CATALOG_FILENAME,
@@ -128,6 +130,74 @@ from .provider_policy import (
 from .provider_runtime import ProviderExecutionRuntime
 
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z", re.ASCII)
+
+
+def _canonical_capture_diagnostic_report(
+    report: dict,
+    *,
+    record: PartRecord,
+    evidence_store: EvidenceStore,
+    library,
+) -> dict:
+    """Keep provider diagnostics while deriving completion only from the live library.
+
+    Acquisition runs in a disposable copy-on-write repository. Its provider outcomes and retained
+    counts are useful diagnostics, but its projected files cannot truthfully mark the canonical
+    record complete before the publisher commits and readbacks the live library.
+    """
+
+    if type(report) is not dict:
+        raise TypeError("capture report must be a JSON object")
+    diagnostic = json.loads(json.dumps(report))
+    rows = diagnostic.get("items")
+    row = next((value for value in rows if type(value) is dict), None) if type(rows) is list else None
+    from stockroom.capture.projection import verify_installed_projection
+
+    evidence = record_completion_evidence(
+        evidence_store,
+        record,
+        projection_verifier=lambda current, resolved, *, validation_reports=None: verify_installed_projection(
+            library,
+            current,
+            resolved,
+            validation_reports=validation_reports,
+        ),
+    )
+    remaining = [requirement.value for requirement in completion_needs(record, evidence)]
+    if row is None:
+        row = {
+            "part_id": record.id,
+            "mpn": record.mpn,
+            "display_name": record.mpn,
+            "category": record.category,
+            "needed": list(remaining),
+            "satisfied": [],
+            "retained": int(diagnostic.get("retained") or 0),
+            "sources": [],
+            "notes": [],
+            "error": "",
+            "provider_outcomes": [],
+            "collection_complete": diagnostic.get("collection_complete"),
+        }
+        diagnostic["items"] = [row]
+    needed = row.get("needed")
+    needed = [value for value in needed if type(value) is str] if type(needed) is list else []
+    complete = not remaining and evidence.state in {"verified", "not-required"}
+    status = "already-complete" if complete else "unchanged"
+    row.update(
+        {
+            "part_id": record.id,
+            "mpn": record.mpn,
+            "category": record.category,
+            "status": status,
+            "needed": needed or list(remaining),
+            "satisfied": [value for value in needed if value not in remaining],
+            "remaining": remaining,
+            "completion_evidence": evidence.to_dict(),
+        }
+    )
+    diagnostic["counts"] = {status: 1}
+    return diagnostic
 _SCHEMA_VERSION = 1
 _RECORD_PROVIDER = "canonical_record"
 _DATASHEET_PROVIDER = "manufacturer_datasheet"
@@ -149,6 +219,7 @@ class ProductionApplicationContext(Protocol):
     profile: Profile
     config: MachineConfig
     cli: KiCadCli
+    ops: LibraryOps
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -468,6 +539,7 @@ class _CopyOnWriteContext:
     config: MachineConfig
     ops: LibraryOps
     jobs: object
+    provider_browser_surface: object | None = None
 
     def rebuild_index(self) -> None:
         return None
@@ -550,6 +622,7 @@ def _seed_copy_on_write_context(
         config=context.config,
         ops=operations,
         jobs=JobRunner(),
+        provider_browser_surface=getattr(context, "provider_browser_surface", None),
     )
 
 
@@ -712,7 +785,16 @@ class StockroomAcquisitionProviderAdapter:
                     capture_id=request.report_item_id,
                 )
                 if request.report_item_id is not None:
-                    write_durable_capture_report(request.report_item_id, report)
+                    canonical_record = self.context.ops.load_record(part_id)
+                    write_durable_capture_report(
+                        request.report_item_id,
+                        _canonical_capture_diagnostic_report(
+                            report,
+                            record=canonical_record,
+                            evidence_store=self.evidence_store,
+                            library=self.context.profile.library,
+                        ),
+                    )
                 record = isolated.ops.load_record(part_id)
                 try:
                     record_installed_kicad_role_evidence(

@@ -9,6 +9,15 @@ def test_mouser_product_url_yields_vendor_and_mpn():
     assert v == ("mouser", "TPD6E05U06RVZR")
 
 
+def test_mouser_product_url_preserves_a_literal_plus_in_the_mpn():
+    v = distributor_mpn_from_url(
+        "https://www.mouser.com/en/ProductDetail/Analog-Devices-Maxim-Integrated/"
+        "MAX17608ATC%2b?qs=qpJ%252B%252B%252Bdg6p0jd0uzRsXZkw%3D%3D"
+    )
+
+    assert v == ("mouser", "MAX17608ATC+")
+
+
 def test_mouser_url_with_only_a_manufacturer_part_segment_still_yields_a_token():
     # the shorter /ProductDetail/<part> form (a Mouser part number) is still a searchable token
     v = distributor_mpn_from_url("https://www.mouser.com/ProductDetail/595-TPD6E05U06RVZR")

@@ -1143,9 +1143,33 @@ export const api = {
     });
   },
 
+  addPartFiles(input: { partId: string; paths: string[] }): Promise<{
+    part_id: string;
+    selected_files: number;
+    attached: string[];
+    ignored: string[];
+    remaining: string[];
+    complete: boolean;
+  }> {
+    return request("POST", `/api/library/parts/${encodeURIComponent(input.partId)}/files`, {
+      body: { paths: input.paths },
+    });
+  },
+
   captureWorkflow(batchId: string): Promise<CaptureWorkflowSession> {
     return apiGet<CaptureWorkflowSession>(
       `/api/library/capture/batches/${encodeURIComponent(batchId)}`,
+    );
+  },
+
+  showCaptureProvider(batchId: string): Promise<{
+    workflow_batch_id: string;
+    part_id: string;
+    visible: boolean;
+  }> {
+    return request(
+      "POST",
+      `/api/library/capture/batches/${encodeURIComponent(batchId)}/provider/show`,
     );
   },
 

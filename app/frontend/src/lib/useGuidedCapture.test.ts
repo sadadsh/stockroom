@@ -80,7 +80,7 @@ describe("useGuidedCapture", () => {
     expect(result.current.status).toBe("done");
   });
 
-  it("prioritizes a retained provider inside the same all-source run", async () => {
+  it("prioritizes a retained provider for the one-provider run", async () => {
     mockCadSourceUrl();
     const capture = mockCapture();
     const { result } = render(["kicad_symbol", "kicad_footprint"]);
@@ -97,7 +97,7 @@ describe("useGuidedCapture", () => {
     );
   });
 
-  it("still runs the all-source ladder when no provider URL resolves", async () => {
+  it("still runs one eligible provider when no saved provider URL resolves", async () => {
     mockCadSourceUrl(null);
     const capture = mockCapture();
     const { result } = render(["kicad_symbol", "kicad_footprint"]);

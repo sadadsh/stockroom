@@ -3,12 +3,12 @@ import {
   BOARD_PLANE_MIN_ASPECT,
   BOARD_PLANE_MIN_HALF_MM,
   BOARD_PLANE_REACH,
+  BOARD_SURFACE_CLEARANCE_MM,
   PAD_THICKNESS_MM,
   boardExtent,
   boardPlaneHalfExtents,
   boardPlaneThickness,
   boardStack,
-  PAD_EMBED_FRACTION,
   DEFAULT_LAYERS,
   silkQuad,
 } from "./boardPlane";
@@ -78,15 +78,11 @@ describe("boardStack (the clipping fix, as an invariant)", () => {
     expect(padTop).toBeLessThanOrEqual(BASE + 1e-9);
   });
 
-  it("sinks the pads HALFWAY into the plate, so copper reads as part of the stack", () => {
-    // Owner, 2026-07-26: "the 3D footprint should sit WITHIN the pcb plate, not lay on top of it."
-    // The board's top face rises to the pads' mid-height - not to their top, which would bury the
-    // land pattern completely and lose the thing the layer exists to show.
+  it("keeps the PCB and copper depth faces unambiguous", () => {
     const s = boardStack(BASE, H);
     const boardTop = s.boardCenterY + s.boardThickness / 2;
-    expect(boardTop).toBeCloseTo(s.padGroupY + PAD_THICKNESS_MM * PAD_EMBED_FRACTION, 10);
-    expect(boardTop).toBeGreaterThan(s.padGroupY); // embedded, not merely resting on the surface
-    expect(boardTop).toBeLessThan(s.padTopY); // still visible, not swallowed
+    expect(boardTop).toBeCloseTo(s.padGroupY - BOARD_SURFACE_CLEARANCE_MM, 10);
+    expect(boardTop).toBeLessThan(s.padGroupY);
   });
 
   it("does NOT move the component down to do it", () => {

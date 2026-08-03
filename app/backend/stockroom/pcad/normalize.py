@@ -157,8 +157,19 @@ def _pad_styles(library: Node, unit_scale_nm: Decimal) -> dict[str, _PadStyle]:
             width_node = shape_node.child("shapeWidth")
             height_node = shape_node.child("shapeHeight")
             if width_node is None or height_node is None:
-                # Thermal definitions use diameters and are irrelevant to an SMD
-                # style only when they explicitly have no physical extent.
+                layer_type_node = shape_node.child("layerType")
+                layer_type = (
+                    _one_argument(layer_type_node, "layerType").casefold()
+                    if layer_type_node is not None
+                    else ""
+                )
+                # P-CAD's Thrm* plane entry is a plane-connection rule, not the pad's physical
+                # copper geometry. Ultra Librarian emits a real outside/inside diameter here
+                # even for SMD pads whose top-copper Rect/Ellipse is already explicit. Altium's
+                # library pad is defined by that physical layer shape; rejecting the whole part
+                # because its source also describes a PCB-plane thermal throws valid CAD away.
+                if layer_type == "plane" and shape_name.startswith("thrm"):
+                    continue
                 outside = _optional_value(shape_node, "outsideDiam", "0")
                 inside = _optional_value(shape_node, "insideDiam", "0")
                 if (
@@ -549,8 +560,15 @@ def normalize(document: Document) -> Library:
 
     footprints = _footprints(library_node, scale, pad_styles, known_text_styles, default_pattern)
     default_pads = next(footprint.pads for footprint in footprints if footprint.default)
-    if {pad.number for pad in default_pads} != {pad for pad, _ in pad_pin_map}:
-        raise _fail("default pattern pads do not close over padPinMap", attached_pattern)
+    # The electrical map must resolve to real footprint pads, but the footprint may legitimately
+    # contain additional physical pads. Ultra Librarian uses that for exposed-pad thermal drill
+    # arrays: TPS62130RGTR maps electrical pads 1-17 and keeps physical thermal-via pads 18-21.
+    # Requiring equality discarded the entire valid library; requiring the mapped set to exist
+    # preserves those physical features without inventing electrical component pins.
+    physical_pad_numbers = {pad.number for pad in default_pads}
+    mapped_pad_numbers = {pad for pad, _ in pad_pin_map}
+    if not mapped_pad_numbers.issubset(physical_pad_numbers):
+        raise _fail("default pattern is missing a pad from padPinMap", attached_pattern)
 
     component_attributes = _attributes(component.children_named("attr"))
     attr_by_name = {

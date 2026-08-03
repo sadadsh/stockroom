@@ -255,21 +255,29 @@ def test_durable_completion_includes_present_but_unverified_cad(monkeypatch):
 
     monkeypatch.setattr(
         "stockroom.capture.verified_cache.record_completion_evidence",
-        lambda _store, _record: CompletionEvidence.unverified(
+        lambda _store, _record, **_kwargs: CompletionEvidence.unverified(
             "the active evidence pointer is absent"
         ),
     )
-    assert _needs_durable_completion(record, evidence_store=object()) is True
+    assert _needs_durable_completion(
+        record,
+        library=object(),
+        evidence_store=object(),
+    ) is True
 
     monkeypatch.setattr(
         "stockroom.capture.verified_cache.record_completion_evidence",
-        lambda _store, _record: CompletionEvidence(
+        lambda _store, _record, **_kwargs: CompletionEvidence(
             state="verified",
             manifest_digest="sha256:" + ("a" * 64),
             reason="the active projection was reverified",
         ),
     )
-    assert _needs_durable_completion(record, evidence_store=object()) is False
+    assert _needs_durable_completion(
+        record,
+        library=object(),
+        evidence_store=object(),
+    ) is False
 
 
 # --- running -------------------------------------------------------------------------------
@@ -538,6 +546,58 @@ def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
     )
     assert replay.status_code == 200, replay.text
     assert replay.json()["batch"]["kind"] == "guided_capture"
+
+
+def test_active_capture_can_reveal_its_retained_provider_surface(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from stockroom.capture.intent import PersonCaptureIntent, person_capture_intent
+
+    _mount_completion_authority(app_ctx, tmp_path)
+    monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(tmp_path / "Capture State"))
+
+    class Surface:
+        shown = 0
+
+        def show_active_provider_browser(self) -> None:
+            self.shown += 1
+
+    surface = Surface()
+    monkeypatch.setattr(app_ctx, "provider_browser_surface", surface, raising=False)
+    reference = client.post(
+        "/api/library/capture/run",
+        json={
+            "part_ids": ["tps62130"],
+            "mode": "assisted",
+            "vendor": "ultralibrarian",
+        },
+    ).json()
+    intent = PersonCaptureIntent()
+    with person_capture_intent(
+        "tps62130",
+        intent,
+        capture_id=reference["workflow_item_id"],
+    ):
+        intent.set_active_route(
+            "ultralibrarian",
+            "https://app.ultralibrarian.com/details/catalog/TI/TPS62130",
+            "ultralibrarian",
+        )
+        response = client.post(
+            f"/api/library/capture/batches/{reference['workflow_batch_id']}/provider/show"
+        )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "workflow_batch_id": reference["workflow_batch_id"],
+        "part_id": "tps62130",
+        "visible": True,
+        "active_route": True,
+    }
+    assert surface.shown == 1
 
 
 def test_durable_capture_projection_returns_the_retained_terminal_report(
@@ -1083,6 +1143,102 @@ def test_selected_recovery_files_must_match_the_exact_provider_route(
         assert intent.take_selected_files(
             "digikey", active_url, "digikey-snapmagic", route_token
         ) == (selected.resolve(),)
+
+
+def test_manual_files_are_processed_without_a_capture_route_and_close_when_complete(
+    client, app_ctx, tmp_path, monkeypatch
+):
+    from stockroom.ingest import manual_files
+
+    selected = tmp_path / "TPS62130.zip"
+    selected.write_bytes(b"user selected package")
+    observed = {}
+
+    def import_files(ctx, part_id, paths):
+        observed["ctx"] = ctx
+        observed["part_id"] = part_id
+        observed["paths"] = paths
+        return {
+            "part_id": part_id,
+            "selected_files": len(paths),
+            "attached": ["altium_symbol", "altium_footprint"],
+            "ignored": ["README.txt: ignored"],
+            "remaining": [],
+            "complete": True,
+        }
+
+    class ProviderOwner:
+        def __init__(self):
+            self.closed = 0
+
+        def provider_browser_surface(self):
+            raise AssertionError("manual intake must not open a provider browser")
+
+        def close_active_provider_browser(self):
+            self.closed += 1
+
+    owner = ProviderOwner()
+    monkeypatch.setattr(manual_files, "import_manual_cad_files", import_files)
+    monkeypatch.setattr(app_ctx, "provider_browser_surface", owner, raising=False)
+    monkeypatch.setattr(app_ctx, "rebuild_index", lambda: observed.setdefault("rebuilt", True))
+    monkeypatch.setattr(app_ctx, "auto_push", lambda: observed.setdefault("pushed", True))
+
+    response = client.post(
+        "/api/library/parts/tps62130/files",
+        json={"paths": [str(selected)]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["complete"] is True
+    assert observed["ctx"] is app_ctx
+    assert observed["part_id"] == "tps62130"
+    assert observed["paths"] == (selected.resolve(),)
+    assert observed["rebuilt"] is True
+    assert observed["pushed"] is True
+    assert owner.closed == 1
+
+
+def test_manual_file_success_survives_a_stale_provider_surface(
+    client, app_ctx, tmp_path, monkeypatch
+):
+    from stockroom.ingest import manual_files
+
+    selected = tmp_path / "TPS62130.step"
+    selected.write_bytes(b"usable model")
+
+    monkeypatch.setattr(
+        manual_files,
+        "import_manual_cad_files",
+        lambda *_args: {
+            "part_id": "tps62130",
+            "selected_files": 1,
+            "attached": ["kicad_model"],
+            "ignored": [],
+            "remaining": [],
+            "complete": True,
+        },
+    )
+
+    class StaleProviderOwner:
+        def close_active_provider_browser(self):
+            raise RuntimeError("provider window already closed")
+
+    monkeypatch.setattr(
+        app_ctx,
+        "provider_browser_surface",
+        StaleProviderOwner(),
+        raising=False,
+    )
+    monkeypatch.setattr(app_ctx, "rebuild_index", lambda: None)
+    monkeypatch.setattr(app_ctx, "auto_push", lambda: None)
+
+    response = client.post(
+        "/api/library/parts/tps62130/files",
+        json={"paths": [str(selected)]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["complete"] is True
 
 
 @pytest.mark.parametrize(

@@ -209,20 +209,39 @@ def _validation_report(
     *,
     source_manifests: tuple[str, ...] = (),
 ) -> bytes:
-    return _canonical_bytes(
-        {
-            "identity": {
-                "authoritative_manufacturer_key": (identity.authoritative_manufacturer_key),
-                "mpn_canonical": identity.mpn_canonical,
+    report: dict[str, object] = {
+        "identity": {
+            "authoritative_manufacturer_key": (identity.authoritative_manufacturer_key),
+            "mpn_canonical": identity.mpn_canonical,
+        },
+        "operation": operation.label,
+        "provider": _PROVIDER,
+        "roles": sorted(roles),
+        "schema": "stockroom.cad-role-validation/1",
+        "source_manifests": sorted(source_manifests),
+        "valid": True,
+    }
+    if {
+        "symbol",
+        "footprint",
+        "model",
+        "altium_symbol",
+        "altium_footprint",
+    }.issubset(roles):
+        report["cross_eda"] = {
+            "status": "verified",
+            "report": {
+                "altium": {
+                    "footprint_entry": "DIOM5227X270N",
+                    "symbol_entry": "S1M",
+                },
+                "package_equivalence": True,
+                "pad_equivalence": True,
+                "terminal_equivalence": True,
+                "valid": True,
             },
-            "operation": operation.label,
-            "provider": _PROVIDER,
-            "roles": sorted(roles),
-            "schema": "stockroom.cad-role-validation/1",
-            "source_manifests": sorted(source_manifests),
-            "valid": True,
         }
-    )
+    return _canonical_bytes(report)
 
 
 def _provider_cad_report(
@@ -1321,6 +1340,38 @@ def test_exact_adapter_rejects_same_provider_roles_from_separate_manifests(
 
     assert isinstance(selected, ProductionStageStop)
     assert selected.code == "exact_dual_eda_evidence_unavailable"
+
+
+def test_exact_adapter_reuses_the_proved_native_altium_footprint(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    evidence = EvidenceStore((tmp_path / "Evidence").absolute())
+    _seed_provider_evidence(evidence, tmp_path / "CAD")
+    observed: list[str] = []
+
+    def verify(**kwargs):
+        observed.append(kwargs["altium_footprint_entry"])
+        return {
+            "package_equivalence": True,
+            "pad_equivalence": True,
+            "terminal_equivalence": True,
+            "valid": True,
+        }
+
+    monkeypatch.setattr(
+        "stockroom.planning.production_workflow.verify_cross_eda_component",
+        verify,
+    )
+
+    selected = ExactEvidenceCadBundleAdapter().select(
+        evidence_store=evidence,
+        identity=ExactPartIdentity(_MANUFACTURER, _MPN),
+        workspace=tmp_path / "Selection",
+    )
+
+    assert not isinstance(selected, ProductionStageStop)
+    assert observed == ["DIOM5227X270N"]
 
 
 def test_source_part_byte_drift_after_identity_fails_closed(tmp_path: Path) -> None:

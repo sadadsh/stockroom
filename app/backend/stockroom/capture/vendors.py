@@ -38,6 +38,7 @@ from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 from stockroom.capture.browser import ProviderControlHint
 from stockroom.capture.identity import (
+    exact_catalog_observation_error,
     exact_observation_error,
     page_identity,
     provider_url_allowed,
@@ -57,9 +58,7 @@ BrowserEngine = Literal["chromium", "camoufox", "cloak"]
 # un-awaited sample of a control the page attaches asynchronously. Neither shape belongs in the
 # one provider this machine may run unattended: a 30s hang ends in a raised error that discards
 # the whole part, and an un-awaited sample reports a render as a provider-wide blockage.
-_ACCORDION_CLICK_TIMEOUT_MS = 2_000
 _EXPORT_BUTTON_TIMEOUT_MS = 10_000
-_EXPORT_CLICK_TIMEOUT_MS = 10_000
 
 
 def formats_for(needs) -> list[str]:
@@ -116,6 +115,16 @@ class VendorCapability:
     # after a download. Reusing that exact page avoids unnecessary catalogue requests and security
     # challenges; adapters that navigate away retain the conservative default.
     reuse_page_between_formats: bool = False
+    # True when every KiCad/Altium submission on this surface also selects and delivers STEP. The
+    # acquisition engine then skips a redundant standalone model pass; classification of the files
+    # remains the authority for whether a model actually arrived.
+    bundles_model_with_cad: bool = False
+    # A reviewed provider may require top-level navigation with CDP disconnected because the CDP
+    # attachment itself triggers its security interstitial.  The selectors/texts are readiness
+    # signals only; provider controls are still operated by the adapter after reconnection.
+    detached_navigation: bool = False
+    native_ready_selectors: tuple[str, ...] = ()
+    native_ready_texts: tuple[str, ...] = ()
     # Whether one explicit part+provider selection authorizes Stockroom to operate ordinary export
     # controls. False keeps those controls person-driven even in the explicit-provider lane.
     operator_automation: bool = True
@@ -243,14 +252,17 @@ class UltraLibrarianAdapter:
         control_hints=(
             ProviderControlHint(
                 label="KiCad v6+ export",
-                selectors=("#KiCADv6",),
+                selectors=('input[name="exports"][id="KiCADv6"]',),
                 source="version_pins['kicad'] / _export_selectors",
             ),
             ProviderControlHint(
                 label="3D STEP model export",
                 # The current live id first, then only the measured legacy alias, exactly as
                 # `_export_selectors` orders them.
-                selectors=("#ThreeDModel", "#MfrThreeDModel"),
+                selectors=(
+                    'input[name="exports"][id="ThreeDModel"]',
+                    'input[name="exports"][id="MfrThreeDModel"]',
+                ),
                 source="version_pins['model'] / _export_selectors",
             ),
             ProviderControlHint(
@@ -441,6 +453,7 @@ class UltraLibrarianAdapter:
         *,
         expected_manufacturer: str = "",
         expected_mpn: str = "",
+        catalog_identity_authorized: bool = False,
     ) -> str:
         """Navigate from wherever we landed to the export panel, and say what happened.
 
@@ -469,6 +482,7 @@ class UltraLibrarianAdapter:
                 page.url or "",
                 expected_manufacturer,
                 expected_mpn,
+                catalog_identity_authorized=catalog_identity_authorized,
             )
         challenge = _challenge_issue(page, "Ultra Librarian")
         if challenge:
@@ -524,6 +538,7 @@ class UltraLibrarianAdapter:
                 page.url or "",
                 expected_manufacturer,
                 requested_mpn,
+                catalog_identity_authorized=catalog_identity_authorized,
             )
             if identity_issue:
                 return identity_issue
@@ -542,6 +557,7 @@ class UltraLibrarianAdapter:
                 page.url or "",
                 expected_manufacturer,
                 expected_mpn,
+                catalog_identity_authorized=catalog_identity_authorized,
             )
             if identity_issue:
                 return identity_issue
@@ -552,6 +568,7 @@ class UltraLibrarianAdapter:
                 page.url or "",
                 expected_manufacturer,
                 expected_mpn,
+                catalog_identity_authorized=catalog_identity_authorized,
             )
             if identity_issue:
                 return identity_issue
@@ -588,6 +605,7 @@ class UltraLibrarianAdapter:
             page.url or "",
             expected_manufacturer,
             expected_mpn,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
 
     def drive(
@@ -597,6 +615,7 @@ class UltraLibrarianAdapter:
         *,
         expected_manufacturer: str = "",
         expected_mpn: str = "",
+        catalog_identity_authorized: bool = False,
     ) -> DriveReport:
         if not expected_manufacturer.strip() or not expected_mpn.strip():
             return DriveReport(
@@ -611,6 +630,7 @@ class UltraLibrarianAdapter:
             page,
             expected_manufacturer=expected_manufacturer,
             expected_mpn=expected_mpn,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
         if blocked:
             clearance = self.user_clearance_issue(page)
@@ -632,6 +652,7 @@ class UltraLibrarianAdapter:
             page.url or "",
             expected_manufacturer,
             expected_mpn,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
         if identity_issue:
             return DriveReport(missed=list(formats), message=identity_issue)
@@ -717,6 +738,7 @@ class UltraLibrarianAdapter:
             page.url or "",
             expected_manufacturer,
             expected_mpn,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
         if identity_issue:
             return DriveReport(missed=list(formats), message=identity_issue)
@@ -802,49 +824,67 @@ class UltraLibrarianAdapter:
     def _run_export(self, page, submit) -> tuple[bool, str, bool]:
         """Activate the panel's own Download control. `(ran, reason, needs_person)`.
 
-        Same defect and same shape as `_click_accordion`: an unbounded default click turned an
-        overlay into a 30s hang and then an exception that escaped `drive()` entirely, losing both
-        the selected formats and the real reason.
+        THE ORDER HERE IS THE SAFETY PROPERTY. Security state is checked before any activation;
+        CAPTCHA, challenge, MFA, and sign-in always return a person-handoff and the vendor export
+        never runs.
 
-        THE ORDER HERE IS THE SAFETY PROPERTY. An intercepted click means something is covering
-        the page, and that something may be a security control. So the recovery is not attempted
-        until `user_clearance_issue` has been consulted: if a CAPTCHA, challenge, MFA, or sign-in
-        state is present, this returns a person-handoff and the vendor's export never runs.
-        Stockroom does not operate, solve, or click past a security control for any provider.
-
-        Only with no security state does it fall back to activating the vendor's own Download
-        control in page context - exactly the reviewed technique `_check_box` already uses for the
-        vendor's own checkboxes, and no different in kind from the click that was intercepted.
+        Stockroom's own fixed task chrome intentionally sits above the provider document. A
+        coordinate click can therefore land on Stockroom's Return tab, restore the app, and leave
+        an old locator behind. The previous fallback then evaluated a missing `#submit-export` but
+        returned success unconditionally, producing a false "submitted" state and a 120-second
+        wait for a download that was never requested. Activate the exact, already-measured vendor
+        node in page context and require a Boolean readback that it actually existed and ran.
         """
-        try:
-            submit.click(timeout=_EXPORT_CLICK_TIMEOUT_MS)
-            trace("capture.step.export-run", selector="#submit-export", via="click", ran=True)
-            return True, "", False
-        except Exception:  # noqa: BLE001 - an intercepted click is page state, not a crash
-            pass
         clearance = self.user_clearance_issue(page)
         if clearance:
             trace(
                 "capture.step.export-run",
                 selector="#submit-export",
-                via="intercepted",
+                via="security-handoff",
                 ran=False,
                 needs_person=True,
                 why=clearance,
             )
             return False, clearance, True
-        try:
-            page.evaluate(
-                "sel => { const el = document.querySelector(sel); if (el) el.click(); }",
-                "#submit-export",
+        before_url = page.url or ""
+        if not _provider_url_allowed("ultralibrarian", before_url):
+            issue = (
+                "Ultra Librarian's Download control disappeared when Stockroom returned to the "
+                "app; the export was not submitted."
             )
             trace(
                 "capture.step.export-run",
                 selector="#submit-export",
-                via="in-page-click",
-                ran=True,
+                via="provider-page-check",
+                ran=False,
+                before_url=url_note(before_url),
+                why=issue,
             )
-            return True, "", False
+            return False, issue, False
+        try:
+            ran = bool(
+                page.evaluate(
+                    """sel => {
+                        const el = document.querySelector(sel);
+                        if (!el) return false;
+                        el.click();
+                        return true;
+                    }""",
+                    "#submit-export",
+                )
+            )
+            after_url = page.url or ""
+            trace(
+                "capture.step.export-run",
+                selector="#submit-export",
+                via="in-page-click" if ran else "missing-control",
+                ran=ran,
+                before_url=url_note(before_url),
+                after_url=url_note(after_url),
+                navigated=before_url != after_url,
+            )
+            if ran:
+                return True, "", False
         except Exception:  # noqa: BLE001 - report the honest miss rather than raising
             pass
         trace(
@@ -975,31 +1015,44 @@ def _click_accordion(page, label: str) -> bool:
             continue
         try:
             if (node.get_attribute("aria-expanded") or "").strip().casefold() == "true":
-                trace_debug(
+                trace(
                     "capture.step.accordion",
                     selector="a.accordion-toggle",
                     section=label,
                     toggles=toggle_count,
                     outcome="already-open",
+                    url=url_note(page.url or ""),
                 )
                 return True
-            node.click(timeout=_ACCORDION_CLICK_TIMEOUT_MS)
-            trace_debug(
+            before_url = page.url or ""
+            href = node.get_attribute("href") or ""
+            # The provider page sits below Stockroom's fixed, closed-shadow task chrome. A
+            # coordinate click near the top of the page can be intercepted by Stockroom's
+            # Return tab and cancel the workflow even though this exact provider node was found.
+            # Operate the already-identified provider toggle in page context instead; it is a
+            # convenience only, and the export checkbox state remains the actual proof.
+            node.evaluate("el => el.click()")
+            after_url = page.url or ""
+            trace(
                 "capture.step.accordion",
                 selector="a.accordion-toggle",
                 section=label,
                 toggles=toggle_count,
-                outcome="opened",
+                outcome="requested-open",
+                href=url_note(href),
+                before_url=url_note(before_url),
+                after_url=url_note(after_url),
+                navigated=before_url != after_url,
             )
             return True
         except Exception:  # noqa: BLE001 - selection is verified by state readback, not by this
-            trace_debug(
+            trace(
                 "capture.step.accordion",
                 selector="a.accordion-toggle",
                 section=label,
                 toggles=toggle_count,
                 outcome="click-refused",
-                bounded_wait_ms=_ACCORDION_CLICK_TIMEOUT_MS,
+                url=url_note(page.url or ""),
             )
             return False
     trace_debug(
@@ -1033,6 +1086,13 @@ def _check_box(page, selector: str) -> bool:
     if matches == 0:
         trace_debug("capture.step.check", selector=selector, matches=0, checked=False)
         return False
+    before_url = page.url or ""
+    try:
+        element_tag = (box.evaluate("el => el.tagName") or "").casefold()
+        element_type = (box.get_attribute("type") or "").casefold()
+    except Exception:  # noqa: BLE001 - the state readback below remains the authority
+        element_tag = "unreadable"
+        element_type = "unreadable"
     route = "already-checked"
     if not box.is_checked():
         route = "playwright-check"
@@ -1049,12 +1109,18 @@ def _check_box(page, selector: str) -> bool:
         except Exception:  # noqa: BLE001 - report the honest miss rather than raising
             pass
     checked = box.is_checked()
-    trace_debug(
+    after_url = page.url or ""
+    trace(
         "capture.step.check",
         selector=selector,
         matches=matches,
+        element_tag=element_tag,
+        element_type=element_type,
         via=route,
         checked=bool(checked),
+        before_url=url_note(before_url),
+        after_url=url_note(after_url),
+        navigated=before_url != after_url,
     )
     return checked
 
@@ -1162,10 +1228,20 @@ def _clear_export_selections(page) -> bool:
 
 
 def _export_selectors(fmt: str, declared_id: str) -> tuple[str, ...]:
-    """Current selector first, then only measured backwards-compatible aliases."""
-    selectors = [f"#{declared_id}"]
+    """Current export INPUT first, then only measured backwards-compatible aliases.
+
+    The ID alone is insufficient on a live provider document: it does not prove the matched node
+    is one of the export checkboxes. Binding the known input group as well prevents a provider
+    navigation element or stale duplicated ID from being operated as though it selected CAD.
+    """
+
+    def export_input(control_id: str) -> str:
+        escaped = control_id.replace("\\", "\\\\").replace('"', '\\"')
+        return f'input[name="exports"][id="{escaped}"]'
+
+    selectors = [export_input(declared_id)]
     if fmt == "model" and declared_id == "ThreeDModel":
-        selectors.append("#MfrThreeDModel")
+        selectors.append(export_input("MfrThreeDModel"))
     return tuple(selectors)
 
 
@@ -1313,6 +1389,22 @@ class SnapMagicAdapter:
             "altium": "Altium native",
         },
         browser_engine="camoufox",
+        # Live Windows proof: this same signed-in WebView/profile loads the exact part page when
+        # CDP is detached, while an attached top-level navigation repeatedly enters Cloudflare's
+        # verification shell.  Navigate natively, wait for one real terminal part/login signal,
+        # then reconnect for the ordinary format controls and task-bound downloads.
+        detached_navigation=True,
+        native_ready_selectors=(
+            'a[name="download-modal"]',
+            '[data-format="kicad_options"]',
+            '[data-format="altium_native"]',
+            '[data-format="step_model"]',
+        ),
+        native_ready_texts=(
+            "the 2d model for this part is not available",
+            "request 3d model",
+            "oh snap! we've experienced an error",
+        ),
         # In the person-driven order this page is actually worked: open the download modal, choose
         # the KiCad version, then take each format. Every selector is the one `open_panel`/`drive`
         # already use, including the two-step KiCad chooser those methods had to measure.
@@ -1344,6 +1436,12 @@ class SnapMagicAdapter:
             ),
         ),
     )
+    # Direct SnapMagic returned the same provider-owned 500 page after fresh native navigation,
+    # signed-in profile reuse, and a full sign-in on repeated live Windows runs. Reopening that
+    # exact URL does not create a new recovery hypothesis; it only burns another two-minute
+    # security wait. One honest attempt preserves the direct route when it is healthy, then lets
+    # collect-all continue to DigiKey's independently attributed SnapMagic route when it is not.
+    max_download_attempts = 1
 
     def resolve_url(self, mpn: str) -> str:
         from stockroom.enrich.cad_sources import resolve_cad_sources
@@ -1356,16 +1454,24 @@ class SnapMagicAdapter:
     _LOGIN_URL = "https://www.snapeda.com/account/login/"
 
     def signed_in(self, page) -> bool:
-        """A signed-in SnapMagic session shows a logout link and no login link.
+        """A signed-in SnapMagic session shows its profile surface and no login link.
 
-        BOTH halves are required, and the reason is the same one Ultra Librarian's `signed_in`
-        records: a check built on the ABSENCE of one element cannot tell a signed-in page from a
-        page that simply has no header. The logout link is the positive signal.
+        The current site renders ``#profile-section`` and the user's feed instead of a persistent
+        logout link.  Retain the legacy logout signal for older pages, but require one positive
+        account element; absence of the login link alone never proves authentication.
         """
         try:
-            if page.locator("a[href*='/account/login']").count() > 0:
-                return False
-            return page.locator("a[href*='/account/logout'], a[href*='logout']").count() > 0
+            login = page.locator("a[href*='/account/login']")
+            for index in range(login.count()):
+                if login.nth(index).is_visible():
+                    return False
+            account = page.locator(
+                "#profile-section, a[href*='/account/logout'], a[href*='logout']"
+            )
+            for index in range(account.count()):
+                if account.nth(index).is_visible():
+                    return True
+            return False
         except Exception:  # noqa: BLE001 - an unreadable page is not a signed-in one
             return False
 
@@ -1390,7 +1496,10 @@ class SnapMagicAdapter:
         if not username or not password:
             return "no SnapMagic credentials are saved in Settings"
         try:
-            page.goto(self._LOGIN_URL, wait_until="domcontentloaded")
+            if self.signed_in(page):
+                return ""
+            if "/account/login" not in (page.url or ""):
+                page.goto(self._LOGIN_URL, wait_until="domcontentloaded")
             if self.signed_in(page):
                 return ""
             user_box = page.locator("#id_username").first
@@ -1472,6 +1581,9 @@ class SnapMagicAdapter:
                 expected_manufacturer,
                 expected_mpn,
             )
+        retryable = self.retryable_download_issue(page)
+        if retryable:
+            return retryable
         challenge = _challenge_issue(page, "SnapMagic")
         if challenge:
             return challenge
@@ -1521,19 +1633,50 @@ class SnapMagicAdapter:
             return account_issue
         opener = page.locator('a[name="download-modal"]:visible').first
         if opener.count() == 0:
-            return "SnapMagic showed no download control for this part."
+            challenge = self.user_clearance_issue(page)
+            if challenge:
+                return challenge
+            return (
+                "SnapMagic did not reach either its download controls or an explicit no-model "
+                "result for this part."
+            )
         opener.click()
         try:
             page.locator(_SNAPMAGIC_READY_FORMATS).first.wait_for(
                 state="visible", timeout=15_000
             )
         except Exception:  # noqa: BLE001
+            account_issue = _snapmagic_account_issue(page)
+            if account_issue:
+                return account_issue
+            challenge = self.user_clearance_issue(page)
+            if challenge:
+                return challenge
+            retryable = self.retryable_download_issue(page)
+            if retryable:
+                return retryable
             return "the SnapMagic format list did not open"
+        return ""
+
+    def retryable_download_issue(self, page) -> str:
+        """A real SnapMagic transient page, never a catalogue or account verdict."""
+
+        body = _visible_body_text(page)
+        if "oh snap! we've experienced an error" in body:
+            return "SnapMagic returned its transient page error; refreshing the exact part"
         return ""
 
     def user_clearance_issue(self, page) -> str:
         """Return the security step that requires the person, never browser automation."""
 
+        # Email verification is an account-preparation gate, not a browser challenge. Treating
+        # the page's generic "verification code" wording as CAPTCHA/2FA made the handoff loop
+        # decide the gate had cleared as soon as SnapMagic replaced it with its transient error,
+        # then reopen the same part and repeat. The account issue is already a provider-wide
+        # blocked result; it must stop this route and let collection continue to DigiKey's
+        # independently attributed SnapMagic surface.
+        if _snapmagic_account_issue(page):
+            return ""
         return _security_verification_issue(page, self.capability.label)
 
     def drive(
@@ -1543,6 +1686,7 @@ class SnapMagicAdapter:
         *,
         expected_manufacturer: str = "",
         expected_mpn: str = "",
+        catalog_identity_authorized: bool = False,
     ) -> DriveReport:
         """Select ONE format and trigger its download.
 
@@ -1648,6 +1792,11 @@ class DigiKeyProviderRoute:
     model_label: str
     supported_formats: tuple[str, ...]
     model_only: bool = False
+    # DigiKey's provider application can select a route successfully while leaving only its
+    # loading skeleton visible forever.  These are measured, route-owned element ids: seeing one
+    # visible after the normal hydration grace period is positive evidence for a bounded reload,
+    # unlike a healthy unopened row whose empty modal template is intentionally hidden.
+    skeleton_ids: tuple[str, ...] = ()
     # The `?tab=` value that lands DIRECTLY on this author inside DigiKey's per-part models page
     # (`/en/models/<id>?tab=<models_tab>`), removing a search, a scroll and a tab click once the
     # part's opaque models id has been learned from the person's own navigation.
@@ -1667,6 +1816,7 @@ _DIGIKEY_SNAPMAGIC_ROUTE = DigiKeyProviderRoute(
     altium_label="altium designer",
     model_label="step",
     supported_formats=("kicad", "model", "altium"),
+    skeleton_ids=("snap-model-skeleton",),
     # Owner-confirmed 2026-07-31, and corroborated by DigiKey's own publicly indexed models URLs,
     # e.g. https://www.digikey.com/en/models/303553?tab=snapmagic.
     models_tab="snapmagic",
@@ -1676,9 +1826,12 @@ _DIGIKEY_ULTRALIBRARIAN_ROUTE = DigiKeyProviderRoute(
     label="Ultra Librarian",
     row_ids=("ultra-media-active",),
     modal_id="ultralib-export-options",
-    altium_label="altium designer (script based)",
+    # P-CAD v15 carries the symbol and footprint in an open ASCII library that Stockroom converts
+    # to native SchLib/PcbLib without launching Altium. The script-based row needs Altium itself.
+    altium_label="pcad v15",
     model_label="step",
     supported_formats=("kicad", "model", "altium"),
+    skeleton_ids=("ultra-model-skeleton",),
     # DigiKey's own publicly indexed models URLs carry it verbatim, e.g.
     # https://www.digikey.com/en/models/3906419?tab=ultralibrarian (and the same shape on the
     # regional storefronts, digikey.ca/en/models/7313085?tab=ultralibrarian).
@@ -1794,13 +1947,13 @@ class DigiKeyUltraLibrarianAdapter:
             "Stockroom opens the exact DigiKey models page and shows the required author routes. "
             "Start each offered download there; Stockroom captures every delivered variant, "
             "retains incomplete TraceParts, manufacturer-provided, and CADENAS model sets as "
-            "supplementary evidence, converts only the recognized Ultra Librarian Altium script "
-            "package, and activates a strictly compatible cross-EDA set."
+            "supplementary evidence, converts the open P-CAD Altium library without launching an "
+            "editor, and activates a strictly compatible cross-EDA set."
         ),
         machine_format_labels={
             "kicad": "KiCad v6+",
             "model": "STEP",
-            "altium": "Altium Designer (script based)",
+            "altium": "PCAD v15",
         },
         user_format_labels={
             "kicad": "KiCad v6 or later",
@@ -1808,7 +1961,11 @@ class DigiKeyUltraLibrarianAdapter:
             "altium": "Altium Designer",
         },
         browser_access="user_driven",
-        operator_automation=False,
+        # One explicit Get Files click authorizes ordinary format selection and download controls
+        # for this exact part. Authentication, CAPTCHA, MFA, passkeys, consent, and security gates
+        # still pause for the person. Keeping this false made collect-all fall back to a ten-minute
+        # raw browser wait after Ultra Librarian had already completed automatically.
+        operator_automation=True,
         # The parent surface opens on its preferred coherent author, Ultra Librarian, so its
         # outlines are that route's measured row, opener, and modal-scoped Download control.
         control_hints=_digikey_route_control_hints(_DIGIKEY_ULTRALIBRARIAN_ROUTE),
@@ -1818,11 +1975,16 @@ class DigiKeyUltraLibrarianAdapter:
         # exact /models/9859001 Ultra Librarian surface without a challenge. Keep the provider
         # page person-controlled; this selects the browser session, not CAPTCHA automation.
         browser_engine="camoufox",
-        reuse_page_between_formats=True,
+        # The live models app leaves its provider fragment unable to reopen after a completed
+        # export. Re-enter the exact catalog-bound product route for each exclusive format; this
+        # is faster and reliable compared with waiting fifteen seconds on the stale fragment.
+        reuse_page_between_formats=False,
+        bundles_model_with_cad=True,
     )
 
     def __init__(self) -> None:
         self._exact_product_url = ""
+        self._catalog_identity_authorized = False
         # DigiKey's author fragments hydrate independently on each models-page render. A route
         # positively observed for one exact product cannot become a terminal catalogue miss when
         # a later task tab temporarily renders its placeholder hidden. Keep only positive,
@@ -1945,6 +2107,7 @@ class DigiKeyUltraLibrarianAdapter:
             self._exact_product_url,
             expected_manufacturer,
             expected_mpn,
+            catalog_identity_authorized=self._catalog_identity_authorized,
         )
         return "" if issue else self._exact_product_url
 
@@ -2035,7 +2198,23 @@ class DigiKeyUltraLibrarianAdapter:
         expected_mpn: str = "",
         _route: DigiKeyProviderRoute = _DIGIKEY_ULTRALIBRARIAN_ROUTE,
         _inspect_only: bool = False,
+        catalog_identity_authorized: bool | None = None,
     ) -> str:
+        if catalog_identity_authorized is not None:
+            self._catalog_identity_authorized = bool(catalog_identity_authorized)
+        # DigiKey leaves this success dialog over the models app after each saved file.  Closing
+        # it is an ordinary, measured post-download control; without it the next requested format
+        # cannot reopen the provider fragment and a multi-format job stalls after file one.
+        completed_dialog = page.locator("#model-download-modal").first
+        try:
+            completed_close = completed_dialog.get_by_role(
+                "button", name="Close", exact=True
+            ).first
+            if completed_close.count() == 1 and completed_close.is_visible():
+                completed_close.click()
+                completed_dialog.wait_for(state="hidden", timeout=3_000)
+        except Exception:  # noqa: BLE001 - absence means there is no completed download to clear
+            pass
         challenge = _challenge_issue(page, self.capability.label)
         if challenge:
             return challenge
@@ -2066,6 +2245,7 @@ class DigiKeyUltraLibrarianAdapter:
                 url,
                 expected_manufacturer,
                 expected_mpn,
+                catalog_identity_authorized=self._catalog_identity_authorized,
             )
             if issue:
                 return issue
@@ -2085,10 +2265,17 @@ class DigiKeyUltraLibrarianAdapter:
 
         if "/models/" not in url:
             return "DigiKey did not reach its dedicated EDA / CAD Models page."
-        if not self._exact_product_url:
+        exact_product_issue = _detail_identity_issue(
+            _route.evidence_provider_key,
+            self._exact_product_url,
+            expected_manufacturer,
+            expected_mpn,
+            catalog_identity_authorized=self._catalog_identity_authorized,
+        )
+        if exact_product_issue:
             return (
-                "DigiKey's opaque model page is missing its exact product-page identity; "
-                "refusing to download."
+                "DigiKey's opaque model page is not bound to this exact product; "
+                f"refusing to download. {exact_product_issue}"
             )
 
         self._wait_for_provider_surface(page, _route)
@@ -2176,10 +2363,7 @@ class DigiKeyUltraLibrarianAdapter:
                 f"#{row_id}",
             )
             if _route.evidence_provider_key == "digikey-snapmagic":
-                external = page.locator(
-                    'a[href*="snapeda.com/parts/"], '
-                    'a[href*="snapmagic.com/parts/"]'
-                ).first
+                external = page.locator('a[href*="snapeda.com/parts/"]').first
                 try:
                     if external.count() > 0 and external.is_visible():
                         return (
@@ -2192,10 +2376,7 @@ class DigiKeyUltraLibrarianAdapter:
                 opener.wait_for(state="visible", timeout=15_000)
             except Exception:  # noqa: BLE001 - the provider section failed to materialize
                 if _route.evidence_provider_key == "digikey-snapmagic":
-                    external = page.locator(
-                        'a[href*="snapeda.com/parts/"], '
-                        'a[href*="snapmagic.com/parts/"]'
-                    ).first
+                    external = page.locator('a[href*="snapeda.com/parts/"]').first
                     try:
                         if external.count() > 0 and external.is_visible():
                             return (
@@ -2306,6 +2487,7 @@ class DigiKeyUltraLibrarianAdapter:
         expected_manufacturer: str = "",
         expected_mpn: str = "",
         _route: DigiKeyProviderRoute,
+        catalog_identity_authorized: bool = False,
     ) -> DriveReport:
         """Classify an incomplete author route without operating an unmeasured control."""
 
@@ -2315,6 +2497,7 @@ class DigiKeyUltraLibrarianAdapter:
             expected_mpn=expected_mpn,
             _route=_route,
             _inspect_only=True,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
         if issue:
             clearance = self.user_clearance_issue(page)
@@ -2379,6 +2562,7 @@ class DigiKeyUltraLibrarianAdapter:
         expected_manufacturer: str = "",
         expected_mpn: str = "",
         _route: DigiKeyProviderRoute,
+        catalog_identity_authorized: bool = False,
     ) -> DriveReport:
         """Operate a measured supplementary route through the same exact-part lifecycle."""
 
@@ -2389,6 +2573,7 @@ class DigiKeyUltraLibrarianAdapter:
             expected_mpn=expected_mpn,
             _route=_route,
             _inspect_only=inspect_only,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
         if issue:
             clearance = self.user_clearance_issue(page)
@@ -2564,6 +2749,7 @@ class DigiKeyUltraLibrarianAdapter:
         expected_manufacturer: str = "",
         expected_mpn: str = "",
         _route: DigiKeyProviderRoute = _DIGIKEY_ULTRALIBRARIAN_ROUTE,
+        catalog_identity_authorized: bool = False,
     ) -> DriveReport:
         if not expected_manufacturer.strip() or not expected_mpn.strip():
             return DriveReport(
@@ -2576,6 +2762,7 @@ class DigiKeyUltraLibrarianAdapter:
             expected_manufacturer=expected_manufacturer,
             expected_mpn=expected_mpn,
             _route=_route,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
         if issue:
             clearance = self.user_clearance_issue(page)
@@ -2718,6 +2905,63 @@ class DigiKeyUltraLibrarianAdapter:
         return self.user_clearance_issue(page)
 
 
+    def retryable_render_issue(
+        self,
+        page,
+        _route: DigiKeyProviderRoute = _DIGIKEY_ULTRALIBRARIAN_ROUTE,
+    ) -> str:
+        """Return structural evidence that one provider fragment needs a fresh render.
+
+        This reads only fixed provider-row/modal presence and visibility. It never reads page
+        text, form values, credentials, or arbitrary markup, so the person-driven browser can use
+        it for at most two bounded reloads without widening Stockroom's provider-content access.
+        """
+
+        try:
+            if _route.evidence_provider_key == "digikey-snapmagic":
+                external = page.locator('a[href*="snapeda.com/parts/"]').first
+                if external.count() > 0 and external.is_visible():
+                    return ""
+            visible_row = None
+            for candidate_id in _route.row_ids:
+                candidate = page.locator(f"#{candidate_id}").first
+                if candidate.count() > 0 and candidate.is_visible():
+                    visible_row = candidate
+                    break
+            row_visible = visible_row is not None
+            modal = page.locator(f"#{_route.modal_id}").first
+            modal_visible = modal.count() > 0 and modal.is_visible()
+            labels_ready = (
+                modal_visible
+                and modal.locator("label[data-original]:visible").count() > 0
+            )
+            # A healthy unopened row has a hidden, intentionally empty modal template. Reloading
+            # merely because the person has not clicked the row within five seconds interrupts
+            # the normal workflow. Retry only after the provider has actually opened the panel
+            # but failed to hydrate its known format controls.
+            if row_visible and modal_visible and not labels_ready:
+                return f"DigiKey loaded the {_route.label} row without its format fragment"
+            if row_visible and visible_row is not None:
+                row_classes = set((visible_row.get_attribute("class") or "").split())
+                if "active" in row_classes:
+                    for skeleton_id in _route.skeleton_ids:
+                        skeleton = page.locator(f"#{skeleton_id}").first
+                        if skeleton.count() > 0 and skeleton.is_visible():
+                            return (
+                                f"DigiKey left the {_route.label} route on its loading skeleton"
+                            )
+            if not row_visible and self._route_was_observed_available(_route):
+                return f"DigiKey temporarily hid the previously observed {_route.label} route"
+            if (
+                not row_visible
+                and _route.evidence_provider_key == "digikey-ultralibrarian"
+                and self._hidden_route_count(_route) == 1
+            ):
+                return "DigiKey returned the first cold hidden Ultra Librarian placeholder"
+        except Exception:  # noqa: BLE001 - retry requires positive readable evidence
+            pass
+        return ""
+
     def retryable_download_issue(
         self,
         page,
@@ -2751,40 +2995,7 @@ class DigiKeyUltraLibrarianAdapter:
         except Exception:  # noqa: BLE001 - unreadable UI is not retry evidence
             pass
 
-        # Measured live on 2026-07-29: rapid task tabs can receive a models page whose provider
-        # row is visible but whose independently fetched format fragment is empty, or whose row is
-        # temporarily hidden after an earlier tab positively exposed it. Both are positive
-        # transient evidence. A genuinely unavailable route stays a terminal skip.
-        try:
-            if _route.evidence_provider_key == "digikey-snapmagic":
-                external = page.locator(
-                    'a[href*="snapeda.com/parts/"], a[href*="snapmagic.com/parts/"]'
-                ).first
-                if external.count() > 0 and external.is_visible():
-                    return ""
-            row_visible = any(
-                page.locator(f"#{candidate_id}").first.count() > 0
-                and page.locator(f"#{candidate_id}").first.is_visible()
-                for candidate_id in _route.row_ids
-            )
-            modal = page.locator(f"#{_route.modal_id}").first
-            labels_ready = (
-                modal.count() > 0
-                and modal.locator("label[data-original]:visible").count() > 0
-            )
-            if row_visible and not labels_ready:
-                return f"DigiKey loaded the {_route.label} row without its format fragment"
-            if not row_visible and self._route_was_observed_available(_route):
-                return f"DigiKey temporarily hid the previously observed {_route.label} route"
-            if (
-                not row_visible
-                and _route.evidence_provider_key == "digikey-ultralibrarian"
-                and self._hidden_route_count(_route) == 1
-            ):
-                return "DigiKey returned the first cold hidden Ultra Librarian placeholder"
-        except Exception:  # noqa: BLE001 - retry requires positive readable evidence
-            pass
-        return ""
+        return self.retryable_render_issue(page, _route)
 
 
 class _DigiKeyProviderRouteAdapter:
@@ -2833,12 +3044,14 @@ class _DigiKeyProviderRouteAdapter:
         *,
         expected_manufacturer: str = "",
         expected_mpn: str = "",
+        catalog_identity_authorized: bool | None = None,
     ) -> str:
         return self._surface.open_panel(
             page,
             expected_manufacturer=expected_manufacturer,
             expected_mpn=expected_mpn,
             _route=self._route,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
 
     def drive(
@@ -2848,6 +3061,7 @@ class _DigiKeyProviderRouteAdapter:
         *,
         expected_manufacturer: str = "",
         expected_mpn: str = "",
+        catalog_identity_authorized: bool = False,
     ) -> DriveReport:
         return self._surface.drive(
             page,
@@ -2855,6 +3069,7 @@ class _DigiKeyProviderRouteAdapter:
             expected_manufacturer=expected_manufacturer,
             expected_mpn=expected_mpn,
             _route=self._route,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
 
     def user_clearance_issue(self, page) -> str:
@@ -2865,6 +3080,9 @@ class _DigiKeyProviderRouteAdapter:
 
     def retryable_download_issue(self, page) -> str:
         return self._surface.retryable_download_issue(page, self._route)
+
+    def retryable_render_issue(self, page) -> str:
+        return self._surface.retryable_render_issue(page, self._route)
 
 
 class DigiKeySnapMagicRouteAdapter(_DigiKeyProviderRouteAdapter):
@@ -2880,8 +3098,8 @@ class DigiKeySnapMagicRouteAdapter(_DigiKeyProviderRouteAdapter):
         needs_login=True,
         instruction=(
             "When DigiKey embeds SnapMagic exports, Stockroom selects the pinned KiCad 6+, "
-            "STEP, and native Altium variants. External-only rows are reported honestly and "
-            "left untouched."
+            "STEP, and native Altium variants. An exact SnapEDA author link stays in the same "
+            "task-bound tab and uses the same measured ordinary export controls."
         ),
         machine_format_labels={
             "kicad": "KiCad v6+",
@@ -2894,14 +3112,158 @@ class DigiKeySnapMagicRouteAdapter(_DigiKeyProviderRouteAdapter):
             "altium": "Altium Designer",
         },
         control_hints=_digikey_route_control_hints(_DIGIKEY_SNAPMAGIC_ROUTE),
-        # Inert as routing metadata. The automated/user-driven decision is resolved once at
-        # the parent provider level through `get_adapter("digikey")`, whose capability is
-        # `user_driven` with `operator_automation=False`, so this value never reaches that
-        # decision. It records what this route was measured to support, not an authorization.
+        # Route metadata. The parent provider owns job-scoped operator authorization; this route
+        # implements the ordinary exact-part controls used within that authorized job.
         browser_access="machine_allowed",
         browser_engine="camoufox",
         reuse_page_between_formats=True,
     )
+
+    def operate_in_user_window(
+        self,
+        page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+        catalog_identity_authorized: bool = False,
+    ) -> list[DriveReport]:
+        """Operate only the ordinary SnapMagic export controls after DigiKey opens its author link.
+
+        DigiKey currently exposes this author as an external same-task part link instead of an
+        embedded modal.  The visible Stockroom WebView remains the browser and the person still owns
+        login, phone verification, CAPTCHA, MFA, and every security surface.  This method only
+        follows the exact identity-bearing author link and invokes SnapMagic's already measured
+        KiCad-v6, STEP, and native-Altium buttons.
+        """
+
+        direct = get_adapter("snapmagic")
+        if direct is None:
+            return [DriveReport(missed=list(formats), message="SnapMagic adapter is unavailable.")]
+
+        self._surface._catalog_identity_authorized = bool(catalog_identity_authorized)
+        host = (urlparse(page.url or "").hostname or "").casefold()
+        if host in {"snapeda.com", "www.snapeda.com"}:
+            identity_issue = _detail_identity_issue(
+                "digikey-snapmagic",
+                page.url or "",
+                expected_manufacturer,
+                expected_mpn,
+            )
+            if identity_issue:
+                return [
+                    DriveReport(missed=list(formats), blocked=True, message=identity_issue)
+                ]
+        else:
+            expected_external = (
+                "DigiKey exposes SnapMagic only as an external provider link for this exact product."
+            )
+            embedded_reports: list[DriveReport] = []
+            for fmt in formats:
+                embedded = self._surface.drive(
+                    page,
+                    [fmt],
+                    expected_manufacturer=expected_manufacturer,
+                    expected_mpn=expected_mpn,
+                    _route=self._route,
+                    catalog_identity_authorized=catalog_identity_authorized,
+                )
+                if embedded.message == expected_external:
+                    break
+                embedded_reports.append(embedded)
+                if embedded.blocked or embedded.requires_user_clearance:
+                    return embedded_reports
+            else:
+                return embedded_reports
+
+            external = page.locator('a[href*="snapeda.com/parts/"]').first
+            if external.count() != 1 or not external.is_visible():
+                return [
+                    DriveReport(
+                        missed=list(formats),
+                        message="DigiKey's exact SnapMagic author link is not visible.",
+                    )
+                ]
+            destination = _absolute(page, external.get_attribute("href") or "")
+            identity_issue = _detail_identity_issue(
+                "digikey-snapmagic",
+                destination,
+                expected_manufacturer,
+                expected_mpn,
+            )
+            if identity_issue:
+                return [DriveReport(missed=list(formats), blocked=True, message=identity_issue)]
+            try:
+                # Keep the author page in this exact broker-bound tab. Following the anchor itself
+                # can honor ``target=_blank`` and strand the real download in an unbound window.
+                page.goto(destination, wait_until="commit", timeout=15_000)
+            except Exception:  # noqa: BLE001 - the exact final URL check below is authoritative
+                pass
+            final_issue = _detail_identity_issue(
+                "digikey-snapmagic",
+                page.url or "",
+                expected_manufacturer,
+                expected_mpn,
+            )
+            if final_issue:
+                return [DriveReport(missed=list(formats), blocked=True, message=final_issue)]
+
+        reports: list[DriveReport] = []
+        for fmt in formats:
+            report = direct.drive(
+                page,
+                [fmt],
+                expected_manufacturer=expected_manufacturer,
+                expected_mpn=expected_mpn,
+            )
+            reports.append(report)
+            if report.blocked or report.requires_user_clearance:
+                break
+        return reports
+
+    def drive(
+        self,
+        page,
+        formats: list[str],
+        *,
+        expected_manufacturer: str = "",
+        expected_mpn: str = "",
+        catalog_identity_authorized: bool = False,
+    ) -> DriveReport:
+        """Drive DigiKey's external SnapMagic route in the same broker-bound tab.
+
+        The automated route runner calls ``drive`` one format at a time. Reusing the same measured
+        implementation here prevents the job-scoped operator lane from mistaking DigiKey's exact
+        external author link for an unavailable route and then falling back to manual capture.
+        """
+
+        embedded = self._surface.drive(
+            page,
+            formats,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+            _route=self._route,
+            catalog_identity_authorized=catalog_identity_authorized,
+        )
+        external_message = (
+            "DigiKey exposes SnapMagic only as an external provider link for this exact product."
+        )
+        if embedded.message != external_message:
+            return embedded
+
+        reports = self.operate_in_user_window(
+            page,
+            formats,
+            expected_manufacturer=expected_manufacturer,
+            expected_mpn=expected_mpn,
+            catalog_identity_authorized=catalog_identity_authorized,
+        )
+        if not reports:
+            return DriveReport(
+                missed=list(formats),
+                message="SnapMagic produced no format result.",
+            )
+        return reports[0]
 
 
 class DigiKeyTracePartsRouteAdapter(_DigiKeyProviderRouteAdapter):
@@ -2942,6 +3304,7 @@ class _DigiKeyObservedSupplementaryRouteAdapter(_DigiKeyProviderRouteAdapter):
         *,
         expected_manufacturer: str = "",
         expected_mpn: str = "",
+        catalog_identity_authorized: bool = False,
     ) -> DriveReport:
         return self._surface.drive_supplementary_route(
             page,
@@ -2949,6 +3312,7 @@ class _DigiKeyObservedSupplementaryRouteAdapter(_DigiKeyProviderRouteAdapter):
             expected_manufacturer=expected_manufacturer,
             expected_mpn=expected_mpn,
             _route=self._route,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
 
     def retryable_download_issue(self, page) -> str:
@@ -3021,6 +3385,7 @@ class DigiKeyCadenasRouteAdapter(_DigiKeyObservedSupplementaryRouteAdapter):
         *,
         expected_manufacturer: str = "",
         expected_mpn: str = "",
+        catalog_identity_authorized: bool = False,
     ) -> DriveReport:
         return self._surface.observe_supplementary_route(
             page,
@@ -3028,6 +3393,7 @@ class DigiKeyCadenasRouteAdapter(_DigiKeyObservedSupplementaryRouteAdapter):
             expected_manufacturer=expected_manufacturer,
             expected_mpn=expected_mpn,
             _route=self._route,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
 
     def retryable_download_issue(self, page) -> str:
@@ -3189,6 +3555,8 @@ def _detail_identity_issue(
     url: str,
     expected_manufacturer: str,
     expected_mpn: str,
+    *,
+    catalog_identity_authorized: bool = False,
 ) -> str:
     """Return a fail-closed provider-detail identity error when an expectation was supplied."""
 
@@ -3205,9 +3573,11 @@ def _detail_identity_issue(
             f"{vendor_key} did not expose the exact manufacturer and MPN in its detail URL; "
             "refusing to operate this page."
         )
-    error = exact_observation_error(
-        SimpleNamespace(manufacturer=expected_manufacturer, mpn=expected_mpn),
-        observed,
+    expected = SimpleNamespace(manufacturer=expected_manufacturer, mpn=expected_mpn)
+    error = (
+        exact_catalog_observation_error(expected, observed)
+        if catalog_identity_authorized
+        else exact_observation_error(expected, observed)
     )
     return f"{vendor_key} {error}." if error else ""
 
@@ -3338,6 +3708,7 @@ _CHALLENGE_MARKERS = (
     "verifying you are human",
     "security verification",
     "checking your browser",
+    "performing security verification",
     "cf-chl-",
     "challenge-platform",
     "captcha-delivery",
@@ -3489,15 +3860,20 @@ def _security_verification_issue(page, label: str) -> str:
 def _snapmagic_account_issue(page) -> str:
     """Detect account states that make format buttons redirect instead of download."""
     try:
+        url = str(page.url or "").casefold()
         body = (page.inner_text("body") or "").casefold()
     except Exception:  # noqa: BLE001 - absence of readable evidence is not an account verdict
         return ""
     if (
-        "verify your email to download" in body
+        "/profiles/verify/" in url
+        or "verify your email to download" in body
         or "email verification is required to download" in body
+        or "verify your phone number" in body
+        or "phone verification is required" in body
     ):
         return (
-            "SnapMagic requires this account's email to be verified before CAD downloads can run."
+            "SnapMagic requires this account's verification to be completed before CAD "
+            "downloads can run."
         )
     return ""
 
@@ -3510,7 +3886,8 @@ def _is_global_blockage(message: str) -> bool:
         for marker in (
             "confirm you are human",
             "download button is not on this page",
-            "email to be verified",
+            "did not reach either its download controls",
+            "account's verification to be completed",
             "requires a signed-in, verified account",
             "sign in to ultra librarian",
         )

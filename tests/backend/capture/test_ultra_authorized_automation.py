@@ -528,6 +528,30 @@ def test_export_navigation_redirect_to_a_wrong_part_is_rejected_before_selection
     assert page.has_exports is True
 
 
+def test_exact_catalog_authority_survives_ultra_librarian_url_slug_punctuation_loss():
+    page = _RedirectsToWrongPart()
+    page.url = (
+        "https://app.ultralibrarian.com/details/fixture/"
+        "Analog-Devices-Inc/MAX17608ATC-?ref=digikey&open=exports"
+    )
+    page.has_exports = True
+
+    strict_issue = UltraLibrarianAdapter().open_panel(
+        page,
+        expected_manufacturer="Analog Devices / Maxim Integrated",
+        expected_mpn="MAX17608ATC+",
+    )
+    catalog_issue = UltraLibrarianAdapter().open_panel(
+        page,
+        expected_manufacturer="Analog Devices / Maxim Integrated",
+        expected_mpn="MAX17608ATC+",
+        catalog_identity_authorized=True,
+    )
+
+    assert "not requested MPN" in strict_issue
+    assert catalog_issue == ""
+
+
 def test_guided_drive_hands_security_to_the_user_then_resumes_with_exact_identity(
     monkeypatch,
     tmp_path,
@@ -986,6 +1010,35 @@ def test_ordinary_overlay_does_not_end_the_authorized_capture(tmp_path):
     assert report.submitted is True
     assert exported == 1
     assert sorted(checked) == ["AltiumNativeCurrent", "KiCADv6", "MfrThreeDModel"]
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_a_submit_control_that_disappears_is_not_reported_as_run(tmp_path):
+    """A stale locator after the app surface returns must not invent a submitted export."""
+
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+    with browser.session() as page:
+        page.route(
+            "https://app.ultralibrarian.com/**",
+            lambda route: route.fulfill(
+                status=200,
+                headers={"Content-Type": "text/html; charset=utf-8"},
+                body='<button id="submit-export">Download</button>',
+            ),
+        )
+        page.goto("https://app.ultralibrarian.com/details/fixture/Acme/ABC-1")
+        submit = page.locator("#submit-export").first
+        assert submit.count() == 1
+        page.evaluate("document.querySelector('#submit-export').remove()")
+
+        ran, reason, needs_person = UltraLibrarianAdapter()._run_export(page, submit)
+
+    assert ran is False
+    assert needs_person is False
+    assert "could not be activated" in reason
 
 
 # Ultra Librarian renders the panel's controls before its Download link is attached. Nothing in

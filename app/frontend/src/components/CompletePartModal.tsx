@@ -9,6 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { assetPresent, assetsFor } from "../lib/edaTarget";
 import type {
   CompletionEvidence,
@@ -18,6 +19,7 @@ import type {
   Requirement,
 } from "../api/types";
 import { useCadSourceQuery } from "../api/queries";
+import { invalidatePartCadProjection } from "../api/partCadProjectionQueries";
 import { api } from "../api/client";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
 import { captureInFlight, useCapture } from "../lib/capture";
@@ -35,6 +37,7 @@ interface Props {
   onClose: () => void;
   onEditField?: (field: string, value: unknown) => void;
   busy?: boolean;
+  autoStart?: boolean;
 }
 
 const CheckMark = () => <Icon id="modal.check" className="h-2.5 w-2.5" />;
@@ -178,8 +181,8 @@ function CaptureRow({ label, copyId, done }: { label: string; copyId: string; do
 // A needs-accurate one-liner: never promise KiCad when only Altium is missing (or vice versa).
 function needsSubline(): string {
   return (
-    "One automatic run reuses verified evidence and stops at the first complete validated " +
-    "KiCad + Altium + STEP package."
+    "One automatic run reuses verified evidence and completes the part from one provider's " +
+    "symbol, footprint, and 3D model set."
   );
 }
 
@@ -226,7 +229,7 @@ function routeStatus(outcome: ProviderOutcome): { label: string; tone: string } 
   return base;
 }
 
-function routeReason(outcome: ProviderOutcome): string {
+function routeReason(outcome: ProviderOutcome, usable: boolean): string {
   if (outcome.reason) return outcome.reason;
   switch (outcome.status) {
     case "activated":
@@ -238,26 +241,38 @@ function routeReason(outcome: ProviderOutcome): string {
     case "unavailable":
       return "This route was checked and has no exact deliverable.";
     case "requires-human":
-      return outcome.attempted
-        ? "The route requires your input before collection can continue."
-        : "This route requires a person-driven handoff and collection remains partial.";
+      return usable
+        ? "This optional route needs a person-driven step before it can add another variant."
+        : outcome.attempted
+          ? "The route requires your input before collection can continue."
+          : "This route requires a person-driven handoff and collection remains incomplete.";
     case "blocked":
-      return "Provider access was blocked and collection remains partial.";
+      return usable
+        ? "This optional provider route was blocked; the active CAD package remains usable."
+        : "Provider access was blocked and collection remains incomplete.";
     case "failed":
-      return "The route failed and collection remains partial.";
+      return usable
+        ? "This optional provider route failed; the active CAD package remains usable."
+        : "The route failed and collection remains incomplete.";
     case "cancelled":
-      return "The route was cancelled and collection remains partial.";
+      return usable
+        ? "This optional provider route was cancelled; the active CAD package remains usable."
+        : "The route was cancelled and collection remains incomplete.";
     case "not-attempted":
-      return "This route was not attempted after an earlier stop, so collection remains partial.";
+      return usable
+        ? "This optional route was not attempted after an earlier stop."
+        : "This route was not attempted after an earlier stop, so collection remains incomplete.";
   }
 }
 
 function ProviderRouteOutcomes({
   outcomes,
   collectionComplete,
+  usable,
 }: {
   outcomes: ProviderOutcome[];
   collectionComplete: boolean | null;
+  usable: boolean;
 }) {
   if (outcomes.length === 0) return null;
   return (
@@ -270,23 +285,29 @@ function ProviderRouteOutcomes({
           <p
             className={
               "mt-1 text-2xs leading-snug " +
-              (collectionComplete ? "text-t2" : "text-[var(--c-warn-text)]")
+              (collectionComplete || usable ? "text-t2" : "text-[var(--c-warn-text)]")
             }
           >
-            {collectionComplete
+            {collectionComplete === true
               ? "Collection Complete. Every route is settled. Unavailable means it was checked and had no exact deliverable."
-              : "Collection Partial. A route requires human input, is blocked or failed, was cancelled, or was not attempted."}
+              : collectionComplete === null && usable
+                ? "Part Ready. One provider supplied a complete verified CAD package."
+              : usable
+                ? "Part Ready. The usable CAD package is complete; some optional provider variants were unavailable or deferred."
+                : collectionComplete === null
+                  ? "Provider Attempt Incomplete. This part still needs files."
+                : "Collection Incomplete. A required route needs input, was blocked or failed, was cancelled, or was not attempted."}
           </p>
         </div>
         <span
           className={
             "flex-none rounded-full px-2 py-0.5 text-2xs font-semibold " +
-            (collectionComplete
+            (collectionComplete || usable
               ? "bg-ok/15 text-[var(--c-ok-text)]"
               : "bg-warn/15 text-[var(--c-warn-text)]")
           }
         >
-          {collectionComplete ? "Complete" : "Partial"}
+          {collectionComplete === true ? "Complete" : usable ? "Ready" : "Incomplete"}
         </span>
       </div>
       <div className="mt-2 flex flex-col divide-y divide-line">
@@ -300,7 +321,9 @@ function ProviderRouteOutcomes({
             >
               <div className="truncate text-xs font-medium text-t1">{outcome.label}</div>
               <div className={"text-2xs font-semibold " + status.tone}>{status.label}</div>
-              <div className="col-span-2 text-2xs leading-snug text-t2">{routeReason(outcome)}</div>
+              <div className="col-span-2 text-2xs leading-snug text-t2">
+                {routeReason(outcome, usable)}
+              </div>
             </div>
           );
         })}
@@ -377,13 +400,21 @@ function Eyebrow({
   );
 }
 
-export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy }: Props) {
+export function CompletePartModal({
+  detail,
+  hasModel,
+  onClose,
+  onEditField,
+  busy,
+  autoStart = false,
+}: Props) {
   const kicadAssets = assetsFor(detail, "kicad");
   const hasSymbol = assetPresent(kicadAssets.symbol);
   const hasFootprint = assetPresent(kicadAssets.footprint);
   const hasDatasheet = !!(detail.datasheet?.source_url || detail.datasheet?.file);
 
   const cadSource = useCadSourceQuery(detail.id, true);
+  const queryClient = useQueryClient();
   const cadNeeds = useMemo<Requirement[]>(() => cadSource.data?.needs ?? [], [cadSource.data]);
   const download = useGuidedCapture(detail.id, cadNeeds, detail.derived.display_name);
   const capture = useCapture();
@@ -407,11 +438,9 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
   const dialogLabel = useText("modal.completePart.aria", "Complete this part");
   const closeLabel = useText("modal.completePart.close", "Close");
   const needs: Requirement[] = download.needs;
-  const activeEvidenceReported =
-    capture.active.partId === detail.id && capture.active.completionEvidenceReported;
-  const completionEvidence = activeEvidenceReported
-    ? capture.active.completionEvidence
-    : (cadSource.data?.completion_evidence ?? null);
+  // Canonical per-part readback is the only rendered completion authority. The capture store
+  // retains live progress and provider diagnostics, never a terminal shadow of library truth.
+  const completionEvidence = cadSource.data?.completion_evidence ?? null;
   const verifiedDigest =
     completionEvidence?.state === "verified"
       ? /^sha256:[0-9a-f]{64}$/.test(completionEvidence.manifest_digest?.trim() ?? "")
@@ -433,9 +462,26 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
     download.status === "window-open" ||
     download.status === "receiving" ||
     download.status === "attaching";
+  const providerPageActive = captureBusy && Boolean(capture.active.routeToken);
   const anotherCaptureBusy =
     captureInFlight(capture.active) && capture.active.partId !== detail.id;
   const cadBusy = captureBusy || anotherCaptureBusy;
+  const autoStartHandled = useRef(false);
+  useEffect(() => {
+    if (
+      !autoStart ||
+      autoStartHandled.current ||
+      !cadSource.data ||
+      !hasExactIdentity ||
+      cadBusy
+    ) {
+      return;
+    }
+    autoStartHandled.current = true;
+    void download.start(undefined, "finish-first").catch((error) =>
+      toast(error instanceof Error ? error.message : "Could not start source collection.", "err"),
+    );
+  }, [autoStart, cadSource.data, hasExactIdentity, cadBusy, download, toast]);
   // Only a route waiting for human input opens the embedded provider page and can be finished or
   // skipped by the person.
   const [captureElapsed, setCaptureElapsed] = useState(0);
@@ -463,31 +509,63 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
         capture.active.url &&
         capture.active.routeToken,
     );
+  const canShowProvider =
+    capture.active.partId === detail.id &&
+    !isDone &&
+    Boolean(capture.active.workflowItemId);
 
-  async function useDownloadedFiles() {
-    const vendor = capture.active.vendor;
-    const detailUrl = capture.active.url;
-    const workflowItemId = capture.active.workflowItemId;
-    const routeToken = capture.active.routeToken;
-    if (!vendor || !detailUrl || !workflowItemId || !routeToken) return;
+  async function showProvider() {
+    try {
+      await capture.showProvider();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not show the provider page.", "err");
+    }
+  }
+
+  async function addFiles() {
     setSelectedFilesBusy(true);
     try {
       const paths = await pickHostFiles("cad-recovery");
       if (paths.length === 0) return;
-      const result = await api.attachSelectedCaptureFiles({
-        partId: detail.id,
-        workflowItemId,
-        paths,
-        vendor,
-        detailUrl,
-        routeToken,
-      });
-      toast(
-        `Stockroom queued ${result.queued_files} selected ${result.queued_files === 1 ? "file" : "files"} for validation in this completion task.`,
-        "ok",
-      );
+      const vendor = capture.active.vendor;
+      const detailUrl = capture.active.url;
+      const workflowItemId = capture.active.workflowItemId;
+      const routeToken = capture.active.routeToken;
+      if (
+        canSelectDownloadedFiles &&
+        vendor &&
+        detailUrl &&
+        workflowItemId &&
+        routeToken
+      ) {
+        const result = await api.attachSelectedCaptureFiles({
+          partId: detail.id,
+          workflowItemId,
+          paths,
+          vendor,
+          detailUrl,
+          routeToken,
+        });
+        toast(
+          `Stockroom added ${result.queued_files} selected ${result.queued_files === 1 ? "file" : "files"} to this provider task.`,
+          "ok",
+        );
+      } else {
+        const result = await api.addPartFiles({ partId: detail.id, paths });
+        await invalidatePartCadProjection(queryClient, detail.id);
+        const attached = result.attached.length;
+        const suffix = result.ignored.length
+          ? ` ${result.ignored.length} unrelated or unreadable ${result.ignored.length === 1 ? "item was" : "items were"} ignored.`
+          : "";
+        toast(
+          result.complete
+            ? `Component complete. Stockroom attached ${attached} ${attached === 1 ? "CAD role" : "CAD roles"}.${suffix}`
+            : `Stockroom attached ${attached} ${attached === 1 ? "CAD role" : "CAD roles"}; ${result.remaining.length} still needed.${suffix}`,
+          attached ? "ok" : "err",
+        );
+      }
     } catch (error) {
-      toast(error instanceof Error ? error.message : "Could not use the selected files.", "err");
+      toast(error instanceof Error ? error.message : "Could not add the selected files.", "err");
     } finally {
       setSelectedFilesBusy(false);
     }
@@ -498,6 +576,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
   // goes here.
   function handleClose() {
     if (captureBusy) download.keepWorking();
+    else if (capture.active.partId === detail.id) download.reset();
     onClose();
   }
 
@@ -634,15 +713,13 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
       download.providerOutcomes.length > 0 ||
       download.collectionComplete !== null);
 
-  const statusTone = collectionPartial
-    ? "text-[var(--c-warn-text)]"
+  const statusTone = isDone
+    ? "text-[var(--c-ok-text)]"
     : download.status === "error"
       ? "text-[var(--c-err-text)]"
       : download.status === "timed-out"
         ? "text-[var(--c-warn-text)]"
-        : isDone
-          ? "text-[var(--c-ok-text)]"
-          : "text-t3";
+        : "text-t3";
 
   return (
     <div
@@ -677,7 +754,8 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
             </div>
             <div className="mt-0.5 text-xs text-t3">
               <Text id="modal.completePart.subtitle">
-                Stockroom completes remaining data and one verified KiCad + Altium + STEP package.
+                Stockroom completes the part from one verified provider set. Choose another source
+                only when you want a different variant.
               </Text>
             </div>
           </div>
@@ -704,10 +782,10 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                 data-completion-evidence={completionEvidence?.state ?? "missing"}
                 className={
                   "rounded-control border p-4 shadow-file transition-colors " +
-                  (collectionPartial
-                    ? "border-warn/40 bg-warn/[0.07]"
-                    : isDone
-                      ? "border-ok/40 bg-ok/[0.07]"
+                  (isDone
+                    ? "border-ok/40 bg-ok/[0.07]"
+                    : collectionPartial
+                      ? "border-warn/40 bg-warn/[0.07]"
                       : "border-line2 bg-raise")
                 }
               >
@@ -742,7 +820,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                       <div className="mt-0.5 text-2xs leading-snug text-t2">
                         {completionSubline}
                         {isDone && collectionPartial
-                          ? " Exhaustive source collection still needs attention."
+                          ? " Some optional provider variants were not collected; this part is fully usable."
                           : ""}
                       </div>
                     </div>
@@ -789,6 +867,7 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                 <ProviderRouteOutcomes
                   outcomes={download.providerOutcomes}
                   collectionComplete={download.collectionComplete}
+                  usable={isDone}
                 />
 
                 {captureBusy ? (
@@ -799,16 +878,17 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                     aria-live="polite"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs font-semibold text-t1">Provider Work Is Active</span>
+                      <span className="text-xs font-semibold text-t1">
+                        {providerPageActive ? "Provider Page Is Ready" : "Processing Downloaded Files"}
+                      </span>
                       <span className="tnum font-mono text-2xs text-t3">
                         {captureElapsed < 1 ? "Starting" : `${captureElapsed}s`}
                       </span>
                     </div>
                     <p className="mt-1 text-2xs leading-snug text-t2">
-                      Stockroom is checking saved evidence and the fastest eligible source. If a
-                      provider needs your sign-in, security check, format choice, or download
-                      click, its exact page and instructions appear inside Stockroom. Completion
-                      stops as soon as one validated KiCad, Altium, and STEP set is ready.
+                      {providerPageActive
+                        ? "Use the embedded provider page if it needs your sign-in or one download click. Stockroom captures every file from this route automatically; use the permanent Stockroom and Provider controls above the page to switch without losing it."
+                        : "Stockroom received the route output and is validating, converting, and attaching its KiCad, Altium, and STEP files as one provider set. You do not need to find or import the downloads manually."}
                     </p>
                   </div>
                 ) : null}
@@ -849,14 +929,19 @@ export function CompletePartModal({ detail, hasModel, onClose, onEditField, busy
                       Add the manufacturer and exact part number before collecting files.
                     </p>
                   ) : null}
-                  {canSelectDownloadedFiles ? (
+                  {hasExactIdentity ? (
                     <Button
                       variant="default"
                       small
-                      disabled={selectedFilesBusy}
-                      onClick={() => void useDownloadedFiles()}
+                      disabled={selectedFilesBusy || anotherCaptureBusy}
+                      onClick={() => void addFiles()}
                     >
-                      {selectedFilesBusy ? "Checking Files..." : "Use Downloaded Files"}
+                      {selectedFilesBusy ? "Processing Files..." : "Add Files"}
+                    </Button>
+                  ) : null}
+                  {canShowProvider ? (
+                    <Button variant="default" small onClick={() => void showProvider()}>
+                      Show Provider
                     </Button>
                   ) : null}
                   {canBackground ? (

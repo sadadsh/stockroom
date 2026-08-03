@@ -54,6 +54,7 @@ from stockroom.capture.cross_eda import (
     verify_kicad_component,
 )
 from stockroom.capture.identity import same_manufacturer, same_mpn
+from stockroom.capture.verified_pair import resolve_verified_pair
 from stockroom.evidence import EvidenceStore
 from stockroom.model.part import PartRecord
 from stockroom.model.part_id import is_valid_part_id, part_id_matches
@@ -579,22 +580,14 @@ class ExactEvidenceCadBundleAdapter:
                     raise ProductionWorkflowError(
                         "KiCad and Altium evidence did not come from one provider download set"
                     )
-                kicad = resolve_cad_variant(
+                verified_pair = resolve_verified_pair(
                     store,
                     identity=identity,
-                    tool="kicad",
                     manifest_digest=descriptor.manifest_digest,
                 )
-                altium = resolve_cad_variant(
-                    store,
-                    identity=identity,
-                    tool="altium",
-                    manifest_digest=descriptor.manifest_digest,
-                )
-                validation = store.verified_cad_validation_report(
-                    descriptor.manifest_digest,
-                    identity=identity,
-                )
+                kicad = verified_pair.kicad
+                altium = verified_pair.altium
+                validation = verified_pair.validation
                 attestation = _provider_detail_attestation(validation, identity)
                 with tempfile.TemporaryDirectory(
                     prefix=".Altium-Candidate-",
@@ -639,6 +632,7 @@ class ExactEvidenceCadBundleAdapter:
                         step_model=model,
                         altium_sources=(schlib, pcblib),
                         altium_identity_attestation=attestation,
+                        altium_footprint_entry=verified_pair.altium_footprint_entry,
                     )
                 if not cross_eda_report_is_proved(verification):
                     raise ProductionWorkflowError("strict cross-EDA verification was not proved")

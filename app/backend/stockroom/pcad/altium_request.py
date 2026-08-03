@@ -13,6 +13,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from stockroom.model.part_id import FALLBACK_STEM, mpn_fingerprint, slug_mpn
 from stockroom.pcad.model import Footprint, Graphic, Library, Point, TextStyle
 
 REQUEST_SCHEMA = "stockroom.cad-converter/request/1"
@@ -23,8 +24,10 @@ REQUEST_SCHEMA = "stockroom.cad-converter/request/1"
 _PCAD_TO_ALTIUM_LAYER = {
     1: 1,  # Top copper
     2: 32,  # Bottom copper
+    4: 37,  # Top solder mask opening
     6: 33,  # Top silkscreen / overlay
     7: 34,  # Bottom silkscreen / overlay
+    8: 35,  # Top paste opening
     10: 57,  # Top assembly / fabrication
     11: 58,  # Bottom assembly / fabrication
     92: 71,  # Courtyard (Mechanical 15)
@@ -38,6 +41,23 @@ _PCAD_TO_ALTIUM_LAYER = {
 # of the imported land pattern Altium should display.
 _NON_FOOTPRINT_OUTPUT_LAYERS = frozenset({94, 96, 98})
 _DEFAULT_GRAPHIC_WIDTH_MM = 0.0254
+_MASK_AND_PASTE_LAYERS = frozenset({35, 36, 37, 38})
+_OUTPUT_STEM_LIMIT = 100
+
+
+def _output_stem(mpn: str) -> str:
+    """Return a bounded native filename without weakening the exact MPN.
+
+    ``outputStem`` names only the two files produced by the converter.  It is not
+    component identity: the request's ``mpn`` field and the symbol parameters retain
+    the provider's exact punctuation.  The fingerprint keeps punctuation variants
+    distinct even when their human-readable slugs collide.
+    """
+
+    fingerprint = mpn_fingerprint(mpn)
+    readable_limit = _OUTPUT_STEM_LIMIT - len(fingerprint) - 1
+    readable = (slug_mpn(mpn) or FALLBACK_STEM)[:readable_limit].rstrip("-")
+    return f"{readable or FALLBACK_STEM}-{fingerprint}"
 
 
 def _mm(nanometres: int) -> float:
@@ -261,6 +281,32 @@ def _footprint_graphics(
         elif graphic.kind == "polygon":
             width = _mm(graphic.width_nm) or _DEFAULT_GRAPHIC_WIDTH_MM
             points = graphic.points
+            coordinates = {(point.x_nm, point.y_nm) for point in points}
+            xs = {point.x_nm for point in points}
+            ys = {point.y_nm for point in points}
+            rectangle = {
+                (x, y)
+                for x in xs
+                for y in ys
+            }
+            if (
+                layer in _MASK_AND_PASTE_LAYERS
+                and len(points) == 4
+                and len(xs) == 2
+                and len(ys) == 2
+                and coordinates == rectangle
+            ):
+                result["fills"].append(
+                    {
+                        "x1mm": _mm(min(xs)),
+                        "y1mm": _mm(min(ys)),
+                        "x2mm": _mm(max(xs)),
+                        "y2mm": _mm(max(ys)),
+                        "layer": layer,
+                        "rotation": 0,
+                    }
+                )
+                continue
             for start, end in zip(points, (*points[1:], points[0]), strict=True):
                 if start == end:
                     continue
@@ -415,7 +461,7 @@ def build_altium_writer_request(
     return {
         "schema": REQUEST_SCHEMA,
         "outputDirectory": str(output_directory.resolve()),
-        "outputStem": library.mpn,
+        "outputStem": _output_stem(library.mpn),
         "manufacturer": library.manufacturer,
         "mpn": library.mpn,
         "defaultFootprint": library.default_footprint,

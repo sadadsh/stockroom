@@ -38,6 +38,9 @@ _WINDOWS_RESERVED_NAMES = {
 _RETRYABLE_HTTP_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
 _DEFAULT_MAX_BYTES = 512 * 1024 * 1024
 _CHUNK_BYTES = 1024 * 1024
+_BROWSER_EVENT_TRANSPORTS = frozenset(
+    {"playwright", "webview2-native", "webview2-browser-domain"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -283,7 +286,43 @@ class DownloadBroker:
             except Exception as exc:  # Playwright permits save_as again for the same download
                 temporary.unlink(missing_ok=True)
                 last_error = exc
-        detail = type(last_error).__name__ if last_error is not None else "unknown failure"
+                # WebView2 can finish the browser-owned artifact but intermittently refuse
+                # Playwright's second copy (`save_as`). The download is still exact-task-bound:
+                # this callback belongs to the page leased for one verified provider detail
+                # route. Prefer the already-finished artifact over throwing the successful ZIP
+                # away because one copy mechanism failed.
+                path_method = getattr(download, "path", None)
+                if callable(path_method):
+                    try:
+                        source = Path(path_method())
+                        if source.is_file() and not source.is_symlink():
+                            def chunks() -> Iterator[bytes]:
+                                with source.open("rb") as handle:
+                                    while chunk := handle.read(_CHUNK_BYTES):
+                                        yield chunk
+
+                            return self._materialize_chunks(
+                                chunks(),
+                                suggested_name=name,
+                                source_url=_receipt_url(
+                                    str(getattr(download, "url", "") or "")
+                                ),
+                                final_url=_receipt_url(
+                                    str(getattr(download, "url", "") or "")
+                                ),
+                                transport="playwright",
+                                attempt=attempt,
+                            )
+                    except Exception as path_exc:  # the next retry may still save normally
+                        last_error = path_exc
+        failure = getattr(download, "failure", None)
+        try:
+            failure_detail = str(failure() or "").strip() if callable(failure) else ""
+        except Exception:  # noqa: BLE001 - diagnostics must not replace the capture failure
+            failure_detail = ""
+        detail = failure_detail or (
+            type(last_error).__name__ if last_error is not None else "unknown failure"
+        )
         error = DownloadBrokerError(
             f"browser download failed after {self.retry_policy.attempts} attempts for "
             f"{self.task.task_id} / {self.task.mpn_canonical}: {detail}"
@@ -299,6 +338,7 @@ class DownloadBroker:
         *,
         source_url: str = "",
         transport: str = "default-browser",
+        suggested_filename: str = "",
     ) -> DownloadReceipt:
         """COPY one file the PERSON downloaded into this task's staging directory.
 
@@ -317,7 +357,7 @@ class DownloadBroker:
         source = Path(path)
         if source.is_symlink() or not source.is_file():
             raise DownloadBrokerError(f"handoff candidate is not a real file: {source.name}")
-        name = source.name or "download"
+        name = suggested_filename or source.name or "download"
 
         def _chunks() -> Iterator[bytes]:
             with source.open("rb") as handle:
@@ -364,7 +404,9 @@ class DownloadBroker:
                         raise error
                     raise DownloadBrokerError(str(error)) from error
                 receipts = tuple(
-                    receipt for receipt in self._receipts if receipt.transport == "playwright"
+                    receipt
+                    for receipt in self._receipts
+                    if receipt.transport in _BROWSER_EVENT_TRANSPORTS
                 )
                 last_event = self._last_playwright_event_at
             settled = len(receipts) >= minimum and (
@@ -519,7 +561,7 @@ class DownloadBroker:
             )
             if duplicate is not None:
                 temporary.unlink(missing_ok=True)
-                if transport == "playwright":
+                if transport in _BROWSER_EVENT_TRANSPORTS:
                     self._last_playwright_event_at = self._monotonic()
                 return duplicate
             destination = _unique_path(temporary.parent, _safe_filename(suggested_name))
@@ -540,7 +582,7 @@ class DownloadBroker:
                 evidence_provider_key=self.task.evidence_provider_key,
             )
             self._receipts.append(receipt)
-            if transport == "playwright":
+            if transport in _BROWSER_EVENT_TRANSPORTS:
                 self._last_playwright_event_at = self._monotonic()
         return receipt
 

@@ -90,7 +90,7 @@ def test_digikey_enumerates_distinct_measured_author_routes() -> None:
         "DigiKey · CADENAS",
     ]
     assert adapter.capability.browser_access == "user_driven"
-    assert adapter.capability.operator_automation is False
+    assert adapter.capability.operator_automation is True
     assert adapter.capability.supported_formats == {"kicad", "model", "altium"}
     assert routes[0].capability.supported_formats == {"kicad", "model", "altium"}
     assert routes[1].capability.supported_formats == {"kicad", "model", "altium"}
@@ -279,8 +279,8 @@ def test_ultra_declares_current_live_model_id_and_retains_measured_legacy_fixtur
     adapter = UltraLibrarianAdapter()
     assert adapter.capability.version_pins["model"] == "ThreeDModel"
     assert _export_selectors("model", "ThreeDModel") == (
-        "#ThreeDModel",
-        "#MfrThreeDModel",
+        'input[name="exports"][id="ThreeDModel"]',
+        'input[name="exports"][id="MfrThreeDModel"]',
     )
 
 
@@ -335,6 +335,36 @@ class _StaticLocator:
         return self._count
 
 
+class _VisibleLocator(_StaticLocator):
+    def __init__(self, visible: tuple[bool, ...]) -> None:
+        super().__init__(len(visible))
+        self._visible = visible
+        self._index = 0
+
+    def nth(self, index: int):
+        result = _VisibleLocator(self._visible)
+        result._index = index
+        return result
+
+    def is_visible(self):
+        return self._visible[self._index]
+
+
+class _SnapMagicAccountPage:
+    url = "https://www.snapeda.com/search/?q=TPS62130RGTR"
+
+    def __init__(self, *, login_visible: bool, profile_visible: bool) -> None:
+        self.login_visible = login_visible
+        self.profile_visible = profile_visible
+
+    def locator(self, selector: str):
+        if selector == "a[href*='/account/login']":
+            return _VisibleLocator((self.login_visible,))
+        if selector == "#profile-section, a[href*='/account/logout'], a[href*='logout']":
+            return _VisibleLocator((self.profile_visible,))
+        raise AssertionError(selector)
+
+
 class _ProviderStatePage:
     def __init__(self, url: str, body: str, *, hidden_formats: int = 0) -> None:
         self.url = url
@@ -364,9 +394,37 @@ def test_challenge_and_unverified_account_states_are_reported_distinctly():
     assert "provider-specific browser profile" in issue
 
     issue = _snapmagic_account_issue(_PageText("Verify your email to download CAD files"))
-    assert "email to be verified" in issue
+    assert "verification to be completed" in issue
+    assert "verification to be completed" in _snapmagic_account_issue(
+        _PageText("Verify your phone number")
+    )
     assert _snapmagic_account_issue(_PageText("Email status: Unverified")) == ""
     assert _snapmagic_account_issue(_PageText("Download verified CAD models")) == ""
+
+
+def test_snapmagic_requires_a_visible_account_surface_for_sign_in():
+    adapter = SnapMagicAdapter()
+
+    assert adapter.signed_in(
+        _SnapMagicAccountPage(login_visible=True, profile_visible=False)
+    ) is False
+    assert adapter.signed_in(
+        _SnapMagicAccountPage(login_visible=False, profile_visible=False)
+    ) is False
+    assert adapter.signed_in(
+        _SnapMagicAccountPage(login_visible=False, profile_visible=True)
+    ) is True
+
+
+def test_snapmagic_verification_route_is_an_account_gate():
+    page = _PageText("Enter the verification code sent to your email address")
+    page.url = "https://www.snapeda.com/profiles/verify/"
+
+    assert _snapmagic_account_issue(page) == (
+        "SnapMagic requires this account's verification to be completed before CAD downloads "
+        "can run."
+    )
+    assert SnapMagicAdapter().user_clearance_issue(page) == ""
 
 
 def test_snapmagic_pins_formats_explicitly_when_account_preference_is_none():
@@ -471,7 +529,8 @@ def test_snapmagic_requires_a_visible_part_specific_download_control():
     )
 
     assert SnapMagicAdapter().open_panel(page) == (
-        "SnapMagic showed no download control for this part."
+        "SnapMagic did not reach either its download controls or an explicit no-model result "
+        "for this part."
     )
 
 
