@@ -631,3 +631,21 @@ opened the real two-component library without launching KiCad or Altium.
   installed native CAD converter, exact Python, bundled Git/Git LFS, Node/npm, signed WebView2
   bootstrapper, Chromium cache, and real Git LFS payloads; the final release asset still requires
   one exact-byte clean-profile rerun after the reproducible rebuild.
+
+### 2026-08-03 — Stockroom 0.7 Exact-Asset Clean-Profile Acceptance
+
+- Capture layer: Computer Use against `dist/Stockroom.exe`, SHA-256
+  `d64a79a0003380bc53b7927d6e98331eeed0b781742fb69e8d1a49226f0b19a5`, built reproducibly
+  from clean pushed source `3c173369aadd0aa6ee91b5f00c4627d0a97fc039`.
+- Onboarding, dark, 1386×893: the exact release bytes opened the real in-window setup surface from
+  an empty isolated profile and prerequisite-scrubbed `PATH`. Open Existing, Create New, and Clone
+  From Git remain understandable; the long acceptance-only default path wraps to a second line but
+  stays inside its card. The action immediately changed to disabled `Working...` feedback.
+- Main workspace, dark, 1386×893: default-library creation completed without a second window or
+  stale modal. The empty Components state, Add Parts action, active `.bootstrap-library`, and green
+  `Current` update standing are all visible with no clipping or horizontal overflow. Open P2: the
+  compact navigation rail still depends on recognizable icons until expanded.
+- Runtime correlation: the running checkout is the exact build revision; Python 3.12.13/Pillow,
+  bundled Git/Git LFS and Node/npm, Chromium, four non-pointer LFS CAD assets, and the installed
+  converter were inspected from the isolated tree. A native conversion produced and read back one
+  symbol and one footprint without Altium. No release-blocking visual or runtime defect remains.
