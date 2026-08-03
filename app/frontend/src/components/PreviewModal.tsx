@@ -1,11 +1,10 @@
 /**
  * The expanded, in-window preview (M6d) — the ConfirmDialog/CommandPalette scrim idiom,
- * no OS window. Tabs switch between the 3D model, the symbol and the footprint (only the
- * ones the part actually has are enabled); the body pan/zooms the SVG or orbits the 3D
- * model. Escape or a scrim click closes, Tab is trapped, and focus returns to where it
+ * no OS window. Each card opens only its own viewer; switching asset kinds happens in the
+ * component workspace, never inside a second combined inspector. The body pan/zooms the SVG
+ * or orbits the 3D model. Escape or a scrim click closes, Tab is trapped, and focus returns to where it
  * was so the modal never strands focus on inert background.
  */
-import { useEffect, useState } from "react";
 import { usePreviewSvg } from "../api/queries";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { Text, useText } from "../lib/copy";
@@ -14,17 +13,10 @@ import { SvgViewport } from "./SvgViewport";
 
 export type PreviewKind = "model" | "symbol" | "footprint";
 
-const TABS: { kind: PreviewKind; label: string; devId: string }[] = [
-  { kind: "symbol", label: "Symbol", devId: "preview.tab-symbol" },
-  { kind: "footprint", label: "Footprint", devId: "preview.tab-footprint" },
-  { kind: "model", label: "3D Model", devId: "preview.tab-model" },
-];
-
 interface Props {
   open: boolean;
   partId: string;
   partName: string;
-  available: Record<PreviewKind, boolean>;
   initialKind: PreviewKind;
   onClose: () => void;
 }
@@ -33,19 +25,13 @@ export function PreviewModal({
   open,
   partId,
   partName,
-  available,
   initialKind,
   onClose,
 }: Props) {
-  const [kind, setKind] = useState<PreviewKind>(initialKind);
-  // Every open starts on the card the user clicked; the shared hook handles focus
-  // capture/restore and Escape + Tab trapping.
-  useEffect(() => {
-    if (open) setKind(initialKind);
-  }, [open, initialKind]);
   const dialogRef = useModalDismiss(open, onClose);
-  const tablistLabel = useText("modal.preview.tablist", "Preview Type");
   const closeLabel = useText("modal.preview.close", "Close");
+  const kindLabel =
+    initialKind === "model" ? "3D Model" : initialKind === "symbol" ? "Symbol" : "Footprint";
 
   if (!open) return null;
 
@@ -74,35 +60,8 @@ export function PreviewModal({
             {partName}
           </span>
           <span className="flex-none text-2xs font-medium uppercase tracking-[0.08em] text-t3">
-            Inspect
+            {kindLabel}
           </span>
-          <div data-dev-id="preview.tabs" className="flex gap-1" role="tablist" aria-label={tablistLabel}>
-            {TABS.map((t) => {
-              const enabled = available[t.kind];
-              const active = kind === t.kind;
-              return (
-                <button
-                  key={t.kind}
-                  type="button"
-                  data-dev-id={t.devId}
-                  role="tab"
-                  aria-selected={active}
-                  disabled={!enabled}
-                  onClick={() => setKind(t.kind)}
-                  className={
-                    "rounded-control px-2.5 py-1 text-xs font-medium transition-colors " +
-                    (active
-                      ? "bg-acc-soft text-t1"
-                      : enabled
-                        ? "text-t2 hover:bg-raise hover:text-t1"
-                        : "cursor-not-allowed text-t3 opacity-50")
-                  }
-                >
-                  <Text id={`modal.preview.tab-${t.kind}`}>{t.label}</Text>
-                </button>
-              );
-            })}
-          </div>
           <button
             type="button"
             data-dev-id="preview.close"
@@ -115,10 +74,10 @@ export function PreviewModal({
         </div>
 
         <div data-dev-id="preview.stage" className="relative flex-1 bg-field">
-          {kind === "model" ? (
+          {initialKind === "model" ? (
             <ModelViewer partId={partId} />
           ) : (
-            <SvgPreview kind={kind} partId={partId} />
+            <SvgPreview kind={initialKind} partId={partId} />
           )}
         </div>
       </div>

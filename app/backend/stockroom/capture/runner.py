@@ -291,6 +291,7 @@ def _verified_source(
     """Build the immutable local-evidence source without importing app mutation at module load."""
 
     from stockroom.cad_materialization import materialize_kicad, materialize_pair
+    from stockroom.capture.projection import verify_installed_projection
     from stockroom.capture.verified_cache import VerifiedEvidenceSource
     from stockroom.evidence import EvidenceStore
     from stockroom.model.part import PartRecord
@@ -313,9 +314,16 @@ def _verified_source(
             require_part_record(record),
             kicad,
             altium,
+            evidence_store=store,
         ),
         run_write=run_write,
         preserve_active_pair=preserve_active_pair,
+        projection_verifier=lambda record, resolved, *, validation_reports=None: verify_installed_projection(
+            ctx.profile.library,
+            record,
+            resolved,
+            validation_reports=validation_reports,
+        ),
     )
 
 
@@ -413,7 +421,18 @@ def coverage(ctx) -> dict:
             record = ctx.ops.load_record(path.stem)
         except Exception:  # noqa: BLE001 - a corrupt record is counted, never fatal
             continue
-        evidence = record_completion_evidence(evidence_store, record)
+        from stockroom.capture.projection import verify_installed_projection
+
+        evidence = record_completion_evidence(
+            evidence_store,
+            record,
+            projection_verifier=lambda current, resolved, *, validation_reports=None: verify_installed_projection(
+                ctx.profile.library,
+                current,
+                resolved,
+                validation_reports=validation_reports,
+            ),
+        )
         needs = completion_needs(record, evidence)
         if not needs:
             complete += 1
@@ -475,6 +494,7 @@ def run_guided_capture(
     finish_first: bool = False,
     collect_all: bool = False,
     capture_id: str | None = None,
+    allow_standalone_browser: bool = False,
 ) -> dict:
     """Complete CAD automatically, with person-controlled capture only as an explicit fallback.
 
@@ -496,6 +516,7 @@ def run_guided_capture(
         or type(operator_authorized) is not bool
         or type(finish_first) is not bool
         or type(collect_all) is not bool
+        or type(allow_standalone_browser) is not bool
     ):
         raise TypeError("capture authorization flags must be booleans")
     if user_driven and operator_authorized:
@@ -581,6 +602,18 @@ def run_guided_capture(
                 provider_order,
                 automatic_provider_keys,
             )
+            if finish_first:
+                # Normal completion is one-provider ownership, not a silent source mixer. The
+                # first eligible provider gets the attempt; another provider is an explicit next
+                # action. Collect-all deliberately retains the exhaustive chain.
+                provider_keys = (
+                    [vendor.strip().lower()]
+                    if isinstance(vendor, str) and vendor.strip()
+                    else provider_keys[:1]
+                )
+                automatic_provider_keys = [
+                    key for key in automatic_provider_keys if key in provider_keys
+                ]
         else:
             # One click authorizes ordinary controls on exactly the provider the person selected.
             # It is not standing permission to operate a different commercial account or a batch.
@@ -596,6 +629,7 @@ def run_guided_capture(
 
     from stockroom.capture.browser import SharedPlaywrightRuntime
     from stockroom.capture.guided import GuidedCaptureSource
+    from stockroom.capture.projection import verify_installed_projection
     from stockroom.capture.vendors import get_adapter
     from stockroom.capture.verified_cache import record_completion_evidence
     from stockroom.evidence import EvidenceStore
@@ -612,7 +646,16 @@ def run_guided_capture(
     evidence_store = EvidenceStore(_capture_evidence_root(ctx))
 
     def completion_evidence_resolver(record):
-        return record_completion_evidence(evidence_store, record)
+        return record_completion_evidence(
+            evidence_store,
+            record,
+            projection_verifier=lambda current, resolved, *, validation_reports=None: verify_installed_projection(
+                ctx.profile.library,
+                current,
+                resolved,
+                validation_reports=validation_reports,
+            ),
+        )
 
     if sequential_providers:
         from stockroom.capture.evidence import exact_identity
@@ -635,8 +678,13 @@ def run_guided_capture(
     )
 
     automatic_provider_set = set(automatic_provider_keys)
-    update_runtime = getattr(ctx, "update_convergence", None)
-    provider_surface = getattr(update_runtime, "provider_browser_surface", None)
+    # The visible host owns provider navigation independently of application-update delivery.
+    # Durable acquisition runs in an isolated copy-on-write context, so this direct capability is
+    # copied with that context. Production replacement hosts retain their existing runtime port.
+    provider_surface = getattr(ctx, "provider_browser_surface", None)
+    if not callable(provider_surface):
+        update_runtime = getattr(ctx, "update_convergence", None)
+        provider_surface = getattr(update_runtime, "provider_browser_surface", None)
     if not callable(provider_surface):
         provider_surface = None
 
@@ -705,6 +753,7 @@ def run_guided_capture(
             collect_variants=explicit_provider_capture or collect_all,
             preserve_active_pair=collect_all,
             close_after_supply=sequential_providers,
+            single_provider_attempt=finish_first,
             # Credentials are supplied only to providers whose reviewed policy explicitly permits
             # machine access. User-driven providers retain their session in the isolated profile
             # without Stockroom impersonating provider-side choices.
@@ -712,6 +761,12 @@ def run_guided_capture(
             run_write=ctx.jobs.run_write,
             now_iso=_utc_now_iso,
             evidence_store=evidence_store,
+            projection_verifier=lambda record, resolved, *, validation_reports=None: verify_installed_projection(
+                ctx.profile.library,
+                record,
+                resolved,
+                validation_reports=validation_reports,
+            ),
             playwright_runtime=playwright_runtime,
             user_driven=source_user_driven,
             operator_authorized=source_operator_authorized,
@@ -748,6 +803,7 @@ def run_guided_capture(
                 and getattr(ctx.config, "digikey_client_secret", "")
             ),
             provider_surface=provider_surface,
+            allow_standalone_browser=allow_standalone_browser,
             publish_active_route=person_intent.set_active_route,
             clear_active_route=person_intent.clear_active_route,
             take_selected_files=person_intent.take_selected_files,

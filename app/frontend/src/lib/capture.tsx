@@ -17,6 +17,7 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../api/client";
+import { invalidatePartCadProjection } from "../api/partCadProjectionQueries";
 import type {
   CompletionEvidence,
   CompletionResult,
@@ -245,7 +246,7 @@ function durableMessage(
   if (batch.status === "blocked") {
     return (
       "Collection stopped before a complete CAD package was available. Clear the provider gate, " +
-      "then select Get Files again; Stockroom will reuse the retained evidence and provider session."
+      "then select Get Files again; Stockroom will reuse the retained evidence."
     );
   }
   if (batch.status === "cancelled") return "Completion was cancelled before publication.";
@@ -271,11 +272,12 @@ function durableMessage(
       : "Completion is active. Stockroom is checking cached evidence and eligible network sources until one complete validated set is ready.";
 }
 
-function resultFromProjection(
+function resultFromCanonicalProjection(
   partId: string,
   partName: string,
   initialNeeds: Requirement[],
   source: CadSourceResponse,
+  diagnosticReport: CompletionResult | null = null,
 ): CompletionResult {
   const remaining = [...source.needs];
   const satisfied = initialNeeds.filter((value) => !remaining.includes(value));
@@ -283,6 +285,9 @@ function resultFromProjection(
   const complete =
     remaining.length === 0 &&
     (evidence?.state === "verified" || evidence?.state === "not-required");
+  const diagnosticItem = diagnosticReport?.items.find(
+    (candidate) => candidate.part_id === partId,
+  );
   return {
     items: [
       {
@@ -294,11 +299,14 @@ function resultFromProjection(
         needed: initialNeeds,
         satisfied,
         remaining,
-        sources: [],
-        notes: [],
-        error: "",
-        provider_outcomes: [],
-        collection_complete: null,
+        // Provider outcomes explain what the acquisition pass attempted, but never decide whether
+        // the library is complete. Only the canonical post-workflow readback above has that
+        // authority; a staging report may exist even when later publication fails.
+        sources: diagnosticItem?.sources ?? [],
+        notes: diagnosticItem?.notes ?? [],
+        error: diagnosticItem?.error ?? "",
+        provider_outcomes: diagnosticItem?.provider_outcomes ?? [],
+        collection_complete: diagnosticItem?.collection_complete ?? null,
         completion_evidence: evidence,
       },
     ],
@@ -329,6 +337,7 @@ export interface CaptureApi {
   ) => Promise<void>;
   reset: () => void;
   keepWorking: () => void;
+  showProvider: () => Promise<void>;
   reopenPartId: string | null;
   requestReopen: () => void;
   requestOpenFor: (partId: string) => void;
@@ -400,11 +409,13 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     queryClient.invalidateQueries({ queryKey: ["parts"] });
     queryClient.invalidateQueries({ queryKey: ["facets"] });
     queryClient.invalidateQueries({ queryKey: ["duplicates"] });
+    queryClient.invalidateQueries({ queryKey: ["library-coverage"] });
+    queryClient.invalidateQueries({ queryKey: ["library-cad"] });
+    queryClient.invalidateQueries({ queryKey: ["altium-status"] });
+    queryClient.invalidateQueries({ queryKey: ["altium-models-pending"] });
     if (partId) {
-      queryClient.invalidateQueries({ queryKey: ["part", partId] });
       queryClient.invalidateQueries({ queryKey: ["part-history", partId] });
-      queryClient.invalidateQueries({ queryKey: ["cad-source", partId] });
-      queryClient.invalidateQueries({ queryKey: ["cad-variants", partId] });
+      void invalidatePartCadProjection(queryClient, partId);
     }
   }, [queryClient]);
 
@@ -451,16 +462,17 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       }
       invalidate();
 
-      const outcomes = item.provider_outcomes ?? [];
-      const collectionComplete = item.collection_complete ?? null;
+      const outcomes = (item.provider_outcomes ?? []).filter(
+        (outcome) => mode === "collect-all" || outcome.attempted || outcome.status !== "not-attempted",
+      );
+      const collectionComplete =
+        mode === "collect-all" ? (item.collection_complete ?? null) : null;
       const remaining =
         item.remaining
           .map((requirement) => REQ_LABELS[requirement as Requirement] ?? requirement)
           .join(", ") || "required CAD files";
       const notes = (item.notes ?? []).join("; ");
       const summary = routeSummary(outcomes);
-      const collectSucceeded = mode !== "collect-all" || collectionComplete === true;
-      const terminalDone = projectionComplete && collectSucceeded;
       const missingLabels =
         item.remaining.length > 0 ? ` Still missing: ${remaining}.` : "";
       const operationDetail = item.error || notes;
@@ -475,7 +487,10 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
 
       setState((current) => ({
         ...current,
-        status: terminalDone ? "done" : "error",
+        // The active CAD package is the product outcome. Exhaustive collection is useful
+        // provenance, but an unavailable optional provider must not turn a verified, usable
+        // KiCad/Altium package into a failed completion.
+        status: projectionComplete ? "done" : "error",
         providerOutcomes: outcomes,
         collectionComplete,
         completionEvidence,
@@ -487,10 +502,10 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
               ? completionEvidenceMessage(completionEvidence)
             : mode === "collect-all"
               ? collectionComplete
-                ? summary
-                  ? `${summary}. Every eligible route completed without a blocked or failed outcome.`
-                  : "Every eligible route completed without a blocked or failed outcome."
-                : `${summary || "Source collection stopped"}. Review the blocked or failed routes below.`
+                ? `${durableSuccessMessage ?? completionEvidenceMessage(completionEvidence)}${
+                    summary ? ` ${summary}.` : ""
+                  } Every eligible route completed without a blocked or failed outcome.`
+                : `${durableSuccessMessage ?? completionEvidenceMessage(completionEvidence)} Some optional provider variants were unavailable or deferred; this part is fully usable.`
               : durableSuccessMessage ?? completionEvidenceMessage(completionEvidence),
       }));
     },
@@ -521,6 +536,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     }): Promise<void> => {
       let cursor = initialCursor;
       let failures = 0;
+      let durableNeeds = needs;
       while (generation === followGenerationRef.current) {
         try {
           const [page, liveSession] = await Promise.all([
@@ -530,6 +546,15 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
           if (page.batch.kind !== "guided_capture") {
             throw new Error("The saved workflow is not a guided capture.");
           }
+          if (liveSession.workflow_item_id !== itemId || liveSession.part_id !== partId) {
+            throw new Error("The durable capture identity changed while reconnecting.");
+          }
+          // The backend creates the durable workflow from the canonical record under its write
+          // fence. That snapshot, not the renderer's earlier query, owns what this run set out to
+          // complete. Adopt it on every poll so a concurrent repair or stale browser cache cannot
+          // make progress and terminal projection disagree about the task's requirements.
+          durableNeeds = liveSession.initial_needs;
+          needsRef.current = durableNeeds;
           failures = 0;
           cursor = Math.max(cursor, page.cursor.next_sequence);
           persistWorkflow(batchId, itemId, cursor);
@@ -537,37 +562,55 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
             ...current,
             status: page.batch.status === "blocked" ? "window-open" : "receiving",
             message: durableMessage(page.batch, page.events, mode, vendor),
+            needs: durableNeeds,
             vendor: liveSession.active_route?.vendor ?? current.vendor,
             url: liveSession.active_route?.detail_url ?? null,
             routeToken: liveSession.active_route?.route_token ?? null,
           }));
 
           if (page.cursor.has_more) continue;
+          // A blocked batch with an exact active route is not a failed terminal result: it is the
+          // durable handoff the person can reopen, clear, or feed selected files. Keep following it
+          // so the same route token owns the eventual download and the modal never loses its
+          // Show Provider / Use Downloaded Files actions. A blocked batch with no active route
+          // still falls through to the honest terminal error below.
+          if (page.batch.status === "blocked" && liveSession.active_route?.route_token) {
+            await delay(POLL_INTERVAL_MS);
+            continue;
+          }
           if (terminalWorkflow(page.batch)) {
             const session = liveSession;
             const source = await api.partCadSource(partId);
-            if (session.workflow_item_id !== itemId || session.part_id !== partId) {
-              throw new Error("The durable capture identity changed while reconnecting.");
-            }
-            const result =
-              session.report ?? resultFromProjection(partId, partName, needs, source);
+            queryClient.setQueryData(["cad-source", partId], source);
+            const result = resultFromCanonicalProjection(
+              partId,
+              partName,
+              durableNeeds,
+              source,
+              session.report ?? null,
+            );
             applyResult(
               partId,
-              needs,
+              durableNeeds,
               mode,
               result,
               page.batch.status === "completed"
                 ? durableMessage(page.batch, page.events, mode, vendor)
                 : undefined,
             );
-            if (page.batch.status !== "completed") {
+            const canonicalReady =
+              source.needs.length === 0 &&
+              ["verified", "not-required"].includes(
+                source.completion_evidence?.state ?? "",
+              );
+            if (page.batch.status !== "completed" && !canonicalReady) {
               setState((current) => ({
                 ...current,
                 status: "error",
                 message: durableMessage(page.batch, page.events, mode, vendor),
               }));
             }
-            if (page.batch.status !== "failed") clearWorkflow(batchId);
+            if (!["failed", "paused"].includes(page.batch.status)) clearWorkflow(batchId);
             return;
           }
           await delay(POLL_INTERVAL_MS);
@@ -598,7 +641,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [applyResult],
+    [applyResult, queryClient],
   );
 
   useEffect(() => {
@@ -828,6 +871,14 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     setState((current) => ({ ...current, backgrounded: true }));
   }, []);
 
+  const showProvider = useCallback(async () => {
+    const batchId = batchIdRef.current;
+    if (!batchId) {
+      throw new Error("This completion has no retained provider page to show.");
+    }
+    await api.showCaptureProvider(batchId);
+  }, []);
+
   const requestReopen = useCallback(() => {
     setReopenPartId(partIdRef.current);
     setState((current) => ({ ...current, backgrounded: false }));
@@ -846,6 +897,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         start,
         reset,
         keepWorking,
+        showProvider,
         reopenPartId,
         requestReopen,
         requestOpenFor,

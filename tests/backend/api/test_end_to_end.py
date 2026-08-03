@@ -14,7 +14,9 @@ def test_full_flow_over_every_router(client):
     assert info["active_profile"] == "Main"
     assert info["part_count"] == 2
     assert client.get("/api/library/parts").json()["count"] == 2
-    assert client.get("/api/library/facets").json()["by_category"]["ICs"] == 2
+    facets = client.get("/api/library/facets").json()
+    assert facets["by_category"]["ICs"] == 2
+    assert "Fuses" in facets["category_catalog"]
     assert client.get("/api/library/parts/tps62130").json()["mpn"] == "TPS62130"
 
     # mutations through the gate-intact engine, read-after-write consistent

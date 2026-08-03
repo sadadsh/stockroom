@@ -18,9 +18,11 @@ class _StubFetcher:
         self._result = result
         self._raise_times = raise_times
         self.calls = 0
+        self.urls = []
 
     def get(self, url, referer="", timeout=15.0):
         self.calls += 1
+        self.urls.append(url)
         if self.calls <= self._raise_times:
             raise EnrichError("transport blip")
         return self._result
@@ -42,6 +44,19 @@ def test_fetch_datasheet_stores_a_valid_pdf(tmp_path):
     out = fetch_datasheet("https://x/d.pdf", dst, fetcher=_StubFetcher(_pdf_result()))
     assert out == dst
     assert out.read_bytes().startswith(b"%PDF-")
+
+
+def test_fetch_datasheet_unwraps_digikey_ti_media_redirect(tmp_path):
+    fetcher = _StubFetcher(_pdf_result())
+    wrapped = (
+        "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl="
+        "https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Ftps2120"
+    )
+
+    out = fetch_datasheet(wrapped, tmp_path / "d.pdf", fetcher=fetcher)
+
+    assert out.read_bytes().startswith(b"%PDF-")
+    assert fetcher.urls == ["https://www.ti.com/lit/gpn/tps2120"]
 
 
 def test_fetch_datasheet_rejects_an_html_wrapper(tmp_path):

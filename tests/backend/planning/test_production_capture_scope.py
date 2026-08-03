@@ -5,10 +5,14 @@ from typing import cast
 
 import pytest
 
+from stockroom.capture.complete import CompletionEvidence
+from stockroom.capture.requirements import Requirement
 from stockroom.evidence import EvidenceStore
+from stockroom.model.part import PartRecord
 from stockroom.planning.production_composition import (
     ProductionApplicationContext,
     StockroomAcquisitionProviderAdapter,
+    _canonical_capture_diagnostic_report,
 )
 from stockroom.planning.provider_policy import (
     KICAD_CAD_OPERATION,
@@ -16,6 +20,66 @@ from stockroom.planning.provider_policy import (
     ExactPartIdentity,
 )
 from stockroom.workflow import StageContext
+
+
+def test_copy_on_write_capture_report_cannot_claim_canonical_completion(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    report = {
+        "items": [
+            {
+                "part_id": "staged-part",
+                "mpn": "PART-1",
+                "display_name": "PART-1",
+                "category": "ICs",
+                "status": "completed",
+                "needed": ["kicad_symbol"],
+                "satisfied": ["kicad_symbol"],
+                "remaining": [],
+                "retained": 1,
+                "sources": ["guided"],
+                "notes": [],
+                "error": "",
+                "provider_outcomes": [{"status": "activated"}],
+                "collection_complete": True,
+                "completion_evidence": {
+                    "state": "verified",
+                    "manifest_digest": "sha256:" + "a" * 64,
+                    "reason": "staging only",
+                },
+            }
+        ],
+        "counts": {"completed": 1},
+        "retained": 1,
+        "collection_complete": True,
+        "stopped": False,
+        "stop_reason": "",
+    }
+    record = SimpleNamespace(id="canonical-part", mpn="PART-1", category="ICs")
+    monkeypatch.setattr(
+        "stockroom.planning.production_composition.record_completion_evidence",
+        lambda *_args, **_kwargs: CompletionEvidence.unverified("canonical projection missing"),
+    )
+    monkeypatch.setattr(
+        "stockroom.planning.production_composition.completion_needs",
+        lambda *_args, **_kwargs: [Requirement.KICAD_SYMBOL],
+    )
+
+    diagnostic = _canonical_capture_diagnostic_report(
+        report,
+        record=cast(PartRecord, record),
+        evidence_store=EvidenceStore(tmp_path / "Evidence"),
+        library=object(),
+    )
+
+    row = diagnostic["items"][0]
+    assert row["part_id"] == "canonical-part"
+    assert row["status"] == "unchanged"
+    assert row["remaining"] == ["kicad_symbol"]
+    assert row["completion_evidence"]["state"] == "unverified"
+    assert row["provider_outcomes"] == [{"status": "activated"}]
+    assert diagnostic["counts"] == {"unchanged": 1}
 
 
 def test_durable_capture_options_cross_the_provider_worker_thread(tmp_path: Path) -> None:
@@ -65,7 +129,13 @@ def test_one_slow_capture_serves_both_cad_operations(
     tmp_path: Path,
 ) -> None:
     adapter = StockroomAcquisitionProviderAdapter(
-        cast(ProductionApplicationContext, SimpleNamespace()),
+        cast(
+            ProductionApplicationContext,
+            SimpleNamespace(
+                ops=SimpleNamespace(load_record=lambda _part_id: object()),
+                profile=SimpleNamespace(library=object()),
+            ),
+        ),
         EvidenceStore(tmp_path / "Evidence"),
         tmp_path / "Staging",
     )
@@ -115,6 +185,10 @@ def test_one_slow_capture_serves_both_cad_operations(
     monkeypatch.setattr(
         "stockroom.planning.production_composition.write_durable_capture_report",
         lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "stockroom.planning.production_composition._canonical_capture_diagnostic_report",
+        lambda report, **_kwargs: report,
     )
     monkeypatch.setattr(
         "stockroom.planning.production_composition.record_installed_kicad_role_evidence",

@@ -29,6 +29,47 @@ _RESULT_SCHEMA = "stockroom.cad-converter/result/1"
 _CONVERTER_ENV = "STOCKROOM_CAD_CONVERTER"
 
 
+def _installed_converter() -> Path | None:
+    """Return the machine-local converter provisioned by the Windows package.
+
+    The continuously updated Python host is a child of the stable launcher, not the immutable
+    release worker. It therefore cannot rely on a temporary PyInstaller extraction path surviving
+    forever. A package provisions the complete sidecar under LocalAppData and source updates keep
+    using that stable, user-scoped location.
+    """
+
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return None
+    candidate = (
+        Path(local_app_data)
+        / "Stockroom"
+        / "Tools"
+        / "CadConverter"
+        / "Stockroom.CadConverter.exe"
+    )
+    return candidate if candidate.is_file() else None
+
+
+def _development_converter() -> Path | None:
+    """Return the converter built beside an editable source checkout, when present."""
+
+    if bool(getattr(sys, "frozen", False)):
+        return None
+    repository_root = Path(__file__).resolve().parents[4]
+    candidate = (
+        repository_root
+        / "app"
+        / "desktop"
+        / "Stockroom.CadConverter"
+        / "bin"
+        / "Release"
+        / "net10.0"
+        / "Stockroom.CadConverter.exe"
+    )
+    return candidate if candidate.is_file() else None
+
+
 class CadConversionError(RuntimeError):
     """The sidecar could not produce strictly verified native Altium libraries."""
 
@@ -127,20 +168,17 @@ def _resolve_converter_executable(value: Path | str | None) -> Path:
     configured = os.environ.get(_CONVERTER_ENV)
     if configured:
         return Path(configured)
-    if not bool(getattr(sys, "frozen", False)):
-        repository_root = Path(__file__).resolve().parents[4]
-        development = (
-            repository_root
-            / "app"
-            / "desktop"
-            / "Stockroom.CadConverter"
-            / "bin"
-            / "Release"
-            / "net10.0"
-            / "Stockroom.CadConverter.exe"
-        )
-        if development.is_file():
-            return development
+    # An editable checkout must run the converter built from that same checkout. Falling through
+    # to the machine-installed package first made source runs silently execute an older validator,
+    # so a fix could pass its own build/tests and still fail in the real app. A continuously updated
+    # packaged checkout has no committed bin/ output and naturally falls through to the installed
+    # converter below.
+    development = _development_converter()
+    if development is not None:
+        return development
+    installed = _installed_converter()
+    if installed is not None:
+        return installed
     raise CadConversionError(
         f"native CAD converter is unavailable; packaged runtime must set {_CONVERTER_ENV}"
     )

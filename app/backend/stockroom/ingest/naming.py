@@ -28,6 +28,7 @@ _CATEGORY_KEYWORDS: tuple[tuple[str, str], ...] = (
     ("header", "Connectors"),
     ("switch", "Switches"),
     ("button", "Switches"),
+    ("fuse", "Fuses"),
     ("relay", "Electromechanical"),
     ("motor", "Electromechanical"),
     ("buzzer", "Electromechanical"),

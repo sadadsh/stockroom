@@ -261,7 +261,7 @@ describe("Glb3DView scene synchronization", () => {
     );
     await waitFor(() => expect(mountSpy).toHaveBeenCalled());
     expect(handle.setLandPattern).toHaveBeenCalledWith(land);
-    expect(handle.setRenderMode).toHaveBeenCalledWith("studio");
+    expect(handle.setRenderMode).toHaveBeenCalledWith("realistic");
     expect(handle.setLayers).toHaveBeenCalledWith({
       model: true,
       pads: true,
@@ -273,7 +273,7 @@ describe("Glb3DView scene synchronization", () => {
     expect(screen.getByRole("group", { name: "Appearance" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Source Color" })).toHaveAttribute(
       "aria-pressed",
-      "false",
+      "true",
     );
     expect(screen.getByRole("group", { name: "Motion" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Camera view" })).toBeInTheDocument();
@@ -342,7 +342,7 @@ describe("Glb3DView scene synchronization", () => {
     expect(handle.setLandPattern).not.toHaveBeenCalledWith(incompleteLand);
   });
 
-  it("makes the compact viewer a passive auto-rotating specimen", async () => {
+  it("keeps every inspection capability reachable in the compact viewer", async () => {
     const handle = sceneHandle();
     mountSpy.mockReturnValue(handle);
     const placedLand = {
@@ -365,10 +365,28 @@ describe("Glb3DView scene synchronization", () => {
       />,
     );
     await waitFor(() => expect(mountSpy).toHaveBeenCalled());
-    expect(screen.getByTestId("model-canvas")).toBeInTheDocument();
+    expect(
+      screen.getByRole("application", { name: /3d model inspection canvas/i }),
+    ).toBeInTheDocument();
     expect(handle.setSpin).toHaveBeenCalledWith(true);
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    expect(screen.queryByRole("group")).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Layers" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Motion" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Pads" }));
+    expect(handle.setLayers).toHaveBeenLastCalledWith({ pads: false });
+    await userEvent.click(screen.getByRole("button", { name: "Auto rotate" }));
+    expect(handle.setSpin).toHaveBeenLastCalledWith(false);
+
+    await userEvent.click(screen.getByRole("button", { name: "3D view settings" }));
+    expect(screen.getByRole("group", { name: "Placement" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Top" }));
+    expect(handle.setView).toHaveBeenLastCalledWith("top");
+    await userEvent.click(screen.getByRole("button", { name: "Studio" }));
+    expect(handle.setRenderMode).toHaveBeenLastCalledWith("studio");
+    await userEvent.click(screen.getByRole("button", { name: "Source" }));
+    expect(handle.setPlacementMode).toHaveBeenLastCalledWith("kicad");
+    await userEvent.click(screen.getByRole("button", { name: "Fit model" }));
+    expect(handle.fit).toHaveBeenCalledOnce();
   });
 
   it("does not carry a failed render across to replacement GLB bytes", async () => {
@@ -392,57 +410,47 @@ describe("Glb3DView scene synchronization", () => {
 });
 
 describe("PreviewModal", () => {
-  const available = { model: true, symbol: true, footprint: true };
-
-  it("opens on the clicked tab and lists every preview type", async () => {
+  it("opens only the clicked preview type", async () => {
     mockApi.previewSvg.mockResolvedValue(svgBlob());
     wrap(
       <PreviewModal
         open
         partId="lm358"
         partName="LM358"
-        available={available}
         initialKind="symbol"
         onClose={vi.fn()}
       />,
     );
     expect(screen.getByRole("dialog", { name: "Inspect LM358" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Symbol" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.getByRole("tab", { name: "3D Model" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Footprint" })).toBeInTheDocument();
+    expect(screen.getByText("Symbol")).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
   });
 
-  it("disables the tab for a preview the part does not have", () => {
+  it("does not expose unrelated preview navigation", () => {
     wrap(
       <PreviewModal
         open
         partId="x"
         partName="X"
-        available={{ model: false, symbol: true, footprint: true }}
         initialKind="symbol"
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByRole("tab", { name: "3D Model" })).toBeDisabled();
+    expect(screen.queryByText("3D Model")).not.toBeInTheDocument();
+    expect(screen.queryByText("Footprint")).not.toBeInTheDocument();
   });
 
-  it("switches to the 3D tab and renders the 3D body", async () => {
-    mockApi.previewSvg.mockResolvedValue(svgBlob());
+  it("renders the 3D viewer when the 3D card opened it", async () => {
     mockApi.modelGlb.mockRejectedValue(new ApiError(502, "no 3D tooling on this box"));
     wrap(
       <PreviewModal
         open
         partId="lm358"
         partName="LM358"
-        available={available}
-        initialKind="symbol"
+        initialKind="model"
         onClose={vi.fn()}
       />,
     );
-    await userEvent.click(screen.getByRole("tab", { name: "3D Model" }));
     expect(await screen.findByText(/no 3d tooling on this box/i)).toBeInTheDocument();
   });
 
@@ -454,7 +462,6 @@ describe("PreviewModal", () => {
         open
         partId="x"
         partName="X"
-        available={available}
         initialKind="symbol"
         onClose={onClose}
       />,
@@ -472,7 +479,6 @@ describe("PreviewModal", () => {
         open={false}
         partId="x"
         partName="X"
-        available={available}
         initialKind="symbol"
         onClose={vi.fn()}
       />,

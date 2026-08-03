@@ -31,6 +31,7 @@ exactly as it was, because a capture that fabricates a partial answer is worse t
 
 from __future__ import annotations
 
+import hashlib
 import inspect
 import tempfile
 import time
@@ -41,11 +42,12 @@ from pathlib import Path
 from typing import Protocol, cast
 from urllib.parse import parse_qs, urlparse
 
-from stockroom.cad_variants import resolve_cad_variant, same_cad_evidence_set
 from stockroom.capture.browser import (
+    CaptureBrowserError,
     PlaywrightCaptureBrowser,
     ProviderHudSpec,
     SharedPlaywrightRuntime,
+    _completed_provider_formats,
 )
 from stockroom.capture.cad_composition import OwnedMaterialization
 from stockroom.capture.complete import (
@@ -65,11 +67,11 @@ from stockroom.capture.evidence import (
 from stockroom.capture.handoff import (
     TRANSPORT_DEFAULT_BROWSER,
     TRANSPORT_PLAYWRIGHT,
-    DefaultBrowserCapture,
     select_transport,
     trace_transport,
 )
 from stockroom.capture.identity import (
+    exact_catalog_observation_error,
     exact_observation_error,
     page_identity,
     provider_url_allowed,
@@ -90,10 +92,42 @@ from stockroom.capture.vendors import (
     get_adapter,
 )
 from stockroom.capture.verified_cache import active_pair_is_verified
+from stockroom.capture.verified_pair import resolve_verified_pair
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.asset import AssetOrigin
 from stockroom.text import counted
+
+
+def _account_verification_blocker(url: str) -> str:
+    """Translate a provider-owned verification redirect into an honest blocked verdict."""
+
+    parsed = urlparse(url or "")
+    host = (parsed.hostname or "").casefold()
+    path = (parsed.path or "").rstrip("/").casefold()
+    if host in {"snapeda.com", "www.snapeda.com", "snapmagic.com", "www.snapmagic.com"} and (
+        path == "/profiles/verify"
+    ):
+        return (
+            "SnapMagic requires this account's one-time phone verification before it will issue "
+            "CAD files. Finish that verification in Stockroom's embedded provider tab; the saved "
+            "provider session will be reused afterward."
+        )
+    return ""
+
+
+def _captured_file_digest(item: object) -> str:
+    value = getattr(item, "sha256", "")
+    if (
+        isinstance(value, str)
+        and len(value) == 71
+        and value.startswith("sha256:")
+        and all(character in "0123456789abcdef" for character in value[7:])
+    ):
+        return value
+    path = Path(getattr(item, "path", ""))
+    with path.open("rb") as stream:
+        return f"sha256:{hashlib.file_digest(stream, 'sha256').hexdigest()}"
 
 # How long to wait for the vendor's file after the adapter submits. Generous because a heavy part's
 # export genuinely generates server-side for tens of seconds (measured live on DigiKey, 2026-07-23),
@@ -219,6 +253,7 @@ def _drive_adapter(
     *,
     expected_manufacturer: str,
     expected_mpn: str,
+    catalog_identity_authorized: bool = False,
 ):
     """Invoke the exact-identity contract while retaining fixture-adapter compatibility."""
 
@@ -229,12 +264,18 @@ def _drive_adapter(
         parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters
     )
     if (expected_manufacturer or expected_mpn) and accepts_identity:
-        return adapter.drive(
-            page,
-            formats,
-            expected_manufacturer=expected_manufacturer,
-            expected_mpn=expected_mpn,
+        kwargs = {
+            "expected_manufacturer": expected_manufacturer,
+            "expected_mpn": expected_mpn,
+        }
+        accepts_catalog_authority = any(
+            parameter.name == "catalog_identity_authorized"
+            or parameter.kind is inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters
         )
+        if accepts_catalog_authority:
+            kwargs["catalog_identity_authorized"] = catalog_identity_authorized
+        return adapter.drive(page, formats, **kwargs)
     if (
         (expected_manufacturer or expected_mpn)
         and adapter.capability.browser_access == "machine_allowed"
@@ -253,6 +294,7 @@ def drive_formats(
     *,
     expected_manufacturer: str = "",
     expected_mpn: str = "",
+    catalog_identity_authorized: bool = False,
 ):
     """Drive a vendor for `formats` and WAIT FOR THE FILES TO LAND. `(DriveReport, error|None)`.
 
@@ -289,6 +331,18 @@ def drive_formats(
     from stockroom.capture.vendors import DriveReport
 
     label = adapter.capability.label
+    formats = list(dict.fromkeys(formats))
+    if (
+        getattr(adapter.capability, "bundles_model_with_cad", False)
+        and "model" in formats
+        and any(fmt in formats for fmt in ("kicad", "altium"))
+    ):
+        formats.remove("model")
+        trace(
+            "capture.drive.model_companion",
+            provider=label,
+            why="STEP is selected with each CAD export; skipped the duplicate model download",
+        )
     wait_s = _DOWNLOAD_TIMEOUT_MS / 1000.0 if timeout_s is None else timeout_s
     trace(
         "capture.drive.start",
@@ -302,13 +356,14 @@ def drive_formats(
     if not adapter.capability.formats_exclusive:
         mark = len(browser.captured)
         error_mark = len(getattr(browser, "download_errors", ()))
-        page.goto(url, wait_until="domcontentloaded")
+        _navigate_adapter_page(browser, page, adapter, url)
         report = _drive_adapter(
             adapter,
             page,
             list(formats),
             expected_manufacturer=expected_manufacturer,
             expected_mpn=expected_mpn,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
         trace(
             "capture.drive.submit",
@@ -373,21 +428,20 @@ def drive_formats(
                 # caller already initialized the task page, so a declared reusable route navigates
                 # only for a bounded retry or when a standalone caller supplied a blank page.
                 current_url = str(getattr(page, "url", "") or "")
+                already_at_target = current_url.rstrip("/") == str(url).rstrip("/")
                 if (
-                    not reuse_page
-                    or attempt > 1
-                    or (
-                        format_index == 0
-                        and current_url in {"", "about:blank"}
-                    )
+                    attempt > 1
+                    or (not reuse_page and not (format_index == 0 and already_at_target))
+                    or (format_index == 0 and current_url in {"", "about:blank"})
                 ):
-                    page.goto(url, wait_until="domcontentloaded")
+                    _navigate_adapter_page(browser, page, adapter, url)
                 one = _drive_adapter(
                     adapter,
                     page,
                     [fmt],
                     expected_manufacturer=expected_manufacturer,
                     expected_mpn=expected_mpn,
+                    catalog_identity_authorized=catalog_identity_authorized,
                 )
             except Exception as exc:  # noqa: BLE001 - one format is one honest result row
                 combined.missed.append(fmt)
@@ -495,6 +549,33 @@ def drive_formats(
     return combined, None
 
 
+def _navigate_adapter_page(browser, page, adapter, url: str) -> None:
+    """Use the provider's reviewed top-level navigation contract."""
+
+    capability = adapter.capability
+    navigate = getattr(browser, "navigate_provider", None)
+    if callable(navigate):
+        login_navigation = "/account/login" in str(url)
+        navigate(
+            page,
+            url,
+            wait_until="domcontentloaded",
+            detached=bool(getattr(capability, "detached_navigation", False)),
+            ready_selectors=(
+                ("#id_username", "a.ls-btn.login-btn", "#profile-section")
+                if login_navigation
+                else tuple(getattr(capability, "native_ready_selectors", ()) or ())
+            ),
+            ready_texts=(
+                ()
+                if login_navigation
+                else tuple(getattr(capability, "native_ready_texts", ()) or ())
+            ),
+        )
+        return
+    page.goto(url, wait_until="domcontentloaded")
+
+
 def _drive_formats_for_record(
     browser,
     page,
@@ -503,6 +584,8 @@ def _drive_formats_for_record(
     url,
     manufacturer: str,
     mpn: str,
+    *,
+    catalog_identity_authorized: bool = False,
 ):
     """Call the production identity-aware driver while allowing narrow legacy test doubles."""
 
@@ -513,6 +596,22 @@ def _drive_formats_for_record(
         parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters
     )
     if accepts_identity:
+        accepts_catalog_authority = any(
+            parameter.name == "catalog_identity_authorized"
+            or parameter.kind is inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters
+        )
+        if accepts_catalog_authority:
+            return drive_formats(
+                browser,
+                page,
+                adapter,
+                formats,
+                url,
+                expected_manufacturer=manufacturer,
+                expected_mpn=mpn,
+                catalog_identity_authorized=catalog_identity_authorized,
+            )
         return drive_formats(
             browser,
             page,
@@ -830,7 +929,13 @@ def _provider_formats(adapter, needs) -> list[str]:
     return requested
 
 
-def _resolved_provider_url_issue(adapter, url: str, record) -> str:
+def _resolved_provider_url_issue(
+    adapter,
+    url: str,
+    record,
+    *,
+    exact_catalog_route: bool = False,
+) -> str:
     """Reject a resolver result before the managed browser can navigate to it."""
 
     provider_key = adapter.capability.key
@@ -841,7 +946,11 @@ def _resolved_provider_url_issue(adapter, url: str, record) -> str:
         )
     detail = page_identity(provider_key, url)
     if detail is not None:
-        error = exact_observation_error(record, detail)
+        error = (
+            exact_catalog_observation_error(record, detail)
+            if exact_catalog_route
+            else exact_observation_error(record, detail)
+        )
         return f"{adapter.capability.label} {error}." if error else ""
     query_name = {
         "digikey": "keywords",
@@ -994,25 +1103,13 @@ def _resolved_kicad_candidate(record, resolved, owner: OwnedMaterialization) -> 
     )
 
 
-def _model_only_fragment(candidate) -> bool:
-    """True for a bare STEP discovered beside a converted provider script package."""
-
-    if getattr(candidate, "symbol_lib_path", None) is not None:
-        return False
-    if getattr(candidate, "footprint_variants", ()):
-        return False
-    return getattr(candidate, "model_path", None) is not None
-
-
 @dataclass
 class _Session:
     """One provider session and the transport that owns it.
 
-    ``browser`` is the transport, not necessarily a Playwright one: a person-driven route carries a
-    ``DefaultBrowserCapture``, which implements the same ``capture_user_downloads`` contract and
-    nothing else. ``page`` is therefore ``None`` on that route BY CONSTRUCTION - there is no page,
-    because Stockroom does not own the window - and every path that reads it is an automated path
-    that a person-driven route never reaches.
+    The browser is always attached to Stockroom's embedded provider WebView. A person-owned gate
+    temporarily detaches the automation transport, but the native page and task-bound download
+    broker remain the same session.
     """
 
     browser: PlaywrightCaptureBrowser
@@ -1102,11 +1199,13 @@ class GuidedCaptureSource:
         collect_variants: bool = False,
         preserve_active_pair: bool = False,
         close_after_supply: bool = False,
+        single_provider_attempt: bool = False,
         credentials=None,
         run_write=None,
         now_iso=None,
         evidence_store=None,
         cross_eda_verifier=None,
+        projection_verifier=None,
         playwright_runtime: SharedPlaywrightRuntime | None = None,
         user_driven: bool = False,
         operator_authorized: bool = False,
@@ -1120,6 +1219,7 @@ class GuidedCaptureSource:
         models_ids=None,
         strict_catalog_urls: bool = False,
         provider_surface=None,
+        allow_standalone_browser: bool = False,
         publish_active_route: Callable[[str, str, str], str] | None = None,
         clear_active_route: Callable[[str, str, str, str], None] | None = None,
         take_selected_files: Callable[[str, str, str, str], tuple[Path, ...]] | None = None,
@@ -1152,6 +1252,7 @@ class GuidedCaptureSource:
         self._collect_variants = collect_variants
         self._preserve_active_pair = preserve_active_pair
         self._close_after_supply = close_after_supply
+        self._single_provider_attempt = single_provider_attempt
         # `(vendor_key) -> (username, password) | None`. Injected, so capture/ never reads the
         # machine config itself and a test can drive sign-in without one.
         self._credentials = credentials
@@ -1160,6 +1261,7 @@ class GuidedCaptureSource:
         self._now_iso = now_iso
         self._evidence_store = evidence_store
         self._cross_eda_verifier = cross_eda_verifier or verify_cross_eda_component
+        self._projection_verifier = projection_verifier
         self._playwright_runtime = playwright_runtime
         self._user_driven = user_driven
         self._operator_authorized = operator_authorized
@@ -1176,6 +1278,9 @@ class GuidedCaptureSource:
         self._models_ids = models_ids
         self._strict_catalog_urls = bool(strict_catalog_urls)
         self._provider_surface = provider_surface
+        if type(allow_standalone_browser) is not bool:
+            raise TypeError("allow_standalone_browser must be a boolean")
+        self._allow_standalone_browser = allow_standalone_browser
         self._publish_active_route = publish_active_route
         self._clear_active_route = clear_active_route
         self._take_selected_files = take_selected_files
@@ -1190,12 +1295,10 @@ class GuidedCaptureSource:
         Lazy on purpose: a run whose parts are all already complete must not flash a browser
         window at the owner for nothing.
 
-        WHICH browser is capability data, decided here and traced here. A route Stockroom is
-        authorized to drive gets the Playwright session it needs to drive with. A person-driven
-        route gets NO automation at all: the validated provider URL is handed to the operating
-        system's default browser, so the session that reaches the provider is the owner's real
-        one - which is the only honest answer to a bot check that was correctly identifying an
-        automated session while a person did the clicking.
+        WHICH browser is capability data, decided here and traced here. Every visible route uses
+        the one Stockroom-owned embedded provider surface. Security gates temporarily detach
+        automation from that same native WebView; silently switching to Vivaldi/Chrome would lose
+        the task-bound download broker and create two contradictory workflows.
         """
         if self._session is not None:
             return self._session
@@ -1207,14 +1310,15 @@ class GuidedCaptureSource:
                 provider_key=self._vendor_key,
                 engine=self._engine if choice.name == TRANSPORT_PLAYWRIGHT else "",
             )
-            if choice.name == TRANSPORT_DEFAULT_BROWSER and self._provider_surface is None:
-                transport = DefaultBrowserCapture(provider_key=self._vendor_key)
-                self._session = _Session(
-                    browser=cast(PlaywrightCaptureBrowser, transport),
-                    ctx_manager=cast("_SessionManager", nullcontext()),
-                    page=None,
-                )
-                return self._session
+        if (
+            not self._headless
+            and self._provider_surface is None
+            and not self._allow_standalone_browser
+        ):
+            raise CaptureBrowserError(
+                "Stockroom's embedded provider browser is unavailable; restart or update "
+                "Stockroom before collecting CAD files"
+            )
         stack = ExitStack()
         try:
             provider_lease = (
@@ -1235,6 +1339,7 @@ class GuidedCaptureSource:
                 provider_key=self._vendor_key,
                 playwright_runtime=self._playwright_runtime,
                 cdp_endpoint=cdp_endpoint,
+                native_surface=provider_lease,
             )
             page = stack.enter_context(browser.session())
             show_provider = getattr(provider_lease, "show", None)
@@ -1350,6 +1455,7 @@ class GuidedCaptureSource:
             detail_url=detail_url,
             evidence_provider_key=author_key,
             provider_note="files selected by the person from the active provider task",
+            manual_identity_paths=tuple(receipt.path for receipt in receipts),
         )
 
     # -- the source contract ---------------------------------------------------------------
@@ -1357,22 +1463,32 @@ class GuidedCaptureSource:
     def supply(self, record) -> SourceOutcome:
         """Run one part and optionally release the provider session before the next source."""
 
+        outcome = SourceOutcome()
         try:
             try:
-                return self._supply_once(record)
+                outcome = self._supply_once(record)
+                return outcome
             except Exception as exc:  # noqa: BLE001 - preserve a complete provider ledger
                 adapter = get_adapter(self._vendor_key)
                 if adapter is None:
                     return SourceOutcome(
                         error=f"{self._vendor_key}: {exc}",
                     )
-                return _provider_wide_outcome(
+                outcome = _provider_wide_outcome(
                     adapter,
                     SourceOutcome(error=f"{adapter.capability.label}: {exc}"),
                     attempted=True,
                     status="failed",
                 )
+                return outcome
         finally:
+            if self._single_provider_attempt:
+                required = set(capture_needs(record))
+                complete = bool(required) and required.issubset(set(outcome.satisfied))
+                if not complete and self._session is not None:
+                    retain = getattr(self._session.browser, "retain_provider_surface", None)
+                    if callable(retain):
+                        retain()
             if self._close_after_supply:
                 self.close()
 
@@ -1456,8 +1572,8 @@ class GuidedCaptureSource:
                     SourceOutcome(
                         skipped=f"{record.mpn or record.id} needs no captured files"
                     ),
-                    attempted=True,
-                    status="unavailable",
+                    attempted=False,
+                    status="not-attempted",
                     stage="needs",
                 )
             # A selected provider is being harvested as an alternative. Ask it for its complete
@@ -1482,12 +1598,17 @@ class GuidedCaptureSource:
                         f"{', '.join(sorted({r.value.split('_')[0] for r in needs}))} for this part"
                     )
                 ),
-                attempted=True,
-                status="unavailable",
+                attempted=False,
+                status="not-attempted",
                 stage="formats",
             )
 
         url = _exact_catalog_url(adapter, record)
+        exact_catalog_route = bool(url)
+        # One source instance services one component/provider run. Keep the catalog provenance on
+        # that instance so route-test doubles and third-party adapter seams do not need a new call
+        # signature merely to carry an internal identity proof.
+        self._catalog_identity_authorized = exact_catalog_route
         if not url and not self._strict_catalog_urls:
             url = adapter.resolve_url(mpn)
         if not url:
@@ -1505,7 +1626,12 @@ class GuidedCaptureSource:
                 status="unavailable",
                 stage="resolve-url",
             )
-        resolved_url_issue = _resolved_provider_url_issue(adapter, url, record)
+        resolved_url_issue = _resolved_provider_url_issue(
+            adapter,
+            url,
+            record,
+            exact_catalog_route=exact_catalog_route,
+        )
         trace(
             "capture.part.url",
             provider=self._vendor_key,
@@ -1601,8 +1727,8 @@ class GuidedCaptureSource:
                         provider_key=self._vendor_key,
                         author_key=_author_key(self._vendor_key, route),
                         label=route.capability.label,
-                        attempted=True,
-                        status="unavailable",
+                        attempted=False,
+                        status="not-attempted",
                     )
                 else:
                     raw_outcome = self._supply_user_driven_route(
@@ -1621,6 +1747,24 @@ class GuidedCaptureSource:
                         label=route.capability.label,
                     )
                 outcomes.append((route.capability.label, outcome))
+                if self._single_provider_attempt and (outcome.satisfied or outcome.retained):
+                    reason = (
+                        f"not attempted because {route.capability.label} owns this one-provider "
+                        "attempt"
+                    )
+                    for later_route in routes[route_index + 1 :]:
+                        outcomes.append(
+                            (
+                                later_route.capability.label,
+                                _unattempted_route_outcome(
+                                    provider_key=self._vendor_key,
+                                    author_key=_author_key(self._vendor_key, later_route),
+                                    label=later_route.capability.label,
+                                    reason=reason,
+                                ),
+                            )
+                        )
+                    break
                 if not self._collect_variants and set(needs).issubset(outcome.satisfied):
                     reason = (
                         f"not attempted after {route.capability.label} completed the first "
@@ -1700,8 +1844,8 @@ class GuidedCaptureSource:
                     provider_key=self._vendor_key,
                     author_key=_author_key(self._vendor_key, route),
                     label=route.capability.label,
-                    attempted=True,
-                    status="unavailable",
+                    attempted=False,
+                    status="not-attempted",
                 )
             else:
                 raw_outcome = self._supply_automated_route(
@@ -1720,6 +1864,24 @@ class GuidedCaptureSource:
                     label=route.capability.label,
                 )
             outcomes.append((route.capability.label, outcome))
+            if self._single_provider_attempt and (outcome.satisfied or outcome.retained):
+                reason = (
+                    f"not attempted because {route.capability.label} owns this one-provider "
+                    "attempt"
+                )
+                for later_route in routes[route_index + 1 :]:
+                    outcomes.append(
+                        (
+                            later_route.capability.label,
+                            _unattempted_route_outcome(
+                                provider_key=self._vendor_key,
+                                author_key=_author_key(self._vendor_key, later_route),
+                                label=later_route.capability.label,
+                                reason=reason,
+                            ),
+                        )
+                    )
+                break
             if not self._collect_variants and set(needs).issubset(outcome.satisfied):
                 reason = (
                     f"not attempted after {route.capability.label} completed the first "
@@ -1778,6 +1940,9 @@ class GuidedCaptureSource:
             "evidence_provider_key",
             self._evidence_provider_key,
         )
+        ensure_connected = getattr(session.browser, "ensure_connected", None)
+        if callable(ensure_connected):
+            ensure_connected(session.page)
         open_task_page = getattr(session.browser, "task_page", None)
         broker = (
             DownloadBroker(
@@ -1827,7 +1992,7 @@ class GuidedCaptureSource:
                 # Librarian absent after SnapMagic initialized the first tab.
                 task_url = str(getattr(task_page, "url", "") or "")
                 if not self._sign_in_attempted or task_url in {"", "about:blank"}:
-                    navigate(url, wait_until="domcontentloaded")
+                    _navigate_adapter_page(session.browser, task_page, adapter, url)
                 sign_in_outcome = self._prepare_sign_in(
                     session,
                     task_page,
@@ -1876,7 +2041,9 @@ class GuidedCaptureSource:
                     )
                     if report.blocked:
                         return SourceOutcome(error=why, blocked=True)
-                    return SourceOutcome(skipped=why)
+                    if report.route_unavailable:
+                        return SourceOutcome(skipped=why)
+                    return SourceOutcome(error=why)
                 elif broker is not None:
                     # Keep the exact task binding through a short quiet period. One provider click
                     # can legitimately emit symbol, footprint, and model as separate downloads;
@@ -1934,6 +2101,9 @@ class GuidedCaptureSource:
                     detail_url=detail_url,
                     evidence_provider_key=evidence_provider_key,
                     reason=route_error,
+                    catalog_identity_authorized=bool(
+                        getattr(self, "_catalog_identity_authorized", False)
+                    ),
                 )
                 return retained.as_blocked() if route_blocked else retained
             return SourceOutcome(error=route_error, blocked=route_blocked)
@@ -1953,6 +2123,9 @@ class GuidedCaptureSource:
                 detail_url=detail_url,
                 surface_key=self._vendor_key,
                 evidence_provider_key=evidence_provider_key,
+                catalog_identity_authorized=bool(
+                    getattr(self, "_catalog_identity_authorized", False)
+                ),
             )
 
         return self._attach(
@@ -1966,6 +2139,9 @@ class GuidedCaptureSource:
             # "not one complete dual-EDA source set; missing native Altium symbol/footprint",
             # which reads like a Stockroom rejection rather than an absent provider export.
             provider_note=getattr(report, "message", ""),
+            catalog_identity_authorized=bool(
+                getattr(self, "_catalog_identity_authorized", False)
+            ),
         )
 
     def _retain_supplementary(
@@ -1977,6 +2153,7 @@ class GuidedCaptureSource:
         surface_key: str,
         evidence_provider_key: str,
         require_step_model: bool = True,
+        catalog_identity_authorized: bool = False,
     ) -> SourceOutcome:
         """Preserve exact route downloads without projecting an incomplete CAD bundle."""
 
@@ -2015,7 +2192,11 @@ class GuidedCaptureSource:
                     "refusing to retain an unbound supplementary download"
                 )
             )
-        identity_error = exact_observation_error(record, observed)
+        identity_error = (
+            exact_catalog_observation_error(record, observed)
+            if catalog_identity_authorized
+            else exact_observation_error(record, observed)
+        )
         if identity_error:
             return SourceOutcome(error=identity_error)
         if require_step_model:
@@ -2050,6 +2231,7 @@ class GuidedCaptureSource:
         detail_url: str,
         evidence_provider_key: str,
         reason: str,
+        catalog_identity_authorized: bool = False,
     ) -> SourceOutcome:
         """Preserve raw bytes while refusing a mixed or one-tool active projection."""
 
@@ -2067,6 +2249,7 @@ class GuidedCaptureSource:
             surface_key=self._vendor_key,
             evidence_provider_key=evidence_provider_key,
             require_step_model=False,
+            catalog_identity_authorized=catalog_identity_authorized,
         )
         if retained.retained:
             return SourceOutcome(
@@ -2253,6 +2436,7 @@ class GuidedCaptureSource:
                 message=issue,
                 issue_detector=issue_detector,
                 should_cancel=self._user_cancelled,
+                cancel_workflow=self._cancel_workflow,
                 timeout_s=self._user_clearance_timeout_s,
             )
             if cleared:
@@ -2279,6 +2463,9 @@ class GuidedCaptureSource:
             self._sign_in_error = ""
             trace("capture.signin.result", provider=self._vendor_key, signed_in=True, why="")
             return None
+        login_url = str(getattr(adapter, "_LOGIN_URL", "") or "")
+        if bool(getattr(adapter.capability, "detached_navigation", False)) and login_url:
+            _navigate_adapter_page(session.browser, page, adapter, login_url)
         self._sign_in_once(page)
         gate_outcome = clear_security_gate()
         if gate_outcome is not None:
@@ -2342,6 +2529,9 @@ class GuidedCaptureSource:
                 url,
                 manufacturer,
                 mpn,
+                catalog_identity_authorized=bool(
+                    getattr(self, "_catalog_identity_authorized", False)
+                ),
             )
             if not report.requires_user_clearance:
                 return report, failure
@@ -2373,6 +2563,7 @@ class GuidedCaptureSource:
                 message=failure or report.message,
                 issue_detector=lambda: detector(page) or "",
                 should_cancel=self._user_cancelled,
+                cancel_workflow=self._cancel_workflow,
                 timeout_s=self._user_clearance_timeout_s,
             )
             trace(
@@ -2417,6 +2608,27 @@ class GuidedCaptureSource:
         """
 
         if self._models_ids is None or self._vendor_key != "digikey":
+            return url
+        user_window_operator = getattr(adapter, "operate_in_user_window", None)
+        surface = getattr(adapter, "_surface", None)
+        exact_product_url = getattr(surface, "evidence_detail_url", None)
+        current_identity_url = ""
+        if callable(exact_product_url):
+            try:
+                current_identity_url = str(
+                    exact_product_url(
+                        None,
+                        expected_manufacturer=manufacturer,
+                        expected_mpn=mpn,
+                    )
+                    or ""
+                )
+            except Exception:  # noqa: BLE001 - a missing optimization falls back to traversal
+                current_identity_url = ""
+        if callable(user_window_operator) and not current_identity_url:
+            # A learned /models/<opaque-id> is a navigation optimization, not part identity.  The
+            # route-only ordinary-control operator must first traverse the exact DigiKey product
+            # URL so ``open_panel`` can establish manufacturer+MPN before it clicks the author row.
             return url
         tab = getattr(adapter, "models_tab", "") or ""
         if not tab:
@@ -2486,6 +2698,42 @@ class GuidedCaptureSource:
         result = None
         capture_error: Exception | None = None
         selected_receipts = ()
+        render_issue_detector = getattr(adapter, "retryable_render_issue", None)
+        user_window_operator = getattr(adapter, "operate_in_user_window", None)
+
+        def operate_controls(page):
+            if not callable(user_window_operator):
+                return []
+            completed = set(_completed_provider_formats(broker.receipts, tuple(formats)))
+            remaining_formats = [fmt for fmt in formats if fmt not in completed]
+            if not remaining_formats:
+                return []
+            operator_kwargs = {
+                "expected_manufacturer": manufacturer,
+                "expected_mpn": mpn,
+            }
+            operator_parameters = inspect.signature(user_window_operator).parameters.values()
+            if any(
+                parameter.name == "catalog_identity_authorized"
+                or parameter.kind is inspect.Parameter.VAR_KEYWORD
+                for parameter in operator_parameters
+            ):
+                operator_kwargs["catalog_identity_authorized"] = bool(
+                    getattr(self, "_catalog_identity_authorized", False)
+                )
+            reports = user_window_operator(page, remaining_formats, **operator_kwargs)
+            for report in reports or ():
+                trace(
+                    "capture.user-window.operator-controls",
+                    provider=self._vendor_key,
+                    route=evidence_provider_key,
+                    selected=list(getattr(report, "selected", ())),
+                    missed=list(getattr(report, "missed", ())),
+                    submitted=bool(getattr(report, "submitted", False)),
+                    blocked=bool(getattr(report, "blocked", False)),
+                    why=str(getattr(report, "message", "") or ""),
+                )
+            return reports or []
         try:
             with self._active_route(open_url, evidence_provider_key) as route_token:
                 try:
@@ -2498,10 +2746,33 @@ class GuidedCaptureSource:
                             manufacturer=manufacturer,
                             mpn=mpn,
                             required_file_labels=_provider_hud_labels(adapter, formats),
+                            required_formats=tuple(formats),
+                            automated_step=(
+                                "Stockroom is selecting and downloading every supported CAD format."
+                                if callable(user_window_operator)
+                                else "Listening for provider downloads."
+                            ),
+                            human_action=(
+                                "Only complete a provider sign-in, phone verification, or security "
+                                "check if it appears."
+                                if callable(user_window_operator)
+                                else "Start this part's download with every required format shown here."
+                            ),
                         ),
                         should_finish=self._user_finished,
                         should_cancel=self._user_cancelled,
                         timeout_s=self._user_capture_timeout_s,
+                        retryable_render_issue=(
+                            (lambda page: str(render_issue_detector(page) or ""))
+                            if callable(render_issue_detector)
+                            else None
+                        ),
+                        max_render_reloads=2 if callable(render_issue_detector) else 0,
+                        **(
+                            {"operate_controls": operate_controls}
+                            if callable(user_window_operator)
+                            else {}
+                        ),
                     )
                 except Exception as exc:  # noqa: BLE001 - an accepted inbox must still drain
                     capture_error = exc
@@ -2561,9 +2832,16 @@ class GuidedCaptureSource:
                 skipped=(
                     f"{provider_label} was left for another provider{suffix}; nothing was attached"
                 ),
-                blocked=True,
+                # This is a route-level instruction, not a provider-session failure.  DigiKey
+                # exposes several independent CAD authors behind one remembered browser session;
+                # choosing "Use Another Provider" must advance from (for example) Ultra
+                # Librarian to SnapMagic instead of suppressing every later DigiKey route.
+                blocked=False,
             )
         if result_status == "timed_out" and not landed:
+            account_blocker = _account_verification_blocker(evidence_url)
+            if account_blocker:
+                return SourceOutcome(skipped=account_blocker, blocked=True)
             suffix = f" after receiving {counted(received, 'file')}" if received else ""
             return SourceOutcome(
                 error=f"{provider_label} capture timed out{suffix}; nothing was attached"
@@ -2578,6 +2856,9 @@ class GuidedCaptureSource:
                 detail_url=evidence_url,
                 surface_key=self._vendor_key,
                 evidence_provider_key=evidence_provider_key,
+                catalog_identity_authorized=bool(
+                    getattr(self, "_catalog_identity_authorized", False)
+                ),
             )
         else:
             outcome = self._attach(
@@ -2593,6 +2874,10 @@ class GuidedCaptureSource:
                     if selected_receipts
                     else ""
                 ),
+                manual_identity_paths=tuple(receipt.path for receipt in selected_receipts),
+                catalog_identity_authorized=bool(
+                    getattr(self, "_catalog_identity_authorized", False)
+                ),
             )
         # Cancel stops subsequent routes/workflow work. It does not erase bytes that crossed the
         # task-bound broker before the click; those retain their normal validation outcome.
@@ -2607,6 +2892,8 @@ class GuidedCaptureSource:
         detail_url: str = "",
         evidence_provider_key: str = "",
         provider_note: str = "",
+        manual_identity_paths: tuple[Path, ...] = (),
+        catalog_identity_authorized: bool = False,
     ) -> SourceOutcome:
         provider_key = evidence_provider_key or self._evidence_provider_key
         if evidence_provider_key:
@@ -2653,6 +2940,8 @@ class GuidedCaptureSource:
                 evidence_provider_key=provider_key,
                 cleanup_callbacks=cleanup_callbacks,
                 provider_note=provider_note,
+                manual_identity_paths=manual_identity_paths,
+                catalog_identity_authorized=catalog_identity_authorized,
             )
             trace(
                 "capture.attach.result",
@@ -2679,6 +2968,8 @@ class GuidedCaptureSource:
         evidence_provider_key: str,
         cleanup_callbacks,
         provider_note: str = "",
+        manual_identity_paths: tuple[Path, ...] = (),
+        catalog_identity_authorized: bool = False,
     ) -> SourceOutcome:
         """Turn the downloaded file(s) into attached assets, with provenance.
 
@@ -2696,6 +2987,7 @@ class GuidedCaptureSource:
             return SourceOutcome(error=f"no capture adapter for vendor {self._vendor_key!r}")
         conversion_failure = ""
         converted_altium = False
+        altium_footprint_entry = ""
         captured_altium = _altium_libraries(landed)
         if captured_altium is not None:
             cleanup_callbacks.append(captured_altium.cleanup)
@@ -2720,6 +3012,9 @@ class GuidedCaptureSource:
                     if callable(cleanup):
                         cleanup_callbacks.append(cleanup)
                     altium_sources = list(converted.libraries)
+                    altium_footprint_entry = str(
+                        getattr(converted, "preferred_footprint", "") or ""
+                    )
             except Exception as exc:  # noqa: BLE001 - keep usable KiCad and report this gap
                 conversion_failure = f"could not convert the provider's Altium package: {exc}"
         trace(
@@ -2740,17 +3035,29 @@ class GuidedCaptureSource:
             preserve_active_pair = (
                 (self._preserve_active_pair or self._collect_variants)
                 and self._evidence_store is not None
-                and active_pair_is_verified(self._evidence_store, record)
+                and self._projection_verifier is not None
+                and active_pair_is_verified(
+                    self._evidence_store,
+                    record,
+                    projection_verifier=self._projection_verifier,
+                )
             )
             candidates = []
+            manual_candidates = []
+            manual_path_set = {Path(path) for path in manual_identity_paths}
             inspect_errors: list[Exception] = []
-            # Exclusive-format providers deliver KiCad and Altium as sibling files. Inspecting
-            # the whole list in one call aborts on the Altium-only sibling and discards the valid
-            # KiCad candidate already found in the first file. Inspect each captured file through
-            # the same pipeline and combine successful candidates instead.
-            for item in landed:
+            # The task owns one bundle even when a provider delivers KiCad, STEP, and Altium as
+            # sibling downloads. The pipeline isolates an unreadable sibling, then merges every
+            # successful fragment in one pass so a bare STEP cannot become an orphan candidate.
+            try:
+                candidates.extend(pipeline.inspect(inputs=[item.path for item in landed]))
+            except Exception as exc:  # noqa: BLE001
+                inspect_errors.append(exc)
+            if manual_path_set:
                 try:
-                    candidates.extend(pipeline.inspect(inputs=[item.path]))
+                    manual_candidates.extend(
+                        pipeline.inspect(inputs=sorted(manual_path_set))
+                    )
                 except Exception as exc:  # noqa: BLE001
                     inspect_errors.append(exc)
             if not landed:
@@ -2758,17 +3065,6 @@ class GuidedCaptureSource:
                     candidates.extend(pipeline.inspect(inputs=[]))
                 except Exception as exc:  # noqa: BLE001
                     inspect_errors.append(exc)
-            if converted_altium:
-                # DigiKey's UL script ZIP carries a root STEP named for the package, not the MPN.
-                # The ingest fingerprint correctly exposes it as a model-only candidate, but it
-                # is supplemental package data rather than a second KiCad definition. Keep any
-                # symbol/footprint-bearing candidate; drop model-only fragments so one complete
-                # same-download dual-EDA set is evaluated rather than competing fragments.
-                candidates = [
-                    candidate
-                    for candidate in candidates
-                    if not _model_only_fragment(candidate)
-                ]
             trace(
                 "capture.attach.inspected",
                 provider=self._vendor_key,
@@ -2787,11 +3083,31 @@ class GuidedCaptureSource:
                 )
                 return SourceOutcome(error=f"could not read the download: {inspect_errors[0]}")
 
+            if manual_path_set and not catalog_identity_authorized:
+                manual_selection = select_exact_candidate(
+                    record,
+                    manual_candidates,
+                    # An unbound file picker can point at anything on disk, so it still needs an
+                    # internal identity. An exact catalog-authorized capture is already bound to
+                    # the active component and uses the single normal selection below.
+                    vendor_key=evidence_provider_key,
+                    detail_url=detail_url,
+                    trust_detail_url=False,
+                )
+                if manual_selection.error or manual_selection.candidate is None:
+                    reason = manual_selection.error or (
+                        "the selected archive does not expose an exact internal part identity"
+                    )
+                    return SourceOutcome(
+                        error=f"manually selected CAD was not attached: {reason}"
+                    )
+
             selection = select_exact_candidate(
                 record,
                 candidates,
                 vendor_key=evidence_provider_key,
                 detail_url=detail_url,
+                catalog_identity_authorized=catalog_identity_authorized,
             )
             candidate = selection.candidate
             trace(
@@ -2809,6 +3125,7 @@ class GuidedCaptureSource:
                     landed,
                     detail_url=detail_url,
                     evidence_provider_key=evidence_provider_key,
+                    catalog_identity_authorized=catalog_identity_authorized,
                     reason=(
                         "provider download contains no exact KiCad symbol, footprint, and STEP "
                         "beside its native Altium files"
@@ -2833,6 +3150,7 @@ class GuidedCaptureSource:
                     landed,
                     detail_url=detail_url,
                     evidence_provider_key=evidence_provider_key,
+                    catalog_identity_authorized=catalog_identity_authorized,
                     reason=(
                         "provider download is not one complete dual-EDA source set; missing "
                         + ", ".join(absent)
@@ -2853,6 +3171,7 @@ class GuidedCaptureSource:
                     landed,
                     detail_url=detail_url,
                     evidence_provider_key=evidence_provider_key,
+                    catalog_identity_authorized=catalog_identity_authorized,
                     reason=(
                         "the complete provider CAD set cannot be activated without native "
                         "cross-EDA verification"
@@ -2867,6 +3186,12 @@ class GuidedCaptureSource:
                     detail_url=detail_url,
                     altium_sources=tuple(altium_sources),
                     cross_eda_verifier=self._cross_eda_verifier,
+                    source_receipt_digests=tuple(
+                        sorted({_captured_file_digest(item) for item in landed})
+                    ),
+                    source_receipts=tuple(item.path for item in landed),
+                    catalog_identity_authorized=catalog_identity_authorized,
+                    altium_footprint_entry=altium_footprint_entry,
                 )
             except Exception as exc:  # noqa: BLE001 - no partial projection on any failure
                 return self._retain_incomplete_cad_set(
@@ -2874,6 +3199,7 @@ class GuidedCaptureSource:
                     landed,
                     detail_url=detail_url,
                     evidence_provider_key=evidence_provider_key,
+                    catalog_identity_authorized=catalog_identity_authorized,
                     reason=f"same-set cross-EDA verification failed: {exc}",
                 )
             if not cross_eda_verified:
@@ -2882,29 +3208,18 @@ class GuidedCaptureSource:
                     landed,
                     detail_url=detail_url,
                     evidence_provider_key=evidence_provider_key,
+                    catalog_identity_authorized=catalog_identity_authorized,
                     reason="same-set cross-EDA verification did not prove the provider bundle",
                 )
             try:
                 identity = exact_identity(record)
-                kicad_resolved = resolve_cad_variant(
+                verified_pair = resolve_verified_pair(
                     self._evidence_store,
                     identity=identity,
-                    tool="kicad",
                     manifest_digest=evidence_digest,
                 )
-                altium_resolved = resolve_cad_variant(
-                    self._evidence_store,
-                    identity=identity,
-                    tool="altium",
-                    manifest_digest=evidence_digest,
-                )
-                if not same_cad_evidence_set(
-                    kicad_resolved.descriptor,
-                    altium_resolved.descriptor,
-                ):
-                    raise ValueError(
-                        "resolved KiCad and Altium projections do not share one evidence set"
-                    )
+                kicad_resolved = verified_pair.kicad
+                altium_resolved = verified_pair.altium
             except Exception as exc:  # noqa: BLE001 - never attach an unbound projection
                 return SourceOutcome(error=f"CAD evidence pointer resolution failed: {exc}")
 
@@ -2939,6 +3254,7 @@ class GuidedCaptureSource:
                         now_iso=self._now_iso() if self._now_iso else "",
                         kicad_active_variant=kicad_resolved.pointer,
                         altium_active_variant=altium_resolved.pointer,
+                        preferred_altium_footprint=verified_pair.altium_footprint_entry,
                     )
                 )
             except Exception as exc:  # noqa: BLE001 - the whole set rolls back as one row

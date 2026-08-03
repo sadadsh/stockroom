@@ -134,7 +134,7 @@ def test_the_operator_authorized_lane_still_drives_the_page_with_playwright():
     assert choice.name == TRANSPORT_PLAYWRIGHT
 
 
-def test_the_guided_source_opens_no_playwright_session_for_a_person_driven_route(tmp_path):
+def test_the_guided_source_fails_closed_without_the_embedded_provider_surface(tmp_path):
     class _Exploded:
         def __init__(self, *args, **kwargs):
             raise AssertionError("a person-driven route must never construct Playwright")
@@ -146,13 +146,12 @@ def test_the_guided_source_opens_no_playwright_session_for_a_person_driven_route
         user_driven=True,
     )
 
-    with pytest.MonkeyPatch.context() as patch:
+    with pytest.MonkeyPatch.context() as patch, pytest.raises(
+        guided.CaptureBrowserError,
+        match="embedded provider browser is unavailable",
+    ):
         patch.setattr(guided, "PlaywrightCaptureBrowser", _Exploded)
-        session = source._ensure_session()
-
-    assert isinstance(session.browser, DefaultBrowserCapture)
-    assert session.page is None
-    assert session.browser.owns_window is False
+        source._ensure_session()
 
 
 def test_the_guided_source_still_builds_playwright_for_the_authorized_route(tmp_path):
@@ -172,6 +171,7 @@ def test_the_guided_source_still_builds_playwright_for_the_authorized_route(tmp_
         vendor="ultralibrarian",
         download_root=tmp_path / "dl",
         user_driven=False,
+        allow_standalone_browser=True,
     )
 
     with pytest.MonkeyPatch.context() as patch:
@@ -180,6 +180,26 @@ def test_the_guided_source_still_builds_playwright_for_the_authorized_route(tmp_
 
     assert len(built) == 1
     assert not isinstance(session.browser, DefaultBrowserCapture)
+
+
+def test_authorized_visible_route_refuses_a_missing_embedded_surface(tmp_path):
+    class _Exploded:
+        def __init__(self, *_args, **_kwargs):
+            raise AssertionError("a standalone browser must not be constructed")
+
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="ultralibrarian",
+        download_root=tmp_path / "dl",
+        user_driven=False,
+    )
+
+    with pytest.MonkeyPatch.context() as patch, pytest.raises(
+        guided.CaptureBrowserError,
+        match="embedded provider browser is unavailable",
+    ):
+        patch.setattr(guided, "PlaywrightCaptureBrowser", _Exploded)
+        source._ensure_session()
 
 
 def test_the_transport_choice_is_traced(tmp_path, monkeypatch):
@@ -198,7 +218,8 @@ def test_the_transport_choice_is_traced(tmp_path, monkeypatch):
         user_driven=True,
     )
     monkeypatch.setattr(guided, "PlaywrightCaptureBrowser", _Exploded)
-    source._ensure_session()
+    with pytest.raises(guided.CaptureBrowserError):
+        source._ensure_session()
     reset_for_tests()
 
     written = log.read_text(encoding="utf-8")

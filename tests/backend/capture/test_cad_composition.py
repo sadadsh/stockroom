@@ -335,6 +335,27 @@ def test_cross_eda_report_accepts_explicit_and_omitted_no_connect_pins() -> None
     assert cross_eda_report_is_proved(report) is True
 
 
+def test_cross_eda_report_accepts_format_specific_physical_pads() -> None:
+    report = {
+        "schema": "stockroom.cross-eda-verification/1",
+        "valid": True,
+        "terminal_map": [
+            {"kicad": "1", "altium": "1"},
+            {"kicad": "2", "altium": "2"},
+        ],
+        "no_connect_pad_map": [],
+        "provider_specific_pad_numbers": {
+            "kicad": [],
+            "altium": ["18", "19", "20", "21"],
+        },
+        "geometry": {"method": "mapped-pad-distance-and-size-signatures"},
+        "kicad": {"pin_count": 2, "pad_count": 2},
+        "altium": {"pin_count": 2, "pad_count": 6},
+    }
+
+    assert cross_eda_report_is_proved(report) is True
+
+
 @pytest.mark.parametrize(
     "mutation",
     [

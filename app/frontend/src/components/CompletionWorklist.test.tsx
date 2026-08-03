@@ -110,6 +110,15 @@ function Displacer() {
   );
 }
 
+function CaptureBackgroundState() {
+  const capture = useCapture();
+  return (
+    <output data-testid="capture-backgrounded">
+      {capture.active.backgrounded ? "backgrounded" : "foreground"}
+    </output>
+  );
+}
+
 // CaptureProvider is the one global capture slot. A row starts a real capture through it, so this
 // surface cannot be rendered without it - exactly as `main.tsx` mounts it above the whole app.
 function renderWorklist(live = false, extra?: ReactNode) {
@@ -155,7 +164,7 @@ describe("completion worklist", () => {
     vi.spyOn(api, "captureWorklist").mockResolvedValue(worklist());
     vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
     const capture = mockCapture();
-    renderWorklist();
+    renderWorklist(false, <CaptureBackgroundState />);
 
     await userEvent.click(
       await screen.findByRole("button", {
@@ -164,6 +173,7 @@ describe("completion worklist", () => {
     );
 
     await waitFor(() => expect(capture.run).toHaveBeenCalled());
+    expect(screen.getByTestId("capture-backgrounded")).toHaveTextContent("backgrounded");
     expect(capture.run).toHaveBeenCalledWith(
       expect.objectContaining({
         partIds: ["lm317"],
@@ -437,9 +447,9 @@ describe("completion worklist", () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps a row that did not complete in the list and says so", async () => {
-    // The failure this forbids: a pass that marched through every row and left nobody able to tell
-    // which components it actually finished.
+  it("stops after a post-start failure when no provider handoff ever opened", async () => {
+    // Creating a durable batch is not proof that a provider page opened. Repeating the same
+    // backend failure across the whole list would produce no useful user trip.
     vi.spyOn(api, "captureWorklist").mockResolvedValue(twoRows());
     vi.spyOn(api, "partCadSource").mockResolvedValue(cadSource());
     const capture = mockCapture([{ event: "error", data: { message: "provider gave nothing" } }]);
@@ -447,13 +457,13 @@ describe("completion worklist", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: WORK_THROUGH_ALL }));
 
-    await waitFor(() => expect(capture.run).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(capture.run).toHaveBeenCalledTimes(1));
     expect(await screen.findByTestId("completion-worklist-auto-ended")).toHaveTextContent(
-      "2 did not complete and are still listed above",
+      "LM317 Regulator could not be started",
     );
     expect(
       screen.getAllByText(/This capture ended without completing/),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
   });
 
   it("renders nothing at all when the batch has no worklist projection", async () => {

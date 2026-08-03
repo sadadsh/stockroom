@@ -553,21 +553,15 @@ def _verify_geometry(
         ):
             physical_map[number] = number
     # Some native libraries omit package-only pads from both symbols (typically NC terminals)
-    # while retaining them in both footprints. Accept only the exact same unused pad numbers on
-    # both sides; this proves package equivalence without inventing an electrical terminal.
+    # while retaining them in both footprints. Map matching physical pad numbers when both EDA
+    # exports carry them. Provider exports may also represent a non-electrical construction detail
+    # in only one format (for example Ultra Librarian's Altium P-CAD export adds numbered thermal
+    # vias while its KiCad footprint uses one exposed pad). Those extras are not electrical pins
+    # and must not discard an otherwise usable provider package.
     unmatched_kicad = set(kicad_counts) - set(physical_map)
     unmatched_altium = set(altium_counts) - set(physical_map.values())
-    if unmatched_kicad == unmatched_altium:
-        for number in sorted(unmatched_kicad):
-            physical_map[number] = number
-    if set(kicad_counts) != set(physical_map):
-        raise CrossEdaVerificationError(
-            "KiCad footprint pad numbers do not equal its symbol pin numbers"
-        )
-    if set(altium_counts) != set(physical_map.values()):
-        raise CrossEdaVerificationError(
-            "Altium footprint pad numbers do not equal its symbol pin numbers"
-        )
+    for number in sorted(unmatched_kicad & unmatched_altium):
+        physical_map[number] = number
     for kicad_number, altium_number in physical_map.items():
         if kicad_counts[kicad_number] != altium_counts[altium_number]:
             raise CrossEdaVerificationError(
@@ -575,12 +569,18 @@ def _verify_geometry(
                 f"{kicad_number!r}/{altium_number!r}"
             )
 
+    # Compare only the electrical/shared physical mapping. Format-specific construction pads are
+    # independently validated by each native reader and recorded in the final report.
+    mapped_kicad_pads = tuple(pad for pad in kicad_pads if pad.number in physical_map)
+    mapped_altium_pads = tuple(
+        pad for pad in altium_pads if pad.number in physical_map.values()
+    )
     canonical = {number: number for number in physical_map}
     altium_canonical = {
         native: canonical_number for canonical_number, native in physical_map.items()
     }
-    left_distances = _distance_signature(kicad_pads, canonical)
-    right_distances = _distance_signature(altium_pads, altium_canonical)
+    left_distances = _distance_signature(mapped_kicad_pads, canonical)
+    right_distances = _distance_signature(mapped_altium_pads, altium_canonical)
     if set(left_distances) != set(right_distances):
         raise CrossEdaVerificationError("KiCad and Altium pad topology differs")
     for key in sorted(left_distances):
@@ -593,8 +593,8 @@ def _verify_geometry(
                 f"KiCad and Altium pad spacing differs for terminals {key!r}"
             )
 
-    left_sizes = _size_signature(kicad_pads, canonical)
-    right_sizes = _size_signature(altium_pads, altium_canonical)
+    left_sizes = _size_signature(mapped_kicad_pads, canonical)
+    right_sizes = _size_signature(mapped_altium_pads, altium_canonical)
     if set(left_sizes) != set(right_sizes):
         raise CrossEdaVerificationError("KiCad and Altium pad size topology differs")
     for key in sorted(left_sizes):
@@ -619,13 +619,22 @@ def _geometry_tolerance_ratio(
 ) -> float:
     """Measure the worst normalized error across the already-verified pad geometry."""
 
+    # ``_verify_geometry`` deliberately permits format-specific construction pads (for example,
+    # thermal vias labelled ``V`` in KiCad but numbered 18-21 in the sibling Altium export).  The
+    # measurement must use the same shared-pad subset as the verifier; feeding all native pads into
+    # label lookup both compared unlike geometry and raised a raw KeyError for those provider-only
+    # labels after the actual verification had already succeeded.
+    mapped_kicad_pads = tuple(pad for pad in kicad_pads if pad.number in physical_map)
+    mapped_altium_pads = tuple(
+        pad for pad in altium_pads if pad.number in physical_map.values()
+    )
     canonical = {number: number for number in physical_map}
     altium_canonical = {
         native: canonical_number for canonical_number, native in physical_map.items()
     }
     ratios: list[float] = []
-    left_distances = _distance_signature(kicad_pads, canonical)
-    right_distances = _distance_signature(altium_pads, altium_canonical)
+    left_distances = _distance_signature(mapped_kicad_pads, canonical)
+    right_distances = _distance_signature(mapped_altium_pads, altium_canonical)
     for key in sorted(left_distances):
         ratios.extend(
             _tolerance_ratio(left, right)
@@ -635,8 +644,8 @@ def _geometry_tolerance_ratio(
                 strict=True,
             )
         )
-    left_sizes = _size_signature(kicad_pads, canonical)
-    right_sizes = _size_signature(altium_pads, altium_canonical)
+    left_sizes = _size_signature(mapped_kicad_pads, canonical)
+    right_sizes = _size_signature(mapped_altium_pads, altium_canonical)
     for key in sorted(left_sizes):
         for left, right in zip(left_sizes[key], right_sizes[key], strict=True):
             ratios.extend(
@@ -744,6 +753,7 @@ def verify_cross_eda_component(
     step_model: Path,
     altium_sources: tuple[Path, ...],
     altium_identity_attestation: ExactPartIdentity | None = None,
+    altium_footprint_entry: str = "",
 ) -> dict[str, object]:
     """Return strict-JSON evidence only after independent native readback agrees."""
 
@@ -772,7 +782,10 @@ def verify_cross_eda_component(
             # package; use its native entry name to select the corresponding Altium footprint.
             # This is an explicit provider binding, not a file-order guess. A missing or ambiguous
             # matching entry still fails closed inside ``read_altium_footprint``.
-            altium_fp = read_altium_footprint(pcblib, kicad_fp.entry)
+            altium_fp = read_altium_footprint(
+                pcblib,
+                altium_footprint_entry or kicad_fp.entry,
+            )
             mapping, kicad_no_connects, altium_no_connects = _terminal_map(kicad, altium)
             physical_mapping = _verify_geometry(
                 kicad_fp.pads,
@@ -787,7 +800,9 @@ def verify_cross_eda_component(
                 physical_mapping,
             )
             represented_kicad = {pin.number for pin in kicad.pins}
-            unrepresented_kicad = frozenset(physical_mapping) - represented_kicad
+            kicad_pad_numbers = {pad.number for pad in kicad_fp.pads}
+            altium_pad_numbers = {pad.number for pad in altium_fp.pads}
+            unrepresented_kicad = frozenset(kicad_pad_numbers) - represented_kicad
             kicad_report = verify_kicad_component(
                 identity=identity,
                 kicad_symbol=kicad_symbol,
@@ -858,6 +873,10 @@ def verify_cross_eda_component(
             for kicad_number, altium_number in sorted(physical_mapping.items())
             if kicad_number not in mapping
         ],
+        "provider_specific_pad_numbers": {
+            "altium": sorted(altium_pad_numbers - set(physical_mapping.values())),
+            "kicad": sorted(kicad_pad_numbers - set(physical_mapping)),
+        },
         "valid": True,
     }
 

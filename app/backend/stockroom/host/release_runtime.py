@@ -160,6 +160,10 @@ class HostWindowReplacement(Protocol):
 
     def provider_browser_surface(self) -> object: ...
 
+    def show_active_provider_browser(self) -> None: ...
+
+    def close_active_provider_browser(self) -> None: ...
+
     def close(self) -> None: ...
 
 
@@ -1443,6 +1447,20 @@ class ProductionUpdateRuntime:
                 "production provider browser is unavailable"
             )
         return replacement.provider_browser_surface()
+
+    def show_active_provider_browser(self) -> None:
+        replacement = self._window_replacement
+        if replacement is None:
+            raise HostReleaseBoundaryError(
+                "production provider browser is unavailable"
+            )
+        replacement.show_active_provider_browser()
+
+    def close_active_provider_browser(self) -> None:
+        replacement = self._window_replacement
+        if replacement is None:
+            return
+        replacement.close_active_provider_browser()
 
     def _activate_loop(self) -> None:
         while True:

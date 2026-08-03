@@ -276,6 +276,51 @@ def test_coherent_pair_uses_the_provider_symbol_footprint_binding(
     assert footprint.name == "TEST-FP"
 
 
+def test_coherent_pair_uses_converter_declared_native_footprint_default(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    fixtures_dir: Path,
+) -> None:
+    pipeline, candidate, kicad_pointer, altium_pointer, _ = _setup(
+        tmp_path,
+        fixtures_dir,
+    )
+    selected = candidate.footprint_variants[0]
+    selected.write_text(
+        selected.read_text(encoding="utf-8").replace(
+            '"TEST-FP"',
+            '"21-0664_TD1233&plus_1C_MXM"',
+            1,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "stockroom.altium.oleread.read_footprint_names",
+        lambda _path: (
+            "21-0664_TD1233+1",
+            "21-0664_TD123300",
+            "21-0664_TD123301",
+        ),
+    )
+
+    record = pipeline.attach_coherent_cad_assets(
+        "pair",
+        candidate,
+        _ALTIUM / "sample.SchLib",
+        _ALTIUM / "sample.PcbLib",
+        kicad_origin=None,
+        altium_origin=None,
+        now_iso="2026-07-29T00:00:00Z",
+        kicad_active_variant=kicad_pointer,
+        altium_active_variant=altium_pointer,
+        preferred_altium_footprint="21-0664_TD1233+1",
+    )
+
+    footprint = record.assets_for("altium").footprint
+    assert footprint is not None
+    assert footprint.name == "21-0664_TD1233+1"
+
+
 def test_guided_coherent_pair_embeds_exact_step_in_the_bound_footprint(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

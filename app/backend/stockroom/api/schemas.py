@@ -267,14 +267,18 @@ class SearchRow(BaseModel):
 
 class FacetsDTO(BaseModel):
     by_category: dict[str, int]
+    category_catalog: list[str]
     by_manufacturer: dict[str, int]
     complete: int
     incomplete: int
 
     @classmethod
     def from_facets(cls, f: _Facets) -> "FacetsDTO":
+        from stockroom.model.category import CATEGORIES
+
         return cls(
             by_category=f.by_category,
+            category_catalog=list(CATEGORIES),
             by_manufacturer=f.by_manufacturer,
             complete=f.complete,
             incomplete=f.incomplete,

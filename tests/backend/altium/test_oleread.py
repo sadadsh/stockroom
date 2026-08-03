@@ -55,6 +55,19 @@ def test_pick_entry_prefers_exact_match_when_multiple():
     assert pick_entry(["A", "BQ24074RGTT", "C"], "symbol", prefer="BQ24074RGTT") == "BQ24074RGTT"
 
 
+def test_pick_entry_decodes_ultralibrarian_plus_transport_spelling():
+    names = [
+        "21-0664_TD1233&plus_1C_MXM-L",
+        "21-0664_TD1233&plus_1C_MXM-M",
+        "21-0664_TD1233&plus_1C_MXM",
+    ]
+
+    assert (
+        pick_entry(names, "footprint", prefer="21-0664_TD1233+1C_MXM")
+        == "21-0664_TD1233&plus_1C_MXM"
+    )
+
+
 def test_pick_entry_refuses_ambiguous_library_with_no_prefer():
     with pytest.raises(ValueError, match="refusing to choose by file order"):
         pick_entry(["A", "B"], "footprint")

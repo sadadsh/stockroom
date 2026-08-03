@@ -62,6 +62,22 @@ class _FlakyDownload(_Download):
         Path(destination).write_bytes(self._content)
 
 
+class _CompletedArtifactDownload(_Download):
+    """WebView2 completed its artifact, but Playwright could not perform save_as."""
+
+    def __init__(self, name: str, content: bytes, artifact: Path):
+        super().__init__(name, content)
+        artifact.write_bytes(content)
+        self._artifact = artifact
+
+    def save_as(self, _destination: str) -> None:
+        self.calls += 1
+        raise RuntimeError("copy failed after browser download completed")
+
+    def path(self) -> Path:
+        return self._artifact
+
+
 class _Page:
     def __init__(self):
         self.handlers: list = []
@@ -380,6 +396,27 @@ def test_playwright_save_retries_and_records_digest(tmp_path):
     assert receipt.sha256 == f"sha256:{hashlib.sha256(b'step-data').hexdigest()}"
 
 
+def test_playwright_accepts_the_completed_task_bound_artifact_when_save_as_fails(tmp_path):
+    broker = DownloadBroker(
+        _task(tmp_path),
+        retry_policy=RetryPolicy(attempts=2, backoff_seconds=(0,)),
+        sleep=lambda _seconds: None,
+    )
+    download = _CompletedArtifactDownload(
+        "ul_TPS62130RGTR.zip",
+        b"provider-zip",
+        tmp_path / "browser-artifact",
+    )
+
+    receipt = broker.capture_playwright(download)
+
+    assert download.calls == 1
+    assert receipt.transport == "playwright"
+    assert receipt.path.name == "ul_TPS62130RGTR.zip"
+    assert receipt.path.read_bytes() == b"provider-zip"
+    assert receipt.sha256 == f"sha256:{hashlib.sha256(b'provider-zip').hexdigest()}"
+
+
 def test_playwright_failure_does_not_report_a_signed_url(tmp_path):
     class FailingDownload(_Download):
         url = "https://vendor.example.test/export?token=browser-secret"
@@ -413,6 +450,18 @@ def test_http_receipt_cannot_satisfy_a_playwright_wait(tmp_path):
 
     with pytest.raises(DownloadBrokerError, match="received 0"):
         broker.wait_for_playwright(_Page(), minimum=1, settle_seconds=0)
+
+
+def test_native_webview_receipt_satisfies_the_browser_download_wait(tmp_path):
+    broker = DownloadBroker(_task(tmp_path), timeout_seconds=0.01)
+    native = tmp_path / "provider.zip"
+    native.write_bytes(b"provider bytes")
+    broker.capture_local_file(native, transport="webview2-native")
+
+    receipts = broker.wait_for_playwright(_Page(), minimum=1, settle_seconds=0)
+
+    assert len(receipts) == 1
+    assert receipts[0].transport == "webview2-native"
 
 
 def test_wait_for_playwright_times_out_honestly(tmp_path):

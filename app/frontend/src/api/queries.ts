@@ -20,6 +20,7 @@ import type {
   SettingsPatch,
 } from "./types";
 import { api, type ListPartsArgs, type SearchArgs } from "./client";
+import { invalidatePartCadProjection } from "./partCadProjectionQueries";
 import { useJob } from "../lib/useJob";
 
 export function useProjects() {
@@ -480,12 +481,9 @@ export function usePartDiff(id: string | null, a: string, b: string | null) {
   });
 }
 
-// The CAD source + capture needs for a part (guided capture, spec section 5). Feeds
-// the both-format checklist its `needs` and the Get CAD Files control its target URL.
-// Kept separate from useGuidedCapture's OWN cad-source GET (fired again right before
-// opening the remote page): this one only decides what the checklist shows, so a stale
-// cached answer here can never open a dead page - the hook always re-resolves fresh at
-// click time.
+// The canonical per-part CAD completion read. It feeds the checklist, the selected-part
+// readiness chip, and the final post-capture readback. Capture invalidates this key after every
+// terminal result, so the screen reconciles with the committed projection without a restart.
 export function useCadSourceQuery(id: string | null, enabled: boolean) {
   return useQuery({
     queryKey: ["cad-source", id],
@@ -503,7 +501,11 @@ function useInvalidateAfterWrite() {
     qc.invalidateQueries({ queryKey: ["parts"] });
     qc.invalidateQueries({ queryKey: ["facets"] });
     qc.invalidateQueries({ queryKey: ["duplicates"] });
-    qc.invalidateQueries({ queryKey: ["part", id] });
+    void invalidatePartCadProjection(qc, id);
+    qc.invalidateQueries({ queryKey: ["library-coverage"] });
+    qc.invalidateQueries({ queryKey: ["library-cad"] });
+    qc.invalidateQueries({ queryKey: ["altium-status"] });
+    qc.invalidateQueries({ queryKey: ["altium-models-pending"] });
     // a write commits, so the part's git timeline (M6k) gained an entry
     qc.invalidateQueries({ queryKey: ["part-history", id] });
   };

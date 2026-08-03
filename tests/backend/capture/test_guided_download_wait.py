@@ -200,6 +200,37 @@ def test_exact_digikey_media_route_wins_over_a_synthesized_provider_search(monke
     )
 
 
+def test_exact_catalog_route_accepts_the_reported_maxim_provider_slug_loss(
+    monkeypatch,
+):
+    browser = _FakeBrowser()
+    _install_adapter(monkeypatch, browser, on_drive=lambda _browser: None)
+    adapter = guided.get_adapter("faketron")
+    record = type(
+        "_MaximRecord",
+        (),
+        {
+            "mpn": "MAX17608ATC+",
+            "manufacturer": "Analog Devices / Maxim Integrated",
+        },
+    )()
+    url = (
+        "https://app.ultralibrarian.com/details/fixture/"
+        "Analog-Devices-Inc/MAX17608ATC-?ref=digikey"
+    )
+
+    assert guided._resolved_provider_url_issue(adapter, url, record)
+    assert (
+        guided._resolved_provider_url_issue(
+            adapter,
+            url,
+            record,
+            exact_catalog_route=True,
+        )
+        == ""
+    )
+
+
 def test_strict_catalog_capture_stops_instead_of_falling_back_to_search(monkeypatch, tmp_path):
     browser = _FakeBrowser()
     _install_adapter(monkeypatch, browser, on_drive=lambda _browser: None)
@@ -448,7 +479,58 @@ def test_each_fresh_route_tab_is_initialized_even_after_run_scoped_sign_in(tmp_p
     )
 
     assert page.gotos == [(url, {"wait_until": "domcontentloaded"})]
-    assert outcome.skipped == "no fixture download"
+    assert outcome.error == "no fixture download"
+    assert not outcome.skipped
+
+
+def test_only_a_proved_absent_provider_route_is_unavailable(tmp_path):
+    capability = VendorCapability(
+        key="digikey",
+        label="DigiKey · Ultra Librarian",
+        tools=("kicad", "altium"),
+        formats_exclusive=True,
+        aggregator=True,
+        needs_login=True,
+        instruction="",
+        browser_access="machine_allowed",
+    )
+    adapter = type(
+        "_Route",
+        (),
+        {
+            "capability": capability,
+            "evidence_provider_key": "digikey-ultralibrarian",
+        },
+    )()
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="digikey",
+        download_root=tmp_path / "Downloads",
+        operator_authorized=True,
+    )
+    source._sign_in_attempted = True
+    source._prepare_sign_in = lambda *_args: None
+    source._drive_automated = lambda *_args: (
+        DriveReport(
+            missed=["kicad", "model", "altium"],
+            route_unavailable=True,
+            message="DigiKey does not offer this author for the exact product.",
+        ),
+        None,
+    )
+
+    outcome = source._supply_automated_route(
+        _Record(),
+        guided._Session(browser=_FakeBrowser(), ctx_manager=None, page=_FakePage()),
+        adapter,
+        _Record.manufacturer,
+        _Record.mpn,
+        "https://www.digikey.com/en/products/result?keywords=TPD6E05U06RVZR",
+        ["kicad", "model", "altium"],
+    )
+
+    assert outcome.skipped == "DigiKey does not offer this author for the exact product."
+    assert not outcome.error
 
 
 def test_reusable_exclusive_route_downloads_all_formats_without_reloading():
@@ -620,6 +702,8 @@ def test_user_driven_guided_supply_never_discards_captured_files(
         "should_finish": finished,
         "should_cancel": cancelled,
         "timeout_s": 5,
+        "retryable_render_issue": None,
+        "max_render_reloads": 0,
     }
     assert pipeline.inputs == [landed]
     assert "no exact KiCad symbol, footprint, and STEP" in (outcome.error or "")
@@ -663,6 +747,37 @@ def test_user_hud_action_advances_or_cancels_without_attaching(
 
     assert message in outcome.skipped
     assert bool(cancel_calls) is workflow_cancelled
+
+
+def test_snapmagic_phone_verification_timeout_is_reported_as_a_resumable_blocker(
+    monkeypatch,
+    tmp_path,
+):
+    browser = _FakeBrowser()
+    _install_adapter(monkeypatch, browser, on_drive=lambda _browser: None)
+
+    def capture_user_downloads(_url, _broker, **_options):
+        return UserCaptureResult(
+            status="timed_out",
+            files=(),
+            final_url="https://www.snapeda.com/profiles/verify/",
+        )
+
+    browser.capture_user_downloads = capture_user_downloads
+    source = guided.GuidedCaptureSource(
+        lambda: (_ for _ in ()).throw(AssertionError("a provider gate must not attach")),
+        vendor="faketron",
+        download_root=tmp_path / "Downloads",
+        user_driven=True,
+    )
+    source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+
+    outcome = source.supply(_Record())
+
+    assert not outcome.error
+    assert outcome.blocked is True
+    assert "one-time phone verification" in outcome.skipped
+    assert "embedded provider tab" in outcome.skipped
 
 
 def test_selected_files_survive_a_browser_failure_and_keep_the_exact_route_binding(
@@ -716,6 +831,7 @@ def test_selected_files_survive_a_browser_failure_and_keep_the_exact_route_bindi
     assert observed["receipt"].transport == "manual-file-picker"
     assert observed["receipt"].evidence_provider_key == "faketron"
     assert observed["options"]["evidence_provider_key"] == "faketron"
+    assert observed["options"]["manual_identity_paths"] == (observed["receipt"].path,)
     assert intent.active_route() is None
 
 
@@ -1027,7 +1143,7 @@ def test_a_refused_sign_in_is_explained_in_the_part_row(monkeypatch, tmp_path):
     assert src._sign_in_error
 
     outcome = src.supply(_Record())
-    assert "did not accept the saved credentials" in (outcome.skipped or ""), outcome
+    assert "did not accept the saved credentials" in (outcome.error or ""), outcome
 
 
 def test_saved_credentials_refuses_a_half_filled_pair(monkeypatch):
@@ -1602,6 +1718,85 @@ def test_unavailable_digikey_route_does_not_skip_the_next_author(
     assert all(row.attempted for row in outcome.provider_outcomes)
 
 
+def test_user_driven_try_another_advances_to_the_next_digikey_author(
+    monkeypatch,
+    tmp_path,
+):
+    def make_capability(label: str) -> VendorCapability:
+        return VendorCapability(
+            key="digikey",
+            label=label,
+            tools=("kicad", "altium"),
+            formats_exclusive=True,
+            aggregator=True,
+            needs_login=True,
+            instruction="",
+            machine_format_labels={
+                "kicad": "KiCad v6+",
+                "model": "STEP",
+                "altium": "Altium Designer",
+            },
+            browser_access="user_driven",
+        )
+
+    routes = tuple(
+        type(
+            "_Route",
+            (),
+            {
+                "capability": make_capability(label),
+                "evidence_provider_key": author,
+            },
+        )()
+        for label, author in (
+            ("DigiKey · Ultra Librarian", "digikey-ultralibrarian"),
+            ("DigiKey · SnapMagic", "digikey-snapmagic"),
+        )
+    )
+
+    class _DigiKey:
+        capability = make_capability("DigiKey CAD Models")
+        evidence_provider_key = "digikey-ultralibrarian"
+
+        def resolve_url(self, mpn):
+            return f"https://www.digikey.com/en/products/result?keywords={mpn}"
+
+        def capture_routes(self):
+            return routes
+
+    monkeypatch.setattr(guided, "get_adapter", lambda _key: _DigiKey())
+    source = guided.GuidedCaptureSource(
+        lambda: None,
+        vendor="digikey",
+        download_root=tmp_path / "Downloads",
+        user_driven=True,
+        collect_variants=True,
+    )
+    source._session = guided._Session(
+        browser=_FakeBrowser(),
+        ctx_manager=None,
+        page=_FakePage(),
+    )
+    attempted: list[str] = []
+
+    def capture_route(_record, _session, route, *_args):
+        attempted.append(route.evidence_provider_key)
+        if route is routes[0]:
+            return SourceOutcome(skipped="left for another provider", blocked=False)
+        return SourceOutcome(retained=5, skipped="retained complete SnapMagic set")
+
+    source._supply_user_driven_route = capture_route
+
+    outcome = source.supply(_Record())
+
+    assert attempted == ["digikey-ultralibrarian", "digikey-snapmagic"]
+    assert [row.status for row in outcome.provider_outcomes] == [
+        "unavailable",
+        "succeeded-retained",
+    ]
+    assert all(row.attempted for row in outcome.provider_outcomes)
+
+
 def test_close_after_supply_releases_the_provider_before_control_returns(
     monkeypatch,
     tmp_path,
@@ -1787,6 +1982,48 @@ def test_digikey_transient_download_failure_reopens_and_retries_exact_format(tmp
     assert attempts == ["kicad", "kicad"]
     assert report.selected == ["kicad"]
     assert report.submitted is True
+
+
+def test_cad_exports_that_bundle_step_skip_the_duplicate_model_pass(tmp_path):
+    browser = _FakeBrowser()
+    drives: list[str] = []
+
+    class _BundledStep:
+        capability = VendorCapability(
+            key="digikey",
+            label="DigiKey · Ultra Librarian",
+            tools=("kicad", "altium"),
+            formats_exclusive=True,
+            aggregator=True,
+            needs_login=True,
+            instruction="",
+            machine_format_labels={
+                "kicad": "KiCad v6+",
+                "model": "STEP",
+                "altium": "PCAD v15",
+            },
+            browser_access="machine_allowed",
+            bundles_model_with_cad=True,
+        )
+
+        def drive(self, _page, formats):
+            fmt = formats[0]
+            drives.append(fmt)
+            browser.captured.append(_CapturedFile(tmp_path / f"{fmt}.zip"))
+            return DriveReport(selected=[fmt], submitted=True)
+
+    report, failure = guided.drive_formats(
+        browser,
+        _FakePage(),
+        _BundledStep(),
+        ["kicad", "model", "altium"],
+        "https://www.digikey.com/en/models/1?tab=ultralibrarian",
+    )
+
+    assert failure is None
+    assert drives == ["kicad", "altium"]
+    assert report.selected == ["kicad", "altium"]
+    assert len(browser.captured) == 2
 
 
 def test_exclusive_drive_waits_for_the_reported_download_count(tmp_path):

@@ -43,9 +43,14 @@ internal sealed class WebViewWindowHost : IDisposable
     private readonly Window _window;
     private readonly WebView2 _webView;
     private readonly Grid _root;
+    private readonly Grid _providerHeader;
     private readonly Grid _providerSurface;
     private readonly Grid _providerContent;
-    private readonly HashSet<WebView2> _providerPopups = [];
+    private readonly Button _providerTabButton;
+    private readonly Button _providerBackButton;
+    private readonly Button _providerForwardButton;
+    private readonly Dictionary<WebView2, ProviderLeaseIdentity> _providerPopups = [];
+    private readonly ProviderLeaseJournal _providerLeases = new();
     private readonly TaskCompletionSource<bool> _navigationCompletion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly string _probeNonce;
@@ -88,10 +93,23 @@ internal sealed class WebViewWindowHost : IDisposable
             CreationProperties = new CoreWebView2CreationProperties(),
         };
         _root = new Grid();
+        _root.RowDefinitions.Add(
+            new RowDefinition { Height = GridLength.Auto });
+        _root.RowDefinitions.Add(
+            new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        Grid.SetRow(_webView, 1);
         _root.Children.Add(_webView);
-        _providerSurface = BuildProviderSurface(
-            HideProviderBrowser,
-            out _providerContent);
+        _providerHeader = BuildProviderHeader(
+            out var stockroomTab,
+            out _providerTabButton,
+            out _providerBackButton,
+            out _providerForwardButton);
+        stockroomTab.Click += (_, _) => HideProviderBrowser();
+        _providerTabButton.Click += (_, _) => ShowActiveProviderBrowser();
+        Grid.SetRow(_providerHeader, 0);
+        _root.Children.Add(_providerHeader);
+        _providerSurface = BuildProviderSurface(out _providerContent);
+        Grid.SetRow(_providerSurface, 1);
         _root.Children.Add(_providerSurface);
         _window = new Window
         {
@@ -308,16 +326,73 @@ internal sealed class WebViewWindowHost : IDisposable
             });
     }
 
-    internal void ShowProviderBrowser()
+    internal IReadOnlyDictionary<string, object?> BeginProviderLease(string leaseId)
+    {
+        return InvokeOnDispatcher(
+            async () =>
+            {
+                ThrowIfNotReady();
+                await EnsureProviderBrowserReadyAsync().ConfigureAwait(true);
+                var lease = _providerLeases.Begin(leaseId);
+                return new Dictionary<string, object?>
+                {
+                    ["lease_id"] = lease.LeaseId,
+                    ["generation"] = lease.Generation,
+                    ["port"] = _providerCdpPort,
+                };
+            });
+    }
+
+    internal bool ReleaseProviderLease(string leaseId, long generation)
+    {
+        return InvokeOnDispatcher(
+            () =>
+            {
+                ThrowIfNotReady();
+                var lease = new ProviderLeaseIdentity(leaseId, generation);
+                if (!_providerLeases.Release(lease))
+                {
+                    return false;
+                }
+                foreach (var popup in _providerPopups
+                    .Where(item => item.Value == lease)
+                    .Select(static item => item.Key)
+                    .ToArray())
+                {
+                    RemoveProviderPopup(popup);
+                }
+                _providerHeader.Visibility = Visibility.Collapsed;
+                _providerSurface.Visibility = Visibility.Collapsed;
+                _webView.Visibility = Visibility.Visible;
+                _webView.Focus();
+                return true;
+            });
+    }
+
+    internal IReadOnlyList<ProviderDownloadEvent> ProviderDownloadEvents(
+        string leaseId,
+        long generation,
+        long afterSequence)
+    {
+        return _providerLeases.After(
+            new ProviderLeaseIdentity(leaseId, generation),
+            afterSequence);
+    }
+
+    internal void ShowProviderBrowser(string leaseId, long generation)
     {
         InvokeOnDispatcher(
             async () =>
             {
                 ThrowIfNotReady();
+                _providerLeases.RequireActive(
+                    new ProviderLeaseIdentity(leaseId, generation));
                 await EnsureProviderBrowserReadyAsync()
                     .ConfigureAwait(true);
+                _providerHeader.Visibility = Visibility.Visible;
                 _webView.Visibility = Visibility.Collapsed;
                 _providerSurface.Visibility = Visibility.Visible;
+                UpdateProviderNavigationButtons();
                 _providerWebView?.Focus();
                 return true;
             });
@@ -332,6 +407,155 @@ internal sealed class WebViewWindowHost : IDisposable
                 _providerSurface.Visibility = Visibility.Collapsed;
                 _webView.Visibility = Visibility.Visible;
                 _webView.Focus();
+            });
+    }
+
+    internal void HideProviderBrowser(string leaseId, long generation)
+    {
+        InvokeOnDispatcher(
+            () =>
+            {
+                ThrowIfNotReady();
+                _providerLeases.RequireActive(
+                    new ProviderLeaseIdentity(leaseId, generation));
+                _providerSurface.Visibility = Visibility.Collapsed;
+                _webView.Visibility = Visibility.Visible;
+                _webView.Focus();
+            });
+    }
+
+    private void ShowActiveProviderBrowser()
+    {
+        if (!_providerLeases.TryGetActive(out _))
+        {
+            return;
+        }
+
+        _webView.Visibility = Visibility.Collapsed;
+        _providerSurface.Visibility = Visibility.Visible;
+        UpdateProviderNavigationButtons();
+        ActiveProviderWebView()?.Focus();
+    }
+
+    internal string ProviderCurrentUrl(string leaseId, long generation)
+    {
+        return InvokeOnDispatcher(
+            async () =>
+            {
+                ThrowIfNotReady();
+                _providerLeases.RequireActive(
+                    new ProviderLeaseIdentity(leaseId, generation));
+                await EnsureProviderBrowserReadyAsync().ConfigureAwait(true);
+                return _providerWebView?.Source?.AbsoluteUri ?? string.Empty;
+            });
+    }
+
+    internal void NavigateProviderBrowser(string leaseId, long generation, string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var destination)
+            || destination.Scheme is not ("http" or "https"))
+        {
+            throw new WindowHostException("provider URL is invalid");
+        }
+        InvokeOnDispatcher(
+            async () =>
+            {
+                ThrowIfNotReady();
+                _providerLeases.RequireActive(
+                    new ProviderLeaseIdentity(leaseId, generation));
+                await EnsureProviderBrowserReadyAsync().ConfigureAwait(true);
+                _providerWebView!.CoreWebView2.Navigate(destination.AbsoluteUri);
+                return true;
+            });
+    }
+
+    internal IReadOnlyDictionary<string, object?> ProviderDocumentState(
+        string leaseId,
+        long generation,
+        IReadOnlyList<string> readySelectors,
+        IReadOnlyList<string> readyTexts)
+    {
+        ArgumentNullException.ThrowIfNull(readySelectors);
+        ArgumentNullException.ThrowIfNull(readyTexts);
+        return InvokeOnDispatcher(
+            async () =>
+            {
+                ThrowIfNotReady();
+                _providerLeases.RequireActive(
+                    new ProviderLeaseIdentity(leaseId, generation));
+                await EnsureProviderBrowserReadyAsync().ConfigureAwait(true);
+                var selectors = JsonSerializer.Serialize(readySelectors);
+                var texts = JsonSerializer.Serialize(
+                    readyTexts.Select(static value => value.ToLowerInvariant()));
+                var script = $$"""
+                    (() => {
+                      const title = String(document.title || "").toLowerCase();
+                      const body = String(document.body?.innerText || "").toLowerCase();
+                      const selectors = {{selectors}};
+                      const readyTexts = {{texts}};
+                      const isVisible = (element) => {
+                        if (!element) return false;
+                        const style = window.getComputedStyle(element);
+                        const rect = element.getBoundingClientRect();
+                        return style.display !== "none" && style.visibility !== "hidden"
+                          && Number(style.opacity || "1") > 0 && rect.width > 4 && rect.height > 4;
+                      };
+                      const challengeFrame = Array.from(document.querySelectorAll(
+                        'iframe[src*="challenges.cloudflare.com"], iframe[title*="challenge" i]'
+                      )).some(isVisible);
+                      const accountVerification = [
+                        "verify your phone number",
+                        "phone verification is required",
+                      ].some((value) => title.includes(value) || body.includes(value));
+                      const providerError = [
+                        "oh snap! we've experienced an error",
+                        "oh snap! we’ve experienced an error",
+                      ].some((value) => title.includes(value) || body.includes(value));
+                      const challengeText = [
+                        "verify you are human",
+                        "verifying you are human",
+                        "performing security verification",
+                        "checking your browser",
+                        "security verification",
+                      ].some((value) => title.includes(value) || body.includes(value));
+                      const selectorReady = selectors.some((selector) => {
+                        try { return Array.from(document.querySelectorAll(selector)).some(isVisible); }
+                        catch (_) { return false; }
+                      });
+                      const textReady = readyTexts.some((value) => body.includes(value));
+                      return {
+                        ready: document.readyState === "interactive" || document.readyState === "complete",
+                        challenge: challengeFrame || accountVerification
+                          || (challengeText && !(selectorReady || textReady)),
+                        account_verification: accountVerification,
+                        provider_error: providerError,
+                        provider_ready: selectors.length === 0 && readyTexts.length === 0
+                          ? true
+                          : selectorReady || textReady,
+                      };
+                    })()
+                    """;
+                var encoded = await _providerWebView!.CoreWebView2
+                    .ExecuteScriptAsync(script)
+                    .ConfigureAwait(true);
+                using var document = JsonDocument.Parse(encoded);
+                var root = document.RootElement;
+                HandoffCodec.RequireExactObject(
+                    root,
+                    "provider document state",
+                    "ready",
+                    "challenge",
+                    "account_verification",
+                    "provider_error",
+                    "provider_ready");
+                return new Dictionary<string, object?>
+                {
+                    ["ready"] = root.GetProperty("ready").GetBoolean(),
+                    ["challenge"] = root.GetProperty("challenge").GetBoolean(),
+                    ["account_verification"] = root.GetProperty("account_verification").GetBoolean(),
+                    ["provider_error"] = root.GetProperty("provider_error").GetBoolean(),
+                    ["provider_ready"] = root.GetProperty("provider_ready").GetBoolean(),
+                };
             });
     }
 
@@ -543,62 +767,134 @@ internal sealed class WebViewWindowHost : IDisposable
         }
     }
 
-    private static Grid BuildProviderSurface(
-        Action hideProviderBrowser,
-        out Grid providerContent)
+    private Grid BuildProviderHeader(
+        out Button stockroomTab,
+        out Button providerTab,
+        out Button backButton,
+        out Button forwardButton)
+    {
+        var header = new Grid
+        {
+            Height = 44,
+            Margin = new Thickness(24, 0, 24, 0),
+            Background = new SolidColorBrush(Color.FromRgb(17, 21, 29)),
+            Visibility = Visibility.Collapsed,
+        };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        stockroomTab = ProviderHeaderButton("Stockroom");
+        providerTab = ProviderHeaderButton("Provider");
+        backButton = ProviderHeaderButton("Back");
+        backButton.IsEnabled = false;
+        backButton.Click += (_, _) => NavigateProviderHistory(back: true);
+        forwardButton = ProviderHeaderButton("Forward");
+        forwardButton.IsEnabled = false;
+        forwardButton.Click += (_, _) => NavigateProviderHistory(back: false);
+        var guidance = new TextBlock
+        {
+            Text = "Capturing KiCad + Altium + STEP automatically · only complete sign-in or security if asked",
+            Foreground = new SolidColorBrush(Color.FromRgb(132, 145, 162)),
+            FontFamily = new FontFamily("Segoe UI"),
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(12, 0, 14, 0),
+        };
+        Grid.SetColumn(stockroomTab, 0);
+        Grid.SetColumn(providerTab, 1);
+        Grid.SetColumn(backButton, 2);
+        Grid.SetColumn(forwardButton, 3);
+        Grid.SetColumn(guidance, 4);
+        header.Children.Add(stockroomTab);
+        header.Children.Add(providerTab);
+        header.Children.Add(backButton);
+        header.Children.Add(forwardButton);
+        header.Children.Add(guidance);
+        return header;
+    }
+
+    private static Grid BuildProviderSurface(out Grid providerContent)
     {
         var surface = new Grid
         {
-            Background = new SolidColorBrush(Color.FromArgb(224, 9, 12, 18)),
+            Margin = new Thickness(24, 0, 24, 24),
+            Background = new SolidColorBrush(Color.FromRgb(17, 21, 29)),
             Visibility = Visibility.Collapsed,
         };
-        var panel = new Grid
+        providerContent = new Grid();
+        surface.Children.Add(providerContent);
+        return surface;
+    }
+
+    private static Button ProviderHeaderButton(string label)
+    {
+        var idleForeground = new SolidColorBrush(Color.FromRgb(205, 214, 225));
+        var idleBackground = new SolidColorBrush(Color.FromRgb(27, 33, 44));
+        var hoverForeground = new SolidColorBrush(Color.FromRgb(17, 21, 29));
+        var hoverBackground = new SolidColorBrush(Color.FromRgb(205, 214, 225));
+        var button = new Button
         {
-            Margin = new Thickness(24),
-            Background = new SolidColorBrush(Color.FromRgb(17, 21, 29)),
-        };
-        panel.RowDefinitions.Add(
-            new RowDefinition { Height = new GridLength(44) });
-        panel.RowDefinitions.Add(
-            new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var header = new Grid();
-        header.ColumnDefinitions.Add(
-            new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        header.ColumnDefinitions.Add(
-            new ColumnDefinition { Width = GridLength.Auto });
-        var title = new TextBlock
-        {
-            Text = "STOCKROOM  /  PROVIDER BROWSER",
-            Foreground = new SolidColorBrush(Color.FromRgb(205, 214, 225)),
-            FontFamily = new FontFamily("Segoe UI Semibold"),
-            FontSize = 12,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(16, 0, 0, 0),
-        };
-        var close = new Button
-        {
-            Content = "Return To Stockroom",
-            Foreground = new SolidColorBrush(Color.FromRgb(205, 214, 225)),
-            Background = new SolidColorBrush(Color.FromRgb(27, 33, 44)),
+            Content = label,
+            Foreground = idleForeground,
+            Background = idleBackground,
             BorderBrush = new SolidColorBrush(Color.FromRgb(55, 65, 81)),
             FontFamily = new FontFamily("Segoe UI Semibold"),
             FontSize = 11,
             Padding = new Thickness(10, 4, 10, 4),
-            Margin = new Thickness(0, 7, 10, 7),
+            Margin = new Thickness(8, 7, 0, 7),
             VerticalAlignment = VerticalAlignment.Center,
         };
-        close.Click += (_, _) => hideProviderBrowser();
-        Grid.SetColumn(title, 0);
-        Grid.SetColumn(close, 1);
-        header.Children.Add(title);
-        header.Children.Add(close);
-        Grid.SetRow(header, 0);
-        panel.Children.Add(header);
-        providerContent = new Grid();
-        Grid.SetRow(providerContent, 1);
-        panel.Children.Add(providerContent);
-        surface.Children.Add(panel);
-        return surface;
+        // Windows' default Button visual state paints a light hover surface. Keep the label
+        // readable instead of letting the inherited dark foreground disappear under the cursor.
+        button.MouseEnter += (_, _) =>
+        {
+            button.Foreground = hoverForeground;
+            button.Background = hoverBackground;
+        };
+        button.MouseLeave += (_, _) =>
+        {
+            button.Foreground = idleForeground;
+            button.Background = idleBackground;
+        };
+        return button;
+    }
+
+    private WebView2? ActiveProviderWebView()
+    {
+        return _providerContent.Children
+            .OfType<WebView2>()
+            .Reverse()
+            .FirstOrDefault(view =>
+                view.Visibility == Visibility.Visible
+                && view.CoreWebView2 is not null);
+    }
+
+    private void NavigateProviderHistory(bool back)
+    {
+        var core = ActiveProviderWebView()?.CoreWebView2;
+        if (core is null)
+        {
+            return;
+        }
+        if (back && core.CanGoBack)
+        {
+            core.GoBack();
+        }
+        else if (!back && core.CanGoForward)
+        {
+            core.GoForward();
+        }
+        UpdateProviderNavigationButtons();
+    }
+
+    private void UpdateProviderNavigationButtons()
+    {
+        var core = ActiveProviderWebView()?.CoreWebView2;
+        _providerBackButton.IsEnabled = core?.CanGoBack == true;
+        _providerForwardButton.IsEnabled = core?.CanGoForward == true;
     }
 
     private void ConfigureProviderCoreWebView(CoreWebView2 core)
@@ -616,11 +912,22 @@ internal sealed class WebViewWindowHost : IDisposable
         settings.IsWebMessageEnabled = false;
         settings.IsZoomControlEnabled = true;
         core.NavigationStarting += OnProviderNavigationStarting;
+        core.HistoryChanged += OnProviderHistoryChanged;
         core.NewWindowRequested += OnProviderNewWindowRequested;
+        core.DownloadStarting += OnProviderDownloadStarting;
+        core.IsDefaultDownloadDialogOpenChanged +=
+            OnProviderDefaultDownloadDialogOpenChanged;
         core.PermissionRequested += OnProviderPermissionRequested;
         core.BasicAuthenticationRequested +=
             OnBasicAuthenticationRequested;
         core.ProcessFailed += OnProviderProcessFailed;
+    }
+
+    private void OnProviderHistoryChanged(object? sender, object eventArguments)
+    {
+        _ = sender;
+        _ = eventArguments;
+        UpdateProviderNavigationButtons();
     }
 
     private static void OnProviderNavigationStarting(
@@ -639,7 +946,9 @@ internal sealed class WebViewWindowHost : IDisposable
     {
         eventArguments.Handled = true;
         if (!ProviderNavigationPolicy.IsAllowedTopLevel(eventArguments.Uri)
-            || _providerEnvironment is not CoreWebView2Environment environment)
+            || _providerEnvironment is not CoreWebView2Environment environment
+            || !_providerLeases.TryGetActive(out var lease)
+            || lease is null)
         {
             return;
         }
@@ -656,7 +965,7 @@ internal sealed class WebViewWindowHost : IDisposable
                 AllowDrop = false,
                 CreationProperties = new CoreWebView2CreationProperties(),
             };
-            _providerPopups.Add(popup);
+            _providerPopups.Add(popup, lease);
             _providerContent.Children.Add(popup);
             await popup.EnsureCoreWebView2Async(environment)
                 .ConfigureAwait(true);
@@ -681,10 +990,8 @@ internal sealed class WebViewWindowHost : IDisposable
     private void OnProviderPopupCloseRequested(object? sender, object eventArguments)
     {
         _ = eventArguments;
-        var popup = _providerPopups.FirstOrDefault(
-            candidate => ReferenceEquals(
-                candidate.CoreWebView2,
-                sender));
+        var popup = _providerPopups.Keys.FirstOrDefault(
+            candidate => ReferenceEquals(candidate.CoreWebView2, sender));
         if (popup is not null)
         {
             RemoveProviderPopup(popup);
@@ -705,6 +1012,133 @@ internal sealed class WebViewWindowHost : IDisposable
         _providerContent.Children.Remove(popup);
         popup.Dispose();
     }
+
+    private void OnProviderDownloadStarting(
+        object? sender,
+        CoreWebView2DownloadStartingEventArgs eventArguments)
+    {
+        eventArguments.Handled = true;
+        SuppressProviderDownloadDialogs();
+        if (!_providerLeases.TryGetActive(out var lease) || lease is null)
+        {
+            eventArguments.Cancel = true;
+            return;
+        }
+
+        var operation = eventArguments.DownloadOperation;
+        var operationId = Guid.NewGuid().ToString("D", CultureInfo.InvariantCulture);
+        RecordProviderDownload(lease, operationId, "started", operation);
+
+        var terminalRecorded = false;
+        EventHandler<object>? stateChanged = null;
+        stateChanged = (_, _) =>
+        {
+            if (operation.State is not (
+                CoreWebView2DownloadState.Completed
+                or CoreWebView2DownloadState.Interrupted))
+            {
+                return;
+            }
+            if (terminalRecorded)
+            {
+                return;
+            }
+            terminalRecorded = true;
+            operation.StateChanged -= stateChanged;
+            RecordProviderDownload(lease, operationId, "terminal", operation);
+            SuppressProviderDownloadDialogs();
+        };
+        operation.StateChanged += stateChanged;
+        if (operation.State is CoreWebView2DownloadState.Completed
+            or CoreWebView2DownloadState.Interrupted)
+        {
+            stateChanged(operation, EventArgs.Empty);
+        }
+    }
+
+    private static void OnProviderDefaultDownloadDialogOpenChanged(
+        object? sender,
+        object eventArguments)
+    {
+        _ = eventArguments;
+        if (sender is not CoreWebView2 core || !core.IsDefaultDownloadDialogOpen)
+        {
+            return;
+        }
+
+        // DownloadStarting.Handled suppresses the normal path, but Browser-domain capture can
+        // make WebView2 announce the transient GUID target a moment later. Close it on the exact
+        // state transition instead of waiting for a timer to notice an already-visible flyout.
+        core.CloseDefaultDownloadDialog();
+    }
+
+    private async void SuppressProviderDownloadDialogs()
+    {
+        // Browser-domain interception names the transient file by GUID. WebView2 can open its
+        // default tray after DownloadStarting returns, and a child provider WebView can own that
+        // tray even when the root received the event. Poll every lease-owned WebView for a short,
+        // bounded window and close only the tray; the download operation and broker remain live.
+        for (var attempt = 0; attempt < 30 && !_shuttingDown; attempt += 1)
+        {
+            foreach (var providerView in _providerContent.Children.OfType<WebView2>().ToArray())
+            {
+                if (providerView.CoreWebView2 is not CoreWebView2 core)
+                {
+                    continue;
+                }
+                try
+                {
+                    if (core.IsDefaultDownloadDialogOpen)
+                    {
+                        core.CloseDefaultDownloadDialog();
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    // This provider WebView closed between enumeration and inspection.
+                }
+            }
+            await Task.Delay(100).ConfigureAwait(true);
+        }
+    }
+
+    private void RecordProviderDownload(
+        ProviderLeaseIdentity lease,
+        string operationId,
+        string phase,
+        CoreWebView2DownloadOperation operation)
+    {
+        var resultFilePath = operation.ResultFilePath ?? string.Empty;
+        _providerLeases.Record(
+            lease,
+            operationId,
+            phase,
+            ProviderDownloadStateName(operation.State),
+            operation.Uri ?? string.Empty,
+            ProviderDownloadName.Resolve(
+                operation.ContentDisposition ?? string.Empty,
+                operation.Uri ?? string.Empty,
+                resultFilePath),
+            resultFilePath,
+            operation.MimeType ?? string.Empty,
+            operation.State == CoreWebView2DownloadState.Interrupted
+                ? operation.InterruptReason.ToString()
+                : string.Empty,
+            operation.TotalBytesToReceive is ulong totalBytes
+                && totalBytes <= long.MaxValue
+                    ? (long)totalBytes
+                    : -1,
+            checked((long)operation.BytesReceived));
+    }
+
+    private static string ProviderDownloadStateName(CoreWebView2DownloadState state) =>
+        state switch
+        {
+            CoreWebView2DownloadState.InProgress => "in_progress",
+            CoreWebView2DownloadState.Completed => "completed",
+            CoreWebView2DownloadState.Interrupted => "interrupted",
+            _ => "unknown",
+        };
 
     private static void OnProviderPermissionRequested(
         object? sender,
@@ -833,7 +1267,7 @@ internal sealed class WebViewWindowHost : IDisposable
             _providerWebView?.CoreWebView2 is CoreWebView2 current
             && ReferenceEquals(sender, current);
         belongsToProvider = belongsToProvider
-            || _providerPopups.Any(
+            || _providerPopups.Keys.Any(
                 popup => ReferenceEquals(
                     popup.CoreWebView2,
                     sender));
@@ -858,9 +1292,10 @@ internal sealed class WebViewWindowHost : IDisposable
 
     private void ResetProviderBrowser()
     {
+        _providerHeader.Visibility = Visibility.Collapsed;
         _providerSurface.Visibility = Visibility.Collapsed;
         _webView.Visibility = Visibility.Visible;
-        foreach (var popup in _providerPopups.ToArray())
+        foreach (var popup in _providerPopups.Keys.ToArray())
         {
             RemoveProviderPopup(popup);
         }

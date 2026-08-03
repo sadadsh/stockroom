@@ -13,6 +13,10 @@ The downloaded package is executable code, so recognition is deliberately narrow
 * the payload filename agrees with the requested MPN; and
 * the importer contains the measured Ultra Librarian entry point and native-output operations.
 
+Current DigiKey exports may also place one provider STEP beside the five script members while
+retaining the shared STEP at the archive root. STEP is inert CAD data, not executable provider
+code. It is accepted by type and bounded size; the reviewed script members remain digest-pinned.
+
 Only a sandbox copy is modified and executed.  The provider download remains untouched.
 """
 
@@ -74,10 +78,6 @@ def _preflight_script_archive(path: Path) -> None:
         files = [item for item in archive.infolist() if not item.is_dir()]
         if not any(PurePosixPath(item.filename).name.casefold() == _IMPORT_NAME for item in files):
             return
-        if len(files) != 6:
-            raise UltraLibrarianImportError(
-                f"the Ultra Librarian script archive has {len(files)} files; expected six"
-            )
         folded: set[str] = set()
         for item in files:
             name = item.filename
@@ -132,17 +132,30 @@ def _preflight_script_archive(path: Path) -> None:
         if (
             len(roots) != 1
             or PurePosixPath(roots[0].filename).suffix.casefold() not in {".step", ".stp"}
-            or len(altium) != 5
+            or len(altium) not in {5, 6}
         ):
             raise UltraLibrarianImportError(
-                "the Ultra Librarian script archive does not match the reviewed six-file shape"
+                "the Ultra Librarian script archive does not match the reviewed script shape"
             )
         names = {PurePosixPath(item.filename).name.casefold(): item for item in altium}
+        step_members = {
+            name for name in names if PurePosixPath(name).suffix.casefold() in {".step", ".stp"}
+        }
         if (
-            len(names) != 5
+            len(names) != len(altium)
             or not {"ul_import.pas", "ul_form.pas", "ul_form.dfm"} <= set(names)
             or sum(name.endswith(".txt") for name in names) != 1
             or sum(name.endswith(".prjscr") for name in names) != 1
+            or len(step_members) != len(altium) - 5
+            or set(names)
+            != {
+                "ul_import.pas",
+                "ul_form.pas",
+                "ul_form.dfm",
+                next(name for name in names if name.endswith(".txt")),
+                next(name for name in names if name.endswith(".prjscr")),
+                *step_members,
+            }
         ):
             raise UltraLibrarianImportError(
                 "the Ultra Librarian Altium directory has unexpected members"
@@ -186,6 +199,7 @@ class UltraLibrarianImportResult:
     pcblib: Path
     marker: Path
     workdir: Path
+    preferred_footprint: str = ""
 
     @property
     def libraries(self) -> tuple[Path, Path]:
@@ -208,9 +222,10 @@ def _convert_pcad_package(
     from stockroom.pcad import normalize as normalize_pcad
     from stockroom.pcad import parse_file
 
+    root_list = tuple(roots)
     files = [
         path
-        for root in roots
+        for root in root_list
         for path in root.rglob("*")
         if path.is_file()
     ]
@@ -225,6 +240,14 @@ def _convert_pcad_package(
             f"the download contains {len(libraries)} P-CAD libraries; expected one"
         )
     lia = libraries[0]
+    library_root = next(
+        (root for root in root_list if lia.is_relative_to(root)),
+        None,
+    )
+    if library_root is None:
+        raise UltraLibrarianImportError(
+            "the P-CAD library is not owned by one provider download"
+        )
     try:
         normalized = normalize_pcad(parse_file(lia))
     except Exception as exc:
@@ -242,7 +265,8 @@ def _convert_pcad_package(
     steps = sorted(
         (
             path
-            for path in files
+            for path in library_root.rglob("*")
+            if path.is_file()
             if path.suffix.casefold() in {".step", ".stp"}
         ),
         key=lambda path: str(path).casefold(),
@@ -278,6 +302,7 @@ def _convert_pcad_package(
         pcblib=converted.footprint_library,
         marker=marker,
         workdir=workdir,
+        preferred_footprint=normalized.default_footprint,
     )
 
 
@@ -425,12 +450,30 @@ def _recognize_package(
         for path in package_files
         if path.parent == package_root and path.suffix.casefold() in {".step", ".stp"}
     ]
-    if len(package_files) != 6 or len(root_steps) != 1:
-        raise UltraLibrarianImportError(
-            "the Ultra Librarian script package does not match the reviewed six-file shape"
-        )
     form_pas = directory / "UL_Form.pas"
     form_dfm = directory / "UL_Form.dfm"
+    directory_steps = [
+        path
+        for path in package_files
+        if path.parent == directory and path.suffix.casefold() in {".step", ".stp"}
+    ]
+    expected_files = {
+        importer,
+        project,
+        payload,
+        form_pas,
+        form_dfm,
+        *root_steps,
+        *directory_steps,
+    }
+    if (
+        len(root_steps) != 1
+        or len(directory_steps) not in {0, 1}
+        or set(package_files) != expected_files
+    ):
+        raise UltraLibrarianImportError(
+            "the Ultra Librarian script package does not match the reviewed script shape"
+        )
     if not form_pas.is_file() or not form_dfm.is_file():
         raise UltraLibrarianImportError(
             "the Ultra Librarian script package is missing its reviewed static members"
@@ -671,6 +714,7 @@ def convert_ul_altium_package(
     expected_mpn: str,
     driver: AltiumDriver | None = None,
     timeout: int = 300,
+    allow_altium: bool = True,
 ) -> UltraLibrarianImportResult | None:
     """Convert one recognized UL script package, or return ``None`` when none is present."""
 
@@ -682,6 +726,8 @@ def convert_ul_altium_package(
         raise ValueError("expected_mpn must be canonical non-empty text")
     if expected_mpn != expected_mpn.strip():
         raise ValueError("expected_mpn must not contain surrounding whitespace")
+    if type(allow_altium) is not bool:
+        raise TypeError("allow_altium must be a boolean")
 
     input_paths = [Path(path) for path in inputs]
     for path in input_paths:
@@ -715,6 +761,11 @@ def convert_ul_altium_package(
         )
         if package is None:
             return None
+        if not allow_altium:
+            raise UltraLibrarianImportError(
+                "this Ultra Librarian script package requires Altium; manual file intake "
+                "left it untouched"
+            )
         native_outputs = [
             path
             for item in unpacked
@@ -802,6 +853,7 @@ def convert_ul_altium_package(
             pcblib=package.pcblib,
             marker=marker,
             workdir=workdir,
+            preferred_footprint=package.footprint_name,
         )
         retain_workdir = True
         return result

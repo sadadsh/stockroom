@@ -54,3 +54,64 @@ def test_main_window_declares_a_minimum_size(fake_webview, monkeypatch, tmp_path
     # broken width. Asserting a range rather than an exact pair keeps this a behaviour test.
     assert 880 <= width <= 1024, f"min width {width} does not match the measured safe floor"
     assert height >= 560, f"min height {height} is below a usable sheet"
+
+
+def test_provider_navigation_is_not_mistaken_for_startup_renderer_recovery(
+    monkeypatch,
+    tmp_path,
+):
+    """After the SPA loaded, an intentional provider lease must stay off-origin."""
+
+    from stockroom.host import window as W
+
+    class Event:
+        def __init__(self):
+            self.handlers = []
+
+        def __iadd__(self, handler):
+            self.handlers.append(handler)
+            return self
+
+        def fire(self):
+            for handler in tuple(self.handlers):
+                handler()
+
+    class Window:
+        def __init__(self):
+            self.current_url = "http://127.0.0.1:1234/"
+            self.events = types.SimpleNamespace(loaded=Event())
+            self.loaded_urls = []
+
+        def get_current_url(self):
+            return self.current_url
+
+        def evaluate_js(self, _script):
+            return None
+
+        def load_url(self, url):
+            self.loaded_urls.append(url)
+
+    window = Window()
+    webview = types.ModuleType("webview")
+    webview.settings = {}
+    webview.create_window = lambda *_args, **_kwargs: window
+
+    def start(**_kwargs):
+        window.events.loaded.fire()
+        window.current_url = "https://app.ultralibrarian.com/details/fixture"
+        window.events.loaded.fire()
+
+    webview.start = start
+    monkeypatch.setitem(sys.modules, "webview", webview)
+    monkeypatch.setattr(W, "_configure_windows_process_identity", lambda: None)
+    monkeypatch.setattr(W, "_apply_window_icon", lambda _window: True)
+    monkeypatch.setattr(W, "_release_window_icons", lambda _window: None)
+    monkeypatch.setattr(
+        "stockroom.store.machine_config.config_dir",
+        lambda: tmp_path,
+        raising=False,
+    )
+
+    W.run_window("http://127.0.0.1:1234/", "token")
+
+    assert window.loaded_urls == []

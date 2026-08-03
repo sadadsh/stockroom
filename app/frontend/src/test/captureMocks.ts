@@ -104,6 +104,28 @@ export function mockCapture(
   const events = vi.spyOn(api, "workflowEvents").mockImplementation(async (batchId) => {
     const captured = runs.get(batchId);
     if (!captured) throw new Error("unknown mocked capture batch");
+    const publishedItem = (
+      captured.report as {
+        items?: Array<{
+          mpn?: string;
+          remaining?: string[];
+          completion_evidence?: unknown;
+        }>;
+      } | null
+    )?.items?.[0];
+    if (!captured.failed && publishedItem) {
+      // A completed production workflow publishes before the terminal event becomes visible.
+      // Mirror that canonical readback; the UI deliberately ignores the staging report as a
+      // completion authority. Failed workflows leave the caller's existing projection untouched.
+      vi.mocked(api.partCadSource).mockResolvedValue({
+        url: null,
+        mpn: publishedItem.mpn ?? "M",
+        vendor: null,
+        needs: publishedItem.remaining ?? [],
+        sources: [],
+        completion_evidence: publishedItem.completion_evidence ?? null,
+      } as never);
+    }
     return {
       schema_version: 1,
       batch: {

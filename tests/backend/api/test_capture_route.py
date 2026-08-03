@@ -100,7 +100,11 @@ def _patch_fixture_vendor(
         "machine_access_authorized",
         lambda key: key == "ultralibrarian",
     )
-    monkeypatch.setattr(capture_guided, "_resolved_provider_url_issue", lambda *_args: "")
+    monkeypatch.setattr(
+        capture_guided,
+        "_resolved_provider_url_issue",
+        lambda *_args, **_kwargs: "",
+    )
     real_page_identity = capture_identity.page_identity
     real_provider_url_allowed = capture_vendors._provider_url_allowed
     monkeypatch.setattr(

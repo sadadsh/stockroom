@@ -14,10 +14,10 @@
  *  a contact shadow, which is most of why the pads used to read as stickers rather than metal. */
 export const PAD_THICKNESS_MM = 0.05;
 
-/** How much of a pad's thickness sits INSIDE the board plate. Half leaves the land pattern plainly
- *  visible while making the copper read as part of the stack rather than as something resting on
- *  it; 1 would bury it completely and 0 is the sticker look the owner rejected. */
-export const PAD_EMBED_FRACTION = 0.5;
+/** A microscopic separation between independently rendered solids. Exact shared faces make the
+ *  depth buffer alternate between PCB mask and copper (z-fighting) even though the physical stack
+ *  is valid. Three microns is invisible at part scale but gives the renderer one unambiguous face. */
+export const BOARD_SURFACE_CLEARANCE_MM = 0.003;
 
 /** The most of a part's SHORT axis one silkscreen line may occupy. 0.08 keeps the outline legible
  *  without letting an accurately-drawn 0.21mm line eat 15% of a 1.4mm body. */
@@ -228,19 +228,11 @@ export function boardStack(componentBaseY: number, componentHeightMm: number): B
   // thickness inside the body - "the 3d model clips into the pads and pcb".
   const padTopY = componentBaseY;
   const padGroupY = componentBaseY - PAD_THICKNESS_MM;
-  // THE PADS ARE LAMINATED INTO THE PLATE, not laid on top of it (owner, 2026-07-26: "the 3D
-  // footprint should sit WITHIN the pcb plate, not lay on top of it"). Real copper is part of the
-  // stack, and a pad standing proud of the surface reads as a sticker.
-  //
-  // The board's top face therefore rises to the pads' MID-HEIGHT rather than their underside. Half,
-  // not all: burying them flush would make the land pattern invisible, which loses the thing the
-  // layer exists to show.
-  //
-  // CRITICALLY, the part does NOT move. `padTopY` is still exactly `componentBaseY`, so the body
-  // still rests on the pads' top face - re-sinking the body into the board is the regression
-  // `cae5a81` fixed and the owner reported as "the 3d model clips into the pads and pcb". Only the
-  // BOARD moves, and only upward.
-  const boardTopY = padGroupY + PAD_THICKNESS_MM * PAD_EMBED_FRACTION;
+  // Copper and PCB are separate meshes. Intersecting them to simulate embedded copper made their
+  // surfaces fight in the depth buffer. Keep the physical order explicit instead: PCB, a visually
+  // imperceptible depth clearance, copper, then component. The component still rests exactly on the
+  // pad tops; only the ambiguous PCB/copper boundary moves.
+  const boardTopY = padGroupY - BOARD_SURFACE_CLEARANCE_MM;
   return {
     boardThickness,
     padGroupY,

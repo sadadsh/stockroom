@@ -21,11 +21,11 @@ from stockroom.cad_materialization import materialize_pair
 from stockroom.cad_variants import (
     CadVariantDescriptor,
     list_cad_variants,
-    resolve_cad_variant,
     same_cad_evidence_set,
 )
 from stockroom.capture.evidence import exact_identity
 from stockroom.capture.runner import capture_state_root
+from stockroom.capture.verified_pair import resolve_verified_pair
 from stockroom.evidence import EvidenceStore
 from stockroom.model.part import PartRecord
 
@@ -357,19 +357,18 @@ def _activate_pair(
                 "provider download evidence set",
             )
 
-        resolved_kicad = resolve_cad_variant(
+        verified_pair = resolve_verified_pair(
             store,
             identity=identity,
-            tool="kicad",
             manifest_digest=selected_kicad.manifest_digest,
         )
-        resolved_altium = resolve_cad_variant(
-            store,
-            identity=identity,
-            tool="altium",
-            manifest_digest=selected_altium.manifest_digest,
+        materialize_pair(
+            ctx,
+            record,
+            verified_pair.kicad,
+            verified_pair.altium,
+            evidence_store=store,
         )
-        materialize_pair(ctx, record, resolved_kicad, resolved_altium)
 
 
 def cad_variants_router(require_token) -> APIRouter:

@@ -6,6 +6,7 @@ attach to an existing part (spec section 5)."""
 
 from __future__ import annotations
 
+import html
 import shutil
 import tempfile
 from collections.abc import Sequence
@@ -66,7 +67,12 @@ def _native_footprint_entry(candidate: StagingCandidate) -> str:
     """
 
     selected = candidate.chosen_footprint
-    return "" if selected is None else Footprint.load(selected).name.strip()
+    if selected is None:
+        return ""
+    # Ultra Librarian writes a literal ``+`` as ``&plus_`` in both the KiCad filename and
+    # footprint declaration, while the converted native Altium entry correctly retains ``+``.
+    # Decode that provider transport spelling before selecting among native PcbLib entries.
+    return html.unescape(Footprint.load(selected).name.strip()).replace("&plus_", "+")
 
 
 class IngestPipeline:
@@ -106,15 +112,24 @@ class IngestPipeline:
         workdir.mkdir(parents=True, exist_ok=True)
         candidates: list[StagingCandidate] = []
 
-        unpacked = unpack_inputs(list(inputs), workdir / "unpack")
-        for u in unpacked:
-            detected = detect_source(u.root)
-            prov = Provenance(
-                source=detected.vendor,
-                original_zip_sha256=u.sha256,
-            )
-            stage_dir = workdir / "stage" / u.root.name
-            candidates.extend(build_candidates(self.cli, detected, stage_dir, prov))
+        failures: list[Exception] = []
+        for index, source in enumerate(inputs):
+            try:
+                unpacked = unpack_inputs([source], workdir / "unpack" / f"Input-{index + 1}")
+                for unpacked_input in unpacked:
+                    detected = detect_source(unpacked_input.root)
+                    provenance = Provenance(
+                        source=detected.vendor,
+                        original_zip_sha256=unpacked_input.sha256,
+                    )
+                    stage_dir = workdir / "stage" / f"Input-{index + 1}"
+                    candidates.extend(
+                        build_candidates(self.cli, detected, stage_dir, provenance)
+                    )
+            except Exception as exc:  # noqa: BLE001 - one sibling must not discard the bundle
+                failures.append(exc)
+        if not candidates and failures:
+            raise failures[0]
 
         # A part often arrives split across two vendor files (symbol+footprint in
         # one, the 3D model or datasheet in another): fold the fragments into the
@@ -326,6 +341,7 @@ class IngestPipeline:
         now_iso: str,
         kicad_active_variant: CadVariantPointer,
         altium_active_variant: CadVariantPointer,
+        preferred_altium_footprint: str = "",
     ) -> PartRecord:
         """Materialize one cross-EDA-proved KiCad/Altium pair in one Git transaction."""
 
@@ -342,7 +358,14 @@ class IngestPipeline:
             )
         with Transaction(self.repo) as txn:
             record = self.ops.load_record(part_id)
-            native_footprint_entry = _native_footprint_entry(candidate)
+            # The converted native library is authoritative for its own entry names. A
+            # provider's KiCad and P-CAD exports can use different logical package labels even
+            # though cross-EDA geometry has proved they are the same footprint. Prefer the
+            # converter's declared native default when available; only use the KiCad payload
+            # name for providers whose native library does not declare one.
+            native_footprint_entry = (
+                preferred_altium_footprint.strip() or _native_footprint_entry(candidate)
+            )
             current_symbol = record.assets_for("kicad").symbol
             entry_name = candidate.entry_name or (
                 current_symbol.name if current_symbol is not None else ""

@@ -6,7 +6,10 @@ import pytest
 
 from stockroom.capture.browser import PlaywrightCaptureBrowser, chromium_unavailable_reason
 from stockroom.capture.guided import drive_formats
-from stockroom.capture.vendors import DigiKeyUltraLibrarianAdapter
+from stockroom.capture.vendors import (
+    DigiKeySnapMagicRouteAdapter,
+    DigiKeyUltraLibrarianAdapter,
+)
 
 _MODELS_HTML = """
 <!doctype html>
@@ -35,8 +38,8 @@ _MODELS_HTML = """
       <input id="ul-kicad" type="radio" name="ultra-format-selection">
       <label for="ul-kicad" data-original="KiCAD v6+">KiCAD v6+</label>
       <input id="ul-altium" type="radio" name="ultra-format-selection">
-      <label for="ul-altium" data-original="Altium Designer (script based)">
-        Altium Designer (script based)
+      <label for="ul-altium" data-original="PCAD v15">
+        PCAD v15
       </label>
       <input id="ul-step" type="radio" name="ultra-format-selection-3d">
       <label for="ul-step" data-original="STEP">STEP</label>
@@ -65,8 +68,50 @@ _EXTERNAL_SNAP_HTML = """
 <html>
   <body>
     <section id="snap-media-active">
-      <a href="https://www.snapmagic.com/parts/example/view-part/">View on SnapMagic</a>
+      <a target="_blank" href="https://www.snapeda.com/parts/5212034-1/TE%20Connectivity%20AMP%20Connectors/view-part/">View on SnapMagic</a>
     </section>
+  </body>
+</html>
+"""
+
+_DIRECT_SNAP_FORMATS_HTML = """
+<!doctype html>
+<html>
+  <body>
+    <a name="download-modal" href="#formats">Download Symbol and Footprint</a>
+    <div id="formats">
+      <a data-format="kicad_options" href="#kicad">KiCad</a>
+      <a data-format="kicad_modv6" href="#done-kicad">KiCad V6 &amp; Later</a>
+      <a data-format="step_model" href="#done-step">STEP model</a>
+      <a data-format="altium_native" href="#done-altium">Altium native</a>
+    </div>
+  </body>
+</html>
+"""
+
+_BLANK_OPEN_SNAP_HTML = """
+<!doctype html>
+<html>
+  <body>
+    <section id="snap-media-active">
+      <button onclick="document.getElementById('snapeda-export-options').hidden=false">
+        Select Download Format
+      </button>
+    </section>
+    <div id="snapeda-export-options" style="min-width: 320px; min-height: 240px"></div>
+  </body>
+</html>
+"""
+
+_STALLED_SNAP_SKELETON_HTML = """
+<!doctype html>
+<html>
+  <body>
+    <section id="snap-media-active" class="load-content active">
+      <span>SnapMagic</span>
+    </section>
+    <div id="snap-container-content" hidden></div>
+    <div id="snap-model-skeleton" style="min-width: 320px; min-height: 240px"></div>
   </body>
 </html>
 """
@@ -303,6 +348,76 @@ def test_digikey_embedded_routes_select_only_their_own_measured_controls(tmp_pat
                 checked.nth(index).get_attribute("name")
                 for index in range(checked.count())
             } == expected_names
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_snapmagic_operator_uses_embedded_formats_before_external_fallback(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    surface._exact_product_url = (
+        "https://www.digikey.com/en/products/detail/texas-instruments/"
+        "TPD6E05U06RVZR/4307639"
+    )
+    snap = surface.capture_routes()[1]
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+
+    with browser.session() as page:
+        page.route(
+            "https://www.digikey.com/en/models/4307639",
+            lambda route: route.fulfill(status=200, content_type="text/html", body=_MODELS_HTML),
+        )
+        page.goto("https://www.digikey.com/en/models/4307639")
+        reports = snap.operate_in_user_window(
+            page,
+            ["kicad", "model", "altium"],
+            expected_manufacturer="Texas Instruments",
+            expected_mpn="TPD6E05U06RVZR",
+        )
+
+    assert [report.selected for report in reports] == [["kicad"], ["model"], ["altium"]]
+    assert all(report.submitted for report in reports)
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_clears_its_completed_download_dialog_before_the_next_format(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    surface._exact_product_url = (
+        "https://www.digikey.com/en/products/detail/texas-instruments/"
+        "TPD6E05U06RVZR/4307639"
+    )
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+    html = _MODELS_HTML.replace(
+        "</body>",
+        """
+        <div id="model-download-modal">
+          <button onclick="this.parentElement.hidden=true">Close</button>
+        </div>
+        </body>
+        """,
+    )
+
+    with browser.session() as page:
+        page.route(
+            "https://www.digikey.com/en/models/4307639",
+            lambda route: route.fulfill(status=200, content_type="text/html", body=html),
+        )
+        page.goto("https://www.digikey.com/en/models/4307639")
+        report = surface.drive(
+            page,
+            ["altium"],
+            expected_manufacturer="Texas Instruments",
+            expected_mpn="TPD6E05U06RVZR",
+        )
+
+        assert page.locator("#model-download-modal").is_hidden()
+
+    assert report.selected == ["altium"]
+    assert report.submitted is True
 
 
 @pytest.mark.skipif(
@@ -666,7 +781,7 @@ def test_digikey_cadenas_fixture_does_not_enable_unmeasured_automation(tmp_path)
     chromium_unavailable_reason() is not None,
     reason=str(chromium_unavailable_reason()),
 )
-def test_digikey_current_external_snapmagic_row_is_not_reported_as_a_download(tmp_path):
+def test_digikey_operator_drive_follows_the_exact_external_snapmagic_route(tmp_path):
     surface = DigiKeyUltraLibrarianAdapter()
     surface._exact_product_url = (
         "https://www.digikey.com/en/products/detail/te-connectivity-amp-connectors/"
@@ -674,6 +789,10 @@ def test_digikey_current_external_snapmagic_row_is_not_reported_as_a_download(tm
     )
     snap = surface.capture_routes()[1]
     browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+    author_url = (
+        "https://www.snapeda.com/parts/5212034-1/"
+        "TE%20Connectivity%20AMP%20Connectors/view-part/"
+    )
 
     with browser.session() as page:
         page.route(
@@ -684,6 +803,14 @@ def test_digikey_current_external_snapmagic_row_is_not_reported_as_a_download(tm
                 body=_EXTERNAL_SNAP_HTML,
             ),
         )
+        page.route(
+            author_url,
+            lambda route: route.fulfill(
+                status=200,
+                content_type="text/html",
+                body=_DIRECT_SNAP_FORMATS_HTML,
+            ),
+        )
         page.goto("https://www.digikey.com/en/models/2038204")
         report = snap.drive(
             page,
@@ -692,10 +819,92 @@ def test_digikey_current_external_snapmagic_row_is_not_reported_as_a_download(tm
             expected_mpn="5212034-1",
         )
 
-    assert report.submitted is False
-    assert report.route_unavailable is True
-    assert report.selected == []
-    assert "external provider link" in report.message
+    assert report.submitted is True
+    assert report.route_unavailable is False
+    assert report.selected == ["kicad"]
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_external_snapmagic_route_operates_all_measured_author_formats(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    surface._exact_product_url = (
+        "https://www.digikey.com/en/products/detail/te-connectivity-amp-connectors/"
+        "5212034-1/2038204"
+    )
+    snap = surface.capture_routes()[1]
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+    author_url = (
+        "https://www.snapeda.com/parts/5212034-1/"
+        "TE%20Connectivity%20AMP%20Connectors/view-part/"
+    )
+
+    with browser.session() as page:
+        page.route(
+            "https://www.digikey.com/en/models/2038204",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="text/html",
+                body=_EXTERNAL_SNAP_HTML,
+            ),
+        )
+        page.route(
+            author_url,
+            lambda route: route.fulfill(
+                status=200,
+                content_type="text/html",
+                body=_DIRECT_SNAP_FORMATS_HTML,
+            ),
+        )
+        page.goto("https://www.digikey.com/en/models/2038204")
+        reports = snap.operate_in_user_window(
+            page,
+            ["kicad", "model", "altium"],
+            expected_manufacturer="TE Connectivity AMP Connectors",
+            expected_mpn="5212034-1",
+        )
+
+    assert [report.selected for report in reports] == [["kicad"], ["model"], ["altium"]]
+    assert all(report.submitted for report in reports)
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_snapmagic_operator_rejects_an_already_open_wrong_direct_part(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    snap = surface.capture_routes()[1]
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+    wrong_url = (
+        "https://www.snapeda.com/parts/WRONG-PART/"
+        "TE%20Connectivity%20AMP%20Connectors/view-part/"
+    )
+
+    with browser.session() as page:
+        page.route(
+            wrong_url,
+            lambda route: route.fulfill(
+                status=200,
+                content_type="text/html",
+                body=_DIRECT_SNAP_FORMATS_HTML,
+            ),
+        )
+        page.goto(wrong_url)
+        reports = snap.operate_in_user_window(
+            page,
+            ["kicad", "model", "altium"],
+            expected_manufacturer="TE Connectivity AMP Connectors",
+            expected_mpn="5212034-1",
+        )
+
+    assert len(reports) == 1
+    assert reports[0].blocked is True
+    assert reports[0].submitted is False
+    assert reports[0].selected == []
+    assert "WRONG-PART" in reports[0].message
 
 
 @pytest.mark.skipif(
@@ -759,6 +968,36 @@ def test_digikey_does_not_treat_a_fast_sibling_as_catalogue_ready(tmp_path):
             ["kicad"],
             expected_manufacturer="Texas Instruments",
             expected_mpn="TPD6E05U06RVZR",
+        )
+
+    assert report.selected == ["kicad"], report
+    assert report.submitted is True
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_catalog_authority_survives_a_lossy_product_slug(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    surface._exact_product_url = (
+        "https://www.digikey.com/en/products/detail/analog-devices-inc-maxim-integrated/"
+        "MAX17608ATC/1234567"
+    )
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+
+    with browser.session() as page:
+        page.route(
+            "https://www.digikey.com/en/models/1234567",
+            lambda route: route.fulfill(status=200, content_type="text/html", body=_MODELS_HTML),
+        )
+        page.goto("https://www.digikey.com/en/models/1234567")
+        report = surface.drive(
+            page,
+            ["kicad"],
+            expected_manufacturer="Analog Devices / Maxim Integrated",
+            expected_mpn="MAX17608ATC+",
+            catalog_identity_authorized=True,
         )
 
     assert report.selected == ["kicad"], report
@@ -852,3 +1091,47 @@ def test_digikey_requires_two_hidden_primary_route_renders_before_absence(
         )
         assert second == "DigiKey does not offer Ultra Librarian for this exact product."
         assert surface.retryable_download_issue(page) == ""
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_does_not_reload_a_healthy_unopened_format_row(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+
+    with browser.session() as page:
+        page.set_content(_MODELS_HTML)
+
+        assert surface.retryable_render_issue(page) == ""
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_reloads_only_an_open_blank_format_panel(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    route = DigiKeySnapMagicRouteAdapter(surface)
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+
+    with browser.session() as page:
+        page.set_content(_BLANK_OPEN_SNAP_HTML)
+
+        assert "without its format fragment" in route.retryable_render_issue(page)
+
+
+@pytest.mark.skipif(
+    chromium_unavailable_reason() is not None,
+    reason=str(chromium_unavailable_reason()),
+)
+def test_digikey_reloads_an_active_route_stalled_on_its_loading_skeleton(tmp_path):
+    surface = DigiKeyUltraLibrarianAdapter()
+    route = DigiKeySnapMagicRouteAdapter(surface)
+    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads", headless=True)
+
+    with browser.session() as page:
+        page.set_content(_STALLED_SNAP_SKELETON_HTML)
+
+        assert "loading skeleton" in route.retryable_render_issue(page)

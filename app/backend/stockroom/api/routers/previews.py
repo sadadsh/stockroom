@@ -196,7 +196,7 @@ def _split_lib_id(fp: str) -> tuple[str, str]:
 # Bump when the footprint render changes (layers, hidden text, ...): the SVG cache is keyed by
 # the .kicad_mod file hash, which does NOT change when the RENDER code does, so a stale blob would
 # be served forever without this token. (C1: copper-only render -> "c1".)
-_FP_RENDER_VERSION = "c4"  # C4: refit the viewBox to the drawn art, at a 2% margin.
+_FP_RENDER_VERSION = "c5"  # C5: quieter strokes and 8% preview-only framing.
 # Bump when the symbol render changes (hidden fields, ...): the cache is content-hashed on
 # the .kicad_sym, which does NOT change when the RENDER code does. (C1: hide the property
 # fields so the body + pins show, not a smudge of overlapping Value/Footprint/Datasheet -> "c1".)
@@ -298,11 +298,33 @@ def scalable_svg(text: str) -> str:
     return text[: match.start()] + stripped + text[match.end() :]
 
 
+def quiet_footprint_strokes(text: str, *, factor: float = 0.72) -> str:
+    """Reduce exported SVG stroke weight without changing the footprint source.
+
+    KiCad's physical line widths are correct for fabrication output, but at thumbnail scale its
+    copper/courtyard outlines can visually merge into pads. The preview is an inspection drawing,
+    so it keeps every path and fill while making only the SVG stroke paint slightly quieter.
+    """
+
+    if not 0 < factor <= 1:
+        raise ValueError("footprint stroke factor is out of range")
+
+    def scale(match: re.Match[str]) -> str:
+        value = float(match.group(1)) * factor
+        return f"stroke-width:{value:.6f}"
+
+    return re.sub(r"stroke-width:\s*([\d.]+)", scale, text)
+
+
 # Fraction of the drawn content's larger dimension left as breathing room around a refit
 # viewBox, so the art does not touch the tile edge. Small on purpose: the whole point is to
 # fill the tile, and a generous margin re-creates the problem being fixed. Halved from 0.04
 # after the owner said the footprint was still too small to read.
-_REFIT_MARGIN = 0.02
+_SYMBOL_REFIT_MARGIN = 0.02
+# Footprints need a little more context than schematic symbols. Copper/pad geometry touching the
+# frame made compact packages feel oversized and exaggerated the apparent line weight. This is a
+# preview camera decision only; no source footprint geometry is rewritten.
+_FOOTPRINT_REFIT_MARGIN = 0.08
 
 
 def _svg_content_bbox(text: str) -> tuple[float, float, float, float] | None:
@@ -380,7 +402,7 @@ def _svg_content_bbox(text: str) -> tuple[float, float, float, float] | None:
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def refit_viewbox(text: str) -> str:
+def refit_viewbox(text: str, *, margin_ratio: float = _SYMBOL_REFIT_MARGIN) -> str:
     """Shrink the root `viewBox` to what the SVG actually draws.
 
     kicad-cli sizes a footprint's viewBox from the footprint's WHOLE extent - every layer and
@@ -412,7 +434,9 @@ def refit_viewbox(text: str) -> str:
     width, height = x1 - x0, y1 - y0
     if width <= 0 or height <= 0:
         return text
-    margin = max(width, height) * _REFIT_MARGIN
+    if not 0 <= margin_ratio <= 0.5:
+        raise ValueError("SVG refit margin ratio is out of range")
+    margin = max(width, height) * margin_ratio
     fitted = (
         f'viewBox="{x0 - margin:.6f} {y0 - margin:.6f} '
         f'{width + 2 * margin:.6f} {height + 2 * margin:.6f}"'
@@ -456,12 +480,15 @@ def _resolve_footprint_file(ctx, part_id: str):
 def previews_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/previews", dependencies=[Depends(require_token)])
 
-    def _svg_response(text: str) -> Response:
+    def _svg_response(text: str, *, margin_ratio: float = _SYMBOL_REFIT_MARGIN) -> Response:
         # every preview goes through here, so a scalable SVG cannot be applied to one kind and
         # forgotten on the other. Refit FIRST (decide what the box contains), then strip the
         # physical width/height (let that box drive the tile) - the two are complementary, and
         # scaling an oversized box only scales the empty margin with it.
-        return Response(content=scalable_svg(refit_viewbox(text)), media_type="image/svg+xml")
+        return Response(
+            content=scalable_svg(refit_viewbox(text, margin_ratio=margin_ratio)),
+            media_type="image/svg+xml",
+        )
 
     @r.get("/symbol/{part_id}.svg")
     def symbol_svg(request: Request, part_id: str, bw: bool = False, rev: str = "") -> Response:
@@ -550,7 +577,10 @@ def previews_router(require_token) -> APIRouter:
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
         if rev:
-            return _svg_response(_svg_at_rev(ctx, part_id, "fp", rev, bw))
+            return _svg_response(
+                quiet_footprint_strokes(_svg_at_rev(ctx, part_id, "fp", rev, bw)),
+                margin_ratio=_FOOTPRINT_REFIT_MARGIN,
+            )
         rec, fp_file, pretty = _resolve_footprint_file(ctx, part_id)
         variant = "_bw" if bw else ""
         # Content-address the key (like the symbol + model endpoints) so an edited
@@ -559,11 +589,17 @@ def previews_router(require_token) -> APIRouter:
         key = f"fp_{part_id}_{_FP_RENDER_VERSION}_{_hash_file(fp_file)}{variant}.svg"
         cached = _cache_dir(ctx) / key
         if cached.exists():
-            return _svg_response(cached.read_text(encoding="utf-8"))
+            return _svg_response(
+                quiet_footprint_strokes(cached.read_text(encoding="utf-8")),
+                margin_ratio=_FOOTPRINT_REFIT_MARGIN,
+            )
         with tempfile.TemporaryDirectory() as td:
             text = _clean_footprint_svg(ctx.cli, fp_file, fp_file.stem, bw, Path(td))
         cached.write_text(text, encoding="utf-8")
-        return _svg_response(text)
+        return _svg_response(
+            quiet_footprint_strokes(text),
+            margin_ratio=_FOOTPRINT_REFIT_MARGIN,
+        )
 
     @r.get("/stock/footprint.svg")
     def stock_footprint_svg(request: Request, fp: str, bw: bool = False) -> Response:
@@ -579,11 +615,17 @@ def previews_router(require_token) -> APIRouter:
         key = f"stockfp_{lib}_{name}_{_FP_RENDER_VERSION}_{_hash_file(fp_file)}{variant}.svg"
         cached = _cache_dir(ctx) / key
         if cached.exists():
-            return _svg_response(cached.read_text(encoding="utf-8"))
+            return _svg_response(
+                quiet_footprint_strokes(cached.read_text(encoding="utf-8")),
+                margin_ratio=_FOOTPRINT_REFIT_MARGIN,
+            )
         with tempfile.TemporaryDirectory() as td:
             text = _clean_footprint_svg(ctx.cli, fp_file, name, bw, Path(td))
         cached.write_text(text, encoding="utf-8")
-        return _svg_response(text)
+        return _svg_response(
+            quiet_footprint_strokes(text),
+            margin_ratio=_FOOTPRINT_REFIT_MARGIN,
+        )
 
     @r.get("/stock/model.glb")
     def stock_model_glb(request: Request, fp: str) -> Response:

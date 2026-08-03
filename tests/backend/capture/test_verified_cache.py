@@ -39,7 +39,19 @@ def _report(
     provider: str,
     roles: tuple[str, ...],
     source_manifests: tuple[str, ...] = (),
+    native_entries: bool = True,
 ) -> bytes:
+    cross_report = {
+        "valid": True,
+        "terminal_equivalence": True,
+        "pad_equivalence": True,
+        "package_equivalence": True,
+    }
+    if native_entries:
+        cross_report["altium"] = {
+            "symbol_entry": "TPS62130RGTR",
+            "footprint_entry": "TPS62130RGTR",
+        }
     return json.dumps(
         {
             "identity": {
@@ -48,6 +60,10 @@ def _report(
             },
             "operation": operation,
             "provider": provider,
+            "cross_eda": {
+                "status": "verified",
+                "report": cross_report,
+            },
             "roles": sorted(roles),
             "schema": "stockroom.cad-role-validation/1",
             "source_manifests": sorted(source_manifests),
@@ -66,6 +82,7 @@ def _bundle(
     provider: str,
     artifacts: dict[str, bytes],
     altium_source: str = "",
+    native_entries: bool = True,
 ) -> str:
     source_manifests = (altium_source,) if altium_source else ()
     operation = ALTIUM_CAD_OPERATION if "altium_symbol" in artifacts else KICAD_CAD_OPERATION
@@ -90,6 +107,7 @@ def _bundle(
             provider=provider,
             roles=roles,
             source_manifests=source_manifests,
+            native_entries=native_entries,
         ),
         source_manifests=source_manifests,
     )
@@ -117,6 +135,23 @@ def _source(store: EvidenceStore, calls: list[tuple]) -> VerifiedEvidenceSource:
                 altium.descriptor.manifest_digest,
             )
         ),
+        projection_verifier=lambda _record, _resolved: None,
+    )
+
+
+def _completion_evidence(store: EvidenceStore, record: PartRecord):
+    return record_completion_evidence(
+        store,
+        record,
+        projection_verifier=lambda _record, _resolved: None,
+    )
+
+
+def _active_pair_verified(store: EvidenceStore, record: PartRecord) -> bool:
+    return active_pair_is_verified(
+        store,
+        record,
+        projection_verifier=lambda _record, _resolved: None,
     )
 
 
@@ -165,6 +200,7 @@ def _complete_pair(
     *,
     provider: str = "ultralibrarian",
     marker: bytes = b"ul",
+    native_entries: bool = True,
 ) -> str:
     identity = exact_identity(record)
     return _bundle(
@@ -176,6 +212,7 @@ def _complete_pair(
             "altium_symbol": b"native SchLib " + marker,
             "altium_footprint": b"native PcbLib " + marker,
         },
+        native_entries=native_entries,
     )
 
 
@@ -203,6 +240,28 @@ def test_source_reverifies_and_materializes_a_complete_cross_eda_pair_first(
     assert set(outcome.satisfied) == set(Requirement)
     assert outcome.error == ""
     assert outcome.skipped == ""
+
+
+def test_source_refuses_a_proved_pair_without_native_entry_bindings(tmp_path: Path) -> None:
+    record = _record()
+    store = EvidenceStore((tmp_path / "Evidence").resolve())
+    _bundle(
+        store,
+        exact_identity(record),
+        provider="ultralibrarian",
+        artifacts={
+            **_kicad_bytes(),
+            "altium_symbol": b"native SchLib",
+            "altium_footprint": b"native PcbLib",
+        },
+        native_entries=False,
+    )
+    calls: list[tuple] = []
+
+    outcome = _source(store, calls).supply(record)
+
+    assert calls == []
+    assert "native Altium symbol entry" in outcome.error
 
 
 def test_source_never_projects_kicad_without_same_download_altium(
@@ -278,12 +337,63 @@ def test_active_pair_requires_resolvable_same_evidence_pointers(tmp_path: Path) 
     digest = _complete_pair(store, record)
     _select_pair(store, record, digest=digest)
 
-    evidence = record_completion_evidence(store, record)
+    evidence = _completion_evidence(store, record)
 
     assert evidence.state == "verified"
     assert evidence.manifest_digest == digest
     assert "reverified" in evidence.reason
-    assert active_pair_is_verified(store, record) is True
+    assert _active_pair_verified(store, record) is True
+
+
+def test_active_pair_requires_installed_projection_readback(tmp_path: Path) -> None:
+    record = _record()
+    _complete_record(record)
+    store = EvidenceStore((tmp_path / "Evidence").resolve())
+    digest = _complete_pair(store, record)
+    _select_pair(store, record, digest=digest)
+
+    def reject_projection(_record, _resolved) -> None:
+        raise ValueError("installed footprint is missing")
+
+    evidence = record_completion_evidence(
+        store,
+        record,
+        projection_verifier=reject_projection,
+    )
+
+    assert evidence.state == "unverified"
+    assert evidence.manifest_digest is None
+    assert "installed CAD projection" in evidence.reason
+    assert "ValueError" in evidence.reason
+
+
+def test_completion_forwards_the_reverified_immutable_validation_report(
+    tmp_path: Path,
+) -> None:
+    record = _record()
+    _complete_record(record)
+    store = EvidenceStore((tmp_path / "Evidence").resolve())
+    digest = _complete_pair(store, record)
+    _select_pair(store, record, digest=digest)
+    observed: dict[str, dict[str, object]] = {}
+
+    def verify(_record, _resolved, *, validation_reports=None) -> None:
+        assert validation_reports is not None
+        observed.update(validation_reports)
+
+    evidence = record_completion_evidence(
+        store,
+        record,
+        projection_verifier=verify,
+    )
+
+    assert evidence.state == "verified"
+    assert observed["kicad"] == observed["altium"]
+    cross = observed["kicad"]["cross_eda"]
+    assert isinstance(cross, dict)
+    report = cross["report"]
+    assert isinstance(report, dict)
+    assert report["altium"]["footprint_entry"] == "TPS62130RGTR"
 
 
 def test_complete_looking_assets_without_active_pointers_are_not_preserved(
@@ -294,12 +404,25 @@ def test_complete_looking_assets_without_active_pointers_are_not_preserved(
     store = EvidenceStore((tmp_path / "Evidence").resolve())
     _complete_pair(store, record)
 
-    evidence = record_completion_evidence(store, record)
+    evidence = _completion_evidence(store, record)
 
     assert evidence.state == "unverified"
     assert evidence.manifest_digest is None
     assert "pointer is absent" in evidence.reason
-    assert active_pair_is_verified(store, record) is False
+    assert _active_pair_verified(store, record) is False
+
+
+def test_active_pair_without_native_entry_bindings_is_not_verified(tmp_path: Path) -> None:
+    record = _record()
+    _complete_record(record)
+    store = EvidenceStore((tmp_path / "Evidence").resolve())
+    digest = _complete_pair(store, record, native_entries=False)
+    _select_pair(store, record, digest=digest)
+
+    evidence = _completion_evidence(store, record)
+
+    assert evidence.state == "unverified"
+    assert "cross-EDA pair could not be reverified" in evidence.reason
 
 
 def test_split_active_pointers_from_different_manifests_are_not_one_pair(
@@ -328,11 +451,11 @@ def test_split_active_pointers_from_different_manifests_are_not_one_pair(
         }
     )
 
-    evidence = record_completion_evidence(store, record)
+    evidence = _completion_evidence(store, record)
 
     assert evidence.state == "unverified"
     assert "do not share one evidence set" in evidence.reason
-    assert active_pair_is_verified(store, record) is False
+    assert _active_pair_verified(store, record) is False
 
 
 def test_tampered_active_evidence_is_not_preserved(tmp_path: Path) -> None:
@@ -345,11 +468,11 @@ def test_tampered_active_evidence_is_not_preserved(tmp_path: Path) -> None:
     symbol = store.list_role_variants(identity=identity, role="symbol")[0]
     store.object_path(symbol.artifact_digest).write_bytes(b"tampered")
 
-    evidence = record_completion_evidence(store, record)
+    evidence = _completion_evidence(store, record)
 
     assert evidence.state == "unverified"
     assert "could not be reverified" in evidence.reason
-    assert active_pair_is_verified(store, record) is False
+    assert _active_pair_verified(store, record) is False
 
 
 def test_active_pointers_cannot_verify_absent_projected_references(tmp_path: Path) -> None:
@@ -358,7 +481,7 @@ def test_active_pointers_cannot_verify_absent_projected_references(tmp_path: Pat
     digest = _complete_pair(store, record)
     _select_pair(store, record, digest=digest)
 
-    evidence = record_completion_evidence(store, record)
+    evidence = _completion_evidence(store, record)
 
     assert evidence.state == "unverified"
     assert "projected references are absent" in evidence.reason
@@ -376,7 +499,7 @@ def test_pointer_for_another_exact_identity_cannot_verify_this_record(
     _complete_record(other)
     other.cad_variants = first.cad_variants
 
-    evidence = record_completion_evidence(store, other)
+    evidence = _completion_evidence(store, other)
 
     assert evidence.state == "unverified"
     assert "could not be reverified" in evidence.reason
@@ -404,11 +527,11 @@ def test_one_owned_tool_can_be_verified_without_fabricating_a_pair(tmp_path: Pat
         }
     )
 
-    evidence = record_completion_evidence(store, record)
+    evidence = _completion_evidence(store, record)
 
     assert evidence.state == "verified"
     assert evidence.manifest_digest == digest
-    assert active_pair_is_verified(store, record) is False
+    assert _active_pair_verified(store, record) is False
 
 
 @pytest.mark.parametrize("part_class", [PartClass.PASSIVE, PartClass.VIRTUAL])
@@ -420,7 +543,7 @@ def test_classes_without_owned_cad_are_explicitly_not_required(
     record.part_class = part_class
     store = EvidenceStore((tmp_path / "Evidence").resolve())
 
-    evidence = record_completion_evidence(store, record)
+    evidence = _completion_evidence(store, record)
 
     assert evidence.state == "not-required"
     assert evidence.manifest_digest is None

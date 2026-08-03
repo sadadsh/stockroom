@@ -7,6 +7,7 @@ import {
   type CadVariantDocument,
   type CadVariantPairActivation,
 } from "./cadVariantClient";
+import { invalidatePartCadProjection } from "./partCadProjectionQueries";
 
 export const cadVariantQueryKey = (partId: string) =>
   ["cad-variants", partId] as const;
@@ -27,8 +28,7 @@ export function useActivateCadPair(partId: string) {
     onSuccess: async (document: CadVariantDocument) => {
       queryClient.setQueryData(cadVariantQueryKey(partId), document);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: cadVariantQueryKey(partId) }),
-        queryClient.invalidateQueries({ queryKey: ["part", partId] }),
+        invalidatePartCadProjection(queryClient, partId),
         queryClient.invalidateQueries({ queryKey: ["parts"] }),
       ]);
     },

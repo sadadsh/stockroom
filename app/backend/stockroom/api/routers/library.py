@@ -144,12 +144,29 @@ def _completion_evidence_store():
     return EvidenceStore((capture_state_root() / "Evidence").resolve())
 
 
-def _needs_durable_completion(record: PartRecord, *, evidence_store=None) -> bool:
+def _projection_verifier(library):
+    from stockroom.capture.projection import verify_installed_projection
+
+    return lambda record, resolved, *, validation_reports=None: verify_installed_projection(
+        library,
+        record,
+        resolved,
+        validation_reports=validation_reports,
+    )
+
+
+def _needs_durable_completion(
+    record: PartRecord,
+    *,
+    library,
+    evidence_store=None,
+) -> bool:
     from stockroom.capture.verified_cache import record_completion_evidence
 
     evidence = record_completion_evidence(
         evidence_store or _completion_evidence_store(),
         record,
+        projection_verifier=_projection_verifier(library),
     )
     return (
         bool(record.missing_fields())
@@ -178,7 +195,11 @@ def _durable_completion_records(
         if not is_valid_part_id(part_id):
             raise ApiError(409, f"Part file has an invalid identifier: {part_id!r}.")
         record = _current_completion_record(ctx, part_id)
-        if not _needs_durable_completion(record, evidence_store=evidence_store):
+        if not _needs_durable_completion(
+            record,
+            library=ctx.profile.library,
+            evidence_store=evidence_store,
+        ):
             continue
         records.append(record)
         if len(records) == limit:
@@ -284,6 +305,7 @@ def _capture_command(
 def _capture_identities(
     records: list[PartRecord],
     *,
+    library,
     mode: str,
     vendor: str | None,
     background: bool,
@@ -299,7 +321,11 @@ def _capture_identities(
                 422,
                 f"Part {record.id!r} needs an MPN before durable capture can start.",
             )
-        evidence = record_completion_evidence(evidence_store, record)
+        evidence = record_completion_evidence(
+            evidence_store,
+            record,
+            projection_verifier=_projection_verifier(library),
+        )
         identities.append(
             IntakeIdentity(
                 manufacturer=record.manufacturer,
@@ -741,6 +767,7 @@ def library_router(require_token) -> APIRouter:
         completion_evidence = record_completion_evidence(
             _completion_evidence_store(),
             record,
+            projection_verifier=_projection_verifier(ctx.profile.library),
         )
         needs = [req.value for req in completion_needs(record, completion_evidence)]
         # EVERY vendor the owner named, in their trust order, not just the one that aggregates.
@@ -1156,6 +1183,7 @@ def library_router(require_token) -> APIRouter:
             batch = coordinator.submit_batch(
                 _capture_identities(
                     selected,
+                    library=ctx.profile.library,
                     mode=mode,
                     vendor=vendor,
                     background=background,
@@ -1313,6 +1341,60 @@ def library_router(require_token) -> APIRouter:
             "queued_files": len(paths),
         }
 
+    @r.post("/parts/{part_id}/files")
+    def add_part_files(request: Request, part_id: str, body: dict | None = None) -> dict:
+        """Process user-selected CAD files without inventing a provider capture task.
+
+        The selected component is the destination. The entire selection is inspected together so
+        split symbol, footprint, model, and native Altium files can form one coherent package;
+        irrelevant siblings are reported and ignored, and the response is canonical readback of
+        what remains.
+        """
+
+        from pathlib import Path
+
+        from stockroom.ingest.manual_files import import_manual_cad_files
+
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        payload = {} if body is None else body
+        unexpected = sorted(str(key) for key in payload if key != "paths")
+        if unexpected:
+            raise ValueError("unknown file-intake fields: " + ", ".join(unexpected))
+        raw_paths = payload.get("paths")
+        if (
+            type(raw_paths) is not list
+            or not 1 <= len(raw_paths) <= 100
+            or any(type(path) is not str or not path.strip() for path in raw_paths)
+        ):
+            raise ValueError("paths must contain between 1 and 100 selected files")
+        try:
+            paths = tuple(Path(path).resolve(strict=True) for path in raw_paths)
+        except (OSError, RuntimeError) as exc:
+            raise ValueError("a selected file is no longer available") from exc
+        if any(path.is_symlink() or not path.is_file() for path in paths):
+            raise ValueError("every selected path must be a real file")
+
+        result = ctx.jobs.run_write(lambda: import_manual_cad_files(ctx, part_id, paths))
+        if result["attached"]:
+            ctx.jobs.run_write(ctx.rebuild_index)
+            ctx.jobs.run_write(ctx.auto_push)
+        if result["complete"]:
+            surface = getattr(ctx, "provider_browser_surface", None)
+            owner = getattr(surface, "__self__", surface)
+            close = getattr(owner, "close_active_provider_browser", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:
+                    # The library mutation is already durable. A stale or closing UI surface must
+                    # not turn successful file intake into a false error for the person using it.
+                    pass
+        return result
+
     @r.get("/capture/batches/{batch_id}")
     def capture_batch(request: Request, batch_id: str) -> dict:
         """Project one durable guided-capture request, its handoff guidance, and its report.
@@ -1362,6 +1444,42 @@ def library_router(require_token) -> APIRouter:
             ),
             "handoff": handoff,
             "report": report,
+        }
+
+    @r.post("/capture/batches/{batch_id}/provider/show")
+    def show_capture_provider(request: Request, batch_id: str) -> dict:
+        """Reveal the one provider route already owned by this durable capture."""
+
+        from stockroom.capture.intent import active_person_capture
+
+        if _OPAQUE_WORKFLOW_REFERENCE.fullmatch(batch_id) is None:
+            raise ApiError(400, "batch_id is not a valid opaque workflow identifier")
+        ctx = request.app.state.ctx
+        coordinator = ctx.workflow_coordinator
+        if coordinator is None:
+            raise ApiError(503, "The durable workflow coordinator is not mounted.")
+        coordinator.get_batch(batch_id)
+        items = coordinator.list_items(batch_id)
+        if len(items) != 1:
+            raise ApiError(409, "Guided capture requires one durable workflow item.")
+        item = items[0]
+        projection = _capture_item_projection(item)
+        route = active_person_capture(item.id, part_id=projection["part_id"])
+
+        surface = getattr(ctx, "provider_browser_surface", None)
+        owner = getattr(surface, "__self__", surface)
+        show = getattr(owner, "show_active_provider_browser", None)
+        if not callable(show):
+            raise ApiError(409, "This Stockroom host cannot restore the provider page.")
+        try:
+            show()
+        except Exception as exc:  # noqa: BLE001 - host errors become one actionable verdict
+            raise ApiError(409, "The active provider page could not be shown.") from exc
+        return {
+            "workflow_batch_id": batch_id,
+            "part_id": projection["part_id"],
+            "visible": True,
+            "active_route": route is not None,
         }
 
     @r.get("/capture/batches/{batch_id}/worklist")

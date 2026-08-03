@@ -189,7 +189,7 @@ def provider_family(provider_key: str) -> str:
 
 
 def cross_eda_report_is_proved(report: object) -> bool:
-    """Accept only the two strict cross-EDA report contracts Stockroom understands."""
+    """Accept only a complete, internally consistent dual-EDA readback report."""
 
     if not isinstance(report, dict):
         return False
@@ -221,6 +221,10 @@ def cross_eda_report_is_proved(report: object) -> bool:
     geometry = canonical.get("geometry")
     kicad = canonical.get("kicad")
     altium = canonical.get("altium")
+    provider_specific = canonical.get(
+        "provider_specific_pad_numbers",
+        {"kicad": [], "altium": []},
+    )
     if (
         not isinstance(terminal_map, list)
         or not terminal_map
@@ -229,6 +233,8 @@ def cross_eda_report_is_proved(report: object) -> bool:
         or geometry.get("method") != "mapped-pad-distance-and-size-signatures"
         or not isinstance(kicad, dict)
         or not isinstance(altium, dict)
+        or not isinstance(provider_specific, dict)
+        or set(provider_specific) != {"kicad", "altium"}
     ):
         return False
     physical_map = terminal_map + no_connect_pad_map
@@ -250,6 +256,20 @@ def cross_eda_report_is_proved(report: object) -> bool:
             return False
         kicad_numbers.add(kicad_number)
         altium_numbers.add(altium_number)
+    specific_numbers: dict[str, set[str]] = {}
+    for tool, mapped_numbers in (
+        ("kicad", kicad_numbers),
+        ("altium", altium_numbers),
+    ):
+        values = provider_specific.get(tool)
+        if not isinstance(values, list):
+            return False
+        validated_values = {
+            value for value in values if isinstance(value, str) and value.strip()
+        }
+        if len(validated_values) != len(values) or bool(validated_values & mapped_numbers):
+            return False
+        specific_numbers[tool] = validated_values
     counts = (
         kicad.get("pin_count"),
         kicad.get("pad_count"),
@@ -264,7 +284,8 @@ def cross_eda_report_is_proved(report: object) -> bool:
         and len(terminal_map) <= altium_pins
         and kicad_pins - len(terminal_map) <= len(no_connect_pad_map)
         and altium_pins - len(terminal_map) <= len(no_connect_pad_map)
-        and len(physical_map) <= kicad_pads == altium_pads
+        and len(physical_map) + len(specific_numbers["kicad"]) <= kicad_pads
+        and len(physical_map) + len(specific_numbers["altium"]) <= altium_pads
     )
 
 

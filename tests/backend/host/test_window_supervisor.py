@@ -289,10 +289,85 @@ class _Channel:
             return "focused", {"focused": True}
         if request.name == "provider-endpoint":
             return "provider-endpoint", {"port": 43127}
+        if request.name == "provider-lease-begin":
+            assert request.payload == {
+                "lease_id": "11111111-1111-4111-8111-111111111111"
+            }
+            return "provider-lease-begun", {
+                "lease_id": "11111111-1111-4111-8111-111111111111",
+                "generation": 7,
+                "port": 43127,
+            }
+        if request.name == "provider-download-events":
+            return "provider-download-events", {
+                "lease_id": request.payload["lease_id"],
+                "generation": request.payload["generation"],
+                "events": [
+                    {
+                        "sequence": 19,
+                        "lease_id": request.payload["lease_id"],
+                        "generation": request.payload["generation"],
+                        "operation_id": "operation-1",
+                        "phase": "terminal",
+                        "state": "completed",
+                        "uri": "https://provider.example.test/model.zip",
+                        "suggested_file_name": "model.zip",
+                        "result_file_path": r"C:\Capture\model.zip",
+                        "mime_type": "application/zip",
+                        "interrupt_reason": "",
+                        "total_bytes": 120,
+                        "bytes_received": 120,
+                    }
+                ],
+            }
+        if request.name == "provider-lease-release":
+            return "provider-lease-released", {
+                "lease_id": request.payload["lease_id"],
+                "generation": request.payload["generation"],
+                "released": True,
+            }
         if request.name == "provider-show":
+            assert request.payload == {
+                "lease_id": "11111111-1111-4111-8111-111111111111",
+                "generation": 7,
+            }
             return "provider-shown", {"visible": True}
         if request.name == "provider-hide":
+            assert request.payload == {
+                "lease_id": "11111111-1111-4111-8111-111111111111",
+                "generation": 7,
+            }
             return "provider-hidden", {"visible": False}
+        if request.name == "provider-current-url":
+            assert request.payload == {
+                "lease_id": "11111111-1111-4111-8111-111111111111",
+                "generation": 7,
+            }
+            return "provider-current-url", {"url": "https://provider.example.test/part"}
+        if request.name == "provider-navigate":
+            assert request.payload == {
+                "lease_id": "11111111-1111-4111-8111-111111111111",
+                "generation": 7,
+                "url": "https://provider.example.test/next",
+            }
+            return "provider-navigated", {"navigated": True}
+        if request.name == "provider-document-state":
+            assert request.payload == {
+                "lease_id": "11111111-1111-4111-8111-111111111111",
+                "generation": 7,
+                "ready_selectors": ["#download"],
+                "ready_texts": ["download"],
+            }
+            return (
+                "provider-document-state",
+                {
+                    "ready": True,
+                    "challenge": False,
+                    "account_verification": False,
+                    "provider_error": False,
+                    "provider_ready": True,
+                },
+            )
         if request.name == "health":
             return (
                 "health",
@@ -508,12 +583,38 @@ def test_launch_binds_exact_child_and_sends_secrets_only_in_bootstrap(
     assert client.identity.window_handle == 4500
     assert client.identity.renderer == "edgechromium"
     assert client.provider_endpoint() == "http://127.0.0.1:43127"
-    client.show_provider()
-    client.hide_provider()
-    assert [message.name for message in channel.sent[-3:]] == [
+    lease = client.begin_provider_lease("11111111-1111-4111-8111-111111111111")
+    assert lease.endpoint == "http://127.0.0.1:43127"
+    client.show_provider(lease.lease_id, lease.generation)
+    client.hide_provider(lease.lease_id, lease.generation)
+    assert client.provider_current_url(lease.lease_id, lease.generation) == (
+        "https://provider.example.test/part"
+    )
+    client.navigate_provider(
+        lease.lease_id,
+        lease.generation,
+        "https://provider.example.test/next",
+    )
+    assert client.provider_document_state(
+        lease.lease_id,
+        lease.generation,
+        ready_selectors=("#download",),
+        ready_texts=("download",),
+    )["provider_ready"] is True
+    events = client.provider_download_events(lease.lease_id, lease.generation)
+    assert events[0].operation_id == "operation-1"
+    assert events[0].result_file_path == r"C:\Capture\model.zip"
+    assert client.release_provider_lease(lease.lease_id, lease.generation) is True
+    assert [message.name for message in channel.sent[-9:]] == [
         "provider-endpoint",
+        "provider-lease-begin",
         "provider-show",
         "provider-hide",
+        "provider-current-url",
+        "provider-navigate",
+        "provider-document-state",
+        "provider-download-events",
+        "provider-lease-release",
     ]
     assert server.accepted_pids == [_CHILD_PID]
     assert channel.expected_names[0] == frozenset({"hello-hidden"})

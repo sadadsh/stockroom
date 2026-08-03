@@ -5,9 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider } from "../lib/devMode";
-import { PreviewModal, type PreviewKind } from "./PreviewModal";
-
-const available: Record<PreviewKind, boolean> = { model: true, symbol: true, footprint: true };
+import { PreviewModal } from "./PreviewModal";
 
 function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -30,7 +28,6 @@ function renderPreview() {
       open
       partId="p1"
       partName="ExamplePart"
-      available={available}
       initialKind="symbol"
       onClose={() => {}}
     />,
@@ -57,13 +54,12 @@ describe("PreviewModal - copy adoption", () => {
     expect(container.querySelector('[data-dev-id="preview.stage"]')).toHaveClass("flex-1");
   });
 
-  it("renders its tab, close and loading strings as default text with no copy wrappers outside dev mode", () => {
+  it("renders only the clicked viewer, close, and loading text outside dev mode", () => {
     vi.spyOn(api, "previewSvg").mockReturnValue(new Promise<Blob>(() => {}));
     const { container } = renderPreview();
 
-    expect(screen.getByRole("tab", { name: "3D Model" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Symbol" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Footprint" })).toBeInTheDocument();
+    expect(screen.getByText("Symbol")).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
     expect(screen.getByText("Loading preview...")).toBeInTheDocument();
 
@@ -71,20 +67,16 @@ describe("PreviewModal - copy adoption", () => {
     expect(container.querySelector("[data-copy-id]")).toBeNull();
   });
 
-  it("wraps every tab label, the Close label and the loading line with their modals.json ids in dev mode", () => {
+  it("wraps the Close label and loading line with their modals.json ids in dev mode", () => {
     vi.spyOn(api, "previewSvg").mockReturnValue(new Promise<Blob>(() => {}));
     const { container } = renderPreview();
 
     toggleDevMode();
 
-    expect(container.querySelector('[data-copy-id="modal.preview.tab-model"]')).not.toBeNull();
-    expect(container.querySelector('[data-copy-id="modal.preview.tab-symbol"]')).not.toBeNull();
-    expect(container.querySelector('[data-copy-id="modal.preview.tab-footprint"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.preview.close-btn"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.preview.loading"]')).not.toBeNull();
 
-    // The tablist + Close aria-labels resolve through useText (string form, no wrapper), so the
-    // Close button keeps its accessible name.
+    // The Close aria-label resolves through useText, so the button keeps its accessible name.
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 });

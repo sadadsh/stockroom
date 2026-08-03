@@ -32,13 +32,23 @@ function _cadSources(url: string | null) {
       ];
 }
 
-function mockSource(url: string | null = "https://app.ultralibrarian.com/x") {
+function mockSource(
+  url: string | null = "https://app.ultralibrarian.com/x",
+  overrides: Record<string, unknown> = {},
+) {
   vi.spyOn(api, "partCadSource").mockResolvedValue({
     url,
     mpn: "M",
     vendor: "Ultra Librarian",
     needs: [],
     sources: _cadSources(url),
+    completion_evidence: {
+      state: "verified",
+      manifest_digest:
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      reason: "The canonical library package was verified.",
+    },
+    ...overrides,
   } as never);
 }
 
@@ -136,6 +146,20 @@ describe("CaptureProvider store", () => {
       report: terminalCompletion({
         needed: ["kicad_symbol"],
         satisfied: ["kicad_symbol"],
+        collection_complete: false,
+        provider_outcomes: [
+          {
+            route_id: "digikey:digikey-snapmagic",
+            provider_key: "digikey",
+            author_key: "digikey-snapmagic",
+            label: "DigiKey / SnapMagic",
+            status: "requires-human",
+            attempted: true,
+            retained: 0,
+            activated: false,
+            reason: "An optional route needs a provider step.",
+          },
+        ],
         completion_evidence: {
           state: "verified",
           manifest_digest:
@@ -150,17 +174,108 @@ describe("CaptureProvider store", () => {
     });
 
     await act(async () => {
-      await result.current.start("p1", "Part One", ["kicad_symbol"]);
+      // The renderer can hold an older query projection than the write-fenced durable intake.
+      // The workflow snapshot must replace that stale caller value for progress and completion.
+      await result.current.start("p1", "Part One", []);
     });
 
     expect(result.current.active.status).toBe("done");
-    expect(result.current.active.message).toContain("KiCad, Altium, and STEP are verified");
+    expect(result.current.active.received.kicad_symbol).toBe(true);
+    expect(result.current.active.collectionComplete).toBeNull();
+    expect(result.current.active.message).toContain("verified and linked");
     expect(stream).not.toHaveBeenCalled();
     expect(readUiSession().selected_ids.workflow_batch).toBeNull();
   });
 
+  it("never treats a verified staging report as published library completion", async () => {
+    mockSource(undefined, {
+      needs: ["kicad_symbol"],
+      completion_evidence: null,
+    });
+    vi.spyOn(api, "runCapture").mockResolvedValue({
+      workflow_batch_id: "batch-publication-failed",
+      workflow_item_id: "item-publication-failed",
+      event_cursor: 0,
+    });
+    vi.spyOn(api, "workflowEvents").mockResolvedValue({
+      schema_version: 1,
+      batch: {
+        id: "batch-publication-failed",
+        kind: "guided_capture",
+        status: "failed",
+        created_at: 1,
+        updated_at: 2,
+        total_items: 1,
+        item_counts: { failed: 1 },
+        cancellation: null,
+        actions: {
+          can_pause: false,
+          can_resume: false,
+          can_retry: true,
+          can_cancel: true,
+        },
+      },
+      events: [
+        {
+          sequence: 4,
+          item_id: "item-publication-failed",
+          stage_id: null,
+          kind: "stage_failed",
+          details: { stage: "publish" },
+          created_at: 2,
+        },
+      ],
+      cursor: {
+        after_sequence: 0,
+        next_sequence: 4,
+        limit: 200,
+        has_more: false,
+      },
+    });
+    vi.spyOn(api, "captureWorkflow").mockResolvedValue({
+      workflow_batch_id: "batch-publication-failed",
+      workflow_item_id: "item-publication-failed",
+      part_id: "p1",
+      mode: "automatic",
+      vendor: "ultralibrarian",
+      background: false,
+      initial_needs: ["kicad_symbol"],
+      report: terminalCompletion({
+        status: "completed",
+        needed: ["kicad_symbol"],
+        satisfied: ["kicad_symbol"],
+        remaining: [],
+        completion_evidence: {
+          state: "verified",
+          manifest_digest:
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          reason: "The staging package was verified before publication failed.",
+        },
+      })[0].data.result,
+    } as never);
+    const { result } = renderHook(() => useCapture(), {
+      wrapper: wrap(new QueryClient()),
+    });
+
+    await act(async () => {
+      await result.current.start("p1", "Part One", ["kicad_symbol"]);
+    });
+
+    expect(result.current.active.status).toBe("error");
+    expect(result.current.active.received.kicad_symbol).not.toBe(true);
+    expect(result.current.active.completionEvidence).toBeNull();
+    expect(result.current.active.message).toContain("before the package could be verified and published");
+  });
+
   it("turns a blocked automatic handoff into an actionable partial result", async () => {
-    mockSource();
+    mockSource(undefined, {
+      needs: ["kicad_symbol"],
+      completion_evidence: {
+        state: "unverified",
+        manifest_digest: null,
+        reason: "No complete shared CAD package was verified.",
+      },
+    });
     vi.spyOn(api, "runCapture").mockResolvedValue({
       workflow_batch_id: "batch-provider-handoff",
       workflow_item_id: "item-provider-handoff",
@@ -240,6 +355,78 @@ describe("CaptureProvider store", () => {
     );
     expect(result.current.active.providerOutcomes[0]?.status).toBe("requires-human");
     expect(readUiSession().selected_ids.workflow_batch).toBeNull();
+  });
+
+  it("keeps a blocked exact provider route active and reopenable", async () => {
+    mockSource(undefined, {
+      needs: ["kicad_symbol"],
+      completion_evidence: {
+        state: "unverified",
+        manifest_digest: null,
+        reason: "No complete shared CAD package was verified.",
+      },
+    });
+    vi.spyOn(api, "runCapture").mockResolvedValue({
+      workflow_batch_id: "batch-active-handoff",
+      workflow_item_id: "item-active-handoff",
+      event_cursor: 0,
+    });
+    vi.spyOn(api, "workflowEvents").mockResolvedValue({
+      schema_version: 1,
+      batch: {
+        id: "batch-active-handoff",
+        kind: "guided_capture",
+        status: "blocked",
+        created_at: 1,
+        updated_at: 2,
+        total_items: 1,
+        item_counts: { blocked: 1 },
+        cancellation: null,
+        actions: {
+          can_pause: true,
+          can_resume: false,
+          can_retry: false,
+          can_cancel: true,
+        },
+      },
+      events: [],
+      cursor: { after_sequence: 0, next_sequence: 1, limit: 200, has_more: false },
+    });
+    vi.spyOn(api, "captureWorkflow").mockResolvedValue({
+      workflow_batch_id: "batch-active-handoff",
+      workflow_item_id: "item-active-handoff",
+      part_id: "p1",
+      mode: "finish-first",
+      vendor: "ultralibrarian",
+      background: false,
+      active_route: {
+        vendor: "ultralibrarian",
+        detail_url: "https://app.ultralibrarian.com/x",
+        route_token: "route-active-handoff",
+      },
+      initial_needs: ["kicad_symbol"],
+      report: null,
+    });
+    const showProvider = vi.spyOn(api, "showCaptureProvider").mockResolvedValue({
+      workflow_batch_id: "batch-active-handoff",
+      part_id: "p1",
+      visible: true,
+    });
+    const { result } = renderHook(() => useCapture(), {
+      wrapper: wrap(new QueryClient()),
+    });
+
+    let running!: Promise<void>;
+    act(() => {
+      running = result.current.start("p1", "Part One", ["kicad_symbol"]);
+    });
+    await waitFor(() => expect(result.current.active.status).toBe("window-open"));
+    expect(result.current.active.routeToken).toBe("route-active-handoff");
+    await act(async () => result.current.showProvider());
+    expect(showProvider).toHaveBeenCalledWith("batch-active-handoff");
+
+    act(() => result.current.reset());
+    await act(async () => running);
   });
 
   it("single-flights the same capture command and submits one idempotent durable request", async () => {
@@ -678,7 +865,10 @@ describe("CaptureProvider store", () => {
   });
 
   it("an error frame from the run surfaces as an error, never a silent done", async () => {
-    mockSource();
+    mockSource(undefined, {
+      needs: ["kicad_symbol"],
+      completion_evidence: null,
+    });
     mockCapture([
       { event: "error", data: { detail: "Ultra Librarian has no model for this part." } },
       { event: "done", data: {} },
@@ -695,7 +885,10 @@ describe("CaptureProvider store", () => {
   });
 
   it("an unchanged completion report never reports verified completion", async () => {
-    mockSource();
+    mockSource(undefined, {
+      needs: ["kicad_symbol"],
+      completion_evidence: null,
+    });
     mockCapture([
       {
         event: "result",
@@ -735,7 +928,7 @@ describe("CaptureProvider store", () => {
   });
 
   it("fails closed when empty needs and remaining arrive without completion evidence", async () => {
-    mockSource();
+    mockSource(undefined, { completion_evidence: null });
     mockCapture(terminalCompletion());
     const { result } = renderHook(() => useCapture(), {
       wrapper: wrap(new QueryClient()),
@@ -751,7 +944,13 @@ describe("CaptureProvider store", () => {
   });
 
   it("accepts verified completion only with a canonical immutable manifest digest", async () => {
-    mockSource();
+    mockSource(undefined, {
+      completion_evidence: {
+        state: "verified",
+        manifest_digest: "sha256:not-canonical",
+        reason: "The provider claimed verification.",
+      },
+    });
     mockCapture(
       terminalCompletion({
         completion_evidence: {
@@ -774,7 +973,13 @@ describe("CaptureProvider store", () => {
   });
 
   it("keeps not-required distinct from verified file completion", async () => {
-    mockSource();
+    mockSource(undefined, {
+      completion_evidence: {
+        state: "not-required",
+        manifest_digest: null,
+        reason: "This mechanical record has no EDA deliverables.",
+      },
+    });
     mockCapture(
       terminalCompletion({
         completion_evidence: {
@@ -805,7 +1010,13 @@ describe("CaptureProvider store", () => {
   });
 
   it("surfaces an explicit unverified verdict as incomplete", async () => {
-    mockSource();
+    mockSource(undefined, {
+      completion_evidence: {
+        state: "unverified",
+        manifest_digest: null,
+        reason: "The active pointers did not match the retained manifest.",
+      },
+    });
     mockCapture(
       terminalCompletion({
         completion_evidence: {
@@ -829,7 +1040,10 @@ describe("CaptureProvider store", () => {
   });
 
   it("shows non-error provider explanations before the remaining CAD gaps", async () => {
-    mockSource();
+    mockSource(undefined, {
+      needs: ["kicad_symbol"],
+      completion_evidence: null,
+    });
     mockCapture([
       {
         event: "result",

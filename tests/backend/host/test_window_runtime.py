@@ -19,6 +19,8 @@ from stockroom.host.window_runtime import (
     ReleaseWindowRuntimeError,
 )
 from stockroom.host.window_supervisor import (
+    ProviderDownloadEvent,
+    ProviderLeaseHandshake,
     WindowHostHealth,
     WindowHostIdentity,
     WindowHostLaunch,
@@ -99,11 +101,74 @@ class _Client:
         self.commands.append("provider-endpoint")
         return "http://127.0.0.1:43127"
 
-    def show_provider(self) -> None:
-        self.commands.append("provider-show")
+    def begin_provider_lease(self, lease_id: str) -> ProviderLeaseHandshake:
+        self.commands.append(f"provider-lease-begin:{lease_id}")
+        return ProviderLeaseHandshake(lease_id, 7, "http://127.0.0.1:43127")
 
-    def hide_provider(self) -> None:
-        self.commands.append("provider-hide")
+    def release_provider_lease(self, lease_id: str, generation: int) -> bool:
+        self.commands.append(f"provider-lease-release:{lease_id}:{generation}")
+        return True
+
+    def provider_download_events(
+        self,
+        lease_id: str,
+        generation: int,
+        *,
+        after_sequence: int = 0,
+    ) -> tuple[ProviderDownloadEvent, ...]:
+        self.commands.append(
+            f"provider-download-events:{lease_id}:{generation}:{after_sequence}"
+        )
+        return (
+            ProviderDownloadEvent(
+                sequence=19,
+                lease_id=lease_id,
+                generation=generation,
+                operation_id="operation-1",
+                phase="terminal",
+                state="completed",
+                uri="https://provider.example.test/model.zip",
+                suggested_file_name="model.zip",
+                result_file_path=r"C:\Capture\model.zip",
+                mime_type="application/zip",
+                interrupt_reason="",
+                total_bytes=120,
+                bytes_received=120,
+            ),
+        )
+
+    def show_provider(self, lease_id: str, generation: int) -> None:
+        self.commands.append(f"provider-show:{lease_id}:{generation}")
+
+    def hide_provider(self, lease_id: str, generation: int) -> None:
+        self.commands.append(f"provider-hide:{lease_id}:{generation}")
+
+    def provider_current_url(self, lease_id: str, generation: int) -> str:
+        self.commands.append(f"provider-current-url:{lease_id}:{generation}")
+        return "https://provider.example.test/part"
+
+    def navigate_provider(self, lease_id: str, generation: int, url: str) -> None:
+        self.commands.append(f"provider-navigate:{lease_id}:{generation}:{url}")
+
+    def provider_document_state(
+        self,
+        lease_id: str,
+        generation: int,
+        *,
+        ready_selectors: tuple[str, ...] = (),
+        ready_texts: tuple[str, ...] = (),
+    ) -> dict[str, object]:
+        self.commands.append(
+            f"provider-document-state:{lease_id}:{generation}:"
+            f"{','.join(ready_selectors)}:{','.join(ready_texts)}"
+        )
+        return {
+            "ready": True,
+            "challenge": False,
+            "account_verification": False,
+            "provider_error": False,
+            "provider_ready": True,
+        }
 
     def health(self) -> WindowHostHealth:
         return WindowHostHealth(
@@ -249,12 +314,70 @@ def test_provider_browser_surface_is_one_scoped_in_app_lease(
 
     with runtime.provider_browser_surface() as lease:
         assert lease.endpoint == "http://127.0.0.1:43127"
-        assert old.commands[-1:] == ["provider-endpoint"]
+        assert lease.lease_id == "11111111-1111-4111-8111-111111111111"
+        assert lease.generation == 7
+        assert old.commands[-1:] == [
+            "provider-lease-begin:11111111-1111-4111-8111-111111111111"
+        ]
         lease.show()
         lease.show()
-        assert old.commands[-2:] == ["provider-endpoint", "provider-show"]
+        assert old.commands[-2:] == [
+            "provider-show:11111111-1111-4111-8111-111111111111:7",
+            "provider-show:11111111-1111-4111-8111-111111111111:7",
+        ]
+        lease.hide()
+        lease.hide()
+        assert old.commands[-2:] == [
+            "provider-hide:11111111-1111-4111-8111-111111111111:7",
+            "provider-hide:11111111-1111-4111-8111-111111111111:7",
+        ]
+        lease.show()
+        assert old.commands[-1] == (
+            "provider-show:11111111-1111-4111-8111-111111111111:7"
+        )
+        assert lease.current_url() == "https://provider.example.test/part"
+        lease.navigate("https://provider.example.test/next")
+        state = lease.document_state(
+            ready_selectors=("#download",),
+            ready_texts=("download",),
+        )
+        assert state["provider_ready"] is True
+        assert lease.security_state()["challenge"] is False
+        downloads = lease.download_events(after_sequence=4)
+        assert downloads[0].result_file_path == r"C:\Capture\model.zip"
+        runtime.show_active_provider_browser()
+        assert old.commands[-1] == (
+            "provider-show:11111111-1111-4111-8111-111111111111:7"
+        )
 
-    assert old.commands[-1] == "provider-hide"
+    assert old.commands[-1] == (
+        "provider-lease-release:11111111-1111-4111-8111-111111111111:7"
+    )
+    runtime.close()
+
+
+def test_incomplete_provider_surface_can_be_retained_then_closed_after_completion(
+    tmp_path: Path,
+) -> None:
+    runtime, old, _new, _candidate = _runtime(tmp_path)
+    runtime.start_initial()
+
+    with runtime.provider_browser_surface() as lease:
+        lease.retain()
+
+    assert not any(command.startswith("provider-lease-release:") for command in old.commands)
+    runtime.show_active_provider_browser()
+    assert old.commands[-1] == (
+        "provider-show:11111111-1111-4111-8111-111111111111:7"
+    )
+
+    runtime.close_active_provider_browser()
+
+    assert old.commands[-1] == (
+        "provider-lease-release:11111111-1111-4111-8111-111111111111:7"
+    )
+    with pytest.raises(ReleaseWindowRuntimeError, match="no active lease"):
+        runtime.show_active_provider_browser()
     runtime.close()
 
 

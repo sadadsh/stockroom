@@ -4,6 +4,7 @@ StagedPart seam once the user finalizes it (spec section 5, stages 3 and 5)."""
 
 from __future__ import annotations
 
+import html
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -118,10 +119,17 @@ def _preferred_footprint_index(
     preferred = raw.replace("\\", "/").rsplit("/", 1)[-1].rsplit(":", 1)[-1]
     if not preferred:
         return 0
+    def provider_name_key(value: str) -> str:
+        # Ultra Librarian escapes a literal ``+`` as ``&plus_`` in filenames while the
+        # symbol's Footprint property retains the literal character.  Decode only that
+        # provider filename spelling; punctuation still distinguishes its M/L variants.
+        return html.unescape(value).casefold().replace("&plus_", "+")
+
+    preferred_key = provider_name_key(preferred)
     matches = [
         index
         for index, variant in enumerate(variants)
-        if variant.stem.casefold() == preferred.casefold()
+        if provider_name_key(variant.stem) == preferred_key
     ]
     return matches[0] if len(matches) == 1 else 0
 

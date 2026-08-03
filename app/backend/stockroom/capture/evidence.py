@@ -13,13 +13,15 @@ guided source may attach them.
 
 from __future__ import annotations
 
+import hashlib
 import inspect
 import json
+import re
 import tempfile
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Protocol
+from typing import Protocol, cast
 
 from stockroom.altium.extract import extract_intlib
 from stockroom.capture.cad_composition import cross_eda_report_is_proved
@@ -30,6 +32,7 @@ from stockroom.capture.cross_eda import (
 )
 from stockroom.capture.identity import (
     PageIdentity,
+    exact_catalog_observation_error,
     exact_observation_error,
     page_identity,
     select_exact_candidate,
@@ -43,8 +46,9 @@ from stockroom.planning import (
     ExactPartIdentity,
 )
 
-BROWSER_CAPTURE_ADAPTER_VERSION = "browser-guided-cad-v1"
+BROWSER_CAPTURE_ADAPTER_VERSION = "browser-guided-cad-v2"
 INSTALLED_KICAD_READBACK_ADAPTER_VERSION = "installed-kicad-readback-v1"
+_SOURCE_RECEIPT_SET_ROLE = "source_receipt_set"
 
 
 class CrossEdaVerifier(Protocol):
@@ -59,6 +63,7 @@ class CrossEdaVerifier(Protocol):
         step_model: Path,
         altium_sources: tuple[Path, ...],
         altium_identity_attestation: ExactPartIdentity | None = None,
+        altium_footprint_entry: str = "",
     ) -> object: ...
 
 
@@ -82,6 +87,97 @@ def _artifact(path: Path, role: str, media_type: str) -> EvidenceArtifact:
     if not data:
         raise ValueError(f"captured {role} is empty")
     return EvidenceArtifact(role, data, media_type, resolved.name)
+
+
+def _source_receipt_set(digests: tuple[str, ...]) -> bytes:
+    """Canonicalize the immutable provider downloads that produced one CAD set.
+
+    Native conversion outputs legitimately contain tool-generated timestamps, so their byte
+    digests can differ even when the downloaded provider ZIP is identical.  The task-bound
+    broker receipt is the stable identity for that observation and prevents repeated collection
+    from manufacturing duplicate selectable variants.
+    """
+
+    if not digests:
+        return b""
+    canonical = tuple(sorted(set(digests)))
+    if any(
+        len(digest) != 71
+        or not digest.startswith("sha256:")
+        or any(character not in "0123456789abcdef" for character in digest[7:])
+        for digest in canonical
+    ):
+        raise ValueError("browser CAD source receipt digests are not canonical")
+    return json.dumps(
+        {
+            "digests": list(canonical),
+            "schema": "stockroom.cad-source-receipts/1",
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+
+
+def _matching_receipt_manifest(
+    store: EvidenceStore,
+    *,
+    identity: ExactPartIdentity,
+    provider_key: str,
+    receipt_set: bytes,
+) -> str | None:
+    if not receipt_set:
+        return None
+    receipt_document = json.loads(receipt_set)
+    receipt_digests = receipt_document.get("digests")
+    if not isinstance(receipt_digests, list) or not receipt_digests:
+        raise ValueError("browser CAD source receipt set is incomplete")
+    receipt_roles = tuple(
+        f"source_receipt_{index}" for index in range(1, len(receipt_digests) + 1)
+    )
+    for artifact in store.list_role_variants(
+        identity=identity,
+        role=_SOURCE_RECEIPT_SET_ROLE,
+    ):
+        if (
+            artifact.provider_key != provider_key
+            or artifact.adapter_version != BROWSER_CAPTURE_ADAPTER_VERSION
+            or artifact.data != receipt_set
+        ):
+            continue
+        # Re-read the complete selectable contract before reusing it.  A receipt index is only a
+        # lookup accelerator; it is never authority for CAD completeness or cross-EDA proof.
+        verified = store.verified_role_artifacts(
+            artifact.manifest_digest,
+            identity=identity,
+            roles=(
+                "symbol",
+                "footprint",
+                "model",
+                "altium_symbol",
+                "altium_footprint",
+                "validation_report",
+                _SOURCE_RECEIPT_SET_ROLE,
+                *receipt_roles,
+            ),
+        )
+        if {
+            verified[role].artifact_digest for role in receipt_roles
+        } != set(receipt_digests):
+            continue
+        validation = store.verified_cad_validation_report(
+            artifact.manifest_digest,
+            identity=identity,
+        )
+        cross_eda = validation.get("cross_eda")
+        report = cross_eda.get("report") if isinstance(cross_eda, dict) else None
+        if (
+            isinstance(cross_eda, dict)
+            and cross_eda.get("status") == "verified"
+            and cross_eda_report_is_proved(report)
+        ):
+            return artifact.manifest_digest
+    return None
 
 
 def _altium_artifacts(paths: Iterable[Path]) -> tuple[EvidenceArtifact, ...]:
@@ -134,13 +230,28 @@ def _verify_cross_eda_with_provider_identity(
     kicad_footprint: Path,
     step_model: Path,
     altium_sources: tuple[Path, ...],
+    catalog_identity_authorized: bool = False,
+    altium_footprint_entry: str = "",
 ) -> object:
     """Call a verifier with exact provider-page identity when it supports that contract."""
 
     parameters = inspect.signature(verifier).parameters.values()
-    supports_attestation = "altium_identity_attestation" in {
-        parameter.name for parameter in parameters
-    } or any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters)
+    parameter_names = {parameter.name for parameter in parameters}
+    supports_kwargs = any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters
+    )
+    call = {
+        "identity": identity,
+        "kicad_symbol": kicad_symbol,
+        "kicad_footprint": kicad_footprint,
+        "step_model": step_model,
+        "altium_sources": altium_sources,
+    }
+    if altium_footprint_entry and (
+        "altium_footprint_entry" in parameter_names or supports_kwargs
+    ):
+        call["altium_footprint_entry"] = altium_footprint_entry
+    supports_attestation = "altium_identity_attestation" in parameter_names or supports_kwargs
     if supports_attestation:
         detail = page_identity(provider_key, detail_url)
         if detail is not None:
@@ -148,26 +259,22 @@ def _verify_cross_eda_with_provider_identity(
                 manufacturer=identity.authoritative_manufacturer_key,
                 mpn=identity.mpn_canonical,
             )
-            if not exact_observation_error(expected_record, detail):
-                attestation = ExactPartIdentity(
-                    detail.manufacturer,
-                    detail.mpn,
+            identity_issue = (
+                exact_catalog_observation_error(expected_record, detail)
+                if catalog_identity_authorized
+                else exact_observation_error(expected_record, detail)
+            )
+            if not identity_issue:
+                # A catalog-authorized URL can use a lossy carrier slug.  The catalog
+                # observation proves the canonical record identity; the lossy URL must
+                # never become the identity written into native-library attestation.
+                attestation = (
+                    identity
+                    if catalog_identity_authorized
+                    else ExactPartIdentity(detail.manufacturer, detail.mpn)
                 )
-                return verifier(
-                    identity=identity,
-                    kicad_symbol=kicad_symbol,
-                    kicad_footprint=kicad_footprint,
-                    step_model=step_model,
-                    altium_sources=altium_sources,
-                    altium_identity_attestation=attestation,
-                )
-    return verifier(
-        identity=identity,
-        kicad_symbol=kicad_symbol,
-        kicad_footprint=kicad_footprint,
-        step_model=step_model,
-        altium_sources=altium_sources,
-    )
+                call["altium_identity_attestation"] = attestation
+    return cast(Callable[..., object], verifier)(**call)
 
 
 def _bind_kicad_symbol_identity(
@@ -176,6 +283,7 @@ def _bind_kicad_symbol_identity(
     identity: ExactPartIdentity,
     provider_key: str,
     detail_url: str,
+    catalog_identity_authorized: bool = False,
 ) -> tuple[str, ...]:
     """Bind a metadata-light provider symbol to its independently verified detail page.
 
@@ -222,7 +330,16 @@ def _bind_kicad_symbol_identity(
         return ()
 
     detail = page_identity(provider_key, detail_url)
-    if detail is None or exact_observation_error(expected_record, detail):
+    detail_issue = (
+        None
+        if detail is None
+        else (
+            exact_catalog_observation_error(expected_record, detail)
+            if catalog_identity_authorized
+            else exact_observation_error(expected_record, detail)
+        )
+    )
+    if detail is None or detail_issue:
         raise CrossEdaVerificationError(
             "KiCad symbol lacks embedded identity and no exact provider detail page can bind it"
         )
@@ -437,6 +554,12 @@ def _active_kicad_pad_allowance(
         )
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("active KiCad validation report is unreadable") from exc
+    return proved_kicad_pad_allowance(validation)
+
+
+def proved_kicad_pad_allowance(validation: object) -> frozenset[str]:
+    """Return only package pads retained by one immutable proved validation report."""
+
     if not isinstance(validation, dict) or validation.get("valid") is not True:
         raise ValueError("active KiCad validation report is not a proved result")
     cross_eda = validation.get("cross_eda")
@@ -459,7 +582,7 @@ def _active_kicad_pad_allowance(
             raise ValueError("active KiCad mechanical-pad allowance is invalid")
         if len(values) != len(set(values)):
             raise ValueError("active KiCad mechanical-pad allowance contains duplicates")
-        return frozenset(values)
+        return frozenset(value for value in values if isinstance(value, str))
     return frozenset()
 
 
@@ -522,6 +645,10 @@ def record_browser_cad_evidence(
     detail_url: str,
     altium_sources: tuple[Path, ...] = (),
     cross_eda_verifier: CrossEdaVerifier | None = None,
+    source_receipt_digests: tuple[str, ...] = (),
+    source_receipts: tuple[Path, ...] = (),
+    catalog_identity_authorized: bool = False,
+    altium_footprint_entry: str = "",
 ) -> tuple[str, bool]:
     """Install and immediately verify one exact browser CAD observation.
 
@@ -529,14 +656,38 @@ def record_browser_cad_evidence(
     for both provider-runtime receipts and ``AssetOrigin.extra``.
     """
     identity = exact_identity(record)
+    receipt_set = _source_receipt_set(source_receipt_digests)
+    raw_by_digest: dict[str, Path] = {}
+    for path in (Path(item) for item in source_receipts):
+        digest = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        raw_by_digest.setdefault(digest, path)
+    raw_receipts = tuple(raw_by_digest[digest] for digest in sorted(raw_by_digest))
+    if receipt_set and not raw_receipts:
+        raise ValueError("source receipt digests require the immutable downloaded files")
+    if raw_receipts:
+        observed_receipts = _source_receipt_set(
+            tuple(sorted(raw_by_digest))
+        )
+        if receipt_set and observed_receipts != receipt_set:
+            raise ValueError("source receipt paths do not match their task-bound digests")
+        receipt_set = observed_receipts
     selection = select_exact_candidate(
         record,
         [candidate],
         vendor_key=provider_key,
         detail_url=detail_url,
+        catalog_identity_authorized=catalog_identity_authorized,
     )
     if selection.error or selection.candidate is not candidate:
         raise ValueError(selection.error or "browser CAD candidate is not exact")
+    existing_manifest = _matching_receipt_manifest(
+        store,
+        identity=identity,
+        provider_key=provider_key,
+        receipt_set=receipt_set,
+    )
+    if existing_manifest is not None:
+        return existing_manifest, True
 
     symbol = getattr(candidate, "symbol_lib_path", None)
     footprint = getattr(candidate, "chosen_footprint", None)
@@ -564,6 +715,7 @@ def record_browser_cad_evidence(
         identity=identity,
         provider_key=provider_key,
         detail_url=detail_url,
+        catalog_identity_authorized=catalog_identity_authorized,
     )
     native_altium = tuple(Path(path) for path in altium_sources)
     cross_eda_report = None
@@ -578,6 +730,8 @@ def record_browser_cad_evidence(
             kicad_footprint=Path(footprint),
             step_model=model_path,
             altium_sources=native_altium,
+            catalog_identity_authorized=catalog_identity_authorized,
+            altium_footprint_entry=altium_footprint_entry,
         )
         if not isinstance(cross_eda_report, dict) or not cross_eda_report_is_proved(
             cross_eda_report
@@ -625,6 +779,15 @@ def record_browser_cad_evidence(
         cross_eda_report=cross_eda_report,
     )
     altium_artifacts = _altium_artifacts(native_altium)
+    raw_receipt_artifacts = tuple(
+        EvidenceArtifact(
+            f"source_receipt_{index}",
+            path.read_bytes(),
+            "application/octet-stream",
+            path.name,
+        )
+        for index, path in enumerate(raw_receipts, start=1)
+    )
     artifacts = (
         _artifact(Path(symbol), "symbol", "application/vnd.kicad.symbol-library"),
         _artifact(Path(footprint), "footprint", "application/vnd.kicad.footprint"),
@@ -636,6 +799,19 @@ def record_browser_cad_evidence(
             "Validation Report.json",
         ),
         *altium_artifacts,
+        *raw_receipt_artifacts,
+        *(
+            (
+                EvidenceArtifact(
+                    _SOURCE_RECEIPT_SET_ROLE,
+                    receipt_set,
+                    "application/json",
+                    "Source Receipt Set.json",
+                ),
+            )
+            if receipt_set
+            else ()
+        ),
     )
     digest = store.record_provider_artifact_success(
         identity=identity,
@@ -654,6 +830,9 @@ def record_browser_cad_evidence(
     index_roles = ["symbol", "footprint", "model"]
     if cross_eda_report is not None:
         index_roles.extend(artifact.role for artifact in altium_artifacts)
+    if receipt_set:
+        index_roles.append(_SOURCE_RECEIPT_SET_ROLE)
+    index_roles.extend(artifact.role for artifact in raw_receipt_artifacts)
     store.index_artifact_manifest(
         digest,
         identity=identity,
@@ -667,6 +846,7 @@ __all__ = [
     "CrossEdaVerifier",
     "INSTALLED_KICAD_READBACK_ADAPTER_VERSION",
     "exact_identity",
+    "proved_kicad_pad_allowance",
     "record_browser_cad_evidence",
     "record_installed_kicad_role_evidence",
 ]

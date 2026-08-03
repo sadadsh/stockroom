@@ -620,6 +620,16 @@ def run_windowed(
             ctx.token,
             host_config,
         )  # auth + continuity from the first byte
+        if open_window is None and update_mode is HostUpdateMode.DEVELOPMENT_SOURCE:
+            # The stable launcher runs the continuously updated source host in this mode. Expose
+            # the original Stockroom WebView as the provider surface before the window starts, so
+            # Playwright can attach over a private loopback CDP port instead of opening a separate
+            # Chromium window or falling back to the person's default browser.
+            from stockroom.host.window import InAppProviderBrowserSurface
+
+            in_app_provider = InAppProviderBrowserSurface(base_url)
+            os.environ["STOCKROOM_CDP_PORT"] = str(in_app_provider.debug_port)
+            setattr(ctx, "provider_browser_surface", in_app_provider)
         if update_mode is HostUpdateMode.PRODUCTION:
             try:
                 production_update_runtime = create_production_update_runtime(
@@ -656,6 +666,13 @@ def run_windowed(
                     release_id=packaged_release_id,
                 )
             setattr(ctx, "update_convergence", production_update_runtime)
+            provider_surface = getattr(
+                production_update_runtime,
+                "provider_browser_surface",
+                None,
+            )
+            if callable(provider_surface):
+                setattr(ctx, "provider_browser_surface", provider_surface)
         # Do not expose the local ASGI app until production authority is active
         # or explicitly bound fail-closed. This removes the startup interval in
         # which mutation routes previously ran without any service fence.

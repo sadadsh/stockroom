@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from stockroom.altium.converter import CadConversionError, _artifact
+import stockroom.altium.converter as converter_module
+from stockroom.altium.converter import (
+    CadConversionError,
+    _artifact,
+    _resolve_converter_executable,
+)
 
 
 def test_artifact_requires_output_containment_size_hash_and_suffix(tmp_path: Path):
@@ -35,3 +40,36 @@ def test_converter_module_has_no_console_parsing_contract():
     # than accidentally teaching production code to scrape stdout in a future edit.
     value = json.loads('{"schema":"stockroom.cad-converter/result/1","status":"ok"}')
     assert value["schema"].endswith("/result/1")
+
+
+def test_continuous_runtime_resolves_the_machine_local_converter(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    executable = (
+        tmp_path
+        / "Stockroom"
+        / "Tools"
+        / "CadConverter"
+        / "Stockroom.CadConverter.exe"
+    )
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"MZ")
+    monkeypatch.delenv("STOCKROOM_CAD_CONVERTER", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(converter_module, "_development_converter", lambda: None)
+
+    assert _resolve_converter_executable(None) == executable
+
+
+def test_editable_checkout_prefers_its_matching_converter(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    development = tmp_path / "Development" / "Stockroom.CadConverter.exe"
+    installed = tmp_path / "Installed" / "Stockroom.CadConverter.exe"
+    monkeypatch.delenv("STOCKROOM_CAD_CONVERTER", raising=False)
+    monkeypatch.setattr(converter_module, "_development_converter", lambda: development)
+    monkeypatch.setattr(converter_module, "_installed_converter", lambda: installed)
+
+    assert _resolve_converter_executable(None) == development

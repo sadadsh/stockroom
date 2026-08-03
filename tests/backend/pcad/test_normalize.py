@@ -10,6 +10,8 @@ SYNTHETIC = """ACCEL_ASCII "fixture.lia"
   (padStyleDef "P1"
     (holeDiam 0)
     (padShape (layerNumRef 1) (padShapeType Rect) (shapeWidth 15) (shapeHeight 19))
+    (padShape (layerType Plane) (padShapeType Thrm4_45)
+      (outsideDiam 25) (insideDiam 20) (spokeWidth 5))
     (padShape (layerNumRef 2) (padShapeType Ellipse) (shapeWidth 0) (shapeHeight 0)))
   (padStyleDef "P2"
     (holeDiam 0)
@@ -106,6 +108,27 @@ def test_incomplete_pad_pin_map_fails_closed():
     source = SYNTHETIC.replace("(numPads 1)", "(numPads 2)", 1)
     with pytest.raises(PcadNormalizeError, match="padPinMap does not match"):
         normalize(parse_text(source))
+
+
+def test_unmapped_physical_thermal_via_pad_is_preserved():
+    source = SYNTHETIC.replace(
+        "      (pickpoint (pt 0 0)))",
+        '      (pad (padNum 18) (padStyleRef "P1") (pt 0 0))\n'
+        "      (pickpoint (pt 0 0)))",
+    ).replace(
+        '(multiLayer (pad (padNum 1) (padStyleRef "P2") (pt 0 0))))',
+        '(multiLayer (pad (padNum 1) (padStyleRef "P2") (pt 0 0))\n'
+        '      (pad (padNum 18) (padStyleRef "P2") (pt 0 0))))',
+    ).replace(
+        '(multiLayer (pad (padNum 1) (padStyleRef "P3") (pt 0 0))))',
+        '(multiLayer (pad (padNum 1) (padStyleRef "P3") (pt 0 0))\n'
+        '      (pad (padNum 18) (padStyleRef "P3") (pt 0 0))))',
+    )
+
+    library = normalize(parse_text(source))
+
+    assert [pad.number for pad in library.footprints[0].pads] == ["1", "18"]
+    assert library.pad_pin_map == (("1", "1"),)
 
 
 def test_real_abm13w_library_extracts_all_native_inputs_when_fixture_is_present():

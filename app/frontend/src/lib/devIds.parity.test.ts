@@ -126,9 +126,6 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "detail.model-view-front",
   // PreviewModal maps a typed tab table to data-dev-id={t.devId}; the exact strings
   // remain at the table declaration so the addressable inspection modes cannot drift.
-  "preview.tab-symbol",
-  "preview.tab-footprint",
-  "preview.tab-model",
   // three-viewport-gizmo creates its own DOM node, so threeScene attaches this id after
   // construction with setAttribute instead of emitting it through JSX.
   "detail.model-gizmo",

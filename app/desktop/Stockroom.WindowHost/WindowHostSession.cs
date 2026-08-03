@@ -20,9 +20,28 @@ internal interface IWindowHostController
 
     int ProviderCdpPort();
 
-    void ShowProviderBrowser();
+    IReadOnlyDictionary<string, object?> BeginProviderLease(string leaseId);
 
-    void HideProviderBrowser();
+    bool ReleaseProviderLease(string leaseId, long generation);
+
+    IReadOnlyList<ProviderDownloadEvent> ProviderDownloadEvents(
+        string leaseId,
+        long generation,
+        long afterSequence);
+
+    void ShowProviderBrowser(string leaseId, long generation);
+
+    void HideProviderBrowser(string leaseId, long generation);
+
+    string ProviderCurrentUrl(string leaseId, long generation);
+
+    void NavigateProviderBrowser(string leaseId, long generation, string url);
+
+    IReadOnlyDictionary<string, object?> ProviderDocumentState(
+        string leaseId,
+        long generation,
+        IReadOnlyList<string> readySelectors,
+        IReadOnlyList<string> readyTexts);
 
     void Shutdown();
 }
@@ -58,9 +77,36 @@ internal sealed class WebViewWindowController : IWindowHostController
 
     public int ProviderCdpPort() => _host.ProviderCdpPort();
 
-    public void ShowProviderBrowser() => _host.ShowProviderBrowser();
+    public IReadOnlyDictionary<string, object?> BeginProviderLease(string leaseId) =>
+        _host.BeginProviderLease(leaseId);
 
-    public void HideProviderBrowser() => _host.HideProviderBrowser();
+    public bool ReleaseProviderLease(string leaseId, long generation) =>
+        _host.ReleaseProviderLease(leaseId, generation);
+
+    public IReadOnlyList<ProviderDownloadEvent> ProviderDownloadEvents(
+        string leaseId,
+        long generation,
+        long afterSequence) =>
+        _host.ProviderDownloadEvents(leaseId, generation, afterSequence);
+
+    public void ShowProviderBrowser(string leaseId, long generation) =>
+        _host.ShowProviderBrowser(leaseId, generation);
+
+    public void HideProviderBrowser(string leaseId, long generation) =>
+        _host.HideProviderBrowser(leaseId, generation);
+
+    public string ProviderCurrentUrl(string leaseId, long generation) =>
+        _host.ProviderCurrentUrl(leaseId, generation);
+
+    public void NavigateProviderBrowser(string leaseId, long generation, string url) =>
+        _host.NavigateProviderBrowser(leaseId, generation, url);
+
+    public IReadOnlyDictionary<string, object?> ProviderDocumentState(
+        string leaseId,
+        long generation,
+        IReadOnlyList<string> readySelectors,
+        IReadOnlyList<string> readyTexts) =>
+        _host.ProviderDocumentState(leaseId, generation, readySelectors, readyTexts);
 
     public void Shutdown() => _host.Shutdown();
 }
@@ -75,8 +121,14 @@ internal sealed class WindowHostSession
         "health",
         "export",
         "provider-endpoint",
+        "provider-lease-begin",
+        "provider-lease-release",
+        "provider-download-events",
         "provider-show",
         "provider-hide",
+        "provider-current-url",
+        "provider-navigate",
+        "provider-document-state",
         "shutdown",
     ];
 
@@ -149,8 +201,7 @@ internal sealed class WindowHostSession
         while (true)
         {
             var request = _channel.Receive(Commands);
-            if (request.Payload.ValueKind != JsonValueKind.Object
-                || request.Payload.EnumerateObject().Any())
+            if (request.Payload.ValueKind != JsonValueKind.Object)
             {
                 throw new WindowHostException(
                     $"{request.Name} payload has invalid fields");
@@ -210,6 +261,19 @@ internal sealed class WindowHostSession
     private (string Name, IReadOnlyDictionary<string, object?> Result)
         ExecuteCommand(HandoffMessage request)
     {
+        if (request.Name is not "provider-navigate"
+            and not "provider-document-state"
+            and not "provider-lease-begin"
+            and not "provider-lease-release"
+            and not "provider-download-events"
+            and not "provider-show"
+            and not "provider-hide"
+            and not "provider-current-url"
+            && request.Payload.EnumerateObject().Any())
+        {
+            throw new WindowHostException(
+                $"{request.Name} payload has invalid fields");
+        }
         return request.Name switch
         {
             "prepare-hidden" => PrepareHidden(request),
@@ -220,8 +284,14 @@ internal sealed class WindowHostSession
                 _controller.Health()),
             "export" => Export(),
             "provider-endpoint" => ProviderEndpoint(),
-            "provider-show" => ProviderShow(),
-            "provider-hide" => ProviderHide(),
+            "provider-lease-begin" => ProviderLeaseBegin(request),
+            "provider-lease-release" => ProviderLeaseRelease(request),
+            "provider-download-events" => ProviderDownloadEvents(request),
+            "provider-show" => ProviderShow(request),
+            "provider-hide" => ProviderHide(request),
+            "provider-current-url" => ProviderCurrentUrl(request),
+            "provider-navigate" => ProviderNavigate(request),
+            "provider-document-state" => ProviderDocumentState(request),
             "shutdown" => (
                 "stopping",
                 new Dictionary<string, object?>
@@ -326,14 +396,120 @@ internal sealed class WindowHostSession
     private (
         string Name,
         IReadOnlyDictionary<string, object?> Result)
-        ProviderShow()
+        ProviderLeaseBegin(HandoffMessage request)
+    {
+        HandoffCodec.RequireExactObject(request.Payload, "provider lease begin", "lease_id");
+        var leaseId = HandoffCodec.GetRequiredString(request.Payload, "lease_id");
+        return (
+            "provider-lease-begun",
+            _controller.BeginProviderLease(leaseId));
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderLeaseRelease(HandoffMessage request)
+    {
+        var lease = ParseProviderLease(request.Payload, "provider lease release");
+        return (
+            "provider-lease-released",
+            new Dictionary<string, object?>
+            {
+                ["lease_id"] = lease.LeaseId,
+                ["generation"] = lease.Generation,
+                ["released"] = _controller.ReleaseProviderLease(
+                    lease.LeaseId,
+                    lease.Generation),
+            });
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderDownloadEvents(HandoffMessage request)
+    {
+        HandoffCodec.RequireExactObject(
+            request.Payload,
+            "provider download events",
+            "lease_id",
+            "generation",
+            "after_sequence");
+        var lease = ParseProviderLease(request.Payload, "provider download events", exact: false);
+        var afterSequence = RequiredInt64(request.Payload, "after_sequence");
+        var events = _controller.ProviderDownloadEvents(
+            lease.LeaseId,
+            lease.Generation,
+            afterSequence);
+        return (
+            "provider-download-events",
+            new Dictionary<string, object?>
+            {
+                ["lease_id"] = lease.LeaseId,
+                ["generation"] = lease.Generation,
+                ["events"] = events.Select(SerializeProviderDownloadEvent).ToArray(),
+            });
+    }
+
+    private static ProviderLeaseIdentity ParseProviderLease(
+        JsonElement payload,
+        string label,
+        bool exact = true)
+    {
+        if (exact)
+        {
+            HandoffCodec.RequireExactObject(payload, label, "lease_id", "generation");
+        }
+        var leaseId = HandoffCodec.GetRequiredString(payload, "lease_id");
+        var generation = RequiredInt64(payload, "generation");
+        if (generation <= 0)
+        {
+            throw new WindowHostException("provider lease generation is invalid");
+        }
+        return new ProviderLeaseIdentity(leaseId, generation);
+    }
+
+    private static long RequiredInt64(JsonElement payload, string name)
+    {
+        if (!payload.TryGetProperty(name, out var value)
+            || value.ValueKind != JsonValueKind.Number
+            || !value.TryGetInt64(out var result))
+        {
+            throw new WindowHostException($"{name} is invalid");
+        }
+        return result;
+    }
+
+    private static IReadOnlyDictionary<string, object?> SerializeProviderDownloadEvent(
+        ProviderDownloadEvent item) =>
+        new Dictionary<string, object?>
+        {
+            ["sequence"] = item.Sequence,
+            ["lease_id"] = item.LeaseId,
+            ["generation"] = item.Generation,
+            ["operation_id"] = item.OperationId,
+            ["phase"] = item.Phase,
+            ["state"] = item.State,
+            ["uri"] = item.Uri,
+            ["suggested_file_name"] = item.SuggestedFileName,
+            ["result_file_path"] = item.ResultFilePath,
+            ["mime_type"] = item.MimeType,
+            ["interrupt_reason"] = item.InterruptReason,
+            ["total_bytes"] = item.TotalBytes,
+            ["bytes_received"] = item.BytesReceived,
+        };
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderShow(HandoffMessage request)
     {
         if (!_visible)
         {
             throw new WindowHostException(
                 "provider browser requires a visible Stockroom window");
         }
-        _controller.ShowProviderBrowser();
+        var lease = ParseProviderLease(request.Payload, "provider show");
+        _controller.ShowProviderBrowser(lease.LeaseId, lease.Generation);
         return (
             "provider-shown",
             new Dictionary<string, object?>
@@ -345,15 +521,111 @@ internal sealed class WindowHostSession
     private (
         string Name,
         IReadOnlyDictionary<string, object?> Result)
-        ProviderHide()
+        ProviderHide(HandoffMessage request)
     {
-        _controller.HideProviderBrowser();
+        var lease = ParseProviderLease(request.Payload, "provider hide");
+        _controller.HideProviderBrowser(lease.LeaseId, lease.Generation);
         return (
             "provider-hidden",
             new Dictionary<string, object?>
             {
                 ["visible"] = false,
             });
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderCurrentUrl(HandoffMessage request)
+    {
+        var lease = ParseProviderLease(request.Payload, "provider current URL");
+        return (
+            "provider-current-url",
+            new Dictionary<string, object?>
+            {
+                ["url"] = _controller.ProviderCurrentUrl(
+                    lease.LeaseId,
+                    lease.Generation),
+            });
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderNavigate(HandoffMessage request)
+    {
+        HandoffCodec.RequireExactObject(
+            request.Payload,
+            "provider navigate",
+            "lease_id",
+            "generation",
+            "url");
+        var lease = ParseProviderLease(request.Payload, "provider navigate", exact: false);
+        var url = HandoffCodec.GetRequiredString(request.Payload, "url");
+        _controller.NavigateProviderBrowser(lease.LeaseId, lease.Generation, url);
+        return (
+            "provider-navigated",
+            new Dictionary<string, object?>
+            {
+                ["navigated"] = true,
+            });
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderDocumentState(HandoffMessage request)
+    {
+        HandoffCodec.RequireExactObject(
+            request.Payload,
+            "provider document state",
+            "lease_id",
+            "generation",
+            "ready_selectors",
+            "ready_texts");
+        var lease = ParseProviderLease(
+            request.Payload,
+            "provider document state",
+            exact: false);
+        var selectors = RequiredStringArray(request.Payload, "ready_selectors");
+        var texts = RequiredStringArray(request.Payload, "ready_texts");
+        return (
+            "provider-document-state",
+            _controller.ProviderDocumentState(
+                lease.LeaseId,
+                lease.Generation,
+                selectors,
+                texts));
+    }
+
+    private static IReadOnlyList<string> RequiredStringArray(
+        JsonElement payload,
+        string name)
+    {
+        if (!payload.TryGetProperty(name, out var value)
+            || value.ValueKind != JsonValueKind.Array)
+        {
+            throw new WindowHostException($"{name} is invalid");
+        }
+        var result = new List<string>();
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String)
+            {
+                throw new WindowHostException($"{name} is invalid");
+            }
+            var text = item.GetString() ?? string.Empty;
+            if (text.Length > 512 || text.Any(char.IsControl))
+            {
+                throw new WindowHostException($"{name} is invalid");
+            }
+            result.Add(text);
+        }
+        if (result.Count > 64)
+        {
+            throw new WindowHostException($"{name} is invalid");
+        }
+        return result;
     }
 
     private static IReadOnlyDictionary<string, object?> ResponsePayload(

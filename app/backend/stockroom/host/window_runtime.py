@@ -39,6 +39,8 @@ from stockroom.host.window_handoff import (
     WindowProof,
 )
 from stockroom.host.window_supervisor import (
+    ProviderDownloadEvent,
+    ProviderLeaseHandshake,
     WindowHostClient,
     WindowHostHealth,
     WindowHostIdentity,
@@ -87,9 +89,34 @@ class WindowClientPort(Protocol):
 
     def provider_endpoint(self) -> str: ...
 
-    def show_provider(self) -> None: ...
+    def begin_provider_lease(self, lease_id: str) -> ProviderLeaseHandshake: ...
 
-    def hide_provider(self) -> None: ...
+    def release_provider_lease(self, lease_id: str, generation: int) -> bool: ...
+
+    def provider_download_events(
+        self,
+        lease_id: str,
+        generation: int,
+        *,
+        after_sequence: int = 0,
+    ) -> tuple[ProviderDownloadEvent, ...]: ...
+
+    def show_provider(self, lease_id: str, generation: int) -> None: ...
+
+    def hide_provider(self, lease_id: str, generation: int) -> None: ...
+
+    def provider_current_url(self, lease_id: str, generation: int) -> str: ...
+
+    def navigate_provider(self, lease_id: str, generation: int, url: str) -> None: ...
+
+    def provider_document_state(
+        self,
+        lease_id: str,
+        generation: int,
+        *,
+        ready_selectors: tuple[str, ...] = (),
+        ready_texts: tuple[str, ...] = (),
+    ) -> dict[str, object]: ...
 
     def health(self) -> WindowHostHealth: ...
 
@@ -138,14 +165,67 @@ class ProviderBrowserLease:
     """A hidden, verified provider surface that becomes visible only when armed."""
 
     endpoint: str
-    _show: Callable[[], None]
-    _shown: bool = False
+    lease_id: str
+    generation: int
+    _show: Callable[[str, int], None]
+    _hide: Callable[[str, int], None]
+    _current_url: Callable[[str, int], str]
+    _navigate: Callable[[str, int, str], None]
+    _document_state: Callable[..., dict[str, object]]
+    _download_events: Callable[..., tuple[ProviderDownloadEvent, ...]]
+    _retained: bool = False
 
     def show(self) -> None:
-        if self._shown:
-            return
-        self._show()
-        self._shown = True
+        # Visibility can also change from the native header's Return To Stockroom control.
+        # Always forward the idempotent host command instead of trusting process-local state
+        # that the native window cannot update.
+        self._show(self.lease_id, self.generation)
+
+    def hide(self) -> None:
+        self._hide(self.lease_id, self.generation)
+
+    def current_url(self) -> str:
+        return self._current_url(self.lease_id, self.generation)
+
+    def navigate(self, url: str) -> None:
+        self._navigate(self.lease_id, self.generation, url)
+
+    def document_state(
+        self,
+        *,
+        ready_selectors: tuple[str, ...] = (),
+        ready_texts: tuple[str, ...] = (),
+    ) -> dict[str, object]:
+        return self._document_state(
+            self.lease_id,
+            self.generation,
+            ready_selectors=ready_selectors,
+            ready_texts=ready_texts,
+        )
+
+    def security_state(self) -> dict[str, object]:
+        state = self.document_state()
+        return {
+            "ready": bool(state.get("ready")),
+            "challenge": bool(state.get("challenge")),
+            "account_verification": bool(state.get("account_verification")),
+        }
+
+    def download_events(
+        self,
+        *,
+        after_sequence: int = 0,
+    ) -> tuple[ProviderDownloadEvent, ...]:
+        return self._download_events(
+            self.lease_id,
+            self.generation,
+            after_sequence=after_sequence,
+        )
+
+    def retain(self) -> None:
+        """Keep this exact provider document available after automation disconnects."""
+
+        self._retained = True
 
 
 def _strict_mapping(
@@ -466,8 +546,8 @@ class SupervisorWindowHandoffPorts(WindowHandoffPorts):
             exported=exported,
         )
 
-    def prepare_provider_browser(self) -> str:
-        """Return the active window's hidden, verified provider endpoint."""
+    def begin_provider_browser_lease(self, lease_id: str) -> ProviderLeaseHandshake:
+        """Fence the active window's hidden provider browser to one capture."""
 
         with self._lock:
             client = self._active
@@ -475,24 +555,88 @@ class SupervisorWindowHandoffPorts(WindowHandoffPorts):
             raise ReleaseWindowRuntimeError(
                 "active native provider browser is unavailable"
             )
-        endpoint = client.provider_endpoint()
-        return endpoint
+        return client.begin_provider_lease(lease_id)
 
-    def show_provider_browser(self) -> None:
+    def release_provider_browser_lease(self, lease_id: str, generation: int) -> bool:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            return False
+        return client.release_provider_lease(lease_id, generation)
+
+    def provider_download_events(
+        self,
+        lease_id: str,
+        generation: int,
+        *,
+        after_sequence: int = 0,
+    ) -> tuple[ProviderDownloadEvent, ...]:
         with self._lock:
             client = self._active
         if client is None or not client.active:
             raise ReleaseWindowRuntimeError(
                 "active native provider browser is unavailable"
             )
-        client.show_provider()
+        return client.provider_download_events(
+            lease_id,
+            generation,
+            after_sequence=after_sequence,
+        )
 
-    def close_provider_browser(self) -> None:
+    def show_provider_browser(self, lease_id: str, generation: int) -> None:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError(
+                "active native provider browser is unavailable"
+            )
+        client.show_provider(lease_id, generation)
+
+    def close_provider_browser(self, lease_id: str, generation: int) -> None:
         with self._lock:
             client = self._active
         if client is None or not client.active:
             return
-        client.hide_provider()
+        client.hide_provider(lease_id, generation)
+
+    def provider_current_url(self, lease_id: str, generation: int) -> str:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError(
+                "active native provider browser is unavailable"
+            )
+        return client.provider_current_url(lease_id, generation)
+
+    def navigate_provider_browser(self, lease_id: str, generation: int, url: str) -> None:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError(
+                "active native provider browser is unavailable"
+            )
+        client.navigate_provider(lease_id, generation, url)
+
+    def provider_document_state(
+        self,
+        lease_id: str,
+        generation: int,
+        *,
+        ready_selectors: tuple[str, ...] = (),
+        ready_texts: tuple[str, ...] = (),
+    ) -> dict[str, object]:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError(
+                "active native provider browser is unavailable"
+            )
+        return client.provider_document_state(
+            lease_id,
+            generation,
+            ready_selectors=ready_selectors,
+            ready_texts=ready_texts,
+        )
 
     def spawn_hidden(
         self,
@@ -708,8 +852,10 @@ class ProductionWindowReplacement:
             id_factory=id_factory,
         )
         self._initial_release = initial_release
+        self._id_factory = id_factory
         self._started = False
         self._provider_lock = threading.RLock()
+        self._active_provider_lease: ProviderLeaseHandshake | None = None
 
     @property
     def active_release_id(self) -> str | None:
@@ -723,15 +869,64 @@ class ProductionWindowReplacement:
         """Lease a hidden embedded browser until capture has armed its listeners."""
 
         with self._provider_lock:
-            endpoint = self._ports.prepare_provider_browser()
+            # A partial prior task may deliberately retain its document. An explicit next capture
+            # replaces that one surface; release the old identity before beginning the new lease.
+            previous = self._active_provider_lease
+            if previous is not None:
+                self._ports.release_provider_browser_lease(
+                    previous.lease_id,
+                    previous.generation,
+                )
+                self._active_provider_lease = None
+            handshake = self._ports.begin_provider_browser_lease(self._id_factory())
+            self._active_provider_lease = handshake
             lease = ProviderBrowserLease(
-                endpoint=endpoint,
+                endpoint=handshake.endpoint,
+                lease_id=handshake.lease_id,
+                generation=handshake.generation,
                 _show=self._ports.show_provider_browser,
+                _hide=self._ports.close_provider_browser,
+                _current_url=self._ports.provider_current_url,
+                _navigate=self._ports.navigate_provider_browser,
+                _document_state=self._ports.provider_document_state,
+                _download_events=self._ports.provider_download_events,
             )
             try:
                 yield lease
             finally:
-                self._ports.close_provider_browser()
+                if not lease._retained:
+                    try:
+                        self._ports.release_provider_browser_lease(
+                            lease.lease_id,
+                            lease.generation,
+                        )
+                    finally:
+                        if self._active_provider_lease == handshake:
+                            self._active_provider_lease = None
+
+    def show_active_provider_browser(self) -> None:
+        """Reveal the provider document retained behind the Stockroom surface."""
+
+        lease = self._active_provider_lease
+        if lease is None:
+            raise ReleaseWindowRuntimeError("provider browser has no active lease")
+        self._ports.show_provider_browser(lease.lease_id, lease.generation)
+
+    def close_active_provider_browser(self) -> None:
+        """Release a retained provider document after canonical completion."""
+
+        with self._provider_lock:
+            lease = self._active_provider_lease
+            if lease is None:
+                return
+            try:
+                self._ports.release_provider_browser_lease(
+                    lease.lease_id,
+                    lease.generation,
+                )
+            finally:
+                if self._active_provider_lease == lease:
+                    self._active_provider_lease = None
 
     def start_initial(self, release: AcceptedRelease | None = None) -> WindowContinuity:
         selected = self._initial_release if release is None else release

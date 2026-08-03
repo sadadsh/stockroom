@@ -657,6 +657,29 @@ def test_every_preview_cache_key_carries_a_render_version_token():
     )
 
 
+def test_footprint_preview_quiets_strokes_without_removing_geometry():
+    from stockroom.api.routers.previews import quiet_footprint_strokes
+
+    source = '<svg><path style="fill:none;stroke:#fff;stroke-width:0.500000" d="M 0 0 4 4"/></svg>'
+
+    rendered = quiet_footprint_strokes(source)
+
+    assert 'stroke-width:0.360000' in rendered
+    assert 'd="M 0 0 4 4"' in rendered
+
+
+def test_footprint_refit_leaves_more_breathing_room_than_a_symbol_refit():
+    from stockroom.api.routers.previews import refit_viewbox
+
+    source = '<svg viewBox="0 0 100 100"><rect x="0" y="0" width="10" height="10"/></svg>'
+
+    symbol = refit_viewbox(source, margin_ratio=0.02)
+    footprint = refit_viewbox(source, margin_ratio=0.08)
+
+    assert 'viewBox="-0.200000 -0.200000 10.400000 10.400000"' in symbol
+    assert 'viewBox="-0.800000 -0.800000 11.600000 11.600000"' in footprint
+
+
 class TestRefitViewBox:
     """kicad-cli sizes a footprint's viewBox from the footprint's FULL extent - including the
     Reference/Value text and layers the preview deliberately does not draw. MEASURED on the real

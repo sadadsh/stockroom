@@ -53,6 +53,17 @@ describe("CaptureStatusPill", () => {
     expect(screen.getByText("1/2")).toBeInTheDocument();
   });
 
+  it("names an active provider handoff as needing input", () => {
+    setActive({
+      partId: "p1",
+      partName: "BQ24074",
+      status: "window-open",
+      backgrounded: true,
+    });
+    render(<CaptureStatusPill />);
+    expect(screen.getByText("Needs your input")).toBeInTheDocument();
+  });
+
   it("reopens the part on click", async () => {
     const user = userEvent.setup();
     setActive({

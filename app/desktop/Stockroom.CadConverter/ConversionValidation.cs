@@ -39,8 +39,9 @@ internal static partial class ConversionValidation
             .Pads.Select(item => item.Designator).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Require(request.PadPinMap.Select(item => item.Pin).ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(symbolPins),
             "padPinMap must close over every symbol pin");
-        Require(request.PadPinMap.Select(item => item.Pad).ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(defaultPads),
-            "padPinMap must close over every default footprint pad");
+        var mappedPads = request.PadPinMap.Select(item => item.Pad).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Require(mappedPads.IsSubsetOf(defaultPads),
+            "padPinMap refers to a pad absent from the default footprint");
         foreach (var footprint in request.Footprints)
         {
             ValidateFootprint(footprint);

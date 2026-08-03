@@ -10,7 +10,7 @@ from stockroom.model.category import (
 )
 
 
-def test_taxonomy_is_the_fixed_thirteen():
+def test_taxonomy_is_the_fixed_fourteen():
     assert CATEGORIES == (
         "Resistors",
         "Capacitors",
@@ -20,6 +20,7 @@ def test_taxonomy_is_the_fixed_thirteen():
         "ICs",
         "Connectors",
         "Switches",
+        "Fuses",
         "Crystals & Oscillators",
         "Sensors",
         "Modules",

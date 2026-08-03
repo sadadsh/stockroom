@@ -162,7 +162,7 @@ describe("WIN-02 - the DevPanel edits the open Complete Part window through its 
 
     const editor = screen.getByLabelText("Edit copy text");
     expect(editor).toHaveValue(
-      "Stockroom completes remaining data and one verified KiCad + Altium + STEP package.",
+      "Stockroom completes the part from one verified provider set. Choose another source only when you want a different variant.",
     );
     fireEvent.change(editor, { target: { value: "Reworded Completion Subtitle" } });
 

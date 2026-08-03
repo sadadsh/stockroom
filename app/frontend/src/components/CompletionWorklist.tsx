@@ -315,7 +315,7 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
       if (active.partId === open.partId) {
         heldRef.current = true;
         if (captureInFlight(active)) {
-          if (active.status !== "resolving") openedRef.current = true;
+          if (active.status === "window-open" && active.routeToken) openedRef.current = true;
           return;
         }
       } else {
@@ -329,7 +329,7 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
       const incomplete =
         active.status === "done" ? pass.incomplete : [...pass.incomplete, open.partId];
       const stopped =
-        active.status === "unavailable" || !openedRef.current
+        active.status === "unavailable" || (active.status !== "done" && !openedRef.current)
           ? `${open.name} could not be started, so working through the list stopped rather than opening every remaining page on the same fault.`
           : null;
       setPass({ ...pass, open: null, incomplete, ended: stopped });
@@ -351,7 +351,9 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
     heldRef.current = false;
     openedRef.current = false;
     setPass({ ...pass, queue: pass.queue.slice(1), open: next });
-    void start(next.partId, next.name, next.remaining, undefined, "finish-first").catch(
+    const running = start(next.partId, next.name, next.remaining, undefined, "finish-first");
+    capture.keepWorking();
+    void running.catch(
       (error) => {
         const detail = error instanceof Error ? error.message : "the capture slot was unavailable";
         setPass((current) =>
@@ -441,11 +443,17 @@ function StartCapture({
             : `Get the first complete validated file set for ${row.mpn || row.part_id}`
       }
       aria-label={`Get files for ${name}`}
-      onClick={() =>
-        void capture
-          .start(row.part_id, name, row.remaining, undefined, "finish-first")
-          .catch(() => capture.requestReopen())
-      }
+      onClick={() => {
+        const running = capture.start(
+          row.part_id,
+          name,
+          row.remaining,
+          undefined,
+          "finish-first",
+        );
+        capture.keepWorking();
+        void running.catch(() => capture.requestReopen());
+      }}
     >
       {running ? "Getting Files" : "Get Files"}
     </Button>
