@@ -11,6 +11,7 @@ param(
     [string]$SigningCertificatePath = "",
     [string]$SigningEnvironmentVariableName = "STOCKROOM_SIGNING_CERT_PASSWORD",
     [string]$MinGitRoot = "",
+    [string]$NodeRoot = "",
     [string]$WebView2BootstrapperPath = "",
     [string]$TufRootPath = "",
     [int]$TufMetadataVersion = 1,
@@ -104,6 +105,9 @@ else {
     if ([string]::IsNullOrWhiteSpace($MinGitRoot)) {
         throw "Production mode requires pinned MinGit for library Git operations."
     }
+    if ([string]::IsNullOrWhiteSpace($NodeRoot)) {
+        throw "Production mode requires pinned Node/npm for owner Dev Mode publishing."
+    }
     if ([string]::IsNullOrWhiteSpace($WebView2BootstrapperPath)) {
         throw "Production mode requires the pinned WebView2 Evergreen bootstrapper."
     }
@@ -131,6 +135,16 @@ else {
     }
     if ($dirty) {
         throw "Production packaging refuses a dirty Git working tree."
+    }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($NodeRoot)) {
+    $NodeRoot = [IO.Path]::GetFullPath($NodeRoot)
+    if (
+        -not (Test-Path -LiteralPath (Join-Path $NodeRoot "node.exe") -PathType Leaf) -or
+        -not (Test-Path -LiteralPath (Join-Path $NodeRoot "npm.cmd") -PathType Leaf)
+    ) {
+        throw "NodeRoot must contain node.exe and npm.cmd."
     }
 }
 
@@ -247,6 +261,19 @@ function Get-DirectoryFingerprint {
             }
     )
     return [string]::Join("`n", $rows)
+}
+
+function Get-TextSha256 {
+    param([Parameter(Mandatory)][string]$Text)
+
+    $bytes = [Text.Encoding]::UTF8.GetBytes($Text)
+    try {
+        $digest = [Security.Cryptography.SHA256]::HashData($bytes)
+        return [Convert]::ToHexString($digest).ToLowerInvariant()
+    }
+    finally {
+        [Array]::Clear($bytes, 0, $bytes.Length)
+    }
 }
 
 function Set-ReproducibleTimestamp {
@@ -396,7 +423,10 @@ if ($SigningCertificateProvided) {
 Invoke-Checked -FilePath $UvPath -Arguments $contractArguments
 
 function Build-Executable {
-    param([Parameter(Mandatory)][string]$Name)
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$CadConverterRoot
+    )
 
     $buildRoot = Initialize-OutputDirectory -Path (Join-Path $WorkRoot $Name)
     $distRoot = Join-Path $buildRoot "Dist"
@@ -409,7 +439,9 @@ function Build-Executable {
         STOCKROOM_VERSION_FILE = $env:STOCKROOM_VERSION_FILE
         STOCKROOM_BUILD_IDENTITY = $env:STOCKROOM_BUILD_IDENTITY
         STOCKROOM_UV_EXECUTABLE = $env:STOCKROOM_UV_EXECUTABLE
+        STOCKROOM_CAD_CONVERTER_ROOT = $env:STOCKROOM_CAD_CONVERTER_ROOT
         STOCKROOM_MINGIT_ROOT = $env:STOCKROOM_MINGIT_ROOT
+        STOCKROOM_NODE_ROOT = $env:STOCKROOM_NODE_ROOT
         STOCKROOM_WEBVIEW2_BOOTSTRAPPER = $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER
     }
     try {
@@ -418,11 +450,18 @@ function Build-Executable {
         $env:STOCKROOM_VERSION_FILE = $VersionInfoPath
         $env:STOCKROOM_BUILD_IDENTITY = $BuildIdentityPath
         $env:STOCKROOM_UV_EXECUTABLE = $UvPath
+        $env:STOCKROOM_CAD_CONVERTER_ROOT = $CadConverterRoot
         if (-not [string]::IsNullOrWhiteSpace($MinGitRoot)) {
             $env:STOCKROOM_MINGIT_ROOT = $MinGitRoot
         }
         else {
             Remove-Item Env:STOCKROOM_MINGIT_ROOT -ErrorAction SilentlyContinue
+        }
+        if (-not [string]::IsNullOrWhiteSpace($NodeRoot)) {
+            $env:STOCKROOM_NODE_ROOT = $NodeRoot
+        }
+        else {
+            Remove-Item Env:STOCKROOM_NODE_ROOT -ErrorAction SilentlyContinue
         }
         if (-not [string]::IsNullOrWhiteSpace($WebView2BootstrapperPath)) {
             $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER = $WebView2BootstrapperPath
@@ -533,17 +572,21 @@ function Build-CadConverter {
     return $publishRoot
 }
 
-$FirstExecutable = Build-Executable -Name "Build 1"
 $FirstWindowHost = Build-WindowHost -Name "Window Host Build 1"
 $FirstCadConverter = Build-CadConverter -Name "CAD Converter Build 1"
+$FirstExecutable = Build-Executable `
+    -Name "Build 1" `
+    -CadConverterRoot $FirstCadConverter
 $FirstExecutableHash = Get-Sha256 -Path $FirstExecutable
 $SecondExecutable = $null
 $SecondExecutableHash = $null
 
 if (-not $SkipReproducibilityProof) {
-    $SecondExecutable = Build-Executable -Name "Build 2"
     $SecondWindowHost = Build-WindowHost -Name "Window Host Build 2"
     $SecondCadConverter = Build-CadConverter -Name "CAD Converter Build 2"
+    $SecondExecutable = Build-Executable `
+        -Name "Build 2" `
+        -CadConverterRoot $SecondCadConverter
     $SecondExecutableHash = Get-Sha256 -Path $SecondExecutable
     if ($FirstExecutableHash -cne $SecondExecutableHash) {
         throw "PyInstaller reproducibility failed: the two Stockroom.exe digests differ."
@@ -1037,6 +1080,31 @@ $Evidence = [ordered]@{
                 )
             }
         } else { $null }
+        bundled_git_lfs = if (
+            -not [string]::IsNullOrWhiteSpace($MinGitRoot) -and
+            (Test-Path -LiteralPath (
+                Join-Path $MinGitRoot "mingw64\bin\git-lfs.exe"
+            ) -PathType Leaf)
+        ) {
+            [ordered]@{
+                executable_sha256 = Get-Sha256 -Path (
+                    Join-Path $MinGitRoot "mingw64\bin\git-lfs.exe"
+                )
+            }
+        } else { $null }
+        bundled_node = if (-not [string]::IsNullOrWhiteSpace($NodeRoot)) {
+            [ordered]@{
+                tree_sha256 = Get-TextSha256 -Text (
+                    Get-DirectoryFingerprint -Root $NodeRoot
+                )
+                node_executable_sha256 = Get-Sha256 -Path (
+                    Join-Path $NodeRoot "node.exe"
+                )
+                npm_command_sha256 = Get-Sha256 -Path (
+                    Join-Path $NodeRoot "npm.cmd"
+                )
+            }
+        } else { $null }
         webview2_bootstrapper = if (
             -not [string]::IsNullOrWhiteSpace($WebView2BootstrapperPath)
         ) {
@@ -1044,6 +1112,14 @@ $Evidence = [ordered]@{
                 sha256 = Get-Sha256 -Path $WebView2BootstrapperPath
             }
         } else { $null }
+        cad_converter = [ordered]@{
+            tree_sha256 = Get-TextSha256 -Text (
+                Get-DirectoryFingerprint -Root $FirstCadConverter
+            )
+            executable_sha256 = Get-Sha256 -Path (
+                Join-Path $FirstCadConverter "Stockroom.CadConverter.exe"
+            )
+        }
     }
     signing = [ordered]@{
         state = $SigningState

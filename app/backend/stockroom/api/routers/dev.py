@@ -3,8 +3,8 @@ per-element overrides back to source.
 
 The frontend's hidden dev mode (Ctrl+Shift+D) edits the app's own colours, radii, labels, icons,
 and per-element size / spacing / layout live, then POSTs the complete override set here. This writes
-four committed source files - ``lib/token.overrides.ts``, ``lib/copy.overrides.ts``,
-``lib/icon.overrides.ts`` and ``lib/element.overrides.ts`` - so a saved change ships for everyone
+five committed source files - ``lib/token.overrides.ts``, ``lib/copy.overrides.ts``,
+``lib/icon.overrides.ts``, ``lib/element.overrides.ts`` and ``lib/behavior.overrides.ts`` - so a saved change ships for everyone
 once committed, not as a per-machine setting. It is a source-tree tool: with no frontend source
 present (a packaged build) it refuses honestly rather than pretending to save.
 
@@ -13,7 +13,7 @@ input, so nothing a caller sends can inject code into a generated module: tokens
 conservative grammar; icon bodies through a strict SVG sanitiser (whitelisted shape/path elements +
 geometry/stroke/fill attributes only, no script / event handlers / remote refs / foreignObject /
 DOCTYPE); per-element CSS through a safe length / keyword / grid-slot grammar. A malicious icon or
-CSS value is rejected with a 400 before anything is written, so a bad payload leaves the four files
+CSS value is rejected with a 400 before anything is written, so a bad payload leaves the five files
 untouched.
 """
 
@@ -21,12 +21,14 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 
 from stockroom.api.errors import ApiError
+from stockroom.vcs.repo import GitError
 
 # frontend/src, relative to this file: routers -> api -> stockroom -> backend -> app -> frontend/src
 _FRONTEND_SRC = Path(__file__).resolve().parents[4] / "frontend" / "src"
@@ -102,8 +104,23 @@ _ELEMENTS_HEADER = """/**
  */
 export const ELEMENT_OVERRIDES: Record<string, Record<string, string>> = """
 
+_BEHAVIORS_HEADER = """/**
+ * Committed behavior overrides written by Dev Mode. Each entry changes how one compatible
+ * control renders while preserving its value, options, disabled state, and change handler.
+ * Generated whole by POST /api/dev/save.
+ */
+export type ChoicePreset = \"dropdown\" | \"segmented\" | \"radio\" | \"searchable\";
+
+export interface BehaviorOverride {
+  preset?: ChoicePreset;
+  disabled?: boolean;
+}
+
+export const BEHAVIOR_OVERRIDES: Record<string, BehaviorOverride> = """
+
 
 # --- token + copy validators (v1, unchanged) --------------------------------------------------
+
 
 def _clean_tokens(block: object) -> dict:
     """Keep only well-formed (css-var -> safe css value) pairs; drop anything suspect."""
@@ -142,26 +159,78 @@ def _clean_copy(block: object) -> dict:
 # attributes survive; the tree is re-serialised from validated nodes, never echoed raw.
 
 _SVG_ALLOWED_TAGS = {
-    "path", "circle", "rect", "line", "polyline", "polygon", "ellipse", "g", "defs", "use",
+    "path",
+    "circle",
+    "rect",
+    "line",
+    "polyline",
+    "polygon",
+    "ellipse",
+    "g",
+    "defs",
+    "use",
 }
 _SVG_ALLOWED_ATTRS = {
     # identity / grouping
-    "id", "class",
+    "id",
+    "class",
     # geometry
-    "d", "cx", "cy", "r", "rx", "ry", "x", "y", "x1", "y1", "x2", "y2",
-    "width", "height", "points", "pathlength", "transform", "transform-origin",
+    "d",
+    "cx",
+    "cy",
+    "r",
+    "rx",
+    "ry",
+    "x",
+    "y",
+    "x1",
+    "y1",
+    "x2",
+    "y2",
+    "width",
+    "height",
+    "points",
+    "pathlength",
+    "transform",
+    "transform-origin",
     # stroke
-    "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-dasharray",
-    "stroke-dashoffset", "stroke-miterlimit", "stroke-opacity", "vector-effect",
+    "stroke",
+    "stroke-width",
+    "stroke-linecap",
+    "stroke-linejoin",
+    "stroke-dasharray",
+    "stroke-dashoffset",
+    "stroke-miterlimit",
+    "stroke-opacity",
+    "vector-effect",
     # fill / paint
-    "fill", "fill-rule", "fill-opacity", "opacity", "color", "clip-rule", "clip-path",
+    "fill",
+    "fill-rule",
+    "fill-opacity",
+    "opacity",
+    "color",
+    "clip-rule",
+    "clip-path",
 }
 # Cheap defence-in-depth pre-scan (the parse walk is authoritative): tokens that must never appear
 # anywhere in the raw body. DOCTYPE / entities (`<!`), processing instructions (`<?`), remote/script
 # vectors, numeric char entities (`&#`, billion-laughs vector).
 _SVG_FORBIDDEN = (
-    "<script", "</script", "<!", "<?", "foreignobject", "<style", "<iframe",
-    "<image", "<audio", "<video", "javascript:", "vbscript:", "expression(", "data:", "&#",
+    "<script",
+    "</script",
+    "<!",
+    "<?",
+    "foreignobject",
+    "<style",
+    "<iframe",
+    "<image",
+    "<audio",
+    "<video",
+    "javascript:",
+    "vbscript:",
+    "expression(",
+    "data:",
+    "&#",
 )
 _SVG_EVENT_ATTR_RE = re.compile(r"\son[a-z]+\s*=")
 
@@ -286,20 +355,85 @@ def _clean_icons(block: object) -> dict:
 
 _ELEM_ALLOWED_PROPS = {
     # size
-    "width", "height", "min-width", "min-height", "max-width", "max-height",
+    "width",
+    "height",
+    "min-width",
+    "min-height",
+    "max-width",
+    "max-height",
     # spacing
-    "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
-    "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
-    "gap", "row-gap", "column-gap",
+    "margin",
+    "margin-top",
+    "margin-right",
+    "margin-bottom",
+    "margin-left",
+    "padding",
+    "padding-top",
+    "padding-right",
+    "padding-bottom",
+    "padding-left",
+    "gap",
+    "row-gap",
+    "column-gap",
     # layout (Phase F)
-    "order", "grid-column", "grid-row",
+    "order",
+    "grid-column",
+    "grid-row",
+    # appearance and typography
+    "display",
+    "visibility",
+    "opacity",
+    "color",
+    "background-color",
+    "border-color",
+    "border-radius",
+    "font-size",
+    "font-weight",
+    "line-height",
+    "letter-spacing",
+    "text-align",
+    # container alignment
+    "flex-direction",
+    "flex-wrap",
+    "justify-content",
+    "align-items",
+    "align-content",
 }
 _ELEM_FORBIDDEN = (";", "<", ">", "{", "}", "url(", "expression(", "/*", "*/", "\\", "@")
 _LENGTH_KEYWORDS = {"auto", "none", "0", "min-content", "max-content", "fit-content"}
 _LENGTH_RE = re.compile(r"^-?(?:\d+|\d*\.\d+)(?:px|rem|em|vh|vw|%)$")
+_LENGTH_LIST_RE = re.compile(
+    r"^-?(?:\d+|\d*\.\d+)(?:px|rem|em|vh|vw|%)"
+    r"(?:\s+-?(?:\d+|\d*\.\d+)(?:px|rem|em|vh|vw|%)){0,3}$"
+)
 _ORDER_RE = re.compile(r"^-?\d{1,3}$")
 # one grid line token: auto, a small integer, `span N`/`span name`, or a named grid line
-_GRID_TOKEN_RE = re.compile(r"^(?:auto|-?\d{1,4}|span\s+(?:\d{1,4}|[a-zA-Z][\w-]*)|[a-zA-Z][\w-]*)$")
+_GRID_TOKEN_RE = re.compile(
+    r"^(?:auto|-?\d{1,4}|span\s+(?:\d{1,4}|[a-zA-Z][\w-]*)|[a-zA-Z][\w-]*)$"
+)
+_COLOR_RE = re.compile(r"^(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent|currentColor)$")
+_NUMBER_RE = re.compile(r"^(?:0|1|0?\.\d{1,3})$")
+_LINE_HEIGHT_RE = re.compile(r"^(?:0|[1-9](?:\.\d{1,3})?|0?\.\d{1,3})$")
+_FONT_WEIGHT_RE = re.compile(r"^(?:[1-9]00|normal|bold)$")
+_APPEARANCE_ENUMS = {
+    "display": {"block", "inline", "inline-block", "flex", "inline-flex", "grid", "none"},
+    "visibility": {"visible", "hidden"},
+    "text-align": {"left", "center", "right", "start", "end"},
+    "flex-direction": {"row", "row-reverse", "column", "column-reverse"},
+    "flex-wrap": {"nowrap", "wrap", "wrap-reverse"},
+    "justify-content": {"start", "end", "center", "space-between", "space-around", "space-evenly"},
+    "align-items": {"stretch", "start", "end", "flex-start", "flex-end", "center", "baseline"},
+    "align-content": {
+        "stretch",
+        "start",
+        "end",
+        "flex-start",
+        "flex-end",
+        "center",
+        "space-between",
+        "space-around",
+    },
+}
 
 
 def _valid_grid_slot(value: str) -> bool:
@@ -324,8 +458,24 @@ def _valid_css_value(prop: str, value: str) -> bool:
         return bool(_ORDER_RE.match(v))
     if prop in ("grid-column", "grid-row"):
         return _valid_grid_slot(v)
+    if prop in _APPEARANCE_ENUMS:
+        return v in _APPEARANCE_ENUMS[prop]
+    if prop in ("color", "background-color", "border-color"):
+        return bool(_COLOR_RE.match(v))
+    if prop == "opacity":
+        return bool(_NUMBER_RE.match(v))
+    if prop == "font-weight":
+        return bool(_FONT_WEIGHT_RE.match(v))
+    if prop == "border-radius":
+        return v == "0" or bool(_LENGTH_RE.match(v)) or bool(_LENGTH_LIST_RE.match(v))
+    if prop == "line-height":
+        return low == "normal" or bool(_LENGTH_RE.match(v)) or bool(_LINE_HEIGHT_RE.match(v))
+    if prop == "letter-spacing":
+        return low == "normal" or v == "0" or bool(_LENGTH_RE.match(v))
+    if prop == "font-size":
+        return low in _LENGTH_KEYWORDS or bool(_LENGTH_RE.match(v))
     # size / spacing / gap: a safe length or a size keyword
-    return low in _LENGTH_KEYWORDS or bool(_LENGTH_RE.match(v))
+    return low in _LENGTH_KEYWORDS or bool(_LENGTH_RE.match(v)) or bool(_LENGTH_LIST_RE.match(v))
 
 
 def _clean_elements(block: object) -> dict:
@@ -356,9 +506,194 @@ def _clean_elements(block: object) -> dict:
     return out
 
 
+_CHOICE_PRESETS = {"dropdown", "segmented", "radio", "searchable"}
+
+
+def _clean_behaviors(block: object) -> dict:
+    """Validate source-backed semantic control substitutions."""
+    out: dict = {}
+    if not isinstance(block, dict):
+        return out
+    for key, entry in block.items():
+        if not isinstance(key, str) or not _DEV_ID_RE.match(key) or not isinstance(entry, dict):
+            continue
+        clean: dict = {}
+        preset = entry.get("preset")
+        disabled = entry.get("disabled")
+        if preset is not None:
+            if not isinstance(preset, str) or preset not in _CHOICE_PRESETS:
+                raise ApiError(400, f"Control preset '{preset}' is not supported.")
+            clean["preset"] = preset
+        if disabled is not None:
+            if not isinstance(disabled, bool):
+                raise ApiError(400, "Control disabled override must be true or false.")
+            clean["disabled"] = disabled
+        if clean:
+            out[key] = clean
+    return out
+
+
 def _emit(path: Path, header: str, data) -> None:
     body = json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True)
     path.write_text(header + body + ";\n", encoding="utf-8")
+
+
+_DEV_SOURCE_PATHS = (
+    "app/frontend/src/lib/token.overrides.ts",
+    "app/frontend/src/lib/copy.overrides.ts",
+    "app/frontend/src/lib/icon.overrides.ts",
+    "app/frontend/src/lib/element.overrides.ts",
+    "app/frontend/src/lib/behavior.overrides.ts",
+)
+
+
+def _app_repo(request: Request):
+    repo = getattr(request.app.state.ctx, "app_repo", None)
+    if repo is None:
+        raise ApiError(409, "Dev Mode needs a managed Stockroom source checkout.")
+    expected = _FRONTEND_SRC.parents[2].resolve()
+    if repo.root.resolve() != expected:
+        raise ApiError(409, "Dev Mode source and the managed application checkout do not match.")
+    return repo
+
+
+def _dev_status(request: Request) -> dict:
+    repo = getattr(request.app.state.ctx, "app_repo", None)
+    available = (
+        _FRONTEND_SRC.is_dir()
+        and repo is not None
+        and repo.root.resolve() == _FRONTEND_SRC.parents[2].resolve()
+    )
+    if not available:
+        return {
+            "available": False,
+            "branch": "",
+            "revision": "",
+            "dirty": [],
+            "can_publish": False,
+            "publish_blocker": "Dev Mode needs a managed Stockroom source checkout.",
+        }
+    dirty = [path.relative_to(repo.root).as_posix() for path in repo.dirty_paths()]
+    allowed = set(_DEV_SOURCE_PATHS)
+    owned = [path for path in dirty if path in allowed or path.startswith("app/frontend-dist/")]
+    foreign = [path for path in dirty if path not in owned]
+    branch = repo.current_branch()
+    blocker = ""
+    if branch != "main":
+        blocker = "Switch the managed Stockroom checkout to main before publishing."
+    elif foreign:
+        blocker = "Unrelated source changes must be committed separately before publishing."
+    elif not owned:
+        blocker = "Save a Dev Mode change before publishing."
+    return {
+        "available": True,
+        "branch": branch,
+        "revision": repo.head(),
+        "dirty": dirty,
+        "can_publish": not blocker,
+        "publish_blocker": blocker,
+    }
+
+
+def _run_frontend(repo, command: str) -> None:
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if command == "install":
+        arguments = [
+            "npm.cmd",
+            "--prefix",
+            "app/frontend",
+            "ci",
+            "--no-audit",
+            "--no-fund",
+        ]
+        timeout = 600
+        label = "dependency install"
+    else:
+        arguments = ["npm.cmd", "--prefix", "app/frontend", "run", command]
+        timeout = 300
+        label = command
+    proc = subprocess.run(
+        arguments,
+        cwd=repo.root,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        creationflags=flags,
+        check=False,
+    )
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout).strip()[-4000:]
+        raise ApiError(409, f"Frontend {label} failed. {detail}")
+
+
+def _foreign_dev_paths(repo) -> list[str]:
+    allowed = set(_DEV_SOURCE_PATHS)
+    return [
+        rel
+        for path in repo.dirty_paths()
+        if (rel := path.relative_to(repo.root).as_posix()) not in allowed
+        and not rel.startswith("app/frontend-dist/")
+    ]
+
+
+def _publish(request: Request, body: object) -> dict:
+    repo = _app_repo(request)
+    if repo.current_branch() != "main":
+        raise ApiError(409, "Dev Mode publishes only from main.")
+    message = "Refine Stockroom interface"
+    if isinstance(body, dict) and body.get("message") is not None:
+        raw = body.get("message")
+        if not isinstance(raw, str) or not raw.strip() or len(raw.strip()) > 120 or "\n" in raw:
+            raise ApiError(
+                400, "Commit message must be one non-empty line of at most 120 characters."
+            )
+        message = raw.strip()
+
+    foreign = _foreign_dev_paths(repo)
+    if foreign:
+        raise ApiError(
+            409, "Publish refused because unrelated files are changed: " + ", ".join(foreign[:8])
+        )
+    dirty = [path.relative_to(repo.root).as_posix() for path in repo.dirty_paths()]
+    if not any(path in _DEV_SOURCE_PATHS or path.startswith("app/frontend-dist/") for path in dirty):
+        raise ApiError(409, "There is no saved Dev Mode change to publish.")
+
+    ok, reason = repo.fetch()
+    if not ok:
+        raise ApiError(503, f"Could not refresh origin before publishing: {reason}")
+    try:
+        remote = repo.resolve_ref("origin/main")
+    except GitError as exc:
+        raise ApiError(409, f"Could not resolve origin/main: {exc}") from exc
+    if remote != repo.head():
+        raise ApiError(
+            409, "Main changed on GitHub. Update Stockroom before publishing this design."
+        )
+
+    _run_frontend(repo, "install")
+    _run_frontend(repo, "typecheck")
+    _run_frontend(repo, "build")
+    foreign = _foreign_dev_paths(repo)
+    if foreign:
+        raise ApiError(
+            409, "Build changed files outside the Dev Mode boundary: " + ", ".join(foreign[:8])
+        )
+    paths = [repo.root / rel for rel in _DEV_SOURCE_PATHS]
+    paths.append(repo.root / "app" / "frontend-dist")
+    revision = repo.commit(message, paths)
+    pushed = repo.push()
+    if not pushed.ok:
+        raise ApiError(
+            503, f"The design was committed locally but GitHub push failed: {pushed.reason}"
+        )
+    return {
+        "ok": True,
+        "commit": revision,
+        "branch": "main",
+        "message": message,
+        "checks": ["locked dependency install", "typecheck", "production build"],
+        "pushed": True,
+    }
 
 
 def dev_router(require_token) -> APIRouter:
@@ -370,11 +705,15 @@ def dev_router(require_token) -> APIRouter:
         if not lib.exists():
             # Hidden dev tool: with no source tree there is nothing to write, so refuse honestly
             # instead of pretending. This is the expected state inside a packaged build.
-            raise ApiError(409, "Dev mode needs the frontend source tree; it is not available in a packaged build.")
+            raise ApiError(
+                409,
+                "Dev mode needs the frontend source tree; it is not available in a packaged build.",
+            )
         tokens = body.get("tokens") if isinstance(body, dict) else None
         copy = body.get("copy") if isinstance(body, dict) else None
         icons = body.get("icons") if isinstance(body, dict) else None
         elements = body.get("elements") if isinstance(body, dict) else None
+        behaviors = body.get("behaviors") if isinstance(body, dict) else None
 
         # Validate every block up front: a malicious icon / CSS value raises here, before any file is
         # written, so a bad payload can never leave the four override files half-updated.
@@ -383,11 +722,13 @@ def dev_router(require_token) -> APIRouter:
         clean_copy = _clean_copy(copy)
         clean_icons = _clean_icons(icons)
         clean_elements = _clean_elements(elements)
+        clean_behaviors = _clean_behaviors(behaviors)
 
         _emit(lib / "token.overrides.ts", _TOKENS_HEADER, {"root": root, "light": light})
         _emit(lib / "copy.overrides.ts", _COPY_HEADER, clean_copy)
         _emit(lib / "icon.overrides.ts", _ICONS_HEADER, clean_icons)
         _emit(lib / "element.overrides.ts", _ELEMENTS_HEADER, clean_elements)
+        _emit(lib / "behavior.overrides.ts", _BEHAVIORS_HEADER, clean_behaviors)
 
         return {
             "ok": True,
@@ -396,11 +737,21 @@ def dev_router(require_token) -> APIRouter:
                 "app/frontend/src/lib/copy.overrides.ts",
                 "app/frontend/src/lib/icon.overrides.ts",
                 "app/frontend/src/lib/element.overrides.ts",
+                "app/frontend/src/lib/behavior.overrides.ts",
             ],
             "tokens": len(root) + len(light),
             "copy": len(clean_copy),
             "icons": len(clean_icons),
             "elements": len(clean_elements),
+            "behaviors": len(clean_behaviors),
         }
+
+    @r.get("/status")
+    def status(request: Request) -> dict:
+        return _dev_status(request)
+
+    @r.post("/publish")
+    def publish(request: Request, body: dict) -> dict:
+        return _publish(request, body)
 
     return r

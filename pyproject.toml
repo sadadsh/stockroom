@@ -1,6 +1,6 @@
 [project]
 name = "stockroom"
-version = "0.1.0"
+version = "0.7.0"
 description = "KiCad V10 component-library manager"
 requires-python = ">=3.12"
 dependencies = [

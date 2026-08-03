@@ -200,6 +200,7 @@ export function PassiveAddSection({
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <SelectField
+              devId="ingest.kind-control"
               label="Kind"
               copyId="ingest.field-kind"
               value={kind}
@@ -208,6 +209,7 @@ export function PassiveAddSection({
               options={KIND_OPTIONS}
             />
             <SelectField
+              devId="ingest.package-control"
               label="Package"
               copyId="ingest.field-package"
               value={pkg}

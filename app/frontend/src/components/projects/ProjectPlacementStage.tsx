@@ -18,6 +18,7 @@ import { Text, useText } from "../../lib/copy";
 import { useObjectUrl } from "../../lib/useObjectUrl";
 import { usePanZoom } from "../../lib/usePanZoom";
 import { Badge, Button, SegmentedControl } from "../primitives";
+import { AdaptiveChoice } from "../AdaptiveChoice";
 
 type PlacementStateByReference = Record<string, AssemblyPlacementState | undefined>;
 
@@ -334,22 +335,17 @@ export function ProjectPlacementStage({
           {boards.length > 1 ? (
             <label className="flex h-8 items-center gap-2 rounded-control border border-line bg-field px-2 text-2xs text-t3">
               <span>{boardLabel}</span>
-              <select
-                aria-label={boardLabel}
+              <AdaptiveChoice
+                devId="projects.board-control"
+                label={boardLabel}
                 value={board}
-                onChange={(event) => {
-                  const nextBoard = event.target.value;
+                onChange={(nextBoard) => {
                   setBoard(nextBoard);
                   onBoardChange?.(nextBoard);
                 }}
-                className="max-w-[180px] bg-transparent text-xs text-t1 outline-none"
-              >
-                {boards.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+                className="max-w-[180px] border-0 bg-transparent"
+                options={boards.map((name) => ({ value: name, label: name }))}
+              />
             </label>
           ) : null}
           <SegmentedControl

@@ -41,10 +41,14 @@ def _prepare_runtime(*, needs_window: bool) -> None:
             (
                 str(mingit / "cmd"),
                 str(mingit / "bin"),
+                str(mingit / "mingw64" / "bin"),
                 str(mingit),
                 os.environ.get("PATH", ""),
             )
         )
+    node = bundle / "node"
+    if (node / "node.exe").is_file() and (node / "npm.cmd").is_file():
+        os.environ["PATH"] = os.pathsep.join((str(node), os.environ.get("PATH", "")))
     if needs_window:
         from stockroom.launcher.launch import ensure_webview2
 
@@ -77,7 +81,10 @@ def _dispatch() -> None:
         return
     if any(argument.startswith("--managed-host-probe") for argument in sys.argv[1:]):
         raise SystemExit("--managed-host-probe requires exactly one absolute receipt path")
-    _prepare_runtime(needs_window=True)
+    # The normal supervisor owns the single-instance lock and visible splash
+    # before it provisions WebView2. Doing it here would leave a fresh-PC
+    # download invisible and allow repeated double-clicks to race the installer.
+    _prepare_runtime(needs_window=False)
     from stockroom.launcher.launch import main as continuous_main
 
     raise SystemExit(continuous_main())

@@ -14,6 +14,14 @@ vi.mock("../api/client", async (importActual) => {
     api: {
       ...actual.api,
       devSave: vi.fn().mockResolvedValue({ ok: true, written: [], tokens: 0, copy: 0 }),
+      devStatus: vi.fn().mockResolvedValue({
+        available: true,
+        branch: "main",
+        revision: "a".repeat(40),
+        dirty: [],
+        can_publish: false,
+        publish_blocker: "Save a Dev Mode change before publishing.",
+      }),
     },
   };
 });
@@ -60,7 +68,7 @@ describe("dev mode", () => {
     expect(document.querySelector("[data-copy-id]")).toBeNull();
 
     toggleDevMode();
-    expect(screen.getByText("Save to source")).toBeInTheDocument();
+    expect(screen.getByText("Save To Source")).toBeInTheDocument();
     // now the label is wrapped as an editable target
     expect(document.querySelector('[data-copy-id="test.label"]')).not.toBeNull();
 
@@ -410,5 +418,25 @@ describe("dev mode element overrides", () => {
       result.current.resetElementProp("detail.spec-sheet", "width");
       result.current.clearElement("detail.spec-sheet");
     }).not.toThrow();
+  });
+});
+
+describe("dev mode edit history", () => {
+  it("enables Undo after a behavior edit and round-trips the exact preset", async () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper });
+    expect(result.current.canUndo).toBe(false);
+
+    act(() => result.current.setBehaviorOverride("detail.category-control", { preset: "segmented" }));
+    await waitFor(() => expect(result.current.canUndo).toBe(true));
+    expect(result.current.behaviorOverrideFor("detail.category-control")?.preset).toBe("segmented");
+
+    act(() => result.current.undo());
+    await waitFor(() => expect(result.current.canRedo).toBe(true));
+    expect(result.current.behaviorOverrideFor("detail.category-control")).toBeUndefined();
+
+    act(() => result.current.redo());
+    await waitFor(() =>
+      expect(result.current.behaviorOverrideFor("detail.category-control")?.preset).toBe("segmented"),
+    );
   });
 });

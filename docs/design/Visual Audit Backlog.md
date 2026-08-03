@@ -21,6 +21,39 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-03 — Source-Backed Dev Mode
+
+- Capture layer: Computer Use against the current source in the real Windows pywebview/WebView2
+  host, with a disposable configuration and a Git clone of the real seven-component Stockroom
+  library. The original library was not mutated. Captures were inspected live at 1,386 × 900 and
+  were not retained as standalone image files.
+- Surfaces: Components, MAX17608ATC+ Readiness, the Design panel, the complete 283-item catalogue,
+  and the Category control in dark and light themes.
+- Intended claim: every registered element remains selectable; all five editing facets and the
+  source/publish footer remain reachable; a real Category dropdown changes to Segmented Control
+  without leaving Stockroom or changing its selected value.
+- Acceptance result: pass after correction. The first audit found a P1 flex-layout defect: an
+  expanded catalogue could consume the panel height and hide the source/publish footer. The panel
+  header, toolbar, and footer are now non-shrinking, the catalogue scrolls independently, and the
+  bounded confirmation rail can scroll. Retest kept the footer visible, selected
+  `detail.category-control` from the filtered catalogue, and exposed the working Behavior presets.
+  A second audit found that ref-backed history changed but the memoized context did not refresh,
+  leaving Undo disabled after a live edit; the history revision is now part of the context contract
+  and has a direct behavior-edit Undo/Redo regression test.
+
+### 2026-08-03 — Exact GitHub 0.6.0 First Launch
+
+- Capture layer: Computer Use against the exact 141,237,598-byte `v0.6.0` GitHub EXE with
+  SHA-256 `55bc6179dec5`, downloaded again through GitHub and run with an empty disposable config.
+- Intended claim: the published executable reaches visible first-run onboarding on Windows without
+  relying on the developer source checkout.
+- Acceptance result: functional pass with a P1 startup-experience failure. The exact asset did
+  eventually reach the centered `Set Up Your Components` onboarding screen and its local default
+  repository path, but it showed no visible window while the outer executable unpacked and started
+  the continuous Python runtime. Multiple nested Stockroom/uv/Python processes existed before any
+  feedback. On a fresh laptop this looks identical to a failed launch and encourages duplicate
+  starts; VA-051 tracks the required early splash/progress and explicit runtime failure surface.
+
 ### 2026-08-01 — Current Capture Reliability Source Host
 
 - Capture layer: Computer Use against the exact current source in the real
@@ -247,6 +280,7 @@ and `P2` meaningful fit, finish, or clarity debt.
 | VA-048 | P1 | STM Viewer first run | Building the STM index without a configured CubeMX source ends with an implementation-facing instruction to set `stm_cubemx_source` via `PATCH /api/settings` or `STM32_CUBEMX`. The user cannot perform that recovery anywhere in the visible app. | The empty state discovers a safe local CubeMX source or opens one native folder picker, saves the choice in Settings, retries in place, and keeps API/environment details behind diagnostics. |
 | VA-049 | P2 | Settings category navigation | The active category inherits the previous category's inner scroll position. Switching from scrolled Data Sources to Maintenance opened halfway down the Maintenance content and hid its first task row until the user manually scrolled upward. | Category switches restore the selected category's own remembered position or start a first visit at the top; no destination begins at an unrelated category's scroll offset. |
 | VA-050 | P1 | Components, Complete Part | The visible 1,386 × 893 dark WebView2 Proof 7 frame exposed internal requirement keys verbatim in the lead state: `required projected references are absent: kicad_symbol, kicad_footprint, kicad_model, altium_symbol, altium_footprint`. This competes with the otherwise plain-language KiCad/Shared/Altium checklist and makes a normal missing-files state read like a backend exception. | The lead state says which user-facing files are needed without schema keys; exact requirement keys remain available only in diagnostics/evidence. |
+| VA-051 | P1 | Windows first launch | The browser-downloaded 0.6.0 EXE can remain completely invisible while it unpacks and starts the continuous runtime. A fresh-machine acquisition or runtime failure has no user-facing error, and duplicate launches are easy. | Show a branded window or splash within two seconds, report each bounded bootstrap phase, make one launch authoritative, and surface an actionable failure instead of remaining invisible. Verify from a browser-downloaded asset on a clean Windows machine. |
 | VA-051 | P1 | Components, Representations, CAD Variants | The real TPS62130RGTR source-host readback shows `33 Retained`, including 17 KiCad and 16 Altium Ultra Librarian variants, so repeated acquisition turns the primary inspection surface into a long wall of visually identical `Preferred` cards. The active all-five-role pair is correct, but history overwhelms comparison and makes a successful one-click workflow look unfinished. | Identical source-receipt evidence reuses one retained same-download pair regardless of nondeterministic generated timestamps. Existing duplicates are grouped or collapsed without deleting immutable originals; the active pair and genuinely different provider/geometry variants remain immediately comparable at 1,024 and 1,384 px widths. |
 
 ## Resolved Findings

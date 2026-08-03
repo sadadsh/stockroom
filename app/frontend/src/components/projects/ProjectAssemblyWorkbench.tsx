@@ -13,6 +13,7 @@ import { useToast } from "../../lib/toast";
 import { Badge, Button, Panel, SectionHeading } from "../primitives";
 import { ProjectInspectorFacts } from "./ProjectInspectorFacts";
 import { ProjectPlacementStage } from "./ProjectPlacementStage";
+import { AdaptiveChoice } from "../AdaptiveChoice";
 
 export function ProjectAssemblyWorkbench({
   projectId,
@@ -433,20 +434,17 @@ export function ProjectAssemblyWorkbench({
             <span className="text-xs font-medium text-t2">
               {placementSelectorLabel}
             </span>
-            <select
-              aria-label={placementSelectorLabel}
+            <AdaptiveChoice
+              devId="projects.build-placement-control"
+              label={placementSelectorLabel}
               value={selectedId}
-              onChange={(event) => setSelectedId(event.target.value)}
-              className="h-8 min-w-0 flex-1 rounded-control border border-line bg-field px-2 text-xs font-medium text-t1 outline-none focus:border-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc"
-            >
-              {ordered.map((placement) => (
-                <option key={placement.placement_id} value={placement.placement_id}>
-                  {multiBoard ? `${boardField} ${placement.board_index} · ` : ""}
-                  {placement.reference} · {placementStateLabels[placement.state]} ·{" "}
-                  {placement.mpn || placement.value || identityNeeded}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedId}
+              className="h-8 flex-1"
+              options={ordered.map((placement) => ({
+                value: placement.placement_id,
+                label: `${multiBoard ? `${boardField} ${placement.board_index} · ` : ""}${placement.reference} · ${placementStateLabels[placement.state]} · ${placement.mpn || placement.value || identityNeeded}`,
+              }))}
+            />
           </label>
           <ProjectPlacementStage
             projectId={projectId}

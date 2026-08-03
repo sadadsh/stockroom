@@ -19,10 +19,30 @@ This directory contains Stockroom's production Windows package boundary:
   release; and
 - an actual launch proof against the unpacked packaged executable.
 
-`stockroom_launcher.py` never provisions or updates an application Git
-checkout. Application releases are complete immutable sets verified by the
-TUF-backed broker. MinGit remains bundled because a user's component library
-is intentionally Git-backed; it is not an application-delivery mechanism.
+Normal standalone launch uses the continuous runtime: the stable EXE provisions
+the pushed `main` checkout under LocalAppData, synchronizes its locked production
+dependencies, and starts that source host. The immutable TUF-backed release set
+remains the packaged worker/update boundary. A user-facing standalone build must
+therefore carry MinGit, Git LFS, Node/npm, the WebView2 installer, `uv`, and the
+complete native CAD converter; it may not rely on tools installed on the build
+machine.
+
+## Owner-portable executable
+
+Run the compatibility wrapper to acquire digest-pinned upstream prerequisites,
+verify the Microsoft signature on WebView2, embed the complete converter, and
+produce the standalone EXE:
+
+```powershell
+.\packaging\build_exe.ps1 -Version 0.7.0.0
+```
+
+On a fresh online Windows PC this requires no manual Git, Git LFS, Node/npm,
+Python, WebView2, or converter installation. The first launch still needs network access
+to clone the public application repository and let `uv` fetch the exact Python
+3.12.13 production environment plus the pinned provider browser builds. The
+progress window names those phases. This is a no-manual-prerequisite portable
+bootstrap, not an offline installer.
 
 ## Reproducible unsigned fixture
 

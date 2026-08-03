@@ -7,19 +7,21 @@ a graceful restart), so the exe itself never needs re-freezing (spec section 12)
 module is the PURE supervisor logic; the three shell-outs (clone / uv sync / spawn the host)
 are injected so the whole loop is testable on Linux exactly like updater.py.
 
-Requires git + uv on the machine (uv is bundled beside the exe; git is the one hard external
-dependency of a git-native app). A missing git / uv is an honest loud failure at the shell
-boundary, never a silent stub.
+Source development requires git + uv on the machine. The frozen release carries uv, MinGit,
+and Git LFS so a fresh Windows machine does not depend on PATH. A missing tool is an honest loud
+failure at the shell boundary, never a silent stub.
 
 No em dashes anywhere (standing owner rule).
 """
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Callable
 
@@ -72,11 +74,102 @@ def _child_env() -> dict:
     env = os.environ.copy()
     mp = _meipass()
     if mp is not None:
-        extra = [str(mp / "mingit" / "cmd"), str(mp / "mingit" / "bin"), str(mp)]
+        extra = [
+            str(mp / "node"),
+            str(mp / "mingit" / "cmd"),
+            str(mp / "mingit" / "bin"),
+            str(mp / "mingit" / "mingw64" / "bin"),
+            str(mp),
+        ]
         extra = [d for d in extra if os.path.isdir(d)]
         if extra:
             env["PATH"] = os.pathsep.join(extra) + os.pathsep + env.get("PATH", "")
     return env
+
+
+def _cad_converter_tree_fingerprint(root: Path) -> str:
+    """Return a path-independent digest of one complete converter publish."""
+
+    root = Path(root).resolve(strict=True)
+    digest = hashlib.sha256()
+    files = sorted(
+        (path for path in root.rglob("*") if path.is_file()),
+        key=lambda path: path.relative_to(root).as_posix(),
+    )
+    if not files:
+        raise RuntimeError("the bundled native CAD converter is empty")
+    for path in files:
+        relative = path.relative_to(root).as_posix().encode("utf-8")
+        digest.update(relative)
+        digest.update(b"\0")
+        digest.update(str(path.stat().st_size).encode("ascii"))
+        digest.update(b"\0")
+        with path.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _bundled_cad_converter_root() -> Path | None:
+    mp = _meipass()
+    if mp is None:
+        return None
+    root = mp / "cad-converter"
+    return root if (root / "Stockroom.CadConverter.exe").is_file() else None
+
+
+def _cad_converter_store() -> Path:
+    override = os.environ.get("STOCKROOM_TOOLS_DIR", "").strip()
+    if override:
+        return Path(override)
+    local_app_data = os.environ.get("LOCALAPPDATA") or str(
+        Path.home() / "AppData" / "Local"
+    )
+    return Path(local_app_data) / "Stockroom" / "Tools"
+
+
+def ensure_cad_converter() -> None:
+    """Atomically provision the bundled converter for the continuous source host.
+
+    PyInstaller's one-file extraction directory is temporary.  The child source
+    host needs a stable, complete sidecar tree for its whole lifetime, so copy to
+    a content-addressed directory and publish it with one rename.  An interrupted
+    copy can only leave a private temporary directory, never a half-installed
+    converter at the path exported to the child.
+    """
+
+    source = _bundled_cad_converter_root()
+    if source is None:
+        # Source development resolves its own build (or an existing installed
+        # package) and must not invent a packaged sidecar.
+        return
+    fingerprint = _cad_converter_tree_fingerprint(source)
+    store = _cad_converter_store().resolve()
+    store.mkdir(parents=True, exist_ok=True)
+    destination = store / f"CadConverter-{fingerprint}"
+    executable = destination / "Stockroom.CadConverter.exe"
+    if destination.is_dir():
+        try:
+            if _cad_converter_tree_fingerprint(destination) == fingerprint:
+                os.environ["STOCKROOM_CAD_CONVERTER"] = str(executable)
+                return
+        except (OSError, RuntimeError):
+            pass
+        shutil.rmtree(destination)
+
+    temporary = Path(tempfile.mkdtemp(prefix=".CadConverter-", dir=store))
+    try:
+        shutil.copytree(source, temporary, dirs_exist_ok=True)
+        if _cad_converter_tree_fingerprint(temporary) != fingerprint:
+            raise RuntimeError("the provisioned native CAD converter failed verification")
+        temporary.replace(destination)
+    finally:
+        if temporary.exists():
+            shutil.rmtree(temporary, ignore_errors=True)
+    if not executable.is_file():
+        raise RuntimeError("the native CAD converter installation is incomplete")
+    os.environ["STOCKROOM_CAD_CONVERTER"] = str(executable)
 
 
 def _require_git() -> None:
@@ -268,6 +361,7 @@ def supervise(
     ensure: Callable[[Path], None] | None = None,
     update: Callable[[Path], None] | None = None,
     webview2: Callable[[], None] | None = None,
+    cad_converter: Callable[[], None] | None = None,
     ensure_browsers: Callable[[Path], None] | None = None,
     progress: Callable[[str], None] | None = None,
     remote: str = APP_REPO_REMOTE,
@@ -276,15 +370,16 @@ def supervise(
     """Run the host, relaunching whenever it exits with EXIT_RESTART (a self-update: the
     in-app updater has already pulled + synced, so the loop just re-runs on the new code).
     Returns the host's final non-restart exit code. The shell-outs are injected for testing;
-    the defaults clone / guarantee WebView2 / `uv sync --frozen` / provision the browser builds
-    / `uv run python -m stockroom.host.run`. `progress(phase)` (a splash callback: clone /
-    webview2 / sync / browsers / starting) lets the first-run splash show what is happening
-    during the slow provision, and is signalled 'starting' right before the FIRST host spawn so
-    the splash can close."""
+    the defaults clone / guarantee WebView2 / provision the native converter / `uv sync --frozen`
+    / provision the browser builds / `uv run python -m stockroom.host.run`. `progress(phase)` (a
+    splash callback: clone / webview2 / cad_converter / sync / browsers / starting) shows what is
+    happening during the slow provision, and is signalled 'starting' right before the FIRST host
+    spawn so the splash can close."""
     workdir = Path(workdir)
     _ensure = ensure or (lambda wd: ensure_clone(wd, remote=remote, clone=clone))
     _update = update or update_to_latest
     _webview2 = webview2 or ensure_webview2
+    _cad_converter = cad_converter or ensure_cad_converter
     _uv = uv_sync or _uv_sync
     _browsers = ensure_browsers or _ensure_browsers
     _spawn = spawn or _spawn_host
@@ -295,22 +390,18 @@ def supervise(
     _update(workdir)  # ff-pull to the latest pushed code on EVERY launch, so updates hit right away
     _progress("webview2")
     _webview2()  # guarantee the runtime the host's window needs BEFORE any host spawn
+    _progress("cad_converter")
+    _cad_converter()
     started = False
     while True:
         _progress("sync")
         _uv(workdir)
         if not started:
-            # Provision the render tier's browser BUILDS once, AFTER the deps sync (uv sync
-            # installs the camoufox/playwright packages but not their ~150 MB browser binaries)
-            # and BEFORE the first host spawn, so a clean install can render distributor pages.
-            # NON-FATAL: unlike WebView2 (without which no window opens), the render tier is
-            # optional (LCSC resolves over plain HTTP), so a failed download degrades the render
-            # path honestly rather than blocking the whole app (source-agnostic completeness).
+            # Provision both provider browser builds once, after dependency sync and before the
+            # first host. Get Files depends on these paths, so a failed fresh-PC provision must
+            # reach the visible fatal boundary instead of opening an apparently healthy app.
             _progress("browsers")
-            try:
-                _browsers(workdir)
-            except Exception:  # noqa: BLE001 - an optional render tier never blocks the launch
-                pass
+            _browsers(workdir)
             _progress("starting")  # provisioning done; the splash closes, the host window appears
             started = True
         code = _spawn(workdir)
@@ -327,7 +418,10 @@ def _git_clone(remote: str, workdir: Path) -> None:  # pragma: no cover - real s
     workdir.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
         [_git_bin(), "clone", remote, str(workdir)],
-        capture_output=True, text=True, creationflags=_NO_WINDOW,
+        capture_output=True,
+        text=True,
+        env=_child_env(),
+        creationflags=_NO_WINDOW,
     )
     if proc.returncode != 0:
         raise RuntimeError(f"could not clone the Stockroom app repo: {proc.stderr.strip()}")
@@ -350,6 +444,7 @@ def _reconcile_pull(workdir: Path, git: str) -> None:
             [git, "-C", str(workdir), *args],
             capture_output=True,
             text=True,
+            env=_child_env(),
             creationflags=_NO_WINDOW,
         )
 
@@ -366,7 +461,7 @@ def _uv_sync(workdir: Path) -> None:  # pragma: no cover - real shell-out
     # Capture output so a failure (offline, proxy, cert) surfaces as a readable message the
     # entry-point dialog can show, not a bare CalledProcessError into a windowed void.
     proc = subprocess.run(
-        [_uv_bin(), "sync", "--frozen"], cwd=str(workdir),
+        [_uv_bin(), "sync", "--frozen", "--no-dev"], cwd=str(workdir),
         capture_output=True, text=True, env=_child_env(), creationflags=_NO_WINDOW,
     )
     if proc.returncode != 0:
@@ -382,23 +477,32 @@ def _ensure_browsers(workdir: Path) -> None:  # pragma: no cover - real shell-ou
     browser binaries (~150 MB total), so a clean install would fail the first distributor render
     until these run. Both commands are IDEMPOTENT (a fast no-op once their build is present), so
     this is cheap on every launch after the provision, and an updated pin re-fetches the new
-    build. Runs with --frozen --no-sync: supervise already synced, so never re-validate against
-    the network here. A failure is raised for supervise to catch (the render tier is optional, so
-    the launch proceeds without it); the readable message is preserved for a future surface."""
+    build. Runs with --frozen --no-sync: supervise already synced, so never re-validates packages
+    here. Each browser gets one retry and both are attempted even if one fails. Any remaining
+    failure reaches the launcher's visible error boundary because a fresh install must not present
+    Get Files as ready without its required provider runtimes."""
+    failures: list[str] = []
     for args, what in (
         (["run", "--frozen", "--no-sync", "python", "-m", "playwright", "install", "chromium"],
          "Chromium"),
         (["run", "--frozen", "--no-sync", "python", "-m", "camoufox", "fetch"], "Camoufox"),
     ):
-        proc = subprocess.run(
-            [_uv_bin(), *args], cwd=str(workdir),
-            capture_output=True, text=True, env=_child_env(), creationflags=_NO_WINDOW,
-        )
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"could not provision the {what} browser build: "
-                + ((proc.stderr or proc.stdout) or "").strip()
+        detail = ""
+        for _attempt in range(2):
+            proc = subprocess.run(
+                [_uv_bin(), *args], cwd=str(workdir),
+                capture_output=True, text=True, env=_child_env(), creationflags=_NO_WINDOW,
             )
+            if proc.returncode == 0:
+                break
+            detail = ((proc.stderr or proc.stdout) or "").strip()
+        else:
+            failures.append(f"{what}: {detail or 'download failed'}")
+    if failures:
+        raise RuntimeError(
+            "could not provision required provider browser builds after retry: "
+            + "; ".join(failures)
+        )
 
 
 def _spawn_host(workdir: Path) -> int:  # pragma: no cover - real shell-out
@@ -407,7 +511,14 @@ def _spawn_host(workdir: Path) -> int:  # pragma: no cover - real shell-out
     proc = subprocess.run(
         [_uv_bin(), "run", "--frozen", "--no-sync", "python", "-m", "stockroom.host.run"],
         cwd=str(workdir), env=_child_env(), creationflags=_NO_WINDOW,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
+    if proc.returncode not in (0, EXIT_RESTART):
+        detail = ((proc.stderr or proc.stdout) or "").strip()
+        if len(detail) > 2000:
+            detail = detail[-2000:]
+        suffix = f": {detail}" if detail else ""
+        raise RuntimeError(f"the Stockroom window exited with code {proc.returncode}{suffix}")
     return proc.returncode
 
 

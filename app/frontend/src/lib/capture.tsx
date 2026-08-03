@@ -234,6 +234,48 @@ const WORKFLOW_STAGE_MESSAGE: Record<string, string> = {
   publish: "Publishing the complete package atomically.",
 };
 
+const WORKFLOW_STAGE_FAILURE_MESSAGE: Record<string, string> = {
+  identity_dedupe:
+    "The part identity changed before completion could start. Refresh the part, then select Get Files again.",
+  metadata:
+    "Part data collection stopped. Select Get Files again; Stockroom will reuse retained evidence.",
+  datasheet:
+    "Datasheet collection stopped. Select Get Files again; Stockroom will reuse retained evidence.",
+  existing_evidence:
+    "Saved CAD evidence could not be read safely. Select Get Files again to recheck the retained files.",
+  cad_acquisition:
+    "CAD collection was interrupted. Select Get Files again; Stockroom will resume from retained evidence.",
+  reconcile:
+    "The collected sources could not be reconciled into one component. Select Get Files again to retry from retained evidence.",
+  canonical_definition:
+    "The shared component definition could not be built. Select Get Files again to retry from retained evidence.",
+  template_generation:
+    "The KiCad and Altium inputs could not be prepared. Select Get Files again to retry from retained evidence.",
+  native_conversion_acquisition:
+    "Native CAD conversion stopped. Select Get Files again; downloaded evidence will be reused.",
+  kicad_build_readback:
+    "KiCad readback could not verify the generated package. Select Get Files again to retry from retained evidence.",
+  altium_build_readback:
+    "Altium readback could not verify the generated package. Select Get Files again to retry from retained evidence.",
+  cross_eda_verification:
+    "KiCad and Altium could not be verified as the same component. Select Get Files again to retry from retained evidence.",
+  catalog_link_generation:
+    "The verified files could not be linked into the component catalog. Select Get Files again to retry publication.",
+  publish:
+    "The verified package could not be published to the library. Select Get Files again to retry publication from retained evidence.",
+};
+
+function latestEventStage(events: WorkflowEvent[], kind?: string): string | null {
+  const newestFirst = [...events].sort((left, right) => right.sequence - left.sequence);
+  for (const event of newestFirst) {
+    const stage = event.details.stage;
+    if ((kind === undefined || event.kind === kind) && typeof stage === "string") {
+      return stage;
+    }
+  }
+  return null;
+}
+
 function durableMessage(
   batch: WorkflowBatchSummary,
   events: WorkflowEvent[],
@@ -251,15 +293,16 @@ function durableMessage(
   }
   if (batch.status === "cancelled") return "Completion was cancelled before publication.";
   if (batch.status === "failed") {
-    return "Completion stopped before the package could be verified and published. Retry to continue from durable evidence.";
+    const failedStage = latestEventStage(events, "stage_failed");
+    return failedStage
+      ? (WORKFLOW_STAGE_FAILURE_MESSAGE[failedStage] ??
+          "Completion stopped at a recorded workflow stage. Select Get Files again; Stockroom will reuse retained evidence.")
+      : "Completion was interrupted. Select Get Files again; Stockroom will reuse retained evidence.";
   }
   if (batch.status === "completed") {
     return "Part data, datasheet, KiCad, Altium, and STEP are verified and linked.";
   }
-  const latestStage = [...events]
-    .sort((left, right) => right.sequence - left.sequence)
-    .map((event) => event.details.stage)
-    .find((stage): stage is string => typeof stage === "string");
+  const latestStage = latestEventStage(events);
   if (latestStage === "cad_acquisition") {
     return mode === "collect-all"
       ? "Collecting every eligible source in order and retaining verified variants."

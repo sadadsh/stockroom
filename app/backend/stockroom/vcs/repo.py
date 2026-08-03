@@ -668,6 +668,12 @@ class GitRepo:
     def current_branch(self) -> str:
         return self._run("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
 
+    def resolve_ref(self, ref: str) -> str:
+        """Resolve one Git ref to its full object id without changing the checkout."""
+        if not ref or any(char.isspace() for char in ref):
+            raise GitError("git ref must be one non-empty token")
+        return self._run("rev-parse", "--verify", ref).stdout.strip()
+
     def has_upstream(self) -> bool:
         return (
             self._run(

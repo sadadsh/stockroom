@@ -4218,7 +4218,10 @@ class WorkflowStore:
                 stage_id=stage_id,
                 kind="stage_failed",
                 now=timestamp,
-                payload={"attempt": row["attempt_count"]},
+                payload={
+                    "attempt": row["attempt_count"],
+                    "stage": row["name"],
+                },
             )
             self._refresh_items_and_batches(
                 connection,

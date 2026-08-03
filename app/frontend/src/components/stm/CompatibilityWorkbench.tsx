@@ -27,6 +27,7 @@ import {
   useStmSuggestions,
 } from "../../api/stmQueries";
 import { ApiError } from "../../api/client";
+import { AdaptiveChoice } from "../AdaptiveChoice";
 import type {
   CompatUnionBody,
   SuggestionGroupDTO,
@@ -415,22 +416,19 @@ export function CompatibilityWorkbench() {
               </Button>
               <label className="flex min-w-0 items-center gap-2">
                 <span className="text-xs text-t3">Target set</span>
-                <select
-                  aria-label="Target Set"
+                <AdaptiveChoice
+                  devId="stm.target-set-control"
+                  label="Target Set"
                   value={customParts ? "custom" : activeSetId}
-                  onChange={(event) => event.target.value !== "custom" && stepTo(event.target.value)}
-                  className="min-w-0 rounded-control bg-field px-2 py-1 text-xs text-t1 outline-none"
-                >
-                  {sets.map((set) => (
-                    <option key={set.id} value={set.id}>
-                      {set.label} · {set.count}
-                      {set.tier === "divergent" ? ` · ${set.divergent} divergent` : ""}
-                    </option>
-                  ))}
-                  {customParts ? (
-                    <option value="custom">Custom · {customParts.length}</option>
-                  ) : null}
-                </select>
+                  onChange={(next) => next !== "custom" && stepTo(next)}
+                  options={[
+                    ...sets.map((set) => ({
+                      value: set.id,
+                      label: `${set.label} · ${set.count}${set.tier === "divergent" ? ` · ${set.divergent} divergent` : ""}`,
+                    })),
+                    ...(customParts ? [{ value: "custom", label: `Custom · ${customParts.length}`, disabled: true }] : []),
+                  ]}
+                />
               </label>
               <Button small onClick={() => stepBy(1)} aria-label="Next Set">
                 →

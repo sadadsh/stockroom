@@ -5,6 +5,7 @@
  * copyId renders the label through the copy layer, so it is dev-mode editable.
  */
 import { Text } from "../lib/copy";
+import { AdaptiveChoice } from "./AdaptiveChoice";
 
 function FieldLabel({ label, copyId }: { label: string; copyId?: string }) {
   return (
@@ -54,6 +55,7 @@ export function SelectField({
   onChange,
   placeholder,
   options,
+  devId,
 }: {
   label: string;
   copyId?: string;
@@ -61,23 +63,22 @@ export function SelectField({
   onChange: (v: string) => void;
   placeholder: string;
   options: [string, string][];
+  devId: string;
 }) {
   return (
     <label className="flex flex-col gap-1">
       <FieldLabel label={label} copyId={copyId} />
-      <select
-        aria-label={label}
+      <AdaptiveChoice
+        devId={devId}
+        label={label}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="rounded-control border border-line2 bg-field px-3 py-2 text-base text-t1 outline-none focus:border-acc"
-      >
-        <option value="">{placeholder}</option>
-        {options.map(([v, text]) => (
-          <option key={v} value={v}>
-            {text}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        options={[
+          { value: "", label: placeholder },
+          ...options.map(([optionValue, text]) => ({ value: optionValue, label: text })),
+        ]}
+        className="w-full"
+      />
     </label>
   );
 }

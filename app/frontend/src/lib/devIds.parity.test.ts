@@ -146,7 +146,19 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "detail.specs-expand",
   "detail.sourcing-collapse",
   "detail.sourcing-expand",
-]; // 16
+  "detail.category-control",
+  // AdaptiveChoice renders these source-spelled ids through its devId prop. The semantic
+  // value/options contract stays in the caller while the primitive swaps presentation presets.
+  "ingest.footprint-control",
+  "ingest.kind-control",
+  "ingest.package-control",
+  "projects.board-control",
+  "projects.bom-filter-control",
+  "projects.bom-line-control",
+  "projects.build-placement-control",
+  "projects.document-control",
+  "stm.target-set-control",
+]; // 26
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));

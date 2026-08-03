@@ -29,6 +29,10 @@ import { TOKEN_OVERRIDES } from "./token.overrides";
 import { COPY_OVERRIDES } from "./copy.overrides";
 import { ICON_OVERRIDES, type IconOverride } from "./icon.overrides";
 import { ELEMENT_OVERRIDES } from "./element.overrides";
+import {
+  BEHAVIOR_OVERRIDES,
+  type BehaviorOverride,
+} from "./behavior.overrides";
 import { applyElementOverrides, startElementOverrideObserver } from "./applyElementOverrides";
 
 // The two override blocks: dark colours + shared radii on :root ("root"), light colours on
@@ -84,6 +88,13 @@ interface DevModeContextValue {
   resetElementProp: (id: string, prop: string) => void;
   // Remove every property for an id (the Box tab's clear-all-for-this-element).
   clearElement: (id: string) => void;
+  behaviorOverrideFor: (id: string) => BehaviorOverride | undefined;
+  setBehaviorOverride: (id: string, override: BehaviorOverride) => void;
+  resetBehaviorOverride: (id: string) => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
   // The label the panel is currently editing (clicked in dev mode), with its default text so the
   // panel can show + reset to it, or null.
   selectedCopyId: string | null;
@@ -148,6 +159,13 @@ const DEFAULT: DevModeContextValue = {
   setElementProp: noop,
   resetElementProp: noop,
   clearElement: noop,
+  behaviorOverrideFor: (id) => BEHAVIOR_OVERRIDES[id],
+  setBehaviorOverride: noop,
+  resetBehaviorOverride: noop,
+  canUndo: false,
+  canRedo: false,
+  undo: noop,
+  redo: noop,
   selectedCopyId: null,
   selectedCopyDefault: "",
   selectCopy: noop,
@@ -200,6 +218,9 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   const [elements, setElements] = useState<Record<string, Record<string, string>>>(() =>
     cloneElements(ELEMENT_OVERRIDES),
   );
+  const [behaviors, setBehaviors] = useState<Record<string, BehaviorOverride>>(() => ({
+    ...BEHAVIOR_OVERRIDES,
+  }));
   const [selectedCopy, setSelectedCopy] = useState<{ id: string; def: string } | null>(null);
   const [selectedDevId, setSelectedDevId] = useState<string | null>(null);
   const [inspect, setInspect] = useState(false);
@@ -212,6 +233,58 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   const [savedCopy, setSavedCopy] = useState(() => JSON.stringify(COPY_OVERRIDES));
   const [savedIcons, setSavedIcons] = useState(() => JSON.stringify(ICON_OVERRIDES));
   const [savedElements, setSavedElements] = useState(() => JSON.stringify(ELEMENT_OVERRIDES));
+  const [savedBehaviors, setSavedBehaviors] = useState(() => JSON.stringify(BEHAVIOR_OVERRIDES));
+  const currentSnapshot = JSON.stringify({ tokens, copy, icons, elements, behaviors });
+  const lastSnapshotRef = useRef(currentSnapshot);
+  const undoRef = useRef<string[]>([]);
+  const redoRef = useRef<string[]>([]);
+  const restoringHistoryRef = useRef(false);
+  // The stacks live in refs so recording history does not itself create another snapshot. Keep a
+  // small revision counter in the context memo dependencies so Undo/Redo enable immediately after
+  // a ref-only stack mutation.
+  const [historyRevision, setHistoryRevision] = useState(0);
+
+  useEffect(() => {
+    if (currentSnapshot === lastSnapshotRef.current) return;
+    if (restoringHistoryRef.current) {
+      restoringHistoryRef.current = false;
+    } else {
+      undoRef.current = [...undoRef.current.slice(-49), lastSnapshotRef.current];
+      redoRef.current = [];
+    }
+    lastSnapshotRef.current = currentSnapshot;
+    setHistoryRevision((revision) => revision + 1);
+  }, [currentSnapshot]);
+
+  const restoreSnapshot = useCallback((raw: string) => {
+    const next = JSON.parse(raw) as {
+      tokens: TokenOverrides;
+      copy: Record<string, string>;
+      icons: Record<string, IconOverride>;
+      elements: Record<string, Record<string, string>>;
+      behaviors: Record<string, BehaviorOverride>;
+    };
+    restoringHistoryRef.current = true;
+    setTokens(next.tokens);
+    setCopyState(next.copy);
+    setIcons(next.icons);
+    setElements(next.elements);
+    setBehaviors(next.behaviors);
+  }, []);
+
+  const undo = useCallback(() => {
+    const previous = undoRef.current.pop();
+    if (!previous) return;
+    redoRef.current.push(lastSnapshotRef.current);
+    restoreSnapshot(previous);
+  }, [restoreSnapshot]);
+
+  const redo = useCallback(() => {
+    const next = redoRef.current.pop();
+    if (!next) return;
+    undoRef.current.push(lastSnapshotRef.current);
+    restoreSnapshot(next);
+  }, [restoreSnapshot]);
 
   // Two refs drive the element-override apply: prevElementsRef holds the previously-applied map so a
   // re-apply can compute exactly which props to clear; elementsRef always holds the latest map so the
@@ -231,6 +304,20 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    function onHistoryKey(event: KeyboardEvent) {
+      if (!enabled || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const target = event.target;
+      if (target instanceof Element && target.matches("input, textarea, [contenteditable='true']")) return;
+      if (event.key.toLowerCase() !== "z") return;
+      event.preventDefault();
+      if (event.shiftKey) redo();
+      else undo();
+    }
+    window.addEventListener("keydown", onHistoryKey);
+    return () => window.removeEventListener("keydown", onHistoryKey);
+  }, [enabled, undo, redo]);
 
   // Apply the committed + edited tokens to the document for the ACTIVE theme (colours are
   // theme-specific, radii shared). Runs regardless of `enabled` so the shipped design is whatever
@@ -385,11 +472,24 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const behaviorOverrideFor = useCallback((id: string) => behaviors[id], [behaviors]);
+  const setBehaviorOverride = useCallback((id: string, override: BehaviorOverride) => {
+    setBehaviors((prev) => ({ ...prev, [id]: { ...(prev[id] ?? {}), ...override } }));
+  }, []);
+  const resetBehaviorOverride = useCallback((id: string) => {
+    setBehaviors((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
   const resetAll = useCallback(() => {
     setTokens({ root: {}, light: {} });
     setCopyState({});
     setIcons({});
     setElements({});
+    setBehaviors({});
     setSelectedCopy(null);
   }, []);
 
@@ -407,7 +507,8 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
     JSON.stringify(tokens) !== savedTokens ||
     JSON.stringify(copy) !== savedCopy ||
     JSON.stringify(icons) !== savedIcons ||
-    JSON.stringify(elements) !== savedElements;
+    JSON.stringify(elements) !== savedElements ||
+    JSON.stringify(behaviors) !== savedBehaviors;
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -416,17 +517,18 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       // D-04 / ELEM-01: carry the working icon + element overrides as the `icons` / `elements`
       // blocks; the backend (already wired) validates them and writes lib/icon.overrides.ts +
       // lib/element.overrides.ts alongside the token/copy files.
-      await api.devSave({ tokens, copy, icons, elements });
+      await api.devSave({ tokens, copy, icons, elements, behaviors });
       setSavedTokens(JSON.stringify(tokens));
       setSavedCopy(JSON.stringify(copy));
       setSavedIcons(JSON.stringify(icons));
       setSavedElements(JSON.stringify(elements));
+      setSavedBehaviors(JSON.stringify(behaviors));
     } catch (err) {
       setLastError(err instanceof ApiError ? err.message : "Could not save to source");
     } finally {
       setSaving(false);
     }
-  }, [tokens, copy, icons, elements]);
+  }, [tokens, copy, icons, elements, behaviors]);
 
   const value = useMemo<DevModeContextValue>(
     () => ({
@@ -452,6 +554,13 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       setElementProp,
       resetElementProp,
       clearElement,
+      behaviorOverrideFor,
+      setBehaviorOverride,
+      resetBehaviorOverride,
+      canUndo: undoRef.current.length > 0,
+      canRedo: redoRef.current.length > 0,
+      undo,
+      redo,
       selectedCopyId: selectedCopy?.id ?? null,
       selectedCopyDefault: selectedCopy?.def ?? "",
       selectCopy,
@@ -492,6 +601,12 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       setElementProp,
       resetElementProp,
       clearElement,
+      behaviorOverrideFor,
+      setBehaviorOverride,
+      resetBehaviorOverride,
+      historyRevision,
+      undo,
+      redo,
       selectedCopy,
       selectCopy,
       clearSelectedCopy,

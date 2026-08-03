@@ -68,6 +68,7 @@ def test_release_can_only_invoke_the_canonical_production_packager() -> None:
     assert "-Mode Production" in build
     assert "-SigningCertificatePath $pfxPath" in build
     assert "-MinGitRoot $env:STOCKROOM_MINGIT_ROOT" in build
+    assert "-NodeRoot $env:STOCKROOM_NODE_ROOT" in build
     assert "-WebView2BootstrapperPath $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER" in build
     assert "-TufRootPath $env:STOCKROOM_TUF_ROOT_PATH" in build
     assert "-TufMetadataVersion ([int]$env:STOCKROOM_TUF_METADATA_VERSION)" in build
@@ -133,6 +134,12 @@ def test_launcher_inputs_are_https_host_restricted_and_digest_pinned() -> None:
     assert "$parsed.UserInfo" in fetch
     assert '"github.com"' in fetch
     assert '"go.microsoft.com"' in fetch
+    assert "git-lfs-windows-amd64-v3.7.1.zip" in fetch
+    assert "8683cdc3d6c029b49393dcebbaa6265bd6efd9abdcf837be855b4cd42e5e80b6" in fetch
+    assert 'Join-Path $minGitRoot "mingw64\\bin\\git-lfs.exe"' in fetch
+    assert "node-v24.19.0-win-x64.zip" in fetch
+    assert "57f71ab3652e797d84acddc79c81cc9ff1c6ddb2a1974cdb83f00fee9bff4c73" in fetch
+    assert "STOCKROOM_NODE_ROOT=$nodeRoot" in fetch
     assert "Get-FileHash -LiteralPath $Destination -Algorithm SHA256" in fetch
     assert "Release input SHA-256 verification failed." in fetch
     assert "STOCKROOM_TUF_ROOT_BASE64" in metadata
@@ -193,7 +200,13 @@ def test_release_requires_complete_signed_canonical_evidence() -> None:
         '$evidence.managed_runtime.coordinator_state -cne "running"',
         '$evidence.managed_runtime.update_channel -cne "production"',
         "$evidence.tools.bundled_mingit.git_executable_sha256",
+        "$evidence.tools.bundled_git_lfs.executable_sha256",
+        "$evidence.tools.bundled_node.tree_sha256",
+        "$evidence.tools.bundled_node.node_executable_sha256",
+        "$evidence.tools.bundled_node.npm_command_sha256",
         "$evidence.tools.webview2_bootstrapper.sha256",
+        "$evidence.tools.cad_converter.tree_sha256",
+        "$evidence.tools.cad_converter.executable_sha256",
         "$evidence.reproducibility.pyinstaller_payloads_match",
         "Get-AuthenticodeSignature -LiteralPath $packagePath",
         "Release output digest does not match Build Evidence.json.",

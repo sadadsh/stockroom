@@ -260,6 +260,36 @@ jobs:
             throw "The verified MinGit archive does not contain cmd\git.exe."
           }
 
+          $gitLfsArchive = Join-Path $inputRoot "git-lfs-windows-amd64-v3.7.1.zip"
+          Receive-VerifiedReleaseInput `
+            -Uri "https://github.com/git-lfs/git-lfs/releases/download/v3.7.1/git-lfs-windows-amd64-v3.7.1.zip" `
+            -ExpectedSha256 "8683cdc3d6c029b49393dcebbaa6265bd6efd9abdcf837be855b4cd42e5e80b6" `
+            -Destination $gitLfsArchive `
+            -AllowedHosts @("github.com")
+          $gitLfsRoot = Join-Path $inputRoot "Git LFS"
+          Expand-Archive -LiteralPath $gitLfsArchive -DestinationPath $gitLfsRoot
+          $gitLfsSource = Join-Path $gitLfsRoot "git-lfs-3.7.1\git-lfs.exe"
+          if (-not (Test-Path -LiteralPath $gitLfsSource -PathType Leaf)) {
+            throw "The verified Git LFS archive does not contain git-lfs.exe."
+          }
+          Copy-Item -LiteralPath $gitLfsSource `
+            -Destination (Join-Path $minGitRoot "mingw64\bin\git-lfs.exe")
+
+          $nodeArchive = Join-Path $inputRoot "node-v24.19.0-win-x64.zip"
+          Receive-VerifiedReleaseInput `
+            -Uri "https://nodejs.org/dist/v24.19.0/node-v24.19.0-win-x64.zip" `
+            -ExpectedSha256 "57f71ab3652e797d84acddc79c81cc9ff1c6ddb2a1974cdb83f00fee9bff4c73" `
+            -Destination $nodeArchive `
+            -AllowedHosts @("nodejs.org")
+          Expand-Archive -LiteralPath $nodeArchive -DestinationPath $inputRoot
+          $nodeRoot = Join-Path $inputRoot "node-v24.19.0-win-x64"
+          if (
+            -not (Test-Path -LiteralPath (Join-Path $nodeRoot "node.exe") -PathType Leaf) -or
+            -not (Test-Path -LiteralPath (Join-Path $nodeRoot "npm.cmd") -PathType Leaf)
+          ) {
+            throw "The verified Node runtime does not contain node.exe and npm.cmd."
+          }
+
           $webView2 = Join-Path $inputRoot "MicrosoftEdgeWebview2Setup.exe"
           Receive-VerifiedReleaseInput `
             -Uri $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL `
@@ -286,7 +316,7 @@ jobs:
           $utf8 = [Text.UTF8Encoding]::new($false)
           [IO.File]::AppendAllText(
             $env:GITHUB_ENV,
-            "STOCKROOM_MINGIT_ROOT=$minGitRoot`nSTOCKROOM_WEBVIEW2_BOOTSTRAPPER=$webView2`nSTOCKROOM_TUF_ROOT_PATH=$tufRoot`n",
+            "STOCKROOM_MINGIT_ROOT=$minGitRoot`nSTOCKROOM_NODE_ROOT=$nodeRoot`nSTOCKROOM_WEBVIEW2_BOOTSTRAPPER=$webView2`nSTOCKROOM_TUF_ROOT_PATH=$tufRoot`n",
             $utf8
           )
 
@@ -397,6 +427,7 @@ jobs:
             -FeedBaseUri $env:STOCKROOM_WINDOWS_FEED_BASE_URI `
             -SigningCertificatePath $pfxPath `
             -MinGitRoot $env:STOCKROOM_MINGIT_ROOT `
+            -NodeRoot $env:STOCKROOM_NODE_ROOT `
             -WebView2BootstrapperPath $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER `
             -TufRootPath $env:STOCKROOM_TUF_ROOT_PATH `
             -TufMetadataVersion ([int]$env:STOCKROOM_TUF_METADATA_VERSION) `
@@ -592,7 +623,19 @@ jobs:
           if (
             [string]$evidence.tools.bundled_mingit.git_executable_sha256 -notmatch
               "^[0-9a-f]{64}$" -or
+            [string]$evidence.tools.bundled_git_lfs.executable_sha256 -notmatch
+              "^[0-9a-f]{64}$" -or
+            [string]$evidence.tools.bundled_node.tree_sha256 -notmatch
+              "^[0-9a-f]{64}$" -or
+            [string]$evidence.tools.bundled_node.node_executable_sha256 -notmatch
+              "^[0-9a-f]{64}$" -or
+            [string]$evidence.tools.bundled_node.npm_command_sha256 -notmatch
+              "^[0-9a-f]{64}$" -or
             [string]$evidence.tools.webview2_bootstrapper.sha256 -notmatch
+              "^[0-9a-f]{64}$" -or
+            [string]$evidence.tools.cad_converter.tree_sha256 -notmatch
+              "^[0-9a-f]{64}$" -or
+            [string]$evidence.tools.cad_converter.executable_sha256 -notmatch
               "^[0-9a-f]{64}$"
           ) {
             throw "Bundled Windows runtime dependency evidence is incomplete."

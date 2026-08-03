@@ -831,6 +831,11 @@ def test_batch_retry_requeues_only_failures_and_is_idempotent(tmp_path):
         now=5,
     )
     assert store.get_batch(batch.id).status is BatchStatus.FAILED
+    failed_event = next(event for event in store.events(batch.id) if event.kind == "stage_failed")
+    assert failed_event.payload == {
+        "attempt": 1,
+        "stage": failed.name.value,
+    }
 
     terminal_events_before = [
         event for event in store.events(batch.id) if event.kind == "stage_completed"
