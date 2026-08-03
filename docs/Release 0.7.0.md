@@ -50,11 +50,18 @@ computer and adds the source-backed owner Dev Mode.
 ## Acceptance
 
 - Full frontend: 1,404 tests across 130 files.
-- Launcher, packaging, provider workflow, and workflow store: 168 focused tests.
+- Launcher, packaging, provider workflow, and workflow store: 177 focused tests;
+  the final production-dependency package contract adds 29 passing checks.
 - TypeScript, Ruff, Windows-targeted Python type checking, actionlint, production
   frontend build/token parity, PowerShell parsing, and Git diff checks pass.
-- A full package rehearsal built the exact standalone payload, packaged 1,070
-  files, completed managed-host and native converter probes, and recorded non-null
-  digests for MinGit, Git LFS, WebView2, and the converter.
-- Final release acceptance additionally requires a clean-revision reproducible
-  build and a no-argument clean-profile launch of the exact published EXE.
+- A clean-revision reproducible package build completed the managed-host and native
+  converter probes and recorded exact digests for MinGit, Git LFS, Node/npm,
+  WebView2, and the converter.
+- A prerequisite-scrubbed clean Windows profile cloned the live public source with
+  bundled Git/Git LFS, provisioned exact Python 3.12.13 and the provider browser
+  runtime, installed the bundled converter, materialized real LFS payloads, and
+  reached the visible Components workspace in both themes. The native converter
+  then produced and strictly read back nonempty `.SchLib` and `.PcbLib` files.
+- The GitHub asset is accepted only after the final rebuilt bytes repeat that
+  no-argument clean-profile launch and the downloaded asset matches the accepted
+  SHA-256 digest.

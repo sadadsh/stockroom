@@ -613,3 +613,21 @@ opened the real two-component library without launching KiCad or Altium.
   should summarize the primary error and put the traceback behind a details affordance.
 - Disposition: release-blocking dependency boundary fixed in source; the candidate remains
   rejected until the same clean profile opens the real Stockroom window.
+
+### 2026-08-03 — Stockroom 0.7 Clean-Profile Success
+
+- Capture layer: Computer Use against the repaired `0.7.0` candidate with empty app, config,
+  tools, Python, and Playwright directories plus a prerequisite-scrubbed `PATH`.
+- Onboarding: the first-run library choice stayed inside the Stockroom window, named the default
+  library destination, exposed the alternative-library action, and replaced its primary action
+  with explicit working feedback while initialization completed. The deliberately long isolated
+  acceptance path wrapped heavily; a normal `%LOCALAPPDATA%` path is materially shorter.
+- Main workspace, dark and light, 1386×893: the application reached the real Components route,
+  showed the intentional `No Components Yet` state, kept Add Parts primary, exposed the active
+  `.bootstrap-library`, and reported `Current` rather than `Update Unknown`. The compact icon rail
+  is internally consistent but remains less self-describing than the expanded rail for a first-time
+  user. No clipping, horizontal overflow, modal residue, or theme-parity defect was visible.
+- Disposition: clean-profile visible startup and onboarding pass. Runtime proof also confirmed the
+  installed native CAD converter, exact Python, bundled Git/Git LFS, Node/npm, signed WebView2
+  bootstrapper, Chromium cache, and real Git LFS payloads; the final release asset still requires
+  one exact-byte clean-profile rerun after the reproducible rebuild.
