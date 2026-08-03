@@ -267,12 +267,18 @@ function Get-TextSha256 {
     param([Parameter(Mandatory)][string]$Text)
 
     $bytes = [Text.Encoding]::UTF8.GetBytes($Text)
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    $digest = $null
     try {
-        $digest = [Security.Cryptography.SHA256]::HashData($bytes)
-        return [Convert]::ToHexString($digest).ToLowerInvariant()
+        $digest = $hasher.ComputeHash($bytes)
+        return -join @($digest | ForEach-Object { $_.ToString("x2") })
     }
     finally {
+        if ($null -ne $digest) {
+            [Array]::Clear($digest, 0, $digest.Length)
+        }
         [Array]::Clear($bytes, 0, $bytes.Length)
+        $hasher.Dispose()
     }
 }
 
