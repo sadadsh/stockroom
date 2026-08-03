@@ -429,6 +429,20 @@ def test_owner_portable_build_pins_every_fresh_pc_launcher_input() -> None:
     assert "$buildArguments.SkipReproducibilityProof = $true" in script
 
 
+def test_no_dev_fresh_install_keeps_host_startup_image_runtime() -> None:
+    import tomllib
+
+    project = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    runtime = {entry.split(">", 1)[0].split("=", 1)[0].casefold() for entry in project["project"]["dependencies"]}
+    development = {
+        entry.split(">", 1)[0].split("=", 1)[0].casefold()
+        for entry in project["dependency-groups"]["dev"]
+    }
+
+    assert "pillow" in runtime
+    assert "pillow" not in development
+
+
 def test_window_host_publish_returns_only_its_publish_root():
     script = BUILD_SCRIPT.read_text(encoding="utf-8")
     start = script.index("function Build-WindowHost")

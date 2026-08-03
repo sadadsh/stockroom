@@ -601,3 +601,15 @@ opened the real two-component library without launching KiCad or Altium.
 | Live window `Stockroom`, 0.5.3.4 embedded DigiKey completion | .NET WindowHost / embedded provider WebView2, real Stockroom Library, 1266×793 | Final repair authority: the native header clearly states that KiCad + Altium + STEP capture is automatic, both DigiKey downloads progress and complete without WebView2's opaque GUID flyout appearing, and Provider → Stockroom → Provider preserves the exact DigiKey page while the modal reports background conversion/attachment. Hover text remains legible. Open P2: the header's long guidance line is intentionally quiet but approaches the right edge at this minimum audit width; responsive shortening below 1,100 px would improve polish without changing the workflow. |
 | `work/Release 0.6.0 Verification/Source Theme One.png` | pywebview / WebView2, real Stockroom Library, dark, 1386×893 | Release-source authority: the final bundle exposes one **Get CAD Files** action, separate 3D/Symbol/Footprint viewers, realistic source-color 3D, and matching KiCad/Altium readiness. Existing P2s remain the truncated long component names and compact icon-only 3D controls; no release-blocking regression or overflow is visible. SHA-256 `387038c75aef8952a6095b1115323edc721141cefe57eb5f2ae022ff580f61fa`. |
 | `work/Release 0.6.0 Verification/Source Theme Two.png` | pywebview / WebView2, real Stockroom Library, light, 1386×893 | Theme-parity authority preserves the same layout, action priority, representation separation, model appearance, and readiness truth. The white model remains distinguishable from the neutral stage; no whole-image inversion, clipped action, or horizontal overflow is visible. SHA-256 `6a9c9b307caf4236409f37dcd15e41d0dcc3c23a036fd703857cbeff6c9580f6`. |
+
+### 2026-08-03 — Stockroom 0.7 Clean-Profile Startup Failure
+
+- Capture layer: Computer Use against the exact reproducible `0.7.0` candidate with empty
+  app/config/tools/Python/browser caches and a prerequisite-scrubbed `PATH`.
+- Visible result: the native error boundary correctly surfaced `ModuleNotFoundError: No module
+  named 'PIL'` from `altium/project_visuals.py` instead of silently exiting.
+- Audit: the dialog is legible and actionable for engineering, but too traceback-heavy for an
+  end user. The release blocker is the missing production Pillow dependency; a later polish item
+  should summarize the primary error and put the traceback behind a details affordance.
+- Disposition: release-blocking dependency boundary fixed in source; the candidate remains
+  rejected until the same clean profile opens the real Stockroom window.
