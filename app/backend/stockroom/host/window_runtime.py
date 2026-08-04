@@ -89,7 +89,16 @@ class WindowClientPort(Protocol):
 
     def provider_endpoint(self) -> str: ...
 
-    def begin_provider_lease(self, lease_id: str) -> ProviderLeaseHandshake: ...
+    def begin_provider_lease(
+        self,
+        lease_id: str,
+        *,
+        staging_root: str = "",
+        component_id: str = "",
+        manufacturer: str = "",
+        mpn: str = "",
+        provider_id: str = "",
+    ) -> ProviderLeaseHandshake: ...
 
     def release_provider_lease(self, lease_id: str, generation: int) -> bool: ...
 
@@ -171,6 +180,14 @@ class ProviderBrowserLease:
     endpoint: str
     lease_id: str
     generation: int
+    # Where this lease's downloads must land, and the component they belong to. The native host
+    # holds the same values; they are repeated here so a caller can read them without a round
+    # trip and so an event can be checked against the lease that produced it.
+    staging_root: str
+    component_id: str
+    manufacturer: str
+    mpn: str
+    provider_id: str
     _show: Callable[[str, int], None]
     _hide: Callable[[str, int], None]
     _current_url: Callable[[str, int], str]
@@ -562,7 +579,16 @@ class SupervisorWindowHandoffPorts(WindowHandoffPorts):
             exported=exported,
         )
 
-    def begin_provider_browser_lease(self, lease_id: str) -> ProviderLeaseHandshake:
+    def begin_provider_browser_lease(
+        self,
+        lease_id: str,
+        *,
+        staging_root: str = "",
+        component_id: str = "",
+        manufacturer: str = "",
+        mpn: str = "",
+        provider_id: str = "",
+    ) -> ProviderLeaseHandshake:
         """Fence the active window's hidden provider browser to one capture."""
 
         with self._lock:
@@ -571,7 +597,14 @@ class SupervisorWindowHandoffPorts(WindowHandoffPorts):
             raise ReleaseWindowRuntimeError(
                 "active native provider browser is unavailable"
             )
-        return client.begin_provider_lease(lease_id)
+        return client.begin_provider_lease(
+            lease_id,
+            staging_root=staging_root,
+            component_id=component_id,
+            manufacturer=manufacturer,
+            mpn=mpn,
+            provider_id=provider_id,
+        )
 
     def release_provider_browser_lease(self, lease_id: str, generation: int) -> bool:
         with self._lock:
@@ -899,8 +932,21 @@ class ProductionWindowReplacement:
         return self._ports.observe_active()
 
     @contextmanager
-    def provider_browser_surface(self):
-        """Lease a hidden embedded browser until capture has armed its listeners."""
+    def provider_browser_surface(
+        self,
+        *,
+        staging_root: str = "",
+        component_id: str = "",
+        manufacturer: str = "",
+        mpn: str = "",
+        provider_id: str = "",
+    ):
+        """Lease a hidden embedded browser until capture has armed its listeners.
+
+        ``staging_root`` is the Stockroom-owned absolute directory this lease's downloads must
+        land in. Without one the native host cancels downloads rather than falling back to the
+        person's Downloads folder.
+        """
 
         with self._provider_lock:
             # A partial prior task may deliberately retain its document. An explicit next capture
@@ -912,12 +958,24 @@ class ProductionWindowReplacement:
                     previous.generation,
                 )
                 self._active_provider_lease = None
-            handshake = self._ports.begin_provider_browser_lease(self._id_factory())
+            handshake = self._ports.begin_provider_browser_lease(
+                self._id_factory(),
+                staging_root=staging_root,
+                component_id=component_id,
+                manufacturer=manufacturer,
+                mpn=mpn,
+                provider_id=provider_id,
+            )
             self._active_provider_lease = handshake
             lease = ProviderBrowserLease(
                 endpoint=handshake.endpoint,
                 lease_id=handshake.lease_id,
                 generation=handshake.generation,
+                staging_root=handshake.staging_root,
+                component_id=handshake.component_id,
+                manufacturer=handshake.manufacturer,
+                mpn=handshake.mpn,
+                provider_id=handshake.provider_id,
                 _show=self._ports.show_provider_browser,
                 _hide=self._ports.close_provider_browser,
                 _current_url=self._ports.provider_current_url,

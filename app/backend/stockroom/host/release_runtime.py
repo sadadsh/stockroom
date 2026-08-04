@@ -158,7 +158,15 @@ class HostWindowReplacement(Protocol):
 
     def wait_until_closed(self) -> int: ...
 
-    def provider_browser_surface(self) -> object: ...
+    def provider_browser_surface(
+        self,
+        *,
+        staging_root: str = "",
+        component_id: str = "",
+        manufacturer: str = "",
+        mpn: str = "",
+        provider_id: str = "",
+    ) -> object: ...
 
     def show_active_provider_browser(self) -> None: ...
 
@@ -1440,13 +1448,27 @@ class ProductionUpdateRuntime:
             raise HostReleaseBoundaryError("production native window is unavailable")
         return replacement.wait_until_closed()
 
-    def provider_browser_surface(self):
+    def provider_browser_surface(
+        self,
+        *,
+        staging_root: str = "",
+        component_id: str = "",
+        manufacturer: str = "",
+        mpn: str = "",
+        provider_id: str = "",
+    ):
         replacement = self._window_replacement
         if replacement is None:
             raise HostReleaseBoundaryError(
                 "production provider browser is unavailable"
             )
-        return replacement.provider_browser_surface()
+        return replacement.provider_browser_surface(
+            staging_root=staging_root,
+            component_id=component_id,
+            manufacturer=manufacturer,
+            mpn=mpn,
+            provider_id=provider_id,
+        )
 
     def show_active_provider_browser(self) -> None:
         replacement = self._window_replacement

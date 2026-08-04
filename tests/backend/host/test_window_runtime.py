@@ -101,9 +101,30 @@ class _Client:
         self.commands.append("provider-endpoint")
         return "http://127.0.0.1:43127"
 
-    def begin_provider_lease(self, lease_id: str) -> ProviderLeaseHandshake:
-        self.commands.append(f"provider-lease-begin:{lease_id}")
-        return ProviderLeaseHandshake(lease_id, 7, "http://127.0.0.1:43127")
+    def begin_provider_lease(
+        self,
+        lease_id: str,
+        *,
+        staging_root: str = "",
+        component_id: str = "",
+        manufacturer: str = "",
+        mpn: str = "",
+        provider_id: str = "",
+    ) -> ProviderLeaseHandshake:
+        self.commands.append(
+            f"provider-lease-begin:{lease_id}:{staging_root}:{component_id}:"
+            f"{manufacturer}:{mpn}:{provider_id}"
+        )
+        return ProviderLeaseHandshake(
+            lease_id,
+            7,
+            "http://127.0.0.1:43127",
+            staging_root=staging_root,
+            component_id=component_id,
+            manufacturer=manufacturer,
+            mpn=mpn,
+            provider_id=provider_id,
+        )
 
     def release_provider_lease(self, lease_id: str, generation: int) -> bool:
         self.commands.append(f"provider-lease-release:{lease_id}:{generation}")
@@ -124,6 +145,10 @@ class _Client:
                 sequence=19,
                 lease_id=lease_id,
                 generation=generation,
+                component_id="component-9",
+                manufacturer="Exact Manufacturer",
+                mpn="MPN-9",
+                provider_id="digikey",
                 operation_id="operation-1",
                 phase="terminal",
                 state="completed",
@@ -312,12 +337,25 @@ def test_provider_browser_surface_is_one_scoped_in_app_lease(
     runtime, old, _new, _candidate = _runtime(tmp_path)
     runtime.start_initial()
 
-    with runtime.provider_browser_surface() as lease:
+    staging_root = str(tmp_path / "Staging")
+    with runtime.provider_browser_surface(
+        staging_root=staging_root,
+        component_id="component-9",
+        manufacturer="Exact Manufacturer",
+        mpn="MPN-9",
+        provider_id="digikey",
+    ) as lease:
         assert lease.endpoint == "http://127.0.0.1:43127"
         assert lease.lease_id == "11111111-1111-4111-8111-111111111111"
         assert lease.generation == 7
+        assert lease.staging_root == staging_root
+        assert lease.component_id == "component-9"
+        assert lease.manufacturer == "Exact Manufacturer"
+        assert lease.mpn == "MPN-9"
+        assert lease.provider_id == "digikey"
         assert old.commands[-1:] == [
-            "provider-lease-begin:11111111-1111-4111-8111-111111111111"
+            "provider-lease-begin:11111111-1111-4111-8111-111111111111:"
+            f"{staging_root}:component-9:Exact Manufacturer:MPN-9:digikey"
         ]
         lease.show()
         lease.show()

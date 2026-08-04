@@ -55,10 +55,30 @@ internal sealed record ProviderLeaseIdentity(
     string LeaseId,
     long Generation);
 
+/// <summary>
+/// What one lease is for: the Stockroom-owned staging root its downloads must land in, and the
+/// component identity every event it produces is stamped with. Deliberately separate from
+/// <see cref="ProviderLeaseIdentity"/> so the generation fence keeps comparing exactly two values.
+/// </summary>
+internal sealed record ProviderLeaseContext(
+    string StagingRoot,
+    string ComponentId,
+    string Manufacturer,
+    string Mpn,
+    string ProviderId)
+{
+    internal static ProviderLeaseContext Empty { get; } =
+        new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+}
+
 internal sealed record ProviderDownloadEvent(
     long Sequence,
     string LeaseId,
     long Generation,
+    string ComponentId,
+    string Manufacturer,
+    string Mpn,
+    string ProviderId,
     string OperationId,
     string Phase,
     string State,
@@ -77,17 +97,31 @@ internal sealed record ProviderDownloadEvent(
 /// </summary>
 internal sealed class ProviderLeaseJournal
 {
-    private const int MaximumRetainedEvents = 4096;
+    internal const int MaximumRetainedEvents = 4096;
+
+    private const int MaximumStagingRootLength = 240;
+    private const int MaximumIdentityLength = 256;
+
+    private static readonly HashSet<string> AllowedPhases =
+        new(StringComparer.Ordinal) { "started", "progress", "terminal" };
 
     private readonly object _sync = new();
     private readonly List<ProviderDownloadEvent> _events = [];
     private ProviderLeaseIdentity? _active;
+    private ProviderLeaseContext _activeContext = ProviderLeaseContext.Empty;
     private long _generation;
     private long _eventSequence;
 
-    internal ProviderLeaseIdentity Begin(string leaseId)
+    internal ProviderLeaseIdentity Begin(string leaseId) =>
+        Begin(leaseId, ProviderLeaseContext.Empty);
+
+    internal ProviderLeaseIdentity Begin(
+        string leaseId,
+        ProviderLeaseContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
         RequireLeaseId(leaseId);
+        RequireContext(context);
         lock (_sync)
         {
             if (_active is not null)
@@ -97,6 +131,7 @@ internal sealed class ProviderLeaseJournal
             _active = new ProviderLeaseIdentity(
                 leaseId,
                 checked(++_generation));
+            _activeContext = context;
             return _active;
         }
     }
@@ -133,6 +168,22 @@ internal sealed class ProviderLeaseJournal
         }
     }
 
+    /// <summary>
+    /// Read the active lease and what it is for under one lock, so a release cannot land between
+    /// the two reads and pair a live identity with a stale destination.
+    /// </summary>
+    internal bool TryGetActive(
+        out ProviderLeaseIdentity? lease,
+        out ProviderLeaseContext context)
+    {
+        lock (_sync)
+        {
+            lease = _active;
+            context = _activeContext;
+            return lease is not null;
+        }
+    }
+
     internal bool Release(ProviderLeaseIdentity requested)
     {
         ArgumentNullException.ThrowIfNull(requested);
@@ -143,12 +194,14 @@ internal sealed class ProviderLeaseJournal
                 return false;
             }
             _active = null;
+            _activeContext = ProviderLeaseContext.Empty;
             return true;
         }
     }
 
     internal ProviderDownloadEvent Record(
         ProviderLeaseIdentity lease,
+        ProviderLeaseContext context,
         string operationId,
         string phase,
         string state,
@@ -161,12 +214,18 @@ internal sealed class ProviderLeaseJournal
         long bytesReceived)
     {
         ArgumentNullException.ThrowIfNull(lease);
+        ArgumentNullException.ThrowIfNull(context);
+        RequirePhase(phase);
         lock (_sync)
         {
             var value = new ProviderDownloadEvent(
                 checked(++_eventSequence),
                 lease.LeaseId,
                 lease.Generation,
+                context.ComponentId,
+                context.Manufacturer,
+                context.Mpn,
+                context.ProviderId,
                 operationId,
                 phase,
                 state,
@@ -214,6 +273,41 @@ internal sealed class ProviderLeaseJournal
             || leaseId.Any(char.IsControl))
         {
             throw new WindowHostException("provider lease id is invalid");
+        }
+    }
+
+    private static void RequireContext(ProviderLeaseContext context)
+    {
+        // An unknown staging root is allowed here and refused at download time. A malformed one
+        // is refused now, because a lease that carries garbage would otherwise look serviceable.
+        if (context.StagingRoot.Length > 0
+            && (context.StagingRoot.Length > MaximumStagingRootLength
+                || context.StagingRoot != context.StagingRoot.Trim()
+                || context.StagingRoot.Any(char.IsControl)
+                || !Path.IsPathFullyQualified(context.StagingRoot)))
+        {
+            throw new WindowHostException("provider lease staging root is invalid");
+        }
+        foreach (var value in new[]
+        {
+            context.ComponentId,
+            context.Manufacturer,
+            context.Mpn,
+            context.ProviderId,
+        })
+        {
+            if (value.Length > MaximumIdentityLength || value.Any(char.IsControl))
+            {
+                throw new WindowHostException("provider lease component identity is invalid");
+            }
+        }
+    }
+
+    private static void RequirePhase(string phase)
+    {
+        if (!AllowedPhases.Contains(phase))
+        {
+            throw new WindowHostException("provider download phase is invalid");
         }
     }
 }

@@ -1,7 +1,12 @@
+import io
 import zipfile
 from pathlib import Path
 
-from stockroom.capture.classify import classify_asset
+from stockroom.capture.classify import (
+    LIA_IMPORT_ROUTE,
+    AssetGroup,
+    classify_asset,
+)
 from stockroom.capture.requirements import Requirement
 
 
@@ -210,3 +215,124 @@ def test_a_lia_inside_a_vendor_zip_is_found_too(tmp_path):
     got = classify_asset(bundle)
     assert Requirement.ALTIUM_SYMBOL in got.requirements
     assert Requirement.ALTIUM_FOOTPRINT in got.requirements
+
+
+# --- the three named groups -------------------------------------------------
+# Classification has to say out loud which of three groups a file belongs to:
+# importable CAD, supporting material that is never auto-imported, and prohibited
+# executable/script content. "Unknown" stays available and is not a claim of safety.
+
+
+def test_importable_cad_group_covers_every_kicad_and_altium_shape(tmp_path):
+    for name in (
+        "part.kicad_sym",
+        "part.lib",
+        "part.kicad_mod",
+        "MyPart.pretty",
+        "part.step",
+        "part.STP",
+        "part.wrl",
+        "part.SchLib",
+        "part.PcbLib",
+        "part.IntLib",
+        "part.lia",
+    ):
+        got = classify_asset(Path(name))
+        assert got.group is AssetGroup.IMPORTABLE_CAD, name
+        assert got.requirements, name
+
+
+def test_a_pretty_directory_is_a_kicad_footprint_role(tmp_path):
+    pretty = tmp_path / "MyPart.pretty"
+    pretty.mkdir()
+    (pretty / "VarA.kicad_mod").write_text("(footprint)")
+    got = classify_asset(pretty)
+    assert got.tool == "kicad" and got.kind == "footprint"
+    assert got.requirements == frozenset({Requirement.KICAD_FOOTPRINT})
+    assert got.group is AssetGroup.IMPORTABLE_CAD
+
+
+def test_the_lia_route_is_named_so_nothing_imports_the_raw_file():
+    # A `.lia` satisfies both Altium roles, but only through the proven P-CAD
+    # normalization; the route is recorded here so callers cannot invent another one.
+    assert LIA_IMPORT_ROUTE == "stockroom.altium.converter.convert_pcad_ascii"
+    got = classify_asset(Path("x.lia"))
+    assert got.group is AssetGroup.IMPORTABLE_CAD
+    assert got.requirements == frozenset(
+        {Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT}
+    )
+
+
+def test_supporting_material_is_named_supporting_not_dropped():
+    for name in ("datasheet.pdf", "README.txt", "LICENSE", "how-to-import.htm", "preview.png"):
+        got = classify_asset(Path(name))
+        assert got.group is AssetGroup.SUPPORTING, name
+        assert got.requirements == frozenset(), name
+
+
+def test_prohibited_content_is_named_by_extension():
+    for name in (
+        "setup.exe", "installer.msi", "helper.dll", "run.bat", "run.cmd", "go.ps1",
+        "loader.js", "loader.vbs", "saver.scr", "legacy.com", "open me.lnk",
+    ):
+        got = classify_asset(Path(name))
+        assert got.group is AssetGroup.PROHIBITED, name
+        assert got.requirements == frozenset(), name
+        assert got.prohibited_members == (Path(name).name,), name
+
+
+def test_prohibited_content_is_named_by_leading_bytes_too(tmp_path):
+    # A content/extension mismatch that cannot be safely identified is prohibited, not
+    # a 3D model: the name says STEP, the bytes say PE image.
+    payload = tmp_path / "model.step"
+    payload.write_bytes(b"MZ\x90\x00 the rest is a binary")
+    got = classify_asset(payload)
+    assert got.group is AssetGroup.PROHIBITED
+    assert got.requirements == frozenset()
+
+
+def test_a_bundle_carrying_an_executable_is_flagged_prohibited(tmp_path):
+    bundle = tmp_path / "bundle.zip"
+    with zipfile.ZipFile(bundle, "w") as zf:
+        zf.writestr("KiCad/part.kicad_sym", "x")
+        zf.writestr("Install/setup.exe", "x")
+    got = classify_asset(bundle)
+    assert got.group is AssetGroup.PROHIBITED
+    assert got.prohibited_members == ("Install/setup.exe",)
+    # the CAD requirements are still reported so the person sees what the bundle claimed
+    assert Requirement.KICAD_SYMBOL in got.requirements
+
+
+def test_a_bundle_of_only_supporting_files_is_supporting(tmp_path):
+    bundle = tmp_path / "docs.zip"
+    with zipfile.ZipFile(bundle, "w") as zf:
+        zf.writestr("datasheet.pdf", "%PDF-1.4")
+        zf.writestr("README.txt", "hi")
+    got = classify_asset(bundle)
+    assert got.group is AssetGroup.SUPPORTING
+    assert got.requirements == frozenset()
+
+
+def test_a_nested_archive_read_is_bounded_by_the_shared_limits(tmp_path, monkeypatch):
+    # The nested member used to be read whole with `inner_fh.read()`. A member that
+    # declares more than the shared per-member bound is now skipped, not swallowed.
+    import stockroom.capture.classify as classify
+
+    inner = io.BytesIO()
+    with zipfile.ZipFile(inner, "w") as z:
+        z.writestr("part.SchLib", "x")
+    outer = tmp_path / "bundle.zip"
+    with zipfile.ZipFile(outer, "w") as z:
+        z.writestr("altium/part.zip", inner.getvalue())
+    monkeypatch.setattr(classify, "MAX_MEMBER_EXPANDED_BYTES", 4)
+    got = classify.classify_asset(outer)
+    assert got.requirements == frozenset()
+
+
+def test_a_corrupt_inner_archive_still_leaves_the_bundle_usable(tmp_path):
+    outer = tmp_path / "bundle.zip"
+    with zipfile.ZipFile(outer, "w") as z:
+        z.writestr("KiCad/part.kicad_sym", "x")
+        z.writestr("altium/broken.zip", b"PK\x03\x04 not really")
+    got = classify_asset(outer)
+    assert Requirement.KICAD_SYMBOL in got.requirements
