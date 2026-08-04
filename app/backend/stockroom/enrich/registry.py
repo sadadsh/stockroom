@@ -14,7 +14,34 @@ from collections.abc import Iterable
 from typing import Protocol, runtime_checkable
 
 from stockroom.enrich.errors import EnrichError
-from stockroom.enrich.schema import EnrichmentResult, mpn_identity_key
+from stockroom.enrich.schema import SOURCE_STATES, EnrichmentResult, mpn_identity_key
+
+# adapter.last_status vocabulary -> the closed source_states vocabulary. Anything the map
+# does not name collapses to "failed": an unknown status is still an attempted source that
+# produced no usable answer, and the state vocabulary never grows by accident.
+_LAST_STATUS_STATES: dict[str, str] = {
+    "ok": "success",
+    "not_found": "unavailable",
+    "rate_limited": "failed",
+    "auth_error": "failed",
+    "error": "failed",
+}
+
+
+def _source_state(source, partial: EnrichmentResult) -> str:
+    """The honest verdict for one consulted distributor source.
+
+    The adapter's own ``last_status`` is the primary signal (the official adapters swallow
+    their transport errors and record the classification there). A source without one is
+    judged by what it returned: data means success, an empty answer means the part is not
+    carried there.
+    """
+    last_status = str(getattr(source, "last_status", "") or "")
+    state = _LAST_STATUS_STATES.get(last_status, "")
+    if not state:
+        state = "success" if partial.filled_fields() else "unavailable"
+    assert state in SOURCE_STATES
+    return state
 
 # The want token that means "ask EVERY distributor, not just enough of them". It is not a
 # field: it is satisfied only once every source declaring a `vendor` has been consulted, which
@@ -122,6 +149,8 @@ class SourceRegistry:
                 partial = source.enrich(mpn, category, set(remaining), **kwargs)
             except EnrichError:
                 unconsulted.discard(id(source))  # asked, and it failed: that still counts
+                if vendor:
+                    result.source_states[vendor] = "failed"
                 continue  # a dead source never blocks
             unconsulted.discard(id(source))
             if (
@@ -131,7 +160,13 @@ class SourceRegistry:
                 # Search APIs are allowed to return fuzzy candidates, but an MPN lookup is not.
                 # Reject the whole foreign row before its manufacturer, specs, prices, or URL
                 # can contaminate the requested part, then continue to the next source.
+                if vendor:
+                    # The source answered, but not with THIS part: for the requested MPN it
+                    # is honestly unavailable there, never a silent nothing.
+                    result.source_states[vendor] = "unavailable"
                 continue
+            if vendor:
+                result.source_states[vendor] = _source_state(source, partial)
             if vendor:
                 record_vendor_offer(result, vendor, partial)
             result.merge_missing(partial)

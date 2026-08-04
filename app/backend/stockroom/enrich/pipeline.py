@@ -567,8 +567,20 @@ class EnrichmentPipeline:
         # emitted Category=Other into the Altium DbLib (owner, 2026-07-26, on the real library).
         # Before the cache write, so the classification is what gets stored.
         fill_category(result)
+        self._record_unconfigured_officials(result)
         self.cache.put(mpn, _result_to_cache(result))
         return result
+
+    def _record_unconfigured_officials(self, result: EnrichmentResult) -> None:
+        """Both official distributor APIs always appear in the per-source states.
+
+        An adapter with no credentials is never constructed into the walk, so without this
+        the result could not distinguish "DigiKey is not set up on this machine" from
+        "DigiKey was never asked" - and the UI must show the first honestly.
+        """
+        for key, adapter in (("mouser", self.mouser), ("digikey", self.digikey)):
+            if adapter is None or not getattr(adapter, "enabled", False):
+                result.source_states.setdefault(key, "not_configured")
 
     def enrich_from_product_url(self, candidate: StagingCandidate, url: str,
                                 overwrite: set[str] | None = None) -> StagingCandidate:
@@ -893,6 +905,11 @@ class _MouserSource:
         self._adapter = adapter
         self._limiter = limiter
 
+    @property
+    def last_status(self) -> str:
+        """The adapter's own classification of its last call, for the per-source state."""
+        return str(getattr(self._adapter, "last_status", "") or "")
+
     def enrich(self, mpn, category, remaining, progress=None):
         # Pace the Mouser API path (the exact ban scenario the KiCost limiter exists to
         # prevent). Without this a bulk enrich of many uncached parts fires unthrottled and
@@ -913,6 +930,11 @@ class _DigiKeySource:
     def __init__(self, adapter, limiter=None):
         self._adapter = adapter
         self._limiter = limiter
+
+    @property
+    def last_status(self) -> str:
+        """The adapter's own classification of its last call, for the per-source state."""
+        return str(getattr(self._adapter, "last_status", "") or "")
 
     def enrich(self, mpn, category, remaining, progress=None):
         # Shares the Mouser limiter (both are paced distributor APIs guarded against the
@@ -957,6 +979,9 @@ def _result_to_cache(r: EnrichmentResult) -> dict:
             k: [{"value": v.value, "source": v.source, "confidence": v.confidence} for v in vs]
             for k, vs in r.field_conflicts.items()
         },
+        # the per-source verdicts (a cache hit must keep showing the same degraded state the
+        # stored answer was produced under, never silently upgrade to "fine")
+        "source_states": dict(r.source_states),
     }
 
 
@@ -992,5 +1017,8 @@ def _result_from_cache(d: dict, category: str) -> EnrichmentResult:
     r.field_conflicts = {
         k: [Sourced(v["value"], v["source"], v["confidence"]) for v in vs]
         for k, vs in d.get("field_conflicts", {}).items()
+    }
+    r.source_states = {
+        str(key): str(value) for key, value in (d.get("source_states") or {}).items()
     }
     return r

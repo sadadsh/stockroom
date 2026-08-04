@@ -22,6 +22,14 @@ SCHEMA_VERSION = 2
 # Confidence ranked low -> high so a merge can compare sources.
 CONFIDENCE_RANK: dict[str, int] = {"low": 0, "medium": 1, "high": 2}
 
+# The closed vocabulary for EnrichmentResult.source_states. Fixed strings only, so a state
+# can never smuggle an exception body, a URL, or credential material into a stored result:
+#   success        - the source answered with data for this exact part
+#   unavailable    - the source answered and does not carry this exact part
+#   failed         - the source was attempted and could not answer (network/auth/rate limit)
+#   not_configured - the source has no credentials on this machine and was never attempted
+SOURCE_STATES: frozenset[str] = frozenset({"success", "unavailable", "failed", "not_configured"})
+
 _UNSAFE = re.compile(r"[\\/\s:*?\"<>|]+")
 
 
@@ -199,6 +207,12 @@ class EnrichmentResult:
     # datasheet_url, lifecycle, ...): the value that won the slot, plus every other answer a
     # source gave, each with its origin. See _CONFLICT_FIELDS for which fields participate.
     field_conflicts: dict[str, list[Sourced]] = field(default_factory=dict)
+    # What actually happened to each consulted source, keyed by its lowercase vendor key
+    # ("mouser"/"digikey"): one of SOURCE_STATES. This is the honest per-source verdict the
+    # UI shows as a degraded state - before it existed, a failed official API was
+    # indistinguishable from a part the distributor simply does not carry. Values are fixed
+    # vocabulary only; no exception text or credential material ever lands here.
+    source_states: dict[str, str] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
 
     def filled_fields(self) -> set[str]:
@@ -268,3 +282,5 @@ class EnrichmentResult:
             self.dist_urls.setdefault(key, val)
         for key, val in other.catalog.items():
             self.catalog.setdefault(key, dict(val))
+        for key, val in other.source_states.items():
+            self.source_states.setdefault(key, val)
