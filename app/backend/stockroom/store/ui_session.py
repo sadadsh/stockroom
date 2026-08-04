@@ -30,7 +30,10 @@ from urllib.parse import urlsplit, urlunsplit
 from stockroom.store.machine_config import MachineConfig, config_dir
 
 SESSION_SCHEMA = "stockroom.ui-session"
-SESSION_VERSION = 1
+# v2 adds the opened-component workspace: which components are open as tabs, which one is
+# active, and each one's own view state. A stored v1 document upgrades on read (see
+# `_migrated`), so an existing install keeps its route, filters, and picker anchor.
+SESSION_VERSION = 2
 DRAFT_SCHEMA = "stockroom.intake-draft"
 DRAFT_VERSION = 1
 
@@ -49,6 +52,13 @@ _MAX_SAFE_JSON_DEPTH = 6
 _MAX_SAFE_JSON_NODES = 2_048
 _MAX_SCROLL_OFFSET = 10_000_000
 _MAX_EVENT_SEQUENCE = (1 << 63) - 1
+
+# One workspace tab per open component. Bounded so a long session cannot grow the durable
+# document without limit; the frontend evicts the least-recently-active tab at the same bound.
+_MAX_OPEN_COMPONENTS = 12
+_INFO_TABS = {"overview", "specifications", "sourcing", "sources"}
+_REPRESENTATION_LAYOUTS = {"all", "symbol", "footprint", "model"}
+_REPRESENTATION_KINDS = ("symbol", "footprint", "model")
 
 _ROUTES = {"components", "projects", "stm", "settings"}
 _DETAIL_TABS = {"specs", "sourcing", "enrich", "history", "handoff"}
@@ -198,12 +208,15 @@ def _text_list(
 
 
 def default_snapshot() -> dict:
-    """Return a fresh canonical v1 snapshot."""
+    """Return a fresh canonical snapshot at the current version."""
 
     return {
         "schema": SESSION_SCHEMA,
         "version": SESSION_VERSION,
         "route": "components",
+        "open_components": [],
+        "active_component": None,
+        "component_views": {},
         "selected_ids": {
             "component": None,
             "project": None,
@@ -484,15 +497,87 @@ def _draft_ref(value: object) -> dict | None:
     }
 
 
-def normalize_snapshot(value: object) -> dict:
-    """Validate and return the canonical v1 snapshot without unknown fields."""
-
+def _component_view(value: object, field: str) -> dict:
     obj = _expect_exact(
         value,
+        field=field,
+        required={"info_tab", "representation_layout", "representation_tool"},
+    )
+    tools = _expect_exact(
+        obj["representation_tool"],
+        field=f"{field}.representation_tool",
+        required=set(_REPRESENTATION_KINDS),
+    )
+    return {
+        "info_tab": _enum(obj["info_tab"], _INFO_TABS, f"{field}.info_tab"),
+        "representation_layout": _enum(
+            obj["representation_layout"],
+            _REPRESENTATION_LAYOUTS,
+            f"{field}.representation_layout",
+        ),
+        "representation_tool": {
+            kind: _text(
+                tools[kind],
+                f"{field}.representation_tool.{kind}",
+                maximum=_MAX_SHORT_TEXT,
+            )
+            for kind in _REPRESENTATION_KINDS
+        },
+    }
+
+
+def _component_views(value: object, open_components: list[str]) -> dict:
+    """Per-component view state, kept only for components that are actually open.
+
+    Pruning rather than rejecting: a view entry for a closed tab is stale bookkeeping, and
+    throwing away the whole durable session over it would cost the person their route,
+    filters, and picker position for no benefit.
+    """
+    if type(value) is not dict or len(value) > _MAX_OPEN_COMPONENTS:
+        raise _invalid("component_views")
+    open_set = set(open_components)
+    out: dict[str, dict] = {}
+    for key, entry in value.items():
+        component_id = _text(key, "component_views", maximum=_MAX_ID, allow_empty=False)
+        if component_id not in open_set:
+            continue
+        out[component_id] = _component_view(entry, f"component_views.{component_id}")
+    return out
+
+
+def _migrated(value: object) -> object:
+    """Upgrade an older stored snapshot in place of rejecting it.
+
+    Only the exact previous version is upgraded, and only when it is otherwise the shape this
+    module wrote. Anything else falls through to validation, which fails closed to defaults -
+    a document from a NEWER build must never be silently downgraded and re-saved as ours.
+    """
+    if type(value) is not dict:
+        return value
+    if value.get("schema") != SESSION_SCHEMA or value.get("version") != 1:
+        return value
+    upgraded = dict(value)
+    selected = upgraded.get("selected_ids")
+    component = selected.get("component") if type(selected) is dict else None
+    upgraded["version"] = 2
+    upgraded["open_components"] = [component] if type(component) is str and component else []
+    upgraded["active_component"] = component if type(component) is str and component else None
+    upgraded["component_views"] = {}
+    return upgraded
+
+
+def normalize_snapshot(value: object) -> dict:
+    """Validate and return the canonical snapshot without unknown fields."""
+
+    obj = _expect_exact(
+        _migrated(value),
         field="ui_session",
         required={
             "schema",
             "version",
+            "open_components",
+            "active_component",
+            "component_views",
             "route",
             "selected_ids",
             "component_filters",
@@ -514,10 +599,25 @@ def normalize_snapshot(value: object) -> dict:
     open_surface = _enum(obj["open_surface"], _OPEN_SURFACES, "open_surface")
     if open_surface == "complete_part" and selected["component"] is None:
         raise _invalid("open_surface")
+    open_components = _text_list(
+        obj["open_components"],
+        "open_components",
+        maximum_items=_MAX_OPEN_COMPONENTS,
+        item_maximum=_MAX_ID,
+    )
+    active_component = _nullable_text(obj["active_component"], "active_component")
+    # The active tab must be one of the open ones. Coerced rather than rejected for the same
+    # reason stale view entries are pruned: the inconsistency is bookkeeping, and failing the
+    # whole document closed would discard everything else the person had restored.
+    if active_component not in open_components:
+        active_component = None
     snapshot = {
         "schema": SESSION_SCHEMA,
         "version": SESSION_VERSION,
         "route": _enum(obj["route"], _ROUTES, "route"),
+        "open_components": open_components,
+        "active_component": active_component,
+        "component_views": _component_views(obj["component_views"], open_components),
         "selected_ids": selected,
         "component_filters": _component_filters(obj["component_filters"]),
         "component_list_anchor": _anchor(

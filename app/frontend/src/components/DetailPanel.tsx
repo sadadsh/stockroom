@@ -73,11 +73,10 @@ import {
   isCuratedOnly,
   isPinned,
   keySpecRows,
-  normalizePinnedSpecs,
   togglePinned,
   withoutPromoted,
 } from "../lib/keySpecs";
-import { readPref, writePref } from "../lib/uiPrefs";
+import { readPinnedSpecs, writePinnedSpecs } from "../lib/pinnedSpecs";
 import { PhotoTrigger, partPhotos } from "./ProductPhoto";
 import {
   useAltiumEmbedCapability,
@@ -289,31 +288,6 @@ function RepresentationMatrix({
 }
 
 type WorkbenchTab = "specs" | "sourcing" | "enrich" | "history" | "handoff";
-
-const PINNED_SPECS_KEY = "stockroom.pinned-specs";
-
-/** The pinned-spec map, host-injected first then the localStorage mirror (see uiPrefs.ts). Unlike the
- *  scalar prefs this one is JSON, so a malformed mirror must degrade to "nothing pinned" rather than
- *  throwing during the first render of the sheet. */
-function readPinnedSpecs(): PinnedSpecs {
-  return normalizePinnedSpecs(
-    readPref<PinnedSpecs>(
-      "pinned_specs",
-      PINNED_SPECS_KEY,
-      (raw) => {
-        try {
-          const parsed = JSON.parse(raw);
-          return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-            ? (parsed as PinnedSpecs)
-            : undefined;
-        } catch {
-          return undefined;
-        }
-      },
-      {},
-    ),
-  );
-}
 
 /**
  * KEY SPECIFICATIONS - the block that replaced the EDA handoff at the head of the Specifications
@@ -687,7 +661,7 @@ export function DetailPanel({
   const togglePin = useCallback((category: string, specKey: string) => {
     setPinnedSpecs((current) => {
       const next = togglePinned(current, category, specKey);
-      writePref("pinned_specs", next, PINNED_SPECS_KEY);
+      writePinnedSpecs(next);
       return next;
     });
   }, []);

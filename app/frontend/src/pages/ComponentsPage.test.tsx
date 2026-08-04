@@ -5,23 +5,27 @@ import type { ReactNode } from "react";
 import { ApiError } from "../api/client";
 import { api } from "../api/client";
 import { cadVariantApi } from "../api/cadVariantClient";
-import type { EnrichmentResult, PartDetail, PartSummary } from "../api/types";
+import type { PartSummary } from "../api/types";
 import { makePartDetail } from "../test/partFixture";
+import { makeWorkspace } from "../test/workspaceFixture";
 import { ToastProvider } from "../lib/toast";
+import { ThemeProvider } from "../lib/theme";
 import { RouterProvider } from "../lib/router";
 import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { CaptureProvider } from "../lib/capture";
 import {
+  MAX_OPEN_COMPONENTS,
   defaultUiSession,
+  openComponentInSession,
   readUiSession,
   resetUiSessionForTests,
 } from "../lib/uiSession";
 import { ComponentsPage } from "./ComponentsPage";
 
 // Mock the typed client so the page renders against fixtures, not a live server.
-// ApiError is preserved (the page branches on it for the error surface). The enrich
-// lookup is a background job now: enrichPart submits it (-> {job_id}) and the sourced
-// result arrives over the job's SSE stream (openJobStream); mock both.
+// ApiError is preserved (the page branches on it for the error surface). The opened
+// component reads the normalized workspace projection, and its representation dock
+// pulls the symbol/footprint SVG and the model GLB, so those are mocked too.
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
   return {
@@ -29,15 +33,13 @@ vi.mock("../api/client", async (importActual) => {
     api: {
       listParts: vi.fn(),
       facets: vi.fn(),
-      partDetail: vi.fn(),
-      editField: vi.fn(),
-      moveCategory: vi.fn(),
+      partWorkspace: vi.fn(),
       deletePart: vi.fn(),
       restoreDeletedPart: vi.fn(),
-      enrichPart: vi.fn(),
-      openJobStream: vi.fn(),
-      setSpecs: vi.fn(),
       getDuplicates: vi.fn(),
+      previewSvg: vi.fn(),
+      modelGlb: vi.fn(),
+      landPattern: vi.fn(),
     },
   };
 });
@@ -53,34 +55,31 @@ vi.mock("../api/cadVariantClient", async (importActual) => {
   };
 });
 
+// three.js is verified in the Windows pixel gate; mock the scene so the dock's 3D module
+// does not need a WebGL context here.
+vi.mock("../lib/threeScene", () => ({
+  mountModelScene: vi.fn(() => ({
+    dispose: vi.fn(),
+    fit: vi.fn(),
+    setView: vi.fn(),
+    setSpin: vi.fn((wanted: boolean) => wanted),
+    setLandPattern: vi.fn(),
+    setRenderMode: vi.fn(),
+    setLayers: vi.fn(),
+    setPlacementMode: vi.fn(),
+    modelInfo: vi.fn(() => null),
+  })),
+}));
+
 const mockApi = vi.mocked(api);
 const mockCadVariantApi = vi.mocked(cadVariantApi);
-
-function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
-  const enc = new TextEncoder();
-  return new ReadableStream<Uint8Array>({
-    start(c) {
-      for (const s of chunks) c.enqueue(enc.encode(s));
-      c.close();
-    },
-  });
-}
-
-// A successful enrich lookup: the submit returns a job ref, the stream carries the
-// sourced result on the terminal `result` event.
-function mockEnrich(r: EnrichmentResult) {
-  mockApi.enrichPart.mockResolvedValue({ job_id: "e1" });
-  mockApi.openJobStream.mockResolvedValue(
-    streamOf([
-      `event: result\ndata: ${JSON.stringify({ result: r })}\n\n`,
-      "event: done\ndata: {}\n\n",
-    ]),
-  );
-}
 
 // Default: no duplicates. Individual tests override to exercise the badge + filter.
 beforeEach(() => {
   mockApi.getDuplicates.mockResolvedValue({ by_mpn: [], by_footprint: [] });
+  mockApi.previewSvg.mockResolvedValue(new Blob(["<svg/>"], { type: "image/svg+xml" }));
+  mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
+  mockApi.landPattern.mockRejectedValue(new ApiError(404, "no footprint"));
   mockCadVariantApi.inventory.mockResolvedValue({
     partId: "lm358",
     inventories: [],
@@ -106,13 +105,20 @@ const SUMMARY: PartSummary = {
   eda_readiness: {},
 };
 
-const DETAIL: PartDetail = makePartDetail({
-  id: "lm358",
-  mpn: "LM358DR",
-  manufacturer: "Texas Instruments",
-  tags: ["op-amp"],
-  derived: { display_name: "LM358", description: "Dual Operational Amplifier" },
-});
+/** The workspace for one id, named so a test can tell two open components apart. */
+function workspaceFor(id: string, displayName: string, description: string) {
+  return makeWorkspace({
+    identity: { id, displayName, mpn: `${displayName}-MPN` },
+    summary: { description: { rawValue: description, formattedValue: description } },
+  });
+}
+
+const FACETS = {
+  by_category: { ICs: 1 },
+  by_manufacturer: { "Texas Instruments": 1 },
+  complete: 1,
+  incomplete: 0,
+};
 
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -123,19 +129,26 @@ function wrap(ui: ReactNode) {
   }
   const utils = render(
     <QueryClientProvider client={qc}>
-      <ToastProvider>
-        <RouterProvider initial="components">
-          <CaptureProvider>
-          <AddPartProvider>
-            <Probe />
-            {ui}
-          </AddPartProvider>
-          </CaptureProvider>
-        </RouterProvider>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <RouterProvider initial="components">
+            <CaptureProvider>
+              <AddPartProvider>
+                <Probe />
+                {ui}
+              </AddPartProvider>
+            </CaptureProvider>
+          </RouterProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
   return { ...utils, state };
+}
+
+/** The open-component strip, scoped so the four information tabs are never mistaken for it. */
+function openTabs(): HTMLElement {
+  return document.querySelector<HTMLElement>('[data-dev-id="component-browser.tabs"]')!;
 }
 
 describe("ComponentsPage", () => {
@@ -151,13 +164,10 @@ describe("ComponentsPage", () => {
     session.component_list_anchor = { part_id: "lm358", offset_px: 37 };
     resetUiSessionForTests(session);
     mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1 },
-      by_manufacturer: { "Texas Instruments": 1 },
-      complete: 1,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.facets.mockResolvedValue(FACETS);
+    mockApi.partWorkspace.mockResolvedValue(
+      workspaceFor("lm358", "LM358", "Dual Operational Amplifier"),
+    );
 
     wrap(<ComponentsPage />);
 
@@ -216,13 +226,10 @@ describe("ComponentsPage", () => {
             resolveList = resolve;
           }),
       );
-      mockApi.facets.mockResolvedValue({
-        by_category: { ICs: 1 },
-        by_manufacturer: {},
-        complete: 1,
-        incomplete: 0,
-      });
-      mockApi.partDetail.mockResolvedValue(DETAIL);
+      mockApi.facets.mockResolvedValue(FACETS);
+      mockApi.partWorkspace.mockResolvedValue(
+        workspaceFor("lm358", "LM358", "Dual Operational Amplifier"),
+      );
 
       const view = wrap(<ComponentsPage />);
 
@@ -256,13 +263,10 @@ describe("ComponentsPage", () => {
     mockApi.listParts.mockImplementation(
       () => new Promise<{ parts: PartSummary[]; count: number }>(() => {}),
     );
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1 },
-      by_manufacturer: {},
-      complete: 1,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.facets.mockResolvedValue(FACETS);
+    mockApi.partWorkspace.mockResolvedValue(
+      workspaceFor("lm358", "LM358", "Dual Operational Amplifier"),
+    );
 
     const view = wrap(<ComponentsPage />);
     expect(await screen.findByText("Loading parts...")).toBeInTheDocument();
@@ -274,28 +278,22 @@ describe("ComponentsPage", () => {
     });
   });
 
-  it("lists parts, shows the count, and auto-selects the first part's detail", async () => {
+  it("lists parts, shows the count, and auto-opens the first part's workspace", async () => {
     mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1 },
-      by_manufacturer: { "Texas Instruments": 1 },
-      complete: 1,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.facets.mockResolvedValue(FACETS);
+    mockApi.partWorkspace.mockResolvedValue(
+      workspaceFor("lm358", "LM358", "Dual Operational Amplifier"),
+    );
 
     wrap(<ComponentsPage />);
 
     // The part appears in the list (the rail carries the library count now, not a header).
-    expect(await screen.findByText("LM358")).toBeInTheDocument();
-    // The detail panel is the only surface that renders the description.
-    // findAllByText, not findByText: the description now appears BOTH as the lede at the head
-    // of the Specifications column and as the editable field in the Handoff tab. Only one is
-    // visible at a time (they are alternative tabs), but both are in the DOM.
-    expect((await screen.findAllByText("Dual Operational Amplifier")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("LM358")).length).toBeGreaterThan(0);
+    // The opened component is the only surface that renders the description.
+    expect(await screen.findByText("Dual Operational Amplifier")).toBeInTheDocument();
   });
 
-  it("keeps the highlighted row and detail panel on the same selected part", async () => {
+  it("keeps the highlighted row and the opened workspace on the same selected part", async () => {
     const secondSummary: PartSummary = {
       id: "tl072",
       display_name: "TL072",
@@ -306,39 +304,29 @@ describe("ComponentsPage", () => {
       missing: [],
       eda_readiness: {},
     };
-    const secondDetail = makePartDetail({
-      id: "tl072",
-      mpn: "TL072ID",
-      manufacturer: "Texas Instruments",
-      derived: {
-        display_name: "TL072",
-        description: "Low-noise dual JFET operational amplifier",
-      },
-    });
     mockApi.listParts.mockResolvedValue({ parts: [SUMMARY, secondSummary], count: 2 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 2 },
-      by_manufacturer: { "Texas Instruments": 2 },
-      complete: 2,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockImplementation(async (id) => (id === "tl072" ? secondDetail : DETAIL));
+    mockApi.facets.mockResolvedValue(FACETS);
+    mockApi.partWorkspace.mockImplementation(async (id) =>
+      id === "tl072"
+        ? workspaceFor("tl072", "TL072", "Low-noise dual JFET operational amplifier")
+        : workspaceFor("lm358", "LM358", "Dual Operational Amplifier"),
+    );
 
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
-    await screen.findAllByText("Dual Operational Amplifier");
+    await screen.findByText("Dual Operational Amplifier");
 
     const secondRow = await screen.findByRole("button", { name: /TL072/ });
     await user.click(secondRow);
 
     expect(secondRow).toHaveAttribute("aria-current", "true");
     expect(
-      (await screen.findAllByText("Low-noise dual JFET operational amplifier")).length,
-    ).toBeGreaterThan(0);
-    expect(mockApi.partDetail).toHaveBeenLastCalledWith("tl072");
+      await screen.findByText("Low-noise dual JFET operational amplifier"),
+    ).toBeInTheDocument();
+    expect(mockApi.partWorkspace).toHaveBeenLastCalledWith("tl072");
   });
 
-  it("keeps 1,000 rows bounded and fetches one detail per keyboard selection", async () => {
+  it("keeps 1,000 rows bounded and fetches one workspace per keyboard selection", async () => {
     const fixture: PartSummary[] = Array.from(
       { length: 1_000 },
       (_, index) => ({
@@ -367,16 +355,8 @@ describe("ComponentsPage", () => {
       complete: fixture.length,
       incomplete: 0,
     });
-    mockApi.partDetail.mockImplementation(async (id) =>
-      makePartDetail({
-        id,
-        mpn: `MPN-${Number(id.slice(-4))}`,
-        manufacturer: "Fixture",
-        derived: {
-          display_name: `Part ${id.slice(-4)}`,
-          description: `Detail ${id}`,
-        },
-      }),
+    mockApi.partWorkspace.mockImplementation(async (id) =>
+      workspaceFor(id, `Part ${id.slice(-4)}`, `Detail ${id}`),
     );
 
     wrap(<ComponentsPage />);
@@ -384,14 +364,14 @@ describe("ComponentsPage", () => {
     const first = await screen.findByRole("button", {
       name: /Part 0000/,
     });
-    await screen.findAllByText("Detail part-0000");
+    await screen.findByText("Detail part-0000");
     const list = document.querySelector('[data-dev-id="components.list"]');
     expect(list).toHaveAttribute("data-virtualized", "true");
     expect(
       list!.querySelectorAll('[data-dev-id="components.row"]').length,
     ).toBeLessThanOrEqual(40);
     expect(mockApi.listParts).toHaveBeenCalledTimes(1);
-    expect(mockApi.partDetail).toHaveBeenCalledTimes(1);
+    expect(mockApi.partWorkspace).toHaveBeenCalledTimes(1);
 
     first.focus();
     await userEvent.keyboard("{ArrowDown}");
@@ -401,11 +381,11 @@ describe("ComponentsPage", () => {
     await waitFor(() =>
       expect(second).toHaveAttribute("aria-current", "true"),
     );
-    await screen.findAllByText("Detail part-0001");
+    await screen.findByText("Detail part-0001");
 
     expect(mockApi.listParts).toHaveBeenCalledTimes(1);
-    expect(mockApi.partDetail).toHaveBeenCalledTimes(2);
-    expect(mockApi.partDetail).toHaveBeenLastCalledWith("part-0001");
+    expect(mockApi.partWorkspace).toHaveBeenCalledTimes(2);
+    expect(mockApi.partWorkspace).toHaveBeenLastCalledWith("part-0001");
   });
 
   it("badges MPN duplicates and the Duplicates filter narrows to just them (D2)", async () => {
@@ -414,7 +394,7 @@ describe("ComponentsPage", () => {
     const solo: PartSummary = { id: "s", display_name: "Solo Part", category: "Passives", mpn: "S1", manufacturer: "Z", is_complete: true, missing: [], eda_readiness: {} };
     mockApi.listParts.mockResolvedValue({ parts: [dupA, dupB, solo], count: 3 });
     mockApi.facets.mockResolvedValue({ by_category: { Passives: 3 }, by_manufacturer: {}, complete: 3, incomplete: 0 });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.partWorkspace.mockImplementation(async (id) => workspaceFor(id, `Open ${id}`, "x"));
     // A real accidental duplicate: two parts under one MPN. Shared footprints are ignored.
     mockApi.getDuplicates.mockResolvedValue({ by_mpn: [{ key: "C1", parts: [dupA, dupB] }], by_footprint: [] });
 
@@ -423,23 +403,20 @@ describe("ComponentsPage", () => {
     // Both duplicate members carry a badge; the solo part does not.
     await waitFor(() => expect(screen.getAllByText("Duplicate")).toHaveLength(2));
 
-    // The Duplicates filter (behind the Filters popover) narrows to just the members.
+    // The Duplicates filter (behind the Filters popover) narrows to just the members. Scoped to
+    // the picker: a component's name also reads on its open tab, which is not the list.
+    const list = document.querySelector<HTMLElement>('[data-dev-id="components.list-scroll"]')!;
     await userEvent.click(screen.getByRole("button", { name: "Filters" }));
     await userEvent.click(screen.getByText(/Duplicates \(2\)/));
-    expect(screen.queryByText("Solo Part")).toBeNull();
-    expect(screen.getByText("Cap A")).toBeInTheDocument();
-    expect(screen.getByText("Cap B")).toBeInTheDocument();
+    expect(within(list).queryByText("Solo Part")).toBeNull();
+    expect(within(list).getByText("Cap A")).toBeInTheDocument();
+    expect(within(list).getByText("Cap B")).toBeInTheDocument();
   });
 
   it("opens the Add A Part modal from the Add Parts toolbar button", async () => {
     mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1 },
-      by_manufacturer: {},
-      complete: 1,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.facets.mockResolvedValue(FACETS);
+    mockApi.partWorkspace.mockResolvedValue(workspaceFor("lm358", "LM358", "Dual op-amp"));
 
     const { state } = wrap(<ComponentsPage />);
     const user = userEvent.setup();
@@ -449,79 +426,16 @@ describe("ComponentsPage", () => {
     expect(state.addPartOpen).toBe(true);
   });
 
-  it("edits an identity field inline and reports a toast", async () => {
-    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1 },
-      by_manufacturer: {},
-      complete: 1,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
-    mockApi.editField.mockResolvedValue({ ...DETAIL, manufacturer: "TI Inc" });
-
-    wrap(<ComponentsPage />);
-    const user = userEvent.setup();
-
-    // Manufacturer is an EDA handoff field, and the handoff moved to its own tab (owner's choice,
-    // 2026-07-26). Open it first; the edit-and-toast behaviour under test is unchanged.
-    await user.click(await screen.findByRole("tab", { name: "Readiness" }));
-    const field = await screen.findByRole("button", { name: "Edit Manufacturer" });
-    await user.click(field);
-    const input = screen.getByLabelText("Manufacturer");
-    await user.clear(input);
-    await user.type(input, "TI Inc");
-    await user.keyboard("{Enter}");
-
-    expect(mockApi.editField).toHaveBeenCalledWith("lm358", "manufacturer", "TI Inc");
-    expect(await screen.findByText("Saved")).toBeInTheDocument();
-  });
-
-  it("moves a part to another category through the select", async () => {
-    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1, Passives: 3 },
-      by_manufacturer: {},
-      complete: 1,
-      incomplete: 0,
-      category_catalog: ["ICs", "Passives", "Fuses"],
-    });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
-    mockApi.moveCategory.mockResolvedValue(
-      makePartDetail({ ...DETAIL, derived: { ...DETAIL.derived, category: "Passives" } }),
-    );
-
-    wrap(<ComponentsPage />);
-    const user = userEvent.setup();
-
-    const select = await screen.findByLabelText("Category");
-    await waitFor(() => {
-      expect(Array.from((select as HTMLSelectElement).options, (option) => option.value)).toContain(
-        "Fuses",
-      );
-    });
-    await user.selectOptions(select, "Passives");
-
-    expect(mockApi.moveCategory).toHaveBeenCalledWith("lm358", "Passives");
-    expect(await screen.findByText("Moved to Passives")).toBeInTheDocument();
-  });
-
   it("deletes a part only after an in-window confirm", async () => {
     mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1 },
-      by_manufacturer: {},
-      complete: 1,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.facets.mockResolvedValue(FACETS);
+    mockApi.partWorkspace.mockResolvedValue(workspaceFor("lm358", "LM358", "Dual op-amp"));
     mockApi.deletePart.mockResolvedValue(undefined);
 
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "More Actions" }));
-    await user.click(screen.getByRole("button", { name: "Delete Part" }));
+    await user.click(await screen.findByRole("button", { name: /Delete Part/ }));
     const dialog = await screen.findByRole("dialog");
     // Nothing deleted until the dialog's own confirm is clicked.
     expect(mockApi.deletePart).not.toHaveBeenCalled();
@@ -534,21 +448,15 @@ describe("ComponentsPage", () => {
 
   it("restores the exact deleted part from the toast action", async () => {
     mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1 },
-      by_manufacturer: {},
-      complete: 1,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.facets.mockResolvedValue(FACETS);
+    mockApi.partWorkspace.mockResolvedValue(workspaceFor("lm358", "LM358", "Dual op-amp"));
     mockApi.deletePart.mockResolvedValue(undefined);
-    mockApi.restoreDeletedPart.mockResolvedValue(DETAIL);
+    mockApi.restoreDeletedPart.mockResolvedValue(makePartDetail({ id: "lm358" }));
 
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "More Actions" }));
-    await user.click(screen.getByRole("button", { name: "Delete Part" }));
+    await user.click(await screen.findByRole("button", { name: /Delete Part/ }));
     await user.click(
       within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }),
     );
@@ -561,7 +469,7 @@ describe("ComponentsPage", () => {
   it("does not re-fetch the just-deleted part off the retained list mid-refetch", async () => {
     // Hold the post-delete list refetch open so the window where TanStack still
     // serves the previous (retained) list is observable. During that window the
-    // deleted part must not be re-selected or re-fetched (it would 404).
+    // deleted part must not be re-opened or re-fetched (it would 404).
     let resolveRefetch!: (v: { parts: PartSummary[]; count: number }) => void;
     mockApi.listParts
       .mockResolvedValueOnce({ parts: [SUMMARY], count: 1 })
@@ -571,30 +479,24 @@ describe("ComponentsPage", () => {
             resolveRefetch = res;
           }),
       );
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1 },
-      by_manufacturer: {},
-      complete: 1,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.facets.mockResolvedValue(FACETS);
+    mockApi.partWorkspace.mockResolvedValue(workspaceFor("lm358", "LM358", "Dual op-amp"));
     mockApi.deletePart.mockResolvedValue(undefined);
 
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
-    await screen.findAllByText("Dual Operational Amplifier");
-    expect(mockApi.partDetail).toHaveBeenCalledTimes(1);
+    await screen.findByText("Dual op-amp");
+    expect(mockApi.partWorkspace).toHaveBeenCalledTimes(1);
 
-    await user.click(await screen.findByRole("button", { name: "More Actions" }));
-    await user.click(screen.getByRole("button", { name: "Delete Part" }));
+    await user.click(await screen.findByRole("button", { name: /Delete Part/ }));
     await user.click(
       within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }),
     );
 
     // Delete succeeded; the refetch is in flight and the old list is retained.
     await screen.findByText("Part deleted");
-    expect(mockApi.partDetail).toHaveBeenCalledTimes(1); // not re-fetched off the stale list
+    expect(mockApi.partWorkspace).toHaveBeenCalledTimes(1); // not re-fetched off the stale list
 
     // Resolve the refetch to an empty library: the honest empty state shows and
     // still nothing re-fetches the deleted part.
@@ -602,139 +504,7 @@ describe("ComponentsPage", () => {
       resolveRefetch({ parts: [], count: 0 });
     });
     expect(await screen.findByText("No Components Yet")).toBeInTheDocument();
-    expect(mockApi.partDetail).toHaveBeenCalledTimes(1);
-  });
-
-  it("enriches a part from its MPN and applies a sourced field through editField", async () => {
-    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1 },
-      by_manufacturer: {},
-      complete: 1,
-      incomplete: 0,
-    });
-    // The record has no manufacturer, so the sourced value is applyable.
-    mockApi.partDetail.mockResolvedValue({ ...DETAIL, manufacturer: "" });
-    mockEnrich({
-      category: "ICs",
-      mpn: null,
-      manufacturer: { value: "Analog Devices", source: "jsonld", confidence: "high" },
-      description: null,
-      datasheet_url: null,
-      stock: null,
-      package: null,
-      price_breaks: [],
-      specs: {},
-      schema_version: 1,
-    });
-    mockApi.editField.mockResolvedValue(DETAIL);
-
-    wrap(<ComponentsPage />);
-    const user = userEvent.setup();
-
-    // Enrich now lives in the part workbench's Enrich tab, so open it first.
-    await user.click(await screen.findByRole("tab", { name: "Evidence" }));
-    await user.click(
-      await screen.findByRole("button", { name: "Enrich From Distributor" }),
-    );
-    expect(mockApi.enrichPart).toHaveBeenCalledWith("LM358DR", "ICs", undefined);
-
-    const row = (await screen.findByText("Analog Devices")).closest("div")!;
-    await user.click(within(row).getByRole("button", { name: "Apply" }));
-
-    expect(mockApi.editField).toHaveBeenCalledWith("lm358", "manufacturer", "Analog Devices");
-    expect(await screen.findByText("Saved")).toBeInTheDocument();
-  });
-
-  it("shows Already Set (no Apply) when the record already holds the enriched value", async () => {
-    // Drives the real DetailPanel -> EnrichPanel `current` wire end to end: if that
-    // wire stops feeding the record's own manufacturer/description into the gate,
-    // Apply is wrongly offered for a value already on the record. The record here
-    // already holds the manufacturer the lookup returns, so the row must read
-    // "Already Set" and offer no Apply.
-    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1 },
-      by_manufacturer: {},
-      complete: 1,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockResolvedValue({ ...DETAIL, manufacturer: "Analog Devices" });
-    mockEnrich({
-      category: "ICs",
-      mpn: null,
-      manufacturer: { value: "Analog Devices", source: "jsonld", confidence: "high" },
-      description: null,
-      datasheet_url: null,
-      stock: null,
-      package: null,
-      price_breaks: [],
-      specs: {},
-      schema_version: 1,
-    });
-
-    wrap(<ComponentsPage />);
-    const user = userEvent.setup();
-
-    // Enrich now lives in the part workbench's Enrich tab, so open it first.
-    await user.click(await screen.findByRole("tab", { name: "Evidence" }));
-    await user.click(
-      await screen.findByRole("button", { name: "Enrich From Distributor" }),
-    );
-
-    expect(await screen.findByText("Already Set")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
-  });
-
-  it("applies an enriched pinout through the specs seam and reports a toast", async () => {
-    // Drives the whole ComponentsPage -> DetailPanel -> EnrichPanel -> handleApplyPinout
-    // -> setSpecs wire. If any link breaks (a dropped onApplyPinout prop), the Apply
-    // Pinout button never reaches setSpecs and this goes RED. The record has no pinout
-    // yet, so Apply Pinout is offered (not "Already Set").
-    const pins = [
-      { pin: "1", name: "OUT1" },
-      { pin: "2", name: "IN1-" },
-    ];
-    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1 },
-      by_manufacturer: {},
-      complete: 1,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
-    mockEnrich({
-      category: "ICs",
-      mpn: null,
-      manufacturer: null,
-      description: null,
-      datasheet_url: null,
-      stock: null,
-      package: null,
-      price_breaks: [],
-      specs: { pinout: { value: pins, source: "datasheet", confidence: "high" } },
-      schema_version: 1,
-    });
-    mockApi.setSpecs.mockResolvedValue(
-      makePartDetail({ ...DETAIL, derived: { ...DETAIL.derived, specs: { pinout: pins } } }),
-    );
-
-    wrap(<ComponentsPage />);
-    const user = userEvent.setup();
-
-    // Enrich now lives in the part workbench's Enrich tab, so open it first.
-    await user.click(await screen.findByRole("tab", { name: "Evidence" }));
-    await user.click(
-      await screen.findByRole("button", { name: "Enrich From Distributor" }),
-    );
-    await user.click(await screen.findByRole("button", { name: "Apply Pinout" }));
-
-    expect(mockApi.setSpecs).toHaveBeenCalledWith(
-      "lm358",
-      { pinout: { value: pins, source: "datasheet", confidence: "high" } },
-      undefined,
-    );
-    expect(await screen.findByText("Pinout saved")).toBeInTheDocument();
+    expect(mockApi.partWorkspace).toHaveBeenCalledTimes(1);
   });
 
   it("shows the honest empty state when the library has no parts", async () => {
@@ -750,7 +520,7 @@ describe("ComponentsPage", () => {
 
     expect(await screen.findByText("No Components Yet")).toBeInTheDocument();
     expect(screen.getAllByText("No Components Yet")).toHaveLength(1);
-    expect(screen.queryByText("Select a part to see its details.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Select a component to open it.")).not.toBeInTheDocument();
     const action = screen.getByRole("button", { name: "Add Parts" });
     await userEvent.click(action);
     expect(view.state.addPartOpen).toBe(true);
@@ -771,5 +541,213 @@ describe("ComponentsPage", () => {
       await screen.findByText("Cannot reach the Stockroom server."),
     ).toBeInTheDocument();
     expect(screen.getByText("Try Again")).toBeInTheDocument();
+  });
+});
+
+describe("open component tabs", () => {
+  const PARTS: PartSummary[] = Array.from({ length: 15 }, (_, index) => ({
+    id: `p${index}`,
+    display_name: `Part ${index}`,
+    category: "ICs",
+    mpn: `MPN-${index}`,
+    manufacturer: "Fixture",
+    is_complete: true,
+    missing: [],
+    eda_readiness: {},
+  }));
+
+  beforeEach(() => {
+    mockApi.listParts.mockResolvedValue({ parts: PARTS, count: PARTS.length });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: PARTS.length },
+      by_manufacturer: { Fixture: PARTS.length },
+      complete: PARTS.length,
+      incomplete: 0,
+    });
+    mockApi.partWorkspace.mockImplementation(async (id) =>
+      workspaceFor(id, `Part ${id.slice(1)}`, `Description ${id}`),
+    );
+  });
+
+  async function openRow(user: ReturnType<typeof userEvent.setup>, index: number) {
+    await user.click(await screen.findByRole("button", { name: new RegExp(`Part ${index}\\b`) }));
+  }
+
+  it("opens a picker row into a tab, and re-selecting it activates rather than duplicates", async () => {
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+    await screen.findByText("Description p0");
+
+    await openRow(user, 1);
+    await screen.findByText("Description p1");
+    expect(readUiSession().open_components).toEqual(["p0", "p1"]);
+
+    // Back to the first, then to the first again: still two tabs, never three.
+    await openRow(user, 0);
+    await openRow(user, 0);
+    await waitFor(() => expect(readUiSession().active_component).toBe("p0"));
+    expect(readUiSession().open_components).toEqual(["p0", "p1"]);
+    expect(within(openTabs()).getAllByRole("tab")).toHaveLength(2);
+  });
+
+  it("activates an already-open component from its own tab", async () => {
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+    await screen.findByText("Description p0");
+    await openRow(user, 1);
+    await screen.findByText("Description p1");
+
+    await user.click(within(openTabs()).getByRole("tab", { name: "Part 0" }));
+
+    await screen.findByText("Description p0");
+    expect(readUiSession().active_component).toBe("p0");
+    // The picker follows the tab, so the highlighted row and the open workspace never disagree.
+    expect(document.querySelector('[data-part-id="p0"]')).toHaveAttribute("aria-current", "true");
+    expect(mockApi.partWorkspace).toHaveBeenLastCalledWith("p0");
+  });
+
+  it("closing a tab leaves the component in the library and activates a neighbour", async () => {
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+    await screen.findByText("Description p0");
+    await openRow(user, 1);
+    await screen.findByText("Description p1");
+
+    await user.click(screen.getByRole("button", { name: "Close Tab" }));
+
+    await waitFor(() => expect(readUiSession().open_components).toEqual(["p0"]));
+    expect(readUiSession().active_component).toBe("p0");
+    // The component is still listed: closing a VIEW of it deleted nothing.
+    expect(await screen.findByRole("button", { name: /Part 1\b/ })).toBeInTheDocument();
+    expect(mockApi.deletePart).not.toHaveBeenCalled();
+  });
+
+  it("restores the open strip and the active tab from the injected session", async () => {
+    let session = defaultUiSession();
+    session = openComponentInSession(session, "p3");
+    session = openComponentInSession(session, "p5");
+    session.selected_ids.component = "p5";
+    resetUiSessionForTests(session);
+
+    wrap(<ComponentsPage />);
+
+    await screen.findByText("Description p5");
+    const tabs = within(openTabs()).getAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["Part 3", "Part 5"]);
+    expect(within(openTabs()).getByRole("tab", { name: "Part 5" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("holds the tab bound at twelve, evicting the least recently used tab", async () => {
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+    await screen.findByText("Description p0");
+
+    for (let index = 1; index < MAX_OPEN_COMPONENTS + 2; index += 1) {
+      await openRow(user, index);
+      await screen.findByText(`Description p${index}`);
+    }
+
+    const open = readUiSession().open_components;
+    expect(open).toHaveLength(MAX_OPEN_COMPONENTS);
+    expect(within(openTabs()).getAllByRole("tab")).toHaveLength(MAX_OPEN_COMPONENTS);
+    expect(open).toContain(`p${MAX_OPEN_COMPONENTS + 1}`);
+    expect(open).not.toContain("p0");
+  });
+
+  it("drops a tab whose component is no longer in the library, without crashing", async () => {
+    let session = defaultUiSession();
+    session = openComponentInSession(session, "p2");
+    session = openComponentInSession(session, "ghost-part");
+    session.selected_ids.component = "p2";
+    resetUiSessionForTests(session);
+
+    wrap(<ComponentsPage />);
+
+    await screen.findByText("Description p2");
+    await waitFor(() => expect(readUiSession().open_components).toEqual(["p2"]));
+    expect(within(openTabs()).queryByRole("tab", { name: "ghost-part" })).toBeNull();
+  });
+
+  it("keeps tabs open while a filter narrows the picker to one row", async () => {
+    // Stale-tab removal must distinguish "this component left the library" from "this component
+    // is not in the current search". A narrowed list is not evidence of a deletion, and closing
+    // someone's open comparison as they type a filter would be the worse failure of the two.
+    let session = defaultUiSession();
+    session = openComponentInSession(session, "p0");
+    session = openComponentInSession(session, "p1");
+    session.selected_ids.component = "p1";
+    session.component_filters.category = "ICs";
+    resetUiSessionForTests(session);
+    mockApi.listParts.mockResolvedValue({ parts: [PARTS[1]], count: 1 });
+
+    wrap(<ComponentsPage />);
+
+    await screen.findByText("Description p1");
+    expect(readUiSession().open_components).toEqual(["p0", "p1"]);
+    // The filtered-out tab keeps its place. Its label falls back to the component id, because a
+    // list that no longer carries the row cannot supply the name.
+    expect(within(openTabs()).getAllByRole("tab")).toHaveLength(2);
+    expect(within(openTabs()).getByRole("tab", { name: "p0" })).toBeInTheDocument();
+  });
+
+  it("remembers each component's information tab and representation layout separately", async () => {
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+    await screen.findByText("Description p0");
+
+    await user.click(screen.getByRole("tab", { name: "Sourcing" }));
+    await user.click(screen.getByRole("radio", { name: "Footprint" }));
+    await waitFor(() =>
+      expect(readUiSession().component_views.p0).toMatchObject({
+        info_tab: "sourcing",
+        representation_layout: "footprint",
+      }),
+    );
+
+    await openRow(user, 1);
+    await screen.findByText("Description p1");
+    // A second component starts at its own defaults rather than inheriting the first's view.
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute("aria-checked", "true");
+
+    await user.click(within(openTabs()).getByRole("tab", { name: "Part 0" }));
+    // Back on the first component, its own view state is in force: the Sourcing tab, not the
+    // Overview the second component was left on.
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Sourcing" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+    expect(screen.getByRole("radio", { name: "Footprint" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
+
+  it("keeps the opened component in a non-scrolling root", async () => {
+    wrap(<ComponentsPage />);
+    await screen.findByText("Description p0");
+    const root = document.querySelector<HTMLElement>('[data-dev-id="component-browser.root"]')!;
+    // The hard contract: height 100%, a zero min-height so flex children can shrink, and no
+    // scrolling of its own. Everything longer than its band belongs in a modal.
+    expect(root.className).toContain("h-full");
+    expect(root.className).toContain("min-h-0");
+    expect(root.className).toContain("overflow-hidden");
+    // Nor may the column that holds it, nor the page itself, become a scroller.
+    const pane = document.querySelector<HTMLElement>('[data-dev-id="components.detail-pane"]')!;
+    expect(pane.className).toContain("overflow-hidden");
+    // Nothing inside the workspace may scroll on its own. Modal subtrees are excluded because a
+    // modal is the ONE surface the rule allows a scrollbar - and none is open here anyway.
+    const scrollers = Array.from(
+      root.querySelectorAll<HTMLElement>("[class*='overflow-y-auto'],[class*='overflow-auto']"),
+    ).filter((node) => !node.closest('[role="dialog"]'));
+    expect(scrollers).toEqual([]);
   });
 });

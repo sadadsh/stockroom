@@ -1,38 +1,50 @@
 /**
- * The Components page: the grouped parts list, the search + facet finder, and the
- * part detail panel, all wired to the real library API. Server state comes from
- * TanStack Query; the only local state is the search text, the active category
- * facet, the complete-only toggle, and the selected part id.
+ * The Components page: the grouped parts list, the search + facet finder, and the opened
+ * components themselves. Server state comes from TanStack Query; the only local state is the
+ * search text, the active category facet, the complete-only toggle, and the selected part id.
  *
- * Honest degradation: a connection error shows a retry surface (not a crash), and
- * a genuinely empty library shows an empty state that names how to add parts.
+ * A component OPENS into a tab rather than replacing a single detail pane. Comparing two parts is
+ * the ordinary case in a library - "is this the same footprint as the other one", "which of these
+ * two has the stock" - and a one-slot detail pane made that a navigation exercise with the answer
+ * held in the person's head. Tabs are bounded (a strip that can grow forever is not a strip),
+ * keyed by stable component id, and persisted through the durable session, so closing the window
+ * mid-comparison does not lose it.
+ *
+ * Honest degradation: a connection error shows a retry surface (not a crash), and a genuinely
+ * empty library shows an empty state that names how to add parts.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   usePartsQuery,
   useFacetsQuery,
   useDuplicates,
-  usePartDetailQuery,
-  useEditField,
-  useMoveCategory,
   useDeletePart,
   useRestoreDeletedPart,
-  useSetSpecs,
 } from "../api/queries";
 import { ApiError } from "../api/client";
-import type { SourcedField } from "../api/types";
 import { useToast } from "../lib/toast";
-import { distributorLabel } from "../lib/sourced";
 import { useAddPart } from "../lib/addPart";
 import { useCapture } from "../lib/capture";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
-import { DetailPanel } from "../components/DetailPanel";
 import { SearchOverlay } from "../components/SearchOverlay";
-import { AddPartIcon } from "../components/icons";
-import { Button, PanelTitle } from "../components/primitives";
-import { Text } from "../lib/copy";
-import { readUiSession, updateUiSession } from "../lib/uiSession";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { AddPartIcon, TrashIcon } from "../components/icons";
+import { Button, PanelTitle, TabStrip, type TabItem } from "../components/primitives";
+import {
+  ComponentWorkspace,
+  ComponentWorkspaceEmpty,
+} from "../components/component-workspace/ComponentWorkspace";
+import { Text, useText } from "../lib/copy";
+import { componentTabDevId } from "../lib/componentDevIds";
+import {
+  closeComponentInSession,
+  openComponentInSession,
+  pruneOpenComponents,
+  readUiSession,
+  updateUiSession,
+  useUiSession,
+} from "../lib/uiSession";
 import { COMPONENT_PICKER_WIDTH } from "../lib/libraryLayout";
 
 export function ComponentsPage() {
@@ -52,23 +64,27 @@ export function ComponentsPage() {
   const [searchOpen, setSearchOpen] = useState(
     () => readUiSession().open_surface === "search",
   );
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [listScrollElement, setListScrollElement] =
     useState<HTMLDivElement | null>(null);
   const selectedIdRef = useRef(selectedId);
   selectedIdRef.current = selectedId;
 
+  const session = useUiSession();
   const partsQuery = usePartsQuery({ q: search, category, completeOnly });
   const facetsQuery = useFacetsQuery();
   const duplicatesQuery = useDuplicates();
-  const detailQuery = usePartDetailQuery(selectedId);
-  const editField = useEditField();
-  const moveCategory = useMoveCategory();
   const deletePart = useDeletePart();
   const restoreDeletedPart = useRestoreDeletedPart();
-  const setSpecs = useSetSpecs();
   const { toast } = useToast();
   const { open: openAddPart } = useAddPart();
   const { reopenPartId } = useCapture();
+  const confirmDeleteTitle = useText("components.delete-title", "Delete Part");
+  const confirmDeleteBody = useText(
+    "components.delete-body",
+    "This removes the component from the library. It can be restored from the toast that follows.",
+  );
+  const confirmDeleteLabel = useText("components.delete-confirm", "Delete");
 
   // Persist the exact primary Library view as one bounded document. This runs
   // only when a value changed, so mounting from an injected snapshot does not
@@ -171,10 +187,10 @@ export function ComponentsPage() {
     };
   }, [listContentSettled, listScrollElement]);
 
-  // The background capture pill asks to reopen its part: select it here so the detail (and its
-  // Complete-Part modal) come up. DetailPanel finishes the handoff by opening the modal.
+  // The background capture pill asks to reopen its part: open it here so its workspace comes up.
   useEffect(() => {
-    if (reopenPartId) setSelectedId(reopenPartId);
+    if (reopenPartId) openComponent(reopenPartId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reopenPartId]);
 
   // Ids that share an MPN with another part (a real accidental duplicate). Shared
@@ -191,78 +207,23 @@ export function ComponentsPage() {
   const parts = duplicatesOnly
     ? allParts.filter((p) => duplicateIds.has(p.id))
     : allParts;
-  const categories = Object.keys(facetsQuery.data?.by_category ?? {}).sort();
-  const categoryOptions =
-    facetsQuery.data?.category_catalog?.length
-      ? facetsQuery.data.category_catalog
-      : categories;
-  const detailBusy =
-    editField.isPending ||
-    moveCategory.isPending ||
-    deletePart.isPending ||
-    setSpecs.isPending;
 
-  function toastError(err: unknown, fallback: string) {
-    toast(err instanceof ApiError ? err.message : fallback, "err");
+  // A tab keeps the name it was opened with even when a later search filters its component out of
+  // the list. Without this the strip would relabel itself to raw ids the moment someone typed.
+  const tabNames = useRef(new Map<string, string>());
+  for (const part of allParts) {
+    tabNames.current.set(part.id, part.display_name || part.mpn || part.id);
   }
 
-  function handleEditField(field: string, value: unknown) {
-    if (!selectedId) return;
-    editField.mutate(
-      { id: selectedId, field, value },
-      {
-        onSuccess: () => toast("Saved", "ok"),
-        onError: (err) => toastError(err, "Could not save"),
-      },
-    );
+  function openComponent(id: string) {
+    setSelectedId(id);
+    updateUiSession((snapshot) => openComponentInSession(snapshot, id));
   }
 
-  function handleMoveCategory(nextCategory: string) {
-    if (!selectedId) return;
-    moveCategory.mutate(
-      { id: selectedId, category: nextCategory },
-      {
-        onSuccess: () => toast(`Moved to ${nextCategory}`, "ok"),
-        onError: (err) => toastError(err, "Could not move"),
-      },
-    );
-  }
-
-  function handleApplyPinout(sourced: SourcedField) {
-    if (!selectedId) return;
-    setSpecs.mutate(
-      {
-        id: selectedId,
-        specs: {
-          pinout: {
-            value: sourced.value,
-            source: sourced.source,
-            confidence: sourced.confidence,
-          },
-        },
-      },
-      {
-        onSuccess: () => toast("Pinout saved", "ok"),
-        onError: (err) => toastError(err, "Could not save the pinout"),
-      },
-    );
-  }
-
-  // Put a different source's answer in force for one spec. It goes through the specs seam with
-  // overwrite, so the record keeps WHICH distributor the chosen value came from (set_specs writes
-  // record.enrichment[key]) instead of silently becoming an anonymous manual edit.
-  function handleUseSpecValue(key: string, value: string, source: string) {
-    if (!selectedId) return;
-    setSpecs.mutate(
-      { id: selectedId, specs: { [key]: { value, source, confidence: "high" } }, overwrite: true },
-      {
-        onSuccess: () =>
-          // an alternate seeded from the record itself carries no source, so the message must not
-          // trail off into "set from "
-          toast(source ? `${key} set from ${distributorLabel(source)}` : `${key} set`, "ok"),
-        onError: (err) => toastError(err, `Could not set ${key}`),
-      },
-    );
+  function closeComponent(id: string) {
+    const next = closeComponentInSession(readUiSession(), id);
+    updateUiSession(() => next);
+    if (next.active_component) setSelectedId(next.active_component);
   }
 
   function handleDelete() {
@@ -275,18 +236,24 @@ export function ComponentsPage() {
           onClick: () => {
             restoreDeletedPart.mutate(deletedId, {
               onSuccess: () => {
-                setSelectedId(deletedId);
+                openComponent(deletedId);
                 toast("Part restored", "ok");
               },
-              onError: (err) => toastError(err, "Could not restore the part"),
+              onError: (err) =>
+                toast(
+                  err instanceof ApiError ? err.message : "Could not restore the part",
+                  "err",
+                ),
             });
           },
         });
-        // Drop the selection; the auto-select effect picks the next part once the
+        // Drop the tab and the selection; the auto-select effect picks the next part once the
         // invalidated list refetches.
+        closeComponent(deletedId);
         setSelectedId(null);
       },
-      onError: (err) => toastError(err, "Could not delete"),
+      onError: (err) =>
+        toast(err instanceof ApiError ? err.message : "Could not delete", "err"),
     });
   }
 
@@ -294,8 +261,9 @@ export function ComponentsPage() {
   // (a new search, a category change, or the first successful load). Act only on
   // SETTLED data: while a refetch is in flight TanStack retains the previous
   // list, so re-selecting parts[0] here would re-pick a just-deleted or
-  // filtered-out part and fire a wasted, guaranteed-404 detail request.
+  // filtered-out part and fire a wasted, guaranteed-404 workspace request.
   const partsFetching = partsQuery.isFetching;
+  const activeComponent = session.active_component;
   useEffect(() => {
     if (partsFetching) return;
     if (parts.length === 0) {
@@ -303,9 +271,25 @@ export function ComponentsPage() {
       return;
     }
     if (!selectedId || !parts.some((p) => p.id === selectedId)) {
-      setSelectedId(parts[0].id);
+      openComponent(parts[0].id);
+    } else if (activeComponent !== selectedId) {
+      // A restored snapshot names the selection but may predate the tab strip (a migrated v1
+      // session), so the selected component still has to be given its tab.
+      openComponent(selectedId);
     }
-  }, [parts, selectedId, partsFetching]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parts, selectedId, partsFetching, activeComponent]);
+
+  // A tab whose component left the library cannot render, so it goes. Only ever evaluated against
+  // an UNFILTERED settled list: a search narrows what is listed without deleting anything, and
+  // pruning on a filtered list would close tabs as someone typed.
+  const hasSearchOrFilter = !!search || !!category || completeOnly || duplicatesOnly;
+  useEffect(() => {
+    if (partsFetching || hasSearchOrFilter || allParts.length === 0) return;
+    const available = new Set(allParts.map((part) => part.id));
+    updateUiSession((snapshot) => pruneOpenComponents(snapshot, available));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allParts, partsFetching, hasSearchOrFilter]);
 
   // Ctrl/Cmd+K (and "/" when not already typing) opens the full-screen parametric search.
   useEffect(() => {
@@ -328,23 +312,26 @@ export function ComponentsPage() {
   }, [searchOpen]);
 
   // Open a part chosen in the search overlay: scope the picker to its category and clear the
-  // narrowing filters so the row is present in the list, select it, and close the overlay.
+  // narrowing filters so the row is present in the list, open it, and close the overlay.
   function openFromSearch(id: string, cat: string) {
     setCategory(cat);
     setCompleteOnly(false);
     setDuplicatesOnly(false);
     setSearch("");
-    setSelectedId(id);
+    openComponent(id);
     setSearchOpen(false);
   }
 
-  const selectedSummary = parts.find((p) => p.id === selectedId) ?? null;
-  const hasSearchOrFilter = !!search || !!category || completeOnly || duplicatesOnly;
   const emptyLibrary =
     !partsQuery.isLoading &&
     !partsQuery.error &&
     allParts.length === 0 &&
     !hasSearchOrFilter;
+
+  const openTabs: TabItem<string>[] = session.open_components.map((id) => ({
+    id,
+    label: tabNames.current.get(id) ?? id,
+  }));
 
   if (emptyLibrary) {
     return (
@@ -379,12 +366,12 @@ export function ComponentsPage() {
     );
   }
 
-  // north-star .app: rail | list | detail, each column self-heading - no full-width page
-  // header band (the active rail item + the rail's library readout carry that).
+  // north-star .app: rail | list | opened components, each column self-heading - no full-width
+  // page header band (the active rail item + the rail's library readout carry that).
   return (
     <div data-dev-id="components.root" className="flex min-h-0 flex-1">
         {/* picker: a docked panel - an Altium title strip, then the padded body. The rail's
-            right border and the detail pane's left border frame this column, so it needs none. */}
+            right border and the workspace's left border frame this column, so it needs none. */}
         <div
           data-dev-id="components.picker"
           className="flex flex-none flex-col"
@@ -431,7 +418,7 @@ export function ComponentsPage() {
               parts={parts}
               duplicateIds={duplicateIds}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={openComponent}
               scrollElement={listScrollElement}
               onRetry={() => partsQuery.refetch()}
               hasSearchOrFilter={hasSearchOrFilter}
@@ -445,40 +432,101 @@ export function ComponentsPage() {
           </div>
         </div>
 
-        {/* detail: the panel owns its own height, padding, and internal scroll (a fixed
-            rail + a tabbed workbench), so this column is a non-scrolling viewport. */}
-        <div data-dev-id="components.detail-pane" className="min-h-0 min-w-0 flex-1 overflow-hidden border-l border-line">
-          {selectedId ? (
-            <DetailPanel
-              detail={detailQuery.data}
-              isLoading={detailQuery.isLoading}
-              error={detailQuery.error}
-              missing={selectedSummary?.missing ?? []}
-              isComplete={selectedSummary?.is_complete ?? false}
-              edaReadiness={selectedSummary?.eda_readiness}
-              onEditField={handleEditField}
-              onMoveCategory={handleMoveCategory}
-              categories={categoryOptions}
-              onDelete={handleDelete}
-              onApplyPinout={handleApplyPinout}
-              onUseSpecValue={handleUseSpecValue}
-              deleting={deletePart.isPending}
-              busy={detailBusy}
-            />
-          ) : (
-            <div data-dev-id="components.select-prompt" className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
-              {partsQuery.isLoading ? (
+        {/* opened components: a tab band on the same 34px chrome line as the rail and picker
+            headers, then the workspace itself. The column never scrolls. */}
+        <div
+          data-dev-id="components.detail-pane"
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-l border-line"
+        >
+          <div
+            data-dev-id="components.workspace-band"
+            className="flex h-[34px] flex-none items-center gap-2 border-b border-line bg-band px-3"
+          >
+            {openTabs.length > 0 && activeComponent ? (
+              <TabStrip
+                tabs={openTabs}
+                active={activeComponent}
+                onSelect={openComponent}
+                idBase="component-browser"
+                devIdBase="component-browser"
+                devIdForTab={componentTabDevId}
+                density="compact"
+                className="min-w-0 overflow-hidden"
+                aria-label="Open components"
+              />
+            ) : (
+              <span className="text-xs font-semibold text-t2">
+                <Text id="component-browser.band-title">Open Components</Text>
+              </span>
+            )}
+            {activeComponent ? (
+              <button
+                type="button"
+                data-dev-id="component-browser.close-tab"
+                onClick={() => closeComponent(activeComponent)}
+                className="ml-auto flex-none rounded-control px-1.5 py-0.5 text-2xs font-medium text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+              >
+                <Text id="component-browser.close-tab">Close Tab</Text>
+              </button>
+            ) : null}
+            {selectedId ? (
+              <button
+                type="button"
+                data-dev-id="component-browser.delete"
+                aria-busy={deletePart.isPending}
+                disabled={deletePart.isPending}
+                onClick={() => setConfirmDelete(true)}
+                className={
+                  "flex-none rounded-control px-1.5 py-0.5 text-2xs font-medium text-err " +
+                  "transition-colors hover:brightness-125 focus-visible:outline " +
+                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc " +
+                  "disabled:pointer-events-none disabled:opacity-60 " +
+                  (activeComponent ? "" : "ml-auto ")
+                }
+              >
+                <span className="inline-flex items-center gap-1">
+                  <TrashIcon />
+                  {deletePart.isPending ? (
+                    <Text id="component-browser.deleting">Deleting Part</Text>
+                  ) : (
+                    <Text id="component-browser.delete">Delete Part</Text>
+                  )}
+                </span>
+              </button>
+            ) : null}
+          </div>
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+            {activeComponent ? (
+              <ComponentWorkspace key={activeComponent} componentId={activeComponent} />
+            ) : partsQuery.isLoading ? (
+              <div
+                data-dev-id="components.select-prompt"
+                className="flex h-full items-center justify-center text-sm text-t3"
+              >
                 <Text id="components.loading">Loading components...</Text>
-              ) : (
-                <Text id="components.select-prompt">Select a part to see its details.</Text>
-              )}
-            </div>
-          )}
+              </div>
+            ) : (
+              <ComponentWorkspaceEmpty />
+            )}
+          </div>
         </div>
 
         {searchOpen ? (
           <SearchOverlay onClose={() => setSearchOpen(false)} onOpenPart={openFromSearch} />
         ) : null}
+
+        <ConfirmDialog
+          open={confirmDelete}
+          title={confirmDeleteTitle}
+          body={confirmDeleteBody}
+          confirmLabel={confirmDeleteLabel}
+          danger
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => {
+            setConfirmDelete(false);
+            handleDelete();
+          }}
+        />
     </div>
   );
 }

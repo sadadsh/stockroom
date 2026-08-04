@@ -100,7 +100,22 @@ const KNOWN_DERIVED: readonly string[] = [
   "stm.inspector.decision",
   "stm.inspector.targets",
   "stm.inspector.evidence",
-]; // 22
+  // ComponentsPage passes the same TabStrip primitive the open-component strip. Only the TABLIST
+  // id is static: each tab is one OPEN COMPONENT, so its id is built by lib/componentDevIds.ts and
+  // is not catalogued at all.
+  "component-browser.tabs",
+  // InfoTabsShell: the four information tabs, whose ids ARE fixed.
+  "component-browser.info.tabs",
+  "component-browser.info.tab-overview",
+  "component-browser.info.tab-specifications",
+  "component-browser.info.tab-sourcing",
+  "component-browser.info.tab-sources",
+  // RepresentationDock's SegmentedControl derives one id per layout option.
+  "component-browser.layout.all",
+  "component-browser.layout.symbol",
+  "component-browser.layout.footprint",
+  "component-browser.layout.model",
+]; // 32
 
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
@@ -158,7 +173,27 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "projects.build-placement-control",
   "projects.document-control",
   "stm.target-set-control",
-]; // 26
+  // component-workspace/WorkspaceRegion.tsx: every bounded information region is the same shell,
+  // so each region's id (and its View All control's id) arrives as a `devId` / `viewAllDevId`
+  // string prop. Spelled out in full at each call site, never interpolated.
+  "component-browser.key-specs",
+  "component-browser.attention",
+  "component-browser.sourcing-snapshot",
+  "component-browser.sourcing-snapshot-all",
+  "component-browser.view-all",
+  "component-browser.specifications",
+  "component-browser.specifications-all",
+  "component-browser.pinout",
+  "component-browser.spec-conflicts",
+  "component-browser.sourcing",
+  "component-browser.sourcing-all",
+  "component-browser.relationships",
+  "component-browser.resources",
+  "component-browser.sources",
+  "component-browser.sources-all",
+  "component-browser.field-sources",
+  "component-browser.diagnostics",
+]; // 43
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));
@@ -200,6 +235,19 @@ describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
     expect(sourceContains("${devIdBase}.${opt.id}")).toBe(true);
     expect(sourceContains('devIdBase="stm.lens"')).toBe(true);
     expect(sourceContains('devIdBase="stm.inspector"')).toBe(true);
+    // The opened component: the open-component tablist, the four information tabs, and the
+    // representation layout switcher.
+    expect(sourceContains('devIdBase="component-browser"')).toBe(true);
+    expect(sourceContains('devIdBase="component-browser.info"')).toBe(true);
+    expect(sourceContains('devIdBase="component-browser.layout"')).toBe(true);
+  });
+
+  it("per-component tab ids are built by the dynamic helper, never spelled into the strip", () => {
+    // The open-component strip overrides only the PER-TAB id; the tablist keeps the derived one.
+    // If this override were dropped, the ids would silently revert to `component-browser.tab-<raw
+    // component id>` - an uncatalogued, unescaped id interpolated straight from a record field.
+    expect(sourceContains("devIdForTab={componentTabDevId}")).toBe(true);
+    expect(sourceContains("${devIdBase}.tab-${t.id}")).toBe(true);
   });
 
   it("every KNOWN_DERIVED id is a catalogue id and is genuinely derived (never a literal)", () => {
@@ -256,6 +304,10 @@ const DOCKED_PANEL_HEADERS = [
   "/src/components/Rail.tsx",
   "/src/components/DetailPanel.tsx",
   "/src/pages/ProjectsPage.tsx",
+  // The open-component tab band replaced the detail sheet's title strip on the Components route,
+  // so it inherits the same obligation: it sits on the SAME horizontal line as the rail header and
+  // the Components list header, and a 4px difference reads as a mis-registration.
+  "/src/pages/ComponentsPage.tsx",
 ];
 
 describe("panel header band height", () => {

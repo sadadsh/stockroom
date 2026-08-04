@@ -456,6 +456,7 @@ export function TabStrip<T extends string>({
   onSelect,
   idBase,
   devIdBase,
+  devIdForTab,
   density = "default",
   className,
   "aria-label": ariaLabel,
@@ -469,6 +470,11 @@ export function TabStrip<T extends string>({
   // templated tab strips get one stable dev-mode id per tab. Omit it and no
   // `data-dev-id` is emitted (zero change for other callers).
   devIdBase?: string;
+  // A strip whose tab ids are RUNTIME ids (one tab per open component) cannot use the
+  // `<devIdBase>.tab-<id>` spelling: those ids have their own bracketed grammar and their own
+  // escaping, which lives in lib/componentDevIds.ts. Supplying this replaces the per-tab id only;
+  // the tablist still takes `<devIdBase>.tabs`.
+  devIdForTab?: (id: T) => string;
   density?: "default" | "compact";
   className?: string;
   "aria-label"?: string;
@@ -503,7 +509,9 @@ export function TabStrip<T extends string>({
           type="button"
           role="tab"
           id={tabButtonId(idBase, t.id)}
-          data-dev-id={devIdBase ? `${devIdBase}.tab-${t.id}` : undefined}
+          data-dev-id={
+            devIdForTab ? devIdForTab(t.id) : devIdBase ? `${devIdBase}.tab-${t.id}` : undefined
+          }
           aria-selected={active === t.id}
           aria-controls={tabPanelId(idBase, t.id)}
           tabIndex={active === t.id ? 0 : -1}

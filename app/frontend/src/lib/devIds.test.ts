@@ -56,7 +56,12 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 273 after each asset opens only its own viewer and the four combined-preview tab controls were
 // removed.
 // 283 with the ten source-backed AdaptiveChoice controls spanning Category, intake, Projects, and STM.
-const EXPECTED_ENTRIES = 283;
+// 338 with the opened-component workspace: the tab band, the persistent identity header, the
+// three-module representation dock and its layout switcher, the four information tabs, the Overview
+// regions, and the one workspace modal. A new `component-browser` area, because these elements
+// belong to the OPENED component rather than to the picker that lists them. Per-component elements
+// (`component-browser.component[<id>]` and friends) are DYNAMIC and deliberately have no rows here.
+const EXPECTED_ENTRIES = 338;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
@@ -83,12 +88,13 @@ describe("devIds catalogue", () => {
     expect(seen.size).toBe(EXPECTED_ENTRIES);
   });
 
-  it("enumerates the 16 areas in first-appearance order, and every entry is a member", () => {
+  it("enumerates the 17 areas in first-appearance order, and every entry is a member", () => {
     expect(DEV_ID_AREAS).toEqual([
       "rail",
       "about",
       "components",
       "projects",
+      "component-browser",
       "detail",
       "search",
       "addpart",
@@ -102,7 +108,7 @@ describe("devIds catalogue", () => {
       "confirm",
       "shell",
     ]);
-    expect(DEV_ID_AREAS).toHaveLength(16);
+    expect(DEV_ID_AREAS).toHaveLength(17);
 
     // Every catalogued area is declared in DEV_ID_AREAS...
     const declared = new Set(DEV_ID_AREAS);
