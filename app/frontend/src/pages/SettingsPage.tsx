@@ -288,15 +288,6 @@ export function SettingsPage() {
   ) : (
     <Text id="settings.summary.up-to-date">Up To Date</Text>
   );
-  const vendorCount = s
-    ? [
-        s.digikey_password_set,
-        s.ul_password_set,
-        s.snapeda_password_set,
-        s.samacsys_password_set,
-      ].filter(Boolean).length
-    : 0;
-
   // Library Completion: the count IS the answer to the owner's central question, so it is shown
   // whatever the state; the tone is what changes. A gap some source can fill is warn, a library
   // with nothing outstanding is calm text.
@@ -647,15 +638,6 @@ export function SettingsPage() {
                   data-dev-id="settings.rescan"
                 >
                   <RescanSection />
-                </SettingsDisclosure>
-                <SettingsDisclosure
-                  title="Provider Sessions And Optional Sign-Ins"
-                  hint="Stockroom reuses provider-only browser sessions first. Saving a sign-in is optional for expired login walls; secrets stay in Windows Credential Manager, and CAPTCHA or MFA always pauses for you."
-                  summary={s ? <span>{`${vendorCount} of 4 Saved`}</span> : null}
-                  className="@3xl:col-span-2"
-                  data-dev-id="settings.vendor-logins"
-                >
-                  <VendorLoginsSection />
                 </SettingsDisclosure>
               </>
             ) : (
@@ -1601,15 +1583,33 @@ function DistributorSection() {
           </Button>
         ) : null}
       </div>
+      <VendorLogin
+        title="DigiKey API Creds"
+        identifierLabel="DigiKey API Client ID"
+        secretLabel="DigiKey API Client Secret"
+        saveLabel="Save DigiKey API Creds"
+        savedIdentifier={settings.data?.digikey_client_id ?? ""}
+        secretSet={settings.data?.digikey_client_secret_set ?? false}
+        secretHint={settings.data?.digikey_client_secret_hint ?? ""}
+        pending={save.isPending}
+        onSave={(clientId, secret) => {
+          const patch: SettingsPatch = { digikey_client_id: clientId };
+          if (secret) patch.digikey_client_secret = secret;
+          save.mutate(patch, {
+            onSuccess: () => toast("DigiKey API creds saved.", "ok"),
+            onError: (e) => toast(errMsg(e), "err"),
+          });
+        }}
+      />
     </>
   );
 }
 
-// One saved credential pair: a non-secret identifier (a username, or the DigiKey API
-// client_id) that is echoed, plus a masked secret that only ever shows a last-4 hint.
-// The guided capture window uses these to auto-fill each sign-in and then keeps the
-// session, so the user signs in once. The two field labels are configurable so the same
-// row can carry a username/password pair or a Client ID / Client Secret pair.
+// One saved credential pair: a non-secret identifier (the DigiKey API client_id) that is
+// echoed, plus a masked secret that only ever shows a last-4 hint. These are catalogue API
+// credentials Stockroom calls directly. No provider-WEBSITE login is stored anywhere: a person
+// signs in to a provider page themselves, in the window Stockroom opens. The two field labels
+// stay configurable so the row can carry either an id/secret or a name/value pair.
 function VendorLogin({
   title,
   identifierLabel,
@@ -1691,115 +1691,6 @@ function VendorLogin({
         </Button>
       </div>
     </div>
-  );
-}
-
-// A titled subgroup inside the credential section, so the DigiKey creds and the
-// in-DigiKey CAD provider logins read as two distinct tiers, not one flat list.
-function CredentialGroup({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="mt-4 first:mt-0">
-      <Eyebrow className="mb-0.5">{label}</Eyebrow>
-      {children}
-    </div>
-  );
-}
-
-function VendorLoginsSection() {
-  const settings = useSettings();
-  const save = useUpdateSettings();
-  const { toast } = useToast();
-  const d = settings.data;
-
-  function saveLogin(patch: SettingsPatch, name: string) {
-    save.mutate(patch, {
-      onSuccess: () => toast(`${name} saved.`, "ok"),
-      onError: (e) => toast(errMsg(e), "err"),
-    });
-  }
-
-  return (
-    <>
-      <CredentialGroup label="DigiKey">
-        <VendorLogin
-          title="DigiKey API Creds"
-          identifierLabel="DigiKey API Client ID"
-          secretLabel="DigiKey API Client Secret"
-          saveLabel="Save DigiKey API Creds"
-          savedIdentifier={d?.digikey_client_id ?? ""}
-          secretSet={d?.digikey_client_secret_set ?? false}
-          secretHint={d?.digikey_client_secret_hint ?? ""}
-          pending={save.isPending}
-          onSave={(clientId, secret) => {
-            const patch: SettingsPatch = { digikey_client_id: clientId };
-            if (secret) patch.digikey_client_secret = secret;
-            saveLogin(patch, "DigiKey API creds");
-          }}
-        />
-        <VendorLogin
-          title="DigiKey Account Login"
-          identifierLabel="DigiKey Account Username"
-          secretLabel="DigiKey Account Password"
-          saveLabel="Save DigiKey Account Login"
-          savedIdentifier={d?.digikey_username ?? ""}
-          secretSet={d?.digikey_password_set ?? false}
-          secretHint={d?.digikey_password_hint ?? ""}
-          pending={save.isPending}
-          onSave={(username, password) => {
-            const patch: SettingsPatch = { digikey_username: username };
-            if (password) patch.digikey_password = password;
-            saveLogin(patch, "DigiKey account login");
-          }}
-        />
-      </CredentialGroup>
-      <CredentialGroup label="In-DigiKey CAD Providers">
-        <VendorLogin
-          title="Ultra Librarian"
-          identifierLabel="Ultra Librarian Username"
-          secretLabel="Ultra Librarian Password"
-          saveLabel="Save Ultra Librarian Login"
-          savedIdentifier={d?.ul_username ?? ""}
-          secretSet={d?.ul_password_set ?? false}
-          secretHint={d?.ul_password_hint ?? ""}
-          pending={save.isPending}
-          onSave={(username, password) => {
-            const patch: SettingsPatch = { ul_username: username };
-            if (password) patch.ul_password = password;
-            saveLogin(patch, "Ultra Librarian login");
-          }}
-        />
-        <VendorLogin
-          title="SnapEDA"
-          identifierLabel="SnapEDA Username"
-          secretLabel="SnapEDA Password"
-          saveLabel="Save SnapEDA Login"
-          savedIdentifier={d?.snapeda_username ?? ""}
-          secretSet={d?.snapeda_password_set ?? false}
-          secretHint={d?.snapeda_password_hint ?? ""}
-          pending={save.isPending}
-          onSave={(username, password) => {
-            const patch: SettingsPatch = { snapeda_username: username };
-            if (password) patch.snapeda_password = password;
-            saveLogin(patch, "SnapEDA login");
-          }}
-        />
-        <VendorLogin
-          title="SamacSys"
-          identifierLabel="SamacSys Username"
-          secretLabel="SamacSys Password"
-          saveLabel="Save SamacSys Login"
-          savedIdentifier={d?.samacsys_username ?? ""}
-          secretSet={d?.samacsys_password_set ?? false}
-          secretHint={d?.samacsys_password_hint ?? ""}
-          pending={save.isPending}
-          onSave={(username, password) => {
-            const patch: SettingsPatch = { samacsys_username: username };
-            if (password) patch.samacsys_password = password;
-            saveLogin(patch, "SamacSys login");
-          }}
-        />
-      </CredentialGroup>
-    </>
   );
 }
 

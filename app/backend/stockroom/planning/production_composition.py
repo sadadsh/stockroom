@@ -773,14 +773,13 @@ class StockroomAcquisitionProviderAdapter:
                     Path(temporary) / "Repository",
                 )
                 part_id = make_part_id(identity.mpn_canonical)
+                # One capture mode: the person works the provider page. ``request.mode`` is a
+                # legacy field kept on the durable item and no longer selects a lane.
                 report = run_guided_capture(
                     isolated,
-                    part_ids=(part_id,),
+                    part_ids=[part_id],
                     vendor=request.vendor,
                     headless=request.background,
-                    operator_authorized=request.mode == "assisted",
-                    finish_first=request.mode == "finish-first",
-                    collect_all=request.mode == "collect-all",
                     should_stop=request.should_stop,
                     capture_id=request.report_item_id,
                 )

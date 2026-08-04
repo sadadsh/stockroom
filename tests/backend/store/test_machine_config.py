@@ -106,59 +106,6 @@ def test_libraries_root_defaults_blank_and_round_trips(tmp_path):
     assert MachineConfig.load(path).libraries_root == str(tmp_path / "lib")
 
 
-def test_vendor_login_fields_round_trip(tmp_path):
-    path = tmp_path / "config.json"
-    cfg = MachineConfig(
-        ul_username="me@x.com",
-        ul_password="pw",
-        snapeda_username="s",
-        snapeda_password="q",
-    )
-    cfg.save(path)
-    saved = json.loads(path.read_text())
-    assert "ul_password" not in saved
-    assert "snapeda_password" not in saved
-    assert saved["ul_username"] == "me@x.com"
-    loaded = MachineConfig.load(path)
-    assert loaded.ul_username == "me@x.com"
-    assert loaded.ul_password == "pw"
-    assert loaded.snapeda_username == "s"
-    assert loaded.snapeda_password == "q"
-
-
-def test_vendor_login_defaults_empty():
-    cfg = MachineConfig()
-    assert cfg.ul_username == "" and cfg.ul_password == ""
-    assert cfg.snapeda_username == "" and cfg.snapeda_password == ""
-
-
-def test_samacsys_and_digikey_account_fields_round_trip(tmp_path):
-    # SamacSys is a kept in-DigiKey CAD provider; the DigiKey account login is the
-    # web sign-in the capture driver autofills (distinct from the OAuth API creds).
-    path = tmp_path / "config.json"
-    cfg = MachineConfig(
-        samacsys_username="sam@x.com",
-        samacsys_password="sp",
-        digikey_username="dk@x.com",
-        digikey_password="dp",
-    )
-    cfg.save(path)
-    saved = json.loads(path.read_text())
-    assert "samacsys_password" not in saved
-    assert "digikey_password" not in saved
-    loaded = MachineConfig.load(path)
-    assert loaded.samacsys_username == "sam@x.com"
-    assert loaded.samacsys_password == "sp"
-    assert loaded.digikey_username == "dk@x.com"
-    assert loaded.digikey_password == "dp"
-
-
-def test_samacsys_and_digikey_account_defaults_empty():
-    cfg = MachineConfig()
-    assert cfg.samacsys_username == "" and cfg.samacsys_password == ""
-    assert cfg.digikey_username == "" and cfg.digikey_password == ""
-
-
 def test_legacy_plaintext_secrets_migrate_before_json_is_scrubbed(tmp_path):
     path = tmp_path / "legacy.json"
     path.write_text(

@@ -58,7 +58,6 @@ function cadSource(over: Partial<CadSourceResponse> = {}): CadSourceResponse {
         aggregator: true,
         instruction: "Open the models tab.",
         capture_available: true,
-        unattended_capture: false,
       },
       {
         key: "ultralibrarian",
@@ -68,7 +67,6 @@ function cadSource(over: Partial<CadSourceResponse> = {}): CadSourceResponse {
         aggregator: false,
         instruction: "Pick the part, choose KiCad and Altium, then Download.",
         capture_available: true,
-        unattended_capture: true,
       },
     ],
     url: "https://www.digikey.com/en/models/1234",
@@ -101,7 +99,7 @@ function Displacer() {
       type="button"
       onClick={() =>
         void capture
-          .start("ne555", "NE555 Timer", [], undefined, "finish-first")
+          .start("ne555", "NE555 Timer", [])
           .catch(() => undefined)
       }
     >
@@ -178,7 +176,6 @@ describe("completion worklist", () => {
       expect.objectContaining({
         partIds: ["lm317"],
         vendor: undefined,
-        mode: "finish-first",
       }),
     );
   });
@@ -356,11 +353,11 @@ describe("completion worklist", () => {
     // capture reached a terminal state, not because a timer went off.
     expect(capture.run).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ partIds: ["lm317"], vendor: undefined, mode: "finish-first" }),
+      expect.objectContaining({ partIds: ["lm317"], vendor: undefined }),
     );
     expect(capture.run).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ partIds: ["ne555"], vendor: undefined, mode: "finish-first" }),
+      expect.objectContaining({ partIds: ["ne555"], vendor: undefined }),
     );
     expect(await screen.findByTestId("completion-worklist-auto-ended")).toHaveTextContent(
       "Worked through all 2 components.",
@@ -427,7 +424,7 @@ describe("completion worklist", () => {
     await userEvent.click(await screen.findByRole("button", { name: WORK_THROUGH_ALL }));
     expect(capture.run).toHaveBeenCalledTimes(1);
     expect(capture.run).toHaveBeenCalledWith(
-      expect.objectContaining({ partIds: ["lm317"], mode: "finish-first" }),
+      expect.objectContaining({ partIds: ["lm317"] }),
     );
   });
 

@@ -1,15 +1,16 @@
 /**
  * What ONE library-wide run could not finish by itself, as a short list of single actions.
  *
- * The owner asked for one simple download action that does everything it safely can. The automatic
- * run completes every available stage; this list exposes only the rare provider pages that still
- * need a human security clearance or download choice.
+ * The owner asked for one simple download action that does everything it safely can. Stockroom
+ * runs every stage it owns - identity, part data, datasheet, saved evidence, validation, and
+ * publication - and this list is the components whose provider page a person still has to work.
  *
  * The design rules this surface follows, because a "what is left" list is exactly the kind of
  * thing that turns into noise:
  *  - ONE row is ONE trip, and the row starts the same Get Files workflow as Complete Part. The
  *    backend opens an exact provider route inside Stockroom and owns its task-bound downloads.
- *  - Ordinary controls may be automated; security challenges remain human-only.
+ *  - The provider page is worked by the person, never by Stockroom. Sign-in, format choice, and
+ *    the download click are all theirs; Stockroom captures and validates what lands.
  *  - The reason is the ROUTE'S OWN words ("no Ultra Librarian sign-in is saved..."), never a
  *    category this component invented from a status code.
  *  - The frontend never builds a provider URL. The backend resolves and opens the exact page.
@@ -28,6 +29,7 @@ import { useEffect, useRef, useState } from "react";
 import { useCaptureWorklist } from "../api/queries";
 import type { CaptureWorklistRow, Requirement } from "../api/types";
 import { captureInFlight, REQ_LABELS, useCapture } from "../lib/capture";
+import { Text } from "../lib/copy";
 import { Badge, Button } from "./primitives";
 
 // A worklist is a sitting, not an inbox: the rows a person can realistically work through before
@@ -114,10 +116,11 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
               file the person downloads is snapshotted, adopted, and put through the unchanged
               identity gates. Only the clicking is theirs. */}
           <p className="text-sm text-t2">
-            Get Files runs the same automatic workflow for each component. Stockroom reuses saved
-            evidence, tries every eligible source, and shows a provider inside the app only when a
-            security or download choice needs you. Work Through All starts the next component as
-            each one finishes.
+            <Text id="settings.completion-worklist.lede">
+              Get Files opens the provider page for one component. Sign in if the provider asks,
+              choose the formats you need, and download; Stockroom captures each file and validates
+              it. Work Through All opens the next component as each one finishes.
+            </Text>
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -351,7 +354,7 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
     heldRef.current = false;
     openedRef.current = false;
     setPass({ ...pass, queue: pass.queue.slice(1), open: next });
-    const running = start(next.partId, next.name, next.remaining, undefined, "finish-first");
+    const running = start(next.partId, next.name, next.remaining);
     capture.keepWorking();
     void running.catch(
       (error) => {
@@ -410,9 +413,9 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
 /**
  * The row's primary control: start the one Get Files workflow for this component.
  *
- * It runs the same all-source path as Complete Part. The backend reuses exact retained evidence,
- * drives every usable route, opens a provider inside Stockroom only when needed, and captures its
- * downloads into the active component without making the person choose a provider first.
+ * It runs the same all-source path as Complete Part. The backend reuses exact retained evidence
+ * and opens the provider page inside Stockroom; the person signs in if asked, chooses the formats,
+ * and downloads, and the backend captures those downloads into the active component.
  */
 function StartCapture({
   row,
@@ -444,13 +447,7 @@ function StartCapture({
       }
       aria-label={`Get files for ${name}`}
       onClick={() => {
-        const running = capture.start(
-          row.part_id,
-          name,
-          row.remaining,
-          undefined,
-          "finish-first",
-        );
+        const running = capture.start(row.part_id, name, row.remaining);
         capture.keepWorking();
         void running.catch(() => capture.requestReopen());
       }}

@@ -76,9 +76,6 @@ const CAD_SOURCES = [
     aggregator: false,
     instruction: "Pick the part, choose KiCad and Altium as the export formats, then Download.",
     capture_available: true,
-    // The one provider reviewed for unattended capture; every other source is person-driven,
-    // which is what decides whether Get Files runs a pass or opens the guided window.
-    unattended_capture: true,
   },
   {
     key: "samacsys",
@@ -157,12 +154,12 @@ describe("CompletePartModal - automatic capture", () => {
     expect(capture.run).toHaveBeenCalledWith(expect.objectContaining({ partIds: [DETAIL.id] }));
   });
 
-  it("presents one source-agnostic automatic-completion workflow", async () => {
+  it("presents one source-agnostic person-driven workflow", async () => {
     mockCadSource(["kicad_symbol", "altium_symbol"]);
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
     expect(
       await screen.findByText(
-        "One automatic run reuses verified evidence and completes the part from one provider's symbol, footprint, and 3D model set.",
+        "Stockroom reuses verified evidence, then opens the provider page. Sign in if the provider asks, choose the formats you need, and download; Stockroom captures each file and validates it.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Preferred Source")).toBeNull();
@@ -260,7 +257,7 @@ describe("CompletePartModal - automatic capture", () => {
       wrapper,
     });
 
-    expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
+    expect(await screen.findByText("Files From The Provider")).toBeInTheDocument();
     expect(screen.queryByText("Files Reverified")).toBeNull();
     expect(screen.getByRole("button", { name: "Get Files" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Get Files" }));
@@ -270,7 +267,6 @@ describe("CompletePartModal - automatic capture", () => {
       expect.objectContaining({
         partIds: [DETAIL.id],
         vendor: undefined,
-        mode: "finish-first",
       }),
     );
     expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
@@ -366,7 +362,7 @@ describe("CompletePartModal - automatic capture", () => {
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, {
       wrapper,
     });
-    await screen.findByText("Automatic Completion");
+    await screen.findByText("Files From The Provider");
     await user.click(screen.getByRole("button", { name: "Get Files" }));
 
     expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
@@ -395,7 +391,7 @@ describe("CompletePartModal - automatic capture", () => {
       wrapper,
     });
 
-    expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
+    expect(await screen.findByText("Files From The Provider")).toBeInTheDocument();
     expect(
       screen.getByText(
         "No completion evidence is recorded. Run verification before treating this part as complete.",
@@ -546,10 +542,10 @@ describe("CompletePartModal - copy + icon adoption", () => {
     // Subtitle + CAD section render their default text (no override).
     expect(
       await screen.findByText(
-        "Stockroom completes the part from one verified provider set. Choose another source only when you want a different variant.",
+        "You open the provider, sign in if it asks, and download. Stockroom captures what you download and validates it.",
       ),
     ).toBeInTheDocument();
-    expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
+    expect(await screen.findByText("Files From The Provider")).toBeInTheDocument();
     // The three glyphs (modal.check on rows, action.download on the CAD button, modal.close on the
     // header button) all draw as <svg> via <Icon>.
     expect(container.querySelectorAll("svg").length).toBeGreaterThanOrEqual(3);
@@ -569,7 +565,7 @@ describe("CompletePartModal - copy + icon adoption", () => {
       { wrapper: devWrapper },
     );
     // Wait for the CAD section (async cad-source query) so cad-title / row-symbol are mounted.
-    await screen.findByText("Automatic Completion");
+    await screen.findByText("Files From The Provider");
 
     toggleDevMode();
 
@@ -590,7 +586,7 @@ describe("CompletePartModal - copy + icon adoption", () => {
       wrapper: devWrapper,
     });
     await screen.findByText(
-      "Stockroom completes the part from one verified provider set. Choose another source only when you want a different variant.",
+      "You open the provider, sign in if it asks, and download. Stockroom captures what you download and validates it.",
     );
 
     expect(screen.getByRole("dialog", { name: "Complete this part" })).toBeInTheDocument();
@@ -612,7 +608,7 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
     const capture = mockCapture();
     RENDER();
 
-    expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
+    expect(await screen.findByText("Files From The Provider")).toBeInTheDocument();
     expect(screen.queryByText("Preferred Source")).toBeNull();
     expect(screen.queryByRole("button", { name: /Ultra Librarian/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /SnapMagic/ })).toBeNull();
@@ -623,7 +619,6 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
       expect.objectContaining({
         partIds: [DETAIL.id],
         vendor: undefined,
-        mode: "finish-first",
       }),
     );
   });
@@ -633,14 +628,14 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
     mockCadSource(["kicad_symbol"]);
     vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => {}));
     RENDER();
-    await screen.findByText("Automatic Completion");
+    await screen.findByText("Files From The Provider");
 
     await user.click(screen.getByRole("button", { name: "Get Files" }));
 
     expect(await screen.findByText("Processing Downloaded Files")).toBeInTheDocument();
     expect(screen.getByText("Starting")).toBeInTheDocument();
     expect(
-      screen.getByText(/received the route output and is validating, converting, and attaching/i),
+      screen.getByText(/received the download and is validating, converting, and attaching/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/default browser/i)).toBeNull();
     expect(screen.queryByText(/separate window/i)).toBeNull();
@@ -706,7 +701,6 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
       workflow_batch_id: "batch-selected-files",
       workflow_item_id: "item-selected-files",
       part_id: DETAIL.id,
-      mode: "finish-first",
       vendor: null,
       background: false,
       active_route: {
@@ -915,7 +909,7 @@ describe("CompletePartModal - the header counter", () => {
       wrapper,
     });
 
-    expect(await screen.findByText("Automatic Completion")).toBeInTheDocument();
+    expect(await screen.findByText("Files From The Provider")).toBeInTheDocument();
     expect(
       screen.getByText(
         "No completion evidence is recorded. Run verification before treating this part as complete.",
@@ -945,7 +939,7 @@ describe("CompletePartModal - the header counter", () => {
     render(<CompletePartModal detail={WITH_DATASHEET} hasModel={true} onClose={() => {}} />, {
       wrapper,
     });
-    await screen.findByText("Automatic Completion");
+    await screen.findByText("Files From The Provider");
 
     // Four metadata rows, three waiting file rows, and the package the card is still proving.
     expect(await screen.findByText("4 / 8")).toBeInTheDocument();

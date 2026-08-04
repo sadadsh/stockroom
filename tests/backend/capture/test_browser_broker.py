@@ -34,7 +34,6 @@ from stockroom.capture.browser import (
     provider_profile_dir,
 )
 from stockroom.capture.download_broker import DownloadBroker, DownloadTask
-from stockroom.capture.guided import _wait_for_capture
 from stockroom.capture.runner import (
     _capture_downloads,
     _capture_evidence_root,
@@ -111,7 +110,6 @@ def test_windows_policy_prefers_installed_chrome_then_managed_chromium():
         "chrome",
         None,
     ]
-    assert "camoufox" not in [candidate.channel for candidate in _browser_candidates("windows")]
 
 
 def test_windows_policy_falls_back_to_managed_chromium_with_the_same_provider_profile(tmp_path):
@@ -191,50 +189,10 @@ def test_embedded_webview_connection_reuses_its_existing_context(tmp_path):
     assert chromium.calls == [("http://127.0.0.1:43127", {"timeout": 20_000})]
     assert browser.launched_browser == "Stockroom Embedded WebView2"
     assert context.init_scripts == []
-    assert cdp_calls == [
-        (
-            "Browser.setDownloadBehavior",
-            {
-                "behavior": "allowAndName",
-                "downloadPath": str((tmp_path / "downloads").resolve()),
-                "eventsEnabled": True,
-            },
-        ),
-    ]
-
-
-def test_browser_domain_download_is_bound_to_the_active_task_when_page_event_is_late(tmp_path):
-    staging = tmp_path / "Staging"
-    staging.mkdir()
-    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
-    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads")
-    browser._embedded_download_session = object()
-    browser._embedded_download_generation = 1
-    browser._embedded_active_generation = 1
-    browser._page_brokers.append((object(), broker))
-
-    browser._on_embedded_download_will_begin(
-        {
-            "guid": "2c25f6ba-77d4-4d84-99f5-bd8884d62be9",
-            "suggestedFilename": "Exact Part.step",
-            "url": "https://provider.example.test/Exact%20Part.step",
-        }
-    )
-    guid_path = browser.download_dir / "2c25f6ba-77d4-4d84-99f5-bd8884d62be9"
-    guid_path.write_text("ISO-10303-21;", encoding="utf-8")
-    browser._on_embedded_download_progress(
-        {
-            "guid": "2c25f6ba-77d4-4d84-99f5-bd8884d62be9",
-            "state": "completed",
-        }
-    )
-
-    pending, finalized = browser._drain_native_downloads(finalize_if_idle=True)
-
-    assert (pending, finalized) == (0, True)
-    assert [receipt.suggested_name for receipt in broker.receipts] == ["Exact Part.step"]
-    assert broker.receipts[0].path.read_text(encoding="utf-8") == "ISO-10303-21;"
-    assert not guid_path.exists()
+    # Stockroom never rewrites the browser's own download behaviour. The host reports what the
+    # person downloaded through its own ledger; sending Browser.setDownloadBehavior here would be
+    # Stockroom operating the provider session rather than observing it.
+    assert cdp_calls == []
 
 
 def test_native_host_download_survives_detached_cdp_and_reaches_exact_broker(tmp_path):
@@ -283,321 +241,6 @@ def test_native_host_download_survives_detached_cdp_and_reaches_exact_broker(tmp
     assert not source.exists()
 
 
-def test_native_host_and_browser_domain_events_materialize_one_receipt(tmp_path):
-    staging = tmp_path / "Staging"
-    staging.mkdir()
-    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
-    guid = "2c25f6ba-77d4-4d84-99f5-bd8884d62be9"
-    download_root = tmp_path / "Downloads"
-    source = download_root / guid
-    events = (
-        SimpleNamespace(
-            sequence=1,
-            operation_id="native-operation",
-            phase="started",
-            state="in_progress",
-            uri="https://provider.example.test/Exact.step",
-            suggested_file_name=guid,
-            result_file_path=str(source),
-        ),
-        SimpleNamespace(
-            sequence=2,
-            operation_id="native-operation",
-            phase="terminal",
-            state="completed",
-            uri="https://provider.example.test/Exact.step",
-            suggested_file_name=guid,
-            result_file_path=str(source),
-        ),
-    )
-
-    class Surface:
-        def download_events(self, *, after_sequence=0):
-            return tuple(item for item in events if item.sequence > after_sequence)
-
-    browser = PlaywrightCaptureBrowser(
-        download_dir=download_root,
-        native_surface=Surface(),
-    )
-    browser._embedded_active_generation = 1
-    browser._page_brokers.append((object(), broker))
-    browser._on_embedded_download_will_begin(
-        {
-            "guid": guid,
-            "suggestedFilename": "Exact Part.step",
-            "url": "https://provider.example.test/Exact.step",
-        }
-    )
-    source.write_text("ISO-10303-21;", encoding="utf-8")
-
-    pending, finalized = browser._drain_native_downloads(finalize_if_idle=True)
-
-    assert (pending, finalized) == (0, True)
-    assert [receipt.suggested_name for receipt in broker.receipts] == ["Exact Part.step"]
-
-
-def test_same_url_native_events_join_their_exact_browser_guids(tmp_path):
-    staging = tmp_path / "Staging"
-    staging.mkdir()
-    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
-    download_root = tmp_path / "Downloads"
-    shared_url = "https://provider.example.test/export"
-    guids = [f"00000000-0000-0000-0000-00000000000{index}" for index in range(1, 4)]
-    events = []
-    for index, guid in enumerate(guids, start=1):
-        source = download_root / guid
-        source.parent.mkdir(parents=True, exist_ok=True)
-        source.write_text(f"payload-{index}", encoding="utf-8")
-        events.extend(
-            (
-                SimpleNamespace(
-                    sequence=index * 2 - 1,
-                    operation_id=f"native-{index}",
-                    phase="started",
-                    state="in_progress",
-                    uri=shared_url,
-                    suggested_file_name=f"Part-{index}.step",
-                    result_file_path=str(source),
-                ),
-                SimpleNamespace(
-                    sequence=index * 2,
-                    operation_id=f"native-{index}",
-                    phase="terminal",
-                    state="completed",
-                    uri=shared_url,
-                    suggested_file_name=f"Part-{index}.step",
-                    result_file_path=str(source),
-                ),
-            )
-        )
-
-    class Surface:
-        def download_events(self, *, after_sequence=0):
-            return tuple(item for item in events if item.sequence > after_sequence)
-
-    browser = PlaywrightCaptureBrowser(download_dir=download_root, native_surface=Surface())
-    browser._embedded_active_generation = 1
-    browser._page_brokers.append((object(), broker))
-    for index, guid in enumerate(guids, start=1):
-        browser._on_embedded_download_will_begin(
-            {
-                "guid": guid,
-                "suggestedFilename": f"Part-{index}.step",
-                "url": shared_url,
-            }
-        )
-
-    pending, finalized = browser._drain_native_downloads(finalize_if_idle=True)
-
-    assert (pending, finalized) == (0, True)
-    assert [receipt.suggested_name for receipt in broker.receipts] == [
-        "Part-1.step",
-        "Part-2.step",
-        "Part-3.step",
-    ]
-    assert {receipt.path.read_text(encoding="utf-8") for receipt in broker.receipts} == {
-        "payload-1",
-        "payload-2",
-        "payload-3",
-    }
-
-
-def test_browser_domain_download_keeps_its_original_task_across_page_rebinding(tmp_path):
-    staging_a = tmp_path / "A"
-    staging_b = tmp_path / "B"
-    staging_a.mkdir()
-    staging_b.mkdir()
-    broker_a = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging_a))
-    broker_b = DownloadBroker(DownloadTask("part-b", "Manufacturer", "MPN-B", staging_b))
-    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads")
-    browser._embedded_download_session = object()
-    browser._embedded_active_generation = 1
-    browser._page_brokers[:] = [(object(), broker_a)]
-    guid = "cd030070-c05a-4cc3-b7f4-451bd9b5356a"
-    browser._on_embedded_download_will_begin(
-        {
-            "guid": guid,
-            "suggestedFilename": "Part A.step",
-            "url": "https://provider.example.test/Part-A.step",
-        }
-    )
-
-    browser._embedded_active_generation = 2
-    browser._page_brokers[:] = [(object(), broker_b)]
-    (browser.download_dir / guid).write_text("ISO-10303-21;", encoding="utf-8")
-    browser._on_embedded_download_progress({"guid": guid, "state": "completed"})
-
-    assert [receipt.suggested_name for receipt in broker_a.receipts] == ["Part A.step"]
-    assert broker_b.receipts == ()
-
-
-def test_cancel_waits_for_a_just_started_browser_domain_download(tmp_path):
-    page = _HudPage()
-    staging = tmp_path / "Staging"
-    staging.mkdir()
-    spec = _provider_hud_spec()
-    broker = DownloadBroker(DownloadTask("part-a", spec.manufacturer, spec.mpn, staging))
-    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads")
-    browser._context = SimpleNamespace(new_page=lambda: page)
-    browser._embedded_download_session = object()
-    page.on_goto = lambda: page.invoke_hud_action("cancel")
-
-    def complete_after_cancel(wait_number: int) -> None:
-        if wait_number != 1:
-            return
-        guid = "d41ba2ca-acde-4f15-bb2e-b3586916df24"
-        browser._on_embedded_download_will_begin(
-            {
-                "guid": guid,
-                "suggestedFilename": "Late.step",
-                "url": "https://provider.example.test/Late.step",
-            }
-        )
-        (browser.download_dir / guid).write_text("ISO-10303-21;", encoding="utf-8")
-        browser._on_embedded_download_progress({"guid": guid, "state": "completed"})
-
-    page.on_wait = complete_after_cancel
-    result = browser.capture_user_downloads(
-        "https://provider.example.test/part",
-        broker,
-        hud=spec,
-        timeout_s=1,
-        poll_interval_s=0.01,
-        settle_seconds=0,
-    )
-
-    assert result.status == "cancelled"
-    assert [receipt.suggested_name for receipt in result.files] == ["Late.step"]
-
-
-def test_explicit_ordinary_control_operator_runs_after_embedded_navigation(tmp_path):
-    events: list[str] = []
-
-    class Page(_EventPage):
-        url = "about:blank"
-
-        def goto(self, url: str, **_options) -> None:
-            self.url = url
-            events.append(f"navigate:{url}")
-
-        def is_closed(self) -> bool:
-            return False
-
-    page = Page()
-    browser = PlaywrightCaptureBrowser(
-        download_dir=tmp_path / "downloads",
-        provider_key="digikey",
-    )
-    browser._context = SimpleNamespace(new_page=lambda: page)
-    staging = tmp_path / "staging"
-    staging.mkdir()
-    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
-
-    result = browser.capture_user_downloads(
-        "https://vendor.example.test/part",
-        broker,
-        operate_controls=lambda active_page: events.append(f"operate:{active_page.url}"),
-        should_finish=lambda: True,
-        settle_seconds=0,
-        timeout_s=1,
-    )
-
-    assert result.status == "completed"
-    assert events == [
-        "navigate:https://vendor.example.test/part",
-        "operate:https://vendor.example.test/part",
-    ]
-
-
-def test_ordinary_control_operator_resumes_after_an_ordinary_login_navigation(tmp_path):
-    operator_runs = 0
-
-    class Page(_EventPage):
-        url = "about:blank"
-
-        def goto(self, url: str, **_options) -> None:
-            self.url = url
-
-        def wait_for_timeout(self, milliseconds: int) -> None:
-            time.sleep(milliseconds / 1000)
-
-        def is_closed(self) -> bool:
-            return False
-
-    page = Page()
-    browser = PlaywrightCaptureBrowser(
-        download_dir=tmp_path / "downloads",
-        provider_key="digikey",
-    )
-    browser._context = SimpleNamespace(new_page=lambda: page)
-    staging = tmp_path / "staging"
-    staging.mkdir()
-    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
-
-    def operate(active_page) -> None:
-        nonlocal operator_runs
-        operator_runs += 1
-        if operator_runs == 1:
-            active_page.url = "https://provider.example.test/sign-in"
-        else:
-            active_page.url = "https://provider.example.test/part"
-
-    result = browser.capture_user_downloads(
-        "https://provider.example.test/part",
-        broker,
-        operate_controls=operate,
-        should_finish=lambda: operator_runs >= 2,
-        settle_seconds=0,
-        poll_interval_s=0.01,
-        timeout_s=2,
-    )
-
-    assert result.status == "completed"
-    assert operator_runs == 2
-    assert result.final_url == "https://provider.example.test/part"
-
-
-@pytest.mark.parametrize("standalone_engine", ["camoufox", "cloak"])
-def test_embedded_webview_overrides_every_standalone_provider_engine(
-    monkeypatch,
-    tmp_path,
-    standalone_engine,
-):
-    events: list[str] = []
-
-    class Runtime:
-        @staticmethod
-        def get():
-            events.append("runtime")
-            return object()
-
-    @contextmanager
-    def embedded_session(_runtime):
-        events.append("embedded")
-        yield "embedded-page"
-
-    @contextmanager
-    def forbidden_standalone_session():
-        pytest.fail("a standalone provider browser was launched beside the embedded WebView")
-        yield  # pragma: no cover
-
-    browser = PlaywrightCaptureBrowser(
-        download_dir=tmp_path / "downloads",
-        engine=standalone_engine,
-        provider_key="digikey",
-        playwright_runtime=Runtime(),
-        cdp_endpoint="http://127.0.0.1:43127",
-    )
-    monkeypatch.setattr(browser, "_playwright_session", embedded_session)
-    monkeypatch.setattr(browser, "_camoufox_session", forbidden_standalone_session)
-    monkeypatch.setattr(browser, "_cloak_session", forbidden_standalone_session)
-
-    with browser.session() as page:
-        assert page == "embedded-page"
-
-    assert events == ["runtime", "embedded"]
-
-
 def test_automatic_download_permission_preserves_existing_profile_preferences(tmp_path):
     profile = tmp_path / "snapmagic"
     preferences_path = profile / "Default" / "Preferences"
@@ -632,155 +275,6 @@ def test_malformed_profile_preferences_fail_closed(tmp_path):
 def test_the_production_runner_defers_to_each_stockroom_managed_provider_engine():
     parameter = inspect.signature(run_guided_capture).parameters["engine"]
     assert parameter.default == ""
-
-
-@pytest.mark.parametrize("persistent", [False, True])
-def test_each_camoufox_context_disables_webrtc_before_opening_a_page(
-    monkeypatch,
-    tmp_path,
-    persistent,
-):
-    context_events: list[tuple[str, object]] = []
-
-    class Context:
-        def __init__(self):
-            self.pages = []
-
-        def add_init_script(self, script: str) -> None:
-            context_events.append(("init_script", script))
-
-        def on(self, event: str, _handler) -> None:
-            context_events.append(("on", event))
-
-        def new_page(self):
-            context_events.append(("new_page", None))
-            return _EventPage()
-
-        def close(self) -> None:
-            context_events.append(("close", None))
-
-    context = Context()
-
-    class Browser:
-        def new_context(self, **options):
-            context_events.append(("new_context", options))
-            return context
-
-    class Handle:
-        def __init__(self, options):
-            self.options = options
-
-        def __enter__(self):
-            return context if self.options.get("persistent_context") else Browser()
-
-        def __exit__(self, *_args):
-            return False
-
-    camoufox_module = ModuleType("camoufox")
-    camoufox_module.DefaultAddons = SimpleNamespace(UBO=object())
-    sync_api_module = ModuleType("camoufox.sync_api")
-    sync_api_module.Camoufox = lambda **options: Handle(options)
-    monkeypatch.setitem(sys.modules, "camoufox", camoufox_module)
-    monkeypatch.setitem(sys.modules, "camoufox.sync_api", sync_api_module)
-
-    browser = PlaywrightCaptureBrowser(
-        download_dir=tmp_path / "Downloads",
-        profile_dir=tmp_path / "Profile" if persistent else None,
-        provider_key="camoufox-probe" if persistent else None,
-        engine="camoufox",
-        headless=True,
-    )
-
-    with browser._camoufox_session():
-        pass
-
-    init_index = next(
-        index for index, event in enumerate(context_events) if event[0] == "init_script"
-    )
-    page_index = next(index for index, event in enumerate(context_events) if event[0] == "new_page")
-    script = context_events[init_index][1]
-    assert init_index < page_index
-    assert isinstance(script, str)
-    assert "RTCPeerConnection" in script
-    assert "webkitRTCPeerConnection" in script
-
-
-@pytest.mark.parametrize("persistent", [False, True])
-def test_each_cloak_context_is_pinned_and_disables_webrtc_before_opening_a_page(
-    monkeypatch,
-    tmp_path,
-    persistent,
-):
-    context_events: list[tuple[str, object]] = []
-    launch_options: list[tuple[str, dict]] = []
-
-    class Context:
-        def __init__(self):
-            self.pages = []
-
-        def add_init_script(self, script: str) -> None:
-            context_events.append(("init_script", script))
-
-        def on(self, event: str, _handler) -> None:
-            context_events.append(("on", event))
-
-        def new_page(self):
-            context_events.append(("new_page", None))
-            return _EventPage()
-
-        def close(self) -> None:
-            context_events.append(("context_close", None))
-
-    context = Context()
-
-    class Browser:
-        def new_context(self, **options):
-            context_events.append(("new_context", options))
-            return context
-
-        def close(self) -> None:
-            context_events.append(("browser_close", None))
-
-    def launch(**options):
-        launch_options.append(("ephemeral", options))
-        return Browser()
-
-    def launch_persistent_context(profile, **options):
-        launch_options.append(("persistent", {"profile": profile, **options}))
-        return context
-
-    cloak_module = ModuleType("cloakbrowser")
-    cloak_module.launch = launch
-    cloak_module.launch_persistent_context = launch_persistent_context
-    monkeypatch.setitem(sys.modules, "cloakbrowser", cloak_module)
-
-    browser = PlaywrightCaptureBrowser(
-        download_dir=tmp_path / "Downloads",
-        profile_dir=tmp_path / "Profile" if persistent else None,
-        provider_key="cloak-probe" if persistent else None,
-        engine="cloak",
-        headless=True,
-    )
-
-    with browser._cloak_session():
-        pass
-
-    kind, options = launch_options[0]
-    assert kind == ("persistent" if persistent else "ephemeral")
-    assert options["browser_version"] == "146.0.7680.177.5"
-    assert options["headless"] is True
-    assert options["humanize"] is True
-    assert len(options["args"]) == 1
-    assert options["args"][0].startswith("--fingerprint=")
-    init_index = next(
-        index for index, event in enumerate(context_events) if event[0] == "init_script"
-    )
-    page_index = next(index for index, event in enumerate(context_events) if event[0] == "new_page")
-    script = context_events[init_index][1]
-    assert init_index < page_index
-    assert isinstance(script, str)
-    assert "RTCPeerConnection" in script
-    assert "webkitRTCPeerConnection" in script
 
 
 @pytest.mark.timeout(30)
@@ -1404,163 +898,6 @@ def test_stockroom_tab_hides_the_provider_without_ending_the_capture(tmp_path):
     assert surface.events == ["show", "hide"]
 
 
-def test_step_only_snapmagic_offer_finishes_after_other_formats_are_confirmed_absent(
-    tmp_path,
-):
-    class Download:
-        suggested_filename = "Part.step"
-        url = "https://snapeda.com/files/Part.step"
-
-        def save_as(self, destination: str) -> None:
-            Path(destination).write_text("ISO-10303-21;", encoding="utf-8")
-
-    page = _HudPage()
-    operated = False
-
-    def operate(_page):
-        nonlocal operated
-        if operated:
-            return []
-        operated = True
-        page.handlers[0](Download())
-        return [
-            SimpleNamespace(selected=[], missed=["kicad"], submitted=False, blocked=False),
-            SimpleNamespace(selected=["model"], missed=[], submitted=True, blocked=False),
-            SimpleNamespace(selected=[], missed=["altium"], submitted=False, blocked=False),
-        ]
-
-    staging = tmp_path / "Staging"
-    staging.mkdir()
-    spec = ProviderHudSpec(
-        provider_label="SnapMagic",
-        author_route="SnapMagic",
-        manufacturer="Exact Manufacturer",
-        mpn="MPN-A/7",
-        required_file_labels=("KiCad", "STEP", "Altium"),
-        required_formats=("kicad", "model", "altium"),
-    )
-    broker = DownloadBroker(DownloadTask("part-a", spec.manufacturer, spec.mpn, staging))
-    browser = PlaywrightCaptureBrowser(
-        download_dir=tmp_path / "Legacy",
-        provider_key="snapmagic",
-    )
-    browser._context = SimpleNamespace(new_page=lambda: page)
-
-    result = browser.capture_user_downloads(
-        "https://www.snapeda.com/parts/MPN-A-7/Exact-Manufacturer/view-part/",
-        broker,
-        hud=spec,
-        timeout_s=1,
-        poll_interval_s=0.01,
-        settle_seconds=0,
-        auto_finish_seconds=0,
-        operate_controls=operate,
-    )
-
-    assert result.status == "completed"
-    assert [receipt.suggested_name for receipt in result.files] == ["Part.step"]
-    unavailable_updates = [
-        argument["unavailableFormats"]
-        for _expression, argument in page.evaluations
-        if isinstance(argument, dict) and argument.get("unavailableFormats")
-    ]
-    assert ["kicad", "altium"] in unavailable_updates
-
-
-def test_all_unavailable_provider_formats_advance_without_waiting_for_downloads(tmp_path):
-    page = _HudPage()
-
-    def operate(_page):
-        return [
-            SimpleNamespace(
-                selected=[],
-                missed=["kicad", "model", "altium"],
-                submitted=False,
-                blocked=False,
-            )
-        ]
-
-    staging = tmp_path / "Staging"
-    staging.mkdir()
-    spec = ProviderHudSpec(
-        provider_label="SnapMagic",
-        author_route="SnapMagic",
-        manufacturer="Exact Manufacturer",
-        mpn="MPN-A/7",
-        required_file_labels=("KiCad", "STEP", "Altium"),
-        required_formats=("kicad", "model", "altium"),
-    )
-    broker = DownloadBroker(DownloadTask("part-a", spec.manufacturer, spec.mpn, staging))
-    browser = PlaywrightCaptureBrowser(
-        download_dir=tmp_path / "Legacy",
-        provider_key="snapmagic",
-    )
-    browser._context = SimpleNamespace(new_page=lambda: page)
-
-    result = browser.capture_user_downloads(
-        "https://www.snapeda.com/parts/MPN-A-7/Exact-Manufacturer/view-part/",
-        broker,
-        hud=spec,
-        timeout_s=10,
-        poll_interval_s=0.01,
-        settle_seconds=0,
-        operate_controls=operate,
-    )
-
-    assert result.status == "try_another"
-    assert result.files == ()
-    assert page.waits == 0
-
-
-def test_submitted_unavailable_report_waits_for_late_download_event(monkeypatch, tmp_path):
-    page = _HudPage()
-    calls = 0
-
-    def operate(_page):
-        nonlocal calls
-        calls += 1
-        return [
-            SimpleNamespace(
-                selected=["kicad"],
-                missed=["kicad"],
-                submitted=True,
-                blocked=False,
-                requires_user_clearance=False,
-            )
-        ]
-
-    staging = tmp_path / "Staging"
-    staging.mkdir()
-    spec = ProviderHudSpec(
-        provider_label="Provider",
-        author_route="Provider",
-        manufacturer="Exact Manufacturer",
-        mpn="MPN-A/7",
-        required_file_labels=("KiCad",),
-        required_formats=("kicad",),
-    )
-    broker = DownloadBroker(DownloadTask("part-a", spec.manufacturer, spec.mpn, staging))
-    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
-    browser._context = SimpleNamespace(new_page=lambda: page)
-    monkeypatch.setattr(browser_module, "_OPERATOR_SUBMISSION_WINDOW_SECONDS", 0.05)
-
-    started = time.monotonic()
-    result = browser.capture_user_downloads(
-        "https://vendor.example.test/part",
-        broker,
-        hud=spec,
-        timeout_s=1,
-        poll_interval_s=0.005,
-        operate_controls=operate,
-    )
-    elapsed = time.monotonic() - started
-
-    assert result.status == "try_another"
-    assert result.files == ()
-    assert elapsed >= 0.04
-    assert calls == 1
-
-
 def test_user_capture_resumes_automatically_after_a_detected_download(tmp_path):
     """One archive carrying every required format resumes without a click."""
 
@@ -1633,14 +970,10 @@ def test_user_capture_reloads_a_blank_provider_fragment_at_most_twice(tmp_path):
         retryable_render_issue=lambda _page: "provider row is blank",
         max_render_reloads=2,
         render_reload_delay_seconds=0,
-        operate_controls=lambda _page: setattr(
-            page, "operator_runs", getattr(page, "operator_runs", 0) + 1
-        ),
     )
 
     assert result.status == "completed"
     assert page.reloads == 2
-    assert page.operator_runs == 3
     assert len(result.files) == 1
 
 
@@ -1808,14 +1141,9 @@ def test_download_callback_failure_is_reported_to_the_owning_wait(tmp_path):
     page.handler(_EmptyDownload())
 
     assert len(browser.download_errors) == 1
-    with pytest.raises(CaptureBrowserError, match="missing or empty"):
-        _wait_for_capture(
-            browser,
-            page,
-            before=0,
-            timeout_s=120,
-            errors_before=0,
-        )
+    assert isinstance(browser.download_errors[0], CaptureBrowserError)
+    assert "missing or empty" in str(browser.download_errors[0])
+    assert browser.captured == []
 
 
 def test_bound_broker_callback_failure_is_reported_without_waiting_for_timeout(tmp_path):
@@ -1833,14 +1161,9 @@ def test_bound_broker_callback_failure_is_reported_without_waiting_for_timeout(t
 
     with browser.task_page(broker) as page:
         page.handlers[0](_EmptyDownload())
-        with pytest.raises(CaptureBrowserError, match="browser download failed"):
-            _wait_for_capture(
-                browser,
-                page,
-                before=0,
-                timeout_s=120,
-                errors_before=0,
-            )
+        assert len(browser.download_errors) == 1
+        assert "browser download failed" in str(browser.download_errors[0])
+        assert browser.captured == []
 
 
 def test_one_page_is_wired_once_even_when_context_and_session_both_observe_it(tmp_path):
@@ -2176,7 +1499,6 @@ def test_embedded_user_capture_detaches_for_navigation_and_any_later_security_ga
     result = browser.capture_user_downloads(
         "https://www.digikey.com/en/models/123",
         broker,
-        operate_controls=lambda _page: events.append("operate"),
         should_finish=lambda: True,
         settle_seconds=0,
         timeout_s=1,
@@ -2185,9 +1507,7 @@ def test_embedded_user_capture_detaches_for_navigation_and_any_later_security_ga
     assert result.status == "completed"
     assert events == [
         "navigate:True:https://www.digikey.com/en/models/123",
-        "operate",
         "detach-security",
-        "operate",
     ]
 
 
@@ -2571,45 +1891,6 @@ def test_user_capture_timeout_is_bounded_and_returns_files_received_so_far(tmp_p
     assert elapsed < 0.5
 
 
-def test_user_capture_timeout_waits_for_recent_operator_submission(monkeypatch, tmp_path):
-    class IdlePage(_EventPage):
-        url = "about:blank"
-
-        def goto(self, url: str, **_options) -> None:
-            self.url = url
-
-        def wait_for_timeout(self, milliseconds: int) -> None:
-            time.sleep(milliseconds / 1000)
-
-        def is_closed(self) -> bool:
-            return False
-
-    page = IdlePage()
-    staging = tmp_path / "Staging"
-    staging.mkdir()
-    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
-    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Legacy")
-    browser._context = SimpleNamespace(new_page=lambda: page)
-    monkeypatch.setattr(browser_module, "_OPERATOR_SUBMISSION_WINDOW_SECONDS", 0.05)
-
-    started = time.monotonic()
-    result = browser.capture_user_downloads(
-        "https://vendor.example.test/search?query=MPN-A",
-        broker,
-        operate_controls=lambda _page: [
-            SimpleNamespace(submitted=True, blocked=False, requires_user_clearance=False, missed=[])
-        ],
-        timeout_s=0.01,
-        poll_interval_s=0.005,
-    )
-    elapsed = time.monotonic() - started
-
-    assert result.status == "timed_out"
-    assert result.files == ()
-    assert elapsed >= 0.04
-    assert browser._embedded_finalized_generations == {1}
-
-
 def test_navigation_terminal_drains_a_late_native_download(tmp_path):
     source = tmp_path / "native-navigation.step"
     source.write_text("ISO-10303-21;", encoding="utf-8")
@@ -2677,57 +1958,6 @@ def test_navigation_terminal_drains_a_late_native_download(tmp_path):
     assert [receipt.suggested_name for receipt in result.files] == ["Exact.step"]
     assert result.files[0].path.read_text(encoding="utf-8") == "ISO-10303-21;"
     assert surface.polls >= 2
-
-
-def test_visible_operator_waits_for_every_expected_download(tmp_path):
-    class Download:
-        def __init__(self, index: int) -> None:
-            self.suggested_filename = f"Part-{index}.step"
-            self.url = f"https://provider.example.test/Part-{index}.step"
-            self.index = index
-
-        def save_as(self, destination: str) -> None:
-            Path(destination).write_text(f"payload-{self.index}", encoding="utf-8")
-
-    page = _HudPage()
-    operates = 0
-
-    def operate(_page):
-        nonlocal operates
-        operates += 1
-        return [
-            SimpleNamespace(
-                submitted=True,
-                expected_downloads=3,
-                blocked=False,
-                requires_user_clearance=False,
-                missed=[],
-            )
-        ]
-
-    def deliver(wait_number: int) -> None:
-        if 1 <= wait_number <= 3:
-            page.handlers[0](Download(wait_number))
-
-    page.on_wait = deliver
-    staging = tmp_path / "Staging"
-    staging.mkdir()
-    broker = DownloadBroker(DownloadTask("part-a", "Manufacturer", "MPN-A", staging))
-    browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "Downloads")
-    browser._context = SimpleNamespace(new_page=lambda: page)
-
-    result = browser.capture_user_downloads(
-        "https://provider.example.test/export",
-        broker,
-        operate_controls=operate,
-        auto_finish_seconds=0,
-        poll_interval_s=0.01,
-        timeout_s=1,
-    )
-
-    assert result.status == "completed"
-    assert len(result.files) == 3
-    assert operates == 1
 
 
 def test_duplicate_browser_event_is_reported_once(tmp_path):
@@ -3467,34 +2697,31 @@ def test_every_declared_control_hint_names_a_measured_source_and_a_plain_selecto
 
 
 def test_control_hints_are_derived_from_the_measured_pins_and_routes_not_invented():
-    """Every outlined selector traces back to data an automated path already measured."""
+    """Every outlined selector traces back to a control measured on the live provider page."""
 
     from stockroom.capture.vendors import (
         _DIGIKEY_MANUFACTURER_ROUTE,
         _DIGIKEY_ULTRALIBRARIAN_ROUTE,
         SnapMagicAdapter,
         UltraLibrarianAdapter,
-        _export_selectors,
         get_adapter,
     )
 
     ultra = UltraLibrarianAdapter.capability
     ultra_hints = {hint.label: hint.selectors for hint in ultra.control_hints}
-    assert ultra_hints["KiCad v6+ export"] == _export_selectors(
-        "kicad", ultra.version_pins["kicad"]
+    assert ultra_hints["KiCad v6+ export"] == ('input[name="exports"][id="KiCADv6"]',)
+    assert ultra_hints["3D STEP model export"] == (
+        'input[name="exports"][id="ThreeDModel"]',
+        'input[name="exports"][id="MfrThreeDModel"]',
     )
-    assert ultra_hints["3D STEP model export"] == _export_selectors(
-        "model", ultra.version_pins["model"]
-    )
-    # The two remaining Ultra Librarian selectors are the exact strings its own driver uses.
     assert ultra_hints["Provider consent"] == ("input[type=checkbox][id^=consent-]",)
     assert ultra_hints["Download export"] == ("#submit-export",)
 
     snap = SnapMagicAdapter.capability
     snap_selectors = [selector for hint in snap.control_hints for selector in hint.selectors]
     assert 'a[name="download-modal"]' in snap_selectors
-    for pin in snap.version_pins.values():
-        assert f'[data-format="{pin}"]' in snap_selectors
+    for measured in ("kicad_modv6", "altium_native", "step_model"):
+        assert f'[data-format="{measured}"]' in snap_selectors
 
     digikey = get_adapter("digikey")
     parent = {hint.label: hint.selectors for hint in digikey.capability.control_hints}
@@ -3607,7 +2834,7 @@ def test_outlines_keep_the_declared_order_and_mark_only_the_first_as_next(tmp_pa
         ProviderControlHint(
             label="KiCad v6+ export",
             selectors=("#KiCADv6",),
-            source="vendors.py version_pins['kicad']",
+            source="Ultra Librarian export panel, measured 2026-07-28",
         ),
         _EXPORT_HINT,
     )

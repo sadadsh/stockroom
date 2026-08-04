@@ -66,18 +66,6 @@ const BASE_SETTINGS: SettingsInfo = {
   digikey_client_id: "",
   digikey_client_secret_set: false,
   digikey_client_secret_hint: "",
-  digikey_username: "",
-  digikey_password_set: false,
-  digikey_password_hint: "",
-  ul_username: "",
-  ul_password_set: false,
-  ul_password_hint: "",
-  snapeda_username: "",
-  snapeda_password_set: false,
-  snapeda_password_hint: "",
-  samacsys_username: "",
-  samacsys_password_set: false,
-  samacsys_password_hint: "",
   kicad_config_override: "",
   kicad_cli_override: "",
   kicad_config_dir: "/home/x/.config/kicad/10.0",
@@ -165,7 +153,6 @@ const SECTION_NAV: Record<string, RegExp> = {
   "settings.kicad": /eda tools/i,
   "settings.altium": /eda tools/i,
   "settings.distributor": /data sources/i,
-  "settings.vendor-logins": /data sources/i,
   "settings.rescan": /data sources/i,
 };
 
@@ -700,81 +687,12 @@ describe("SettingsPage — KiCad wiring", () => {
   });
 });
 
-describe("SettingsPage - capture credentials", () => {
-  it("makes saved sign-ins optional and names persistent sessions plus security pauses", async () => {
-    renderPage();
-    await openSettings("settings.vendor-logins");
-
-    expect(screen.getByText("Provider Sessions And Optional Sign-Ins")).toBeInTheDocument();
-    expect(screen.getByText(/reuses provider-only browser sessions first/i)).toBeInTheDocument();
-    expect(screen.getByText(/CAPTCHA or MFA always pauses for you/i)).toBeInTheDocument();
-  });
-
-  it("saves the Ultra Librarian username and password", async () => {
-    const user = userEvent.setup();
-    mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
-    renderPage();
-    await openSettings("settings.vendor-logins");
-    await user.type(screen.getByLabelText("Ultra Librarian Username"), "me@x.com");
-    await user.type(screen.getByLabelText("Ultra Librarian Password"), "secret");
-    await user.click(screen.getByRole("button", { name: "Save Ultra Librarian Login" }));
-    expect(mockApi.updateSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ ul_username: "me@x.com", ul_password: "secret" }),
-    );
-  });
-
-  it("renders the password input as type password", async () => {
-    renderPage();
-    await openSettings("settings.vendor-logins");
-    expect(screen.getByLabelText("Ultra Librarian Password")).toHaveAttribute("type", "password");
-  });
-
-  it("saves the SnapEDA username and password", async () => {
-    const user = userEvent.setup();
-    mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
-    renderPage();
-    await openSettings("settings.vendor-logins");
-    await user.type(screen.getByLabelText("SnapEDA Username"), "sn@x.com");
-    await user.type(screen.getByLabelText("SnapEDA Password"), "snpw");
-    await user.click(screen.getByRole("button", { name: "Save SnapEDA Login" }));
-    expect(mockApi.updateSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ snapeda_username: "sn@x.com", snapeda_password: "snpw" }),
-    );
-  });
-
-  it("saves the SamacSys username and password", async () => {
-    const user = userEvent.setup();
-    mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
-    renderPage();
-    await openSettings("settings.vendor-logins");
-    await user.type(screen.getByLabelText("SamacSys Username"), "sam@x.com");
-    await user.type(screen.getByLabelText("SamacSys Password"), "sampw");
-    await user.click(screen.getByRole("button", { name: "Save SamacSys Login" }));
-    expect(mockApi.updateSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ samacsys_username: "sam@x.com", samacsys_password: "sampw" }),
-    );
-  });
-
-  it("saves the DigiKey account login and masks the password input", async () => {
-    const user = userEvent.setup();
-    mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
-    renderPage();
-    await openSettings("settings.vendor-logins");
-    const pass = screen.getByLabelText("DigiKey Account Password");
-    expect(pass).toHaveAttribute("type", "password");
-    await user.type(screen.getByLabelText("DigiKey Account Username"), "dk@x.com");
-    await user.type(pass, "acctpw");
-    await user.click(screen.getByRole("button", { name: "Save DigiKey Account Login" }));
-    expect(mockApi.updateSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ digikey_username: "dk@x.com", digikey_password: "acctpw" }),
-    );
-  });
-
+describe("SettingsPage - distributor API credentials", () => {
   it("saves the DigiKey API creds and masks the client secret input", async () => {
     const user = userEvent.setup();
     mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
     renderPage();
-    await openSettings("settings.vendor-logins");
+    await openSettings("settings.distributor");
     const secret = screen.getByLabelText("DigiKey API Client Secret");
     expect(secret).toHaveAttribute("type", "password");
     await user.type(screen.getByLabelText("DigiKey API Client ID"), "CLIENTID");
@@ -786,6 +704,17 @@ describe("SettingsPage - capture credentials", () => {
         digikey_client_secret: "APISECRET",
       }),
     );
+  });
+
+  // Stockroom no longer signs in to a provider website, so no provider login can be configured.
+  it("offers no provider-website sign-in anywhere in Data Sources", async () => {
+    renderPage();
+    await openSettings("settings.distributor");
+    expect(screen.queryByText("Provider Sessions And Optional Sign-Ins")).toBeNull();
+    expect(screen.queryByLabelText("Ultra Librarian Password")).toBeNull();
+    expect(screen.queryByLabelText("SnapEDA Password")).toBeNull();
+    expect(screen.queryByLabelText("SamacSys Password")).toBeNull();
+    expect(screen.queryByLabelText("DigiKey Account Password")).toBeNull();
   });
 });
 

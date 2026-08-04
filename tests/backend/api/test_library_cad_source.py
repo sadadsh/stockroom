@@ -157,7 +157,7 @@ def test_each_vendor_states_which_tools_it_can_export_for(client, app_ctx):
         assert isinstance(source["aggregator"], bool)
 
 
-def test_implemented_capture_providers_explain_the_automated_finish_contract(client, app_ctx):
+def test_implemented_capture_providers_explain_the_person_driven_contract(client, app_ctx):
     part_id = _land_bare_part(app_ctx)
     sources = client.get(f"/api/library/parts/{part_id}/cad-source").json()["sources"]
     implemented = [source for source in sources if source["capture_available"]]
@@ -165,12 +165,13 @@ def test_implemented_capture_providers_explain_the_automated_finish_contract(cli
     assert implemented
     for source in implemented:
         instruction = source["instruction"].lower()
-        assert "automatic sources first" in instruction
-        assert "opens the exact result" in instruction
-        assert "chooses the required formats" in instruction
+        # It must say what Stockroom does and, just as plainly, what the PERSON does.
+        assert "retained evidence first" in instruction
+        assert "opens the exact provider page" in instruction
+        assert "you work the provider page" in instruction
+        assert "security check" in instruction
         assert "validates" in instruction
         assert "attaches" in instruction
-        assert "security check" in instruction
 
     vendors = client.get("/api/library/capture/vendors").json()["vendors"]
     assert vendors
@@ -187,7 +188,6 @@ def test_user_driven_capture_route_requires_one_part_and_one_provider(client, ap
         ({"mode": "assisted"}, "exactly one selected part"),
         ({"mode": "assisted", "part_ids": [part_id, "another-part"], "vendor": "snapmagic"},
          "exactly one selected part"),
-        ({"mode": "assisted", "part_ids": [part_id]}, "one selected provider"),
         ({"mode": "assisted", "part_ids": [part_id], "vendor": "snapmagic", "limit": 1},
          "does not accept a batch limit"),
         ({"mode": "assisted", "part_ids": [part_id], "vendor": "not-a-provider"},
@@ -197,7 +197,7 @@ def test_user_driven_capture_route_requires_one_part_and_one_provider(client, ap
          "background must be a boolean"),
         ({"mode": "assisted", "part_ids": [part_id], "vendor": "samacsys",
           "background": True},
-         "requires a visible person-driven provider page"),
+         "requires a visible provider page"),
     )
 
     for payload, detail in cases:
@@ -226,7 +226,7 @@ def test_collect_all_route_is_one_exact_visible_part_without_batch_controls(
         ),
         (
             {"mode": "collect-all", "part_ids": [part_id], "background": True},
-            "requires visible sequential provider handoffs",
+            "requires a visible provider page",
         ),
     )
 
@@ -298,19 +298,19 @@ def test_a_part_with_no_mpn_offers_NOWHERE_rather_than_four_dead_searches(client
     assert body["url"] is None
 
 
-def test_cad_source_says_which_providers_can_finish_unattended(client, app_ctx):
-    """`capture_available` cannot answer "which one should a chooser reach for first".
+def test_no_cad_source_row_claims_a_provider_finishes_without_a_person(client, app_ctx):
+    """`capture_available` now means exactly one thing: person-driven capture is implemented.
 
-    Every implemented adapter is capture_available, so a surface defaulting to the head of the
-    trust order lands on the aggregator whose controls stay person-driven. DigiKey is declared
-    user_driven on Terms-of-Use grounds, so it can never be unattended whatever the machine
-    policy says; that is the invariant worth pinning here.
+    The row used to carry `unattended_capture` so a chooser could prefer a provider Stockroom
+    would drive itself. No provider is driven any more, so the field is gone rather than pinned
+    to a permanent False that reads like a temporary state.
     """
     part_id = _land_bare_part(app_ctx)
     sources = client.get(f"/api/library/parts/{part_id}/cad-source").json()["sources"]
 
     by_key = {source["key"]: source for source in sources}
     for source in sources:
-        assert isinstance(source["unattended_capture"], bool), source
-    assert by_key["digikey"]["unattended_capture"] is False
-    assert by_key["samacsys"]["unattended_capture"] is False
+        assert "unattended_capture" not in source, source
+        assert isinstance(source["capture_available"], bool), source
+    assert by_key["digikey"]["capture_available"] is True
+    assert by_key["samacsys"]["capture_available"] is True

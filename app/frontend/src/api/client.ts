@@ -1108,9 +1108,10 @@ export const api = {
     );
   },
 
-  // ONE ACQUISITION WORKFLOW. Verified local evidence runs first, then Stockroom works exact
-  // provider results in order. A provider page appears inside Stockroom
-  // only when a security gate or download choice genuinely requires a person.
+  // ONE ACQUISITION WORKFLOW, and exactly one lane inside it: the person opens the provider page
+  // Stockroom resolved, signs in if the provider asks, chooses the formats, and downloads. The
+  // backend captures those downloads and validates them. There is no mode to pick, so no `mode`
+  // is sent.
   //
   // `partIds: [one]` is per-component; omitting it captures every part still missing files. Both
   // are the same backend path deliberately, so verifying one verifies the other.
@@ -1122,7 +1123,6 @@ export const api = {
       partIds?: string[];
       vendor?: string;
       limit?: number;
-      mode?: "automatic" | "assisted" | "finish-first" | "collect-all";
       background?: boolean;
       idempotencyKey?: string;
     } = {},
@@ -1132,7 +1132,6 @@ export const api = {
         part_ids: input.partIds,
         vendor: input.vendor,
         limit: input.limit,
-        mode: input.mode,
         background: input.background,
         idempotency_key: input.idempotencyKey,
       },
@@ -1202,8 +1201,8 @@ export const api = {
     );
   },
 
-  // The providers automatic acquisition can actually drive, read off the adapter registry so a
-  // surface can never offer one with no implementation behind it.
+  // The providers a capture can open for a person, read off the adapter registry so a surface can
+  // never offer one with no implementation behind it.
   captureVendors(): Promise<{
     vendors: {
       key: string;
@@ -1212,7 +1211,6 @@ export const api = {
       needs_login: boolean;
       aggregator: boolean;
       instruction: string;
-      one_download_for_all_formats: boolean;
     }[];
   }> {
     return apiGet("/api/library/capture/vendors");

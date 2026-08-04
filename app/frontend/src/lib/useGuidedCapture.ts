@@ -11,7 +11,6 @@ import {
   subsetComplete,
   KICAD_REQS,
   ALTIUM_REQS,
-  type CaptureMode,
 } from "./capture";
 import type { Requirement } from "../api/types";
 
@@ -31,7 +30,6 @@ export function useGuidedCapture(partId: string, needs: Requirement[] = [], part
   const received = ownsState ? cap.active.received : {};
   const backgrounded = ownsState ? cap.active.backgrounded : false;
   const providerOutcomes = ownsState ? cap.active.providerOutcomes : [];
-  const collectionComplete = ownsState ? cap.active.collectionComplete : null;
 
   return {
     status,
@@ -42,13 +40,9 @@ export function useGuidedCapture(partId: string, needs: Requirement[] = [], part
     received,
     backgrounded,
     providerOutcomes,
-    collectionComplete,
     kicadComplete: subsetComplete(activeNeeds, received, KICAD_REQS),
     altiumComplete: subsetComplete(activeNeeds, received, ALTIUM_REQS),
-    start: (
-      sourceKey?: string,
-      mode: CaptureMode = "finish-first",
-    ) => cap.start(partId, partName, needs, sourceKey, mode),
+    start: (sourceKey?: string) => cap.start(partId, partName, needs, sourceKey),
     reset: () => cap.reset(),
     keepWorking: () => cap.keepWorking(),
   };

@@ -596,9 +596,6 @@ export interface CadSource {
   // True only when the network capture broker has a real browser adapter for this provider.
   // A discoverable provider page is not the same as an implemented capture route.
   capture_available: boolean;
-  // True when this provider can finish a part with nobody watching, on this machine right now.
-  // Every implemented adapter is `capture_available`; only some are authorized to run unattended.
-  unattended_capture?: boolean;
 }
 
 export interface CadSourceResponse {
@@ -643,23 +640,8 @@ export interface SettingsInfo {
   digikey_client_id: string;
   digikey_client_secret_set: boolean;
   digikey_client_secret_hint: string;
-  // DigiKey account web login (the driver's hands-free sign-in), distinct from the
-  // API creds. The username is echoed raw; the password is presence + last-4 hint.
-  digikey_username: string;
-  digikey_password_set: boolean;
-  digikey_password_hint: string;
-  // Saved logins for the in-DigiKey CAD providers (Ultra Librarian, SnapEDA, SamacSys).
-  // Usernames are echoed raw (not secrets); passwords cross the wire only as presence
-  // + a last-4 hint.
-  ul_username: string;
-  ul_password_set: boolean;
-  ul_password_hint: string;
-  snapeda_username: string;
-  snapeda_password_set: boolean;
-  snapeda_password_hint: string;
-  samacsys_username: string;
-  samacsys_password_set: boolean;
-  samacsys_password_hint: string;
+  // No provider-website logins live here. Stockroom never signs in to a provider site on
+  // someone's behalf, so there is nothing for the machine to store.
   // KiCad wiring: the per-machine overrides (plain paths, not secrets), the
   // effective locations they resolve to, and whether SR_LIB currently points at
   // the active profile's library.
@@ -678,14 +660,6 @@ export interface SettingsPatch {
   github_token?: string;
   digikey_client_id?: string;
   digikey_client_secret?: string;
-  digikey_username?: string;
-  digikey_password?: string;
-  ul_username?: string;
-  ul_password?: string;
-  snapeda_username?: string;
-  snapeda_password?: string;
-  samacsys_username?: string;
-  samacsys_password?: string;
   kicad_config_override?: string;
   kicad_cli_override?: string;
   stm_cubemx_source?: string;
@@ -2869,8 +2843,8 @@ export interface CompletionItem {
   // One terminal result for every planned surface/author route. DigiKey's Ultra Librarian,
   // SnapMagic, and TraceParts rows remain independent.
   provider_outcomes?: ProviderOutcome[];
-  // Null for ordinary missing-only completion. In collect-all mode this is false whenever any
-  // planned route is blocked, errors, or lacks a terminal availability verdict.
+  // Null for ordinary missing-only completion, which is the only completion there is now that a
+  // run has one lane. Kept because the backend still reports the field.
   collection_complete?: boolean | null;
   // Required by the current backend contract. Optional here is deliberate defensive decoding:
   // a missing field must fail closed instead of making an old server look complete.
@@ -2947,7 +2921,6 @@ export interface CaptureWorkflowSession {
   workflow_batch_id: string;
   workflow_item_id: string;
   part_id: string;
-  mode: "automatic" | "assisted" | "finish-first" | "collect-all";
   vendor: string | null;
   background: boolean;
   active_route?: { vendor: string; detail_url: string; route_token: string } | null;

@@ -205,9 +205,6 @@ _TOOLS = {
         "catalog."
     ),
     "capturerec.py": "THE recorder: a human drives a vendor page, this writes down the workflow.",
-    "cad_capture_canary.py": (
-        "Prove one live CAD route through Stockroom's broker, evidence store, and API."
-    ),
     "deploy.py": "Deploy to the Windows install AND prove the code arrived.",
     "export_stm_target_definition.py": "Compile an STM target definition from explicit policy.",
     "gen_eda_registry_ts.py": "Generate the TS EDA registry from the Python one (single source).",

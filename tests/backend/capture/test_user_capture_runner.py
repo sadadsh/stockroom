@@ -1,3 +1,11 @@
+"""There is ONE capture mode, and it is person-driven.
+
+The runner used to carry a ladder - automatic, assisted, finish-first, collect-all - and each rung
+decided how much of a provider page Stockroom would operate itself. That ladder is gone. Stockroom
+builds a safe URL, hosts the provider surface, and stages what the person downloads; nothing here
+may drive a provider page, and nothing may re-appear behind a flag.
+"""
+
 from __future__ import annotations
 
 import inspect
@@ -8,202 +16,41 @@ import pytest
 from stockroom.capture import runner
 
 
-def test_automatic_capture_is_the_runner_default():
-    parameter = inspect.signature(runner.run_guided_capture).parameters["user_driven"]
-    authorized = inspect.signature(runner.run_guided_capture).parameters["operator_authorized"]
+def test_person_driven_is_the_only_mode_and_no_automation_lane_remains():
+    parameters = set(inspect.signature(runner.run_guided_capture).parameters)
 
-    assert parameter.default is False
-    assert authorized.default is False
-
-
-@pytest.mark.parametrize(
-    ("part_ids", "vendor", "limit", "message"),
-    [
-        (None, "snapmagic", None, "exactly one selected part"),
-        ([], "snapmagic", None, "exactly one selected part"),
-        (["part-a", "part-b"], "snapmagic", None, "exactly one selected part"),
-        (["part-a"], None, None, "one selected provider"),
-        (["part-a"], "snapmagic", 1, "does not accept a batch limit"),
-    ],
-)
-def test_user_driven_runner_rejects_batch_or_implicit_provider_scope(
-    part_ids,
-    vendor,
-    limit,
-    message,
-):
-    with pytest.raises(ValueError, match=message):
-        runner.run_guided_capture(
-            object(),
-            part_ids=part_ids,
-            vendor=vendor,
-            limit=limit,
-            user_driven=True,
-        )
+    assert not parameters & {
+        "user_driven",
+        "operator_authorized",
+        "finish_first",
+        "collect_all",
+        "sequential_providers",
+    }
+    # The lane selectors, the authorization seam, and the saved provider logins are gone with the
+    # automation they existed to serve.
+    for retired in (
+        "HumanRequiredSource",
+        "_provider_route_plan",
+        "_machine_access_detail",
+        "_automatic_provider_keys",
+        "_automation_first_order",
+        "_machine_access_allowed",
+        "_saved_credentials",
+        "_capture_rate_ledger",
+    ):
+        assert not hasattr(runner, retired), f"{retired} is an automation seam and must be gone"
 
 
-def test_runner_uses_permitted_automatic_sources_and_keeps_provider_capture_explicit(
-    monkeypatch,
-    tmp_path,
-):
-    import stockroom.evidence as evidence_module
-    from stockroom.capture import browser as browser_module
-    from stockroom.capture import guided as guided_module
-    from stockroom.ingest import pipeline as pipeline_module
-
-    constructed: list[dict] = []
-    pipeline_factories = []
-    pipeline_options: list[dict] = []
-    source_batches: list[list[object]] = []
-    runtimes = []
-
-    class Pipeline:
-        def __init__(self, *_args, **options):
-            pipeline_options.append(options)
-
-    class Source:
-        key = "guided"
-
-        def __init__(self, make_pipeline, **options):
-            self.options = options
-            self.closed = False
-            pipeline_factories.append(make_pipeline)
-            constructed.append(options)
-
-        def close(self):
-            self.closed = True
-
-    class Runtime:
-        def __init__(self):
-            self.closed = False
-            runtimes.append(self)
-
-        def close(self):
-            self.closed = True
-
-    class Report:
-        def of(self, *_statuses):
-            return False
-
-        def to_dict(self):
-            return {"items": [], "summary": {}}
-
-    def complete(work, *, sources, **_options):
-        assert list(work) == ["part-a"]
-        source_batches.append(list(sources))
-        return Report()
-
-    monkeypatch.setattr(guided_module, "GuidedCaptureSource", Source)
-    monkeypatch.setattr(pipeline_module, "IngestPipeline", Pipeline)
-    monkeypatch.setattr(browser_module, "SharedPlaywrightRuntime", Runtime)
-    monkeypatch.setattr(evidence_module, "EvidenceStore", lambda _root: object())
-    monkeypatch.setattr(runner, "complete_library", complete)
-    monkeypatch.setattr(
-        runner,
-        "_capture_downloads",
-        lambda _ctx, key: tmp_path / f"{key}-downloads",
-    )
-    monkeypatch.setattr(
-        runner,
-        "_capture_profile",
-        lambda _ctx, key: tmp_path / f"{key}-profile",
-    )
-    monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
-
-    stop = lambda: False
-    in_app_provider_surface = lambda: None
-    ctx = SimpleNamespace(
-        ops=SimpleNamespace(load_record=lambda _part_id: None),
-        jobs=SimpleNamespace(run_write=lambda fn: fn()),
-        rebuild_index=lambda: None,
-        auto_push=lambda: None,
-        profile=object(),
-        repo=object(),
-        cli=object(),
-        config=SimpleNamespace(ul_private_evaluation_automation=False),
-        provider_browser_surface=in_app_provider_surface,
-    )
-
-    result = runner.run_guided_capture(
-        ctx,
-        part_ids=["part-a"],
-        vendor="snapmagic",
-        should_stop=stop,
-    )
-
-    assert result == {"items": [], "summary": {}}
-    assert [source.key for source in source_batches[0]] == [
-        "verified-cache",
-        "snapmagic-human-required",
-        "digikey-human-required",
-        "ultralibrarian-human-required",
-        "samacsys-human-required",
-    ]
-    assert constructed == []
-    assert runtimes == []
-
-    runner.run_guided_capture(
-        ctx,
-        part_ids=["part-a"],
-        vendor="snapmagic",
-        operator_authorized=True,
-        should_stop=stop,
-    )
-
-    assisted = constructed
-    assert [source.key for source in source_batches[1]] == [
-        "guided",
-    ]
-    assert [options["vendor"] for options in assisted] == ["snapmagic"]
-    assert [options["engine"] for options in assisted] == ["camoufox"]
-    assert all(options["user_driven"] is False for options in assisted)
-    assert all(options["operator_authorized"] is True for options in assisted)
-    assert all(options["collect_variants"] is True for options in assisted)
-    assert assisted[0]["provider_surface"] is in_app_provider_surface
-    cancel_checks = [options["user_cancelled"] for options in assisted]
-    assert cancel_checks[0]() is False
-    assisted[0]["cancel_workflow"]()
-    assert cancel_checks[0]() is True
-    assert all(options["credentials"] is runner._saved_credentials for options in assisted)
-    assert all(source.closed for source in source_batches[1] if hasattr(source, "closed"))
-    assert runtimes == []
-
-    runner.run_guided_capture(
-        ctx,
-        part_ids=["part-a"],
-        vendor="digikey",
-        operator_authorized=True,
-        should_stop=stop,
-    )
-
-    digikey = constructed[-1]
-    assert digikey["vendor"] == "digikey"
-    assert digikey["engine"] == "camoufox"
-    assert digikey["convert_altium"] is runner._convert_ul_altium_package
-    assert digikey["user_driven"] is False
-    assert digikey["operator_authorized"] is True
-    assert digikey["credentials"] is runner._saved_credentials
-    assert digikey["collect_variants"] is True
-    pipeline_factories[-1]()
-    assert pipeline_options[-1] == {"auto_embed_altium_models": True}
-
-    runner.run_guided_capture(
-        ctx,
-        part_ids=["part-a"],
-        vendor="ultralibrarian",
-        user_driven=True,
-        should_stop=stop,
-    )
-
-    ultra = constructed[-1]
-    assert ultra["vendor"] == "ultralibrarian"
-    assert ultra["convert_altium"] is runner._convert_ul_altium_package
+def test_provider_capture_requires_exactly_one_selected_part():
+    with pytest.raises(ValueError, match="exactly one selected part"):
+        runner.run_guided_capture(object(), part_ids=["part-a", "part-b"], vendor="snapmagic")
+    with pytest.raises(ValueError, match="exactly one selected part"):
+        runner.run_guided_capture(object(), vendor="snapmagic")
+    with pytest.raises(ValueError, match="does not accept a batch limit"):
+        runner.run_guided_capture(object(), part_ids=["part-a"], vendor="snapmagic", limit=1)
 
 
-def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
-    monkeypatch,
-    tmp_path,
-):
+def _runner_context(tmp_path, monkeypatch, *, record=None):
     import stockroom.evidence as evidence_module
     from stockroom.capture import browser as browser_module
     from stockroom.capture import guided as guided_module
@@ -212,25 +59,26 @@ def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
     constructed: list[dict] = []
     source_batches: list[list[object]] = []
     complete_options: list[dict] = []
+    closed: list[bool] = []
 
     class Pipeline:
-        def __init__(self, *_args, **_options):
-            pass
+        def __init__(self, *_args, **options):
+            self.options = options
 
     class Source:
         key = "guided"
 
-        def __init__(self, _make_pipeline, **options):
+        def __init__(self, make_pipeline, **options):
+            self.make_pipeline = make_pipeline
             self.options = options
-            self.closed = False
             constructed.append(options)
 
         def close(self):
-            self.closed = True
+            closed.append(True)
 
     class Runtime:
         def close(self):
-            pass
+            return None
 
     class Direct:
         key = "verified-cache"
@@ -242,12 +90,11 @@ def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
             return False
 
         def to_dict(self):
-            return {"items": [], "counts": {}, "collection_complete": True}
+            return {"items": [], "counts": {}}
 
     def complete(work, *, sources, **options):
-        assert list(work) == ["part-a"]
         source_batches.append(list(sources))
-        complete_options.append(options)
+        complete_options.append({**options, "work": list(work)})
         return Report()
 
     monkeypatch.setattr(guided_module, "GuidedCaptureSource", Source)
@@ -258,16 +105,6 @@ def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
     monkeypatch.setattr(runner, "build_sources", lambda *_args, **_kwargs: [Direct()])
     monkeypatch.setattr(
         runner,
-        "_automatic_provider_keys",
-        lambda _vendor, *, config=None: ["ultralibrarian"],
-    )
-    monkeypatch.setattr(
-        runner,
-        "DurableSlidingWindowLimiter",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        runner,
         "_capture_downloads",
         lambda _ctx, key: tmp_path / f"{key}-downloads",
     )
@@ -276,36 +113,35 @@ def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
         "_capture_profile",
         lambda _ctx, key: tmp_path / f"{key}-profile",
     )
-    monkeypatch.setattr(
-        runner,
-        "_capture_rate_ledger",
-        lambda _ctx, key: tmp_path / f"{key}-rate.json",
-    )
     monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
-    record = SimpleNamespace(
+
+    exact = record or SimpleNamespace(
         id="part-a",
         manufacturer="Texas Instruments",
         mpn="BQ24074",
     )
     ctx = SimpleNamespace(
-        ops=SimpleNamespace(load_record=lambda _part_id: record),
+        ops=SimpleNamespace(load_record=lambda _part_id: exact),
         jobs=SimpleNamespace(run_write=lambda fn: fn()),
         rebuild_index=lambda: None,
         auto_push=lambda: None,
         profile=object(),
         repo=object(),
         cli=object(),
-        config=SimpleNamespace(ul_private_evaluation_automation=True),
+        config=SimpleNamespace(),
+    )
+    return ctx, constructed, source_batches, complete_options, closed
+
+
+def test_one_selected_part_visits_every_registered_provider_person_driven(monkeypatch, tmp_path):
+    ctx, constructed, source_batches, complete_options, closed = _runner_context(
+        tmp_path,
+        monkeypatch,
     )
 
-    result = runner.run_guided_capture(
-        ctx,
-        part_ids=["part-a"],
-        vendor="snapmagic",
-        collect_all=True,
-    )
+    result = runner.run_guided_capture(ctx, part_ids=["part-a"])
 
-    assert result["collection_complete"] is True
+    assert result == {"items": [], "counts": {}}
     assert [source.key for source in source_batches[0]] == [
         "verified-cache",
         "guided",
@@ -313,247 +149,78 @@ def test_collect_all_keeps_every_provider_and_closes_each_session_after_supply(
         "guided",
         "guided",
     ]
-    assert [options["vendor"] for options in constructed] == [
-        "ultralibrarian",
-        "snapmagic",
-        "digikey",
-        "samacsys",
-    ]
-    assert all(options["collect_variants"] is True for options in constructed)
-    assert all(options["preserve_active_pair"] is True for options in constructed)
-    assert all(options["close_after_supply"] is True for options in constructed)
-    assert [options["user_driven"] for options in constructed] == [
-        False,
-        False,
-        False,
-        True,
-    ]
-    assert [options["operator_authorized"] for options in constructed] == [
-        False,
-        True,
-        True,
-        False,
-    ]
+    assert [options["vendor"] for options in constructed] == list(runner._VENDOR_CHAIN)
+    # Every provider is worked by the person, so every source is built the same way. No option
+    # here can grant Stockroom permission to operate a provider control.
+    for options in constructed:
+        assert options["collect_variants"] is True
+        assert options["preserve_active_pair"] is True
+        assert options["close_after_supply"] is True
+        assert set(options) & {
+            "user_driven",
+            "operator_authorized",
+            "credentials",
+            "rate_limiter",
+            "machine_access_check",
+        } == set()
     assert complete_options[0]["exhaustive"] is True
     assert complete_options[0]["collect_variants"] is True
     assert callable(complete_options[0]["evidence_resolver"])
-    assert all(source.closed for source in source_batches[0] if hasattr(source, "closed"))
+    assert closed == [True] * len(constructed)
 
 
-def test_collect_all_finishes_every_operable_route_before_asking_a_person(
+def test_a_preferred_provider_narrows_the_run_to_that_one_surface(monkeypatch, tmp_path):
+    ctx, constructed, source_batches, _options, _closed = _runner_context(tmp_path, monkeypatch)
+
+    runner.run_guided_capture(ctx, part_ids=["part-a"], vendor="digikey")
+
+    assert [options["vendor"] for options in constructed] == ["digikey"]
+    assert constructed[0]["convert_altium"] is runner._convert_ul_altium_package
+    assert [source.key for source in source_batches[0]] == ["verified-cache", "guided"]
+
+
+def test_an_unknown_provider_choice_fails_honestly(monkeypatch, tmp_path):
+    ctx, _constructed, _batches, _options, _closed = _runner_context(tmp_path, monkeypatch)
+
+    with pytest.raises(ValueError, match="no network capture adapter"):
+        runner.run_guided_capture(ctx, part_ids=["part-a"], vendor="not-a-provider")
+
+
+def test_a_broader_run_is_the_verified_evidence_lane_and_opens_no_provider_window(
     monkeypatch,
     tmp_path,
 ):
-    """Person-driven providers run LAST, after every route Stockroom can drive itself.
+    """Nobody can stand in front of two parts at once, so no provider surface is constructed."""
 
-    Collect All Sources is exhaustive. DigiKey and SnapMagic have measured ordinary controls for
-    this exact-part job; SamacSys remains raw person-driven. Every operable route must therefore
-    finish before the one remaining handoff.
-    """
+    ctx, constructed, source_batches, complete_options, _closed = _runner_context(
+        tmp_path,
+        monkeypatch,
+    )
 
-    import stockroom.evidence as evidence_module
-    from stockroom.capture import browser as browser_module
+    runner.run_guided_capture(ctx, part_ids=["part-a", "part-b"])
+
+    assert constructed == []
+    assert [source.key for source in source_batches[0]] == ["verified-cache"]
+    assert complete_options[0]["exhaustive"] is False
+
+
+def test_run_completion_never_constructs_a_provider_browser(monkeypatch, tmp_path):
+    """Library-wide completion is retained evidence only; it must not open a window."""
+
+    ctx, constructed, source_batches, _options, _closed = _runner_context(tmp_path, monkeypatch)
+
+    def refuse(*_args, **_kwargs):
+        raise AssertionError("bulk completion must not build a provider capture source")
+
     from stockroom.capture import guided as guided_module
-    from stockroom.ingest import pipeline as pipeline_module
 
-    constructed: list[dict] = []
+    monkeypatch.setattr(guided_module, "GuidedCaptureSource", refuse)
 
-    class Pipeline:
-        def __init__(self, *_args, **_options):
-            pass
+    result = runner.run_completion(ctx, part_ids=["part-a"])
 
-    class Source:
-        key = "guided"
-
-        def __init__(self, _make_pipeline, **options):
-            self.options = options
-            constructed.append(options)
-
-        def close(self):
-            pass
-
-    class Runtime:
-        def close(self):
-            pass
-
-    class Direct:
-        key = "verified-cache"
-
-    class Report:
-        items = ()
-
-        def of(self, *_statuses):
-            return False
-
-        def to_dict(self):
-            return {"items": [], "counts": {}, "collection_complete": True}
-
-    monkeypatch.setattr(guided_module, "GuidedCaptureSource", Source)
-    monkeypatch.setattr(pipeline_module, "IngestPipeline", Pipeline)
-    monkeypatch.setattr(browser_module, "SharedPlaywrightRuntime", Runtime)
-    monkeypatch.setattr(evidence_module, "EvidenceStore", lambda _root: object())
-    monkeypatch.setattr(runner, "complete_library", lambda *_args, **_options: Report())
-    monkeypatch.setattr(runner, "build_sources", lambda *_args, **_kwargs: [Direct()])
-    monkeypatch.setattr(
-        runner,
-        "_automatic_provider_keys",
-        lambda _vendor, *, config=None: ["ultralibrarian"],
-    )
-    monkeypatch.setattr(
-        runner,
-        "DurableSlidingWindowLimiter",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        runner,
-        "_capture_downloads",
-        lambda _ctx, key: tmp_path / f"{key}-downloads",
-    )
-    monkeypatch.setattr(
-        runner,
-        "_capture_profile",
-        lambda _ctx, key: tmp_path / f"{key}-profile",
-    )
-    monkeypatch.setattr(
-        runner,
-        "_capture_rate_ledger",
-        lambda _ctx, key: tmp_path / f"{key}-rate.json",
-    )
-    monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
-    record = SimpleNamespace(
-        id="part-a",
-        manufacturer="Texas Instruments",
-        mpn="BQ24074",
-    )
-    ctx = SimpleNamespace(
-        ops=SimpleNamespace(load_record=lambda _part_id: record),
-        jobs=SimpleNamespace(run_write=lambda fn: fn()),
-        rebuild_index=lambda: None,
-        auto_push=lambda: None,
-        profile=object(),
-        repo=object(),
-        cli=object(),
-        config=SimpleNamespace(ul_private_evaluation_automation=True),
-    )
-
-    runner.run_guided_capture(ctx, part_ids=["part-a"], collect_all=True)
-
-    order = [options["vendor"] for options in constructed]
-    driven = [options["user_driven"] for options in constructed]
-
-    assert order == ["ultralibrarian", "digikey", "snapmagic", "samacsys"]
-    assert driven == [False, False, False, True]
-    # Stated as the invariant, not as one hard-coded list: no automated route may follow a
-    # person-driven one.
-    assert driven == sorted(driven)
-
-
-def test_collect_all_preference_reorders_only_within_the_automation_lane(
-    monkeypatch,
-    tmp_path,
-):
-    """A preferred person-driven provider is still not promoted ahead of automation.
-
-    Preference reorders one lane; it never buys a person-driven surface the right to hold up
-    routes that need nobody.
-    """
-
-    import stockroom.evidence as evidence_module
-    from stockroom.capture import browser as browser_module
-    from stockroom.capture import guided as guided_module
-    from stockroom.ingest import pipeline as pipeline_module
-
-    constructed: list[dict] = []
-
-    class Pipeline:
-        def __init__(self, *_args, **_options):
-            pass
-
-    class Source:
-        key = "guided"
-
-        def __init__(self, _make_pipeline, **options):
-            constructed.append(options)
-
-        def close(self):
-            pass
-
-    class Runtime:
-        def close(self):
-            pass
-
-    class Direct:
-        key = "verified-cache"
-
-    class Report:
-        items = ()
-
-        def of(self, *_statuses):
-            return False
-
-        def to_dict(self):
-            return {"items": [], "counts": {}, "collection_complete": True}
-
-    monkeypatch.setattr(guided_module, "GuidedCaptureSource", Source)
-    monkeypatch.setattr(pipeline_module, "IngestPipeline", Pipeline)
-    monkeypatch.setattr(browser_module, "SharedPlaywrightRuntime", Runtime)
-    monkeypatch.setattr(evidence_module, "EvidenceStore", lambda _root: object())
-    monkeypatch.setattr(runner, "complete_library", lambda *_args, **_options: Report())
-    monkeypatch.setattr(runner, "build_sources", lambda *_args, **_kwargs: [Direct()])
-    monkeypatch.setattr(
-        runner,
-        "_automatic_provider_keys",
-        lambda _vendor, *, config=None: ["ultralibrarian"],
-    )
-    monkeypatch.setattr(
-        runner,
-        "DurableSlidingWindowLimiter",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        runner,
-        "_capture_downloads",
-        lambda _ctx, key: tmp_path / f"{key}-downloads",
-    )
-    monkeypatch.setattr(
-        runner,
-        "_capture_profile",
-        lambda _ctx, key: tmp_path / f"{key}-profile",
-    )
-    monkeypatch.setattr(
-        runner,
-        "_capture_rate_ledger",
-        lambda _ctx, key: tmp_path / f"{key}-rate.json",
-    )
-    monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
-    record = SimpleNamespace(
-        id="part-a",
-        manufacturer="Texas Instruments",
-        mpn="BQ24074",
-    )
-    ctx = SimpleNamespace(
-        ops=SimpleNamespace(load_record=lambda _part_id: record),
-        jobs=SimpleNamespace(run_write=lambda fn: fn()),
-        rebuild_index=lambda: None,
-        auto_push=lambda: None,
-        profile=object(),
-        repo=object(),
-        cli=object(),
-        config=SimpleNamespace(ul_private_evaluation_automation=True),
-    )
-
-    runner.run_guided_capture(
-        ctx,
-        part_ids=["part-a"],
-        vendor="digikey",
-        collect_all=True,
-    )
-
-    order = [options["vendor"] for options in constructed]
-
-    assert order == ["ultralibrarian", "digikey", "snapmagic", "samacsys"]
-    # Every registered provider is still visited: preference demotes nobody out of the run.
-    assert sorted(order) == sorted(runner._VENDOR_CHAIN)
+    assert result == {"items": [], "counts": {}}
+    assert constructed == []
+    assert [source.key for source in source_batches[0]] == ["verified-cache"]
 
 
 def test_runner_uses_one_immutable_evidence_resolver_for_selection_and_completion(
@@ -611,7 +278,6 @@ def test_runner_uses_one_immutable_evidence_resolver_for_selection_and_completio
         lambda store, current, **_kwargs: ("verified-by", store, current.id),
     )
     monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
-    monkeypatch.setattr(runner, "_automatic_provider_keys", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(runner, "_vendor_chain", lambda _vendor: [])
     monkeypatch.setattr(runner, "build_sources", lambda *_args, **_kwargs: [Source()])
     monkeypatch.setattr(runner, "iter_incomplete", select)
@@ -627,10 +293,7 @@ def test_runner_uses_one_immutable_evidence_resolver_for_selection_and_completio
     assert observed["completion_evidence"] == observed["selection_evidence"]
 
 
-def test_coverage_does_not_bless_populated_bare_cad_references(
-    monkeypatch,
-    tmp_path,
-):
+def test_coverage_reports_provider_gaps_as_needing_a_person(monkeypatch, tmp_path):
     from stockroom.capture.requirements import Requirement, split_requirement
     from stockroom.model.part import AssetRef, PartRecord
 
@@ -663,15 +326,16 @@ def test_coverage_does_not_bless_populated_bare_cad_references(
     )
 
     monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
-    monkeypatch.setattr(runner, "_automatic_provider_keys", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(runner, "_vendor_chain", lambda _vendor: [])
 
     report = runner.coverage(ctx)
 
     assert report["total"] == 1
     assert report["complete"] == 0
-    assert report["needs_files"] == 1
+    # No provider finishes a part without a person any more, so every provider-fillable gap is
+    # reported as needing one rather than as something the bulk pass will handle.
+    assert report["needs_assistance"] == 1
     assert report["unsourced"] == 0
+    assert sorted(report["assisted_sources"]) == sorted(runner._VENDOR_CHAIN)
     assert set(report["by_requirement"]) == {requirement.value for requirement in Requirement}
 
 
@@ -681,11 +345,10 @@ def test_the_person_can_finish_a_route_and_skip_the_part_while_the_run_is_live(
 ):
     """The Finish / Skip seam, end to end, on the run that is actually executing.
 
-    `capture_user_downloads(..., should_finish=...)` and `GuidedCaptureSource(user_finished=...)`
-    both existed and were simply never passed, so a person-driven route ended only on cancel, on
-    ~25 s of quiet after a file landed, or on the 600 s timeout. This asserts the whole chain: the
-    run publishes its intent under its one selected part, a signal raised mid-run reaches the
-    predicates the running capture polls, and it is unreachable once the run is over.
+    A person-driven route otherwise ends only on cancel, on ~25 s of quiet after a file landed, or
+    on the timeout - five times over for DigiKey's five author routes. This asserts the whole
+    chain: the run publishes its intent under its one selected part, a signal raised mid-run
+    reaches the predicates the running capture polls, and it is unreachable once the run is over.
     """
 
     import stockroom.evidence as evidence_module
@@ -765,23 +428,19 @@ def test_the_person_can_finish_a_route_and_skip_the_part_while_the_run_is_live(
         lambda _ctx, key: tmp_path / f"{key}-profile",
     )
     monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
+    record = SimpleNamespace(id="part-a", manufacturer="Texas Instruments", mpn="BQ24074")
     ctx = SimpleNamespace(
-        ops=SimpleNamespace(load_record=lambda _part_id: None),
+        ops=SimpleNamespace(load_record=lambda _part_id: record),
         jobs=SimpleNamespace(run_write=lambda fn: fn()),
         rebuild_index=lambda: None,
         auto_push=lambda: None,
         profile=object(),
         repo=object(),
         cli=object(),
-        config=SimpleNamespace(ul_private_evaluation_automation=False),
+        config=SimpleNamespace(),
     )
 
-    runner.run_guided_capture(
-        ctx,
-        part_ids=["part-a"],
-        vendor="digikey",
-        operator_authorized=True,
-    )
+    runner.run_guided_capture(ctx, part_ids=["part-a"], vendor="digikey")
 
     assert observed["published"] == ("part-a",)
     assert observed["quiet_finish"] is False
@@ -796,64 +455,29 @@ def test_the_person_can_finish_a_route_and_skip_the_part_while_the_run_is_live(
         signal_person_capture("part-a", SKIP_PART)
 
 
-def test_a_library_wide_automatic_run_publishes_no_person_control(monkeypatch, tmp_path):
+def test_a_verified_evidence_run_publishes_no_person_control(monkeypatch, tmp_path):
     """Nothing opens a person-driven window, so there is nothing for a person to finish or skip."""
 
-    import stockroom.evidence as evidence_module
-    from stockroom.capture import browser as browser_module
-    from stockroom.capture import guided as guided_module
     from stockroom.capture.intent import running_person_captures
-    from stockroom.ingest import pipeline as pipeline_module
 
+    ctx, _constructed, _batches, _options, _closed = _runner_context(tmp_path, monkeypatch)
     published: list[tuple[str, ...]] = []
-
-    class Pipeline:
-        def __init__(self, *_args, **_options):
-            pass
-
-    class Source:
-        key = "guided"
-
-        def __init__(self, _make_pipeline, **_options):
-            pass
-
-        def close(self):
-            return None
-
-    class Runtime:
-        def close(self):
-            return None
-
-    class Report:
-        items = ()
-
-        def of(self, *_statuses):
-            return False
-
-        def to_dict(self):
-            return {"items": [], "counts": {}}
 
     def complete(_work, **_options):
         published.append(running_person_captures())
+
+        class Report:
+            items = ()
+
+            def of(self, *_statuses):
+                return False
+
+            def to_dict(self):
+                return {"items": [], "counts": {}}
+
         return Report()
 
-    monkeypatch.setattr(guided_module, "GuidedCaptureSource", Source)
-    monkeypatch.setattr(pipeline_module, "IngestPipeline", Pipeline)
-    monkeypatch.setattr(browser_module, "SharedPlaywrightRuntime", Runtime)
-    monkeypatch.setattr(evidence_module, "EvidenceStore", lambda _root: object())
     monkeypatch.setattr(runner, "complete_library", complete)
-    monkeypatch.setattr(runner, "build_sources", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
-    ctx = SimpleNamespace(
-        ops=SimpleNamespace(load_record=lambda _part_id: None),
-        jobs=SimpleNamespace(run_write=lambda fn: fn()),
-        rebuild_index=lambda: None,
-        auto_push=lambda: None,
-        profile=object(),
-        repo=object(),
-        cli=object(),
-        config=SimpleNamespace(ul_private_evaluation_automation=False),
-    )
 
     runner.run_guided_capture(ctx, part_ids=["part-a", "part-b"])
 

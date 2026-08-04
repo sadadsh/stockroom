@@ -20,23 +20,25 @@ makes a green test say nothing about what the owner experiences.
 
 ONE BROWSER FOR THE WHOLE RUN
 The session is opened lazily on the first part that needs it and closed by the runner at the end.
-That matters for the workflow the owner actually has: a 90-part sitting must cost ONE sign-in, not
-ninety. The persistent profile then carries that sign-in to later runs.
+That matters for the workflow the owner actually has: a sitting must cost ONE sign-in, not one per
+part. The persistent per-provider profile then carries that sign-in to later runs.
 
 WHAT IT DOES NOT DO
-It never invents a file. If the vendor offers nothing, the part is reported skipped and left
-exactly as it was, because a capture that fabricates a partial answer is worse than one that says
-"nothing here".
+It never operates a provider control. The person navigates within the page, picks the formats,
+signs in, accepts the licence, clears the security check, and starts the download; this module
+opens the exact page, names the files it needs, and stages, validates, and attaches what arrives.
+
+It never invents a file either. If the provider offers nothing, the part is reported skipped and
+left exactly as it was, because a capture that fabricates a partial answer is worse than one that
+says "nothing here".
 """
 
 from __future__ import annotations
 
 import hashlib
-import inspect
 import tempfile
-import time
 from collections.abc import Callable
-from contextlib import ExitStack, contextmanager, nullcontext
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
@@ -47,7 +49,6 @@ from stockroom.capture.browser import (
     PlaywrightCaptureBrowser,
     ProviderHudSpec,
     SharedPlaywrightRuntime,
-    _completed_provider_formats,
 )
 from stockroom.capture.cad_composition import OwnedMaterialization
 from stockroom.capture.complete import (
@@ -64,12 +65,7 @@ from stockroom.capture.evidence import (
     exact_identity,
     record_browser_cad_evidence,
 )
-from stockroom.capture.handoff import (
-    TRANSPORT_DEFAULT_BROWSER,
-    TRANSPORT_PLAYWRIGHT,
-    select_transport,
-    trace_transport,
-)
+from stockroom.capture.handoff import TRANSPORT_PLAYWRIGHT
 from stockroom.capture.identity import (
     exact_catalog_observation_error,
     exact_observation_error,
@@ -81,12 +77,10 @@ from stockroom.capture.requirements import Requirement, asset_present, capture_n
 from stockroom.capture.trace import (
     file_note,
     trace,
-    trace_debug,
     trace_warning,
     url_note,
 )
 from stockroom.capture.vendors import (
-    DriveReport,
     VendorCapability,
     formats_for,
     get_adapter,
@@ -129,10 +123,7 @@ def _captured_file_digest(item: object) -> str:
     with path.open("rb") as stream:
         return f"sha256:{hashlib.file_digest(stream, 'sha256').hexdigest()}"
 
-# How long to wait for the vendor's file after the adapter submits. Generous because a heavy part's
-# export genuinely generates server-side for tens of seconds (measured live on DigiKey, 2026-07-23),
-# and this is a BACKSTOP: the wait ends the instant the file appears in the saved list.
-_DOWNLOAD_TIMEOUT_MS = 120_000
+
 _COHERENT_CAD_FORMATS = ("kicad", "model", "altium")
 _CAD_AUTHOR_LABELS = {
     "ultralibrarian": "Ultra Librarian",
@@ -140,488 +131,6 @@ _CAD_AUTHOR_LABELS = {
     "traceparts": "TraceParts",
     "samacsys": "SamacSys",
 }
-
-
-def _wait_for_capture(
-    browser,
-    page,
-    before: int,
-    timeout_s: float,
-    gap: float = 0.25,
-    *,
-    minimum: int = 1,
-    errors_before: int | None = None,
-    stop_when: Callable[[], bool] | None = None,
-) -> bool:
-    """True once the expected NEW files have actually been SAVED. Poll the list, not the event.
-
-    The saved list is the observation; the download event is only a promise. See the call site for
-    the race this exists to avoid.
-
-    IT MUST SLEEP THROUGH THE PAGE, NOT THROUGH `time.sleep`. Playwright's SYNC api uses greenlet to
-    switch between the caller's synchronous code and its async internals, and that switch only
-    happens inside a Playwright call. A bare `time.sleep()` blocks the whole THREAD, so incoming
-    browser messages sit unread in the socket buffer: `on("download")` is never invoked, `captured`
-    can never grow, and the wait burns its full timeout on a download that completed immediately.
-    `page.wait_for_timeout` IS a Playwright call, so it yields to that loop.
-
-    Playwright's own docs say the same thing and are the reason this is stated as mechanism rather
-    than as a guess - they recommend `wait_for_timeout` over the time module "because internally
-    Playwright relies on asynchronous operations and when using time.sleep() they can't get
-    processed correctly" (playwright.dev/python/docs/api/class-page, `wait_for_timeout`).
-
-    Measured 2026-07-27: with `time.sleep` the localhost end-to-end tests passed (their download was
-    already dispatched during `drive`) while the API-driven capture failed every time at the full
-    120 s backstop with nothing attached - the same symptom as the event race this function replaced,
-    from the opposite cause.
-    """
-    error_mark = (
-        len(getattr(browser, "download_errors", ())) if errors_before is None else errors_before
-    )
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        errors = getattr(browser, "download_errors", ())
-        if len(errors) > error_mark:
-            raise errors[error_mark]
-        if len(browser.captured) >= before + minimum:
-            return True
-        if stop_when is not None and stop_when():
-            return False
-        page.wait_for_timeout(gap * 1000)
-    # One last look: a file that landed inside the final gap still counts.
-    errors = getattr(browser, "download_errors", ())
-    if len(errors) > error_mark:
-        raise errors[error_mark]
-    return len(browser.captured) >= before + minimum
-
-
-def sign_in_adapter(adapter, page, credentials) -> str:
-    """Sign this page in for the vendor. `""` when signed in or when there is nothing to do.
-
-    Shared by `GuidedCaptureSource` and `scripts/webread.py --drive` so the live tool cannot
-    authenticate differently from the app - the first version of that tool called `sign_in`
-    unconditionally and crashed on the one adapter that does not have it.
-
-    Deliberately NOT fatal, and every no-op case is distinct from a refusal. A vendor that needs no
-    login, an adapter with NO `sign_in`, or absent credentials all return "" - because everything up
-    to the Download button works signed out (measured 2026-07-27), so a per-part outcome is far more
-    useful than a dead run. A refusal returns its reason so the caller can say WHY rather than
-    leaving the owner to infer it from a vendor-shaped "no download button".
-    """
-    if adapter is None or not getattr(adapter.capability, "needs_login", False):
-        trace_debug("capture.signin.skipped", provider=_adapter_label(adapter), why="no login required")
-        return ""
-    label = _adapter_label(adapter)
-    sign_in = getattr(adapter, "sign_in", None)
-    if sign_in is None:
-        trace_debug("capture.signin.skipped", provider=label, why="adapter has no sign-in seam")
-        return ""
-    if getattr(adapter, "signed_in", None) and adapter.signed_in(page):
-        trace("capture.signin.reused", provider=label, source="persistent provider profile")
-        return ""  # the persistent profile already carries the session
-    creds = credentials(adapter.capability.key) if credentials is not None else None
-    if not creds:
-        # NAMED, not silent. This is the exact state the owner hit on 2026-07-31: a signed-out
-        # Ultra Librarian profile with nothing saved in Settings. Returning "" here left the
-        # per-part row saying only "the Download button is not on this page", which is the
-        # SYMPTOM. The caller keeps this on `_sign_in_error` and appends it to that row, so the
-        # report names the cause. It is still not fatal: everything up to the Download button
-        # works signed out, so the drive still runs and may still report something better.
-        trace_warning(
-            "capture.signin.unavailable",
-            provider=label,
-            saved_sign_in_seam=credentials is not None,
-            why="not signed in and no saved sign-in is available for this provider",
-        )
-        return (
-            f"no {label} sign-in is saved in Settings and this browser profile is not signed in"
-        )
-    outcome = sign_in(page, creds[0], creds[1]) or ""
-    trace(
-        "capture.signin.attempted",
-        provider=label,
-        accepted=not outcome,
-        why=outcome,
-    )
-    return outcome
-
-
-def _drive_adapter(
-    adapter,
-    page,
-    formats: list[str],
-    *,
-    expected_manufacturer: str,
-    expected_mpn: str,
-    catalog_identity_authorized: bool = False,
-):
-    """Invoke the exact-identity contract while retaining fixture-adapter compatibility."""
-
-    parameters = inspect.signature(adapter.drive).parameters.values()
-    accepts_identity = {
-        parameter.name for parameter in parameters
-    } >= {"expected_manufacturer", "expected_mpn"} or any(
-        parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters
-    )
-    if (expected_manufacturer or expected_mpn) and accepts_identity:
-        kwargs = {
-            "expected_manufacturer": expected_manufacturer,
-            "expected_mpn": expected_mpn,
-        }
-        accepts_catalog_authority = any(
-            parameter.name == "catalog_identity_authorized"
-            or parameter.kind is inspect.Parameter.VAR_KEYWORD
-            for parameter in parameters
-        )
-        if accepts_catalog_authority:
-            kwargs["catalog_identity_authorized"] = catalog_identity_authorized
-        return adapter.drive(page, formats, **kwargs)
-    if (
-        (expected_manufacturer or expected_mpn)
-        and adapter.capability.browser_access == "machine_allowed"
-    ):
-        raise TypeError("machine-access adapter does not implement exact manufacturer+MPN gating")
-    return adapter.drive(page, formats)
-
-
-def drive_formats(
-    browser,
-    page,
-    adapter,
-    formats,
-    url,
-    timeout_s: float | None = None,
-    *,
-    expected_manufacturer: str = "",
-    expected_mpn: str = "",
-    catalog_identity_authorized: bool = False,
-):
-    """Drive a vendor for `formats` and WAIT FOR THE FILES TO LAND. `(DriveReport, error|None)`.
-
-    THE one place a vendor is driven for real. `GuidedCaptureSource.supply` runs it as part of
-    completing a part; `scripts/webread.py --drive` runs it to answer "what does this vendor
-    ACTUALLY deliver" without touching a library. Two callers, one implementation, so a fix to the
-    sequencing or the wait reaches both - the alternative was measured on 2026-07-27, when a live
-    vendor drive was done by a throwaway script and the knowledge died with the session.
-
-    ONE download, or ONE PER FORMAT - decided by the adapter's capability, never by a vendor name.
-    Ultra Librarian ticks checkboxes and exports everything together (`formats_exclusive=False`);
-    SnapMagic has a separate button per format, so asking for both in one drive would fetch only the
-    first and silently lose the other. That flag was DATA nothing read until 2026-07-27, which is
-    exactly how a half-working vendor ships.
-
-    A format the vendor simply does not carry is recorded as MISSED and the rest still run - a part
-    that can get its footprint but not its 3D model must come away with the footprint, not nothing.
-    A format that WAS submitted and never arrived is the returned error instead: calling that a miss
-    would let a vanished file read as "the vendor had nothing".
-
-    Re-navigates before each exclusive format unless the adapter declares a measured reusable-page
-    contract. Taking a download generally closes a modal or changes the page, but DigiKey's models
-    app does the opposite: the fragment survives while redundant renders trigger empty fragments
-    and security challenges. Either behavior is capability data, never a vendor-name branch.
-
-    THE WAIT IS ON THE SAVED FILE, NEVER ON THE DOWNLOAD EVENT. `wait_for_event("download")` RACES
-    the `on("download")` handler the browser session registers up front; whichever listener is
-    active when the event fires consumes it, so a fast download is taken by the handler and the wait
-    then burns its full timeout reporting failure for a file already on disk (measured 2026-07-27,
-    briefly and wrongly read as "Camoufox cannot download"). `browser.captured` grows only AFTER
-    `save_as` returns, so polling it observes the file genuinely existing, and the timeout stays a
-    backstop for a vendor that never answers rather than the thing that decides success.
-    """
-    from stockroom.capture.vendors import DriveReport
-
-    label = adapter.capability.label
-    formats = list(dict.fromkeys(formats))
-    if (
-        getattr(adapter.capability, "bundles_model_with_cad", False)
-        and "model" in formats
-        and any(fmt in formats for fmt in ("kicad", "altium"))
-    ):
-        formats.remove("model")
-        trace(
-            "capture.drive.model_companion",
-            provider=label,
-            why="STEP is selected with each CAD export; skipped the duplicate model download",
-        )
-    wait_s = _DOWNLOAD_TIMEOUT_MS / 1000.0 if timeout_s is None else timeout_s
-    trace(
-        "capture.drive.start",
-        provider=label,
-        formats=list(formats),
-        exclusive=bool(adapter.capability.formats_exclusive),
-        url=url_note(url),
-        wait_s=round(wait_s, 1),
-    )
-
-    if not adapter.capability.formats_exclusive:
-        mark = len(browser.captured)
-        error_mark = len(getattr(browser, "download_errors", ()))
-        _navigate_adapter_page(browser, page, adapter, url)
-        report = _drive_adapter(
-            adapter,
-            page,
-            list(formats),
-            expected_manufacturer=expected_manufacturer,
-            expected_mpn=expected_mpn,
-            catalog_identity_authorized=catalog_identity_authorized,
-        )
-        trace(
-            "capture.drive.submit",
-            provider=label,
-            submitted=bool(report.submitted),
-            selected=list(report.selected),
-            missed=list(report.missed),
-            blocked=bool(report.blocked),
-            needs_person=bool(report.requires_user_clearance),
-            route_unavailable=bool(report.route_unavailable),
-            why=report.message,
-        )
-        if not report.submitted:
-            return report, None
-        if not _wait_for_capture(
-            browser,
-            page,
-            mark,
-            wait_s,
-            minimum=max(1, int(report.expected_downloads)),
-            errors_before=error_mark,
-            stop_when=lambda: bool(_user_clearance_issue(adapter, page)),
-        ):
-            gate = _download_gate(adapter, page)
-            if gate:
-                report.blocked = True
-                report.requires_user_clearance = bool(_user_clearance_issue(adapter, page))
-                trace_warning(
-                    "capture.drive.gated",
-                    provider=label,
-                    landed=len(browser.captured) - mark,
-                    needs_person=bool(report.requires_user_clearance),
-                    why=gate,
-                )
-                return report, gate
-            trace_warning(
-                "capture.drive.timeout",
-                provider=label,
-                wait_s=round(wait_s, 1),
-                landed=len(browser.captured) - mark,
-            )
-            return report, f"{label} did not deliver a file within {wait_s:.0f}s"
-        trace(
-            "capture.drive.delivered",
-            provider=label,
-            landed=len(browser.captured) - mark,
-        )
-        return report, None
-
-    combined = DriveReport(expected_downloads=0)
-    reuse_page = bool(getattr(adapter.capability, "reuse_page_between_formats", False))
-    for format_index, fmt in enumerate(formats):
-        attempts = max(1, min(3, int(getattr(adapter, "max_download_attempts", 1))))
-        delivered = False
-        for attempt in range(1, attempts + 1):
-            mark = len(browser.captured)
-            error_mark = len(getattr(browser, "download_errors", ()))
-            try:
-                # Most exclusive-format providers need a fresh render after every download.
-                # DigiKey's measured models app is the opposite: its fragment remains valid, while
-                # repeated renders trigger empty fragments and then a Cloudflare challenge. The
-                # caller already initialized the task page, so a declared reusable route navigates
-                # only for a bounded retry or when a standalone caller supplied a blank page.
-                current_url = str(getattr(page, "url", "") or "")
-                already_at_target = current_url.rstrip("/") == str(url).rstrip("/")
-                if (
-                    attempt > 1
-                    or (not reuse_page and not (format_index == 0 and already_at_target))
-                    or (format_index == 0 and current_url in {"", "about:blank"})
-                ):
-                    _navigate_adapter_page(browser, page, adapter, url)
-                one = _drive_adapter(
-                    adapter,
-                    page,
-                    [fmt],
-                    expected_manufacturer=expected_manufacturer,
-                    expected_mpn=expected_mpn,
-                    catalog_identity_authorized=catalog_identity_authorized,
-                )
-            except Exception as exc:  # noqa: BLE001 - one format is one honest result row
-                combined.missed.append(fmt)
-                combined.message = f"{label}: {exc}"
-                trace_warning(
-                    "capture.drive.format.raised",
-                    provider=label,
-                    format=fmt,
-                    attempt=attempt,
-                    why=str(exc),
-                )
-                break
-            trace(
-                "capture.drive.format",
-                provider=label,
-                format=fmt,
-                attempt=attempt,
-                of=attempts,
-                submitted=bool(one.submitted),
-                selected=list(one.selected),
-                missed=list(one.missed),
-                blocked=bool(one.blocked),
-                needs_person=bool(one.requires_user_clearance),
-                route_unavailable=bool(one.route_unavailable),
-                why=one.message,
-            )
-            if not one.submitted:
-                retry_issue = _retryable_download_issue(adapter, page)
-                if retry_issue and attempt < attempts:
-                    combined.message = (
-                        f"{retry_issue}; reopening the exact DigiKey route "
-                        f"(attempt {attempt + 1} of {attempts})."
-                    )
-                    continue
-                combined.missed.extend(one.missed or [fmt])
-                combined.blocked = combined.blocked or one.blocked
-                combined.requires_user_clearance = (
-                    combined.requires_user_clearance or one.requires_user_clearance
-                )
-                combined.route_unavailable = (
-                    combined.route_unavailable or one.route_unavailable
-                )
-                if retry_issue:
-                    combined.message = (
-                        f"{retry_issue}; stopped after {attempts} bounded attempts."
-                    )
-                elif one.message:
-                    combined.message = one.message
-                if one.blocked:
-                    # Auth/challenge/account state is provider-wide. Trying the remaining format
-                    # buttons cannot change it and only repeats the same failure.
-                    return combined, None
-                if one.route_unavailable:
-                    return combined, None
-                break
-            if _wait_for_capture(
-                browser,
-                page,
-                mark,
-                wait_s,
-                minimum=max(1, int(one.expected_downloads)),
-                errors_before=error_mark,
-                stop_when=lambda: bool(
-                    _user_clearance_issue(adapter, page)
-                    or _retryable_download_issue(adapter, page)
-                ),
-            ):
-                combined.selected.extend(one.selected or [fmt])
-                combined.submitted = True
-                combined.expected_downloads += max(1, int(one.expected_downloads))
-                delivered = True
-                trace("capture.drive.format.delivered", provider=label, format=fmt, attempt=attempt)
-                break
-            gate = _download_gate(adapter, page)
-            if gate:
-                combined.blocked = True
-                combined.requires_user_clearance = bool(_user_clearance_issue(adapter, page))
-                trace_warning(
-                    "capture.drive.format.gated",
-                    provider=label,
-                    format=fmt,
-                    attempt=attempt,
-                    needs_person=bool(combined.requires_user_clearance),
-                    why=gate,
-                )
-                return combined, gate
-            retry_issue = _retryable_download_issue(adapter, page)
-            if retry_issue and attempt < attempts:
-                combined.message = (
-                    f"{retry_issue}; reopening the exact DigiKey route "
-                    f"(attempt {attempt + 1} of {attempts})."
-                )
-                continue
-            if retry_issue:
-                return (
-                    combined,
-                    f"{label} could not deliver {fmt} after {attempts} bounded attempts: "
-                    f"{retry_issue}",
-                )
-            return combined, f"{label} did not deliver {fmt} within {wait_s:.0f}s"
-        if delivered:
-            continue
-    if combined.selected:
-        combined.message = f"Requested {' and '.join(combined.selected)} from {label}."
-    return combined, None
-
-
-def _navigate_adapter_page(browser, page, adapter, url: str) -> None:
-    """Use the provider's reviewed top-level navigation contract."""
-
-    capability = adapter.capability
-    navigate = getattr(browser, "navigate_provider", None)
-    if callable(navigate):
-        login_navigation = "/account/login" in str(url)
-        navigate(
-            page,
-            url,
-            wait_until="domcontentloaded",
-            detached=bool(getattr(capability, "detached_navigation", False)),
-            ready_selectors=(
-                ("#id_username", "a.ls-btn.login-btn", "#profile-section")
-                if login_navigation
-                else tuple(getattr(capability, "native_ready_selectors", ()) or ())
-            ),
-            ready_texts=(
-                ()
-                if login_navigation
-                else tuple(getattr(capability, "native_ready_texts", ()) or ())
-            ),
-        )
-        return
-    page.goto(url, wait_until="domcontentloaded")
-
-
-def _drive_formats_for_record(
-    browser,
-    page,
-    adapter,
-    formats,
-    url,
-    manufacturer: str,
-    mpn: str,
-    *,
-    catalog_identity_authorized: bool = False,
-):
-    """Call the production identity-aware driver while allowing narrow legacy test doubles."""
-
-    parameters = inspect.signature(drive_formats).parameters.values()
-    accepts_identity = {
-        parameter.name for parameter in parameters
-    } >= {"expected_manufacturer", "expected_mpn"} or any(
-        parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters
-    )
-    if accepts_identity:
-        accepts_catalog_authority = any(
-            parameter.name == "catalog_identity_authorized"
-            or parameter.kind is inspect.Parameter.VAR_KEYWORD
-            for parameter in parameters
-        )
-        if accepts_catalog_authority:
-            return drive_formats(
-                browser,
-                page,
-                adapter,
-                formats,
-                url,
-                expected_manufacturer=manufacturer,
-                expected_mpn=mpn,
-                catalog_identity_authorized=catalog_identity_authorized,
-            )
-        return drive_formats(
-            browser,
-            page,
-            adapter,
-            formats,
-            url,
-            expected_manufacturer=manufacturer,
-            expected_mpn=mpn,
-        )
-    return drive_formats(browser, page, adapter, formats, url)
 
 
 def _provider_note_suffix(note: str, *, limit: int = 220) -> str:
@@ -639,89 +148,6 @@ def _provider_note_suffix(note: str, *, limit: int = 220) -> str:
     if len(text) > limit:
         text = text[: limit - 1].rstrip() + "…"
     return f"; {text}"
-
-
-def _adapter_label(adapter) -> str:
-    """Best-effort provider label for a trace line. Never raises over an odd test double."""
-
-    try:
-        return str(adapter.capability.label)
-    except Exception:  # noqa: BLE001
-        return ""
-
-
-def _download_gate(adapter, page) -> str:
-    """Provider-specific global blockage, consulted only after no file arrived."""
-    detector = getattr(adapter, "download_gate", None)
-    if detector is None:
-        trace_debug("capture.gate.download", provider=_adapter_label(adapter), detector=False)
-        return ""
-    try:
-        issue = detector(page) or ""
-    except Exception:  # noqa: BLE001 - a detector cannot replace the authoritative timeout
-        trace_debug(
-            "capture.gate.download",
-            provider=_adapter_label(adapter),
-            detector=True,
-            readable=False,
-        )
-        return ""
-    trace_debug(
-        "capture.gate.download",
-        provider=_adapter_label(adapter),
-        detector=True,
-        fired=bool(issue),
-        why=issue,
-    )
-    return issue
-
-
-def _user_clearance_issue(adapter, page) -> str:
-    """Authentication/security gate that only the person may clear.
-
-    Every call is traced with its VERDICT, because the adapter-side detectors log which signal
-    fired. Together those two lines make a false positive (a collapsed sign-in form, a preloaded
-    CAPTCHA iframe) distinguishable from a real gate, which was impossible before: both produced
-    the identical "still needs its sign-in or security check" sentence and nothing else.
-    """
-
-    detector = getattr(adapter, "user_clearance_issue", None)
-    if detector is None:
-        trace_debug("capture.gate.clearance", provider=_adapter_label(adapter), detector=False)
-        return ""
-    try:
-        issue = detector(page) or ""
-    except Exception:  # noqa: BLE001 - an unreadable page is not clearance evidence
-        trace_debug(
-            "capture.gate.clearance",
-            provider=_adapter_label(adapter),
-            detector=True,
-            readable=False,
-        )
-        return ""
-    trace_debug(
-        "capture.gate.clearance",
-        provider=_adapter_label(adapter),
-        detector=True,
-        fired=bool(issue),
-        why=issue,
-    )
-    return issue
-
-
-def _retryable_download_issue(adapter, page) -> str:
-    """A provider-observed transient export failure, never inferred from elapsed time alone."""
-
-    detector = getattr(adapter, "retryable_download_issue", None)
-    if detector is None:
-        return ""
-    try:
-        issue = detector(page) or ""
-    except Exception:  # noqa: BLE001 - retry evidence must be positive and provider-observed
-        return ""
-    if issue:
-        trace("capture.gate.retryable", provider=_adapter_label(adapter), why=issue)
-    return issue
 
 
 def _combine_route_outcomes(
@@ -1156,11 +582,10 @@ class GuidedCaptureSource:
     name = "guided"
 
     def provides(self) -> frozenset:
-        """What this source can deliver through its declared browser-access contract.
+        """What this source can deliver: the formats a person can select on its provider page.
 
-        Human-visible format labels and machine selectors are separate declarations. A user-driven
-        provider can be a supported path without granting Stockroom permission to inspect or
-        operate its DOM; both declarations still require an implemented validation/attach seam.
+        A declared format still requires an implemented validation/attach seam on this side, which
+        is why this reads capability data rather than assuming every provider export is ingestible.
         """
         adapter = get_adapter(self._vendor_key)
         if adapter is None:
@@ -1200,22 +625,16 @@ class GuidedCaptureSource:
         preserve_active_pair: bool = False,
         close_after_supply: bool = False,
         single_provider_attempt: bool = False,
-        credentials=None,
         run_write=None,
         now_iso=None,
         evidence_store=None,
         cross_eda_verifier=None,
         projection_verifier=None,
         playwright_runtime: SharedPlaywrightRuntime | None = None,
-        user_driven: bool = False,
-        operator_authorized: bool = False,
         user_finished: Callable[[], bool] | None = None,
         user_cancelled: Callable[[], bool] | None = None,
         cancel_workflow: Callable[[], None] | None = None,
         user_capture_timeout_s: float = 600.0,
-        rate_limiter=None,
-        user_clearance_timeout_s: float = 600.0,
-        machine_access_check: Callable[[], bool] | None = None,
         models_ids=None,
         strict_catalog_urls: bool = False,
         provider_surface=None,
@@ -1253,25 +672,16 @@ class GuidedCaptureSource:
         self._preserve_active_pair = preserve_active_pair
         self._close_after_supply = close_after_supply
         self._single_provider_attempt = single_provider_attempt
-        # `(vendor_key) -> (username, password) | None`. Injected, so capture/ never reads the
-        # machine config itself and a test can drive sign-in without one.
-        self._credentials = credentials
-        self._sign_in_error = ""
         self._run_write = run_write or (lambda fn: fn())
         self._now_iso = now_iso
         self._evidence_store = evidence_store
         self._cross_eda_verifier = cross_eda_verifier or verify_cross_eda_component
         self._projection_verifier = projection_verifier
         self._playwright_runtime = playwright_runtime
-        self._user_driven = user_driven
-        self._operator_authorized = operator_authorized
         self._user_finished = user_finished
         self._user_cancelled = user_cancelled
         self._cancel_workflow = cancel_workflow
         self._user_capture_timeout_s = user_capture_timeout_s
-        self._rate_limiter = rate_limiter
-        self._user_clearance_timeout_s = user_clearance_timeout_s
-        self._machine_access_check = machine_access_check
         # Optional, machine-local, and OFF when absent. It carries one opaque DigiKey models id per
         # part, learned from the person's own navigation, so a second capture can skip the search
         # they already did. Without it every capture is exactly the first-run journey.
@@ -1284,7 +694,6 @@ class GuidedCaptureSource:
         self._publish_active_route = publish_active_route
         self._clear_active_route = clear_active_route
         self._take_selected_files = take_selected_files
-        self._sign_in_attempted = False
         self._session: _Session | None = None
 
     # -- lifecycle -------------------------------------------------------------------------
@@ -1295,20 +704,25 @@ class GuidedCaptureSource:
         Lazy on purpose: a run whose parts are all already complete must not flash a browser
         window at the owner for nothing.
 
-        WHICH browser is capability data, decided here and traced here. Every visible route uses
-        the one Stockroom-owned embedded provider surface. Security gates temporarily detach
-        automation from that same native WebView; silently switching to Vivaldi/Chrome would lose
-        the task-bound download broker and create two contradictory workflows.
+        Every visible route uses the one Stockroom-owned embedded provider surface, traced here
+        so a run says which transport carried it. Silently switching to an installed browser would
+        lose the task-bound download broker and create two contradictory workflows.
         """
         if self._session is not None:
             return self._session
         adapter = get_adapter(self._vendor_key)
         if adapter is not None:
-            choice = select_transport(adapter.capability, person_driven=self._user_driven)
-            trace_transport(
-                choice,
-                provider_key=self._vendor_key,
-                engine=self._engine if choice.name == TRANSPORT_PLAYWRIGHT else "",
+            # Trace what actually happens, not a choice that is no longer made. Every provider
+            # page opens in Stockroom's OWN embedded surface, and the driver is attached to that
+            # window so the task-bound broker sees its downloads. It is never used to operate a
+            # provider's controls - the person does all of that.
+            trace(
+                "capture.transport",
+                provider=self._vendor_key,
+                transport=TRANSPORT_PLAYWRIGHT,
+                why="the person drives this route inside Stockroom's own provider surface",
+                engine=self._engine or "none",
+                provider_controls_operated=False,
             )
         if (
             not self._headless
@@ -1353,21 +767,6 @@ class GuidedCaptureSource:
         self._session = _Session(browser=browser, ctx_manager=stack, page=page)
         return self._session
 
-    def _sign_in_once(self, page) -> None:
-        """Sign in for the WHOLE run, on the one session, before the first part.
-
-        Here rather than per part because that is the shape of the real workflow: a 90-part sitting
-        must cost one sign-in, and the persistent profile then carries it to later runs entirely.
-
-        Deliberately NOT fatal. A vendor that needs no login, an adapter with no `sign_in`, or
-        absent credentials all leave this a silent no-op, and a REFUSED sign-in is recorded and
-        allowed to continue - because everything up to the Download button works signed out
-        (measured), so the per-part outcome is a far more useful error than a dead run. The reason
-        is kept on `_sign_in_error` so those per-part rows can say WHY rather than just "no button".
-        """
-        self._sign_in_error = sign_in_adapter(
-            get_adapter(self._vendor_key), page, self._credentials
-        )
 
     def close(self) -> None:
         """Close the browser. Called by the runner in a finally, so a stopped or failed run never
@@ -1537,8 +936,6 @@ class GuidedCaptureSource:
             mpn=getattr(record, "mpn", ""),
             manufacturer=getattr(record, "manufacturer", ""),
             routes=[_author_key(self._vendor_key, route) for route in routes],
-            user_driven=self._user_driven,
-            operator_authorized=self._operator_authorized,
             collect_variants=self._collect_variants,
             engine=self._engine,
         )
@@ -1579,8 +976,8 @@ class GuidedCaptureSource:
             # A selected provider is being harvested as an alternative. Ask it for its complete
             # declared set even though the active library itself has no missing requirements.
             needs = sorted(self.provides(), key=lambda requirement: requirement.value)
-        # Filter on the formats accepted by this provider's declared access contract and by
-        # Stockroom's implemented attach seams. User-driven formats do not require DOM selectors.
+        # Filter on the formats this provider declares a person can select and on Stockroom's
+        # implemented attach seams.
         formats = _provider_formats(adapter, needs)
         trace(
             "capture.part.formats",
@@ -1650,161 +1047,7 @@ class GuidedCaptureSource:
                 stage="resolved-url-identity",
             )
 
-        machine_access_issue = self._machine_access_issue(adapter)
-        if machine_access_issue:
-            return self._decline(
-                adapter,
-                SourceOutcome(error=machine_access_issue, blocked=True),
-                attempted=False,
-                status="requires-human",
-                stage="machine-access",
-            )
-        # The first managed-browser start can perform a saved-credential sign-in before any part
-        # navigation. Count it durably as provider access instead of letting login bypass pacing.
-        if (
-            not self._user_driven
-            and self._session is None
-            and not self._acquire_rate_limit()
-        ):
-            return self._decline(
-                adapter,
-                SourceOutcome(
-                    skipped="provider capture was cancelled while waiting for pacing"
-                ),
-                attempted=False,
-                status="cancelled",
-                stage="pacing",
-            )
-        machine_access_issue = self._machine_access_issue(adapter)
-        if machine_access_issue:
-            return self._decline(
-                adapter,
-                SourceOutcome(error=machine_access_issue, blocked=True),
-                attempted=False,
-                status="requires-human",
-                stage="machine-access-after-pacing",
-            )
         session = self._ensure_session()
-        if self._user_driven:
-            outcomes: list[tuple[str, SourceOutcome]] = []
-            for route_index, route in enumerate(routes):
-                if self._user_cancelled is not None and self._user_cancelled():
-                    reason = "not attempted because the capture was cancelled"
-                    for later_route in routes[route_index:]:
-                        outcomes.append(
-                            (
-                                later_route.capability.label,
-                                _unattempted_route_outcome(
-                                    provider_key=self._vendor_key,
-                                    author_key=_author_key(self._vendor_key, later_route),
-                                    label=later_route.capability.label,
-                                    reason=reason,
-                                    status="cancelled",
-                                ),
-                            )
-                        )
-                    break
-                route_formats = _provider_formats(
-                    route,
-                    self.provides() if self._collect_variants else needs,
-                )
-                trace(
-                    "capture.route.start",
-                    provider=self._vendor_key,
-                    route=_author_key(self._vendor_key, route),
-                    label=route.capability.label,
-                    formats=list(route_formats),
-                    mode="user-driven",
-                    part=getattr(record, "id", ""),
-                )
-                if not route_formats:
-                    outcome = _with_route_outcome(
-                        SourceOutcome(
-                            skipped=(
-                                f"{route.capability.label} has no accepted format for this task"
-                            )
-                        ),
-                        provider_key=self._vendor_key,
-                        author_key=_author_key(self._vendor_key, route),
-                        label=route.capability.label,
-                        attempted=False,
-                        status="not-attempted",
-                    )
-                else:
-                    raw_outcome = self._supply_user_driven_route(
-                        record,
-                        session,
-                        route,
-                        manufacturer,
-                        mpn,
-                        url,
-                        route_formats,
-                    )
-                    outcome = _with_route_outcome(
-                        raw_outcome,
-                        provider_key=self._vendor_key,
-                        author_key=_author_key(self._vendor_key, route),
-                        label=route.capability.label,
-                    )
-                outcomes.append((route.capability.label, outcome))
-                if self._single_provider_attempt and (outcome.satisfied or outcome.retained):
-                    reason = (
-                        f"not attempted because {route.capability.label} owns this one-provider "
-                        "attempt"
-                    )
-                    for later_route in routes[route_index + 1 :]:
-                        outcomes.append(
-                            (
-                                later_route.capability.label,
-                                _unattempted_route_outcome(
-                                    provider_key=self._vendor_key,
-                                    author_key=_author_key(self._vendor_key, later_route),
-                                    label=later_route.capability.label,
-                                    reason=reason,
-                                ),
-                            )
-                        )
-                    break
-                if not self._collect_variants and set(needs).issubset(outcome.satisfied):
-                    reason = (
-                        f"not attempted after {route.capability.label} completed the first "
-                        "validated source set"
-                    )
-                    for later_route in routes[route_index + 1 :]:
-                        outcomes.append(
-                            (
-                                later_route.capability.label,
-                                _unattempted_route_outcome(
-                                    provider_key=self._vendor_key,
-                                    author_key=_author_key(self._vendor_key, later_route),
-                                    label=later_route.capability.label,
-                                    reason=reason,
-                                ),
-                            )
-                        )
-                    break
-                if outcome.blocked:
-                    reason = (
-                        f"not attempted after {route.capability.label} blocked the provider session"
-                    )
-                    for later_route in routes[route_index + 1 :]:
-                        outcomes.append(
-                            (
-                                later_route.capability.label,
-                                _unattempted_route_outcome(
-                                    provider_key=self._vendor_key,
-                                    author_key=_author_key(
-                                        self._vendor_key,
-                                        later_route,
-                                    ),
-                                    label=later_route.capability.label,
-                                    reason=reason,
-                                ),
-                            )
-                        )
-                    break
-            return _combine_route_outcomes(outcomes)
-
         outcomes: list[tuple[str, SourceOutcome]] = []
         for route_index, route in enumerate(routes):
             if self._user_cancelled is not None and self._user_cancelled():
@@ -1833,13 +1076,15 @@ class GuidedCaptureSource:
                 route=_author_key(self._vendor_key, route),
                 label=route.capability.label,
                 formats=list(route_formats),
-                mode="user-driven" if self._user_driven else "automated",
+                mode="user-driven",
                 part=getattr(record, "id", ""),
             )
             if not route_formats:
                 outcome = _with_route_outcome(
                     SourceOutcome(
-                        skipped=f"{route.capability.label} has no accepted format for this task"
+                        skipped=(
+                            f"{route.capability.label} has no accepted format for this task"
+                        )
                     ),
                     provider_key=self._vendor_key,
                     author_key=_author_key(self._vendor_key, route),
@@ -1848,7 +1093,7 @@ class GuidedCaptureSource:
                     status="not-attempted",
                 )
             else:
-                raw_outcome = self._supply_automated_route(
+                raw_outcome = self._supply_user_driven_route(
                     record,
                     session,
                     route,
@@ -1910,7 +1155,10 @@ class GuidedCaptureSource:
                             later_route.capability.label,
                             _unattempted_route_outcome(
                                 provider_key=self._vendor_key,
-                                author_key=_author_key(self._vendor_key, later_route),
+                                author_key=_author_key(
+                                    self._vendor_key,
+                                    later_route,
+                                ),
                                 label=later_route.capability.label,
                                 reason=reason,
                             ),
@@ -1923,226 +1171,6 @@ class GuidedCaptureSource:
             )
         return _combine_route_outcomes(outcomes)
 
-    def _supply_automated_route(
-        self,
-        record,
-        session: _Session,
-        adapter,
-        manufacturer: str,
-        mpn: str,
-        url: str,
-        formats: list[str],
-    ) -> SourceOutcome:
-        """Capture one immutable DigiKey author route on its own page/broker binding."""
-
-        evidence_provider_key = getattr(
-            adapter,
-            "evidence_provider_key",
-            self._evidence_provider_key,
-        )
-        ensure_connected = getattr(session.browser, "ensure_connected", None)
-        if callable(ensure_connected):
-            ensure_connected(session.page)
-        open_task_page = getattr(session.browser, "task_page", None)
-        broker = (
-            DownloadBroker(
-                DownloadTask(
-                    task_id=record.id,
-                    manufacturer_key=manufacturer,
-                    mpn_canonical=mpn,
-                    staging_root=self._download_root,
-                    surface_key=self._vendor_key,
-                    evidence_provider_key=evidence_provider_key,
-                )
-            )
-            if callable(open_task_page)
-            else None
-        )
-        before = len(session.browser.captured)
-        detail_url = ""
-        report = None
-        route_error = ""
-        route_blocked = False
-        task_page = None
-        trace(
-            "capture.route.binding",
-            provider=self._vendor_key,
-            route=evidence_provider_key,
-            task=getattr(record, "id", ""),
-            task_bound_page=broker is not None,
-            download_root=self._download_root,
-        )
-        try:
-            if broker is not None:
-                assert callable(open_task_page)
-                page_context = open_task_page(broker)
-            else:
-                page_context = nullcontext(session.page)
-            with page_context as task_page:
-                navigate = getattr(task_page, "goto", None)
-                if not callable(navigate):
-                    return SourceOutcome(
-                        error=f"{adapter.capability.label} browser page cannot navigate.",
-                        blocked=True,
-                    )
-                # Each attributed route owns a fresh broker-bound tab. Sign-in is run-scoped, but
-                # tab initialization is not: the second and third tabs still start at about:blank.
-                # DigiKey's provider catalogue is client-rendered and a cold tab that receives
-                # only the later format navigation can race hydration, falsely reporting Ultra
-                # Librarian absent after SnapMagic initialized the first tab.
-                task_url = str(getattr(task_page, "url", "") or "")
-                if not self._sign_in_attempted or task_url in {"", "about:blank"}:
-                    _navigate_adapter_page(session.browser, task_page, adapter, url)
-                sign_in_outcome = self._prepare_sign_in(
-                    session,
-                    task_page,
-                    adapter,
-                    manufacturer,
-                    mpn,
-                )
-                if sign_in_outcome is not None:
-                    return sign_in_outcome
-                report, failure = self._drive_automated(
-                    session,
-                    task_page,
-                    adapter,
-                    formats,
-                    url,
-                    manufacturer,
-                    mpn,
-                )
-                # FAILURE IS CHECKED FIRST, and the order is load-bearing. A vendor whose LAST
-                # format was submitted and never arrived comes back with `submitted=False` (the
-                # flag is only set after the file lands) AND an error - so testing `submitted`
-                # first would report a vanished download as "the vendor simply had nothing".
-                if failure is not None:
-                    trace_warning(
-                        "capture.route.failed",
-                        provider=self._vendor_key,
-                        route=evidence_provider_key,
-                        blocked=bool(report.blocked),
-                        why=failure,
-                    )
-                    route_error = failure
-                    route_blocked = bool(report.blocked)
-                elif not report.submitted:
-                    why = report.message or "the vendor offered no download"
-                    if self._sign_in_error:
-                        # Everything up to the Download button works signed out, so a refused
-                        # sign-in is the real cause of "no Download button" and must be explicit.
-                        why = f"{why} ({self._sign_in_error})"
-                    trace_warning(
-                        "capture.route.no-download",
-                        provider=self._vendor_key,
-                        route=evidence_provider_key,
-                        blocked=bool(report.blocked),
-                        sign_in_reason=self._sign_in_error,
-                        why=why,
-                    )
-                    if report.blocked:
-                        return SourceOutcome(error=why, blocked=True)
-                    if report.route_unavailable:
-                        return SourceOutcome(skipped=why)
-                    return SourceOutcome(error=why)
-                elif broker is not None:
-                    # Keep the exact task binding through a short quiet period. One provider click
-                    # can legitimately emit symbol, footprint, and model as separate downloads;
-                    # unbinding after the first file would misfile a late sibling under the next
-                    # component in a batch.
-                    broker.wait_for_playwright(
-                        task_page,
-                        minimum=max(1, int(report.expected_downloads)),
-                        settle_seconds=0.75,
-                    )
-                detail_url = getattr(task_page, "url", "") or ""
-                evidence_detail_url = getattr(adapter, "evidence_detail_url", None)
-                if callable(evidence_detail_url):
-                    detail_url = evidence_detail_url(
-                        task_page,
-                        expected_manufacturer=manufacturer,
-                        expected_mpn=mpn,
-                    )
-        except Exception as exc:  # noqa: BLE001 - one part's failure is a row, not a crash
-            trace_warning(
-                "capture.route.raised",
-                provider=self._vendor_key,
-                route=evidence_provider_key,
-                why=str(exc),
-            )
-            route_error = f"{adapter.capability.label}: {exc}"
-            if task_page is not None:
-                detail_url = str(getattr(task_page, "url", "") or detail_url)
-                evidence_detail_url = getattr(adapter, "evidence_detail_url", None)
-                if callable(evidence_detail_url):
-                    try:
-                        detail_url = evidence_detail_url(
-                            task_page,
-                            expected_manufacturer=manufacturer,
-                            expected_mpn=mpn,
-                        )
-                    except Exception:  # noqa: BLE001 - the observed page URL remains usable
-                        pass
-
-        landed = list(broker.receipts) if broker is not None else session.browser.captured[before:]
-        trace(
-            "capture.route.landed",
-            provider=self._vendor_key,
-            route=evidence_provider_key,
-            files=len(landed),
-            names=[file_note(getattr(item, "path", "")) for item in landed],
-            detail_url=url_note(detail_url),
-            broker_bound=broker is not None,
-        )
-        if route_error:
-            if landed:
-                retained = self._retain_incomplete_cad_set(
-                    record,
-                    landed,
-                    detail_url=detail_url,
-                    evidence_provider_key=evidence_provider_key,
-                    reason=route_error,
-                    catalog_identity_authorized=bool(
-                        getattr(self, "_catalog_identity_authorized", False)
-                    ),
-                )
-                return retained.as_blocked() if route_blocked else retained
-            return SourceOutcome(error=route_error, blocked=route_blocked)
-        if not landed:
-            trace_warning(
-                "capture.route.no-file",
-                provider=self._vendor_key,
-                route=evidence_provider_key,
-                why="the provider submitted an export but no file was saved for this task",
-            )
-            return SourceOutcome(error="the vendor download did not produce a file")
-
-        if getattr(adapter, "supplementary_only", False):
-            return self._retain_supplementary(
-                record,
-                landed,
-                detail_url=detail_url,
-                surface_key=self._vendor_key,
-                evidence_provider_key=evidence_provider_key,
-                catalog_identity_authorized=bool(
-                    getattr(self, "_catalog_identity_authorized", False)
-                ),
-            )
-
-        return self._attach(
-            record,
-            landed,
-            url,
-            detail_url=detail_url,
-            evidence_provider_key=evidence_provider_key,
-            # The drive's own account of what it could and could not select. Without it, a part
-            # whose provider simply does not publish a native Altium row came back as the generic
-            # "not one complete dual-EDA source set; missing native Altium symbol/footprint",
-            # which reads like a Stockroom rejection rather than an absent provider export.
-            provider_note=getattr(report, "message", ""),
-            catalog_identity_authorized=bool(
-                getattr(self, "_catalog_identity_authorized", False)
-            ),
-        )
 
     def _retain_supplementary(
         self,
@@ -2222,6 +1250,7 @@ class GuidedCaptureSource:
                 "activated"
             ),
         )
+
 
     def _retain_incomplete_cad_set(
         self,
@@ -2304,283 +1333,6 @@ class GuidedCaptureSource:
         finally:
             pipeline.cleanup()
 
-    def _machine_access_issue(self, adapter) -> str:
-        """Fail closed when a machine-eligible adapter lacks live authorization."""
-
-        if self._user_driven or self._operator_authorized:
-            return ""
-        if adapter.capability.browser_access != "machine_allowed":
-            trace(
-                "capture.access.refused",
-                provider=self._vendor_key,
-                signal="browser-access-user-driven",
-                browser_access=adapter.capability.browser_access,
-            )
-            return (
-                f"{adapter.capability.label} is not authorized for machine-driven capture; "
-                "use its user-driven workflow."
-            )
-        if self._machine_access_check is None:
-            trace(
-                "capture.access.refused",
-                provider=self._vendor_key,
-                signal="no-live-authorization-check",
-            )
-            return (
-                f"{adapter.capability.label} automatic capture requires an explicit live "
-                "machine-authorization check."
-            )
-        try:
-            allowed = self._machine_access_check()
-            readable = True
-        except Exception:  # noqa: BLE001 - unreadable authorization is revoked authorization
-            allowed = False
-            readable = False
-        trace(
-            "capture.access.checked",
-            provider=self._vendor_key,
-            allowed=bool(allowed),
-            readable=readable,
-        )
-        if allowed:
-            return ""
-        return (
-            f"{adapter.capability.label} automatic access is disabled or its private-evaluation "
-            "authorization is no longer active."
-        )
-
-    def _acquire_rate_limit(self) -> bool:
-        """Acquire the configured limiter and keep a pending wait cancellable."""
-
-        if self._rate_limiter is None:
-            return True
-        acquire = self._rate_limiter.acquire
-        parameters = inspect.signature(acquire).parameters.values()
-        supports_cancel = "should_cancel" in {
-            parameter.name for parameter in parameters
-        } or any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters)
-        result = (
-            acquire(should_cancel=self._user_cancelled)
-            if supports_cancel
-            else acquire()
-        )
-        return result is not False
-
-    def _prepare_sign_in(
-        self,
-        session: _Session,
-        page,
-        adapter,
-        manufacturer: str,
-        mpn: str,
-    ) -> SourceOutcome | None:
-        """Attempt saved-credential sign-in once and hand any security step to the person."""
-
-        if self._user_driven or self._sign_in_attempted:
-            return None
-        self._sign_in_attempted = True
-        trace(
-            "capture.signin.start",
-            provider=self._vendor_key,
-            label=adapter.capability.label,
-            needs_login=bool(adapter.capability.needs_login),
-            saved_sign_in_seam=self._credentials is not None,
-        )
-        detector = getattr(adapter, "user_clearance_issue", None)
-        if not callable(detector):
-            self._sign_in_once(page)
-            trace(
-                "capture.signin.result",
-                provider=self._vendor_key,
-                clearance_detector=False,
-                why=self._sign_in_error,
-            )
-            return None
-
-        def current_issue() -> str:
-            return str(detector(page) or "")
-
-        def security_issue() -> str:
-            # A normal signed-out page is not a security gate. The provider's broader
-            # user-clearance detector also reports its Login link, so using it before
-            # `_sign_in_once` deadlocks automatic login: Stockroom waits for the person
-            # without ever trying the saved credentials. Only actual CAPTCHA/MFA/passkey
-            # evidence is eligible for the pre-login handoff.
-            from stockroom.capture.vendors import _security_verification_issue
-
-            return _security_verification_issue(page, adapter.capability.label)
-
-        def clear_security_gate(issue_detector=current_issue) -> SourceOutcome | None:
-            issue = issue_detector()
-            gate_name = (
-                "pre-login-security" if issue_detector is security_issue else "user-clearance"
-            )
-            trace(
-                "capture.signin.gate",
-                provider=self._vendor_key,
-                gate=gate_name,
-                fired=bool(issue),
-                why=issue,
-            )
-            if not issue:
-                return None
-            wait_for_clearance = getattr(session.browser, "wait_for_user_clearance", None)
-            if not callable(wait_for_clearance):
-                return SourceOutcome(error=issue, blocked=True)
-            cleared = wait_for_clearance(
-                page,
-                provider_label=adapter.capability.label,
-                author_route=_provider_hud_author_route(adapter),
-                manufacturer=manufacturer,
-                mpn=mpn,
-                message=issue,
-                issue_detector=issue_detector,
-                should_cancel=self._user_cancelled,
-                cancel_workflow=self._cancel_workflow,
-                timeout_s=self._user_clearance_timeout_s,
-            )
-            if cleared:
-                authorization_issue = self._machine_access_issue(adapter)
-                if authorization_issue:
-                    return SourceOutcome(error=authorization_issue, blocked=True)
-                return None
-            cancelled = self._user_cancelled is not None and self._user_cancelled()
-            return SourceOutcome(
-                error=(
-                    "provider capture was cancelled during the security handoff"
-                    if cancelled
-                    else f"{adapter.capability.label} still needs its sign-in or security check "
-                    "to be cleared; no provider control was bypassed."
-                ),
-                blocked=not cancelled,
-            )
-
-        gate_outcome = clear_security_gate(security_issue)
-        if gate_outcome is not None:
-            return gate_outcome
-        signed_in = getattr(adapter, "signed_in", None)
-        if callable(signed_in) and signed_in(page):
-            self._sign_in_error = ""
-            trace("capture.signin.result", provider=self._vendor_key, signed_in=True, why="")
-            return None
-        login_url = str(getattr(adapter, "_LOGIN_URL", "") or "")
-        if bool(getattr(adapter.capability, "detached_navigation", False)) and login_url:
-            _navigate_adapter_page(session.browser, page, adapter, login_url)
-        self._sign_in_once(page)
-        gate_outcome = clear_security_gate()
-        if gate_outcome is not None:
-            return gate_outcome
-        signed_in = getattr(adapter, "signed_in", None)
-        confirmed = callable(signed_in) and bool(signed_in(page))
-        if confirmed:
-            self._sign_in_error = ""
-        trace(
-            "capture.signin.result",
-            provider=self._vendor_key,
-            signed_in=confirmed,
-            readback=callable(signed_in),
-            why=self._sign_in_error,
-        )
-        return None
-
-    def _drive_automated(
-        self,
-        session: _Session,
-        page,
-        adapter,
-        formats: list[str],
-        url: str,
-        manufacturer: str,
-        mpn: str,
-    ):
-        """Drive, hand security controls to the person, then resume without bypassing them."""
-
-        # One handoff can cover a login -> 2FA -> challenge sequence because the browser waits until
-        # the detector sees no security gate. A second handoff covers a distinct post-submit gate.
-        # Anything beyond that is a provider loop and fails closed instead of keeping the user stuck.
-        for handoff_number in range(3):
-            machine_access_issue = self._machine_access_issue(adapter)
-            if machine_access_issue:
-                report = DriveReport(
-                    missed=list(formats),
-                    blocked=True,
-                    message=machine_access_issue,
-                )
-                return report, report.message
-            if not self._acquire_rate_limit():
-                report = DriveReport(
-                    missed=list(formats),
-                    message="provider capture was cancelled while waiting for pacing",
-                )
-                return report, report.message
-            machine_access_issue = self._machine_access_issue(adapter)
-            if machine_access_issue:
-                report = DriveReport(
-                    missed=list(formats),
-                    blocked=True,
-                    message=machine_access_issue,
-                )
-                return report, report.message
-            report, failure = _drive_formats_for_record(
-                session.browser,
-                page,
-                adapter,
-                formats,
-                url,
-                manufacturer,
-                mpn,
-                catalog_identity_authorized=bool(
-                    getattr(self, "_catalog_identity_authorized", False)
-                ),
-            )
-            if not report.requires_user_clearance:
-                return report, failure
-            trace(
-                "capture.handoff.start",
-                provider=self._vendor_key,
-                handoff=handoff_number + 1,
-                of=3,
-                why=failure or report.message,
-            )
-            if handoff_number >= 2:
-                return (
-                    report,
-                    f"{adapter.capability.label} repeatedly returned to a security or sign-in "
-                    "gate after it was cleared; automatic capture stopped.",
-                )
-            wait_for_clearance = getattr(session.browser, "wait_for_user_clearance", None)
-            if not callable(wait_for_clearance):
-                return report, failure or report.message
-            detector = getattr(adapter, "user_clearance_issue", None)
-            if not callable(detector):
-                return report, failure or report.message
-            cleared = wait_for_clearance(
-                page,
-                provider_label=adapter.capability.label,
-                author_route=_provider_hud_author_route(adapter),
-                manufacturer=manufacturer,
-                mpn=mpn,
-                message=failure or report.message,
-                issue_detector=lambda: detector(page) or "",
-                should_cancel=self._user_cancelled,
-                cancel_workflow=self._cancel_workflow,
-                timeout_s=self._user_clearance_timeout_s,
-            )
-            trace(
-                "capture.handoff.result",
-                provider=self._vendor_key,
-                handoff=handoff_number + 1,
-                cleared=bool(cleared),
-                timeout_s=self._user_clearance_timeout_s,
-            )
-            if not cleared:
-                report.blocked = True
-                return (
-                    report,
-                    f"{adapter.capability.label} still needs the sign-in or security check to be "
-                    "cleared; no provider control was bypassed.",
-                )
-        raise AssertionError("unreachable security-handoff loop")
 
     def _route_open_url(self, adapter, manufacturer: str, mpn: str, url: str) -> str:
         """The exact page to open for one route: the author tab if it is known, else today's URL.
@@ -2597,38 +1349,15 @@ class GuidedCaptureSource:
 
         `_resolved_provider_url_issue` cannot gate this one, and deliberately is not asked to. That
         gate proves identity from the URL TEXT - an exact `/detail/<mfr>/<mpn>/` path or the MPN in
-        the search query - and a models URL is an opaque id by construction, which is exactly why
-        `evidence_detail_url` still retains the product URL rather than this one. The proof here is
+        the search query - and a models URL is an opaque id by construction. The proof here is
         provenance instead: the id was observed at the end of a capture for this exact part and is
         stored under that part's manufacturer AND MPN, so a hit is bound to the requested part
         rather than merely spelling it. That is enough to NAVIGATE on, and it is used for nothing
         else - identity for attachment continues to run through the unchanged candidate and
-        detail-URL gates, so a stale or re-numbered id can only cost a wrong page, never a wrong
-        attachment.
+        detail-URL gates, so a stale or re-numbered id can only cost a wrong page.
         """
 
         if self._models_ids is None or self._vendor_key != "digikey":
-            return url
-        user_window_operator = getattr(adapter, "operate_in_user_window", None)
-        surface = getattr(adapter, "_surface", None)
-        exact_product_url = getattr(surface, "evidence_detail_url", None)
-        current_identity_url = ""
-        if callable(exact_product_url):
-            try:
-                current_identity_url = str(
-                    exact_product_url(
-                        None,
-                        expected_manufacturer=manufacturer,
-                        expected_mpn=mpn,
-                    )
-                    or ""
-                )
-            except Exception:  # noqa: BLE001 - a missing optimization falls back to traversal
-                current_identity_url = ""
-        if callable(user_window_operator) and not current_identity_url:
-            # A learned /models/<opaque-id> is a navigation optimization, not part identity.  The
-            # route-only ordinary-control operator must first traverse the exact DigiKey product
-            # URL so ``open_panel`` can establish manufacturer+MPN before it clicks the author row.
             return url
         tab = getattr(adapter, "models_tab", "") or ""
         if not tab:
@@ -2698,42 +1427,6 @@ class GuidedCaptureSource:
         result = None
         capture_error: Exception | None = None
         selected_receipts = ()
-        render_issue_detector = getattr(adapter, "retryable_render_issue", None)
-        user_window_operator = getattr(adapter, "operate_in_user_window", None)
-
-        def operate_controls(page):
-            if not callable(user_window_operator):
-                return []
-            completed = set(_completed_provider_formats(broker.receipts, tuple(formats)))
-            remaining_formats = [fmt for fmt in formats if fmt not in completed]
-            if not remaining_formats:
-                return []
-            operator_kwargs = {
-                "expected_manufacturer": manufacturer,
-                "expected_mpn": mpn,
-            }
-            operator_parameters = inspect.signature(user_window_operator).parameters.values()
-            if any(
-                parameter.name == "catalog_identity_authorized"
-                or parameter.kind is inspect.Parameter.VAR_KEYWORD
-                for parameter in operator_parameters
-            ):
-                operator_kwargs["catalog_identity_authorized"] = bool(
-                    getattr(self, "_catalog_identity_authorized", False)
-                )
-            reports = user_window_operator(page, remaining_formats, **operator_kwargs)
-            for report in reports or ():
-                trace(
-                    "capture.user-window.operator-controls",
-                    provider=self._vendor_key,
-                    route=evidence_provider_key,
-                    selected=list(getattr(report, "selected", ())),
-                    missed=list(getattr(report, "missed", ())),
-                    submitted=bool(getattr(report, "submitted", False)),
-                    blocked=bool(getattr(report, "blocked", False)),
-                    why=str(getattr(report, "message", "") or ""),
-                )
-            return reports or []
         try:
             with self._active_route(open_url, evidence_provider_key) as route_token:
                 try:
@@ -2747,32 +1440,14 @@ class GuidedCaptureSource:
                             mpn=mpn,
                             required_file_labels=_provider_hud_labels(adapter, formats),
                             required_formats=tuple(formats),
-                            automated_step=(
-                                "Stockroom is selecting and downloading every supported CAD format."
-                                if callable(user_window_operator)
-                                else "Listening for provider downloads."
-                            ),
+                            automated_step="Listening for provider downloads.",
                             human_action=(
-                                "Only complete a provider sign-in, phone verification, or security "
-                                "check if it appears."
-                                if callable(user_window_operator)
-                                else "Start this part's download with every required format shown here."
+                                "Start this part's download with every required format shown here."
                             ),
                         ),
                         should_finish=self._user_finished,
                         should_cancel=self._user_cancelled,
                         timeout_s=self._user_capture_timeout_s,
-                        retryable_render_issue=(
-                            (lambda page: str(render_issue_detector(page) or ""))
-                            if callable(render_issue_detector)
-                            else None
-                        ),
-                        max_render_reloads=2 if callable(render_issue_detector) else 0,
-                        **(
-                            {"operate_controls": operate_controls}
-                            if callable(user_window_operator)
-                            else {}
-                        ),
                     )
                 except Exception as exc:  # noqa: BLE001 - an accepted inbox must still drain
                     capture_error = exc
