@@ -205,7 +205,15 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "component-browser.spec-group",
   "component-browser.pinout-table",
   "component-browser.offer-ladder",
-]; // 46
+  // component-workspace/CompleteComponentSheet.tsx: the four bands of the provider trip share one
+  // band shell, so each band's id arrives as a `devId` string prop. Spelled out in full at each
+  // call site, never interpolated. The Providers band deliberately passes NONE: its addressable
+  // element is the matrix inside it, which emits `component-browser.provider-matrix` itself.
+  "component-browser.provider-browser",
+  "component-browser.provider-progress",
+  "component-browser.provider-report",
+  "component-browser.provider-sets",
+]; // 50
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));

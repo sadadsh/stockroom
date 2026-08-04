@@ -359,6 +359,22 @@ class MoveBody(BaseModel):
     category: str
 
 
+class ProviderCoverageBody(BaseModel):
+    """One person's explicit claim about whether a provider carries an artifact for a part.
+
+    The status vocabulary is closed to what a person can actually know. `downloaded` and
+    `validated` are absent by construction: they are statements about bytes Stockroom is
+    holding, and no assertion can make them true. An empty status withdraws a previous claim.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    artifact: Literal["symbol", "footprint", "model"]
+    status: Literal["available", "not_available", ""] = ""
+    note: str = ""
+
+
 class ProjectSummary(BaseModel):
     """The list shape for a registered PCB project (M7, KiCad or Altium), served from
     the derived project index. eda, board_count/sheet_count and has_git are the digest

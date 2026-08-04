@@ -51,17 +51,28 @@ export function ComponentHeader({
   onPrimaryAction,
   onEditIdentity,
   onOpenDatasheet,
+  onOpenProviders,
 }: {
   workspace: ComponentWorkspaceResponse;
   onPrimaryAction: (action: string | null) => void;
   /** Identity is edited from the header because the header is what identity IS on this surface. */
   onEditIdentity: () => void;
   onOpenDatasheet: () => void;
+  /** Opens Complete Component: the whole provider trip, in the one modal allowed to scroll. */
+  onOpenProviders: () => void;
 }) {
   const { identity, summary, representations } = workspace;
   const kicad = toolStatus(representations, "kicad");
   const altium = toolStatus(representations, "altium");
   const attention = primaryAttention(workspace);
+  const providers = workspace.providers;
+  // How many providers could supply the WHOLE set, out of how many exist. Two numbers, because
+  // "2 of 9" and "2" are different facts and only the first says whether to keep looking.
+  const providerSummary = `${providers.completeProviders.length}/${providers.rows.length}`;
+  const providersTitle = useText(
+    "component-browser.providers-summary-title",
+    "Providers that can supply the symbol, the footprint and the 3D model",
+  );
   const actionLabel = useText(
     "component-browser.header-action",
     primaryActionLabel(attention?.action ?? null),
@@ -141,6 +152,15 @@ export function ComponentHeader({
             </a>
           ) : null}
         </span>
+        <Button
+          data-dev-id="component-browser.providers-summary"
+          small
+          title={providersTitle}
+          onClick={onOpenProviders}
+        >
+          <Text id="component-browser.providers-open">Complete Component</Text>
+          <span className="tnum font-mono text-2xs text-t2">{providerSummary}</span>
+        </Button>
         <Button
           data-dev-id="component-browser.identity-edit"
           small

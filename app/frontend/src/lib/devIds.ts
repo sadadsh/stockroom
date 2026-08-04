@@ -83,8 +83,9 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "components.row-warn", label: "Incomplete warning icon", area: "components" },
   { id: "components.workspace-band", label: "Open component tab band", area: "components" },
   // The opened component. Per-COMPONENT ids are dynamic (`component-browser.component[<id>]`,
-  // its `.tab`, and `.representation[<kind>]`), built by lib/componentDevIds.ts, so they carry no
-  // catalogue row: the set is the library, not a fixed list.
+  // its `.tab`, `.representation[<kind>]`, and `.provider[<provider id>]`), built by
+  // lib/componentDevIds.ts, so they carry no catalogue row: the set is the library and the
+  // provider registry, not a fixed list.
   { id: "component-browser.root", label: "Opened component workspace", area: "component-browser" },
   { id: "component-browser.tabs", label: "Open component tabs", area: "component-browser" },
   { id: "component-browser.close-tab", label: "Close the active component tab", area: "component-browser" },
@@ -173,6 +174,21 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.change-entry", label: "One commit in the component timeline", area: "component-browser" },
   { id: "component-browser.diagnostics-toggle", label: "Show or hide diagnostics", area: "component-browser" },
   { id: "component-browser.diagnostics-raw", label: "Show or hide the canonical record", area: "component-browser" },
+  // Complete Component: the whole provider trip for one component, inside the one workspace modal.
+  // Which provider can supply the whole set, how to reach it, what has landed, and which retained
+  // set is in force. Per-provider ROWS are dynamic and deliberately have no rows here.
+  { id: "component-browser.providers-summary", label: "Complete Component action", area: "component-browser" },
+  { id: "component-browser.complete-component", label: "Complete Component sheet", area: "component-browser" },
+  { id: "component-browser.provider-matrix", label: "Provider coverage matrix", area: "component-browser" },
+  { id: "component-browser.provider-open", label: "Open one provider", area: "component-browser" },
+  { id: "component-browser.provider-assert", label: "Your answer for one artifact", area: "component-browser" },
+  { id: "component-browser.provider-browser", label: "Provider trip controls", area: "component-browser" },
+  { id: "component-browser.provider-show", label: "Show the provider page", area: "component-browser" },
+  { id: "component-browser.provider-return", label: "Return To Stockroom", area: "component-browser" },
+  { id: "component-browser.provider-import", label: "Import downloaded files", area: "component-browser" },
+  { id: "component-browser.provider-progress", label: "Download progress", area: "component-browser" },
+  { id: "component-browser.provider-report", label: "Provider run report", area: "component-browser" },
+  { id: "component-browser.provider-sets", label: "Retained verified sets", area: "component-browser" },
   { id: "component-browser.identity-edit", label: "Edit Identity action", area: "component-browser" },
   { id: "component-browser.identity-sheet", label: "Identity editing sheet", area: "component-browser" },
   { id: "component-browser.identity-field", label: "One editable identity field", area: "component-browser" },

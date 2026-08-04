@@ -6,7 +6,11 @@
  * the caller invalidates the affected queries after a success.
  */
 import { apiBase, apiToken } from "../lib/runtime";
-import type { ComponentWorkspaceResponse } from "./workspaceTypes";
+import type {
+  ComponentProvidersView,
+  ComponentWorkspaceResponse,
+  CoverageArtifact,
+} from "./workspaceTypes";
 import type {
   ActivateResponse,
   ApproveProjectReviewResult,
@@ -635,6 +639,43 @@ export const api = {
   partWorkspace(id: string): Promise<ComponentWorkspaceResponse> {
     return apiGet<ComponentWorkspaceResponse>(
       `/api/library/parts/${encodeURIComponent(id)}/workspace`,
+    );
+  },
+
+  // Which provider can supply everything for this component, and how to reach each one. The same
+  // document also arrives inside the workspace projection above, so a surface that already holds
+  // the workspace reads it from there; this exists for a caller that wants only the coverage.
+  partProviders(id: string): Promise<ComponentProvidersView> {
+    return apiGet<ComponentProvidersView>(
+      `/api/library/parts/${encodeURIComponent(id)}/providers`,
+    );
+  },
+
+  // Record what a PERSON knows about one provider's coverage of this component, and read the
+  // recomputed coverage back. The status vocabulary is deliberately narrower than the coverage
+  // vocabulary: "downloaded" and "validated" are claims about bytes Stockroom is holding, so the
+  // backend rejects them with a 422 rather than letting a surface offer them. An empty status
+  // withdraws a previous claim.
+  setPartProviderCoverage(
+    id: string,
+    body: {
+      provider: string;
+      artifact: CoverageArtifact;
+      status: "available" | "not_available" | "";
+      note?: string;
+    },
+  ): Promise<ComponentProvidersView> {
+    return request<ComponentProvidersView>(
+      "POST",
+      `/api/library/parts/${encodeURIComponent(id)}/providers`,
+      {
+        body: {
+          provider: body.provider,
+          artifact: body.artifact,
+          status: body.status,
+          note: body.note ?? "",
+        },
+      },
     );
   },
 

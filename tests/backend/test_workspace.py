@@ -111,6 +111,7 @@ def test_workspace_has_every_top_level_region():
         "representations",
         "specifications",
         "sourcing",
+        "providers",
         "sources",
         "attention",
     }

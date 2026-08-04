@@ -41,6 +41,7 @@ import {
   type RepresentationLayout,
 } from "../../lib/uiSession";
 import { CadVariantSection } from "../CadVariantSection";
+import { CompleteComponentSheet } from "./CompleteComponentSheet";
 import { EnrichPanel } from "../EnrichPanel";
 import { PreviewModal, type PreviewKind } from "../PreviewModal";
 import { TabPanel, type TabItem } from "../primitives";
@@ -79,6 +80,7 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
   const [details, setDetails] = useState<RepresentationKind | null>(null);
   const [viewAll, setViewAll] = useState<ComponentInfoTab | null>(null);
   const [identityOpen, setIdentityOpen] = useState(false);
+  const [providersOpen, setProvidersOpen] = useState(false);
   const loadingLabel = useText("component-browser.loading", "Loading component...");
   const loadFailed = useText(
     "component-browser.load-failed",
@@ -87,6 +89,7 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
   const manual = useText("component-browser.manual", "Manual");
   const emptyValue = useText("component-browser.no-value", "None");
   const identityTitle = useText("component-browser.identity-modal", "Edit Identity");
+  const providersTitle = useText("component-browser.providers-modal", "Complete Component");
   const savedLabel = useText("component-browser.saved", "Saved");
   const saveFailed = useText("component-browser.save-failed", "Could not save");
   const movedLabel = useText("component-browser.moved", "Moved");
@@ -186,6 +189,7 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
           workspace={workspace}
           onPrimaryAction={runAction}
           onEditIdentity={() => setIdentityOpen(true)}
+          onOpenProviders={() => setProvidersOpen(true)}
           onOpenDatasheet={() => {
             const url = workspace.summary.datasheetUrl;
             if (url) window.open(url, "_blank", "noreferrer");
@@ -294,6 +298,21 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
             {/* The retained-variant chooser stays reachable from here until its own slice replaces it. */}
             <CadVariantSection partId={componentId} enabled />
           </div>
+        ) : null}
+      </WorkspaceModal>
+
+      <WorkspaceModal
+        open={providersOpen}
+        title={providersTitle}
+        onClose={() => setProvidersOpen(false)}
+      >
+        {providersOpen ? (
+          <CompleteComponentSheet
+            componentId={componentId}
+            identity={workspace.identity}
+            providers={workspace.providers}
+            onClose={() => setProvidersOpen(false)}
+          />
         ) : null}
       </WorkspaceModal>
 

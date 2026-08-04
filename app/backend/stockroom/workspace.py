@@ -26,6 +26,7 @@ from stockroom.eda.registry import all_tools, get_tool
 from stockroom.enrich.schema import SOURCE_STATES
 from stockroom.model.asset import ASSET_KINDS, Asset
 from stockroom.model.trust import Verdict, asset_verdict
+from stockroom.provider_coverage import provider_coverage
 from stockroom.providers import provider_label
 
 # Bump when the workspace shape changes in a way a reader must notice. The frontend mirrors
@@ -133,6 +134,7 @@ DATA_DESTINATIONS: dict[str, str] = {
     "datasheet": "sources.records",
     "purchase": "sourcing.offers",
     "catalog": "sourcing",
+    "provider_assertions": "providers.rows",
     "enrichment": "sources.fields",
     "alternates": "sources.fields.alternates",
     "sources": "sources.records",
@@ -731,8 +733,15 @@ def _attention(record) -> list[dict[str, Any]]:
 # ------------------------------------------------------------------ entry point
 
 
-def component_workspace(record) -> dict[str, Any]:
-    """The whole opened-component presentation model for one record."""
+def component_workspace(record, *, coverage: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """The whole opened-component presentation model for one record.
+
+    `coverage` is `stockroom.provider_coverage.provider_coverage(...)` already computed by a
+    caller that HAS the machine-local evidence store, passed in rather than reached for: this
+    module still never opens a path. Omitting it is not an error and does not hide the section -
+    it falls back to the coverage the record itself proves, which is the complete answer for a
+    caller with no store and an honest subset for one that has evidence it did not hand over.
+    """
     return {
         "schemaVersion": WORKSPACE_SCHEMA_VERSION,
         "identity": _identity(record),
@@ -740,6 +749,7 @@ def component_workspace(record) -> dict[str, Any]:
         "representations": _representations(record),
         "specifications": _specifications(record),
         "sourcing": _sourcing(record),
+        "providers": dict(coverage) if coverage is not None else provider_coverage(record),
         "sources": _sources(record),
         "attention": _attention(record),
     }
