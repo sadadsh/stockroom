@@ -21,6 +21,11 @@ import type {
 } from "./types";
 import { api, type ListPartsArgs, type SearchArgs } from "./client";
 import { invalidatePartCadProjection } from "./partCadProjectionQueries";
+import type {
+  ComponentProvidersView,
+  ComponentWorkspaceResponse,
+  CoverageArtifact,
+} from "./workspaceTypes";
 import { useJob } from "../lib/useJob";
 
 export function useProjects() {
@@ -467,6 +472,35 @@ export function usePartWorkspaceQuery(id: string | null) {
     queryKey: ["part-workspace", id],
     queryFn: () => api.partWorkspace(id as string),
     enabled: !!id,
+  });
+}
+
+/**
+ * Record one person's correction to a provider's coverage of one component.
+ *
+ * The backend answers with the RECOMPUTED coverage, so the returned document is written straight
+ * into the workspace cache rather than triggering a refetch: it is the same projection the
+ * workspace already carries, and re-asking would only let the two disagree for a frame. The write
+ * is still committed to the record, so the workspace is invalidated afterwards to pick up anything
+ * else the commit changed.
+ */
+export function useSetProviderCoverage(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      provider: string;
+      artifact: CoverageArtifact;
+      status: "available" | "not_available" | "";
+      note?: string;
+    }) => api.setPartProviderCoverage(id, input),
+    onSuccess: (providers: ComponentProvidersView) => {
+      qc.setQueryData(
+        ["part-workspace", id],
+        (current: ComponentWorkspaceResponse | undefined) =>
+          current ? { ...current, providers } : current,
+      );
+      qc.invalidateQueries({ queryKey: ["part-history", id] });
+    },
   });
 }
 

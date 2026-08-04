@@ -209,6 +209,126 @@ export interface ComponentSourcesView {
   diagnostics: SourceDiagnosticsView;
 }
 
+/**
+ * Per-component provider coverage. Mirrors `stockroom.provider_coverage` exactly.
+ *
+ * The question this answers is "which provider can supply the WHOLE set for this part": a symbol,
+ * a footprint and a 3D model, from one provider's coherent verified download. Stockroom never
+ * combines files from two providers, so nothing here is a five-slot mix-and-match model - a row
+ * is one provider, and `complete` is the answer the screen exists to show.
+ */
+export type CoverageArtifact = "symbol" | "footprint" | "model";
+
+/** Closed vocabulary, and every value names the evidence that produced it. Never a percentage. */
+export type CoverageStatus =
+  | "unknown"
+  | "available"
+  | "not_available"
+  | "downloaded"
+  | "validated";
+
+/** What proved the status. "" when nothing has said anything. */
+export type CoverageOrigin =
+  | ""
+  | "official_api"
+  | "user"
+  | "native_download"
+  | "validator";
+
+/**
+ * How the provider can be reached. "" means NO url exists for that provider, which is a real
+ * answer: a manufacturer site, TraceParts and CADENAS have no measured search surface, and a
+ * fabricated link would send a person to a page that proves nothing about this part.
+ */
+export type ProviderUrlKind = "" | "evidence" | "search";
+
+/**
+ * One person's recorded correction.
+ *
+ * `applied: false` means it was NOT applied because Stockroom already holds stronger proof
+ * (a downloaded or validated file). The disagreement is kept and must be shown, not hidden.
+ */
+export interface ProviderUserAssertion {
+  status: CoverageStatus;
+  origin: string;
+  notedAt: string;
+  note: string;
+  applied: boolean;
+}
+
+export interface ProviderArtifactCoverage {
+  status: CoverageStatus;
+  origin: CoverageOrigin;
+  userAssertion: ProviderUserAssertion | null;
+}
+
+/** One provider's coverage of one EDA tool, counted out of the three artifacts. */
+export interface ProviderToolCoverage {
+  count: number;
+  total: number;
+  /** Already formatted by the backend: "0/3" through "3/3". Rendered, never recomputed. */
+  summary: string;
+  complete: boolean;
+  /** Whether the provider exports for this tool at all. A 0/3 on a provider that never
+   *  offered the tool is a different fact from a 0/3 on one that does. */
+  supported: boolean;
+}
+
+export interface ProviderCoverageRow {
+  id: string;
+  label: string;
+  order: number;
+  url: string;
+  urlKind: ProviderUrlKind;
+  instruction: string;
+  needsLogin: boolean;
+  aggregator: boolean;
+  distributor: boolean;
+  statusCounts: Record<CoverageStatus, number>;
+  /** This provider can supply symbol, footprint AND 3D model for this component. */
+  complete: boolean;
+  symbol: ProviderArtifactCoverage;
+  footprint: ProviderArtifactCoverage;
+  model: ProviderArtifactCoverage;
+  kicad: ProviderToolCoverage;
+  altium: ProviderToolCoverage;
+}
+
+export interface ComponentProvidersView {
+  artifacts: CoverageArtifact[];
+  statuses: CoverageStatus[];
+  tools: string[];
+  /** Precomputed by the backend so no reader re-derives it and gets it subtly different. */
+  completeProviders: string[];
+  /** Already ranked by the backend. Rendered in the given order, never re-sorted here. */
+  rows: ProviderCoverageRow[];
+}
+
+/**
+ * One row's coverage of a registered tool, read by key.
+ *
+ * The tool columns are named for the registry keys the backend sends in `tools`, so a third tool
+ * arrives as data rather than as a new field. The lookup is here, once, so no call site invents
+ * its own cast.
+ */
+export function providerToolCoverage(
+  row: ProviderCoverageRow,
+  tool: string,
+): ProviderToolCoverage | null {
+  const cell = (row as unknown as Record<string, unknown>)[tool];
+  return cell && typeof cell === "object" && "summary" in (cell as object)
+    ? (cell as ProviderToolCoverage)
+    : null;
+}
+
+/** One row's coverage of one artifact, read by key, for the same reason. */
+export function providerArtifactCoverage(
+  row: ProviderCoverageRow,
+  artifact: CoverageArtifact,
+): ProviderArtifactCoverage {
+  return row[artifact];
+}
+
 export type AttentionSeverity = "blocking" | "warning" | "info";
 
 export interface AttentionItem {
@@ -227,6 +347,7 @@ export interface ComponentWorkspaceResponse {
   representations: Record<RepresentationKind, RepresentationView>;
   specifications: ComponentSpecificationsView;
   sourcing: ComponentSourcingView;
+  providers: ComponentProvidersView;
   sources: ComponentSourcesView;
   attention: AttentionItem[];
 }

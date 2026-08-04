@@ -71,7 +71,13 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // provider site, so `settings.vendor-logins` (the "Provider Sessions And Optional Sign-Ins"
 // section) has nothing left to configure. The DigiKey catalogue API creds moved into
 // `settings.distributor`, which keeps `settings.vendor-login-row` emitted.
-const EXPECTED_ENTRIES = 373;
+// 385 with Complete Component: the header action that opens it, the sheet itself, the provider
+// coverage matrix and its per-row Open Provider and per-artifact answer controls, the provider trip
+// controls (show the page, return to Stockroom, import downloaded files), the download progress,
+// the run report, and the retained verified sets. Per-PROVIDER rows are dynamic
+// (`component-browser.component[<id>].provider[<provider id>]`) and carry no rows here, for the
+// same reason the per-component ids do not. A deliberate re-baseline, which is what this gate is for.
+const EXPECTED_ENTRIES = 385;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

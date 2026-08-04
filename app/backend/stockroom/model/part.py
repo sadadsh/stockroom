@@ -206,6 +206,50 @@ class EnrichmentField:
 
 
 @dataclass
+class ProviderAssertion:
+    """One person's explicit claim about whether a provider carries an artifact for this part.
+
+    This lives on the record rather than in a sidecar because it IS component state: it travels
+    with the part through git exactly like every other curated field, and a second file would be
+    a second source of truth for the same question.
+
+    `origin` is always "user" and is stored rather than assumed, so a claim can never be read
+    back without its attribution. It is not a confidence score and there is no scale here: the
+    only two things a person can say are that the artifact is there or that it is not.
+    """
+
+    status: str = ""
+    origin: str = "user"
+    noted_at: str = ""
+    note: str = ""
+    # Keys a newer build put on this entry, kept verbatim and re-emitted - the same guarantee
+    # `SourcedValue.extra` gives, for the same reason: peers share these files through git.
+    extra: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            **self.extra,
+            "status": self.status,
+            "origin": self.origin,
+            "noted_at": self.noted_at,
+            "note": self.note,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "ProviderAssertion":
+        known = {"status", "origin", "noted_at", "note"}
+        return cls(
+            status=str(d.get("status", "")),
+            # A stored assertion with no origin predates the field; it can only ever have come
+            # from a person, because nothing else writes here.
+            origin=str(d.get("origin", "")) or "user",
+            noted_at=str(d.get("noted_at", "")),
+            note=str(d.get("note", "")),
+            extra={k: v for k, v in d.items() if k not in known},
+        )
+
+
+@dataclass
 class SourcedValue:
     """One value a source offered for a field, with where it came from.
 
@@ -401,6 +445,7 @@ _KNOWN_KEYS: frozenset[str] = frozenset(
         "enrichment",
         "alternates",
         "catalog",
+        "provider_assertions",
     }
 )
 
@@ -469,6 +514,11 @@ class PartRecord:
     # an electrical spec nor a derived display field: CAD/3D availability, media resources,
     # packaging equivalence and relationship classes retain their own structured semantics.
     catalog: dict[str, dict] = field(default_factory=dict)
+    # Explicit per-provider, per-artifact claims a PERSON made about CAD coverage, keyed
+    # provider key -> asset kind. Kept apart from `catalog` (which is what a distributor said)
+    # and from `assets` (which is what Stockroom holds) precisely so the three can never be
+    # confused for one another. Omitted from the JSON entirely when empty.
+    provider_assertions: dict[str, dict[str, ProviderAssertion]] = field(default_factory=dict)
     # The schema version this record was WRITTEN at. A record read from disk keeps its own
     # value (never downgraded to ours, never RAISED to ours without a real migration), so a
     # build that does not fully understand a newer record cannot claim otherwise to the next
@@ -602,6 +652,18 @@ class PartRecord:
                 {"catalog": {key: dict(value) for key, value in self.catalog.items()}}
                 if self.catalog else {}
             ),
+            **(
+                {
+                    "provider_assertions": {
+                        provider: {
+                            kind: assertion.to_dict() for kind, assertion in slots.items()
+                        }
+                        for provider, slots in self.provider_assertions.items()
+                        if slots
+                    }
+                }
+                if any(self.provider_assertions.values()) else {}
+            ),
         }
 
     @classmethod
@@ -644,6 +706,15 @@ class PartRecord:
                 str(key): dict(value)
                 for key, value in (d.get("catalog") or {}).items()
                 if isinstance(value, dict)
+            },
+            provider_assertions={
+                str(provider): {
+                    str(kind): ProviderAssertion.from_dict(assertion)
+                    for kind, assertion in slots.items()
+                    if isinstance(assertion, dict)
+                }
+                for provider, slots in (d.get("provider_assertions") or {}).items()
+                if isinstance(slots, dict)
             },
             schema_version=record_version(d),
             extra={k: v for k, v in d.items() if k not in _KNOWN_KEYS},
@@ -767,6 +838,7 @@ __all__ = [
     "PartClass",
     "PartRecord",
     "Provenance",
+    "ProviderAssertion",
     "Purchase",
     "RequirementOverride",
     "SourceEntry",

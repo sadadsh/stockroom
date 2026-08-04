@@ -7,6 +7,7 @@
  *     component-browser.component[<component id>]
  *     component-browser.component[<component id>].tab
  *     component-browser.component[<component id>].representation[<kind>]
+ *     component-browser.component[<component id>].provider[<provider id>]
  *
  * ONE builder, because the alternative is every call site interpolating an id into a template and
  * a second call site interpolating it slightly differently - at which point the ids are no longer
@@ -51,6 +52,17 @@ export function componentTabDevId(id: string): string {
 /** One representation module inside that component's dock. */
 export function componentRepresentationDevId(id: string, kind: string): string {
   return `${componentDevId(id)}.representation[${devIdSegment(kind)}]`;
+}
+
+/**
+ * One provider's coverage row for that component.
+ *
+ * The registry decides which providers exist, so this set is a library too: catalogued rows would
+ * go stale the moment a provider is added, and an interpolated selector would break on the first
+ * provider key carrying a character the bracket grammar cannot hold.
+ */
+export function componentProviderDevId(id: string, providerId: string): string {
+  return `${componentDevId(id)}.provider[${devIdSegment(providerId)}]`;
 }
 
 /**

@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+from datetime import UTC, datetime
 from types import MappingProxyType
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -19,9 +20,12 @@ from stockroom.api.schemas import (
     MoveBody,
     ParametricFacetsDTO,
     PartSummary,
+    ProviderCoverageBody,
     SearchRow,
     SetSpecsBody,
 )
+from stockroom.capture.runner import capture_state_root
+from stockroom.evidence import EvidenceStore
 from stockroom.ingest.passive_add import (
     PassiveAddError,
     PassiveNeedsInputError,
@@ -29,6 +33,8 @@ from stockroom.ingest.passive_add import (
 )
 from stockroom.model.part import PartRecord
 from stockroom.model.part_id import is_valid_part_id
+from stockroom.mutation.transaction import Transaction
+from stockroom.provider_coverage import provider_coverage, set_user_assertion
 from stockroom.verify.record_diff import extract_symbol_node, field_diff
 from stockroom.workflow import IntakeIdentity
 from stockroom.workspace import component_workspace
@@ -66,6 +72,20 @@ _OPAQUE_WORKFLOW_REFERENCE = re.compile(
 # than a count, so each group is bounded and reports its own true total beside it. A surface can
 # then say "12 of 340" honestly instead of receiving a response sized by the library.
 _WORKLIST_MAX_ROWS = 200
+
+
+def _coverage(record: PartRecord) -> dict:
+    """Provider coverage for one record, including what the machine-local evidence store holds.
+
+    The store is opened HERE and handed to the projection, which never opens a path itself.
+    Retained ingest candidates are not consulted: nothing in this build owns a candidate store
+    root, and reading from an invented one would report evidence from a directory no writer
+    uses.
+    """
+    return provider_coverage(
+        record,
+        evidence=EvidenceStore((capture_state_root() / "Evidence").resolve()),
+    )
 
 
 def _completion_request(
@@ -709,11 +729,57 @@ def library_router(require_token) -> APIRouter:
     @r.get("/parts/{part_id}/workspace")
     def part_workspace(request: Request, part_id: str) -> dict:
         """The opened component, already decided: identity, representations, specifications,
-        sourcing, sources, and what needs attention. See `stockroom.workspace`."""
+        sourcing, provider coverage, sources, and what needs attention. See
+        `stockroom.workspace`."""
         ctx = request.app.state.ctx
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
-        return component_workspace(ctx.ops.load_record(part_id))
+        record = ctx.ops.load_record(part_id)
+        return component_workspace(record, coverage=_coverage(record))
+
+    @r.get("/parts/{part_id}/providers")
+    def part_providers(request: Request, part_id: str) -> dict:
+        """Which provider can supply everything for this part, and how to reach each one."""
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        return _coverage(ctx.ops.load_record(part_id))
+
+    @r.post("/parts/{part_id}/providers")
+    def set_part_provider_coverage(
+        request: Request, part_id: str, body: ProviderCoverageBody
+    ) -> dict:
+        """Record what a person knows about one provider's coverage of this part.
+
+        The claim is persisted on the record and attributed to them. It cannot displace a
+        `downloaded` or `validated` status - that is enforced in `provider_coverage`, where the
+        grid is built, rather than here, so no second writer can route around it.
+        """
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        record = ctx.ops.load_record(part_id)
+        try:
+            set_user_assertion(
+                record,
+                provider=body.provider,
+                artifact=body.artifact,
+                status=body.status,
+                noted_at=datetime.now(UTC).isoformat(),
+                note=body.note,
+            )
+        except (KeyError, ValueError) as exc:
+            raise ApiError(422, str(exc)) from exc
+        path = ctx.ops.lib.parts_dir / f"{part_id}.json"
+        with Transaction(ctx.repo) as txn:
+            path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(path)
+            txn.commit(
+                f"Record provider coverage for {part_id}: {body.provider}/{body.artifact}"
+            )
+        ctx.rebuild_index()
+        ctx.auto_push()
+        return _coverage(record)
 
     @r.patch("/parts/{part_id}")
     def edit_field(request: Request, part_id: str, body: EditFieldBody) -> dict:
