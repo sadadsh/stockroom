@@ -467,7 +467,10 @@ describe("overview", () => {
     // The action is the point of an attention item: acting on a representation problem takes you
     // to that representation.
     await user.click(
-      within(items[0]).getByRole("button", { name: "Symbol Missing: open-representation:symbol" }),
+      // The action name is "Resolve: <what is wrong>". It used to be "<title>: <raw action token>",
+      // which read out "open-representation:symbol" to a screen reader - an internal routing key,
+      // not a sentence a person can act on.
+      within(items[0]).getByRole("button", { name: "Resolve: Symbol Missing" }),
     );
     await waitFor(() =>
       expect(readUiSession().component_views[ID]?.representation_layout).toBe("symbol"),
@@ -476,7 +479,7 @@ describe("overview", () => {
     // A source disagreement is answered where attribution lives.
     await user.click(
       within(items[1]).getByRole("button", {
-        name: "Sources Disagree On Package: open-field-source:package",
+        name: "Resolve: Sources Disagree On Package",
       }),
     );
     await waitFor(() => expect(readUiSession().component_views[ID]?.info_tab).toBe("sources"));

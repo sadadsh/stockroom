@@ -214,8 +214,26 @@ describe("StmViewerPage", () => {
     expect(screen.getByText("Part")).toBeInTheDocument();
     expect(screen.getByText("STM32F407VETx")).toBeInTheDocument();
     expect(screen.queryByText("STM32F407V(E-G)Tx")).toBeNull();
-    // the reserved pinout region shows its empty state until a part is picked
-    expect(screen.getByText("Select a part to see its pinout.")).toBeInTheDocument();
+    // the reserved pinout region shows its empty state until a part is picked, through the SHARED
+    // product-state primitive rather than this route's own paragraph
+    const prompt = screen.getByText("Select a part to see its pinout.");
+    expect(prompt.closest('[data-product-state="empty"]')).not.toBeNull();
+  });
+
+  it("renders its failure through the shared error state, with a written sentence and one retry", () => {
+    mockStatus.mockReturnValue(query({ data: { built: true, mcu_count: 1, family_count: 1 } }));
+    mockMcus.mockReturnValue(
+      query({ error: new ApiError(0, "connection refused"), isError: true }),
+    );
+
+    wrap(<StmViewerPage />);
+
+    // Not `error.message`: a transport string in the middle of the matrix is the one thing a
+    // person cannot act on.
+    const failure = screen.getByText("Stockroom is not answering on this machine.");
+    expect(failure.closest('[data-product-state="error"]')).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
+    expect(screen.queryByText(/connection refused/)).toBeNull();
   });
 
   it("changing the scope re-drives useStmMcus with the new family", async () => {

@@ -30,7 +30,15 @@ import { PartsList } from "../components/PartsList";
 import { SearchOverlay } from "../components/SearchOverlay";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { AddPartIcon, TrashIcon } from "../components/icons";
-import { Button, PanelTitle, TabStrip, type TabItem } from "../components/primitives";
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  RouteHeader,
+  TabStrip,
+  type TabItem,
+} from "../components/primitives";
 import {
   ComponentWorkspace,
   ComponentWorkspaceEmpty,
@@ -377,12 +385,12 @@ export function ComponentsPage() {
           className="flex flex-none flex-col"
           style={{ width: COMPONENT_PICKER_WIDTH }}
         >
-          <PanelTitle
+          <RouteHeader
             data-dev-id="components.list-title"
             right={parts.length ? parts.length.toLocaleString() : undefined}
           >
             <Text id="components.list-title">Components</Text>
-          </PanelTitle>
+          </RouteHeader>
           <div className="px-3 pt-3">
             <Button
               variant="soft"
@@ -501,9 +509,13 @@ export function ComponentsPage() {
             ) : partsQuery.isLoading ? (
               <div
                 data-dev-id="components.select-prompt"
-                className="flex h-full items-center justify-center text-sm text-t3"
+                className="flex h-full items-center justify-center px-6"
               >
-                <Text id="components.loading">Loading components...</Text>
+                {/* Says what THIS pane is waiting for. It used to repeat the picker's own
+                    loading line word for word, which put the same sentence on screen twice. */}
+                <LoadingState dense id="components.loading">
+                  Nothing is open yet. The component list is still loading.
+                </LoadingState>
               </div>
             ) : (
               <ComponentWorkspaceEmpty />
@@ -554,27 +566,35 @@ function PickerBody({
   hasSearchOrFilter: boolean;
   onClearFilters: () => void;
 }) {
+  // Every branch below is one of the shared product states rather than five hand-written
+  // centred divs, and every string goes through the copy layer. It did not: "Loading parts...",
+  // "Try Again", "Cannot reach the Stockroom server." and "Clear Filters" were the only
+  // user-visible strings on this route that could not be overridden, and the failure branch put
+  // `error.message` - a raw transport exception - straight in front of the person.
   if (isLoading) {
     return (
-      <div className="px-3 py-8 text-center text-sm text-t3">
-        Loading parts...
-      </div>
+      <LoadingState className="mt-2" id="components.list-loading">
+        Loading this library's components...
+      </LoadingState>
     );
   }
   if (error) {
     const status = error instanceof ApiError ? error.status : undefined;
-    const message =
-      status === 0
-        ? "Cannot reach the Stockroom server."
-        : status === 401
-          ? "Not authorized. The API token is missing or invalid."
-          : error.message;
     return (
-      <div className="flex flex-col items-center gap-3 px-3 py-8 text-center">
-        <div className="text-sm text-err">{message}</div>
-        <Button small onClick={onRetry}>
-          Try Again
-        </Button>
+      <div className="mt-2">
+        {status === 0 ? (
+          <ErrorState id="components.list-unreachable" onRetry={onRetry}>
+            Stockroom is not answering on this machine.
+          </ErrorState>
+        ) : status === 401 ? (
+          <ErrorState id="components.list-unauthorized" onRetry={onRetry}>
+            This machine is not signed in to the library.
+          </ErrorState>
+        ) : (
+          <ErrorState id="components.list-failed" onRetry={onRetry}>
+            This library's components could not be listed.
+          </ErrorState>
+        )}
       </div>
     );
   }
@@ -583,12 +603,12 @@ function PickerBody({
     // "the library itself is empty".
     if (hasSearchOrFilter) {
       return (
-        <div className="flex flex-col items-center gap-3 px-3 py-8 text-center">
-          <div className="text-sm text-t3">
-            No parts match the current search or filter.
-          </div>
+        <div className="mt-2 flex flex-col items-start gap-2">
+          <EmptyState id="components.list-no-match">
+            No component matches the current search or filter.
+          </EmptyState>
           <Button small onClick={onClearFilters}>
-            Clear Filters
+            <Text id="components.clear-filters">Clear Filters</Text>
           </Button>
         </div>
       );

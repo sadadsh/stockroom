@@ -373,9 +373,16 @@ function ProviderRow({
         >
           {labels.openProvider}
         </Button>
+        {/* A disabled control has to SAY why, in the row. A `title` on a disabled button is
+            unreachable by keyboard and unannounced by a screen reader, so the reason a trip is
+            unavailable was visible for one cause (no page) and invisible for the other. */}
         {!reachable ? (
           <span className="mt-1 block max-w-[15rem] text-2xs leading-snug text-t3">
             {labels.noPage}
+          </span>
+        ) : openDisabledReason !== "" ? (
+          <span className="mt-1 block max-w-[15rem] text-2xs leading-snug text-t3">
+            {openDisabledReason}
           </span>
         ) : null}
       </td>

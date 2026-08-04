@@ -14,7 +14,7 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
   const status = useAltiumStatus();
   const odbc = useOdbcStatus();
   const { toast } = useToast();
-  const dialogRef = useModalDismiss(open, onClose);
+  const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(open, onClose);
   const dialogLabel = useText("altiumdb.setup.aria", "Altium Setup");
 
   const installed = odbc.data?.installed ?? null;
@@ -34,7 +34,8 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
 
   return (
     <div
-      className="fixed inset-0 z-[95] flex items-start justify-center bg-black/60 p-4 pt-[7vh]"
+      style={{ zIndex: modalZ }}
+      className="fixed inset-0 flex items-start justify-center bg-black/60 p-4 pt-[7vh]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

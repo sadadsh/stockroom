@@ -208,9 +208,11 @@ describe("CadVariantSection", () => {
       .mockResolvedValueOnce(document());
     wrap(<CadVariantSection partId="lm358" enabled />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Could not read CAD variants. evidence store is unavailable",
-    );
+    // A written sentence, not the query's own exception appended to a prefix: "evidence store is
+    // unavailable" is a transport string, and the retry beside it is what a person can act on.
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The retained CAD variants could not be read.");
+    expect(alert).not.toHaveTextContent("evidence store is unavailable");
     await userEvent.click(screen.getByRole("button", { name: "Try Again" }));
     expect(await screen.findByText("4 Retained")).toBeInTheDocument();
   });

@@ -24,8 +24,10 @@ import { PinoutTable } from "../components/stm/PinoutTable";
 import { BuildIndexGate } from "../components/stm/BuildIndexGate";
 import { CompatibilityWorkbench } from "../components/stm/CompatibilityWorkbench";
 import {
-  Button,
+  EmptyState,
+  ErrorState,
   Eyebrow,
+  LoadingState,
   SegmentedControl,
   TabPanel,
   TabStrip,
@@ -122,7 +124,9 @@ export function StmViewerPage() {
           {/* matrix */}
           <div className="flex min-w-0 flex-1 flex-col border-l border-line px-4 pt-1">
             {mcus.isLoading ? (
-              <div className="py-16 text-center text-sm text-t3">Loading the spec matrix...</div>
+              <LoadingState className="mt-4" id="stm.matrix-loading">
+                Loading the STM32 specification matrix...
+              </LoadingState>
             ) : mcusError ? (
               <MatrixError error={mcusError} onRetry={() => mcus.refetch()} />
             ) : (
@@ -212,17 +216,22 @@ function PinoutRegion({
       {!activePart ? (
         <GhostSpecimen />
       ) : isLoading ? (
-        <ChamberMessage>Loading the pinout...</ChamberMessage>
+        <ChamberMessage>
+          <LoadingState dense id="stm.pinout-loading">
+            Loading this part's pinout...
+          </LoadingState>
+        </ChamberMessage>
       ) : error ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-card bg-stage px-6 text-center">
-          <p className="text-sm text-err">
-            {error instanceof ApiError && error.status === 0
-              ? "Cannot reach the Stockroom server."
-              : error.message}
-          </p>
-          <Button small onClick={onRetry}>
-            Try Again
-          </Button>
+          {error instanceof ApiError && error.status === 0 ? (
+            <ErrorState dense id="stm.pinout-unreachable" onRetry={onRetry}>
+              Stockroom is not answering on this machine.
+            </ErrorState>
+          ) : (
+            <ErrorState dense id="stm.pinout-failed" onRetry={onRetry}>
+              This part's pinout could not be read.
+            </ErrorState>
+          )}
         </div>
       ) : pinout ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -260,7 +269,9 @@ function PinoutRegion({
               {inspectedPin ? (
                 <PinInspector pin={inspectedPin} part={activePart} />
               ) : (
-                <p className="px-1 py-4 text-sm text-t3">Select a pin to inspect its facts.</p>
+                <EmptyState dense className="px-1" id="stm.pin-prompt">
+                  Select a pin to inspect its facts.
+                </EmptyState>
               )}
             </div>
           </div>
@@ -275,10 +286,11 @@ const PINOUT_VIEWS = [
   { id: "table", label: "Table" },
 ] as const;
 
+/** The centring chamber a state block sits in. The state decides its own tone and wording. */
 function ChamberMessage({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center rounded-card bg-stage px-6 text-center shadow-[inset_0_1px_0_var(--edge-hi)]">
-      <p className="text-sm text-t3">{children}</p>
+      {children}
     </div>
   );
 }
@@ -313,7 +325,7 @@ function GhostSpecimen() {
           </g>
         ))}
       </svg>
-      <p className="text-sm text-t3">Select a part to see its pinout.</p>
+      <EmptyState dense id="stm.part-prompt">Select a part to see its pinout.</EmptyState>
     </div>
   );
 }
@@ -349,18 +361,25 @@ function PageShell({
 // build call to action (which is only for the specific not-built state).
 function MatrixError({ error, onRetry }: { error: Error; onRetry: () => void }) {
   const status = error instanceof ApiError ? error.status : undefined;
-  const message =
-    status === 0
-      ? "Cannot reach the Stockroom server."
-      : status === 401
-        ? "Not authorized. The API token is missing or invalid."
-        : error.message;
+  // Three written sentences, one per cause a person can act on differently. `error.message` used
+  // to be the fallback branch, which put a transport string in the middle of the matrix.
+  if (status === 0) {
+    return (
+      <ErrorState className="mt-4" id="stm.matrix-unreachable" onRetry={onRetry}>
+        Stockroom is not answering on this machine.
+      </ErrorState>
+    );
+  }
+  if (status === 401) {
+    return (
+      <ErrorState className="mt-4" id="stm.matrix-unauthorized" onRetry={onRetry}>
+        This machine is not signed in to the library.
+      </ErrorState>
+    );
+  }
   return (
-    <div className="flex flex-col items-center gap-3 py-16 text-center">
-      <div className="text-sm text-err">{message}</div>
-      <Button small onClick={onRetry}>
-        Try Again
-      </Button>
-    </div>
+    <ErrorState className="mt-4" id="stm.matrix-failed" onRetry={onRetry}>
+      The STM32 specification matrix could not be read.
+    </ErrorState>
   );
 }

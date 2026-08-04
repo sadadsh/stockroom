@@ -61,22 +61,22 @@ describe("PreviewModal - copy adoption", () => {
     expect(screen.getByText("Symbol")).toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
-    expect(screen.getByText("Loading preview...")).toBeInTheDocument();
+    expect(screen.getByText("Loading this preview...")).toBeInTheDocument();
 
     // Off dev mode a <Text> is a bare string: no editable copy targets exist.
     expect(container.querySelector("[data-copy-id]")).toBeNull();
   });
 
-  it("wraps the Close label and loading line with their modals.json ids in dev mode", () => {
+  it("wraps the loading line with its modals.json id in dev mode, and names the close control", () => {
     vi.spyOn(api, "previewSvg").mockReturnValue(new Promise<Blob>(() => {}));
     const { container } = renderPreview();
 
     toggleDevMode();
 
-    expect(container.querySelector('[data-copy-id="modal.preview.close-btn"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.preview.loading"]')).not.toBeNull();
 
-    // The Close aria-label resolves through useText, so the button keeps its accessible name.
+    // Close is the shared frame's icon control: its copy lives in the accessible name and
+    // resolves through useText, which is the repo's rule for copy inside an attribute.
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 });

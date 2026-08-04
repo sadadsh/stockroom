@@ -817,6 +817,28 @@ describe("ProjectsPage shared workspace", () => {
     expect(within(map).getByRole("button", { name: "Expand Board" })).toBeInTheDocument();
   });
 
+  it("shows the shared product states rather than this route's own placeholders", async () => {
+    // The picker's empty state and the workspace's failure both come from the shared kit now, so
+    // "nothing here" and "that failed" read the same on Projects as they do on Components.
+    mockApi.listProjects.mockResolvedValue([]);
+    renderPage();
+
+    const empty = await screen.findByText("Link a project or select one from the list.");
+    expect(empty.closest('[data-product-state="empty"]')).not.toBeNull();
+  });
+
+  it("shows a written failure and one retry when a project cannot be opened", async () => {
+    mockApi.projectWorkspace.mockRejectedValue(new Error("EBUSY: resource busy or locked"));
+    renderPage();
+
+    const failure = await screen.findByText("This project could not be opened.");
+    expect(failure.closest('[data-product-state="error"]')).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
+    // `workspace.error.message` used to be rendered verbatim, which put a filesystem errno in
+    // front of the person.
+    expect(screen.queryByText(/EBUSY/)).toBeNull();
+  });
+
   it("keeps the PCB dominant at 1024px by collapsing the repeated file rail", async () => {
     renderPage();
     await screen.findByRole("heading", { name: "Power Board" });

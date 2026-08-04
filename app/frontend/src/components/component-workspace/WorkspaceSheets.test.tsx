@@ -28,6 +28,7 @@ import {
   makeSourceRecord,
   makeWorkspace,
 } from "../../test/workspaceFixture";
+import { makePartDetail } from "../../test/partFixture";
 import { ComponentWorkspace } from "./ComponentWorkspace";
 import { canApplyAlternate } from "./SourcesSheet";
 import { factMatches, pinoutColumns, sheetGroups } from "./SpecificationsSheet";
@@ -616,6 +617,87 @@ describe("the sources and history sheet", () => {
     expect(await within(dialog).findByText("TI -> Texas Instruments")).toBeInTheDocument();
   });
 
+  it("offers the visual diff only for a commit that actually moved a drawing", async () => {
+    mockApi.partHistory.mockResolvedValue({
+      commits: [
+        {
+          sha: "a".repeat(40),
+          subject: "Edit lm358: manufacturer",
+          author: "owner",
+          iso_date: "2026-08-01T10:00:00Z",
+        },
+      ],
+      count: 1,
+    });
+    // A text-only commit. "symbol_content_hash changed" is a true field row and tells a person
+    // nothing about geometry, but there is no geometry here to look at, so no overlay is offered.
+    mockApi.partDiff.mockResolvedValue({
+      a: "",
+      b: "a".repeat(40),
+      fields: [
+        { key: "manufacturer", before: "TI", after: "Texas Instruments", status: "changed" },
+      ],
+      assets: { symbol: false, footprint: false, model: false, datasheet: false },
+    });
+    const { user } = await openSheet(sourcesWorkspace, "Sources & History", "View All");
+    const dialog = await screen.findByRole("dialog", { name: "Sources & History" });
+    await user.click(within(dialog).getByRole("tab", { name: "Changes" }));
+    await user.click(await within(dialog).findByText("Edit lm358: manufacturer"));
+
+    expect(await within(dialog).findByText("TI -> Texas Instruments")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Visual Diff" })).toBeNull();
+  });
+
+  it("opens the visual diff NESTED in the sheet, and closes it without closing the sheet", async () => {
+    // The deferred overlay, finally reachable. It could not be built while this sheet and the diff
+    // window shared a z-index and a window-level Escape listener; the modal stack settles both.
+    mockApi.partHistory.mockResolvedValue({
+      commits: [
+        {
+          sha: "a".repeat(40),
+          subject: "Redraw lm358 symbol",
+          author: "owner",
+          iso_date: "2026-08-01T10:00:00Z",
+        },
+      ],
+      count: 1,
+    });
+    mockApi.partDiff.mockResolvedValue({
+      a: "",
+      b: "a".repeat(40),
+      fields: [{ key: "symbol_content_hash", before: "aaa", after: "bbb", status: "changed" }],
+      assets: { symbol: true, footprint: false, model: false, datasheet: false },
+    });
+    const { user } = await openSheet(sourcesWorkspace, "Sources & History", "View All");
+    const sheet = await screen.findByRole("dialog", { name: "Sources & History" });
+    await user.click(within(sheet).getByRole("tab", { name: "Changes" }));
+    await user.click(await within(sheet).findByText("Redraw lm358 symbol"));
+
+    const trigger = await within(sheet).findByRole("button", { name: "Visual Diff" });
+    await user.click(trigger);
+
+    const overlay = await screen.findByRole("dialog", {
+      name: `Visual Diff for ${sourcesWorkspace.identity.displayName}`,
+    });
+    // Both windows are open at once, and the overlay paints above the sheet it came from.
+    expect(sheet).toBeInTheDocument();
+    expect(Number((overlay.parentElement as HTMLElement).style.zIndex)).toBeGreaterThan(
+      Number((sheet.parentElement as HTMLElement).style.zIndex),
+    );
+
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", {
+          name: `Visual Diff for ${sourcesWorkspace.identity.displayName}`,
+        }),
+      ).toBeNull(),
+    );
+    // The sheet survives, and focus is back on the control inside it that opened the overlay.
+    expect(screen.getByRole("dialog", { name: "Sources & History" })).toBeInTheDocument();
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it("keeps diagnostics collapsed until they are asked for, and the raw record until then", async () => {
     mockApi.partDetail.mockResolvedValue({ id: ID, mpn: "LM358DR" } as never);
     const { user } = await openSheet(sourcesWorkspace, "Sources & History", "View All");
@@ -640,6 +722,19 @@ describe("the sources and history sheet", () => {
 // --------------------------------------------------------------- restored capabilities
 
 describe("identity editing, restored", () => {
+  // The identity sheet's handoff half renders the CANONICAL RECORD (the EDA registry names record
+  // attributes), so these tests have to supply one. It is fetched only while the sheet is open.
+  beforeEach(() => {
+    mockApi.partDetail.mockResolvedValue(
+      makePartDetail({
+        id: ID,
+        mpn: "LM358DR",
+        manufacturer: "Texas Instruments",
+        derived: { display_name: "LM358DR", category: "ICs", description: "Dual op-amp" },
+      }) as never,
+    );
+  });
+
   it("edits a canonical identity field from the header", async () => {
     mockApi.editField.mockResolvedValue({} as never);
     await open();
@@ -684,9 +779,29 @@ describe("identity editing, restored", () => {
     );
     const user = userEvent.setup();
     await user.click(
-      screen.getByRole("button", { name: "Manufacturer Is Missing: edit-identity" }),
+      screen.getByRole("button", { name: "Resolve: Manufacturer Is Missing" }),
     );
     expect(await screen.findByRole("dialog", { name: "Edit Identity" })).toBeInTheDocument();
+  });
+
+  it("renders the EDA handoff band from the registry, so its fields have exactly one editor", async () => {
+    // The orphan decision, made visible. `HandoffBand` lost its only importer when DetailPanel was
+    // deleted while this sheet hand-wrote mpn/manufacturer/description a second time. The band is
+    // the one that survived: it is generated from the EDA registry, so a third tool joins by
+    // declaring `data_fields`, and it carries the symbol and footprint references and the datasheet
+    // that the hand-written list had no way to show.
+    await open();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Edit Identity" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit Identity" });
+
+    const band = await within(dialog).findByRole("region", { name: "EDA Handoff" });
+    // The two fields the registry does NOT own stay in the sheet's own Identity section...
+    expect(within(dialog).getByRole("button", { name: "Edit Display Name" })).toBeInTheDocument();
+    // ...and the registry-owned ones appear once, in the band.
+    expect(within(band).getByText("Symbol")).toBeInTheDocument();
+    expect(within(band).getByText("Footprint")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("Manufacturer")).toHaveLength(1);
   });
 });
 

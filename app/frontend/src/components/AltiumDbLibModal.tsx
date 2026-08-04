@@ -24,7 +24,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
   const status = useAltiumStatus();
   const [filter, setFilter] = useState<Filter>("all");
   // Escape + Tab focus-trap + focus-restore (the shared modal idiom); attach the ref to the dialog.
-  const dialogRef = useModalDismiss(open, onClose);
+  const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(open, onClose);
 
   const rows = status.data?.rows ?? [];
   const readyCount = useMemo(() => rows.filter((r) => r.ready).length, [rows]);
@@ -45,7 +45,8 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
 
   return (
     <div
-      className="fixed inset-0 z-[95] flex items-start justify-center bg-black/60 p-4 pt-[7vh]"
+      style={{ zIndex: modalZ }}
+      className="fixed inset-0 flex items-start justify-center bg-black/60 p-4 pt-[7vh]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

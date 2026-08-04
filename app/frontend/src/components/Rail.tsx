@@ -379,11 +379,12 @@ function AboutModal({
   const aboutLabel = useText("modal.about.aria", "About Stockroom");
   // Always mounted only while open, so `open` is true whenever this renders. The hook owns Escape,
   // the focus move into the dialog and the focus restore on the way out.
-  const dialogRef = useModalDismiss(true, onClose);
+  const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(true, onClose);
   return (
     <div
       data-dev-id="about.scrim"
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/55 p-4"
+      style={{ zIndex: modalZ }}
+      className="fixed inset-0 flex items-center justify-center bg-black/55 p-4"
       role="presentation"
       onClick={onClose}
     >

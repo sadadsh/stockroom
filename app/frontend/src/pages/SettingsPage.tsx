@@ -39,7 +39,16 @@ import {
 import { useTheme, type Theme } from "../lib/theme";
 import { statusTone } from "../lib/statusTone";
 import { useToast } from "../lib/toast";
-import { Badge, Button, Card, Dot, Eyebrow, PanelTitle } from "../components/primitives";
+import {
+  Badge,
+  Button,
+  Card,
+  Dot,
+  ErrorState,
+  Eyebrow,
+  LoadingState,
+  RouteHeader,
+} from "../components/primitives";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "../components/Icon";
 import {
@@ -367,12 +376,12 @@ export function SettingsPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-dev-id="settings.root">
-      <PanelTitle
+      <RouteHeader
         data-dev-id="settings.title"
         right={unmet.length > 0 ? `${unmet.length} need attention` : "Machine ready"}
       >
         <Text id="settings.title">Settings</Text>
-      </PanelTitle>
+      </RouteHeader>
       <div className="@container flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-4 pt-4">
         <MachineSetupBand
           loading={!s}
@@ -939,9 +948,13 @@ function LibraryRepositoriesSection() {
   return (
     <>
       {libraries.isLoading ? (
-        <p className="py-1 text-sm text-t3">Loading libraries...</p>
+        <LoadingState dense id="settings.libraries-loading">
+          Loading this machine's libraries...
+        </LoadingState>
       ) : libraries.isError ? (
-        <p className="py-1 text-sm text-err">Could not load libraries.</p>
+        <ErrorState dense id="settings.libraries-failed" onRetry={() => libraries.refetch()}>
+          This machine's libraries could not be listed.
+        </ErrorState>
       ) : (
         <div>
           {libraries.data?.libraries.map((library) => {
@@ -1076,9 +1089,13 @@ function SyncSection() {
   return (
     <>
       {status.isLoading ? (
-        <p className="py-1 text-sm text-t3">Checking sync status...</p>
+        <LoadingState dense id="settings.sync-loading">
+          Checking how this library compares with its remote...
+        </LoadingState>
       ) : status.isError ? (
-        <p className="py-1 text-sm text-err">Could not read sync status.</p>
+        <ErrorState dense id="settings.sync-failed" onRetry={() => status.refetch()}>
+          The sync standing of this library could not be read.
+        </ErrorState>
       ) : status.data ? (
         <>
           <StatusRow
@@ -1302,9 +1319,13 @@ function KiCadSection() {
   return (
     <>
       {sys.isLoading ? (
-        <p className="py-1 text-sm text-t3">Reading KiCad status...</p>
+        <LoadingState dense id="settings.kicad-loading">
+          Reading how KiCad is set up on this machine...
+        </LoadingState>
       ) : sys.isError ? (
-        <p className="py-1 text-sm text-err">Could not read KiCad status.</p>
+        <ErrorState dense id="settings.kicad-failed" onRetry={() => sys.refetch()}>
+          The KiCad setup on this machine could not be read.
+        </ErrorState>
       ) : sys.data ? (
         <>
           <StatusRow
@@ -1760,9 +1781,13 @@ function UpdateSection() {
   return (
     <>
       {check.isLoading ? (
-        <p className="py-1 text-sm text-t3">Checking for updates...</p>
+        <LoadingState dense id="settings.update-loading">
+          Checking for a newer Stockroom...
+        </LoadingState>
       ) : check.isError ? (
-        <p className="py-1 text-sm text-err">Could not check for updates.</p>
+        <ErrorState dense id="settings.update-failed" onRetry={() => check.refetch()}>
+          Stockroom could not check for a newer version.
+        </ErrorState>
       ) : (
         <>
           <StatusRow

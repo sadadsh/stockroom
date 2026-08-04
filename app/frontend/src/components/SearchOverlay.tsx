@@ -48,7 +48,7 @@ import {
 import { prettifyValue } from "../lib/specSchema";
 import { SearchIcon } from "./icons";
 import { Icon } from "./Icon";
-import { PanelTitle } from "./primitives";
+import { RouteHeader } from "./primitives";
 import { RowThumbnail } from "./PartsList";
 import {
   readUiSession,
@@ -382,7 +382,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
         />
 
         <div className="flex min-h-0 min-w-0 flex-col border-l border-line">
-          <PanelTitle>Results</PanelTitle>
+          <RouteHeader>Results</RouteHeader>
           <div
             ref={setResultsScrollElement}
             className="min-h-0 flex-1 overflow-auto"
@@ -661,9 +661,9 @@ function FacetRail({
 }) {
   return (
     <div className="flex min-h-0 flex-col" data-dev-id="search.rail">
-      <PanelTitle right={activeCount > 0 ? `${activeCount} active` : undefined}>
+      <RouteHeader right={activeCount > 0 ? `${activeCount} active` : undefined}>
         Filters
-      </PanelTitle>
+      </RouteHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2 pt-1">
         <FacetGroup title="Category" first data-dev-id="search.rail-category">
           {categories.map(([name, count]) => (

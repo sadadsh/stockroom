@@ -150,6 +150,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.spec-row-pin", label: "Pin a specification from the sheet", area: "component-browser" },
   { id: "component-browser.spec-alternate", label: "An alternate value for a specification", area: "component-browser" },
   { id: "component-browser.pinout-table", label: "Complete pinout table", area: "component-browser" },
+  { id: "component-browser.pinout-filter", label: "Filter the pinout table", area: "component-browser" },
   { id: "component-browser.pinout-lookup", label: "Look up a pinout", area: "component-browser" },
   { id: "component-browser.pinout-apply", label: "Apply Pinout action", area: "component-browser" },
   { id: "component-browser.sourcing-sheet", label: "Full sourcing sheet", area: "component-browser" },
@@ -172,6 +173,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.source-refresh", label: "Refresh Sourcing action", area: "component-browser" },
   { id: "component-browser.enrich", label: "Source lookup panel", area: "component-browser" },
   { id: "component-browser.change-entry", label: "One commit in the component timeline", area: "component-browser" },
+  { id: "component-browser.change-diff", label: "Open the visual diff for one commit", area: "component-browser" },
   { id: "component-browser.diagnostics-toggle", label: "Show or hide diagnostics", area: "component-browser" },
   { id: "component-browser.diagnostics-raw", label: "Show or hide the canonical record", area: "component-browser" },
   // Complete Component: the whole provider trip for one component, inside the one workspace modal.
@@ -192,7 +194,9 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.identity-edit", label: "Edit Identity action", area: "component-browser" },
   { id: "component-browser.identity-sheet", label: "Identity editing sheet", area: "component-browser" },
   { id: "component-browser.identity-field", label: "One editable identity field", area: "component-browser" },
-  { id: "component-browser.identity-category", label: "Move this component to another category", area: "component-browser" },
+  // The category MOVE control is `detail.category-control` now: the identity sheet's hand-written
+  // select was a second editor for a field the generated EDA registry already owns, so the sheet
+  // renders the handoff band instead and the band's AdaptiveChoice is the one control.
   // The EDA handoff block (components/HandoffBand.tsx). Per-field cell ids are DERIVED
   // (`detail.handoff-<field key>`) from the generated EDA registry, so a new registry field brings
   // its own cell id and this catalogue needs no edit.
@@ -215,8 +219,10 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.model-view-iso", label: "3D view: three-quarter", area: "detail" },
   { id: "detail.model-view-top", label: "3D view: top down", area: "detail" },
   { id: "detail.model-view-front", label: "3D view: front elevation", area: "detail" },
-  { id: "detail.pinout", label: "Pinout panel", area: "detail" },
-  { id: "detail.pinout-list", label: "Datasheet pinout scroll region", area: "detail" },
+  // `detail.pinout` / `detail.pinout-list` went with components/PinoutViewer.tsx. It had lost its
+  // only importer when DetailPanel was deleted, and the workspace's own `PinoutTable` already
+  // renders every column the record wrote (that one showed pin and name only). Its one remaining
+  // capability, finding a signal in a large package, is `component-browser.pinout-filter`.
   { id: "search.root", label: "Search overlay", area: "search" },
   { id: "search.query", label: "Query field", area: "search" },
   { id: "search.query-input", label: "Query input", area: "search" },
@@ -363,6 +369,8 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "diff.root", label: "Diff dialog", area: "diff" },
   { id: "diff.header", label: "Diff header", area: "diff" },
   { id: "diff.tabs", label: "Diff type tabs", area: "diff" },
+  { id: "diff.tab-symbol", label: "Symbol diff tab", area: "diff" },
+  { id: "diff.tab-footprint", label: "Footprint diff tab", area: "diff" },
   { id: "diff.stage", label: "Diff viewport", area: "diff" },
   { id: "confirm.root", label: "Confirm dialog", area: "confirm" },
   { id: "confirm.scrim", label: "Confirm backdrop", area: "confirm" },

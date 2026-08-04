@@ -14,11 +14,12 @@ import { PinoutTable } from "./PinoutTable";
 export function BenchPartModal({ part, onClose }: { part: string; onClose: () => void }) {
   const pinout = useStmPinout(part);
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
-  const dialogRef = useModalDismiss(true, onClose);
+  const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(true, onClose);
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-6"
+      style={{ zIndex: modalZ }}
+      className="fixed inset-0 flex items-center justify-center bg-black/50 p-6"
       data-testid="bench-part-modal"
       onClick={onClose}
     >

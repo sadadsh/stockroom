@@ -17,8 +17,8 @@ import type {
 } from "../../api/workspaceTypes";
 import { Text, useText } from "../../lib/copy";
 import { isPinned, type PinnedSpecs } from "../../lib/keySpecs";
-import { Badge } from "../primitives";
-import { Empty, Region } from "./WorkspaceRegion";
+import { Badge, EmptyState, Region } from "../primitives";
+
 import { SOURCE_STATE_LABEL, sourceStateOf, sourceStateTone } from "./workspaceStatus";
 
 const GRID =
@@ -72,7 +72,7 @@ export function SpecificationsTab({
         viewAllCopyId="component-browser.specifications-all"
       >
         {groups.length === 0 ? (
-          <Empty id="component-browser.specifications-empty">No specifications on record.</Empty>
+          <EmptyState dense id="component-browser.specifications-empty">No specifications on record.</EmptyState>
         ) : (
           <ul className="min-h-0 overflow-hidden">
             {pinnedFacts.map((fact) => (
@@ -116,7 +116,7 @@ export function SpecificationsTab({
         count={pinCount}
       >
         {pinCount === 0 ? (
-          <Empty id="component-browser.pinout-empty">No pinout on record.</Empty>
+          <EmptyState dense id="component-browser.pinout-empty">No pinout on record.</EmptyState>
         ) : (
           <div className="min-h-0 overflow-hidden">
             <p className="py-1 text-2xs text-t2">{`${pinCount} ${pinsRecorded}`}</p>
@@ -140,7 +140,7 @@ export function SpecificationsTab({
         count={conflictCount(workspace)}
       >
         {conflictCount(workspace) === 0 ? (
-          <Empty id="component-browser.spec-conflicts-empty">Every source agrees.</Empty>
+          <EmptyState dense id="component-browser.spec-conflicts-empty">Every source agrees.</EmptyState>
         ) : (
           <p className="py-2 text-2xs text-t2">
             <Text id="component-browser.spec-conflicts-body">
@@ -181,7 +181,7 @@ export function SourcingTab({
         viewAllCopyId="component-browser.sourcing-all"
       >
         {offers.length === 0 ? (
-          <Empty id="component-browser.sourcing-empty">No distributor offers on record.</Empty>
+          <EmptyState dense id="component-browser.sourcing-empty">No distributor offers on record.</EmptyState>
         ) : (
           <ul className="min-h-0 overflow-hidden">
             {offers.map((offer) => (
@@ -207,7 +207,7 @@ export function SourcingTab({
         count={relationships.reduce((total, group) => total + group.count, 0)}
       >
         {relationships.length === 0 ? (
-          <Empty id="component-browser.relationships-empty">No related parts were offered.</Empty>
+          <EmptyState dense id="component-browser.relationships-empty">No related parts were offered.</EmptyState>
         ) : (
           <ul className="min-h-0 overflow-hidden">
             {relationships.map((group) => (
@@ -229,7 +229,7 @@ export function SourcingTab({
         count={resources.length}
       >
         {resources.length === 0 ? (
-          <Empty id="component-browser.resources-empty">No documents were offered.</Empty>
+          <EmptyState dense id="component-browser.resources-empty">No documents were offered.</EmptyState>
         ) : (
           <ul className="min-h-0 overflow-hidden">
             {resources.map((resource) => (
@@ -280,7 +280,7 @@ export function SourcesTab({
         viewAllCopyId="component-browser.sources-all"
       >
         {records.length === 0 ? (
-          <Empty id="component-browser.sources-empty">No captured source records.</Empty>
+          <EmptyState dense id="component-browser.sources-empty">No captured source records.</EmptyState>
         ) : (
           <ul className="min-h-0 overflow-hidden">
             {records.map((record) => {
@@ -311,7 +311,7 @@ export function SourcesTab({
         count={fields.length}
       >
         {fields.length === 0 ? (
-          <Empty id="component-browser.field-sources-empty">No field carries an attribution.</Empty>
+          <EmptyState dense id="component-browser.field-sources-empty">No field carries an attribution.</EmptyState>
         ) : (
           <ul className="min-h-0 overflow-hidden text-2xs text-t2">
             <li className="truncate py-1">{`${disagreements} ${conflicts}`}</li>

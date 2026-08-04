@@ -3,7 +3,7 @@ import type { DiscoveredProject, ProjectSummary } from "../../api/types";
 import { ApiError } from "../../api/client";
 import { useDiscoverProjects, useRegisterProject } from "../../api/queries";
 import { BoardIcon, CloseIcon, SearchIcon } from "../icons";
-import { Badge, Button, PanelTitle } from "../primitives";
+import { Badge, Button, EmptyState, ErrorState, LoadingState, RouteHeader } from "../primitives";
 import { useToast } from "../../lib/toast";
 import { Text, useText } from "../../lib/copy";
 import { pickHostFolder } from "../../lib/hostFolderPicker";
@@ -72,12 +72,12 @@ export function ProjectPicker({
       className="flex w-[320px] flex-none flex-col max-[1180px]:w-[224px]"
       aria-label={pickerLabel}
     >
-      <PanelTitle
+      <RouteHeader
         data-dev-id="projects.list-title"
         right={projects.length ? projects.length.toLocaleString() : undefined}
       >
         <Text id="projects.picker.title">Projects</Text>
-      </PanelTitle>
+      </RouteHeader>
       <div className="px-3 pt-3">
         <Button
           variant="soft"
@@ -117,16 +117,14 @@ export function ProjectPicker({
       </div>
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {loading ? (
-          <PickerMessage>
-            <Text id="projects.picker.loading">Loading projects...</Text>
-          </PickerMessage>
+          <LoadingState className="mt-2" id="projects.picker.loading">
+            Loading this machine's linked projects...
+          </LoadingState>
         ) : error ? (
-          <div className="flex flex-col items-center gap-3 px-3 py-8 text-center">
-            <p className="text-sm text-err">{error.message}</p>
-            <Button small onClick={onRetry}>
-              <Text id="projects.try-again">Try Again</Text>
-            </Button>
-          </div>
+          // A written sentence and the shared retry, not `error.message` and a bare button.
+          <ErrorState className="mt-2" id="projects.picker.failed" onRetry={onRetry}>
+            This machine's linked projects could not be listed.
+          </ErrorState>
         ) : projects.length === 0 ? (
           <div className="flex flex-col items-center gap-2.5 px-5 py-10 text-center">
             <span className="text-t3">
@@ -142,9 +140,9 @@ export function ProjectPicker({
             </p>
           </div>
         ) : filtered.length === 0 ? (
-          <PickerMessage>
-            <Text id="projects.picker.no-match">No projects match this search.</Text>
-          </PickerMessage>
+          <EmptyState className="mt-2" id="projects.picker.no-match">
+            No project matches this search.
+          </EmptyState>
         ) : (
           <div className="space-y-1" role="listbox" aria-label={listLabel}>
             {filtered.map((project) => {
@@ -231,10 +229,6 @@ export function ProjectPicker({
       ) : null}
     </aside>
   );
-}
-
-function PickerMessage({ children }: { children: React.ReactNode }) {
-  return <div className="px-3 py-8 text-center text-sm text-t3">{children}</div>;
 }
 
 function LinkProjectDialog({
@@ -367,7 +361,9 @@ function LinkProjectDialog({
             </Button>
           </div>
           {discover.error ? (
-            <p className="mt-3 text-sm text-err">{discover.error.message}</p>
+            <ErrorState className="mt-3" id="projects.picker.discover-failed">
+              This machine could not be searched for projects.
+            </ErrorState>
           ) : null}
           {discover.isSuccess && results.length === 0 ? (
             <p className="mt-4 rounded-card border border-line bg-field p-4 text-sm text-t2">

@@ -56,7 +56,7 @@ export function PinoutMap(props: Props) {
   const [maximized, setMaximized] = useState(false);
   const [maxView, setMaxView] = useState<"map" | "table">("map");
   const close = useCallback(() => setMaximized(false), []);
-  const dialogRef = useModalDismiss(maximized, close);
+  const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(maximized, close);
 
   return (
     <>
@@ -64,7 +64,8 @@ export function PinoutMap(props: Props) {
 
       {maximized ? (
         <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-6"
+          style={{ zIndex: modalZ }}
+          className="fixed inset-0 flex items-center justify-center bg-black/50 p-6"
           data-testid="pinout-max-overlay"
           onClick={close}
         >

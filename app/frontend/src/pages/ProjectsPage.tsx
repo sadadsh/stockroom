@@ -17,8 +17,10 @@ import { ProjectAssemblyWorkbench } from "../components/projects/ProjectAssembly
 import { ProjectChangesWorkbench } from "../components/projects/ProjectChangesWorkbench";
 import {
   Badge,
-  Button,
   Dot,
+  EmptyState,
+  ErrorState,
+  LoadingState,
   TabPanel,
   TabStrip,
   type TabItem,
@@ -68,10 +70,16 @@ export function ProjectsPage() {
         {selectedId ? (
           <SelectedProject key={selectedId} projectId={selectedId} />
         ) : (
-          <div className="flex h-full items-center justify-center p-8 text-center text-sm text-t3">
-            {projects.isLoading
-              ? <Text id="projects.loading">Loading projects...</Text>
-              : <Text id="projects.empty">Link a project or select one from the list.</Text>}
+          <div className="flex h-full items-center justify-center p-8 text-center">
+            {projects.isLoading ? (
+              <LoadingState dense id="projects.loading">
+                Loading this machine's linked projects...
+              </LoadingState>
+            ) : (
+              <EmptyState dense id="projects.empty">
+                Link a project or select one from the list.
+              </EmptyState>
+            )}
           </div>
         )}
       </main>
@@ -95,21 +103,20 @@ function SelectedProject({ projectId }: { projectId: string }) {
   if (workspace.isLoading) {
     return (
       <WorkspaceMessage>
-        <Text id="projects.workspace.loading">Loading project...</Text>
+        <LoadingState dense id="projects.workspace.loading">
+          Loading this project...
+        </LoadingState>
       </WorkspaceMessage>
     );
   }
   if (workspace.error || !workspace.data) {
     return (
-      <WorkspaceMessage tone="err">
-        <span>
-          {workspace.error?.message ?? (
-            <Text id="projects.workspace.error">Could not open project.</Text>
-          )}
-        </span>
-        <Button small onClick={() => workspace.refetch()}>
-          <Text id="projects.try-again">Try Again</Text>
-        </Button>
+      <WorkspaceMessage>
+        {/* A written sentence and one retry. `workspace.error.message` is a transport string
+            (a status line, a stack) and was shown to the person verbatim. */}
+        <ErrorState id="projects.workspace.error" onRetry={() => workspace.refetch()}>
+          This project could not be opened.
+        </ErrorState>
       </WorkspaceMessage>
     );
   }
@@ -258,19 +265,10 @@ function RuntimeBadge({
   );
 }
 
-function WorkspaceMessage({
-  children,
-  tone = "neutral",
-}: {
-  children: React.ReactNode;
-  tone?: "neutral" | "err";
-}) {
+/** The centring frame the route's state block sits in. The state decides its own tone. */
+function WorkspaceMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className={`flex h-full min-h-[300px] flex-col items-center justify-center gap-3 p-8 text-center text-sm ${
-        tone === "err" ? "text-err" : "text-t3"
-      }`}
-    >
+    <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-3 p-8 text-center">
       {children}
     </div>
   );

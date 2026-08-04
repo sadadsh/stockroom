@@ -115,7 +115,12 @@ const KNOWN_DERIVED: readonly string[] = [
   "component-browser.sources.tab-records",
   "component-browser.sources.tab-changes",
   "component-browser.sources.tab-diagnostics",
-]; // 32
+  // DiffModal's kind switcher is the same TabStrip primitive now, rather than a fourth
+  // hand-rolled row of pills that had no roving tabindex and no arrow keys.
+  "diff.tabs",
+  "diff.tab-symbol",
+  "diff.tab-footprint",
+]; // 35
 
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
@@ -196,7 +201,28 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "component-browser.provider-progress",
   "component-browser.provider-report",
   "component-browser.provider-sets",
-]; // 49
+  // components/modalParts.tsx ModalShell: the scrim, the 38px header and the close control are ONE
+  // frame now, so each window names its own parts through `devId` / `headerDevId` / `closeDevId`
+  // string props. Spelled out in full at each call site. Four windows had hand-written the same
+  // frame four slightly different ways, which is also how two of them ended up sharing a z-index.
+  "component-browser.modal",
+  "component-browser.modal-close",
+  "diff.root",
+  "diff.header",
+  "preview.root",
+  "preview.header",
+  "preview.close",
+  // components/modalParts.tsx ModalActions: the confirm dialog's action row is the shared bar.
+  "confirm.actions",
+  // components/productState.tsx AttentionItem: one attention row is one object, so the row's id and
+  // its action's id arrive as `devId` / `actionDevId` string props.
+  "component-browser.attention-item",
+  "component-browser.attention-action",
+  // The stage windows' body IS the stage, so the body takes the window's stage id rather than a
+  // second absolutely-positioned div inside it.
+  "preview.stage",
+  "diff.stage",
+]; // 61
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));
@@ -244,6 +270,8 @@ describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
     expect(sourceContains('devIdBase="component-browser.layout"')).toBe(true);
     // The source ledger's own four tabs, inside the workspace modal.
     expect(sourceContains('devIdBase="component-browser.sources"')).toBe(true);
+    // The visual diff's symbol/footprint switcher.
+    expect(sourceContains('devIdBase="diff"')).toBe(true);
   });
 
   it("per-component tab ids are built by the dynamic helper, never spelled into the strip", () => {
@@ -304,7 +332,11 @@ describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
 // and status bars a third (24px); scoping matters, because the first draft of this gate convicted
 // all of them and would have "fixed" a consistency that was never broken.
 const DOCKED_PANEL_HEADERS = [
-  "/src/components/primitives.tsx",
+  // The strip itself lives here now, as `RouteHeader`. `primitives.tsx` re-exports it and no
+  // longer declares a `bg-band` height of its own, so this gate follows the decision rather than
+  // scanning a file that can no longer offend. The 38px MODAL header family lives in
+  // `modalParts.tsx`, which is deliberately NOT in this list.
+  "/src/components/productState.tsx",
   "/src/components/Rail.tsx",
   "/src/pages/ProjectsPage.tsx",
   // The open-component tab band replaced the detail sheet's title strip on the Components route,
