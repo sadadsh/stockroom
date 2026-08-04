@@ -335,14 +335,17 @@ internal sealed class WebViewWindowHost : IDisposable
             });
     }
 
-    internal IReadOnlyDictionary<string, object?> BeginProviderLease(string leaseId)
+    internal IReadOnlyDictionary<string, object?> BeginProviderLease(
+        string leaseId,
+        ProviderLeaseContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
         return InvokeOnDispatcher(
             async () =>
             {
                 ThrowIfNotReady();
                 await EnsureProviderBrowserReadyAsync().ConfigureAwait(true);
-                var lease = _providerLeases.Begin(leaseId);
+                var lease = _providerLeases.Begin(leaseId, context);
                 return new Dictionary<string, object?>
                 {
                     ["lease_id"] = lease.LeaseId,
@@ -1192,7 +1195,7 @@ internal sealed class WebViewWindowHost : IDisposable
     {
         eventArguments.Handled = true;
         SuppressProviderDownloadDialogs();
-        if (!_providerLeases.TryGetActive(out var lease) || lease is null)
+        if (!_providerLeases.TryGetActive(out var lease, out var context) || lease is null)
         {
             eventArguments.Cancel = true;
             return;
@@ -1200,10 +1203,69 @@ internal sealed class WebViewWindowHost : IDisposable
 
         var operation = eventArguments.DownloadOperation;
         var operationId = Guid.NewGuid().ToString("D", CultureInfo.InvariantCulture);
-        RecordProviderDownload(lease, operationId, "started", operation);
+        // Resolved once, from the evidence available before the destination is rewritten, and
+        // carried verbatim through every event. Sanitizing happens only on the way to disk.
+        var suggestedFileName = ProviderDownloadName.Resolve(
+            operation.ContentDisposition ?? string.Empty,
+            operation.Uri ?? string.Empty,
+            operation.ResultFilePath ?? string.Empty);
+        if (!ProviderDownloadStaging.TryResolveDestination(
+                context.StagingRoot,
+                operationId,
+                suggestedFileName,
+                out var destination))
+        {
+            // No proven Stockroom-owned destination means no download. The person's Downloads
+            // folder is not an acceptable fallback for untrusted provider bytes.
+            eventArguments.Cancel = true;
+            return;
+        }
 
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            eventArguments.ResultFilePath = destination;
+        }
+        catch (Exception exception) when (
+            exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
+        {
+            eventArguments.Cancel = true;
+            return;
+        }
+
+        RecordProviderDownload(
+            lease,
+            context,
+            operationId,
+            "started",
+            operation,
+            suggestedFileName);
+
+        var throttle = new ProviderDownloadProgressThrottle(Environment.TickCount64);
         var terminalRecorded = false;
+        EventHandler<object>? bytesReceivedChanged = null;
         EventHandler<object>? stateChanged = null;
+        bytesReceivedChanged = (_, _) =>
+        {
+            if (terminalRecorded
+                || !throttle.TryAcquire(
+                    Environment.TickCount64,
+                    checked((long)operation.BytesReceived),
+                    ProviderDownloadTotalBytes(operation)))
+            {
+                return;
+            }
+            RecordProviderDownload(
+                lease,
+                context,
+                operationId,
+                "progress",
+                operation,
+                suggestedFileName);
+        };
         stateChanged = (_, _) =>
         {
             if (operation.State is not (
@@ -1218,9 +1280,26 @@ internal sealed class WebViewWindowHost : IDisposable
             }
             terminalRecorded = true;
             operation.StateChanged -= stateChanged;
-            RecordProviderDownload(lease, operationId, "terminal", operation);
+            operation.BytesReceivedChanged -= bytesReceivedChanged;
+            // One last progress entry regardless of the throttle, so a reader always sees the
+            // final byte count as progress immediately before the terminal entry.
+            RecordProviderDownload(
+                lease,
+                context,
+                operationId,
+                "progress",
+                operation,
+                suggestedFileName);
+            RecordProviderDownload(
+                lease,
+                context,
+                operationId,
+                "terminal",
+                operation,
+                suggestedFileName);
             SuppressProviderDownloadDialogs();
         };
+        operation.BytesReceivedChanged += bytesReceivedChanged;
         operation.StateChanged += stateChanged;
         if (operation.State is CoreWebView2DownloadState.Completed
             or CoreWebView2DownloadState.Interrupted)
@@ -1277,32 +1356,35 @@ internal sealed class WebViewWindowHost : IDisposable
 
     private void RecordProviderDownload(
         ProviderLeaseIdentity lease,
+        ProviderLeaseContext context,
         string operationId,
         string phase,
-        CoreWebView2DownloadOperation operation)
+        CoreWebView2DownloadOperation operation,
+        string suggestedFileName)
     {
-        var resultFilePath = operation.ResultFilePath ?? string.Empty;
         _providerLeases.Record(
             lease,
+            context,
             operationId,
             phase,
             ProviderDownloadStateName(operation.State),
             operation.Uri ?? string.Empty,
-            ProviderDownloadName.Resolve(
-                operation.ContentDisposition ?? string.Empty,
-                operation.Uri ?? string.Empty,
-                resultFilePath),
-            resultFilePath,
+            suggestedFileName,
+            operation.ResultFilePath ?? string.Empty,
             operation.MimeType ?? string.Empty,
             operation.State == CoreWebView2DownloadState.Interrupted
                 ? operation.InterruptReason.ToString()
                 : string.Empty,
-            operation.TotalBytesToReceive is ulong totalBytes
-                && totalBytes <= long.MaxValue
-                    ? (long)totalBytes
-                    : -1,
+            ProviderDownloadTotalBytes(operation),
             checked((long)operation.BytesReceived));
     }
+
+    private static long ProviderDownloadTotalBytes(
+        CoreWebView2DownloadOperation operation) =>
+        operation.TotalBytesToReceive is ulong totalBytes
+            && totalBytes <= long.MaxValue
+                ? (long)totalBytes
+                : -1;
 
     private static string ProviderDownloadStateName(CoreWebView2DownloadState state) =>
         state switch

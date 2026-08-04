@@ -147,6 +147,48 @@ public sealed class ProviderBrowserContractTests
                 "core.ProcessFailed += OnProviderProcessFailed;"));
     }
 
+    [Fact]
+    public void ProductionSourceStagesEveryProviderDownloadAndNeverFallsBackToDownloads()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                FindProjectDirectory(),
+                "WebViewWindowHost.cs")).Replace("\r\n", "\n", StringComparison.Ordinal);
+        var handlerStart = source.IndexOf(
+            "private void OnProviderDownloadStarting(",
+            StringComparison.Ordinal);
+        var handlerEnd = source.IndexOf(
+            "private static void OnProviderDefaultDownloadDialogOpenChanged(",
+            handlerStart,
+            StringComparison.Ordinal);
+        var handler = source[handlerStart..handlerEnd];
+
+        // The destination is decided by the staging resolver alone; there is no other assignment
+        // to ResultFilePath and no path that lets WebView2 keep its own default location.
+        Assert.Equal(1, CountOccurrences(source, "eventArguments.ResultFilePath ="));
+        Assert.Contains(
+            "ProviderDownloadStaging.TryResolveDestination(",
+            handler,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Directory.CreateDirectory(Path.GetDirectoryName(destination)!);\n            eventArguments.ResultFilePath = destination;",
+            handler,
+            StringComparison.Ordinal);
+        Assert.Equal(3, CountOccurrences(handler, "eventArguments.Cancel = true;"));
+        Assert.Contains(
+            "operation.BytesReceivedChanged += bytesReceivedChanged;",
+            handler,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"progress\",\n                operation,\n                suggestedFileName);\n            RecordProviderDownload(\n                lease,\n                context,\n                operationId,\n                \"terminal\",",
+            handler,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "SpecialFolder",
+            source,
+            StringComparison.Ordinal);
+    }
+
     private static string FindProjectDirectory()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

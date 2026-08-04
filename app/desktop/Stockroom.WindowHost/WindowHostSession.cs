@@ -20,7 +20,9 @@ internal interface IWindowHostController
 
     int ProviderCdpPort();
 
-    IReadOnlyDictionary<string, object?> BeginProviderLease(string leaseId);
+    IReadOnlyDictionary<string, object?> BeginProviderLease(
+        string leaseId,
+        ProviderLeaseContext context);
 
     bool ReleaseProviderLease(string leaseId, long generation);
 
@@ -81,8 +83,10 @@ internal sealed class WebViewWindowController : IWindowHostController
 
     public int ProviderCdpPort() => _host.ProviderCdpPort();
 
-    public IReadOnlyDictionary<string, object?> BeginProviderLease(string leaseId) =>
-        _host.BeginProviderLease(leaseId);
+    public IReadOnlyDictionary<string, object?> BeginProviderLease(
+        string leaseId,
+        ProviderLeaseContext context) =>
+        _host.BeginProviderLease(leaseId, context);
 
     public bool ReleaseProviderLease(string leaseId, long generation) =>
         _host.ReleaseProviderLease(leaseId, generation);
@@ -416,11 +420,25 @@ internal sealed class WindowHostSession
         IReadOnlyDictionary<string, object?> Result)
         ProviderLeaseBegin(HandoffMessage request)
     {
-        HandoffCodec.RequireExactObject(request.Payload, "provider lease begin", "lease_id");
+        HandoffCodec.RequireExactObject(
+            request.Payload,
+            "provider lease begin",
+            "lease_id",
+            "staging_root",
+            "component_id",
+            "manufacturer",
+            "mpn",
+            "provider_id");
         var leaseId = HandoffCodec.GetRequiredString(request.Payload, "lease_id");
+        var context = new ProviderLeaseContext(
+            HandoffCodec.GetRequiredString(request.Payload, "staging_root"),
+            HandoffCodec.GetRequiredString(request.Payload, "component_id"),
+            HandoffCodec.GetRequiredString(request.Payload, "manufacturer"),
+            HandoffCodec.GetRequiredString(request.Payload, "mpn"),
+            HandoffCodec.GetRequiredString(request.Payload, "provider_id"));
         return (
             "provider-lease-begun",
-            _controller.BeginProviderLease(leaseId));
+            _controller.BeginProviderLease(leaseId, context));
     }
 
     private (
@@ -504,6 +522,10 @@ internal sealed class WindowHostSession
             ["sequence"] = item.Sequence,
             ["lease_id"] = item.LeaseId,
             ["generation"] = item.Generation,
+            ["component_id"] = item.ComponentId,
+            ["manufacturer"] = item.Manufacturer,
+            ["mpn"] = item.Mpn,
+            ["provider_id"] = item.ProviderId,
             ["operation_id"] = item.OperationId,
             ["phase"] = item.Phase,
             ["state"] = item.State,

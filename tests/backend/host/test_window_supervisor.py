@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 import traceback
 from collections.abc import Callable, Collection, Mapping, Sequence
@@ -44,6 +45,7 @@ _NOW = 1_800_000_000_000
 _PARENT_PID = 111
 _CHILD_PID = 222
 _BASE_URL = "http://127.0.0.1:43210"
+_STAGING_ROOT = str(Path(tempfile.gettempdir()).resolve() / "Stockroom Staging")
 
 
 @dataclass
@@ -222,6 +224,14 @@ class _Channel:
         self.receive_error = receive_error
         self.close_error = close_error
         self.sent: list[HandoffMessage] = []
+        self.expect_lease_scope: dict[str, object] = {
+            "lease_id": "11111111-1111-4111-8111-111111111111",
+            "staging_root": _STAGING_ROOT,
+            "component_id": "component-9",
+            "manufacturer": "Exact Manufacturer",
+            "mpn": "MPN-9",
+            "provider_id": "digikey",
+        }
         self.expected_names: list[frozenset[str] | None] = []
         self.closed = False
         self._closed_event = threading.Event()
@@ -290,9 +300,7 @@ class _Channel:
         if request.name == "provider-endpoint":
             return "provider-endpoint", {"port": 43127}
         if request.name == "provider-lease-begin":
-            assert request.payload == {
-                "lease_id": "11111111-1111-4111-8111-111111111111"
-            }
+            assert request.payload == self.expect_lease_scope
             return "provider-lease-begun", {
                 "lease_id": "11111111-1111-4111-8111-111111111111",
                 "generation": 7,
@@ -307,6 +315,10 @@ class _Channel:
                         "sequence": 19,
                         "lease_id": request.payload["lease_id"],
                         "generation": request.payload["generation"],
+                        "component_id": "component-9",
+                        "manufacturer": "Exact Manufacturer",
+                        "mpn": "MPN-9",
+                        "provider_id": "digikey",
                         "operation_id": "operation-1",
                         "phase": "terminal",
                         "state": "completed",
@@ -583,8 +595,20 @@ def test_launch_binds_exact_child_and_sends_secrets_only_in_bootstrap(
     assert client.identity.window_handle == 4500
     assert client.identity.renderer == "edgechromium"
     assert client.provider_endpoint() == "http://127.0.0.1:43127"
-    lease = client.begin_provider_lease("11111111-1111-4111-8111-111111111111")
+    lease = client.begin_provider_lease(
+        "11111111-1111-4111-8111-111111111111",
+        staging_root=_STAGING_ROOT,
+        component_id="component-9",
+        manufacturer="Exact Manufacturer",
+        mpn="MPN-9",
+        provider_id="digikey",
+    )
     assert lease.endpoint == "http://127.0.0.1:43127"
+    assert lease.staging_root == _STAGING_ROOT
+    assert lease.component_id == "component-9"
+    assert lease.manufacturer == "Exact Manufacturer"
+    assert lease.mpn == "MPN-9"
+    assert lease.provider_id == "digikey"
     client.show_provider(lease.lease_id, lease.generation)
     client.hide_provider(lease.lease_id, lease.generation)
     assert client.provider_current_url(lease.lease_id, lease.generation) == (
@@ -604,6 +628,10 @@ def test_launch_binds_exact_child_and_sends_secrets_only_in_bootstrap(
     events = client.provider_download_events(lease.lease_id, lease.generation)
     assert events[0].operation_id == "operation-1"
     assert events[0].result_file_path == r"C:\Capture\model.zip"
+    assert events[0].component_id == "component-9"
+    assert events[0].manufacturer == "Exact Manufacturer"
+    assert events[0].mpn == "MPN-9"
+    assert events[0].provider_id == "digikey"
     assert client.release_provider_lease(lease.lease_id, lease.generation) is True
     assert [message.name for message in channel.sent[-9:]] == [
         "provider-endpoint",
@@ -1529,6 +1557,148 @@ def test_supervisor_rejects_invalid_timeout_configuration(
             WindowHostSupervisor(command_timeout_seconds=value)
         else:
             WindowHostSupervisor(stop_timeout_seconds=value)
+
+
+def _download_event(**changes: object) -> dict[str, object]:
+    event: dict[str, object] = {
+        "sequence": 19,
+        "lease_id": "lease-a",
+        "generation": 7,
+        "component_id": "component-9",
+        "manufacturer": "Exact Manufacturer",
+        "mpn": "MPN-9",
+        "provider_id": "digikey",
+        "operation_id": "operation-1",
+        "phase": "progress",
+        "state": "in_progress",
+        "uri": "https://provider.example.test/model.zip",
+        "suggested_file_name": "CON.step",
+        "result_file_path": r"C:\Capture\Downloads\task-1\operation-1\_CON.step",
+        "mime_type": "application/zip",
+        "interrupt_reason": "",
+        "total_bytes": 120,
+        "bytes_received": 60,
+    }
+    event.update(changes)
+    return event
+
+
+@pytest.mark.parametrize("phase", ["started", "progress", "terminal"])
+def test_download_event_phase_vocabulary_includes_bounded_progress(phase: str) -> None:
+    parsed = supervisor_module._parse_provider_download_event(
+        _download_event(phase=phase),
+        "lease-a",
+        7,
+    )
+
+    assert parsed.phase == phase
+    assert parsed.component_id == "component-9"
+    assert parsed.manufacturer == "Exact Manufacturer"
+    assert parsed.mpn == "MPN-9"
+    assert parsed.provider_id == "digikey"
+    # The sanitized name on disk never overwrites the name the provider actually suggested.
+    assert parsed.suggested_file_name == "CON.step"
+    assert parsed.result_file_path.endswith("_CON.step")
+
+
+@pytest.mark.parametrize(
+    ("changes", "match"),
+    [
+        ({"phase": "cancelled"}, "state is invalid"),
+        ({"phase": ""}, "state is invalid"),
+        ({"state": "downloading"}, "state is invalid"),
+        ({"component_id": None}, "text is invalid"),
+        ({"manufacturer": 7}, "text is invalid"),
+        ({"mpn": ["MPN-9"]}, "text is invalid"),
+        ({"provider_id": b"digikey"}, "text is invalid"),
+        ({"component_id": "a" * 257}, "component identity is invalid"),
+        ({"manufacturer": "Exact\u0000Manufacturer"}, "component identity is invalid"),
+        ({"mpn": "MPN\u001f9"}, "component identity is invalid"),
+        ({"provider_id": "digikey\u007f"}, "component identity is invalid"),
+    ],
+)
+def test_malformed_download_event_fields_raise_instead_of_passing_through(
+    changes: dict[str, object],
+    match: str,
+) -> None:
+    with pytest.raises(WindowSupervisorProtocolError, match=match):
+        supervisor_module._parse_provider_download_event(
+            _download_event(**changes),
+            "lease-a",
+            7,
+        )
+
+
+@pytest.mark.parametrize("name", ["component_id", "manufacturer", "mpn", "provider_id"])
+def test_a_download_event_missing_its_component_identity_is_refused(name: str) -> None:
+    event = _download_event()
+    del event[name]
+
+    with pytest.raises(WindowSupervisorProtocolError, match="fields are invalid"):
+        supervisor_module._parse_provider_download_event(event, "lease-a", 7)
+
+
+def test_a_late_download_event_never_attaches_to_another_lease_or_generation() -> None:
+    late = _download_event(phase="terminal", state="interrupted")
+
+    with pytest.raises(WindowSupervisorProtocolError, match="lease is invalid"):
+        supervisor_module._parse_provider_download_event(late, "lease-a", 8)
+    with pytest.raises(WindowSupervisorProtocolError, match="lease is invalid"):
+        supervisor_module._parse_provider_download_event(late, "lease-b", 7)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("staging_root", "Relative/Staging"),
+        ("staging_root", " " + _STAGING_ROOT),
+        ("staging_root", _STAGING_ROOT + "\u0001"),
+        ("staging_root", str(Path(_STAGING_ROOT) / ("a" * 240))),
+        ("staging_root", 7),
+        ("component_id", "a" * 257),
+        ("manufacturer", "Exact\u0000Manufacturer"),
+        ("mpn", None),
+        ("provider_id", "digikey\u007f"),
+    ],
+)
+def test_lease_handshake_refuses_a_malformed_scope_before_touching_the_child(
+    tmp_path: Path,
+    field_name: str,
+    value: object,
+) -> None:
+    client, _server, _launcher, channel = _launch(tmp_path)
+    before = len(channel.sent)
+
+    with pytest.raises(ValueError):
+        client.begin_provider_lease(
+            "11111111-1111-4111-8111-111111111111",
+            **{field_name: value},
+        )
+
+    assert len(channel.sent) == before
+    client.close()
+
+
+def test_lease_handshake_allows_an_unknown_staging_root_and_sends_it_empty(
+    tmp_path: Path,
+) -> None:
+    channel = _Channel()
+    channel.expect_lease_scope = {
+        "lease_id": "11111111-1111-4111-8111-111111111111",
+        "staging_root": "",
+        "component_id": "",
+        "manufacturer": "",
+        "mpn": "",
+        "provider_id": "",
+    }
+    client, _server, _launcher, _channel = _launch(tmp_path, channel=channel)
+
+    lease = client.begin_provider_lease("11111111-1111-4111-8111-111111111111")
+
+    assert lease.staging_root == ""
+    assert lease.component_id == ""
+    assert channel.sent[-1].payload == channel.expect_lease_scope
+    client.close()
 
 
 @pytest.mark.skipif(os.name != "nt", reason="requires a native Windows process job")

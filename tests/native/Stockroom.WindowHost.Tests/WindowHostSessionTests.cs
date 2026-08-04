@@ -283,7 +283,15 @@ public sealed class WindowHostSessionTests
                 2,
                 "provider-lease-begin",
                 Now + 30_000,
-                new Dictionary<string, object?> { ["lease_id"] = leaseId }),
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = leaseId,
+                    ["staging_root"] = @"C:\Capture\Downloads\task-1",
+                    ["component_id"] = "component-9",
+                    ["manufacturer"] = "Exact Manufacturer",
+                    ["mpn"] = "MPN-9",
+                    ["provider_id"] = "digikey",
+                }),
             HandoffProtocolTests.BuildMessage(
                 3,
                 "provider-download-events",
@@ -317,7 +325,9 @@ public sealed class WindowHostSessionTests
 
         Assert.Equal(
             [
-                $"provider-lease-begin:{leaseId}",
+                $"provider-lease-begin:{leaseId}:"
+                    + @"C:\Capture\Downloads\task-1:component-9:"
+                    + "Exact Manufacturer:MPN-9:digikey",
                 $"provider-download-events:{leaseId}:7:0",
                 $"provider-lease-release:{leaseId}:7",
                 "shutdown",
@@ -342,6 +352,12 @@ public sealed class WindowHostSessionTests
         Assert.Equal("terminal", download.GetProperty("phase").GetString());
         Assert.Equal("completed", download.GetProperty("state").GetString());
         Assert.Equal(@"C:\Capture\model.zip", download.GetProperty("result_file_path").GetString());
+        Assert.Equal("component-9", download.GetProperty("component_id").GetString());
+        Assert.Equal(
+            "Exact Manufacturer",
+            download.GetProperty("manufacturer").GetString());
+        Assert.Equal("MPN-9", download.GetProperty("mpn").GetString());
+        Assert.Equal("digikey", download.GetProperty("provider_id").GetString());
     }
 
     [Fact]
@@ -354,7 +370,15 @@ public sealed class WindowHostSessionTests
                 2,
                 "provider-lease-begin",
                 Now + 30_000,
-                new Dictionary<string, object?> { ["lease_id"] = leaseId }),
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = leaseId,
+                    ["staging_root"] = @"C:\Capture\Downloads\task-2",
+                    ["component_id"] = string.Empty,
+                    ["manufacturer"] = string.Empty,
+                    ["mpn"] = string.Empty,
+                    ["provider_id"] = string.Empty,
+                }),
             HandoffProtocolTests.BuildMessage(
                 3,
                 "provider-refresh",
@@ -387,7 +411,8 @@ public sealed class WindowHostSessionTests
 
         Assert.Equal(
             [
-                $"provider-lease-begin:{leaseId}",
+                $"provider-lease-begin:{leaseId}:"
+                    + @"C:\Capture\Downloads\task-2::::",
                 $"provider-refresh:{leaseId}:7",
                 $"provider-state:{leaseId}:7",
                 "shutdown",
@@ -483,9 +508,14 @@ public sealed class WindowHostSessionTests
             return 43127;
         }
 
-        public IReadOnlyDictionary<string, object?> BeginProviderLease(string leaseId)
+        public IReadOnlyDictionary<string, object?> BeginProviderLease(
+            string leaseId,
+            ProviderLeaseContext context)
         {
-            Operations.Add($"provider-lease-begin:{leaseId}");
+            Operations.Add(
+                $"provider-lease-begin:{leaseId}:{context.StagingRoot}:"
+                + $"{context.ComponentId}:{context.Manufacturer}:{context.Mpn}:"
+                + context.ProviderId);
             return new Dictionary<string, object?>
             {
                 ["lease_id"] = leaseId,
@@ -512,6 +542,10 @@ public sealed class WindowHostSessionTests
                     19,
                     leaseId,
                     generation,
+                    "component-9",
+                    "Exact Manufacturer",
+                    "MPN-9",
+                    "digikey",
                     "download-1",
                     "terminal",
                     "completed",

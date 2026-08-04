@@ -556,6 +556,11 @@ class ProviderLeaseHandshake:
     lease_id: str
     generation: int
     endpoint: str
+    staging_root: str = ""
+    component_id: str = ""
+    manufacturer: str = ""
+    mpn: str = ""
+    provider_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -563,6 +568,10 @@ class ProviderDownloadEvent:
     sequence: int
     lease_id: str
     generation: int
+    component_id: str
+    manufacturer: str
+    mpn: str
+    provider_id: str
     operation_id: str
     phase: str
     state: str
@@ -580,6 +589,10 @@ _PROVIDER_DOWNLOAD_EVENT_KEYS = frozenset(
         "sequence",
         "lease_id",
         "generation",
+        "component_id",
+        "manufacturer",
+        "mpn",
+        "provider_id",
         "operation_id",
         "phase",
         "state",
@@ -592,6 +605,43 @@ _PROVIDER_DOWNLOAD_EVENT_KEYS = frozenset(
         "bytes_received",
     }
 )
+
+# The native journal's exact vocabularies. A value outside them is a protocol break, not a
+# variant to tolerate: `progress` is bounded by the host-side throttle, and the terminal
+# entry is always preceded by one final `progress` entry for the same operation.
+_PROVIDER_DOWNLOAD_PHASES = frozenset({"started", "progress", "terminal"})
+_PROVIDER_DOWNLOAD_STATES = frozenset(
+    {"in_progress", "completed", "interrupted", "unknown"}
+)
+_MAX_PROVIDER_IDENTITY_LENGTH = 256
+_MAX_PROVIDER_STAGING_ROOT_LENGTH = 240
+
+
+def _validate_staging_root(value: str) -> str:
+    """An empty staging root is honest ignorance; a malformed one is a bug worth failing on."""
+
+    if type(value) is not str:
+        raise ValueError("provider staging root must be text")
+    if not value:
+        return value
+    if (
+        value != value.strip()
+        or len(value) > _MAX_PROVIDER_STAGING_ROOT_LENGTH
+        or any(character < " " or character == "\x7f" for character in value)
+        or not Path(value).is_absolute()
+    ):
+        raise ValueError("provider staging root must be an exact absolute directory")
+    return value
+
+
+def _validate_provider_identity(value: str, label: str) -> str:
+    if (
+        type(value) is not str
+        or len(value) > _MAX_PROVIDER_IDENTITY_LENGTH
+        or any(character < " " or character == "\x7f" for character in value)
+    ):
+        raise ValueError(f"provider lease {label} is invalid")
+    return value
 
 
 def _parse_provider_download_event(
@@ -617,17 +667,29 @@ def _parse_provider_download_event(
     text_names = _PROVIDER_DOWNLOAD_EVENT_KEYS - frozenset(integer_names)
     if any(type(item[name]) is not str for name in text_names):
         raise WindowSupervisorProtocolError("provider download event text is invalid")
-    if item["phase"] not in {"started", "terminal"} or item["state"] not in {
-        "in_progress",
-        "completed",
-        "interrupted",
-        "unknown",
-    }:
+    if (
+        item["phase"] not in _PROVIDER_DOWNLOAD_PHASES
+        or item["state"] not in _PROVIDER_DOWNLOAD_STATES
+    ):
         raise WindowSupervisorProtocolError("provider download event state is invalid")
+    # A download event names the component it belongs to so it is self-describing; the lease
+    # and generation above are what keep a late event from attaching to another component.
+    for name in ("component_id", "manufacturer", "mpn", "provider_id"):
+        value = cast(str, item[name])
+        if len(value) > _MAX_PROVIDER_IDENTITY_LENGTH or any(
+            character < " " or character == "\x7f" for character in value
+        ):
+            raise WindowSupervisorProtocolError(
+                "provider download event component identity is invalid"
+            )
     return ProviderDownloadEvent(
         sequence=cast(int, item["sequence"]),
         lease_id=cast(str, item["lease_id"]),
         generation=cast(int, item["generation"]),
+        component_id=cast(str, item["component_id"]),
+        manufacturer=cast(str, item["manufacturer"]),
+        mpn=cast(str, item["mpn"]),
+        provider_id=cast(str, item["provider_id"]),
         operation_id=cast(str, item["operation_id"]),
         phase=cast(str, item["phase"]),
         state=cast(str, item["state"]),
@@ -1057,9 +1119,31 @@ class WindowHostClient:
             parse,
         )
 
-    def begin_provider_lease(self, lease_id: str) -> ProviderLeaseHandshake:
+    def begin_provider_lease(
+        self,
+        lease_id: str,
+        *,
+        staging_root: str = "",
+        component_id: str = "",
+        manufacturer: str = "",
+        mpn: str = "",
+        provider_id: str = "",
+    ) -> ProviderLeaseHandshake:
+        """Fence the provider surface, name where its downloads must land, and stamp the
+        component the lease is for onto every event it will produce.
+
+        ``staging_root`` is a Stockroom-owned absolute directory. An empty one means no
+        destination is known, and the host cancels downloads rather than letting WebView2
+        write into the person's Downloads folder.
+        """
+
         if type(lease_id) is not str or not lease_id or lease_id != lease_id.strip():
             raise ValueError("provider lease id must be exact non-empty text")
+        staging_root = _validate_staging_root(staging_root)
+        component_id = _validate_provider_identity(component_id, "component id")
+        manufacturer = _validate_provider_identity(manufacturer, "manufacturer")
+        mpn = _validate_provider_identity(mpn, "mpn")
+        provider_id = _validate_provider_identity(provider_id, "provider id")
 
         def parse(response: HandoffMessage, sequence: int) -> ProviderLeaseHandshake:
             result = _strict_result(
@@ -1079,13 +1163,25 @@ class WindowHostClient:
                 lease_id=lease_id,
                 generation=generation,
                 endpoint=f"http://127.0.0.1:{port}",
+                staging_root=staging_root,
+                component_id=component_id,
+                manufacturer=manufacturer,
+                mpn=mpn,
+                provider_id=provider_id,
             )
 
         return self._command(
             "provider-lease-begin",
             "provider-lease-begun",
             parse,
-            payload={"lease_id": lease_id},
+            payload={
+                "lease_id": lease_id,
+                "staging_root": staging_root,
+                "component_id": component_id,
+                "manufacturer": manufacturer,
+                "mpn": mpn,
+                "provider_id": provider_id,
+            },
         )
 
     def release_provider_lease(self, lease_id: str, generation: int) -> bool:

@@ -26,7 +26,6 @@ import hashlib
 import json
 import re
 import shutil
-import stat
 import tempfile
 import zipfile
 from dataclasses import dataclass
@@ -38,7 +37,14 @@ from stockroom.altium.driver import AltiumDriver
 from stockroom.altium.embed3d import delphi_quote
 from stockroom.altium.oleread import read_footprint_names, read_symbol_names
 from stockroom.capture.identity import same_manufacturer
-from stockroom.ingest.sandbox import unpack_inputs
+from stockroom.ingest.errors import IngestError
+from stockroom.ingest.sandbox import (
+    DEFAULT_LIMITS,
+    ArchiveLimits,
+    ArchivePolicy,
+    inspect_archive,
+    unpack_inputs,
+)
 
 _SCHEMA = "stockroom.ul-altium-import/1"
 _IMPORT_NAME = "ul_import.pas"
@@ -59,6 +65,27 @@ _REQUIRED_IMPORT_MARKERS = (
     "DoSafeChangeFileNameAndSave(BasePath + '.PcbLib'",
     "DoSafeChangeFileNameAndSave(BasePath + '.SchLib'",
 )
+# The provider's Delphi members are the ONE reviewed exception to the sandbox's blanket refusal
+# of script content, and only because every one of them is pinned by SHA-256 below before Altium
+# is allowed to open it. The exemption covers the extension gate only: the sandbox still sniffs
+# leading bytes, so a `.pas` carrying a PE payload is refused like any other.
+_REVIEWED_SCRIPT_SUFFIXES = frozenset({".pas", ".dfm", ".prjscr"})
+_UNPACK_POLICY = ArchivePolicy(reviewed_member_suffixes=_REVIEWED_SCRIPT_SUFFIXES)
+# A reviewed script package is five or six small members plus one STEP. Bounding a member at
+# 5 MiB (rather than the generic 64 MiB) keeps this narrow shape narrow, and requiring non-empty
+# members refuses a zero-length stand-in for a pinned file. Nesting is refused outright: a script
+# archive that carries another archive is not the shape that was reviewed.
+_SCRIPT_ARCHIVE_POLICY = ArchivePolicy(
+    limits=ArchiveLimits(
+        max_member_expanded_bytes=5 * 1024 * 1024,
+        max_nested_archive_depth=0,
+        max_members=64,
+        max_total_expanded_bytes=32 * 1024 * 1024,
+        max_archive_bytes=min(DEFAULT_LIMITS.max_archive_bytes, 32 * 1024 * 1024),
+    ),
+    reviewed_member_suffixes=_REVIEWED_SCRIPT_SUFFIXES,
+    require_non_empty_members=True,
+)
 
 
 class UltraLibrarianImportError(RuntimeError):
@@ -70,99 +97,72 @@ def _sha256_bytes(data: bytes) -> str:
 
 
 def _preflight_script_archive(path: Path) -> None:
-    """Reject unsafe or unreviewed script archives before extraction."""
+    """Reject unsafe or unreviewed script archives before extraction.
+
+    Archive safety itself is not this module's job and is no longer implemented here: the
+    bounded walk in ``stockroom.ingest.sandbox`` owns path shape, member modes, encryption,
+    compression, per-member and total expansion, ratio and nesting, for every caller. What
+    remains here is the part that IS this module's concern -- the exact reviewed script shape
+    and the SHA-256 pins on the members Altium will be asked to execute.
+    """
 
     if not path.is_file() or not zipfile.is_zipfile(path):
         return
-    with zipfile.ZipFile(path) as archive:
-        files = [item for item in archive.infolist() if not item.is_dir()]
-        if not any(PurePosixPath(item.filename).name.casefold() == _IMPORT_NAME for item in files):
-            return
-        folded: set[str] = set()
-        for item in files:
-            name = item.filename
-            pure = PurePosixPath(name)
-            if (
-                not name
-                or "\\" in name
-                or pure.is_absolute()
-                or ".." in pure.parts
-                or ":" in pure.parts[0]
-            ):
-                raise UltraLibrarianImportError(
-                    f"the Ultra Librarian archive has an unsafe member: {name!r}"
-                )
-            key = name.casefold()
-            if key in folded:
-                raise UltraLibrarianImportError(
-                    "the Ultra Librarian archive has duplicate or case-colliding members"
-                )
-            folded.add(key)
-            unix_mode = item.external_attr >> 16
-            if item.create_system == 3 and stat.S_IFMT(unix_mode) not in {0, stat.S_IFREG}:
-                raise UltraLibrarianImportError(
-                    f"the Ultra Librarian archive has a non-regular member: {name!r}"
-                )
-            if item.flag_bits & 0x1:
-                raise UltraLibrarianImportError("the Ultra Librarian script archive is encrypted")
-            if item.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}:
-                raise UltraLibrarianImportError(
-                    "the Ultra Librarian script archive uses unsupported compression"
-                )
-            if item.file_size <= 0 or item.file_size > 5 * 1024 * 1024:
-                raise UltraLibrarianImportError(
-                    f"the Ultra Librarian archive member has an unsafe size: {name!r}"
-                )
-            if item.compress_size and item.file_size / item.compress_size > 100:
-                raise UltraLibrarianImportError(
-                    f"the Ultra Librarian archive member has an unsafe compression ratio: {name!r}"
-                )
-            if pure.suffix.casefold() in {".zip", ".7z", ".rar", ".tar"}:
-                raise UltraLibrarianImportError(
-                    "the Ultra Librarian script archive contains a nested archive"
-                )
+    try:
+        inspection = inspect_archive(path, policy=_UNPACK_POLICY)
+    except IngestError as exc:
+        raise UltraLibrarianImportError(f"the download archive is unsafe: {exc}") from exc
+    if not any(member.parts[-1].casefold() == _IMPORT_NAME for member in inspection.files):
+        return
+    try:
+        inspection = inspect_archive(path, policy=_SCRIPT_ARCHIVE_POLICY)
+    except IngestError as exc:
+        raise UltraLibrarianImportError(
+            f"the Ultra Librarian script archive is unsafe: {exc}"
+        ) from exc
 
-        roots = [item for item in files if len(PurePosixPath(item.filename).parts) == 1]
-        altium = [
-            item
-            for item in files
-            if len(PurePosixPath(item.filename).parts) == 2
-            and PurePosixPath(item.filename).parts[0].casefold() == "altiumdesigner"
-        ]
-        if (
-            len(roots) != 1
-            or PurePosixPath(roots[0].filename).suffix.casefold() not in {".step", ".stp"}
-            or len(altium) not in {5, 6}
-        ):
-            raise UltraLibrarianImportError(
-                "the Ultra Librarian script archive does not match the reviewed script shape"
-            )
-        names = {PurePosixPath(item.filename).name.casefold(): item for item in altium}
-        step_members = {
-            name for name in names if PurePosixPath(name).suffix.casefold() in {".step", ".stp"}
+    files = inspection.files
+    roots = [member for member in files if len(member.parts) == 1]
+    altium = [
+        member
+        for member in files
+        if len(member.parts) == 2 and member.parts[0].casefold() == "altiumdesigner"
+    ]
+    if (
+        len(roots) != 1
+        or roots[0].suffix not in {".step", ".stp"}
+        or len(altium) not in {5, 6}
+    ):
+        raise UltraLibrarianImportError(
+            "the Ultra Librarian script archive does not match the reviewed script shape"
+        )
+    names = {member.parts[-1].casefold(): member for member in altium}
+    step_members = {
+        name for name in names if PurePosixPath(name).suffix.casefold() in {".step", ".stp"}
+    }
+    if (
+        len(names) != len(altium)
+        or not {"ul_import.pas", "ul_form.pas", "ul_form.dfm"} <= set(names)
+        or sum(name.endswith(".txt") for name in names) != 1
+        or sum(name.endswith(".prjscr") for name in names) != 1
+        or len(step_members) != len(altium) - 5
+        or set(names)
+        != {
+            "ul_import.pas",
+            "ul_form.pas",
+            "ul_form.dfm",
+            next(name for name in names if name.endswith(".txt")),
+            next(name for name in names if name.endswith(".prjscr")),
+            *step_members,
         }
-        if (
-            len(names) != len(altium)
-            or not {"ul_import.pas", "ul_form.pas", "ul_form.dfm"} <= set(names)
-            or sum(name.endswith(".txt") for name in names) != 1
-            or sum(name.endswith(".prjscr") for name in names) != 1
-            or len(step_members) != len(altium) - 5
-            or set(names)
-            != {
-                "ul_import.pas",
-                "ul_form.pas",
-                "ul_form.dfm",
-                next(name for name in names if name.endswith(".txt")),
-                next(name for name in names if name.endswith(".prjscr")),
-                *step_members,
-            }
-        ):
-            raise UltraLibrarianImportError(
-                "the Ultra Librarian Altium directory has unexpected members"
-            )
+    ):
+        raise UltraLibrarianImportError(
+            "the Ultra Librarian Altium directory has unexpected members"
+        )
+    with zipfile.ZipFile(path) as archive:
         for member_name in ("ul_form.pas", "ul_form.dfm"):
             if (
-                _sha256_bytes(archive.read(names[member_name]))
+                _sha256_bytes(archive.read(names[member_name].name))
                 != _APPROVED_STATIC_MEMBER_SHA256[member_name]
             ):
                 raise UltraLibrarianImportError(
@@ -170,7 +170,7 @@ def _preflight_script_archive(path: Path) -> None:
                 )
         project_name = next(name for name in names if name.endswith(".prjscr"))
         if (
-            _sha256_bytes(archive.read(names[project_name]))
+            _sha256_bytes(archive.read(names[project_name].name))
             != _APPROVED_STATIC_MEMBER_SHA256[".prjscr"]
         ):
             raise UltraLibrarianImportError(
@@ -740,7 +740,7 @@ def convert_ul_altium_package(
     evidence_root.mkdir(parents=True)
     try:
         try:
-            unpacked = unpack_inputs(input_paths, unpack_root)
+            unpacked = unpack_inputs(input_paths, unpack_root, policy=_UNPACK_POLICY)
         except Exception as exc:
             raise UltraLibrarianImportError(
                 f"could not unpack the Ultra Librarian download: {exc}"

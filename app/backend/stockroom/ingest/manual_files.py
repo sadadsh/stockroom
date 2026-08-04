@@ -20,6 +20,7 @@ from stockroom.altium.ul_import import (
 )
 from stockroom.capture.identity import same_mpn
 from stockroom.capture.requirements import Requirement, capture_needs
+from stockroom.ingest.errors import IngestError
 from stockroom.ingest.pipeline import IngestPipeline
 from stockroom.ingest.sandbox import unpack_inputs
 from stockroom.ingest.staging import StagingCandidate
@@ -118,13 +119,26 @@ def _has_kicad_payload(candidate: StagingCandidate) -> bool:
 
 
 def _discover_native_altium(inputs: tuple[Path, ...], root: Path) -> list[Path]:
+    """Native Altium libraries among the selected files.
+
+    Each selection is unpacked on its own. The sandbox refuses an archive that carries
+    provider script content, and one refused sibling must not discard a perfectly good
+    ``.SchLib`` the person selected beside it -- the reviewed Ultra Librarian route below
+    is what handles a script package, and it reports its own outcome.
+    """
+
     found: list[Path] = []
-    for unpacked in unpack_inputs(list(inputs), root):
-        found.extend(
-            path
-            for path in sorted(unpacked.root.rglob("*"))
-            if path.is_file() and path.suffix.casefold() in _ALTIUM_SUFFIXES
-        )
+    for index, selected in enumerate(inputs):
+        try:
+            unpacked = unpack_inputs([selected], root / str(index))
+        except IngestError:
+            continue
+        for item in unpacked:
+            found.extend(
+                path
+                for path in sorted(item.root.rglob("*"))
+                if path.is_file() and path.suffix.casefold() in _ALTIUM_SUFFIXES
+            )
     return found
 
 
