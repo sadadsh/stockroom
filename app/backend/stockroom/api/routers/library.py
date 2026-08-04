@@ -31,6 +31,7 @@ from stockroom.model.part import PartRecord
 from stockroom.model.part_id import is_valid_part_id
 from stockroom.verify.record_diff import extract_symbol_node, field_diff
 from stockroom.workflow import IntakeIdentity
+from stockroom.workspace import component_workspace
 
 # How deep the per-part timeline reads. A part rarely accrues this many commits;
 # the same cap governs history and the diff rev-validation so the two agree on what
@@ -699,10 +700,21 @@ def library_router(require_token) -> APIRouter:
 
     @r.get("/parts/{part_id}")
     def part_detail(request: Request, part_id: str) -> dict:
+        """The raw canonical record. Kept for compatibility and diagnostics; the opened
+        component reads the normalized workspace projection below instead."""
         ctx = request.app.state.ctx
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
         return ctx.ops.load_record(part_id).to_dict()
+
+    @r.get("/parts/{part_id}/workspace")
+    def part_workspace(request: Request, part_id: str) -> dict:
+        """The opened component, already decided: identity, representations, specifications,
+        sourcing, sources, and what needs attention. See `stockroom.workspace`."""
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        return component_workspace(ctx.ops.load_record(part_id))
 
     @r.patch("/parts/{part_id}")
     def edit_field(request: Request, part_id: str, body: EditFieldBody) -> dict:
