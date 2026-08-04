@@ -8,12 +8,67 @@
  * `id` must be stable and unique (it is the persistence key); children must be a plain string
  * (the default text and the diff baseline). For copy that lives in an attribute (aria-label,
  * placeholder, title) use `useText(id, default)`, which resolves the same override as a string.
+ *
+ * A sentence that has to carry a value takes NAMED placeholders rather than concatenation:
+ *
+ *     <Text id="provider.downloaded" values={{ count, total }}>
+ *       Downloaded {count} of {total} files
+ *     </Text>
+ *
+ * The default declares the required names; `lib/copyPlaceholders.ts` owns the grammar and the
+ * fail-safe rules. An override that drops a required name, invents an unknown one, or is malformed
+ * is NOT rendered: the default is used instead and a diagnostic is recorded, so a stale committed
+ * override can never show a person template syntax or delete the number a sentence exists to say.
  */
 import { useDevMode } from "./devMode";
+import {
+  clearCopyDiagnostic,
+  copyOverrideProblem,
+  copyPlaceholders,
+  declareCopyPlaceholders,
+  formatCopy,
+  recordCopyDiagnostic,
+  type CopyValues,
+} from "./copyPlaceholders";
 
-export function Text({ id, children }: { id: string; children: string }) {
-  const { enabled, resolveCopy, selectCopy, selectedCopyId, isCopyOverridden } = useDevMode();
-  const resolved = resolveCopy(id, children);
+export type { CopyValues } from "./copyPlaceholders";
+
+/**
+ * The one resolve path every form shares: learn what the default declares, then take the committed
+ * override ONLY when it still satisfies that declaration. Returns the template, unsubstituted.
+ */
+function useSafeTemplate(id: string, fallback: string): string {
+  const { resolveCopy } = useDevMode();
+  declareCopyPlaceholders(id, fallback);
+  const candidate = resolveCopy(id, fallback);
+  if (candidate === fallback) {
+    clearCopyDiagnostic(id);
+    return fallback;
+  }
+  const problem = copyOverrideProblem(fallback, candidate);
+  if (problem) {
+    recordCopyDiagnostic(id, problem, copyPlaceholders(fallback) ?? []);
+    return fallback;
+  }
+  clearCopyDiagnostic(id);
+  return candidate;
+}
+
+function useResolvedCopy(id: string, fallback: string, values?: CopyValues): string {
+  return formatCopy(useSafeTemplate(id, fallback), values);
+}
+
+export function Text({
+  id,
+  values,
+  children,
+}: {
+  id: string;
+  values?: CopyValues;
+  children: string;
+}) {
+  const { enabled, selectCopy, selectedCopyId, isCopyOverridden } = useDevMode();
+  const resolved = useResolvedCopy(id, children, values);
 
   if (!enabled) return <>{resolved}</>;
 
@@ -22,6 +77,9 @@ export function Text({ id, children }: { id: string; children: string }) {
   return (
     <span
       data-copy-id={id}
+      // The raw TEMPLATE, not the substituted text: the panel edits the sentence with its
+      // placeholders in it, and reading the rendered text back would bake this render's values in.
+      data-copy-default={children}
       title={`Edit copy: ${id}`}
       onClickCapture={(e) => {
         // Capture + stop so a label inside a button edits instead of triggering the button.
@@ -45,7 +103,23 @@ export function Text({ id, children }: { id: string; children: string }) {
 
 // The string form for copy that lives in an attribute (aria-label / placeholder / title), where a
 // wrapper element cannot go. Resolves the same override; it is not click-to-edit.
-export function useText(id: string, fallback: string): string {
-  const { resolveCopy } = useDevMode();
-  return resolveCopy(id, fallback);
+export function useText(id: string, fallback: string, values?: CopyValues): string {
+  return useResolvedCopy(id, fallback, values);
+}
+
+/**
+ * The deferred form, for a sentence whose values are only known inside a callback (a toast written
+ * when a request comes back, say). A hook cannot run there, so this resolves the template during
+ * render and hands back a formatter to call later with the numbers of the moment.
+ *
+ * The alternative is what this replaces: resolving a fragment with `useText` and concatenating a
+ * count onto it at the call site. That is not a sentence anyone can reword - the word order is in
+ * the JavaScript, not in the string - and it is exactly what named placeholders exist to end.
+ */
+export function useCopyFormatter(
+  id: string,
+  fallback: string,
+): (values?: CopyValues) => string {
+  const template = useSafeTemplate(id, fallback);
+  return (values?: CopyValues) => formatCopy(template, values);
 }

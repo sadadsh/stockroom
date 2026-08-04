@@ -71,6 +71,7 @@ export function PassiveAddSection({
   const pkgPlaceholder = useText("ingest.package-placeholder", "Select package...");
   const valuePlaceholder = useText("ingest.value-placeholder", "e.g. 10 k\u03a9");
   const tolerancePlaceholder = useText("ingest.tolerance-placeholder", "e.g. 1%");
+  const datasheetPlaceholder = useText("ingest.field-datasheet-placeholder", "https://...");
   const datasheetHint = useText(
     "ingest.datasheet-hint",
     "Required. Paste the datasheet link if it was not pulled.",
@@ -279,7 +280,7 @@ export function PassiveAddSection({
             copyId="ingest.field-datasheet-url"
             value={datasheetUrl}
             onChange={setDatasheetUrl}
-            placeholder="https://..."
+            placeholder={datasheetPlaceholder}
             hint={datasheetHint}
           />
           <TextField

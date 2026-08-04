@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useStmFamilies } from "../../api/stmQueries";
 import type { FamilyDTO } from "../../api/types";
 import type { StmScope } from "../../pages/StmViewerPage";
+import { instanceDevId } from "../../lib/componentDevIds";
 import { Badge, Eyebrow } from "../primitives";
 
 // A small disclosure chevron (no shared icon for it); rotates 90deg when the family is expanded.
@@ -118,7 +119,8 @@ function FamilyGroup({
       >
         <button
           type="button"
-          data-dev-id={`stm.family-${family.family}`}
+          data-dev-id={instanceDevId("stm.family", family.family)}
+          data-dev-role="stm.family"
           onClick={onToggleFamily}
           aria-pressed={active}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"

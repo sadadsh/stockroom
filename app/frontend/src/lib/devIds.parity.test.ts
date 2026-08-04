@@ -46,7 +46,11 @@ const SOURCE: ReadonlyArray<readonly [string, string]> = Object.entries(RAW).fil
 // Matches static literal attributes like data-dev-id="detail.spec-group". The [a-z] start
 // deliberately ignores template usages (`data-dev-id={`...`}`, `data-dev-id="${id}"`) and
 // the `data-dev-id="..."` doc example in element.overrides.ts.
-const DEV_ID_ATTR = /data-dev-id="([a-z][a-z0-9]*(?:[.-][a-z0-9]+)*)"/g;
+//
+// `data-dev-role` counts as an emission of the same catalogue id. It is the SHARED half of the id
+// contract: an element that carries a per-instance `data-dev-id` declares the class it belongs to
+// here, and that class is a catalogue row like any other (see lib/componentDevIds.ts).
+const DEV_ID_ATTR = /data-dev-(?:id|role)="([a-z][a-z0-9]*(?:[.-][a-z0-9]+)*)"/g;
 
 function scanEmittedLiteralIds(): Set<string> {
   const ids = new Set<string>();
@@ -222,7 +226,12 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   // second absolutely-positioned div inside it.
   "preview.stage",
   "diff.stage",
-]; // 61
+  // lib/componentDevIds.ts CANDIDATE_ROLE: the staged candidate card carries a per-candidate
+  // `data-dev-id` and declares this as its SHARED role. The role name is a named export rather than
+  // a literal at the call site because `candidateDevId()` builds the instance id from the same
+  // constant - two spellings of one id is exactly how the two halves would drift apart.
+  "ingest.candidate",
+]; // 62
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));
@@ -316,6 +325,86 @@ describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
     // Exact partition sanity: the three disjoint buckets cover the whole catalogue.
     expect(accounted.size).toBe(catalogueIds.size);
     expect(emitted.size + KNOWN_DERIVED.length + KNOWN_PROP_PASSED.length).toBe(catalogueIds.size);
+  });
+});
+
+// --- dynamic ids are BUILT, never interpolated ---------------------------------------------------
+// A `data-dev-id` assembled from a template literal at a call site is the failure this whole file
+// exists to prevent, and it is the one the literal scan above cannot see: the id never appears in
+// source, no catalogue row covers it, and the value it embeds arrives from a record - a package name
+// with a bracket in it, a field key with a space. Every dynamic id goes through
+// `lib/componentDevIds.ts`, which bounds and escapes the value first.
+
+// A direct template on the attribute: data-dev-id={`...`}
+const INTERPOLATED_ATTR = /data-dev-id=\{`([^`]*)`\}/g;
+
+// The one exception, and why. `item.route` comes from `lib/nav.ts`, a closed union of four routes,
+// and all four resulting ids ARE catalogue rows (see KNOWN_DERIVED). No record value reaches it.
+const ALLOWED_INTERPOLATIONS: readonly string[] = ["rail.nav-${item.route}"];
+
+describe("dynamic dev ids are built, not interpolated", () => {
+  it("no data-dev-id is assembled from a template literal at a call site", () => {
+    const offenders: string[] = [];
+    for (const [path, text] of SOURCE) {
+      INTERPOLATED_ATTR.lastIndex = 0;
+      for (let m = INTERPOLATED_ATTR.exec(text); m; m = INTERPOLATED_ATTR.exec(text)) {
+        if (ALLOWED_INTERPOLATIONS.includes(m[1])) continue;
+        offenders.push(`${path}: ${m[1]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("the instance-id builders are the only source of a bracketed id", () => {
+    // Every bracketed id in source is produced by one of these, so the escape and the length bound
+    // are not optional at any call site.
+    expect(sourceContains("export function instanceDevId(")).toBe(true);
+    expect(sourceContains("`${role}[${devIdSegment(value)}]`")).toBe(true);
+    expect(sourceContains("`${COMPONENT_BROWSER_AREA}.component[${devIdSegment(id)}]`")).toBe(true);
+  });
+});
+
+// --- one static id, one control -----------------------------------------------------------------
+// A catalogue id names one control (or one role played by a repeated row). The way that quietly
+// breaks is a copy-paste: a new component takes an existing `data-dev-id` because the markup looked
+// similar, and from then on an override written for one surface silently retunes another. A shared
+// id emitted from TWO DIFFERENT FILES is the shape that mistake takes, so it has to be declared.
+
+// Ids that legitimately appear in more than one file, each with the reason it is not a collision.
+const KNOWN_SHARED_ACROSS_FILES: Readonly<Record<string, string>> = {
+  // Not a second emission: AddPartModal names the hero input in a querySelector to land the caret
+  // in it when the window opens. The one emission is IngestPage's.
+  "ingest.input": "AddPartModal selects it to focus; IngestPage emits it",
+  // The same role in two presentations: one source record's outcome, rendered compactly in the
+  // information panel and in full in the sourcing sheet. Retuning the row is meant to reach both.
+  "component-browser.source-state": "one source-record row, compact panel and full sheet",
+};
+
+describe("no unrelated controls share one static dev id", () => {
+  it("every emitted static id belongs to a single file, unless it is a declared shared role", () => {
+    const files = new Map<string, Set<string>>();
+    for (const [path, text] of SOURCE) {
+      DEV_ID_ATTR.lastIndex = 0;
+      for (const m of text.matchAll(DEV_ID_ATTR)) {
+        if (!files.has(m[1])) files.set(m[1], new Set());
+        files.get(m[1])!.add(path);
+      }
+    }
+    const offenders = [...files]
+      .filter(([id, paths]) => paths.size > 1 && !(id in KNOWN_SHARED_ACROSS_FILES))
+      .map(([id, paths]) => `${id}: ${[...paths].sort().join(", ")}`)
+      .sort();
+    expect(offenders).toEqual([]);
+  });
+
+  it("every declared shared role is really emitted from more than one file", () => {
+    // Keeps the allowlist honest: a stale entry (the duplication was since removed) fails here
+    // rather than sitting forever as permission nobody needs.
+    const stale = Object.keys(KNOWN_SHARED_ACROSS_FILES).filter((id) => {
+      const paths = SOURCE.filter(([, text]) => text.includes(`"${id}"`));
+      return paths.length < 2;
+    });
+    expect(stale).toEqual([]);
   });
 });
 

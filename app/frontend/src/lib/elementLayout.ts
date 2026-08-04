@@ -73,6 +73,143 @@ export function isValidGridSlot(value: string): boolean {
   return parts.every((p) => p !== "" && GRID_TOKEN_RE.test(p));
 }
 
+// --- the applied-value grammar ------------------------------------------------------------------
+// The backend `dev.py` (`_ELEM_ALLOWED_PROPS` / `_valid_css_value`) is the sole authority on what may
+// be WRITTEN into committed source. This is its client-side mirror, and it exists for the other
+// direction: `lib/element.overrides.ts` is committed source that can be hand-edited or can arrive
+// from a revision whose grammar was wider, so the runtime that applies it has to decide what to do
+// with a declaration it no longer recognises. It IGNORES it. A stale override is dropped quietly
+// rather than fed to `style.setProperty` (which would silently no-op anyway) or allowed to stand in
+// the panel as an editable value the writer would reject with a 400.
+//
+// Deliberately mirrors the BACKEND grammar rather than the panel's stricter picker grammar
+// (`isValidGridSlot` above): anything the writer accepted must keep applying, or upgrading the app
+// would delete a tweak that was legitimately committed.
+
+const EDITABLE_PROPS: ReadonlySet<string> = new Set([
+  "width",
+  "height",
+  "min-width",
+  "min-height",
+  "max-width",
+  "max-height",
+  "margin",
+  "margin-top",
+  "margin-right",
+  "margin-bottom",
+  "margin-left",
+  "padding",
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left",
+  "gap",
+  "row-gap",
+  "column-gap",
+  "order",
+  "grid-column",
+  "grid-row",
+  "display",
+  "visibility",
+  "opacity",
+  "color",
+  "background-color",
+  "border-color",
+  "border-radius",
+  "font-size",
+  "font-weight",
+  "line-height",
+  "letter-spacing",
+  "text-align",
+  "flex-direction",
+  "flex-wrap",
+  "justify-content",
+  "align-items",
+  "align-content",
+]);
+
+/** True only for a property Dev Mode may override. Anything else is not editable, by contract. */
+export function isEditableElementProp(prop: string): boolean {
+  return EDITABLE_PROPS.has(prop.trim().toLowerCase());
+}
+
+const MAX_VALUE_LEN = 64;
+const FORBIDDEN = [";", "<", ">", "{", "}", "url(", "expression(", "/*", "*/", "\\", "@"];
+const LENGTH_KEYWORDS = new Set(["auto", "none", "0", "min-content", "max-content", "fit-content"]);
+const LENGTH_RE = /^-?(?:\d+|\d*\.\d+)(?:px|rem|em|vh|vw|%)$/;
+const LENGTH_LIST_RE =
+  /^-?(?:\d+|\d*\.\d+)(?:px|rem|em|vh|vw|%)(?:\s+-?(?:\d+|\d*\.\d+)(?:px|rem|em|vh|vw|%)){0,3}$/;
+const BACKEND_ORDER_RE = /^-?\d{1,3}$/;
+const BACKEND_GRID_TOKEN_RE = /^(?:auto|-?\d{1,4}|span\s+(?:\d{1,4}|[a-zA-Z][\w-]*)|[a-zA-Z][\w-]*)$/;
+const COLOR_RE = /^(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent|currentColor)$/;
+const NUMBER_RE = /^(?:0|1|0?\.\d{1,3})$/;
+const LINE_HEIGHT_RE = /^(?:0|[1-9](?:\.\d{1,3})?|0?\.\d{1,3})$/;
+const FONT_WEIGHT_RE = /^(?:[1-9]00|normal|bold)$/;
+const ENUMS: Record<string, ReadonlySet<string>> = {
+  display: new Set(["block", "inline", "inline-block", "flex", "inline-flex", "grid", "none"]),
+  visibility: new Set(["visible", "hidden"]),
+  "text-align": new Set(["left", "center", "right", "start", "end"]),
+  "flex-direction": new Set(["row", "row-reverse", "column", "column-reverse"]),
+  "flex-wrap": new Set(["nowrap", "wrap", "wrap-reverse"]),
+  "justify-content": new Set([
+    "start",
+    "end",
+    "center",
+    "space-between",
+    "space-around",
+    "space-evenly",
+  ]),
+  "align-items": new Set(["stretch", "start", "end", "flex-start", "flex-end", "center", "baseline"]),
+  "align-content": new Set([
+    "stretch",
+    "start",
+    "end",
+    "flex-start",
+    "flex-end",
+    "center",
+    "space-between",
+    "space-around",
+  ]),
+};
+
+function backendGridSlot(value: string): boolean {
+  const parts = value.split("/").map((p) => p.trim());
+  if (parts.length < 1 || parts.length > 2) return false;
+  return parts.every((p) => p !== "" && BACKEND_GRID_TOKEN_RE.test(p));
+}
+
+/**
+ * True only for a value in the safe grammar for `prop`. Rejects the empty string, anything over 64
+ * characters, a newline, and every character that could end one declaration and begin another.
+ */
+export function isSafeElementValue(prop: string, value: string): boolean {
+  if (typeof value !== "string") return false;
+  if (value.includes("\n") || value.includes("\r")) return false;
+  const v = value.trim();
+  if (!v || v.length > MAX_VALUE_LEN) return false;
+  const low = v.toLowerCase();
+  if (FORBIDDEN.some((bad) => low.includes(bad))) return false;
+  const name = prop.trim().toLowerCase();
+  if (name === "order") return BACKEND_ORDER_RE.test(v);
+  if (name === "grid-column" || name === "grid-row") return backendGridSlot(v);
+  if (name in ENUMS) return ENUMS[name].has(v);
+  if (name === "color" || name === "background-color" || name === "border-color") {
+    return COLOR_RE.test(v);
+  }
+  if (name === "opacity") return NUMBER_RE.test(v);
+  if (name === "font-weight") return FONT_WEIGHT_RE.test(v);
+  if (name === "border-radius") return v === "0" || LENGTH_RE.test(v) || LENGTH_LIST_RE.test(v);
+  if (name === "line-height") return low === "normal" || LENGTH_RE.test(v) || LINE_HEIGHT_RE.test(v);
+  if (name === "letter-spacing") return low === "normal" || v === "0" || LENGTH_RE.test(v);
+  if (name === "font-size") return LENGTH_KEYWORDS.has(low) || LENGTH_RE.test(v);
+  return LENGTH_KEYWORDS.has(low) || LENGTH_RE.test(v) || LENGTH_LIST_RE.test(v);
+}
+
+/** True when a property/value pair is both editable and safe - the one gate the runtime applies. */
+export function isApplicableElementOverride(prop: string, value: string): boolean {
+  return isEditableElementProp(prop) && isSafeElementValue(prop, value);
+}
+
 // Which direction a reorder moves the selected element among its siblings: one visual step earlier
 // ("up") or later ("down").
 export type ReorderDirection = "up" | "down";

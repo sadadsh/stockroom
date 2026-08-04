@@ -12,6 +12,19 @@
  * "Show All" fallback) and points the Copy tab at the element's data-copy-id. Editing a token still
  * edits the GLOBAL token (setToken) and editing copy still edits the global copy (setCopy). The
  * token-row helpers (ColorRow/ScaleRow/ShadowRow) and CopyEditor are reused as-is, not rewritten.
+ *
+ * Two capabilities the id system needs from this surface, added alongside the catalogue:
+ *
+ *  - The LIVE group in the Catalogue lists the dev ids currently in the document. A per-instance id
+ *    belongs to a record, not to a fixed list, so the catalogue can never name the tab of the
+ *    component that happens to be open; one search box now finds both halves.
+ *  - The Box tab asks WHICH CONTRACT an edit is under when the selection has both identities: this
+ *    one (its instance id) or every one of these (the shared role it declares). Guessing would make
+ *    one of the two capabilities unreachable, and the wrong guess is destructive.
+ *
+ * The panel's own chrome comes from the shared design system (`SectionHeader`, `ModalActions`), but
+ * its STRINGS deliberately do not go through the copy layer: this is the editor, and routing the
+ * editor's labels through the surface it edits means one bad override can make it unusable.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "../lib/theme";
@@ -20,14 +33,26 @@ import { DEV_TOKENS, DEV_TOKEN_GROUPS, DEFAULT_RANGE, type DevToken } from "../l
 import { DEV_IDS, DEV_ID_BY_ID, DEV_ID_AREAS } from "../lib/devIds";
 import { usedVarsForElement } from "../lib/inspectVars";
 import {
+  devIdScope,
+  nodeForDevId,
+  renderedDevIds,
+  sharedRoleOf,
+} from "../lib/componentDevIds";
+import {
   containerLayoutOf,
   gridColumnsOf,
   isValidGridSlot,
   isValidOrder,
+  isSafeElementValue,
   reorderSiblings,
   reorderSiblingsOf,
 } from "../lib/elementLayout";
+import { copyOverrideProblem, copyPlaceholders } from "../lib/copyPlaceholders";
 import { Button } from "./primitives";
+// The Interface Studio is part of the product, so its own chrome comes from the shared design
+// system rather than from a private set of class strings that drift away from it.
+import { SectionHeader } from "./productState";
+import { ModalActions } from "./modalParts";
 import { Icon, resolveIcon, sanitizeIconBody } from "./Icon";
 import { ICON_BY_ID, ICON_IDS_BY_CATEGORY } from "../lib/iconRegistry";
 import { api, ApiError } from "../api/client";
@@ -182,6 +207,14 @@ function TokenRow({ token, highlighted = false }: { token: DevToken; highlighted
   );
 }
 
+// What a placeholder problem means, in the words of the person who has to fix it. The reason lines
+// are the panel's own chrome (see the Copy tab comment): they describe the editor, not the product.
+const COPY_PROBLEM_TEXT: Record<string, string> = {
+  malformed: "This uses a brace that is not a placeholder. Write each value as {name}.",
+  "missing-placeholder": "This drops a placeholder the default needs, so its value would vanish.",
+  "unknown-placeholder": "This uses a placeholder with no value behind it.",
+};
+
 function CopyEditor() {
   const dev = useDevMode();
   if (!dev.selectedCopyId) {
@@ -192,19 +225,28 @@ function CopyEditor() {
     );
   }
   const id = dev.selectedCopyId;
-  const current = dev.resolveCopy(id, dev.selectedCopyDefault);
+  const defaultText = dev.selectedCopyDefault;
+  const current = dev.resolveCopy(id, defaultText);
+  // Validate the WORKING text against the default's declared placeholder set, so the problem is
+  // named while it is being typed rather than as a 400 after Save. The render path independently
+  // falls back to the default, so a saved-anyway mistake is still not a broken screen.
+  const problem = current === defaultText ? null : copyOverrideProblem(defaultText, current);
+  const required = copyPlaceholders(defaultText) ?? [];
   return (
     <div className="px-3.5 py-3">
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Copy</span>
-        <button
-          type="button"
-          onClick={dev.clearSelectedCopy}
-          className="text-2xs font-semibold text-t2 hover:text-t1"
-        >
-          Done
-        </button>
-      </div>
+      <SectionHeader
+        title="Copy"
+        className="mb-1.5"
+        action={
+          <button
+            type="button"
+            onClick={dev.clearSelectedCopy}
+            className="text-2xs font-semibold text-t2 hover:text-t1"
+          >
+            Done
+          </button>
+        }
+      />
       <div className="mb-1.5 truncate font-mono text-2xs text-t3" title={id}>
         {id}
       </div>
@@ -213,8 +255,21 @@ function CopyEditor() {
         value={current}
         rows={2}
         onChange={(e) => dev.setCopy(id, e.target.value)}
-        className="w-full resize-y rounded-control border border-line2 bg-field px-2 py-1.5 text-sm text-t1 outline-none focus:border-acc"
+        className={
+          "w-full resize-y rounded-control border bg-field px-2 py-1.5 text-sm text-t1 outline-none " +
+          (problem ? "border-err focus:border-err" : "border-line2 focus:border-acc")
+        }
       />
+      {required.length > 0 ? (
+        <div className="mt-1 font-mono text-2xs text-t3">
+          Keep: {required.map((name) => `{${name}}`).join(" ")}
+        </div>
+      ) : null}
+      {problem ? (
+        <div role="alert" className="mt-1 text-2xs leading-relaxed text-err">
+          {COPY_PROBLEM_TEXT[problem]} The default is shown until this is fixed.
+        </div>
+      ) : null}
       {dev.isCopyOverridden(id) ? (
         <button
           type="button"
@@ -364,9 +419,7 @@ function TokensTab({ showAll, setShowAll }: { showAll: boolean; setShowAll: (v: 
         if (tokens.length === 0) return null;
         return (
           <section key={group} className="py-1.5">
-            <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-              {group}
-            </div>
+            <SectionHeader title={group} className="mb-1" />
             {tokens.map((t) => (
               <TokenRow
                 key={t.cssVar}
@@ -389,7 +442,7 @@ function CopyTab() {
 
   const copyId = useMemo(() => {
     if (!selectedDevId) return null;
-    const el = document.querySelector(`[data-dev-id="${selectedDevId}"]`);
+    const el = nodeForDevId(selectedDevId);
     if (!el) return null;
     const c = el.querySelector("[data-copy-id]") ?? el.closest("[data-copy-id]");
     return c?.getAttribute("data-copy-id") ?? null;
@@ -398,8 +451,11 @@ function CopyTab() {
   useEffect(() => {
     if (!selectedDevId) return; // the direct <Text> click owns selectedCopyId; leave it alone
     if (copyId && copyId !== selectedCopyId) {
-      const el = document.querySelector(`[data-copy-id="${copyId}"]`);
-      selectCopy(copyId, el?.textContent ?? "");
+      const el = document.querySelector(`[data-copy-id="${CSS.escape(copyId)}"]`);
+      // The raw TEMPLATE, not the rendered text: reading textContent back would bake this render's
+      // substituted values into the default and make every placeholder look like a missing one.
+      const template = el?.getAttribute("data-copy-default") ?? el?.textContent ?? "";
+      selectCopy(copyId, template);
     } else if (!copyId && selectedCopyId) {
       clearSelectedCopy();
     }
@@ -422,7 +478,7 @@ function IconTab() {
 
   const iconId = useMemo(() => {
     if (!selectedDevId) return null;
-    const el = document.querySelector(`[data-dev-id="${selectedDevId}"]`);
+    const el = nodeForDevId(selectedDevId);
     if (!el) return null;
     const i =
       (el.matches("[data-icon-id]") ? el : null) ??
@@ -459,18 +515,21 @@ function IconTab() {
 
   return (
     <div className="px-3.5 py-3">
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Icon</span>
-        {overridden ? (
-          <button
-            type="button"
-            onClick={() => dev.resetIcon(iconId)}
-            className="text-2xs text-t3 hover:text-t1"
-          >
-            Reset to default
-          </button>
-        ) : null}
-      </div>
+      <SectionHeader
+        title="Icon"
+        className="mb-1.5"
+        action={
+          overridden ? (
+            <button
+              type="button"
+              onClick={() => dev.resetIcon(iconId)}
+              className="text-2xs text-t3 hover:text-t1"
+            >
+              Reset to default
+            </button>
+          ) : undefined
+        }
+      />
       <div className="mb-2 truncate font-mono text-2xs text-t3" title={iconId}>
         {iconId}
       </div>
@@ -607,6 +666,9 @@ function BoxRow({
   const dev = useDevMode();
   const value = dev.elementOverridesFor(id)?.[prop] ?? "";
   const overridden = dev.isElementPropOverridden(id, prop);
+  // A value outside the safe grammar is marked, not swallowed: it stays in the field so it can be
+  // corrected, it is never applied by the runtime, and Save drops it rather than earning a 400.
+  const invalid = value !== "" && !isSafeElementValue(prop, value);
   return (
     <div className="flex items-center gap-2 py-1">
       <span className="min-w-0 flex-1 truncate text-xs text-t2">{label}</span>
@@ -614,6 +676,8 @@ function BoxRow({
       <input
         type="text"
         aria-label={`${label} value`}
+        aria-invalid={invalid || undefined}
+        title={invalid ? `${label} does not accept this value, so it will not be saved.` : undefined}
         value={value}
         placeholder={placeholder}
         onChange={(e) => {
@@ -622,7 +686,10 @@ function BoxRow({
           if (next === "") dev.resetElementProp(id, prop);
           else dev.setElementProp(id, prop, next);
         }}
-        className="tnum w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
+        className={
+          "tnum w-[104px] flex-none rounded-control border bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none " +
+          (invalid ? "border-err focus:border-err" : "border-line focus:border-acc")
+        }
       />
     </div>
   );
@@ -693,7 +760,7 @@ function GridSlotControl({
 // the save `elements` block) - no new persistence path, no reparenting.
 function LayoutSection({ id }: { id: string }) {
   const dev = useDevMode();
-  const node = document.querySelector(`[data-dev-id="${id}"]`);
+  const node = nodeForDevId(id);
   if (!node) return null;
   const layout = containerLayoutOf(node.parentElement);
   if (layout === "none") return null;
@@ -741,7 +808,7 @@ function LayoutSection({ id }: { id: string }) {
 
   return (
     <section className="py-1.5">
-      <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Layout</div>
+      <SectionHeader title="Layout" className="mb-1" />
       <div className="flex items-center gap-2 py-1">
         <button
           type="button"
@@ -769,9 +836,7 @@ function LayoutSection({ id }: { id: string }) {
       ) : null}
       {isGridChild ? (
         <div className="mt-1.5">
-          <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-            Grid Slot
-          </div>
+          <SectionHeader title="Grid Slot" className="mb-1" />
           <GridSlotControl id={id} prop="grid-column" label="Grid Column" cols={cols} />
           <GridSlotControl id={id} prop="grid-row" label="Grid Row" cols={cols} />
           {anySlot ? (
@@ -797,14 +862,20 @@ function LayoutSection({ id }: { id: string }) {
 function BoxTab() {
   const dev = useDevMode();
   const { selectedDevId } = dev;
+  // Which contract the edit is written under. `instance` keys the override on the selected element's
+  // own id; `shared` keys it on the role it declares, which reaches every sibling carrying that role.
+  const [scope, setScope] = useState<"instance" | "shared">("instance");
 
   // Resolve the live node once and read its computed style for the placeholders. A catalogue id with
   // no mounted element (a null node) falls back to empty placeholders. getComputedStyle is a live view,
   // so a placeholder reflects the element's current value even after an override is cleared.
-  const computed = useMemo(() => {
-    if (!selectedDevId) return null;
-    const node = document.querySelector(`[data-dev-id="${selectedDevId}"]`);
-    return node ? getComputedStyle(node) : null;
+  const node = useMemo(() => (selectedDevId ? nodeForDevId(selectedDevId) : null), [selectedDevId]);
+  const computed = useMemo(() => (node ? getComputedStyle(node) : null), [node]);
+  const role = sharedRoleOf(node);
+
+  // A new selection starts on its own instance, never on whatever scope the last one was left in.
+  useEffect(() => {
+    setScope("instance");
   }, [selectedDevId]);
 
   if (!selectedDevId) {
@@ -815,31 +886,71 @@ function BoxTab() {
     );
   }
 
-  const overrides = dev.elementOverridesFor(selectedDevId);
+  const isInstance = devIdScope(selectedDevId) === "instance";
+  const targetId = scope === "shared" && role ? role : selectedDevId;
+  const overrides = dev.elementOverridesFor(targetId);
   const hasAny = overrides != null && Object.keys(overrides).length > 0;
   const placeholderFor = (prop: string) => computed?.getPropertyValue(prop) ?? "";
   const applyPreset = (preset: "fill" | "hide" | "row" | "stack" | "wrap") => {
-    if (preset === "fill") dev.setElementProp(selectedDevId, "width", "100%");
-    if (preset === "hide") dev.setElementProp(selectedDevId, "display", "none");
+    if (preset === "fill") dev.setElementProp(targetId, "width", "100%");
+    if (preset === "hide") dev.setElementProp(targetId, "display", "none");
     if (preset === "row") {
-      dev.setElementProp(selectedDevId, "display", "flex");
-      dev.setElementProp(selectedDevId, "flex-direction", "row");
-      dev.setElementProp(selectedDevId, "align-items", "center");
+      dev.setElementProp(targetId, "display", "flex");
+      dev.setElementProp(targetId, "flex-direction", "row");
+      dev.setElementProp(targetId, "align-items", "center");
     }
     if (preset === "stack") {
-      dev.setElementProp(selectedDevId, "display", "flex");
-      dev.setElementProp(selectedDevId, "flex-direction", "column");
+      dev.setElementProp(targetId, "display", "flex");
+      dev.setElementProp(targetId, "flex-direction", "column");
     }
     if (preset === "wrap") {
-      dev.setElementProp(selectedDevId, "display", "flex");
-      dev.setElementProp(selectedDevId, "flex-wrap", "wrap");
+      dev.setElementProp(targetId, "display", "flex");
+      dev.setElementProp(targetId, "flex-wrap", "wrap");
     }
   };
 
   return (
     <div className="px-3.5 py-2">
+      {/* The instance / shared choice, only where there IS one. An element that names a role as well
+          as itself can be edited either way, and which one is meant is a decision, not a guess. */}
+      {isInstance && role ? (
+        <section className="py-1.5">
+          <SectionHeader title="Applies To" className="mb-1" />
+          <div className="flex gap-1">
+            <button
+              type="button"
+              aria-pressed={scope === "instance"}
+              onClick={() => setScope("instance")}
+              className={
+                "rounded-control border px-2 py-1 text-2xs font-semibold transition-colors " +
+                (scope === "instance"
+                  ? "border-transparent bg-acc text-acc-on"
+                  : "border-line text-t2 hover:text-t1")
+              }
+            >
+              This One
+            </button>
+            <button
+              type="button"
+              aria-pressed={scope === "shared"}
+              onClick={() => setScope("shared")}
+              className={
+                "rounded-control border px-2 py-1 text-2xs font-semibold transition-colors " +
+                (scope === "shared"
+                  ? "border-transparent bg-acc text-acc-on"
+                  : "border-line text-t2 hover:text-t1")
+              }
+            >
+              Every One Of These
+            </button>
+          </div>
+          <div className="mt-1 truncate font-mono text-2xs text-t3" title={targetId}>
+            {targetId}
+          </div>
+        </section>
+      ) : null}
       <section className="py-1.5">
-        <div className="mb-1.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Presets</div>
+        <SectionHeader title="Presets" className="mb-1" />
         <div className="flex flex-wrap gap-1">
           {([[
             "fill", "Fill Width"], ["row", "Row"], ["stack", "Stack"], ["wrap", "Wrap"], ["hide", "Hide"]] as const).map(([preset, label]) => (
@@ -850,13 +961,11 @@ function BoxTab() {
         </div>
       </section>
       <section className="py-1.5">
-        <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-          Resize
-        </div>
+        <SectionHeader title="Resize" className="mb-1" />
         {BOX_RESIZE_PROPS.map((p) => (
           <BoxRow
             key={p.prop}
-            id={selectedDevId}
+            id={targetId}
             prop={p.prop}
             label={p.label}
             placeholder={placeholderFor(p.prop)}
@@ -864,13 +973,11 @@ function BoxTab() {
         ))}
       </section>
       <section className="py-1.5">
-        <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-          Spacing
-        </div>
+        <SectionHeader title="Spacing" className="mb-1" />
         {BOX_SPACING_PROPS.map((p) => (
           <BoxRow
             key={p.prop}
-            id={selectedDevId}
+            id={targetId}
             prop={p.prop}
             label={p.label}
             placeholder={placeholderFor(p.prop)}
@@ -878,26 +985,22 @@ function BoxTab() {
         ))}
       </section>
       <section className="py-1.5">
-        <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-          Appearance And Type
-        </div>
+        <SectionHeader title="Appearance And Type" className="mb-1" />
         {BOX_APPEARANCE_PROPS.map((p) => (
-          <BoxRow key={p.prop} id={selectedDevId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} />
+          <BoxRow key={p.prop} id={targetId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} />
         ))}
       </section>
       <section className="py-1.5">
-        <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-          Container Alignment
-        </div>
+        <SectionHeader title="Container Alignment" className="mb-1" />
         {BOX_ALIGNMENT_PROPS.map((p) => (
-          <BoxRow key={p.prop} id={selectedDevId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} />
+          <BoxRow key={p.prop} id={targetId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} />
         ))}
       </section>
-      <LayoutSection id={selectedDevId} />
+      <LayoutSection id={targetId} />
       {hasAny ? (
         <button
           type="button"
-          onClick={() => dev.clearElement(selectedDevId)}
+          onClick={() => dev.clearElement(targetId)}
           className="mt-2 text-2xs font-semibold text-t2 hover:text-t1"
         >
           Clear All
@@ -911,7 +1014,7 @@ function BehaviorTab() {
   const dev = useDevMode();
   const id = dev.selectedDevId;
   if (!id) return <div className="px-3.5 py-3 text-2xs text-t3">Select a control to edit its behavior.</div>;
-  const node = document.querySelector(`[data-dev-id="${id}"]`);
+  const node = nodeForDevId(id);
   if (!node?.hasAttribute("data-dev-control")) {
     return (
       <div className="px-3.5 py-3 text-2xs leading-relaxed text-t3">
@@ -929,7 +1032,7 @@ function BehaviorTab() {
   ] as const;
   return (
     <div className="px-3.5 py-3">
-      <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Control Preset</div>
+      <SectionHeader title="Control Preset" className="mb-1" />
       <div className="grid grid-cols-2 gap-1.5">
         {presets.map(([preset, label]) => (
           <button
@@ -966,8 +1069,39 @@ function BehaviorTab() {
   );
 }
 
+/**
+ * Select one id and put its element in front of the person.
+ *
+ * Resolution goes through `nodeForDevId`, so an INSTANCE id lands on the exact element it names
+ * rather than on the first sibling that happens to share a prefix, and an id carrying a quote or a
+ * bracket is a clean miss instead of a thrown selector.
+ */
+function locateDevId(id: string, select: (id: string) => void, vars: (v: string[]) => void) {
+  select(id);
+  const node = nodeForDevId(id);
+  if (!node) {
+    vars([]);
+    return;
+  }
+  vars(usedVarsForElement(node));
+  node.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  const prevOutline = node.style.outline;
+  const prevOffset = node.style.outlineOffset;
+  node.style.outline = "2px solid var(--c-acc)";
+  node.style.outlineOffset = "2px";
+  window.setTimeout(() => {
+    node.style.outline = prevOutline;
+    node.style.outlineOffset = prevOffset;
+  }, 700);
+}
+
 // The collapsible Catalogue: all registered ids filtered by the toolbar search and grouped by area. Clicking
 // an entry selects it and locates the live element (scrollIntoView + a transient flash outline).
+//
+// The catalogue alone cannot answer "what can I edit right now": a per-instance id belongs to a
+// record, not to a fixed list, so the tab of the component that is open has no row here and never
+// will. The LIVE group above the areas closes that gap by enumerating the dev ids actually in the
+// document, so one search box finds both halves of the id system.
 function Catalogue({
   search,
   open,
@@ -992,24 +1126,16 @@ function Catalogue({
     [q],
   );
 
+  // Re-enumerated whenever the panel opens, the search changes or the selection moves: the live set
+  // changes as the app does, and a stale list would point at elements that are no longer there.
+  const live = useMemo(() => {
+    if (!open) return [];
+    const dynamic = renderedDevIds().filter((id) => devIdScope(id) === "instance");
+    return q === "" ? dynamic : dynamic.filter((id) => id.toLowerCase().includes(q));
+  }, [open, q, dev.selectedDevId]);
+
   function locate(id: string) {
-    dev.selectDevId(id);
-    const el = document.querySelector(`[data-dev-id="${id}"]`);
-    if (!el) {
-      dev.selectVars([]);
-      return;
-    }
-    dev.selectVars(usedVarsForElement(el));
-    const node = el as HTMLElement;
-    node.scrollIntoView?.({ block: "center", behavior: "smooth" });
-    const prevOutline = node.style.outline;
-    const prevOffset = node.style.outlineOffset;
-    node.style.outline = "2px solid var(--c-acc)";
-    node.style.outlineOffset = "2px";
-    window.setTimeout(() => {
-      node.style.outline = prevOutline;
-      node.style.outlineOffset = prevOffset;
-    }, 700);
+    locateDevId(id, dev.selectDevId, dev.selectVars);
   }
 
   return (
@@ -1022,18 +1148,34 @@ function Catalogue({
       >
         <span aria-hidden="true">{open ? "▾" : "▸"}</span>
         Catalogue
-        <span className="ml-auto font-mono text-t3">{filtered.length}</span>
+        <span className="ml-auto font-mono text-t3">{filtered.length + live.length}</span>
       </button>
       {open ? (
         <div className="px-3.5 pb-2">
+          {live.length > 0 ? (
+            <section className="py-1" data-testid="dev-live-ids">
+              <SectionHeader title="live" className="mb-1" />
+              {live.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => locate(id)}
+                  className={
+                    "flex w-full items-baseline gap-1.5 rounded-control px-1.5 py-1 text-left transition-colors hover:bg-raise2 " +
+                    (dev.selectedDevId === id ? "bg-raise2" : "")
+                  }
+                >
+                  <span className="min-w-0 truncate font-mono text-xs text-t2">{id}</span>
+                </button>
+              ))}
+            </section>
+          ) : null}
           {DEV_ID_AREAS.map((area) => {
             const entries = filtered.filter((e) => e.area === area);
             if (entries.length === 0) return null;
             return (
               <section key={area} className="py-1">
-                <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-                  {area}
-                </div>
+                <SectionHeader title={area} className="mb-1" />
                 {entries.map((e) => (
                   <button
                     key={e.id}
@@ -1070,6 +1212,27 @@ function SelectionPane({
 }) {
   const dev = useDevMode();
   const entry = dev.selectedDevId ? DEV_ID_BY_ID.get(dev.selectedDevId) : undefined;
+  const [copied, setCopied] = useState(false);
+  const selectedId = dev.selectedDevId;
+
+  useEffect(() => {
+    setCopied(false);
+  }, [selectedId]);
+
+  // Copy ID hands back the EXACT id, brackets and all - it is the string an override is keyed on and
+  // the string a test selects by, so a prettified or truncated form would be worse than useless.
+  // Clipboard access can be denied or absent (an embedded webview, a jsdom test); the fallback keeps
+  // the id selectable rather than pretending the copy happened.
+  async function copyId() {
+    if (!selectedId) return;
+    try {
+      await navigator.clipboard?.writeText(selectedId);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+
   return (
     <div>
       <div className="border-b border-line px-3.5 py-2.5">
@@ -1077,17 +1240,36 @@ function SelectionPane({
           <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
             Selected
           </span>
-          {dev.selectedDevId ? (
-            <span className="min-w-0 truncate font-mono text-2xs text-t1">
-              {"▸"} {dev.selectedDevId}
+          {selectedId ? (
+            <span
+              data-testid="dev-selected-id"
+              className="min-w-0 truncate font-mono text-2xs text-t1"
+              title={selectedId}
+            >
+              {"▸"} {selectedId}
             </span>
           ) : (
             <span className="text-2xs text-t3">Nothing selected</span>
           )}
+          {selectedId ? (
+            <button
+              type="button"
+              aria-label="Copy ID"
+              onClick={copyId}
+              className="ml-auto flex-none rounded-control border border-line px-1.5 py-0.5 text-2xs font-semibold text-t2 transition-colors hover:text-t1"
+            >
+              {copied ? "Copied" : "Copy ID"}
+            </button>
+          ) : null}
         </div>
         {entry ? (
           <div className="mt-0.5 text-2xs text-t2">
             {entry.label} <span className="text-t3">{"·"} {entry.area}</span>
+          </div>
+        ) : null}
+        {!entry && selectedId && devIdScope(selectedId) === "instance" ? (
+          <div className="mt-0.5 text-2xs text-t2">
+            One instance <span className="text-t3">{"·"} edits here leave its siblings alone</span>
           </div>
         ) : null}
         {dev.highlightedVars.length > 0 ? (
@@ -1206,7 +1388,7 @@ export function DevPanel() {
   useEffect(() => {
     const id = dev.selectedDevId;
     if (!id) return;
-    const el = document.querySelector(`[data-dev-id="${id}"]`);
+    const el = nodeForDevId(id);
     if (!el) return;
     const hasCopy = el.querySelector("[data-copy-id]") ?? el.closest("[data-copy-id]");
     if (hasCopy) return;
@@ -1284,12 +1466,19 @@ export function DevPanel() {
             <p className="mt-2 text-2xs leading-relaxed text-t3">
               Stockroom will verify TypeScript, rebuild the production interface, commit only Dev Mode files, and push main.
             </p>
-            <div className="mt-2 flex gap-2">
-              <Button variant="accent" small disabled={publishing || !publishMessage.trim()} onClick={publish}>
+            <ModalActions className="mt-2 px-0 pb-0">
+              <Button small disabled={publishing} onClick={() => setPublishOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="accent"
+                small
+                disabled={publishing || !publishMessage.trim()}
+                onClick={publish}
+              >
                 {publishing ? "Publishing..." : "Verify And Push"}
               </Button>
-              <Button small disabled={publishing} onClick={() => setPublishOpen(false)}>Cancel</Button>
-            </div>
+            </ModalActions>
           </div>
         ) : null}
         <div className="mb-2 flex items-center gap-3">

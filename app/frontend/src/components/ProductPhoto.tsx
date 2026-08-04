@@ -12,7 +12,7 @@ import { useProductImage } from "../api/queries";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { orderPhotos } from "../lib/sourcingOrder";
 import { useObjectUrl } from "../lib/useObjectUrl";
-import { Text } from "../lib/copy";
+import { Text, useText } from "../lib/copy";
 import type { SourcedAlternate } from "../api/types";
 
 /** The photo URL out of a spec bag - either shape: a plain string (a candidate's or a
@@ -249,6 +249,7 @@ export function PhotoCard({
   onClose: () => void;
 }) {
   const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(open, onClose);
+  const closeLabel = useText("photo.close", "Close");
   const shots: PartPhoto[] =
     photos && photos.length ? photos : url ? [{ url, vendor: "" }] : [];
   const [at, setAt] = useState(0);
@@ -320,7 +321,7 @@ export function PhotoCard({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={closeLabel}
             className="flex h-7 w-7 flex-none items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

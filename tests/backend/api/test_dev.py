@@ -446,3 +446,123 @@ def test_dev_publish_refuses_foreign_dirty_source_before_running_build(tmp_path,
         assert "unrelated files" in exc.detail
     else:
         raise AssertionError("foreign source must block Dev Mode publish")
+
+
+def test_dev_save_accepts_approved_dynamic_element_ids(client, tmp_path, monkeypatch):
+    # An element that exists once per open component / staged candidate has no catalogue row, so its
+    # id carries a bracketed instance value. Those ids must be writable - editing exactly one
+    # repeated instance is the whole point - in the SHAPES lib/componentDevIds.ts builds.
+    src = _src_with_lib(tmp_path, monkeypatch)
+    body = {
+        "tokens": {"root": {}, "light": {}},
+        "copy": {},
+        "elements": {
+            "component-browser.component[stm32h743vit6]": {"width": "240px"},
+            "component-browser.component[stm32h743vit6].tab": {"padding": "8px"},
+            "component-browser.component[stm32h743vit6].representation[symbol]": {"gap": "4px"},
+            "component-browser.component[stm32h743vit6].provider[digikey]": {"height": "40px"},
+            "ingest.candidate[abc-123]": {"margin": "2px"},
+            "stm.package[LQFP100]": {"min-width": "10px"},
+            "detail.handoff-field[manufacturer]": {"max-width": "50%"},
+            # The shared role each of those declares is an ordinary catalogue-shaped id.
+            "ingest.candidate": {"padding": "6px"},
+        },
+    }
+    res = client.post("/api/dev/save", json=body)
+    assert res.status_code == 200
+    assert res.json()["elements"] == 8
+
+    elem_ts = (src / "lib" / "element.overrides.ts").read_text(encoding="utf-8")
+    assert "component-browser.component[stm32h743vit6].tab" in elem_ts
+    assert "ingest.candidate[abc-123]" in elem_ts
+
+
+def test_dev_save_drops_unregistered_dynamic_element_ids(client, tmp_path, monkeypatch):
+    # A bracketed id that is not one of the approved shapes is not "a dev id we forgot to
+    # catalogue", it is an unregistered selector. Dropped, exactly like a malformed static id.
+    src = _src_with_lib(tmp_path, monkeypatch)
+    body = {
+        "tokens": {"root": {}, "light": {}},
+        "copy": {},
+        "elements": {
+            "anything[whatever]": {"width": "10px"},
+            "components.row[1]": {"width": "10px"},
+            # a bracket value carrying a quote could never have come from devIdSegment()
+            'ingest.candidate["evil"]': {"width": "10px"},
+            "component-browser.component[a].provider[b].extra": {"width": "10px"},
+            "components.row": {"width": "10px"},  # the one legitimate entry
+        },
+    }
+    res = client.post("/api/dev/save", json=body)
+    assert res.status_code == 200
+    assert res.json()["elements"] == 1
+
+    elem_ts = (src / "lib" / "element.overrides.ts").read_text(encoding="utf-8")
+    assert "anything" not in elem_ts
+    assert "components.row[1]" not in elem_ts
+    assert '"components.row"' in elem_ts
+
+
+def test_dev_save_writes_a_copy_override_that_keeps_its_placeholders(client, tmp_path, monkeypatch):
+    src = _src_with_lib(tmp_path, monkeypatch)
+    body = {
+        "tokens": {"root": {}, "light": {}},
+        "copy": {"provider.downloaded": "{count} of {total} files are in"},
+        "copyPlaceholders": {"provider.downloaded": ["count", "total"]},
+    }
+    res = client.post("/api/dev/save", json=body)
+    assert res.status_code == 200
+    assert res.json()["copy"] == 1
+    copy_ts = (src / "lib" / "copy.overrides.ts").read_text(encoding="utf-8")
+    assert "{count} of {total} files are in" in copy_ts
+
+
+def test_dev_save_rejects_a_copy_override_with_broken_placeholders(client, tmp_path, monkeypatch):
+    # Each of these would either show a person template syntax or silently delete the value the
+    # sentence exists to carry, so none of them may reach committed source.
+    src = _src_with_lib(tmp_path, monkeypatch)
+    cases = [
+        ("Downloaded {count} of {total files", "malformed"),
+        ("Downloaded {} files", "malformed"),
+        ("Downloaded {{count}} files", "malformed"),
+        ("Downloaded some files", "missing"),
+        ("Downloaded {count} of {total} on {pages}", "unknown"),
+    ]
+    for text, _why in cases:
+        res = client.post(
+            "/api/dev/save",
+            json={
+                "tokens": {"root": {}, "light": {}},
+                "copy": {"provider.downloaded": text},
+                "copyPlaceholders": {"provider.downloaded": ["count", "total"]},
+            },
+        )
+        assert res.status_code == 400, f"expected 400 for {text!r}"
+        assert "provider.downloaded" in res.text
+        assert not (src / "lib" / "copy.overrides.ts").exists()
+
+
+def test_dev_save_syntax_checks_a_copy_id_with_no_declaration(client, tmp_path, monkeypatch):
+    # An id whose surface has not rendered this session carries no declaration, so the writer can
+    # only check the SYNTAX. It still refuses a malformed one, and it still writes a well-formed one
+    # rather than blocking every save because an old entry cannot be verified.
+    src = _src_with_lib(tmp_path, monkeypatch)
+    res = client.post(
+        "/api/dev/save",
+        json={
+            "tokens": {"root": {}, "light": {}},
+            "copy": {"old.entry": "Downloaded {coun"},
+        },
+    )
+    assert res.status_code == 400
+    assert not (src / "lib" / "copy.overrides.ts").exists()
+
+    res = client.post(
+        "/api/dev/save",
+        json={
+            "tokens": {"root": {}, "light": {}},
+            "copy": {"old.entry": "Downloaded {count} files"},
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()["copy"] == 1

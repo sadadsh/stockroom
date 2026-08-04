@@ -33,7 +33,12 @@ import {
   BEHAVIOR_OVERRIDES,
   type BehaviorOverride,
 } from "./behavior.overrides";
-import { applyElementOverrides, startElementOverrideObserver } from "./applyElementOverrides";
+import {
+  applicableOverrides,
+  applyElementOverrides,
+  startElementOverrideObserver,
+} from "./applyElementOverrides";
+import { copyPlaceholderDeclarations } from "./copyPlaceholders";
 
 // The two override blocks: dark colours + shared radii on :root ("root"), light colours on
 // :root[data-theme="light"] ("light"). Defined here (not in the regenerated overrides file) so the
@@ -517,7 +522,22 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       // D-04 / ELEM-01: carry the working icon + element overrides as the `icons` / `elements`
       // blocks; the backend (already wired) validates them and writes lib/icon.overrides.ts +
       // lib/element.overrides.ts alongside the token/copy files.
-      await api.devSave({ tokens, copy, icons, elements, behaviors });
+      //
+      // `elements` is narrowed to what the runtime would actually apply, so Save writes only
+      // source-backed overrides: a property that is no longer editable, or a value outside the safe
+      // grammar, is dropped here rather than sent to earn a 400 that names a value nobody typed.
+      //
+      // `copyPlaceholders` carries what each seen default DECLARES, so the writer can reject a
+      // rewording that dropped a required placeholder or invented one. The default lives in the
+      // JSX, so the backend has no other way to know the required set.
+      await api.devSave({
+        tokens,
+        copy,
+        icons,
+        elements: applicableOverrides(elements),
+        behaviors,
+        copyPlaceholders: copyPlaceholderDeclarations(),
+      });
       setSavedTokens(JSON.stringify(tokens));
       setSavedCopy(JSON.stringify(copy));
       setSavedIcons(JSON.stringify(icons));

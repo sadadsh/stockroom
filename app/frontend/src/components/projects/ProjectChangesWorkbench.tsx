@@ -269,6 +269,10 @@ function ConnectRepositoryPanel({
     "Use a secure HTTPS or SSH repository URL.",
   );
   const branchLabel = useText("projects.activity.branch", "Branch");
+  const remotePlaceholder = useText(
+    "projects.activity.remote-url-placeholder",
+    "https://github.com/team/project.git",
+  );
   const stateLabel = useText("projects.activity.state", "State");
   const latestCommitLabel = useText(
     "projects.activity.commit-label",
@@ -369,7 +373,7 @@ function ConnectRepositoryPanel({
                 if (error) setError("");
               }}
               className={`${INPUT} mt-2`}
-              placeholder="https://github.com/team/project.git"
+              placeholder={remotePlaceholder}
               aria-describedby="project-remote-guidance"
               aria-invalid={!!error}
             />

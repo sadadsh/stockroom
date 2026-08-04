@@ -174,8 +174,10 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
           </ul>
           {oldProjectionHasMore ? (
             <p className="text-sm text-t3">
-              More provider routes remain beyond this compatibility view. Work through these
-              components first, then run it again so Stockroom re-reads what is genuinely left.
+              <Text id="settings.worklist-more-routes">
+                More provider routes remain beyond this compatibility view. Work through these
+                components first, then run it again so Stockroom re-reads what is genuinely left.
+              </Text>
             </p>
           ) : !projectedRouteRows && hidden > 0 ? (
             <p className="text-sm text-t3">
@@ -242,13 +244,17 @@ function WorklistRow({
       <p className="col-span-2 text-2xs leading-snug text-[var(--c-warn-text)]">{row.reason}</p>
       {incomplete ? (
         <p className="col-span-2 text-2xs leading-snug text-[var(--c-warn-text)]">
-          This capture ended without completing, so this component still needs a trip. Start it
-          again when you are ready.
+          <Text id="settings.worklist-incomplete">
+            This capture ended without completing, so this component still needs a trip. Start it
+            again when you are ready.
+          </Text>
         </p>
       ) : null}
       {row.remaining.length > 0 ? (
         <div className="col-span-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-2xs text-t3">Still needs</span>
+          <span className="text-2xs text-t3">
+            <Text id="settings.worklist-still-needs">Still needs</Text>
+          </span>
           {row.remaining.map((requirement) => (
             <Badge key={requirement} tone="neutral" size="sm">
               {REQ_LABELS[requirement as Requirement] ?? requirement}

@@ -1693,6 +1693,10 @@ export interface DevSaveBody {
       disabled?: boolean;
     }
   >;
+  // The placeholder names each copy id's DEFAULT declares (`Downloaded {count} of {total} files` ->
+  // ["count", "total"]). The default lives in the JSX, so this is the only way the writer can hold a
+  // reworded override to the same set and refuse one that dropped or invented a placeholder.
+  copyPlaceholders?: Record<string, string[]>;
 }
 
 // The write outcome: the relative source paths written, and how many token / copy / icon / element

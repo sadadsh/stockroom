@@ -11,7 +11,7 @@
 import { useRef } from "react";
 import type { RepresentationKind, RepresentationView } from "../../api/workspaceTypes";
 import type { RepresentationLayout } from "../../lib/uiSession";
-import { Text } from "../../lib/copy";
+import { Text, useText } from "../../lib/copy";
 import { SegmentedControl } from "../primitives";
 import {
   REPRESENTATION_KINDS,
@@ -55,6 +55,8 @@ export function RepresentationDock({
   onExpand: (kind: RepresentationKind) => void;
   onDetails: (kind: RepresentationKind) => void;
 }) {
+  const dockLabel = useText("component-browser.dock-label", "Representations");
+  const layoutLabel = useText("component-browser.layout-label", "Representation layout");
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Arrow keys walk the three modules whichever form they are in, so a keyboard user never has to
@@ -82,7 +84,7 @@ export function RepresentationDock({
   return (
     <section
       data-dev-id="component-browser.dock"
-      aria-label="Representations"
+      aria-label={dockLabel}
       className="flex min-h-0 flex-[2_1_0%] flex-col overflow-hidden px-4 pt-2.5"
     >
       <div className="mb-1.5 flex flex-none items-center gap-3">
@@ -101,7 +103,7 @@ export function RepresentationDock({
             onChange={(id) => onLayout(id as RepresentationLayout)}
             size="small"
             devIdBase="component-browser.layout"
-            aria-label="Representation layout"
+            aria-label={layoutLabel}
           />
         </span>
       </div>

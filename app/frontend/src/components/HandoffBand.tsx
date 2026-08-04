@@ -22,7 +22,8 @@ import type { PartDetail } from "../api/types";
 import { EDA_DATA_FIELDS, edaTool } from "../lib/edaRegistry.generated";
 import { assetRef, assetsFor } from "../lib/edaTarget";
 import { compactUrl } from "../lib/compactUrl";
-import { Text } from "../lib/copy";
+import { Text, useText } from "../lib/copy";
+import { instanceDevId } from "../lib/componentDevIds";
 import { EditableText } from "./EditableText";
 import { AdaptiveChoice } from "./AdaptiveChoice";
 import { EYEBROW_DENSE } from "./primitives";
@@ -116,6 +117,7 @@ export function HandoffBand({
   categories?: string[];
   busy?: boolean;
 }) {
+  const bandLabel = useText("detail.handoff-label", "EDA Handoff");
   const fields = handoffFields();
   const resolved = fields.map((f) => ({ field: f, value: resolve(f.key, detail) }));
   const ready = resolved.filter((r) => r.value.text.trim()).length;
@@ -135,7 +137,7 @@ export function HandoffBand({
     // box the content actually has, never an ancestor that happens to be wider.
     <section
       data-dev-id="detail.handoff"
-      aria-label="EDA Handoff"
+      aria-label={bandLabel}
       className="@container flex flex-none flex-col rounded-card border border-line bg-surface"
     >
       <header className="flex items-center gap-3 border-b border-line px-3 py-1.5">
@@ -227,7 +229,10 @@ function HandoffCell({
   const missing = !value.text.trim();
   return (
     <div
-      data-dev-id={`detail.handoff-${fieldKey}`}
+      // One cell per registry field: the cell names the field it IS and the class it belongs to,
+      // so a field key carrying a space or a bracket can never forge another cell's id.
+      data-dev-id={instanceDevId("detail.handoff-field", fieldKey)}
+      data-dev-role="detail.handoff-field"
       className={`flex min-w-0 flex-col justify-start gap-0.5 bg-canvas px-3 py-2 ${className ?? ""}`}
     >
       <div className="flex min-w-0 items-center gap-1.5">
@@ -322,7 +327,8 @@ function HandoffValue({
           href={value.href}
           target="_blank"
           rel="noreferrer"
-          data-dev-id={`detail.handoff-open-${fieldKey}`}
+          data-dev-id={instanceDevId("detail.handoff-open", fieldKey)}
+          data-dev-role="detail.handoff-open"
           aria-label={`Open ${label}`}
           title={value.full}
           className="flex-none rounded-control p-0.5 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
