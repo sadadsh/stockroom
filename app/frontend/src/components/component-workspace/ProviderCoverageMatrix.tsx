@@ -269,7 +269,10 @@ function ProviderRow({
   const reachable = row.url !== "";
   return (
     <tr
+      // One row per provider, so the row names the provider it IS and the class it belongs to. An
+      // override on the instance retunes that provider's row; one on the role retunes every row.
       data-dev-id={componentProviderDevId(componentId, row.id)}
+      data-dev-role="component-browser.provider-row"
       data-provider={row.id}
       // A complete provider is the ANSWER to this screen, so it is marked three ways: a tinted
       // row, a leading accent rule, and a badge that says it in words. Colour alone would fail a

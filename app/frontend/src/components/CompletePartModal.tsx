@@ -277,7 +277,7 @@ function ProviderRouteOutcomes({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-t2">
-            Source Results
+            <Text id="complete.source-results">Source Results</Text>
           </div>
           <p
             className={
@@ -766,7 +766,9 @@ export function CompletePartModal({
         <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
           {showCad ? (
             <section className="mb-5" data-dev-id="complete.cad">
-              <Eyebrow>Files</Eyebrow>
+              <Eyebrow>
+                <Text id="complete.files-eyebrow">Files</Text>
+              </Eyebrow>
               <div
                 data-completion-evidence={completionEvidence?.state ?? "missing"}
                 className={
@@ -915,7 +917,9 @@ export function CompletePartModal({
                     </Button>
                   ) : needs.length > 0 ? (
                     <p className="text-xs text-[var(--c-warn-text)]">
-                      Add the manufacturer and exact part number before collecting files.
+                      <Text id="complete.identity-required">
+                        Add the manufacturer and exact part number before collecting files.
+                      </Text>
                     </p>
                   ) : null}
                   {hasExactIdentity ? (
@@ -930,7 +934,7 @@ export function CompletePartModal({
                   ) : null}
                   {canShowProvider ? (
                     <Button variant="default" small onClick={() => void showProvider()}>
-                      Show Provider
+                      <Text id="complete.show-provider">Show Provider</Text>
                     </Button>
                   ) : null}
                   {canBackground ? (
@@ -951,7 +955,9 @@ export function CompletePartModal({
           ) : null}
 
           <section>
-            <Eyebrow>Details</Eyebrow>
+            <Eyebrow>
+              <Text id="complete.details-eyebrow">Details</Text>
+            </Eyebrow>
             <div data-dev-id="complete.requirements" className="flex flex-col divide-y divide-line">
               {requirements.map((req) => (
                 <Requirement key={req.key} req={req} busy={busy} onEditField={onEditField} />

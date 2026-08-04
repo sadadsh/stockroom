@@ -182,6 +182,10 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.providers-summary", label: "Complete Component action", area: "component-browser" },
   { id: "component-browser.complete-component", label: "Complete Component sheet", area: "component-browser" },
   { id: "component-browser.provider-matrix", label: "Provider coverage matrix", area: "component-browser" },
+  // The SHARED role every provider row declares (`data-dev-role`). Each row also carries its own
+  // per-provider instance id, so one row can be tuned without touching the others; this row is what
+  // an edit meant for ALL of them is keyed on.
+  { id: "component-browser.provider-row", label: "Every provider coverage row", area: "component-browser" },
   { id: "component-browser.provider-open", label: "Open one provider", area: "component-browser" },
   { id: "component-browser.provider-assert", label: "Your answer for one artifact", area: "component-browser" },
   { id: "component-browser.provider-browser", label: "Provider trip controls", area: "component-browser" },
@@ -201,6 +205,11 @@ export const DEV_IDS: DevIdEntry[] = [
   // (`detail.handoff-<field key>`) from the generated EDA registry, so a new registry field brings
   // its own cell id and this catalogue needs no edit.
   { id: "detail.handoff", label: "EDA handoff block", area: "detail" },
+  // The SHARED roles the per-field cells declare. Each cell also carries its own
+  // `detail.handoff-field[<field key>]` instance id, built by lib/componentDevIds.ts, so one
+  // field can be tuned alone and a registry field key can never forge another cell's id.
+  { id: "detail.handoff-field", label: "Every handoff field cell", area: "detail" },
+  { id: "detail.handoff-open", label: "Every handoff open link", area: "detail" },
   { id: "detail.category-control", label: "Category selector", area: "detail" },
   { id: "detail.handoff-ready", label: "Handoff readiness count", area: "detail" },
   // The 3D model instrument (components/Glb3DView.tsx + lib/threeScene.ts).
@@ -278,6 +287,10 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "stm.pinout", label: "Single-MCU pinout workspace", area: "stm" },
   { id: "stm.bench", label: "Universal support workbench", area: "stm" },
   { id: "stm.target-set-control", label: "Target set control", area: "stm" },
+  // Shared roles for the two repeated STM pickers. Each button also carries its own
+  // `stm.package[<name>]` / `stm.family[<family>]` instance id.
+  { id: "stm.package", label: "Every package choice", area: "stm" },
+  { id: "stm.family", label: "Every family choice", area: "stm" },
   { id: "stm.target-definition", label: "Target definition workspace", area: "stm" },
   { id: "stm.socket-solution", label: "Socket solution workspace", area: "stm" },
   { id: "stm.target-map", label: "Physical package map", area: "stm" },

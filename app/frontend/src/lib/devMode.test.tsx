@@ -440,3 +440,123 @@ describe("dev mode edit history", () => {
     );
   });
 });
+
+// --- history across every facet, and reset at every scope --------------------------------------
+// Undo/redo is one snapshot stack over the whole working state, so a new facet is exactly the kind
+// of thing that silently falls outside it. These walk all five and then the three reset scopes.
+
+describe("undo and redo cover every facet", () => {
+  it("round-trips a copy, token, icon, box and behavior edit", async () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper });
+    expect(result.current.canUndo).toBe(false);
+
+    act(() => result.current.setCopy("a.label", "Reworded"));
+    await waitFor(() => expect(result.current.canUndo).toBe(true));
+    act(() => result.current.setToken("--c-acc", "#123456"));
+    await waitFor(() => expect(result.current.tokenValue("--c-acc")).toBe("#123456"));
+    act(() => result.current.setIconSwap("nav.components", "nav.settings"));
+    await waitFor(() => expect(result.current.isIconOverridden("nav.components")).toBe(true));
+    act(() => result.current.setElementProp("components.row", "width", "240px"));
+    await waitFor(() =>
+      expect(result.current.isElementPropOverridden("components.row", "width")).toBe(true),
+    );
+    act(() => result.current.setBehaviorOverride("detail.category-control", { preset: "radio" }));
+    await waitFor(() =>
+      expect(result.current.behaviorOverrideFor("detail.category-control")?.preset).toBe("radio"),
+    );
+
+    // Five undos walk back through all five, newest first, each leaving the others intact.
+    act(() => result.current.undo());
+    await waitFor(() =>
+      expect(result.current.behaviorOverrideFor("detail.category-control")).toBeUndefined(),
+    );
+    expect(result.current.isElementPropOverridden("components.row", "width")).toBe(true);
+
+    act(() => result.current.undo());
+    await waitFor(() =>
+      expect(result.current.isElementPropOverridden("components.row", "width")).toBe(false),
+    );
+    act(() => result.current.undo());
+    await waitFor(() => expect(result.current.isIconOverridden("nav.components")).toBe(false));
+    act(() => result.current.undo());
+    await waitFor(() => expect(result.current.tokenValue("--c-acc")).not.toBe("#123456"));
+    act(() => result.current.undo());
+    await waitFor(() => expect(result.current.resolveCopy("a.label", "Default")).toBe("Default"));
+
+    // Redo walks forward through the same five.
+    act(() => result.current.redo());
+    await waitFor(() => expect(result.current.resolveCopy("a.label", "Default")).toBe("Reworded"));
+    act(() => result.current.redo());
+    await waitFor(() => expect(result.current.tokenValue("--c-acc")).toBe("#123456"));
+    act(() => result.current.redo());
+    await waitFor(() => expect(result.current.isIconOverridden("nav.components")).toBe(true));
+    act(() => result.current.redo());
+    await waitFor(() =>
+      expect(result.current.isElementPropOverridden("components.row", "width")).toBe(true),
+    );
+    act(() => result.current.redo());
+    await waitFor(() =>
+      expect(result.current.behaviorOverrideFor("detail.category-control")?.preset).toBe("radio"),
+    );
+  });
+});
+
+describe("reset works per property, per element, and globally", () => {
+  it("clears exactly the scope asked for", async () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper });
+
+    act(() => {
+      result.current.setElementProp("components.row", "width", "240px");
+      result.current.setElementProp("components.row", "padding", "8px");
+      result.current.setElementProp("components.list", "gap", "4px");
+      result.current.setCopy("a.label", "Reworded");
+      result.current.setToken("--c-acc", "#123456");
+    });
+    await waitFor(() =>
+      expect(result.current.isElementPropOverridden("components.row", "padding")).toBe(true),
+    );
+
+    // Per property: only that one declaration goes.
+    act(() => result.current.resetElementProp("components.row", "width"));
+    await waitFor(() =>
+      expect(result.current.isElementPropOverridden("components.row", "width")).toBe(false),
+    );
+    expect(result.current.isElementPropOverridden("components.row", "padding")).toBe(true);
+
+    // Per element: that id's whole map goes, its sibling id is untouched.
+    act(() => result.current.clearElement("components.row"));
+    await waitFor(() => expect(result.current.elementOverridesFor("components.row")).toBeUndefined());
+    expect(result.current.elementOverridesFor("components.list")).toEqual({ gap: "4px" });
+
+    // Globally: every facet returns to the shipped design.
+    act(() => result.current.resetAll());
+    await waitFor(() => expect(result.current.elementOverridesFor("components.list")).toBeUndefined());
+    expect(result.current.resolveCopy("a.label", "Default")).toBe("Default");
+    expect(result.current.tokenValue("--c-acc")).not.toBe("#123456");
+  });
+});
+
+describe("save writes only source-backed overrides", () => {
+  it("drops a property or value the writer would reject, and declares the placeholder sets", async () => {
+    mockApi.devSave.mockClear();
+    const { result } = renderHook(() => useDevMode(), { wrapper });
+
+    act(() => {
+      result.current.setElementProp("components.row", "width", "240px");
+      // Editable property, value outside the safe grammar: it stays visible in the panel (so it can
+      // be corrected) but must not be sent to earn a 400 naming a value nobody typed.
+      result.current.setElementProp("components.row", "padding", "8px; color: red");
+    });
+    await waitFor(() =>
+      expect(result.current.isElementPropOverridden("components.row", "padding")).toBe(true),
+    );
+
+    await act(async () => {
+      await result.current.save();
+    });
+    await waitFor(() => expect(mockApi.devSave).toHaveBeenCalledTimes(1));
+    const sent = mockApi.devSave.mock.calls[0][0];
+    expect(sent.elements).toEqual({ "components.row": { width: "240px" } });
+    expect(sent.copyPlaceholders).toBeTruthy();
+  });
+});

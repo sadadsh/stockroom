@@ -26,6 +26,7 @@ import {
   useStmSocketSolution,
   useStmSuggestions,
 } from "../../api/stmQueries";
+import { instanceDevId } from "../../lib/componentDevIds";
 import { ApiError } from "../../api/client";
 import { AdaptiveChoice } from "../AdaptiveChoice";
 import type {
@@ -360,7 +361,8 @@ export function CompatibilityWorkbench() {
                       <button
                         key={p.name}
                         type="button"
-                        data-dev-id={`stm.package-${p.name}`}
+                        data-dev-id={instanceDevId("stm.package", p.name)}
+                        data-dev-role="stm.package"
                         aria-pressed={active}
                         title={
                           partial

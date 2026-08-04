@@ -18,6 +18,7 @@ import {
 import type { PartSummary } from "../api/types";
 import { WarnIcon } from "./icons";
 import { Icon } from "./Icon";
+import { Text, useText } from "../lib/copy";
 import { Badge } from "./primitives";
 
 // The row icon: a 30px tile carrying the part's category glyph. It deliberately does NOT render
@@ -315,7 +316,9 @@ export function PartsList({
 
   if (parts.length === 0) {
     return (
-      <div className="px-3 py-8 text-center text-sm text-t3">No Matches</div>
+      <div className="px-3 py-8 text-center text-sm text-t3">
+        <Text id="components.no-matches">No Matches</Text>
+      </div>
     );
   }
 
@@ -460,6 +463,10 @@ function PartRow({
   ) => void;
   virtual?: boolean;
 }) {
+  const duplicateTitle = useText(
+    "components.row-duplicate-title",
+    "Another part shares this MPN",
+  );
   const attention = partAttention(part);
   const attentionId = attention ? `part-attention-${part.id}` : undefined;
   return (
@@ -500,10 +507,10 @@ function PartRow({
             <span
               data-dev-id="components.row-duplicate"
               className="flex-none"
-              title="Another part shares this MPN"
+              title={duplicateTitle}
             >
               <Badge tone="warn" size="sm">
-                Duplicate
+                <Text id="components.row-duplicate-label">Duplicate</Text>
               </Badge>
             </span>
           ) : null}

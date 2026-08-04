@@ -34,7 +34,7 @@ import type {
 import { captureInFlight, useCapture, REQ_LABELS } from "../../lib/capture";
 import { useGuidedCapture } from "../../lib/useGuidedCapture";
 import { pickHostFiles } from "../../lib/hostFilePicker";
-import { Text, useText } from "../../lib/copy";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { useToast } from "../../lib/toast";
 import { CadVariantSection } from "../CadVariantSection";
 import { Badge, Button } from "../primitives";
@@ -193,13 +193,15 @@ export function CompleteComponentSheet({
     "component-browser.provider-import-failed",
     "Could not import the selected files.",
   );
-  const importQueued = useText(
+  // Placeholder entries, not fragments: the count used to be concatenated onto a headless phrase,
+  // which meant the word order lived in the JavaScript and nobody could reword the sentence.
+  const importQueued = useCopyFormatter(
     "component-browser.provider-import-queued",
-    "files were added to the open provider task",
+    "Added {count} files to the open provider task",
   );
-  const importAttached = useText(
+  const importAttached = useCopyFormatter(
     "component-browser.provider-import-attached",
-    "CAD roles were attached",
+    "Attached {count} CAD roles",
   );
   const importIgnored = useText(
     "component-browser.provider-import-ignored",
@@ -217,9 +219,9 @@ export function CompleteComponentSheet({
     "component-browser.provider-correction-failed",
     "Could not record your answer.",
   );
-  const correctionSaved = useText(
+  const correctionSaved = useCopyFormatter(
     "component-browser.provider-correction-saved",
-    "Your answer was recorded",
+    "Your answer was recorded for {provider}",
   );
 
   const busy = captureInFlight(capture.active);
@@ -248,7 +250,7 @@ export function CompleteComponentSheet({
     correction.mutate(
       { provider: row.id, artifact, status },
       {
-        onSuccess: () => toast(`${correctionSaved}: ${row.label}`, "ok"),
+        onSuccess: () => toast(correctionSaved({ provider: row.label }), "ok"),
         onError: (error) =>
           toast(error instanceof Error ? error.message : correctionFailed, "err"),
       },
@@ -296,14 +298,14 @@ export function CompleteComponentSheet({
           detailUrl: active.url,
           routeToken: active.routeToken,
         });
-        toast(`${result.queued_files} ${importQueued}`, "ok");
+        toast(importQueued({ count: result.queued_files }), "ok");
         return;
       }
       const result = await api.addPartFiles({ partId: componentId, paths });
       await invalidatePartCadProjection(queryClient, componentId);
       toast(
         result.attached.length
-          ? `${result.attached.length} ${importAttached}`
+          ? importAttached({ count: result.attached.length })
           : importIgnored,
         result.attached.length ? "ok" : "err",
       );
@@ -332,7 +334,12 @@ export function CompleteComponentSheet({
         trailing={
           providers.completeProviders.length > 0 ? (
             <Badge tone="ok" size="sm">
-              {`${providers.completeProviders.length} ${matrixLabels.completeSet}`}
+              <Text
+                id="component-browser.provider-complete-count"
+                values={{ count: providers.completeProviders.length }}
+              >
+                {"{count} Complete Set"}
+              </Text>
             </Badge>
           ) : (
             <span className="text-2xs text-t3">
@@ -413,7 +420,12 @@ export function CompleteComponentSheet({
         trailing={
           needs.length > 0 ? (
             <span className="tnum font-mono text-2xs text-t2">
-              {`${receivedCount}/${needs.length}`}
+              <Text
+                id="component-browser.provider-progress-count"
+                values={{ received: receivedCount, total: needs.length }}
+              >
+                {"{received}/{total}"}
+              </Text>
             </span>
           ) : null
         }

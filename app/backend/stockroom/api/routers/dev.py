@@ -15,6 +15,17 @@ geometry/stroke/fill attributes only, no script / event handlers / remote refs /
 DOCTYPE); per-element CSS through a safe length / keyword / grid-slot grammar. A malicious icon or
 CSS value is rejected with a 400 before anything is written, so a bad payload leaves the five files
 untouched.
+
+Two things the writer is the authority on beyond raw safety:
+
+  * COPY PLACEHOLDERS. A copy entry that carries a value writes it as ``{name}``. The default lives
+    in the JSX, so the frontend sends the placeholder set each id DECLARES and a rewording that is
+    malformed, drops a required name, or invents an unknown one is refused with a message naming
+    the placeholder. The render path fails safe on a stale override; this stops one being made.
+  * DYNAMIC ELEMENT IDS. An element that exists once per open component or per staged candidate has
+    no catalogue row, so its id carries a bracketed instance value. Those ids are accepted only in
+    the shapes ``lib/componentDevIds.ts`` builds; any other bracketed id is dropped, so an override
+    can never be keyed on an unregistered selector.
 """
 
 from __future__ import annotations
@@ -37,10 +48,48 @@ _FRONTEND_SRC = Path(__file__).resolve().parents[4] / "frontend" / "src"
 _CSS_VAR_RE = re.compile(r"^--[a-z0-9-]+$")
 _VALUE_RE = re.compile(r"^[#a-zA-Z0-9(),.%/ \-]+$")
 _COPY_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-# A stable dot-namespaced id: lowercase-kebab segments joined by dots (icon ids, dev-element ids,
-# a glyph swap target), mirroring lib/devIds.ts + the copy id convention. Shape-checks keys +
-# swapToId so only a "known-shaped" id is ever written into committed source.
+# A stable dot-namespaced id: lowercase-kebab segments joined by dots (icon ids, catalogued
+# dev-element ids, a glyph swap target), mirroring lib/devIds.ts + the copy id convention.
+# Shape-checks keys + swapToId so only a "known-shaped" id is ever written into committed source.
 _DEV_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*$")
+
+# --- dynamic (per-instance) dev ids -------------------------------------------------------------
+# An element that exists once per OPEN COMPONENT or per STAGED CANDIDATE cannot have a catalogue
+# row, so lib/componentDevIds.ts builds its id from a bracket grammar instead. Those ids must be
+# writable - editing exactly one repeated instance is the point of them - but only in the SHAPES the
+# builder emits. An arbitrary bracketed id is not "a dev id we forgot to catalogue", it is an
+# unregistered selector, and it is dropped like any other malformed key.
+#
+# The bracket VALUE mirrors what `devIdSegment()` guarantees on the way in: bounded, and free of the
+# brackets / quotes / backslash / whitespace / control characters that could close the grammar early
+# or make the attribute unreadable.
+_DEV_ID_VALUE = r"[^\[\]\"'`\\\s\x00-\x1f\x7f]{1,192}"
+_DYNAMIC_DEV_ID_RES = tuple(
+    re.compile(pattern)
+    for pattern in (
+        rf"^component-browser\.component\[{_DEV_ID_VALUE}\]$",
+        rf"^component-browser\.component\[{_DEV_ID_VALUE}\]\.tab$",
+        rf"^component-browser\.component\[{_DEV_ID_VALUE}\]\.representation\[{_DEV_ID_VALUE}\]$",
+        rf"^component-browser\.component\[{_DEV_ID_VALUE}\]\.provider\[{_DEV_ID_VALUE}\]$",
+        rf"^ingest\.candidate\[{_DEV_ID_VALUE}\]$",
+        rf"^detail\.handoff-field\[{_DEV_ID_VALUE}\]$",
+        rf"^detail\.handoff-open\[{_DEV_ID_VALUE}\]$",
+        rf"^stm\.package\[{_DEV_ID_VALUE}\]$",
+        rf"^stm\.family\[{_DEV_ID_VALUE}\]$",
+    )
+)
+_MAX_DEV_ID_LEN = 512
+
+
+def _valid_element_id(value: object) -> bool:
+    """True for a catalogued dot-namespaced id OR one of the approved dynamic instance shapes."""
+    if not isinstance(value, str) or not value or len(value) > _MAX_DEV_ID_LEN:
+        return False
+    if "[" in value or "]" in value:
+        return any(pattern.match(value) for pattern in _DYNAMIC_DEV_ID_RES)
+    return bool(_DEV_ID_RE.match(value))
+
+
 _MAX_VALUE_LEN = 200
 _MAX_COPY_LEN = 2000
 _MAX_ICON_BODY_LEN = 20000
@@ -139,16 +188,88 @@ def _clean_tokens(block: object) -> dict:
     return out
 
 
-def _clean_copy(block: object) -> dict:
-    """Keep only well-formed (copy-id -> text) pairs, length-capped."""
+# --- copy placeholders --------------------------------------------------------------------------
+# A copy entry that has to say a number or a name writes it as `{name}` (see lib/copyPlaceholders.ts).
+# The DEFAULT lives in the JSX, so the frontend sends what each id declares and the writer holds the
+# rewording to it. Both halves matter: the render path fails safe on a stale committed override, and
+# this refuses to commit one in the first place, with a message that says which name is wrong.
+_PLACEHOLDER_RE = re.compile(r"\{([A-Za-z][A-Za-z0-9_]*)\}")
+_MAX_PLACEHOLDERS = 8
+
+
+def _copy_placeholders(text: str) -> set[str] | None:
+    """The placeholder names in a template, or None when a brace is not part of a well-formed one."""
+    names: set[str] = set()
+    remainder: list[str] = []
+    last = 0
+    for match in _PLACEHOLDER_RE.finditer(text):
+        names.add(match.group(1))
+        remainder.append(text[last : match.start()])
+        last = match.end()
+    remainder.append(text[last:])
+    rest = "".join(remainder)
+    if "{" in rest or "}" in rest:
+        return None
+    return names
+
+
+def _clean_declared_placeholders(block: object) -> dict[str, set[str]]:
+    """Normalise the `copyPlaceholders` block into {copy id -> required names}; drop bad shapes."""
+    out: dict[str, set[str]] = {}
+    if not isinstance(block, dict):
+        return out
+    for key, names in block.items():
+        if not isinstance(key, str) or not _COPY_ID_RE.match(key):
+            continue
+        if not isinstance(names, list):
+            continue
+        declared = {n for n in names if isinstance(n, str) and _PLACEHOLDER_RE.fullmatch("{" + n + "}")}
+        if len(declared) != len(names):
+            continue
+        out[key] = declared
+    return out
+
+
+def _clean_copy(block: object, declared: dict[str, set[str]] | None = None) -> dict:
+    """Keep only well-formed (copy-id -> text) pairs, length-capped and placeholder-checked.
+
+    A malformed placeholder, or one that no longer matches the set its default declares, is a 400:
+    the rewording would either show a person template syntax or silently drop the value the sentence
+    exists to carry, and neither is something to write into committed source and discover later."""
     out: dict = {}
     if not isinstance(block, dict):
         return out
+    declarations = declared or {}
     for key, value in block.items():
         if not isinstance(key, str) or not _COPY_ID_RE.match(key):
             continue
         if not isinstance(value, str) or len(value) > _MAX_COPY_LEN:
             continue
+        names = _copy_placeholders(value)
+        if names is None:
+            raise ApiError(
+                400,
+                f"Copy override for '{key}' has malformed placeholder syntax. "
+                "Write each value as {name}.",
+            )
+        if len(names) > _MAX_PLACEHOLDERS:
+            raise ApiError(400, f"Copy override for '{key}' has too many placeholders.")
+        required = declarations.get(key)
+        if required is not None:
+            missing = sorted(required - names)
+            unknown = sorted(names - required)
+            if missing:
+                raise ApiError(
+                    400,
+                    f"Copy override for '{key}' is missing the placeholder "
+                    "{" + missing[0] + "}. Keep every placeholder the default declares.",
+                )
+            if unknown:
+                raise ApiError(
+                    400,
+                    f"Copy override for '{key}' uses the unknown placeholder "
+                    "{" + unknown[0] + "}. There is no value to put there.",
+                )
         out[key] = value
     return out
 
@@ -487,7 +608,7 @@ def _clean_elements(block: object) -> dict:
     if not isinstance(block, dict):
         return out
     for key, props in block.items():
-        if not isinstance(key, str) or not _DEV_ID_RE.match(key):
+        if not _valid_element_id(key):
             continue
         if not isinstance(props, dict):
             continue
@@ -515,7 +636,7 @@ def _clean_behaviors(block: object) -> dict:
     if not isinstance(block, dict):
         return out
     for key, entry in block.items():
-        if not isinstance(key, str) or not _DEV_ID_RE.match(key) or not isinstance(entry, dict):
+        if not _valid_element_id(key) or not isinstance(entry, dict):
             continue
         clean: dict = {}
         preset = entry.get("preset")
@@ -717,9 +838,13 @@ def dev_router(require_token) -> APIRouter:
 
         # Validate every block up front: a malicious icon / CSS value raises here, before any file is
         # written, so a bad payload can never leave the four override files half-updated.
+        declared = _clean_declared_placeholders(
+            body.get("copyPlaceholders") if isinstance(body, dict) else None
+        )
+
         root = _clean_tokens((tokens or {}).get("root") if isinstance(tokens, dict) else None)
         light = _clean_tokens((tokens or {}).get("light") if isinstance(tokens, dict) else None)
-        clean_copy = _clean_copy(copy)
+        clean_copy = _clean_copy(copy, declared)
         clean_icons = _clean_icons(icons)
         clean_elements = _clean_elements(elements)
         clean_behaviors = _clean_behaviors(behaviors)

@@ -92,7 +92,17 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // that modals stack), and `diff.tab-symbol` / `diff.tab-footprint` (the diff's kind switcher is
 // the shared TabStrip, which derives an id per tab). A deliberate re-baseline, which is what this
 // gate is for.
-const EXPECTED_ENTRIES = 346;
+// 347 with `component-browser.provider-row`: the SHARED role every provider coverage row declares.
+// Each row already carried a per-provider instance id, which is what makes one row editable on its
+// own; this row is what an edit meant for EVERY provider row is keyed on. Adding it is what keeps
+// the instance / shared distinction addressable from both ends rather than only from the narrow one.
+// 351 with the four SHARED roles the last interpolated ids became: detail.handoff-field,
+// detail.handoff-open, stm.package and stm.family. Those elements had been building an id by
+// interpolating a registry field key or a package name straight into the attribute, which no
+// catalogue row covered and no selector could be safely derived from. Each is an instance id now
+// (stm.package[LQFP100]), built through the same escape every other dynamic id uses, and the role
+// it declares is the catalogue row here. A deliberate re-baseline, which is what this gate is for.
+const EXPECTED_ENTRIES = 351;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

@@ -8,6 +8,7 @@
  */
 import type { ReactNode } from "react";
 import type { ComponentInfoTab } from "../../lib/uiSession";
+import { useText } from "../../lib/copy";
 import { TabStrip, type TabItem } from "../primitives";
 
 export function InfoTabsShell({
@@ -21,6 +22,7 @@ export function InfoTabsShell({
   onSelect: (tab: ComponentInfoTab) => void;
   children: ReactNode;
 }) {
+  const tabsLabel = useText("component-browser.info-tabs-label", "Component information");
   return (
     <section
       data-dev-id="component-browser.info"
@@ -34,7 +36,7 @@ export function InfoTabsShell({
           idBase="component-info"
           devIdBase="component-browser.info"
           density="compact"
-          aria-label="Component information"
+          aria-label={tabsLabel}
         />
       </div>
       {children}

@@ -13,6 +13,7 @@ import { EDA_DATA_FIELDS } from "../lib/edaRegistry.generated";
 import type { DeepPartial } from "fishery";
 import type { PartDetail } from "../api/types";
 import { makeAsset, makePartDetail } from "../test/partFixture";
+import { devIdSelector, instanceDevId } from "../lib/componentDevIds";
 
 // NO CAST. This fixture used to end `as unknown as PartDetail`, which is precisely how it kept
 // type-checking through the 2026-07-27 rename while describing a record the server had stopped
@@ -67,9 +68,9 @@ describe("HandoffBand", () => {
     expect(screen.getByText("Texas Instruments")).toBeTruthy();
     // symbol and footprint legitimately carry the SAME reference string here, so each is read
     // from its own cell rather than by a document-wide text query
-    const symbol = document.querySelector('[data-dev-id="detail.handoff-symbol"]')!;
+    const symbol = document.querySelector(devIdSelector(instanceDevId("detail.handoff-field", "symbol")))!;
     expect(symbol.textContent).toContain("SR-Diodes:TPD6E05U06RVZR");
-    const footprint = document.querySelector('[data-dev-id="detail.handoff-footprint"]')!;
+    const footprint = document.querySelector(devIdSelector(instanceDevId("detail.handoff-field", "footprint")))!;
     expect(footprint.textContent).toContain("SR-Diodes:TPD6E05U06RVZR");
     // 7 of 7: every curated field on this fixture is filled.
     expect(screen.getByText(/7 of 7 filled/)).toBeTruthy();
@@ -99,9 +100,9 @@ describe("HandoffBand", () => {
     render(<HandoffBand detail={part()} />);
     // Category reaches Altium alone, so it is badged. MPN reaches both, so badging it would be
     // eight identical badges saying nothing.
-    const category = document.querySelector('[data-dev-id="detail.handoff-category"]')!;
+    const category = document.querySelector(devIdSelector(instanceDevId("detail.handoff-field", "category")))!;
     expect(category.textContent).toContain("Altium Designer only");
-    const mpn = document.querySelector('[data-dev-id="detail.handoff-mpn"]')!;
+    const mpn = document.querySelector(devIdSelector(instanceDevId("detail.handoff-field", "mpn")))!;
     expect(mpn.textContent).not.toContain("Altium Designer");
     expect(mpn.textContent).not.toContain("KiCad");
   });

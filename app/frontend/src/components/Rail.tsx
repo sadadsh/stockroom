@@ -102,6 +102,8 @@ function readCollapsed(): boolean {
 
 export function Rail() {
   const { route, navigate } = useRouter();
+  const navLabel = useText("nav.rail-label", "Primary");
+  const themeToggleLabel = useText("nav.theme-toggle", "Toggle light or dark theme");
   const [collapsed, setCollapsed] = useState(readCollapsed);
   // Persist only what the USER chose. This effect used to run on mount, which wrote the derived
   // value straight into the preference store - and after that first launch "never chosen" could
@@ -139,7 +141,7 @@ export function Rail() {
     // reachable immediately after navigation.
     <div className={collapsed ? "relative z-[60] w-[52px] flex-none" : "flex-none"}>
     <nav
-      aria-label="Primary"
+      aria-label={navLabel}
       data-dev-id="rail.root"
       className={
         // NOTE: no `bg-*` here. Two background utilities in one class list are resolved by STYLESHEET
@@ -301,15 +303,15 @@ export function Rail() {
               ) : updateView.standing === "current" ? (
                 <Text id="nav.update-current">Current</Text>
               ) : updateView.standing === "updating" ? (
-                <span>Updating...</span>
+                <Text id="nav.update-updating">Updating...</Text>
               ) : updateView.standing === "checking" ? (
                 <Text id="nav.update-checking">Checking...</Text>
               ) : updateView.standing === "retrying" ? (
-                <span>Retrying...</span>
+                <Text id="nav.update-retrying">Retrying...</Text>
               ) : updateView.standing === "blocked" ? (
-                <span>Update Blocked</span>
+                <Text id="nav.update-blocked">Update Blocked</Text>
               ) : updateView.standing === "restart_required" ? (
-                <span>Restart Required</span>
+                <Text id="nav.update-restart">Restart Required</Text>
               ) : (
                 <Text id="nav.update-unknown">Update Unknown</Text>
               )}
@@ -319,8 +321,8 @@ export function Rail() {
             type="button"
             data-dev-id="rail.theme-toggle"
             onClick={toggle}
-            aria-label="Toggle light or dark theme"
-            title="Toggle light or dark theme"
+            aria-label={themeToggleLabel}
+            title={themeToggleLabel}
             className={
               RAIL_ROW +
               " text-xs font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1"
@@ -377,6 +379,7 @@ function AboutModal({
   note?: string;
 }) {
   const aboutLabel = useText("modal.about.aria", "About Stockroom");
+  const closeAboutLabel = useText("modal.about.close", "Close About");
   // Always mounted only while open, so `open` is true whenever this renders. The hook owns Escape,
   // the focus move into the dialog and the focus restore on the way out.
   const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(true, onClose);
@@ -404,8 +407,8 @@ function AboutModal({
           type="button"
           data-dev-id="about.close"
           onClick={onClose}
-          aria-label="Close About"
-          title="Close About"
+          aria-label={closeAboutLabel}
+          title={closeAboutLabel}
           className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-control text-t3 transition-colors hover:bg-[var(--c-hover)] hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
         >
           <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
@@ -426,10 +429,15 @@ function AboutModal({
         </div>
         <p data-dev-id="about.credit" className="mt-1 text-sm text-t2">
           <Text id="modal.about.credit">Developed with love by </Text>
-          <span className="font-medium text-t1">Sadad Haidari</span>.
+          <span className="font-medium text-t1">
+            <Text id="modal.about.author">Sadad Haidari</Text>
+          </span>
+          .
         </p>
         <p className="mt-2 text-xs text-t3">
-          <span className="font-medium">Version</span>{" "}
+          <span className="font-medium">
+            <Text id="modal.about.version">Version</Text>
+          </span>{" "}
           <span className="tnum font-mono">{version}</span>
         </p>
         {note ? (

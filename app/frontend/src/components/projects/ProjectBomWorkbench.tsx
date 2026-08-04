@@ -496,11 +496,17 @@ function BomLineInspector({
                 ))}
               </div>
             ) : (
-              <p className="mt-2 text-xs text-t3">No pricing option was returned for this quantity.</p>
+              <p className="mt-2 text-xs text-t3">
+                <Text id="projects.bom.no-pricing-option">
+                  No pricing option was returned for this quantity.
+                </Text>
+              </p>
             )
           ) : (
             <p className="mt-2 text-xs leading-5 text-t3">
-              Uses the exact build quantity. DigiReel is not requested until an order is prepared.
+              <Text id="projects.bom.exact-quantity">
+                Uses the exact build quantity. DigiReel is not requested until an order is prepared.
+              </Text>
             </p>
           )}
         </section>

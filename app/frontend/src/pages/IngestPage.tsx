@@ -13,7 +13,7 @@ import { useEnrichLookup, useSettings } from "../api/queries";
 import { useCapture } from "../lib/capture";
 import { useAddPart } from "../lib/addPart";
 import { useToast } from "../lib/toast";
-import { Text, useText } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import {
   mergeResultIntoCandidate,
   pulledSpecConflicts,
@@ -144,7 +144,7 @@ export function IngestPage() {
     "Nothing came back. The page might have blocked the fetch, or the link is not a product page.",
   );
   const toastLookupFailed = useText("ingest.toast-lookup-failed", "Look up failed.");
-  const toastAdded = useText("ingest.toast-added", "Added");
+  const toastAdded = useCopyFormatter("ingest.toast-added", "Added {name}");
 
   // Rehydrate the server-staged draft once. The session document contains only
   // its immutable id/revision; network input and review fields live in the
@@ -396,7 +396,7 @@ export function IngestPage() {
             plan={plan}
             input={lookedUpInput}
             onAdded={(name) => {
-              toast(`${toastAdded} ${name}`, "ok");
+              toast(toastAdded({ name }), "ok");
               reset();
             }}
             toast={toast}
@@ -454,6 +454,7 @@ export function IngestPage() {
           {staged.map(({ id, candidate, datasheetUrl, conflicts }) => (
             <CandidateCard
               key={id}
+              stagedId={String(id)}
               candidate={candidate}
               conflicts={conflicts}
               initialDatasheetUrl={datasheetUrl}
@@ -689,6 +690,7 @@ function PulledSummary({ result }: { result: EnrichmentResult }) {
 // not a count. A key two sources disagreed on shows every value with its origin
 // (merge-only-identical); internal keys (product_url, the photo URL) never show as rows.
 function PulledSpecTable({ result }: { result: EnrichmentResult }) {
+  const pulledSpecsLabel = useText("ingest.pulled-specs-label", "Pulled Specs");
   const conflicts = result.spec_conflicts ?? {};
   const specRows = Object.entries(result.specs)
     .filter(
@@ -717,7 +719,7 @@ function PulledSpecTable({ result }: { result: EnrichmentResult }) {
         data-dev-id="ingest.pulled-specs"
         className="max-h-56 overflow-y-auto"
         role="region"
-        aria-label="Pulled Specs"
+        aria-label={pulledSpecsLabel}
         tabIndex={0}
       >
         <div className="grid grid-cols-1 gap-y-1 text-sm sm:grid-cols-[max-content_1fr] sm:gap-x-4">

@@ -6,7 +6,7 @@
 import type { ReactNode } from "react";
 import { Rail } from "./Rail";
 import { AddPartModal } from "./AddPartModal";
-import { Text } from "../lib/copy";
+import { Text, useCopyFormatter } from "../lib/copy";
 import { plural } from "../lib/plural";
 import { useRouter } from "../lib/router";
 import { useFacetsQuery, useOnboarding } from "../api/queries";
@@ -69,18 +69,24 @@ function ShellStatusBar() {
       ) : (
         <>
           {/* Agrees with its number: this read "1 Components" on 10 of the 12 captured screens.
-              The NUMBER stays outside <Text>, whose id maps to one overridable string - folding a
-              count into it would mint a different copy key for every library size. */}
+              The count is a named PLACEHOLDER, so one overridable string covers every library size
+              and the word order (number before noun) is in the sentence rather than in the JSX. */}
           <span className="tnum font-medium text-t1">
-            {total.toLocaleString()}{" "}
-            <Text id="shell.status.count">{plural(total, "Component")}</Text>
+            <Text
+              id="shell.status.count"
+              values={{ count: total.toLocaleString(), noun: plural(total, "Component") }}
+            >
+              {"{count} {noun}"}
+            </Text>
           </span>
           {incomplete > 0 ? (
             <>
               <span className="text-line2">|</span>
               {/* the number worth ACTING on, so it earns the warn tone rather than a quiet grey */}
               <span className="tnum text-warn">
-                {incomplete} <Text id="shell.status.incomplete">Missing Data</Text>
+                <Text id="shell.status.incomplete" values={{ count: incomplete }}>
+                  {"{count} Missing Data"}
+                </Text>
               </span>
             </>
           ) : null}
@@ -100,12 +106,15 @@ function ShellStatusBar() {
  */
 function LibraryStatus() {
   const onboarding = useOnboarding();
+  // The accessible name is a sentence with a slot, so it can be reworded without a call site
+  // deciding where the library's name goes.
+  const libraryLabel = useCopyFormatter("shell.status.library-label", "Library: {name}");
   const active = onboarding.data?.libraries.find((library) => library.active);
   if (!active) return null;
   return (
     <span
       data-dev-id="shell.library"
-      aria-label={`Library: ${active.name}`}
+      aria-label={libraryLabel({ name: active.name })}
       className="inline-flex min-w-0 items-center gap-1 text-t2"
     >
       <span><Text id="shell.status.library">Library</Text>:</span>

@@ -9,30 +9,57 @@
  *
  * Why this is safe: values are written via `el.style.setProperty(prop, value)`, which takes a
  * property + value PAIR. It applies the value structurally and cannot introduce a second declaration
- * or any markup, so a value is never parsed as CSS text (unlike `style.cssText` / `innerHTML`). This
- * runtime does NOT re-validate; the backend `dev.py` `_valid_css_value` grammar is the sole authority
- * on what may ever be written into committed source. Here we only apply what is already committed.
+ * or any markup, so a value is never parsed as CSS text (unlike `style.cssText` / `innerHTML`). The
+ * backend `dev.py` `_valid_css_value` grammar is the sole authority on what may ever be written into
+ * committed source; this runtime re-checks against that same grammar (mirrored in
+ * `lib/elementLayout.ts`) for one reason only - a committed file can be hand-edited or can arrive
+ * from an older revision, so an override that is no longer valid must be IGNORED rather than allowed
+ * to throw during boot.
+ *
+ * INSTANCE vs SHARED: which elements an id reaches is decided by the id itself, in
+ * `lib/componentDevIds.ts`. An id carrying a `[value]` segment names exactly one element; a
+ * catalogue id names a role and reaches every element carrying it as `data-dev-id` OR as
+ * `data-dev-role`. Selection goes through `CSS.escape`, so a record id holding a quote, a bracket or
+ * a backslash is a miss, never a thrown selector.
  */
+import { nodesForDevId } from "./componentDevIds";
+import { isApplicableElementOverride } from "./elementLayout";
 
 // devId -> (cssProp -> value). Mirrors ELEMENT_OVERRIDES exactly.
 export type ElementOverrides = Record<string, Record<string, string>>;
 
-// Ids are dot-namespaced lowercase-kebab (e.g. `detail.spec-sheet`), so a quoted attribute selector
-// is valid as-is; the quotes keep the dot from being read as a class combinator.
-function selectorFor(id: string): string {
-  return `[data-dev-id="${id}"]`;
+/**
+ * The subset of an override map this runtime will apply: the entries whose property is editable and
+ * whose value is in the safe grammar. Exported so Save can send only what the writer would accept
+ * and the panel can say which committed entries are being ignored.
+ */
+export function applicableOverrides(source: ElementOverrides): ElementOverrides {
+  const out: ElementOverrides = {};
+  for (const [id, props] of Object.entries(source)) {
+    if (!id || typeof props !== "object" || props === null) continue;
+    const clean: Record<string, string> = {};
+    for (const [prop, value] of Object.entries(props)) {
+      if (isApplicableElementOverride(prop, value)) clean[prop] = value;
+    }
+    if (Object.keys(clean).length > 0) out[id] = clean;
+  }
+  return out;
 }
 
 /**
  * Apply `current` as inline styles, and clear any property that was in `previous` but is gone from
  * `current` (so removing an override clears exactly that one declaration). Idempotent: applying the
  * same map twice is a no-op, which is what makes the observer's broad re-apply safe.
+ *
+ * `previous` is diffed on its RAW keys rather than its applicable subset, so a property that stops
+ * being valid (or stops being editable) is still cleared off the element it was last written to.
  */
 export function applyElementOverrides(current: ElementOverrides, previous?: ElementOverrides): void {
-  // Set every current prop on every matching node.
-  for (const [id, props] of Object.entries(current)) {
-    const nodes = document.querySelectorAll<HTMLElement>(selectorFor(id));
-    for (const el of nodes) {
+  const live = applicableOverrides(current);
+
+  // Set every current prop on every element the id addresses.
+  for (const [id, props] of Object.entries(live)) {
+    for (const el of nodesForDevId(id)) {
       for (const [prop, value] of Object.entries(props)) el.style.setProperty(prop, value);
     }
   }
@@ -41,11 +68,10 @@ export function applyElementOverrides(current: ElementOverrides, previous?: Elem
   // removed prop within a still-present id).
   if (previous) {
     for (const [id, prevProps] of Object.entries(previous)) {
-      const nextProps = current[id];
+      const nextProps = live[id];
       const removed = Object.keys(prevProps).filter((prop) => !nextProps || !(prop in nextProps));
       if (removed.length === 0) continue;
-      const nodes = document.querySelectorAll<HTMLElement>(selectorFor(id));
-      for (const el of nodes) {
+      for (const el of nodesForDevId(id)) {
         for (const prop of removed) el.style.removeProperty(prop);
       }
     }

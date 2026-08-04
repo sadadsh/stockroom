@@ -8,9 +8,10 @@ import { ApiError } from "../api/client";
 import { useIngestCommit } from "../api/queries";
 import type { PartDetail, StagingCandidate } from "../api/types";
 import type { ToastTone } from "../lib/toast";
-import { Text, useText } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import type { SpecConflict } from "../lib/candidateFromResult";
 import { distributorLabel } from "../lib/sourced";
+import { CANDIDATE_ROLE, candidateDevId } from "../lib/componentDevIds";
 import { Badge, Button, Card, Dot } from "./primitives";
 import { PhotoTrigger, productPhotoUrl } from "./ProductPhoto";
 import { AdaptiveChoice } from "./AdaptiveChoice";
@@ -43,12 +44,16 @@ const titleCase = (s: string) =>
   s.replace(/\b\w/g, (ch) => ch.toUpperCase());
 
 export function CandidateCard({
+  stagedId,
   candidate,
   conflicts,
   initialDatasheetUrl,
   onCommitted,
   toast,
 }: {
+  // The staging list's own key for this candidate. It is the card's dev-mode identity, so tuning
+  // one staged card cannot reach the others - a candidate has no record id until it is committed.
+  stagedId: string;
   candidate: StagingCandidate;
   // Source disagreements kept for display: the first value won
   // the slot, the rest are shown so nothing pulled is silently discarded
@@ -65,7 +70,8 @@ export function CandidateCard({
   const [missing, setMissing] = useState<string[]>([]);
   const commit = useIngestCommit();
   // Copy layer: toast strings resolve here so the callbacks fire the override, not the literal.
-  const toastAdded = useText("ingest.toast-added", "Added");
+  // A whole sentence with a named slot, not the word "Added" with a name glued after it.
+  const toastAdded = useCopyFormatter("ingest.toast-added", "Added {name}");
   const toastIncomplete = useText("ingest.toast-incomplete", "Still incomplete");
   const toastCouldNotAdd = useText("ingest.toast-could-not-add", "Could not add");
 
@@ -84,7 +90,7 @@ export function CandidateCard({
     setMissing([]);
     commit.mutate(c, {
       onSuccess: (created) => {
-        toast(`${toastAdded} ${c.display_name || "part"}`, "ok");
+        toast(toastAdded({ name: c.display_name || "part" }), "ok");
         onCommitted(created);
       },
       onError: (err) => {
@@ -117,7 +123,15 @@ export function CandidateCard({
   });
 
   return (
-    <Card data-dev-id="ingest.candidate" data-candidate className="px-4 py-4">
+    // The staged list renders this card once per candidate, so the card carries BOTH identities:
+    // `data-dev-id` names this one candidate (tuning it leaves the others alone) and `data-dev-role`
+    // names the class every staged card belongs to (an override there is meant to reach all of them).
+    <Card
+      data-dev-id={candidateDevId(stagedId)}
+      data-dev-role={CANDIDATE_ROLE}
+      data-candidate
+      className="px-4 py-4"
+    >
       {/* the action leads (owner 2026-07-24: burying Add at the bottom of a long card
           among the info made the flow confusing): the part's name + the ONE accent
           button on top, the editable review fields below it */}

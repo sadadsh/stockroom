@@ -8,7 +8,7 @@ import { useState } from "react";
 import type { Facets } from "../api/types";
 import { SearchIcon } from "./icons";
 import { Icon } from "./Icon";
-import { useText } from "../lib/copy";
+import { Text, useText } from "../lib/copy";
 
 interface Props {
   search: string;
@@ -48,6 +48,7 @@ export function Finder({
   // Copy for an attribute (placeholder + label), so it is reworded through the same override
   // as any <Text> label when dev mode saves it.
   const searchLabel = useText("components.search-placeholder", "Search Parts");
+  const filtersLabel = useText("components.filter-button-label", "Filters");
 
   return (
     <div data-dev-id="components.finder" className="relative">
@@ -83,7 +84,7 @@ export function Finder({
         <button
           type="button"
           data-dev-id="components.filter-button"
-          aria-label="Filters"
+          aria-label={filtersLabel}
           onClick={() => setOpen((v) => !v)}
           className="inline-flex h-[31px] flex-none items-center gap-1.5 rounded-control border border-line bg-raise px-2 text-t3 transition-colors hover:bg-raise2 hover:text-t1"
         >
@@ -102,7 +103,9 @@ export function Finder({
           className="absolute inset-x-0 top-[calc(100%+6px)] z-[70] rounded-card border border-line2 bg-popover p-3 shadow-pop"
         >
           <div className="mb-2 flex items-center justify-between">
-            <div className="text-2xs font-semibold text-t3">Show</div>
+            <div className="text-2xs font-semibold text-t3">
+              <Text id="components.filter-show">Show</Text>
+            </div>
             <label
               data-dev-id="components.filter-complete"
               className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1"
@@ -123,7 +126,7 @@ export function Finder({
                 checked={completeOnly}
                 onChange={(e) => onCompleteOnly(e.target.checked)}
               />
-              Complete Only
+              <Text id="components.filter-complete-label">Complete Only</Text>
             </label>
           </div>
 
@@ -155,7 +158,7 @@ export function Finder({
           ) : null}
 
           <div className="mb-2 mt-3 text-2xs font-semibold text-t3">
-            Category
+            <Text id="components.filter-category">Category</Text>
           </div>
           <div data-dev-id="components.filter-categories" className="max-h-64 overflow-y-auto">
             <FacetRow
@@ -175,7 +178,7 @@ export function Finder({
             ))}
             {categories.length === 0 ? (
               <div className="px-1.5 py-2 text-xs text-t3">
-                No categories so far
+                <Text id="components.filter-no-categories">No categories so far</Text>
               </div>
             ) : null}
           </div>

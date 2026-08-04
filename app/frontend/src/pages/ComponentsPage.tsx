@@ -56,6 +56,7 @@ import {
 import { COMPONENT_PICKER_WIDTH } from "../lib/libraryLayout";
 
 export function ComponentsPage() {
+  const openComponentsLabel = useText("components.open-tabs-label", "Open components");
   const [search, setSearch] = useState(() => readUiSession().component_filters.query);
   const [category, setCategory] = useState<string | null>(
     () => readUiSession().component_filters.category,
@@ -356,8 +357,10 @@ export function ComponentsPage() {
               <Text id="components.empty-title">No Components Yet</Text>
             </h1>
             <p className="mt-1.5 text-sm leading-relaxed text-t3">
-              Add a manufacturer part number. Stockroom will keep its KiCad,
-              Altium, STEP, source, and verification evidence together.
+              <Text id="components.empty-body">
+                Add a manufacturer part number. Stockroom will keep its KiCad, Altium, STEP,
+                source, and verification evidence together.
+              </Text>
             </p>
             <Button
               variant="accent"
@@ -460,7 +463,7 @@ export function ComponentsPage() {
                 devIdForTab={componentTabDevId}
                 density="compact"
                 className="min-w-0 overflow-hidden"
-                aria-label="Open components"
+                aria-label={openComponentsLabel}
               />
             ) : (
               <span className="text-xs font-semibold text-t2">

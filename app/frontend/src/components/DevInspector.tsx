@@ -24,6 +24,7 @@ import { createPortal } from "react-dom";
 import { useDevMode } from "../lib/devMode";
 import { usedVarsForElement } from "../lib/inspectVars";
 import { DEV_ID_BY_ID } from "../lib/devIds";
+import { devIdScope, sharedRoleOf } from "../lib/componentDevIds";
 
 interface Badge {
   id: string;
@@ -33,6 +34,7 @@ interface Badge {
 
 interface Hover {
   id: string;
+  label: string;
   vars: string[];
   rect: { left: number; top: number; width: number; height: number };
 }
@@ -40,6 +42,20 @@ interface Hover {
 function rectOf(el: Element): { left: number; top: number; width: number; height: number } {
   const r = el.getBoundingClientRect();
   return { left: r.left, top: r.top, width: r.width, height: r.height };
+}
+
+/**
+ * The human name for an id. A catalogue id has one; a per-instance id does not and cannot, so it
+ * borrows the label of the shared role its element declares and says which contract it is under.
+ * The ID ITSELF is always shown verbatim beside this - the label is context, never a substitute.
+ */
+function labelFor(id: string, el: Element | null): string {
+  const entry = DEV_ID_BY_ID.get(id);
+  if (entry) return entry.label;
+  if (devIdScope(id) !== "instance") return "";
+  const role = sharedRoleOf(el);
+  const roleLabel = role ? DEV_ID_BY_ID.get(role)?.label : undefined;
+  return roleLabel ? `${roleLabel} (one instance)` : "One instance";
 }
 
 export function DevInspector() {
@@ -68,7 +84,7 @@ export function DevInspector() {
         setHover(null);
         return;
       }
-      setHover({ id, vars: usedVarsForElement(el), rect: rectOf(el) });
+      setHover({ id, label: labelFor(id, el), vars: usedVarsForElement(el), rect: rectOf(el) });
     }
 
     function onClick(e: MouseEvent) {
@@ -111,7 +127,7 @@ export function DevInspector() {
       setBadges(
         nodes.map((el) => {
           const id = el.getAttribute("data-dev-id") ?? "";
-          return { id, label: DEV_ID_BY_ID.get(id)?.label ?? id, rect: rectOf(el) };
+          return { id, label: labelFor(id, el) || id, rect: rectOf(el) };
         }),
       );
     }
@@ -139,9 +155,7 @@ export function DevInspector() {
           <div className="absolute left-0 top-full mt-1 flex max-w-[280px] flex-col gap-1 rounded-control border border-line2 bg-popover px-2 py-1.5 shadow-pop">
             <div className="flex items-baseline gap-1.5">
               <span className="font-mono text-2xs font-semibold text-t1">{hover.id}</span>
-              <span className="truncate text-2xs text-t3">
-                {DEV_ID_BY_ID.get(hover.id)?.label ?? ""}
-              </span>
+              <span className="truncate text-2xs text-t3">{hover.label}</span>
             </div>
             {hover.vars.length > 0 ? (
               <div className="flex flex-wrap gap-1">

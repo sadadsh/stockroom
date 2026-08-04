@@ -32,18 +32,19 @@ import {
   useBulkImportState,
   type BulkImportInput,
 } from "../lib/bulkImportStore";
+import { plural } from "../lib/plural";
 import { Button } from "./primitives";
-import { Text } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 
 // Outcome tiers in the order a reader needs them: what landed, what was already there, then the
 // two that want attention. `tone` maps to the semantic text colors, never a surface tint.
-const TIERS: { status: string; label: string; tone: string }[] = [
-  { status: "added", label: "Added", tone: "text-ok" },
-  { status: "would-add", label: "Would Add", tone: "text-ok" },
-  { status: "exists", label: "Already There", tone: "text-t2" },
-  { status: "duplicate", label: "Duplicate", tone: "text-t3" },
-  { status: "incomplete", label: "Needs More", tone: "text-warn" },
-  { status: "error", label: "Failed", tone: "text-err" },
+const TIERS: { status: string; copyId: string; label: string; tone: string }[] = [
+  { status: "added", copyId: "bulk.outcome-added", label: "Added", tone: "text-ok" },
+  { status: "would-add", copyId: "bulk.outcome-would-add", label: "Would Add", tone: "text-ok" },
+  { status: "exists", copyId: "bulk.outcome-exists", label: "Already There", tone: "text-t2" },
+  { status: "duplicate", copyId: "bulk.outcome-duplicate", label: "Duplicate", tone: "text-t3" },
+  { status: "incomplete", copyId: "bulk.outcome-incomplete", label: "Needs More", tone: "text-warn" },
+  { status: "error", copyId: "bulk.outcome-error", label: "Failed", tone: "text-err" },
 ];
 
 function looksLikeCsv(text: string): boolean {
@@ -69,6 +70,9 @@ function countEntries(text: string, csv: boolean): number {
 function Row({ item }: { item: BulkImportItem }) {
   const tier = TIERS.find((t) => t.status === item.status);
   const resolved = item.mpn && item.mpn !== item.query;
+  // The missing-field list is DATA; the sentence around it is copy, so it takes a placeholder
+  // rather than having the word "Missing" concatenated onto a join().
+  const missingLine = useCopyFormatter("bulk.row-missing", "Missing {fields}");
   return (
     <tr className="align-baseline hover:bg-field">
       <td className="py-1.5 pr-3 font-mono text-xs text-t1">{item.query}</td>
@@ -79,21 +83,27 @@ function Row({ item }: { item: BulkImportItem }) {
         {item.display_name || <span className="text-t3">&mdash;</span>}
       </td>
       <td className="whitespace-nowrap py-1.5 pr-3 text-xs">
-        <span className={tier?.tone ?? "text-t2"}>{tier?.label ?? item.status}</span>
+        <span className={tier?.tone ?? "text-t2"}>
+          {tier ? <Text id={tier.copyId}>{tier.label}</Text> : item.status}
+        </span>
       </td>
       {/* The column that answers "did I get the FILES". A status of "Added" alone cannot:
           a part can land complete on its identity and still have no symbol, footprint or 3D. */}
       <td className="whitespace-nowrap py-1.5 pr-3 text-xs">
         {item.assets === "kicad-stock" ? (
-          <span className="text-ok">Symbol, Footprint, 3D</span>
+          <span className="text-ok">
+            <Text id="bulk.cad-complete">Symbol, Footprint, 3D</Text>
+          </span>
         ) : item.status === "added" || item.status === "would-add" ? (
-          <span className="text-warn">Needs Capture</span>
+          <span className="text-warn">
+            <Text id="bulk.cad-needs-capture">Needs Capture</Text>
+          </span>
         ) : (
           <span className="text-t3">&mdash;</span>
         )}
       </td>
       <td className="py-1.5 text-xs text-t3">
-        {item.error || (item.missing.length ? `Missing ${item.missing.join(", ")}` : "")}
+        {item.error || (item.missing.length ? missingLine({ fields: item.missing.join(", ") }) : "")}
       </td>
     </tr>
   );
@@ -108,7 +118,9 @@ function Summary({ result }: { result: BulkImportResult }) {
           <div className={`font-mono text-xl font-semibold tnum ${t.tone}`}>
             {result.counts[t.status]}
           </div>
-          <div className="mt-0.5 text-2xs text-t2">{t.label}</div>
+          <div className="mt-0.5 text-2xs text-t2">
+            <Text id={t.copyId}>{t.label}</Text>
+          </div>
         </div>
       ))}
     </div>
@@ -135,6 +147,17 @@ export function BulkImportSection() {
     }
   }
 
+  const importLabel = useCopyFormatter("bulk.import-count", "Import {count} {noun}");
+  const importIdle = useText("bulk.import", "Import");
+  const showAttentionLabel = useCopyFormatter(
+    "bulk.show-attention",
+    "Show Only What Needs Attention ({count})",
+  );
+  const showAllLabel = useCopyFormatter("bulk.show-all", "Show All {count} Rows");
+  const entryNounCsv = useText("bulk.entries-csv", " rows");
+  const entryNounList = useText("bulk.entries-list", " part numbers");
+  const starting = useText("bulk.starting", "Starting");
+
   const csv = useMemo(() => looksLikeCsv(text), [text]);
   const count = useMemo(() => countEntries(text, csv), [text, csv]);
   const busy = job.status === "running";
@@ -160,7 +183,7 @@ export function BulkImportSection() {
         {count > 0 ? (
           <span className="text-2xs text-t3">
             <span className="font-mono tnum">{count}</span>
-            {csv ? " rows" : " part numbers"}
+            {csv ? entryNounCsv : entryNounList}
           </span>
         ) : null}
       </div>
@@ -187,7 +210,7 @@ export function BulkImportSection() {
           disabled={busy || count === 0}
           onClick={() => run({ text, format: csv ? "csv" : "list" })}
         >
-          {count > 0 ? `Import ${count} ${count === 1 ? "Part" : "Parts"}` : "Import"}
+          {count > 0 ? importLabel({ count, noun: plural(count, "Part") }) : importIdle}
         </Button>
         {/* Secondary, and it must LOOK it: as a filled `soft` button it out-shouted the disabled
             primary next to it, so the safe-but-lesser action read as the main one. */}
@@ -203,7 +226,7 @@ export function BulkImportSection() {
             className="min-w-0 flex-1 truncate text-xs text-t2"
             data-dev-id="ingest.bulk-progress"
           >
-            {job.progress?.message ?? "Starting"}
+            {job.progress?.message ?? starting}
           </span>
         ) : null}
       </div>
@@ -238,12 +261,24 @@ export function BulkImportSection() {
               <table className="w-full min-w-[34rem] text-left">
                 <thead>
                   <tr className="border-b border-line text-2xs text-t3">
-                    <th className="pb-1.5 pr-3 font-normal">You Pasted</th>
-                    <th className="pb-1.5 pr-3 font-normal">Resolved To</th>
-                    <th className="pb-1.5 pr-3 font-normal">Part</th>
-                    <th className="pb-1.5 pr-3 font-normal">Outcome</th>
-                    <th className="pb-1.5 pr-3 font-normal">CAD</th>
-                    <th className="pb-1.5 font-normal">Detail</th>
+                    <th className="pb-1.5 pr-3 font-normal">
+                      <Text id="bulk.col-pasted">You Pasted</Text>
+                    </th>
+                    <th className="pb-1.5 pr-3 font-normal">
+                      <Text id="bulk.col-resolved">Resolved To</Text>
+                    </th>
+                    <th className="pb-1.5 pr-3 font-normal">
+                      <Text id="bulk.col-part">Part</Text>
+                    </th>
+                    <th className="pb-1.5 pr-3 font-normal">
+                      <Text id="bulk.col-outcome">Outcome</Text>
+                    </th>
+                    <th className="pb-1.5 pr-3 font-normal">
+                      <Text id="bulk.col-cad">CAD</Text>
+                    </th>
+                    <th className="pb-1.5 font-normal">
+                      <Text id="bulk.col-detail">Detail</Text>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -262,8 +297,8 @@ export function BulkImportSection() {
               onClick={() => setShowAll((v) => !v)}
             >
               {showAll
-                ? `Show Only What Needs Attention (${attention.length})`
-                : `Show All ${result.items.length} Rows`}
+                ? showAttentionLabel({ count: attention.length })
+                : showAllLabel({ count: result.items.length })}
             </button>
           ) : null}
         </div>
