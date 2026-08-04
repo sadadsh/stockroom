@@ -77,7 +77,12 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // the run report, and the retained verified sets. Per-PROVIDER rows are dynamic
 // (`component-browser.component[<id>].provider[<provider id>]`) and carry no rows here, for the
 // same reason the per-component ids do not. A deliberate re-baseline, which is what this gate is for.
-const EXPECTED_ENTRIES = 385;
+// 345 after the superseded detail panel was deleted: the component workspace had already taken over
+// every capability it carried, so its 40 ids stopped rendering (27 literals, 8 prop-passed, and the
+// 5 workbench tab ids TabStrip derived from its `devIdBase="detail"`). The `detail` area SURVIVES
+// with 21 rows whose emitters are live components: HandoffBand's EDA handoff block and category
+// selector, Glb3DView + threeScene's 3D model instrument, and PinoutViewer's pin list.
+const EXPECTED_ENTRIES = 345;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

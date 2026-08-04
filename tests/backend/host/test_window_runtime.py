@@ -97,10 +97,6 @@ class _Client:
     def focus(self) -> None:
         self.commands.append("focus")
 
-    def provider_endpoint(self) -> str:
-        self.commands.append("provider-endpoint")
-        return "http://127.0.0.1:43127"
-
     def begin_provider_lease(
         self,
         lease_id: str,
@@ -118,7 +114,6 @@ class _Client:
         return ProviderLeaseHandshake(
             lease_id,
             7,
-            "http://127.0.0.1:43127",
             staging_root=staging_root,
             component_id=component_id,
             manufacturer=manufacturer,
@@ -345,7 +340,8 @@ def test_provider_browser_surface_is_one_scoped_in_app_lease(
         mpn="MPN-9",
         provider_id="digikey",
     ) as lease:
-        assert lease.endpoint == "http://127.0.0.1:43127"
+        # No endpoint of any kind: the lease hands out commands, never a driver handle.
+        assert not hasattr(lease, "endpoint")
         assert lease.lease_id == "11111111-1111-4111-8111-111111111111"
         assert lease.generation == 7
         assert lease.staging_root == staging_root

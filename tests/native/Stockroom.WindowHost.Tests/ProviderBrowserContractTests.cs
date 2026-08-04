@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace Stockroom.WindowHost.Tests;
 
 public sealed class ProviderBrowserContractTests
@@ -23,65 +21,39 @@ public sealed class ProviderBrowserContractTests
     }
 
     [Fact]
-    public void CdpProofRequiresTheExpectedLoopbackPortAndOwnedPageMarker()
+    public void ProviderBrowserExposesNoAutomationEndpointToProveOwnershipOf()
     {
-        const int port = 43127;
-        const string marker =
-            "about:blank#stockroom-provider-2ed594a5e46d4fc0aecb17ca94aab32f";
-        var version = Encoding.UTF8.GetBytes(
-            $$"""
-              {
-                "Browser": "Edg/140.0.0.0",
-                "webSocketDebuggerUrl": "ws://localhost:{{port}}/devtools/browser/proof"
-              }
-              """);
-        var targets = Encoding.UTF8.GetBytes(
-            $$"""
-              [
-                {
-                  "type": "page",
-                  "url": "{{marker}}",
-                  "webSocketDebuggerUrl": "ws://127.0.0.1:{{port}}/devtools/page/proof"
-                }
-              ]
-              """);
+        // The previous contract proved that a loopback CDP endpoint belonged to THIS WebView,
+        // which was only ever a way to make an unavoidable hole less dangerous. The hole is gone:
+        // the provider browser opens no debugging port, so there is no endpoint to attach to, no
+        // ownership to prove, and no proof helper to keep correct. Absence is the stronger claim,
+        // and it is asserted over the whole production source rather than over one call site.
+        var source = File.ReadAllText(
+            Path.Combine(
+                FindProjectDirectory(),
+                "WebViewWindowHost.cs"));
 
-        ProviderCdpProof.RequireVersion(version, port);
-        ProviderCdpProof.RequireOwnedTarget(targets, marker);
-    }
-
-    [Fact]
-    public void CdpProofRejectsAValidChromiumEndpointOnTheWrongPort()
-    {
-        var version = Encoding.UTF8.GetBytes(
-            """
-              {
-                "Browser": "Edg/140.0.0.0",
-                "webSocketDebuggerUrl": "ws://127.0.0.1:43128/devtools/browser/foreign"
-              }
-              """);
-
-        Assert.Throws<WindowHostException>(
-            () => ProviderCdpProof.RequireVersion(version, 43127));
-    }
-
-    [Fact]
-    public void CdpProofRejectsAChromiumEndpointWithoutThisWebViewsMarker()
-    {
-        var targets = Encoding.UTF8.GetBytes(
-            """
-              [
-                {
-                  "type": "page",
-                  "url": "https://example.test/foreign"
-                }
-              ]
-              """);
-
-        Assert.Throws<WindowHostException>(
-            () => ProviderCdpProof.RequireOwnedTarget(
-                targets,
-                "about:blank#stockroom-provider-expected"));
+        Assert.DoesNotContain(
+            "ProviderCdpProof",
+            source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "VerifyProviderCdpEndpointAsync",
+            source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "ReserveLoopbackPort",
+            source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "AdditionalBrowserArguments",
+            source,
+            StringComparison.Ordinal);
+        // The persistent provider profile and its single-owner guarantee are unchanged.
+        Assert.Contains(
+            "ExclusiveUserDataFolderAccess = true",
+            source,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -114,14 +86,6 @@ public sealed class ProviderBrowserContractTests
             StringComparison.Ordinal);
         Assert.DoesNotContain(
             "core.Navigate(eventArguments.Uri)",
-            source,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "ProviderCdpProof.RequireVersion",
-            source,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "ProviderCdpProof.RequireOwnedTarget",
             source,
             StringComparison.Ordinal);
         Assert.Contains(

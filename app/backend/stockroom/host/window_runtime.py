@@ -87,8 +87,6 @@ class WindowClientPort(Protocol):
 
     def focus(self) -> None: ...
 
-    def provider_endpoint(self) -> str: ...
-
     def begin_provider_lease(
         self,
         lease_id: str,
@@ -175,9 +173,13 @@ class NativeWindowObservation:
 
 @dataclass(slots=True)
 class ProviderBrowserLease:
-    """A hidden, verified provider surface that becomes visible only when armed."""
+    """A hidden provider surface that becomes visible only when armed.
 
-    endpoint: str
+    Nothing here hands out a driver handle. The person operates the page; Stockroom observes it
+    through this lease's own commands and its download-event journal, which is the whole reason
+    the surface can be trusted with a signed-in provider profile.
+    """
+
     lease_id: str
     generation: int
     # Where this lease's downloads must land, and the component they belong to. The native host
@@ -968,7 +970,6 @@ class ProductionWindowReplacement:
             )
             self._active_provider_lease = handshake
             lease = ProviderBrowserLease(
-                endpoint=handshake.endpoint,
                 lease_id=handshake.lease_id,
                 generation=handshake.generation,
                 staging_root=handshake.staging_root,

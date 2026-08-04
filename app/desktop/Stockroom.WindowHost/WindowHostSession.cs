@@ -18,8 +18,6 @@ internal interface IWindowHostController
 
     IReadOnlyDictionary<string, object?> ExportSession();
 
-    int ProviderCdpPort();
-
     IReadOnlyDictionary<string, object?> BeginProviderLease(
         string leaseId,
         ProviderLeaseContext context);
@@ -81,8 +79,6 @@ internal sealed class WebViewWindowController : IWindowHostController
     public IReadOnlyDictionary<string, object?> ExportSession() =>
         _host.ExportSession();
 
-    public int ProviderCdpPort() => _host.ProviderCdpPort();
-
     public IReadOnlyDictionary<string, object?> BeginProviderLease(
         string leaseId,
         ProviderLeaseContext context) =>
@@ -136,7 +132,6 @@ internal sealed class WindowHostSession
         "focus",
         "health",
         "export",
-        "provider-endpoint",
         "provider-lease-begin",
         "provider-lease-release",
         "provider-download-events",
@@ -303,7 +298,6 @@ internal sealed class WindowHostSession
                 "health",
                 _controller.Health()),
             "export" => Export(),
-            "provider-endpoint" => ProviderEndpoint(),
             "provider-lease-begin" => ProviderLeaseBegin(request),
             "provider-lease-release" => ProviderLeaseRelease(request),
             "provider-download-events" => ProviderDownloadEvents(request),
@@ -399,19 +393,6 @@ internal sealed class WindowHostSession
             new Dictionary<string, object?>
             {
                 ["snapshot"] = _controller.ExportSession(),
-            });
-    }
-
-    private (
-        string Name,
-        IReadOnlyDictionary<string, object?> Result)
-        ProviderEndpoint()
-    {
-        return (
-            "provider-endpoint",
-            new Dictionary<string, object?>
-            {
-                ["port"] = _controller.ProviderCdpPort(),
             });
     }
 

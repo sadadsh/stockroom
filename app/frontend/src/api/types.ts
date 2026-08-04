@@ -2621,15 +2621,16 @@ export interface BulkImportResult {
 
 // GET /api/library/completion -- "is my library complete, and what is missing?"
 //
-// The owner's central question, which until now only a script outside the app could answer.
-// The action totals are deliberately separate. `needs_files` is work the automatic lane can
-// improve, `needs_assistance` is work a managed user-driven provider can improve, and `unsourced`
-// is a real gap neither lane can currently fill. Automatic and assisted counts may overlap when
-// one part needs both kinds of source.
+// There is ONE provider lane: every registered provider is person-driven, so no count here means
+// "a machine will fetch it". The action totals are deliberately separate because they answer
+// different questions. `needs_files` is work retained verified evidence alone can still improve,
+// `needs_assistance` is work a person can close at a provider, and `unsourced` is a real gap
+// nothing on record can fill. The first two overlap when one part needs both.
 export interface LibraryCoverage {
   total: number;
   complete: number;
   needs_files: number;
+  // Optional because older backends omit it entirely, not because it is a second lane.
   needs_assistance?: number;
   unsourced: number;
   // Requirement value ("kicad_symbol", "altium_footprint", ...) -> how many parts lack it.
@@ -2637,6 +2638,9 @@ export interface LibraryCoverage {
   // The registered source keys, and every Requirement they can between them supply.
   sources: string[];
   can_provide: string[];
+  // Every registered provider, and everything those providers can between them supply. "Assisted"
+  // names the only kind there is: a person works the provider page. Optional for the same
+  // older-backend reason as `needs_assistance`.
   assisted_sources?: string[];
   assisted_can_provide?: string[];
 }
@@ -2884,7 +2888,8 @@ export interface CaptureWorklistRow {
   remaining: Requirement[];
 }
 
-// A part the run finished unattended, through an authorized automatic route.
+// A part the run finished WITHOUT opening a provider page: retained verified evidence already
+// covered what it needed. Not an automatic provider route - no such route exists.
 export interface CaptureWorklistCompleted {
   part_id: string;
   mpn: string;
@@ -2909,6 +2914,7 @@ export interface CaptureBatchWorklist {
   // Missing on older backends, where rows/totals were provider-route scoped.
   worklist_unit?: "components";
   worklist_total: number;
+  // Finished from retained verified evidence, with no provider page opened.
   unattended: CaptureWorklistCompleted[];
   unattended_total: number;
   stalled: CaptureWorklistStalled[];

@@ -51,20 +51,23 @@ def test_no_adapter_or_author_route_exposes_a_provider_driving_seam():
     assert found == [], f"provider-driving seams returned: {found}"
 
 
-def test_the_capture_package_never_rewrites_the_browsers_download_behaviour():
-    """`Browser.setDownloadBehavior` is Stockroom operating the session, not observing it.
+def test_the_capture_package_attaches_no_driver_and_rewrites_no_download_behaviour():
+    """No driver may connect to the provider surface, and none may rearm its downloads.
 
-    The remaining `connect_over_cdp` attaches to Stockroom's OWN embedded provider window - the
-    surface it hosts and closes - which is how the HUD draws its outlines and how the task-bound
-    broker stays bound. It attaches to nothing the person did not open here.
+    `connect_over_cdp` used to be permitted here because it attached to Stockroom's OWN embedded
+    provider window. That allowance is withdrawn: the native host opens no remote-debugging port,
+    so there is nothing to connect to, and a re-added `connect_over_cdp` would only be reaching
+    for a port someone had to re-open first. `Browser.setDownloadBehavior` is Stockroom operating
+    a session rather than observing it. Provider downloads reach Stockroom through the native
+    lease journal and nothing else.
     """
 
+    forbidden = ("connect_over_cdp", "Browser.setDownloadBehavior")
     found: list[str] = []
     for path in sorted(_CAPTURE.rglob("*.py")):
         source = path.read_text(encoding="utf-8")
-        if "Browser.setDownloadBehavior" in source:
-            found.append(path.name)
-    assert found == [], f"capture still arms browser-domain downloads in: {found}"
+        found.extend(f"{path.name}: {marker}" for marker in forbidden if marker in source)
+    assert found == [], f"capture still drives a provider browser in: {found}"
 
 
 def test_the_capture_package_holds_no_provider_website_credentials():

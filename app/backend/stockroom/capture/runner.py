@@ -349,10 +349,7 @@ def run_guided_capture(
     progress=None,
     should_stop=None,
     limit=None,
-    headless: bool = False,
-    engine: str = "",
     capture_id: str | None = None,
-    allow_standalone_browser: bool = False,
 ) -> dict:
     """Collect CAD from provider surfaces a PERSON works, one selected part at a time.
 
@@ -369,8 +366,6 @@ def run_guided_capture(
     every registered provider is offered in turn.
     """
 
-    if type(allow_standalone_browser) is not bool:
-        raise TypeError("allow_standalone_browser must be a boolean")
     if part_ids is not None and isinstance(part_ids, (str, bytes)):
         raise ValueError("part_ids must be a sequence of exact part ids")
     from threading import Event
@@ -411,8 +406,6 @@ def run_guided_capture(
         preferred_provider=str(vendor or ""),
         parts=(len(selected_parts) if selected_parts is not None else "derived"),
         limit=limit,
-        headless=headless,
-        engine=engine or "capability-default",
         log=install_capture_log(),
     )
 
@@ -432,7 +425,6 @@ def run_guided_capture(
         else []
     )
 
-    from stockroom.capture.browser import SharedPlaywrightRuntime
     from stockroom.capture.guided import GuidedCaptureSource
     from stockroom.capture.projection import verify_installed_projection
     from stockroom.capture.vendors import get_adapter
@@ -473,8 +465,6 @@ def run_guided_capture(
             if get_adapter(key) is None:
                 raise ValueError(f"no network capture adapter for provider {key!r}")
 
-    playwright_runtime = SharedPlaywrightRuntime() if provider_keys else None
-
     # The visible host owns provider navigation independently of application-update delivery.
     # Durable acquisition runs in an isolated copy-on-write context, so this direct capability is
     # copied with that context. Production replacement hosts retain their existing runtime port.
@@ -500,12 +490,6 @@ def run_guided_capture(
             make_pipeline,
             vendor=key,
             download_root=_capture_downloads(ctx, key),
-            profile_dir=_capture_profile(ctx, key),
-            headless=headless,
-            # Stockroom's version-pinned Playwright Chromium owns the normal path. An installed
-            # user browser is not part of the product contract and cannot silently change the
-            # browser version underneath a provider surface.
-            engine=engine or "chromium",
             # Both the direct and DigiKey-aggregated Ultra Librarian routes can deliver legacy
             # P-CAD/script packages when native Altium libraries are unavailable. Inject the
             # content-recognizing converter at the provider-surface boundary: it returns ``None``
@@ -530,7 +514,6 @@ def run_guided_capture(
                 resolved,
                 validation_reports=validation_reports,
             ),
-            playwright_runtime=playwright_runtime,
             user_cancelled=capture_should_stop,
             # "No more is coming from this page", consumed by whichever route is open when the
             # person says it. Without this a person-driven route could only end on cancel, on
@@ -550,7 +533,6 @@ def run_guided_capture(
                 and getattr(ctx.config, "digikey_client_secret", "")
             ),
             provider_surface=provider_surface,
-            allow_standalone_browser=allow_standalone_browser,
             publish_active_route=person_intent.set_active_route,
             clear_active_route=person_intent.clear_active_route,
             take_selected_files=person_intent.take_selected_files,
@@ -609,8 +591,6 @@ def run_guided_capture(
     finally:
         for source in guided_sources:
             source.close()
-        if playwright_runtime is not None:
-            playwright_runtime.close()
 
     _trace_run_verdict("user-driven" if person_driven_capture else "verified-evidence", report)
     if report.of("completed", "improved") or any(
@@ -753,23 +733,6 @@ def _capture_downloads(_ctx, provider_key: str) -> Path:
     return root
 
 
-def _capture_profile(_ctx, provider_key: str) -> Path:
-    """The persistent browser profile holding vendor sign-ins.
-
-    PER-MACHINE, and it is the permitted kind: it holds session cookies only, so it cannot change
-    what the library renders the way a per-machine enrich cache can. It is what makes a 90-part
-    sitting cost ONE sign-in. Every provider has an isolated profile and an explicit session lock.
-    """
-    from stockroom.capture.browser import provider_profile_dir
-
-    root = provider_profile_dir(
-        capture_state_root() / "Profiles",
-        provider_key,
-    )
-    root.mkdir(parents=True, exist_ok=True)
-    return root
-
-
 def _capture_evidence_root(_ctx) -> Path:
     """Machine-local immutable provider evidence, outside the Git library."""
     root = capture_state_root() / "Evidence"
@@ -789,9 +752,10 @@ def _take(iterable, n: int):
 # The executable fallback chain. DigiKey leads because one exact product page exposes distinct
 # Ultra Librarian, SnapMagic, and TraceParts author routes and Stockroom preserves each route's
 # provenance independently. Direct Ultra Librarian stays next (the preferred authored library),
-# followed by SnapMagic and the person-driven SamacSys availability fallback. Exact identity,
-# native readback, cross-EDA equivalence, and immutable evidence gate every attachment regardless
-# of surface. Machine-access policy still decides which entries may run unattended.
+# followed by SnapMagic and the SamacSys availability fallback. Exact identity, native readback,
+# cross-EDA equivalence, and immutable evidence gate every attachment regardless of surface. Every
+# entry is person-driven: the order is the order a person is offered these surfaces in, and no
+# entry runs without one.
 _VENDOR_CHAIN = ("digikey", "ultralibrarian", "snapmagic", "samacsys")
 
 

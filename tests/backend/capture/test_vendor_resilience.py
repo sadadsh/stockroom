@@ -18,6 +18,7 @@ from stockroom.capture.vendors import (
     UltraLibrarianAdapter,
     _href_demonstrates_mpn,
     _requested_mpn,
+    all_adapters,
 )
 
 
@@ -113,10 +114,13 @@ def test_every_vendor_names_the_exact_export_the_person_must_take():
     assert snap["altium"] == "Altium native"
 
 
-def test_ultra_hints_the_current_live_model_control_and_its_measured_legacy_alias():
-    hints = {hint.label: hint.selectors for hint in UltraLibrarianAdapter.capability.control_hints}
+def test_no_vendor_capability_carries_provider_page_selectors():
+    """Measured selectors existed only to outline controls inside the provider document.
 
-    assert hints["3D STEP model export"] == (
-        'input[name="exports"][id="ThreeDModel"]',
-        'input[name="exports"][id="MfrThreeDModel"]',
-    )
+    Nothing is injected into that document any more, so a stored selector could not be checked
+    against anything and would silently rot into a claim about a page Stockroom never reads.
+    """
+
+    for adapter in all_adapters():
+        capability = adapter.capability
+        assert not hasattr(capability, "control_hints"), capability.key

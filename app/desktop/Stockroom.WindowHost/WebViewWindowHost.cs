@@ -1,9 +1,6 @@
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
-using System.Net;
-using System.Net.Http;
-using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -35,8 +32,6 @@ internal sealed class WebViewWindowHost : IDisposable
 {
     private const int InitializationTimeoutSeconds = 30;
     private const int ProviderInitializationAttempts = 3;
-    private const int ProviderProbeTimeoutSeconds = 10;
-    private const int MaximumProviderProbeBytes = 256 * 1024;
 
     private readonly HandoffBootstrap _bootstrap;
     private readonly MachineWindowConfig _machineConfig;
@@ -62,8 +57,6 @@ internal sealed class WebViewWindowHost : IDisposable
     private CoreWebView2Environment? _environment;
     private CoreWebView2Environment? _providerEnvironment;
     private WebView2? _providerWebView;
-    private int _providerCdpPort;
-    private readonly string _providerProbeNonce;
     private IntPtr _windowHandle;
     private ResolvedWindowGeometry? _resolvedGeometry;
     private RendererReadiness? _readiness;
@@ -90,8 +83,6 @@ internal sealed class WebViewWindowHost : IDisposable
         _fatalFailure = fatalFailure
             ?? throw new ArgumentNullException(nameof(fatalFailure));
         _probeNonce = Convert.ToHexStringLower(
-            RandomNumberGenerator.GetBytes(16));
-        _providerProbeNonce = Convert.ToHexStringLower(
             RandomNumberGenerator.GetBytes(16));
         _webView = new WebView2
         {
@@ -317,24 +308,6 @@ internal sealed class WebViewWindowHost : IDisposable
             });
     }
 
-    internal int ProviderCdpPort()
-    {
-        return InvokeOnDispatcher(
-            async () =>
-            {
-                ThrowIfNotReady();
-                await EnsureProviderBrowserReadyAsync()
-                    .ConfigureAwait(true);
-                if (_providerCdpPort is < 1 or > 65535)
-                {
-                    throw new WindowHostException(
-                        "provider browser endpoint is unavailable");
-                }
-
-                return _providerCdpPort;
-            });
-    }
-
     internal IReadOnlyDictionary<string, object?> BeginProviderLease(
         string leaseId,
         ProviderLeaseContext context)
@@ -350,7 +323,6 @@ internal sealed class WebViewWindowHost : IDisposable
                 {
                     ["lease_id"] = lease.LeaseId,
                     ["generation"] = lease.Generation,
-                    ["port"] = _providerCdpPort,
                 };
             });
     }
@@ -729,8 +701,7 @@ internal sealed class WebViewWindowHost : IDisposable
 
     private async Task EnsureProviderBrowserReadyAsync()
     {
-        if (_providerWebView?.CoreWebView2 is not null
-            && _providerCdpPort is > 0 and <= 65535)
+        if (_providerWebView?.CoreWebView2 is not null)
         {
             return;
         }
@@ -753,7 +724,7 @@ internal sealed class WebViewWindowHost : IDisposable
         }
 
         throw new WindowHostException(
-            "embedded provider browser could not prove its local automation endpoint",
+            "embedded provider browser could not be initialized",
             lastFailure
                 ?? new InvalidOperationException(
                     "provider browser initialization did not report a failure"));
@@ -761,7 +732,6 @@ internal sealed class WebViewWindowHost : IDisposable
 
     private async Task InitializeProviderBrowserAttemptAsync()
     {
-        _providerCdpPort = ReserveLoopbackPort();
         var providerWebView = new WebView2
         {
             AllowDrop = false,
@@ -772,12 +742,11 @@ internal sealed class WebViewWindowHost : IDisposable
         var options = new CoreWebView2EnvironmentOptions
         {
             // Capture is leased across release activation, so only the active host initializes
-            // this browser. A fresh port per host avoids stale or foreign CDP ownership while the
-            // stable user-data folder preserves provider sign-in state between launches.
+            // this browser. Exclusive access keeps a second host out of the profile while the
+            // stable user-data folder preserves provider sign-in state between launches. No
+            // remote-debugging port is opened: nothing outside this process may drive this
+            // browser, and the person operating it is the only source of input.
             ExclusiveUserDataFolderAccess = true,
-            AdditionalBrowserArguments = string.Create(
-                CultureInfo.InvariantCulture,
-                $"--remote-debugging-port={_providerCdpPort}"),
         };
         var environment = await CoreWebView2Environment.CreateAsync(
                 browserExecutableFolder: null,
@@ -789,28 +758,7 @@ internal sealed class WebViewWindowHost : IDisposable
         await providerWebView.EnsureCoreWebView2Async(environment)
             .ConfigureAwait(true);
         ConfigureProviderCoreWebView(providerWebView.CoreWebView2);
-        var markerUrl = $"about:blank#stockroom-provider-{_providerProbeNonce}";
-        await NavigateProviderAsync(providerWebView, markerUrl)
-            .ConfigureAwait(true);
-        await VerifyProviderCdpEndpointAsync(
-                _providerCdpPort,
-                markerUrl)
-            .ConfigureAwait(true);
         _providerSurface.Visibility = Visibility.Collapsed;
-    }
-
-    private static int ReserveLoopbackPort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        try
-        {
-            listener.Start();
-            return ((IPEndPoint)listener.LocalEndpoint).Port;
-        }
-        finally
-        {
-            listener.Stop();
-        }
     }
 
     private Grid BuildProviderHeader(
@@ -1403,116 +1351,6 @@ internal sealed class WebViewWindowHost : IDisposable
         eventArguments.SavesInProfile = false;
     }
 
-    private async Task NavigateProviderAsync(
-        WebView2 providerWebView,
-        string markerUrl)
-    {
-        var completion = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        void Completed(
-            object? sender,
-            CoreWebView2NavigationCompletedEventArgs eventArguments)
-        {
-            if (eventArguments.IsSuccess)
-            {
-                completion.TrySetResult(true);
-            }
-            else
-            {
-                completion.TrySetException(
-                    new WindowHostException(
-                        "provider browser marker navigation failed"));
-            }
-        }
-
-        providerWebView.CoreWebView2.NavigationCompleted += Completed;
-        try
-        {
-            providerWebView.Source = new Uri(markerUrl, UriKind.Absolute);
-            await completion.Task.WaitAsync(
-                    TimeSpan.FromSeconds(ProviderProbeTimeoutSeconds))
-                .ConfigureAwait(true);
-        }
-        finally
-        {
-            providerWebView.CoreWebView2.NavigationCompleted -= Completed;
-        }
-    }
-
-    private static async Task VerifyProviderCdpEndpointAsync(
-        int port,
-        string markerUrl)
-    {
-        using var handler = new SocketsHttpHandler
-        {
-            UseProxy = false,
-        };
-        using var client = new HttpClient(handler)
-        {
-            Timeout = TimeSpan.FromMilliseconds(500),
-        };
-        var deadline = DateTimeOffset.UtcNow
-            + TimeSpan.FromSeconds(ProviderProbeTimeoutSeconds);
-        Exception? lastFailure = null;
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            try
-            {
-                var version = await ReadProviderProbeAsync(
-                        client,
-                        $"http://127.0.0.1:{port}/json/version")
-                    .ConfigureAwait(true);
-                ProviderCdpProof.RequireVersion(version, port);
-                var targets = await ReadProviderProbeAsync(
-                        client,
-                        $"http://127.0.0.1:{port}/json/list")
-                    .ConfigureAwait(true);
-                ProviderCdpProof.RequireOwnedTarget(targets, markerUrl);
-                return;
-            }
-            catch (Exception exception)
-                when (exception is HttpRequestException
-                    or TaskCanceledException
-                    or JsonException
-                    or WindowHostException)
-            {
-                lastFailure = exception;
-                await Task.Delay(50).ConfigureAwait(true);
-            }
-        }
-
-        throw new WindowHostException(
-            "provider browser CDP endpoint did not prove ownership",
-            lastFailure
-                ?? new InvalidOperationException(
-                    "provider browser CDP probe did not report a failure"));
-    }
-
-    private static async Task<byte[]> ReadProviderProbeAsync(
-        HttpClient client,
-        string url)
-    {
-        using var response = await client.GetAsync(
-                url,
-                HttpCompletionOption.ResponseHeadersRead)
-            .ConfigureAwait(true);
-        response.EnsureSuccessStatusCode();
-        var length = response.Content.Headers.ContentLength;
-        if (length is > MaximumProviderProbeBytes)
-        {
-            throw new WindowHostException(
-                "provider browser CDP response is too large");
-        }
-        var bytes = await response.Content.ReadAsByteArrayAsync()
-            .ConfigureAwait(true);
-        if (bytes.Length is 0 or > MaximumProviderProbeBytes)
-        {
-            throw new WindowHostException(
-                "provider browser CDP response is invalid");
-        }
-        return bytes;
-    }
-
     private void OnProviderProcessFailed(
         object? sender,
         CoreWebView2ProcessFailedEventArgs eventArguments)
@@ -1571,7 +1409,6 @@ internal sealed class WebViewWindowHost : IDisposable
                 OnProviderBrowserProcessExited;
             _providerEnvironment = null;
         }
-        _providerCdpPort = 0;
     }
 
     private async Task AddMachineUiBootstrapAsync(CoreWebView2 core)
@@ -2130,65 +1967,6 @@ internal static class ProviderNavigationPolicy
         }
         return uri.Scheme == Uri.UriSchemeHttps
             && !string.IsNullOrWhiteSpace(uri.IdnHost);
-    }
-}
-
-internal static class ProviderCdpProof
-{
-    internal static void RequireVersion(ReadOnlySpan<byte> document, int expectedPort)
-    {
-        using var parsed = JsonDocument.Parse(document.ToArray());
-        var root = parsed.RootElement;
-        if (root.ValueKind != JsonValueKind.Object
-            || !root.TryGetProperty("Browser", out var browser)
-            || browser.ValueKind != JsonValueKind.String
-            || string.IsNullOrWhiteSpace(browser.GetString())
-            || !root.TryGetProperty(
-                "webSocketDebuggerUrl",
-                out var rawWebSocket)
-            || rawWebSocket.ValueKind != JsonValueKind.String
-            || !Uri.TryCreate(
-                rawWebSocket.GetString(),
-                UriKind.Absolute,
-                out var webSocket)
-            || webSocket.Scheme != "ws"
-            || !IsLoopbackHost(webSocket.Host)
-            || webSocket.Port != expectedPort)
-        {
-            throw new WindowHostException(
-                "provider browser CDP version proof is invalid");
-        }
-    }
-
-    private static bool IsLoopbackHost(string host)
-    {
-        return string.Equals(
-                host,
-                "localhost",
-                StringComparison.OrdinalIgnoreCase)
-            || (IPAddress.TryParse(host, out var address)
-                && IPAddress.IsLoopback(address));
-    }
-
-    internal static void RequireOwnedTarget(
-        ReadOnlySpan<byte> document,
-        string expectedUrl)
-    {
-        using var parsed = JsonDocument.Parse(document.ToArray());
-        var root = parsed.RootElement;
-        if (root.ValueKind != JsonValueKind.Array
-            || !root.EnumerateArray().Any(
-                item => item.ValueKind == JsonValueKind.Object
-                    && item.TryGetProperty("type", out var type)
-                    && type.ValueKind == JsonValueKind.String
-                    && type.GetString() == "page"
-                    && item.TryGetProperty("url", out var url)
-                    && url.ValueKind == JsonValueKind.String
-                    && url.GetString() == expectedUrl))
-        {
-            throw new WindowHostException(
-                "provider browser CDP target ownership proof is invalid");
-        }
     }
 }
 

@@ -39,11 +39,6 @@ public sealed class WindowHostSessionTests
                 new Dictionary<string, object?>()),
             HandoffProtocolTests.BuildMessage(
                 7,
-                "provider-endpoint",
-                Now + 30_000,
-                new Dictionary<string, object?>()),
-            HandoffProtocolTests.BuildMessage(
-                8,
                 "provider-show",
                 Now + 30_000,
                 new Dictionary<string, object?>
@@ -52,7 +47,7 @@ public sealed class WindowHostSessionTests
                     ["generation"] = 7,
                 }),
             HandoffProtocolTests.BuildMessage(
-                9,
+                8,
                 "provider-hide",
                 Now + 30_000,
                 new Dictionary<string, object?>
@@ -61,7 +56,7 @@ public sealed class WindowHostSessionTests
                     ["generation"] = 7,
                 }),
             HandoffProtocolTests.BuildMessage(
-                10,
+                9,
                 "provider-current-url",
                 Now + 30_000,
                 new Dictionary<string, object?>
@@ -70,7 +65,7 @@ public sealed class WindowHostSessionTests
                     ["generation"] = 7,
                 }),
             HandoffProtocolTests.BuildMessage(
-                11,
+                10,
                 "provider-navigate",
                 Now + 30_000,
                 new Dictionary<string, object?>
@@ -80,7 +75,7 @@ public sealed class WindowHostSessionTests
                     ["url"] = "https://provider.example.test/next",
                 }),
             HandoffProtocolTests.BuildMessage(
-                12,
+                11,
                 "provider-document-state",
                 Now + 30_000,
                 new Dictionary<string, object?>
@@ -91,7 +86,7 @@ public sealed class WindowHostSessionTests
                     ["ready_texts"] = new[] { "download" },
                 }),
             HandoffProtocolTests.BuildMessage(
-                13,
+                12,
                 "shutdown",
                 Now + 30_000,
                 new Dictionary<string, object?>()));
@@ -117,7 +112,6 @@ public sealed class WindowHostSessionTests
                 "export",
                 "show",
                 "focus",
-                "provider-endpoint",
                 "provider-show:lease-1:7",
                 "provider-hide:lease-1:7",
                 "provider-current-url:lease-1:7",
@@ -135,7 +129,6 @@ public sealed class WindowHostSessionTests
                 "exported",
                 "shown",
                 "focused",
-                "provider-endpoint",
                 "provider-shown",
                 "provider-hidden",
                 "provider-current-url",
@@ -145,7 +138,7 @@ public sealed class WindowHostSessionTests
             ],
             responses.Select(static item => item.Name));
         Assert.Equal(
-            Enumerable.Range(1, 13).Select(static item => (long)item),
+            Enumerable.Range(1, 12).Select(static item => (long)item),
             responses.Select(static item => item.Sequence));
 
         var hello = responses[0].Payload.GetProperty("result");
@@ -196,13 +189,13 @@ public sealed class WindowHostSessionTests
                 .GetProperty("schema")
                 .GetString());
         Assert.True(controller.ShutdownCalled);
-        Assert.Equal(
-            43127,
-            responses[6]
-                .Payload
-                .GetProperty("result")
-                .GetProperty("port")
-                .GetInt32());
+        // No response may hand the caller a debugging port. Python observes this window only
+        // through the lease/download-event protocol; there is nothing for a driver to attach to.
+        Assert.DoesNotContain(
+            responses,
+            static item => item.Payload.TryGetProperty("result", out var result)
+                && result.ValueKind == JsonValueKind.Object
+                && result.TryGetProperty("port", out _));
     }
 
     [Fact]
@@ -502,12 +495,6 @@ public sealed class WindowHostSessionTests
 
         public void Focus() => Operations.Add("focus");
 
-        public int ProviderCdpPort()
-        {
-            Operations.Add("provider-endpoint");
-            return 43127;
-        }
-
         public IReadOnlyDictionary<string, object?> BeginProviderLease(
             string leaseId,
             ProviderLeaseContext context)
@@ -520,7 +507,6 @@ public sealed class WindowHostSessionTests
             {
                 ["lease_id"] = leaseId,
                 ["generation"] = 7L,
-                ["port"] = 43127,
             };
         }
 

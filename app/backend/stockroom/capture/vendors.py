@@ -12,9 +12,6 @@ WHAT A VENDOR ENTRY STILL HAS TO CARRY
     `Footprint.load` REFUSES. A wrong pick downloads a file that fails much later, far from the
     cause, so the exact human-visible choice is declared per vendor in `user_format_labels` and
     shown to the person rather than guessed at.
-  * WHERE those choices sit, as `control_hints`, so the guided HUD can outline the next control.
-    That is POSITION data: the HUD reads a bounding box, never page content, and never clicks.
-
 Provider identity that is not capture-specific - labels, domains, and search URLs - comes from
 `stockroom.providers`, the one authoritative registry. What stays here is the capture-specific
 route knowledge that registry deliberately does not model: DigiKey's per-author rows inside its
@@ -30,7 +27,6 @@ from typing import Protocol
 from unicodedata import normalize
 from urllib.parse import parse_qs, unquote, urlparse
 
-from stockroom.capture.browser import ProviderControlHint
 from stockroom.capture.identity import (
     exact_catalog_observation_error,
     exact_observation_error,
@@ -79,15 +75,6 @@ class VendorCapability:
     # Exact visible choices a person selects in a provider-controlled page. Deliberately labels
     # and not DOM ids: Stockroom names the right export, the person takes it.
     user_format_labels: dict[str, str] = field(default_factory=dict)
-    # WHERE this provider's controls sit, in the order a person works through them, so the guided
-    # HUD can draw a Stockroom-owned outline over the next one. This is POSITION data and nothing
-    # else: the HUD reads a bounding box, never page content, and never operates the control.
-    #
-    # THE SELECTOR IS NEVER INVENTED. Every string here is one this repo measured against the live
-    # provider page, and the whole list is deliberately short: a provider with no measured control
-    # stays hint-less and the person gets the checklist text instead, because an outline over the
-    # wrong control is worse than no outline at all.
-    control_hints: tuple[ProviderControlHint, ...] = ()
 
     @property
     def supported_formats(self) -> frozenset[str]:
@@ -130,34 +117,6 @@ class UltraLibrarianAdapter:
             "model": "STEP",
             "altium": "Altium Designer (Native)",
         },
-        # `input[name=exports]` is deliberately NOT here: it is the presence probe for the whole
-        # checkbox GROUP, so it can never resolve to one control and would only ever degrade.
-        control_hints=(
-            ProviderControlHint(
-                label="KiCad v6+ export",
-                selectors=('input[name="exports"][id="KiCADv6"]',),
-                source="Ultra Librarian export panel, measured 2026-07-28",
-            ),
-            ProviderControlHint(
-                label="3D STEP model export",
-                # The current live id first, then only the measured legacy alias.
-                selectors=(
-                    'input[name="exports"][id="ThreeDModel"]',
-                    'input[name="exports"][id="MfrThreeDModel"]',
-                ),
-                source="Ultra Librarian export panel, measured 2026-07-28",
-            ),
-            ProviderControlHint(
-                label="Provider consent",
-                selectors=("input[type=checkbox][id^=consent-]",),
-                source="Ultra Librarian export panel, measured 2026-07-27",
-            ),
-            ProviderControlHint(
-                label="Download export",
-                selectors=("#submit-export",),
-                source="Ultra Librarian export panel, measured 2026-07-27",
-            ),
-        ),
     )
 
     def resolve_url(self, mpn: str) -> str:
@@ -223,35 +182,6 @@ class SnapMagicAdapter:
             "model": "STEP model",
             "altium": "Altium native",
         },
-        # In the order this page is actually worked: open the download modal, choose the KiCad
-        # version, then take each format.
-        control_hints=(
-            ProviderControlHint(
-                label="Download",
-                selectors=('a[name="download-modal"]',),
-                source="SnapMagic part page, measured 2026-07-27",
-            ),
-            ProviderControlHint(
-                label="KiCad version chooser",
-                selectors=('[data-format="kicad_options"]',),
-                source="SnapMagic two-step KiCad chooser, measured 2026-07-27",
-            ),
-            ProviderControlHint(
-                label="KiCad V6 & Later",
-                selectors=('[data-format="kicad_modv6"]',),
-                source="SnapMagic two-step KiCad chooser, measured 2026-07-27",
-            ),
-            ProviderControlHint(
-                label="STEP model",
-                selectors=('[data-format="step_model"]',),
-                source="SnapMagic part page, measured 2026-07-27",
-            ),
-            ProviderControlHint(
-                label="Altium native",
-                selectors=('[data-format="altium_native"]',),
-                source="SnapMagic part page, measured 2026-07-27",
-            ),
-        ),
     )
 
     def resolve_url(self, mpn: str) -> str:
@@ -355,43 +285,6 @@ _DIGIKEY_CADENAS_ROUTE = DigiKeyProviderRoute(
 )
 
 
-def _digikey_route_control_hints(
-    route: DigiKeyProviderRoute,
-    *,
-    download_control: str = '[id^="btn-download-"]',
-) -> tuple[ProviderControlHint, ...]:
-    """Outline hints for one DigiKey author route, DERIVED from its measured ids.
-
-    Nothing is invented here: the row selector is the route's own ``row_ids``, the opener is the
-    exact ``onclick`` pair the page uses, and the download control is scoped to the route's own
-    ``modal_id`` - page-wide ``[id^="btn-download-"]`` matches every route's modal at once and
-    would only ever degrade. A route with no measured download contract passes
-    ``download_control=""`` and simply gets no outline for that step.
-    """
-
-    hints = [
-        ProviderControlHint(
-            label=f"{route.label} row",
-            selectors=(", ".join(f"#{row_id}" for row_id in dict.fromkeys(route.row_ids)),),
-            source=f"DigiKeyProviderRoute.row_ids for {route.evidence_provider_key}",
-        ),
-        ProviderControlHint(
-            label=f"Open {route.label} formats",
-            selectors=(f'a[onclick*="{route.modal_id}"], button[onclick*="{route.modal_id}"]',),
-            source=f"DigiKeyProviderRoute.modal_id for {route.evidence_provider_key}",
-        ),
-    ]
-    if download_control:
-        hints.append(
-            ProviderControlHint(
-                label=f"Download from {route.label}",
-                selectors=(f"#{route.modal_id} {download_control}",),
-                source=f"DigiKey modal download control for {route.evidence_provider_key}",
-            )
-        )
-    return tuple(hints)
-
-
 class DigiKeyUltraLibrarianAdapter:
     """DigiKey's exact product/model pages with independently attributed CAD-author routes.
 
@@ -419,9 +312,6 @@ class DigiKeyUltraLibrarianAdapter:
             "model": "STEP",
             "altium": "Altium Designer",
         },
-        # The parent surface opens on its preferred coherent author, Ultra Librarian, so its
-        # outlines are that route's measured row, opener, and modal-scoped Download control.
-        control_hints=_digikey_route_control_hints(_DIGIKEY_ULTRALIBRARIAN_ROUTE),
     )
 
     def capture_routes(self) -> tuple[object, ...]:
@@ -485,7 +375,6 @@ class DigiKeySnapMagicRouteAdapter(_DigiKeyProviderRouteAdapter):
             "model": "STEP",
             "altium": "Altium Designer",
         },
-        control_hints=_digikey_route_control_hints(_DIGIKEY_SNAPMAGIC_ROUTE),
     )
 
 
@@ -505,7 +394,6 @@ class DigiKeyTracePartsRouteAdapter(_DigiKeyProviderRouteAdapter):
             "evidence without treating it as a complete KiCad library variant."
         ),
         user_format_labels={"model": "STEP AP214"},
-        control_hints=_digikey_route_control_hints(_DIGIKEY_TRACEPARTS_ROUTE),
     )
 
 
@@ -526,12 +414,6 @@ class DigiKeyManufacturerProvidedRouteAdapter(_DigiKeyProviderRouteAdapter):
             "delivered exact files as supplementary evidence without activating them."
         ),
         user_format_labels={"model": "3D Model"},
-        # `#btn-download-mfr` is this route's own measured Download control, not the generic
-        # prefix the other routes share.
-        control_hints=_digikey_route_control_hints(
-            _DIGIKEY_MANUFACTURER_ROUTE,
-            download_control="#btn-download-mfr",
-        ),
     )
 
 
@@ -551,12 +433,6 @@ class DigiKeyCadenasRouteAdapter(_DigiKeyProviderRouteAdapter):
             "retains whatever it delivers as supplementary evidence."
         ),
         user_format_labels={"model": "3D Model"},
-        # No download control has been measured for this polymorphic row, so it gets no outline
-        # for that step rather than an invented one.
-        control_hints=_digikey_route_control_hints(
-            _DIGIKEY_CADENAS_ROUTE,
-            download_control="",
-        ),
     )
 
 
@@ -714,47 +590,3 @@ def _detail_identity_issue(
         else exact_observation_error(expected, observed)
     )
     return f"{vendor_key} {error}." if error else ""
-
-
-_HUD_GUIDANCE_INDEX: dict[str, tuple[str, tuple[ProviderControlHint, ...]]] | None = None
-
-
-def _hud_guidance_index() -> dict[str, tuple[str, tuple[ProviderControlHint, ...]]]:
-    """Index every adapter's guidance by its EXACT capability label, including author routes.
-
-    Built once and lazily, because the registry finishes assembling above and DigiKey's author
-    routes are constructed on demand rather than registered. Two adapters claiming one label would
-    make a lookup a guess, so that label is emptied instead.
-    """
-
-    global _HUD_GUIDANCE_INDEX
-    if _HUD_GUIDANCE_INDEX is not None:
-        return _HUD_GUIDANCE_INDEX
-    index: dict[str, tuple[str, tuple[ProviderControlHint, ...]]] = {}
-    for adapter in all_adapters():
-        candidates = [adapter]
-        capture_routes = getattr(adapter, "capture_routes", None)
-        if callable(capture_routes):
-            candidates.extend(capture_routes())
-        for candidate in candidates:
-            capability = getattr(candidate, "capability", None)
-            if capability is None:
-                continue
-            entry = (capability.instruction, capability.control_hints)
-            existing = index.get(capability.label)
-            index[capability.label] = entry if existing is None or existing == entry else ("", ())
-    _HUD_GUIDANCE_INDEX = index
-    return index
-
-
-def provider_hud_guidance(provider_label: str) -> tuple[str, tuple[ProviderControlHint, ...]]:
-    """The provider's own instruction and measured outline hints for one exact provider label.
-
-    This is the guided HUD's read of vendor DATA. It never touches a page; an unknown label simply
-    yields no guidance, which degrades the HUD to the Tier 1 checklist built from Stockroom's own
-    required-file labels.
-    """
-
-    if type(provider_label) is not str:
-        return "", ()
-    return _hud_guidance_index().get(provider_label.strip(), ("", ()))

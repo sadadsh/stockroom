@@ -297,14 +297,11 @@ class _Channel:
             return "shown", {"visible": True}
         if request.name == "focus":
             return "focused", {"focused": True}
-        if request.name == "provider-endpoint":
-            return "provider-endpoint", {"port": 43127}
         if request.name == "provider-lease-begin":
             assert request.payload == self.expect_lease_scope
             return "provider-lease-begun", {
                 "lease_id": "11111111-1111-4111-8111-111111111111",
                 "generation": 7,
-                "port": 43127,
             }
         if request.name == "provider-download-events":
             return "provider-download-events", {
@@ -594,7 +591,6 @@ def test_launch_binds_exact_child_and_sends_secrets_only_in_bootstrap(
     assert client.identity.parent_process_id == _PARENT_PID
     assert client.identity.window_handle == 4500
     assert client.identity.renderer == "edgechromium"
-    assert client.provider_endpoint() == "http://127.0.0.1:43127"
     lease = client.begin_provider_lease(
         "11111111-1111-4111-8111-111111111111",
         staging_root=_STAGING_ROOT,
@@ -603,7 +599,7 @@ def test_launch_binds_exact_child_and_sends_secrets_only_in_bootstrap(
         mpn="MPN-9",
         provider_id="digikey",
     )
-    assert lease.endpoint == "http://127.0.0.1:43127"
+    assert not hasattr(lease, "endpoint")
     assert lease.staging_root == _STAGING_ROOT
     assert lease.component_id == "component-9"
     assert lease.manufacturer == "Exact Manufacturer"
@@ -633,8 +629,7 @@ def test_launch_binds_exact_child_and_sends_secrets_only_in_bootstrap(
     assert events[0].mpn == "MPN-9"
     assert events[0].provider_id == "digikey"
     assert client.release_provider_lease(lease.lease_id, lease.generation) is True
-    assert [message.name for message in channel.sent[-9:]] == [
-        "provider-endpoint",
+    assert [message.name for message in channel.sent[-8:]] == [
         "provider-lease-begin",
         "provider-show",
         "provider-hide",

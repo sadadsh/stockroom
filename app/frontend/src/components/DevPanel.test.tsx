@@ -170,8 +170,8 @@ describe("DevPanel inspect-first shell", () => {
     toggleDevMode();
     fireEvent.click(screen.getByRole("button", { name: /Catalogue/ }));
 
-    fireEvent.change(screen.getByLabelText("Search ids"), { target: { value: "complete-part" } });
-    const entry = screen.getByRole("button", { name: /detail\.complete-part/ });
+    fireEvent.change(screen.getByLabelText("Search ids"), { target: { value: "nav-components" } });
+    const entry = screen.getByRole("button", { name: /rail\.nav-components/ });
     fireEvent.click(entry);
     expect(scrollIntoViewMock).toHaveBeenCalled();
   });

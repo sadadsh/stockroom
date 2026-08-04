@@ -779,7 +779,6 @@ class StockroomAcquisitionProviderAdapter:
                     isolated,
                     part_ids=[part_id],
                     vendor=request.vendor,
-                    headless=request.background,
                     should_stop=request.should_stop,
                     capture_id=request.report_item_id,
                 )

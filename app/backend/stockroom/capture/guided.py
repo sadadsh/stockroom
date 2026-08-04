@@ -46,9 +46,8 @@ from urllib.parse import parse_qs, urlparse
 
 from stockroom.capture.browser import (
     CaptureBrowserError,
-    PlaywrightCaptureBrowser,
     ProviderHudSpec,
-    SharedPlaywrightRuntime,
+    ProviderSurfaceCapture,
 )
 from stockroom.capture.cad_composition import OwnedMaterialization
 from stockroom.capture.complete import (
@@ -65,7 +64,6 @@ from stockroom.capture.evidence import (
     exact_identity,
     record_browser_cad_evidence,
 )
-from stockroom.capture.handoff import TRANSPORT_PLAYWRIGHT
 from stockroom.capture.identity import (
     exact_catalog_observation_error,
     exact_observation_error,
@@ -531,16 +529,15 @@ def _resolved_kicad_candidate(record, resolved, owner: OwnedMaterialization) -> 
 
 @dataclass
 class _Session:
-    """One provider session and the transport that owns it.
+    """One leased provider surface and the capture that observes it.
 
-    The browser is always attached to Stockroom's embedded provider WebView. A person-owned gate
-    temporarily detaches the automation transport, but the native page and task-bound download
-    broker remain the same session.
+    Nothing is attached to the page. The lease is Stockroom's own embedded provider WebView; the
+    capture below only listens to its download journal, so the person's session stays exactly
+    what it is - a person in a browser.
     """
 
-    browser: PlaywrightCaptureBrowser
+    browser: ProviderSurfaceCapture
     ctx_manager: "_SessionManager"
-    page: object
 
 
 class _SessionManager(Protocol):
@@ -617,9 +614,6 @@ class GuidedCaptureSource:
         *,
         vendor: str = "ultralibrarian",
         download_root: Path,
-        profile_dir: Path | None = None,
-        headless: bool = False,
-        engine: str = "chromium",
         convert_altium=None,
         collect_variants: bool = False,
         preserve_active_pair: bool = False,
@@ -630,7 +624,6 @@ class GuidedCaptureSource:
         evidence_store=None,
         cross_eda_verifier=None,
         projection_verifier=None,
-        playwright_runtime: SharedPlaywrightRuntime | None = None,
         user_finished: Callable[[], bool] | None = None,
         user_cancelled: Callable[[], bool] | None = None,
         cancel_workflow: Callable[[], None] | None = None,
@@ -638,7 +631,6 @@ class GuidedCaptureSource:
         models_ids=None,
         strict_catalog_urls: bool = False,
         provider_surface=None,
-        allow_standalone_browser: bool = False,
         publish_active_route: Callable[[str, str, str], str] | None = None,
         clear_active_route: Callable[[str, str, str, str], None] | None = None,
         take_selected_files: Callable[[str, str, str, str], tuple[Path, ...]] | None = None,
@@ -657,9 +649,6 @@ class GuidedCaptureSource:
         self.report_label = adapter.capability.label if adapter is not None else vendor
         self._download_root = Path(download_root)
         self._download_root.mkdir(parents=True, exist_ok=True)
-        self._profile_dir = profile_dir
-        self._headless = headless
-        self._engine = engine
         # Optional provider-package conversion seam. Direct and DigiKey-embedded Ultra Librarian
         # routes can deliver a recognized legacy P-CAD/script package instead of native Altium
         # libraries. The runner injects a content-recognizing converter on those provider surfaces;
@@ -677,7 +666,6 @@ class GuidedCaptureSource:
         self._evidence_store = evidence_store
         self._cross_eda_verifier = cross_eda_verifier or verify_cross_eda_component
         self._projection_verifier = projection_verifier
-        self._playwright_runtime = playwright_runtime
         self._user_finished = user_finished
         self._user_cancelled = user_cancelled
         self._cancel_workflow = cancel_workflow
@@ -688,9 +676,6 @@ class GuidedCaptureSource:
         self._models_ids = models_ids
         self._strict_catalog_urls = bool(strict_catalog_urls)
         self._provider_surface = provider_surface
-        if type(allow_standalone_browser) is not bool:
-            raise TypeError("allow_standalone_browser must be a boolean")
-        self._allow_standalone_browser = allow_standalone_browser
         self._publish_active_route = publish_active_route
         self._clear_active_route = clear_active_route
         self._take_selected_files = take_selected_files
@@ -699,78 +684,52 @@ class GuidedCaptureSource:
     # -- lifecycle -------------------------------------------------------------------------
 
     def _ensure_session(self) -> _Session:
-        """Open the browser once, on the first part that actually needs it.
+        """Lease the provider surface once, on the first part that actually needs it.
 
-        Lazy on purpose: a run whose parts are all already complete must not flash a browser
+        Lazy on purpose: a run whose parts are all already complete must not flash a provider
         window at the owner for nothing.
 
-        Every visible route uses the one Stockroom-owned embedded provider surface, traced here
-        so a run says which transport carried it. Silently switching to an installed browser would
-        lose the task-bound download broker and create two contradictory workflows.
+        Every visible route uses the one Stockroom-owned embedded provider surface, and nothing
+        is attached to it. Silently switching to an installed browser would lose the task-bound
+        download broker and create two contradictory workflows.
         """
         if self._session is not None:
             return self._session
         adapter = get_adapter(self._vendor_key)
         if adapter is not None:
-            # Trace what actually happens, not a choice that is no longer made. Every provider
-            # page opens in Stockroom's OWN embedded surface, and the driver is attached to that
-            # window so the task-bound broker sees its downloads. It is never used to operate a
-            # provider's controls - the person does all of that.
+            # Trace what actually happens. The provider page opens in Stockroom's OWN embedded
+            # surface with no driver connected to it; the only thing Stockroom reads is the
+            # host's download journal, which is how the task-bound broker stays bound.
             trace(
                 "capture.transport",
                 provider=self._vendor_key,
-                transport=TRANSPORT_PLAYWRIGHT,
+                transport="stockroom-provider-surface",
                 why="the person drives this route inside Stockroom's own provider surface",
-                engine=self._engine or "none",
+                automation_attached=False,
                 provider_controls_operated=False,
             )
-        if (
-            not self._headless
-            and self._provider_surface is None
-            and not self._allow_standalone_browser
-        ):
+        if self._provider_surface is None:
             raise CaptureBrowserError(
                 "Stockroom's embedded provider browser is unavailable; restart or update "
                 "Stockroom before collecting CAD files"
             )
         stack = ExitStack()
         try:
-            provider_lease = (
-                stack.enter_context(self._provider_surface())
-                if self._provider_surface is not None and not self._headless
-                else None
-            )
-            cdp_endpoint = (
-                str(getattr(provider_lease, "endpoint", provider_lease))
-                if provider_lease is not None
-                else None
-            )
-            browser = PlaywrightCaptureBrowser(
-                engine=self._engine,
+            provider_lease = stack.enter_context(self._provider_surface())
+            browser = ProviderSurfaceCapture(
                 download_dir=self._download_root,
-                profile_dir=self._profile_dir,
-                headless=self._headless,
                 provider_key=self._vendor_key,
-                playwright_runtime=self._playwright_runtime,
-                cdp_endpoint=cdp_endpoint,
                 native_surface=provider_lease,
             )
-            page = stack.enter_context(browser.session())
-            show_provider = getattr(provider_lease, "show", None)
-            if callable(show_provider):
-                # `browser.session()` wires the page/context download handlers before it
-                # yields.  Only then may a person see and click the provider surface.
-                show_provider()
         except BaseException:
             stack.close()
             raise
-        self._session = _Session(browser=browser, ctx_manager=stack, page=page)
+        self._session = _Session(browser=browser, ctx_manager=stack)
         return self._session
 
-
     def close(self) -> None:
-        """Close the browser. Called by the runner in a finally, so a stopped or failed run never
-        leaves a window open."""
+        """Release the provider surface. Called by the runner in a finally, so a stopped or
+        failed run never leaves a window open."""
         session = self._session
         self._session = None
         if session is None:
@@ -937,7 +896,6 @@ class GuidedCaptureSource:
             manufacturer=getattr(record, "manufacturer", ""),
             routes=[_author_key(self._vendor_key, route) for route in routes],
             collect_variants=self._collect_variants,
-            engine=self._engine,
         )
         if self._user_cancelled and self._user_cancelled():
             return self._decline(
