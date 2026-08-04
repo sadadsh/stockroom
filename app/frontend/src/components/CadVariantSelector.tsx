@@ -15,7 +15,7 @@ import type {
   CadVariantTool,
   SupplementaryCadEvidence,
 } from "../api/cadVariantClient";
-import { Text } from "../lib/copy";
+import { Text, useText } from "../lib/copy";
 import { Badge, Button, Card, Dot, EYEBROW_DENSE } from "./primitives";
 
 export type {
@@ -202,6 +202,10 @@ function PairInventory({
   > | null;
   onActivate: (activation: CadVariantPairActivation) => void;
 }) {
+  const sectionLabel = useText(
+    "cad.variant.selector.pairs-aria",
+    "Same-Download CAD Pairs",
+  );
   const kicad = inventories.find((inventory) => inventory.tool === "kicad");
   const altium = inventories.find((inventory) => inventory.tool === "altium");
   const ordered = [...pairs].sort(
@@ -214,13 +218,17 @@ function PairInventory({
 
   return (
     <section
-      aria-label="Same-Download CAD Pairs"
+      aria-label={sectionLabel}
       className="border-b border-line bg-surface px-3 py-2.5"
     >
       <div className="mb-2 flex min-w-0 items-baseline gap-2">
-        <h3 className="text-xs font-semibold text-t1">Same-Download Pairs</h3>
+        <h3 className="text-xs font-semibold text-t1">
+          <Text id="cad.variant.selector.pairs-title">Same-Download Pairs</Text>
+        </h3>
         <span className="text-2xs text-t3">
-          One switch updates KiCad and Altium together
+          <Text id="cad.variant.selector.pairs-help">
+            One switch updates KiCad and Altium together
+          </Text>
         </span>
       </div>
       {ordered.length ? (
@@ -263,7 +271,7 @@ function PairInventory({
                   </h4>
                   {active ? (
                     <Badge tone="ok" size="sm">
-                      Active In Both
+                      <Text id="cad.variant.selector.pair-active">Active In Both</Text>
                     </Badge>
                   ) : null}
                   <Badge tone="neutral" size="sm">
@@ -309,8 +317,10 @@ function PairInventory({
         </div>
       ) : (
         <div className="rounded-card border border-dashed border-line px-3 py-3 text-2xs text-t2">
-          No activatable pair is retained. Individual provider variants remain visible below, but
-          Stockroom will not combine files from separate downloads or activate one EDA alone.
+          <Text id="cad.variant.selector.no-pairs">
+            No activatable pair is retained. Individual provider variants remain visible below, but
+            Stockroom will not combine files from separate downloads or activate one EDA alone.
+          </Text>
         </div>
       )}
     </section>
@@ -328,9 +338,13 @@ function SupplementaryInventory({
 }: {
   evidence: readonly SupplementaryCadEvidence[];
 }) {
+  const sectionLabel = useText(
+    "cad.variant.selector.supplementary-aria",
+    "Supplementary Retained Artifacts",
+  );
   return (
     <section
-      aria-label="Supplementary Retained Artifacts"
+      aria-label={sectionLabel}
       className="border-t border-line bg-surface px-3 py-2.5"
     >
       <div className="mb-2 flex min-w-0 items-baseline gap-2">
@@ -338,7 +352,9 @@ function SupplementaryInventory({
           <Text id="detail.cad-variants.supplementary">Retained Originals</Text>
         </h3>
         <span className="text-2xs text-t3">
-          Exact provider files kept for inspection and future processing
+          <Text id="cad.variant.selector.supplementary-help">
+            Exact provider files kept for inspection and future processing
+          </Text>
         </span>
       </div>
       <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
@@ -353,10 +369,10 @@ function SupplementaryInventory({
                 {manifest.provider}
               </h4>
               <Badge tone="neutral" size="sm">
-                Supplementary
+                <Text id="cad.variant.selector.supplementary-badge">Supplementary</Text>
               </Badge>
               <Badge tone="neutral" size="sm">
-                Not Activatable
+                <Text id="cad.variant.selector.not-activatable">Not Activatable</Text>
               </Badge>
             </div>
             <p className="mt-1 text-2xs text-t2">
@@ -418,7 +434,8 @@ function ToolInventory({
         </span>
         {activeVariant ? (
           <span className="ml-auto min-w-0 truncate text-2xs text-t2">
-            Active: <span className="font-medium text-t1">{activeVariant.provider}</span>
+            <Text id="cad.variant.selector.active-label">Active:</Text>{" "}
+            <span className="font-medium text-t1">{activeVariant.provider}</span>
           </span>
         ) : null}
       </div>
@@ -503,12 +520,12 @@ function VariantRow({
           </h4>
           {active ? (
             <Badge tone="ok" size="sm">
-              Active In Pair
+              <Text id="cad.variant.selector.variant-active">Active In Pair</Text>
             </Badge>
           ) : null}
           {storedWithoutPair ? (
             <Badge tone="warn" size="sm">
-              Stored Only
+              <Text id="cad.variant.selector.variant-stored-only">Stored Only</Text>
             </Badge>
           ) : null}
           <Badge tone="neutral" size="sm">
@@ -522,13 +539,17 @@ function VariantRow({
 
         <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
           <div className="min-w-0">
-            <dt className={EYEBROW_DENSE}>Files</dt>
+            <dt className={EYEBROW_DENSE}>
+              <Text id="cad.variant.selector.files-label">Files</Text>
+            </dt>
             <dd className="mt-0.5 truncate text-2xs text-t1" title={fileSummary || undefined}>
               {artifactSummary || "No Files Recorded"}
             </dd>
           </div>
           <div className="min-w-0">
-            <dt className={EYEBROW_DENSE}>Evidence</dt>
+            <dt className={EYEBROW_DENSE}>
+              <Text id="cad.variant.selector.evidence-label">Evidence</Text>
+            </dt>
             <dd
               className="mt-0.5 truncate font-mono text-2xs text-t1"
               title={variant.evidenceDigest}

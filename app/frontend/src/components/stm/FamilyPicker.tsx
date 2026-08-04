@@ -14,6 +14,7 @@ import type { FamilyDTO } from "../../api/types";
 import type { StmScope } from "../../pages/StmViewerPage";
 import { instanceDevId } from "../../lib/componentDevIds";
 import { Badge, Eyebrow } from "../primitives";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
 
 // A small disclosure chevron (no shared icon for it); rotates 90deg when the family is expanded.
 function ChevronIcon({ className }: { className?: string }) {
@@ -39,32 +40,41 @@ export function FamilyPicker({ scope, onScopeChange }: Props) {
 
   const rows = families.data?.families ?? [];
   const selectedCount = scope.families.length + scope.mcus.length;
+  const allFamiliesLabel = useText("stm.family.all", "All Families");
 
   return (
     <div className="flex min-h-0 flex-col">
       <div className="mb-2 flex items-center justify-between px-1">
-        <Eyebrow>Families</Eyebrow>
+        <Eyebrow>
+          <Text id="stm.family.title">Families</Text>
+        </Eyebrow>
         {selectedCount > 0 ? (
           <button
             type="button"
             onClick={() => onScopeChange({ families: [], mcus: [] })}
             className="rounded-control px-1.5 py-0.5 text-2xs font-medium text-t3 hover:text-t1"
           >
-            Clear
+            <Text id="stm.family.clear">Clear</Text>
           </button>
         ) : null}
       </div>
 
       {families.isLoading ? (
-        <p className="px-2 py-3 text-xs text-t3">Loading families...</p>
+        <p className="px-2 py-3 text-xs text-t3">
+          <Text id="stm.family.loading">Loading families...</Text>
+        </p>
       ) : families.isError ? (
-        <p className="px-2 py-3 text-xs text-err">Could not load families.</p>
+        <p className="px-2 py-3 text-xs text-err">
+          <Text id="stm.family.failed">Could not load families.</Text>
+        </p>
       ) : rows.length === 0 ? (
-        <p className="px-2 py-3 text-xs text-t3">No families in the index.</p>
+        <p className="px-2 py-3 text-xs text-t3">
+          <Text id="stm.family.empty">No families in the index.</Text>
+        </p>
       ) : (
         <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
           <ScopeRow
-            label="All Families"
+            label={allFamiliesLabel}
             count={rows.reduce((sum, f) => sum + f.mcu_count, 0)}
             active={scope.families.length === 0 && scope.mcus.length === 0}
             onToggle={() => onScopeChange({ families: [], mcus: [] })}
@@ -109,6 +119,8 @@ function FamilyGroup({
 }) {
   const active = scope.families.includes(family.family);
   const hasLines = family.lines.length > 0;
+  const collapseLabel = useCopyFormatter("stm.family.collapse.aria", "Collapse {family}");
+  const expandLabel = useCopyFormatter("stm.family.expand.aria", "Expand {family}");
   return (
     <div>
       <div
@@ -135,7 +147,11 @@ function FamilyGroup({
           <button
             type="button"
             onClick={onExpand}
-            aria-label={expanded ? `Collapse ${family.family}` : `Expand ${family.family}`}
+            aria-label={
+              expanded
+                ? collapseLabel({ family: family.family })
+                : expandLabel({ family: family.family })
+            }
             className="flex-none rounded-control p-0.5 text-t3 hover:text-t1"
           >
             <ChevronIcon

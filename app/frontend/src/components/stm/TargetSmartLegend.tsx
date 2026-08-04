@@ -7,6 +7,7 @@ import {
   type TargetMapLens,
 } from "../../lib/stmTargetVisuals";
 import { formatPercent } from "../../lib/stmTargetInsights";
+import { Text, useText } from "../../lib/copy";
 import { LegendSwatch } from "../primitives";
 import { InfoIcon } from "../icons";
 
@@ -26,12 +27,17 @@ export function TargetSmartLegend({
   const selected = catalog.find((entry) => entry.key === activeKey) ?? null;
   const exclusive = targetLegendIsExclusive(lens);
   const groups = [...new Set(catalog.map((entry) => entry.group))];
+  const legendLabel = useText("stm.target.legend.aria", "Interactive Map Legend");
+  const distributionLabel = useText(
+    "stm.target.legend.distribution.aria",
+    "Package Position Distribution",
+  );
 
   return (
     <section
       data-dev-id="stm.target-legend"
       className="relative flex-none border-b border-line px-3 py-1.5"
-      aria-label="Interactive Map Legend"
+      aria-label={legendLabel}
       data-testid="target-smart-legend"
     >
       <div className="flex items-center gap-2">
@@ -52,7 +58,7 @@ export function TargetSmartLegend({
         >
           <summary className="flex h-6 cursor-pointer list-none items-center gap-1 rounded-control px-1.5 text-2xs text-t3 hover:bg-hover hover:text-t1">
             <InfoIcon className="h-3.5 w-3.5" />
-            Guide
+            <Text id="stm.target.legend.guide">Guide</Text>
             <span className="font-mono">
               {entries.length}/{catalog.length}
             </span>
@@ -86,7 +92,11 @@ export function TargetSmartLegend({
                             {entry.description}
                           </span>
                           <span className="mt-1 block text-2xs leading-relaxed text-t3">
-                            <span className="text-t2">Measured From: </span>
+                            <span className="text-t2">
+                              <Text id="stm.target.legend.measured-from">
+                                Measured From:
+                              </Text>{" "}
+                            </span>
                             {entry.basis}
                           </span>
                         </span>
@@ -106,7 +116,7 @@ export function TargetSmartLegend({
       {exclusive ? (
         <div
           className="mt-1 flex h-1 overflow-hidden rounded-control bg-raise2"
-          aria-label="Package Position Distribution"
+          aria-label={distributionLabel}
           role="img"
         >
           {entries.map((entry) => (

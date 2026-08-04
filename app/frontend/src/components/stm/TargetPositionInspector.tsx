@@ -13,6 +13,7 @@ import {
   formatToken,
   sentenceCase,
 } from "../../lib/stmTargetInsights";
+import { Text, useText } from "../../lib/copy";
 import { Eyebrow, SegmentedControl } from "../primitives";
 import { TargetCoverageMeter } from "./TargetCoverageMeter";
 
@@ -36,6 +37,10 @@ export function TargetPositionInspector({
 }) {
   const [view, setView] = useState<InspectorView>("decision");
   useEffect(() => setView("decision"), [position.position]);
+  const viewLabel = useText(
+    "stm.target.position.view.aria",
+    "Position Inspector View",
+  );
 
   const foundation = definition.functional_foundation.groups.filter((group) =>
     group.positions.includes(position.position),
@@ -97,7 +102,9 @@ export function TargetPositionInspector({
       <header className="flex-none border-b border-line bg-surface px-3 pb-2.5 pt-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <Eyebrow dense>Physical Position</Eyebrow>
+            <Eyebrow dense>
+              <Text id="stm.target.position.physical">Physical Position</Text>
+            </Eyebrow>
             <div className="mt-0.5 flex items-baseline gap-2">
               <span className="font-mono text-xl font-semibold text-t1">
                 {position.position}
@@ -124,7 +131,7 @@ export function TargetPositionInspector({
           size="small"
           className="mt-2 w-full [&>button]:flex-1"
           devIdBase="stm.inspector"
-          aria-label="Position Inspector View"
+          aria-label={viewLabel}
         />
       </header>
 
@@ -196,17 +203,29 @@ function DecisionView({
       </div>
 
       <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 border-y border-line py-2 text-xs">
-        <dt className="text-t3">Electrical Identities</dt>
+        <dt className="text-t3">
+          <Text id="stm.target.position.electrical-identities">
+            Electrical Identities
+          </Text>
+        </dt>
         <dd className="font-mono text-t1">{identityCount}</dd>
-        <dt className="text-t3">Board Action</dt>
+        <dt className="text-t3">
+          <Text id="stm.target.position.board-action">Board Action</Text>
+        </dt>
         <dd className="text-right text-t1">
           {BOARD_ACTION_LABEL[position.board_action]}
         </dd>
-        <dt className="text-t3">Active Routing Paths</dt>
+        <dt className="text-t3">
+          <Text id="stm.target.position.active-paths">
+            Active Routing Paths
+          </Text>
+        </dt>
         <dd className="font-mono text-t1">
           {strategy?.active_path_count ?? strategy?.branches.length ?? 0}
         </dd>
-        <dt className="text-t3">Safe Default</dt>
+        <dt className="text-t3">
+          <Text id="stm.target.position.safe-default">Safe Default</Text>
+        </dt>
         <dd className="text-right text-t1">
           {strategy?.safe_default ? formatToken(strategy.safe_default) : "Not Declared"}
         </dd>
@@ -322,7 +341,9 @@ function TargetsView({
   return (
     <>
       <p className="mb-2 text-2xs leading-relaxed text-t3">
-        Grouped by canonical pin name and electrical identity across the selected MCU set.
+        <Text id="stm.target.position.targets.grouping">
+          Grouped by canonical pin name and electrical identity across the selected MCU set.
+        </Text>
       </p>
       <div className="divide-y divide-line border-y border-line">
         {groups.map((group) => (
@@ -477,7 +498,11 @@ function EvidenceView({
         {safety ? (
           <div className="mt-2 border-y border-line py-2">
             <div className="flex justify-between gap-3 text-xs">
-              <span className="text-t3">Safe Default</span>
+              <span className="text-t3">
+                <Text id="stm.target.position.evidence.safe-default">
+                  Safe Default
+                </Text>
+              </span>
               <span className="text-t1">{formatToken(safety.safe_default)}</span>
             </div>
             {safety.branches.map((branch) => (
@@ -505,7 +530,11 @@ function EvidenceView({
           {strategy.fallback ? (
             <>
               <div className="flex justify-between gap-2 text-2xs">
-                <span className="font-medium text-t1">Conservative Fallback</span>
+                <span className="font-medium text-t1">
+                  <Text id="stm.target.position.conservative-fallback">
+                    Conservative Fallback
+                  </Text>
+                </span>
                 <span className="font-mono text-t2">
                   {strategy.fallback.independent_paths} Active Paths
                 </span>

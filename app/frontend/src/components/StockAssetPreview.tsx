@@ -6,6 +6,7 @@
  * The 3D reuses the same auto-rotating viewer the committed-part preview uses.
  */
 import { useStockModelGlb, useStockPreviewSvg } from "../api/queries";
+import { Text } from "../lib/copy";
 import { useObjectUrl } from "../lib/useObjectUrl";
 import { useTheme } from "../lib/theme";
 import { Glb3DView } from "./Glb3DView";
@@ -32,7 +33,7 @@ export function StockAssetPreview({ footprintLibId }: { footprintLibId: string }
       <Panel label="Footprint">
         {svg.isError ? (
           <span className="px-4 text-center text-xs text-t3">
-            Footprint preview needs KiCad installed.
+            <Text id="stock-preview.needs-kicad">Footprint preview needs KiCad installed.</Text>
           </span>
         ) : svgUrl ? (
           <img

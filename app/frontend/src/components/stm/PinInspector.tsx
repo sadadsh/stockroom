@@ -9,6 +9,7 @@
  */
 import type { PinDTO } from "../../api/types";
 import { Eyebrow } from "../primitives";
+import { Text, useText } from "../../lib/copy";
 import { categoryFill, categoryLabel, isFiveVoltTolerant } from "./pinEncoding";
 import { AfOptionsPanel } from "./AfOptionsPanel";
 
@@ -23,13 +24,22 @@ const SIDE_LABEL: Record<string, string> = {
 // composes in as a section of the inspector, reachable from both the pin and the signal directions.
 export function PinInspector({ pin, part }: { pin: PinDTO; part?: string | null }) {
   const fiveV = isFiveVoltTolerant(pin);
+  const supplyLabel = useText("stm.pinout.inspector.supply", "Supply");
+  const rolesLabel = useText("stm.pinout.inspector.roles", "Roles");
+  const toleranceLabel = useText("stm.pinout.inspector.tolerance", "5V Tolerance");
+  const tolerantLabel = useText("stm.pinout.inspector.tolerant", "Tolerant");
+  const notTolerantLabel = useText("stm.pinout.inspector.not-tolerant", "Not tolerant");
   return (
     <div className="flex flex-col gap-4" data-testid="pin-inspector">
       {/* hero: the pin name is the one focal element */}
       <div>
         <div className="flex items-baseline gap-2">
           <span className="font-mono text-lg font-semibold text-t1">{pin.canonical_pin_name}</span>
-          <span className="font-mono text-xs text-t3">Pin {pin.position}</span>
+          <span className="font-mono text-xs text-t3">
+            <Text id="stm.pinout.inspector.pin" values={{ position: pin.position }}>
+              {"Pin {position}"}
+            </Text>
+          </span>
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-t2">
           <span className="flex items-center gap-1.5">
@@ -48,23 +58,36 @@ export function PinInspector({ pin, part }: { pin: PinDTO; part?: string | null 
           {pin.lqfp_side ? (
             <>
               <Sep />
-              <span>{SIDE_LABEL[pin.lqfp_side]} side</span>
+              <span>
+                <Text
+                  id="stm.pinout.inspector.side"
+                  values={{ side: SIDE_LABEL[pin.lqfp_side] }}
+                >
+                  {"{side} side"}
+                </Text>
+              </span>
             </>
           ) : null}
           {fiveV ? (
             <>
               <Sep />
-              <span>5V tolerant</span>
+              <span>
+                <Text id="stm.pinout.inspector.five-v">5V tolerant</Text>
+              </span>
             </>
           ) : null}
         </div>
         {pin.raw_pin_name && pin.raw_pin_name !== pin.canonical_pin_name ? (
-          <div className="mt-1 font-mono text-2xs text-t3">Raw {pin.raw_pin_name}</div>
+          <div className="mt-1 font-mono text-2xs text-t3">
+            <Text id="stm.pinout.inspector.raw" values={{ name: pin.raw_pin_name }}>
+              {"Raw {name}"}
+            </Text>
+          </div>
         ) : null}
       </div>
 
       {pin.supply ? (
-        <Row label="Supply">
+        <Row label={supplyLabel}>
           <span className="font-mono text-sm text-t1">{pin.supply}</span>
         </Row>
       ) : null}
@@ -76,7 +99,7 @@ export function PinInspector({ pin, part }: { pin: PinDTO; part?: string | null 
       {part ? <AfOptionsPanel part={part} position={pin.position} /> : null}
 
       {pin.roles.length > 0 ? (
-        <Section label="Roles">
+        <Section label={rolesLabel}>
           <ul className="flex flex-col gap-1">
             {pin.roles.map((r, i) => (
               <li key={`${r.role_name}-${i}`} className="flex items-baseline justify-between gap-3">
@@ -88,14 +111,18 @@ export function PinInspector({ pin, part }: { pin: PinDTO; part?: string | null 
         </Section>
       ) : null}
 
-      <Section label="5V Tolerance">
+      <Section label={toleranceLabel}>
         {pin.five_v ? (
           <div className="flex flex-col gap-1 text-xs text-t2">
-            <span className="text-t1">{pin.five_v.tolerant ? "Tolerant" : "Not tolerant"}</span>
+            <span className="text-t1">
+              {pin.five_v.tolerant ? tolerantLabel : notTolerantLabel}
+            </span>
             {pin.five_v.caveat ? <span className="text-t3">{pin.five_v.caveat}</span> : null}
           </div>
         ) : (
-          <span className="text-xs text-t3">Not applicable</span>
+          <span className="text-xs text-t3">
+            <Text id="stm.pinout.inspector.tolerance-none">Not applicable</Text>
+          </span>
         )}
       </Section>
     </div>
@@ -116,11 +143,14 @@ function FunctionSections({ pin, showAf }: { pin: PinDTO; showAf: boolean }) {
   const afs = pin.alternate_functions;
   const afSignals = new Set(afs.map((af) => af.signal));
   const plain = pin.functions.filter((fn) => !afSignals.has(fn.signal));
+  const functionsLabel = useText("stm.pinout.inspector.functions", "Functions");
+  const afLabel = useText("stm.pinout.inspector.alternate-functions", "Alternate Functions");
+  const analogLabel = useText("stm.pinout.inspector.analog-system", "Analog & System");
 
   if (afs.length === 0) {
     if (pin.functions.length === 0) return null;
     return (
-      <Section label="Functions">
+      <Section label={functionsLabel}>
         <PlainFunctionList functions={pin.functions} />
       </Section>
     );
@@ -129,7 +159,7 @@ function FunctionSections({ pin, showAf }: { pin: PinDTO; showAf: boolean }) {
   return (
     <>
       {showAf ? (
-        <Section label="Alternate Functions">
+        <Section label={afLabel}>
           <ul className="flex flex-col gap-1">
             {afs.map((af, i) => (
               <li
@@ -148,7 +178,7 @@ function FunctionSections({ pin, showAf }: { pin: PinDTO; showAf: boolean }) {
         </Section>
       ) : null}
       {plain.length > 0 ? (
-        <Section label="Analog & System">
+        <Section label={analogLabel}>
           <PlainFunctionList functions={plain} />
         </Section>
       ) : null}

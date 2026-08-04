@@ -44,6 +44,7 @@ import { useLibraryDerivation } from "../api/queries";
 import type { DerivationReport, LibraryDerivation } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
+import { Text } from "../lib/copy";
 import { Badge, Button, Dot } from "./primitives";
 
 // The empty stamp is a real state on disk, not a missing value: a record written before the
@@ -116,10 +117,18 @@ export function DerivationSection() {
   }, [job, toast, derivation]);
 
   if (derivation.isLoading) {
-    return <p className="py-1 text-sm text-t3">Reading which rules built your components...</p>;
+    return (
+      <p className="py-1 text-sm text-t3">
+        <Text id="library.derivation.loading">Reading which rules built your components...</Text>
+      </p>
+    );
   }
   if (derivation.isError || !derivation.data) {
-    return <p className="py-1 text-sm text-err">Could not read your library.</p>;
+    return (
+      <p className="py-1 text-sm text-err">
+        <Text id="library.derivation.error">Could not read your library.</Text>
+      </p>
+    );
   }
 
   return (
@@ -154,7 +163,12 @@ export function DerivationSection() {
 
 function Summary({ data }: { data: LibraryDerivation }) {
   const total = data.current + data.stale;
-  if (total === 0) return <p className="text-base text-t2">Your library has no components yet.</p>;
+  if (total === 0)
+    return (
+      <p className="text-base text-t2">
+        <Text id="library.derivation.empty">Your library has no components yet.</Text>
+      </p>
+    );
   // Three sentences, not one with a ratio in it. "162 of 162 were built by different rules" is
   // arithmetically true and reads as broken: a count whose numerator equals its denominator says
   // "all", so it has to SAY all. Same class of defect as the count-vs-noun mismatches `717ec2c`
@@ -168,8 +182,9 @@ function Summary({ data }: { data: LibraryDerivation }) {
         </>
       ) : data.current === 0 ? (
         <>
-          None of the <span className="tnum font-medium text-t1">{total}</span> components were
-          built by <span className="font-medium text-t1">{data.ruleset}</span>, the rules this
+          None of the <span className="tnum font-medium text-t1">{total}</span>{" "}
+          <Text id="library.derivation.summary-none-built">components were built by</Text>{" "}
+          <span className="font-medium text-t1">{data.ruleset}</span>, the rules this
           version runs, so their names and descriptions may not match what a rebuilt component
           shows.
         </>
@@ -177,8 +192,11 @@ function Summary({ data }: { data: LibraryDerivation }) {
         <>
           <span className="tnum font-medium text-t1">{data.stale}</span> of{" "}
           <span className="tnum">{total}</span> components were built by different rules than the{" "}
-          <span className="font-medium text-t1">{data.ruleset}</span> this version runs, so their
-          names and descriptions may not match what a rebuilt component shows.
+          <span className="font-medium text-t1">{data.ruleset}</span>{" "}
+          <Text id="library.derivation.summary-mixed-tail">
+            this version runs, so their names and descriptions may not match what a rebuilt
+            component shows.
+          </Text>
         </>
       )}
     </p>
@@ -195,26 +213,30 @@ function StampLedger({ data }: { data: LibraryDerivation }) {
   if (rows.length === 0) return null;
   return (
     <table className="w-full border-collapse text-sm">
-      <caption className="sr-only">Components by the ruleset that built them</caption>
+      <caption className="sr-only">
+        <Text id="library.derivation.table-caption">
+          Components by the ruleset that built them
+        </Text>
+      </caption>
       <thead>
         <tr>
           <th
             scope="col"
             className="w-[9rem] pb-2 text-left text-2xs font-medium uppercase tracking-wide text-t3"
           >
-            Ruleset
+            <Text id="library.derivation.column-ruleset">Ruleset</Text>
           </th>
           <th
             scope="col"
             className="w-[6rem] pb-2 text-right text-2xs font-medium uppercase tracking-wide text-t3"
           >
-            Components
+            <Text id="library.derivation.column-components">Components</Text>
           </th>
           <th
             scope="col"
             className="pb-2 pl-4 text-left text-2xs font-medium uppercase tracking-wide text-t3"
           >
-            Standing
+            <Text id="library.derivation.column-standing">Standing</Text>
           </th>
         </tr>
       </thead>
@@ -224,7 +246,11 @@ function StampLedger({ data }: { data: LibraryDerivation }) {
           return (
             <tr key={stamp || "never"} className="border-t border-line last:border-b">
               <th scope="row" className="py-2 text-left font-medium text-t1">
-                {stamp || <span className="text-t3">None</span>}
+                {stamp || (
+                  <span className="text-t3">
+                    <Text id="library.derivation.stamp-none">None</Text>
+                  </span>
+                )}
               </th>
               <td className="tnum py-2 text-right text-t2">{count}</td>
               <td className="py-2 pl-4">
@@ -246,7 +272,8 @@ function Report({ report }: { report: DerivationReport }) {
   return (
     <div className="flex flex-col gap-2 border-l-2 border-line pl-3 text-sm text-t2">
       <p>
-        Checked <span className="tnum">{report.checked}</span>, recomputed{" "}
+        <Text id="library.derivation.report-checked">Checked</Text>{" "}
+        <span className="tnum">{report.checked}</span>, recomputed{" "}
         <span className="tnum text-t1">{report.rewritten}</span>, already current{" "}
         <span className="tnum">{report.unchanged}</span>.
       </p>

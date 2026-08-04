@@ -7,6 +7,7 @@
  */
 import { AnimatePresence, motion } from "motion/react";
 import { useCapture } from "../lib/capture";
+import { useText } from "../lib/copy";
 import { useRouter } from "../lib/router";
 import type { GuidedStatus } from "../lib/capture";
 
@@ -25,6 +26,7 @@ const STATUS_LABEL: Record<GuidedStatus, string> = {
 export function CaptureStatusPill() {
   const cap = useCapture();
   const { navigate } = useRouter();
+  const dismissLabel = useText("capture.dismiss", "Dismiss");
   const a = cap.active;
   const visible = !!a.partId && a.backgrounded && a.status !== "idle";
   const received = a.needs.filter((n) => a.received[n]).length;
@@ -106,7 +108,7 @@ export function CaptureStatusPill() {
             <button
               type="button"
               onClick={() => cap.reset()}
-              aria-label="Dismiss"
+              aria-label={dismissLabel}
               className="grid h-7 w-7 flex-none place-items-center rounded-control border border-line2 bg-popover text-t3 shadow-pop hover:text-t1"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" className="h-3.5 w-3.5">

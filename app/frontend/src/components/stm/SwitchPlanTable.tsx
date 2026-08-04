@@ -10,6 +10,7 @@
  */
 import { Fragment, useMemo, useState } from "react";
 import type { UnionDTO, UnionPositionDTO } from "../../api/types";
+import { Text } from "../../lib/copy";
 import { Badge, Eyebrow } from "../primitives";
 import { CLASSIFICATION_LABEL, classificationTone } from "./compatEncoding";
 import { CompatReconcileDetail } from "./CompatReconcileDetail";
@@ -74,14 +75,18 @@ export function SwitchPlanTable({ union }: { union: UnionDTO }) {
   return (
     <section className="flex flex-col gap-2" data-testid="switch-plan">
       <div className="flex items-baseline justify-between gap-3">
-        <Eyebrow>Switch Plan</Eyebrow>
+        <Eyebrow>
+          <Text id="stm.switch-plan.title">Switch Plan</Text>
+        </Eyebrow>
         <span className="tnum font-mono text-2xs text-t3">
           {sharedCount} shared · {rows.length} need attention
         </span>
       </div>
       {rows.length === 0 ? (
         <p className="rounded-card bg-stage px-4 py-6 text-center text-sm text-t3 shadow-[inset_0_1px_0_var(--edge-hi)]">
-          Every position is identical across the set. A plain socket carries all parts.
+          <Text id="stm.switch-plan.all-identical">
+            Every position is identical across the set. A plain socket carries all parts.
+          </Text>
         </p>
       ) : (
         <div className="max-h-80 overflow-y-auto rounded-card bg-stage shadow-[inset_0_1px_0_var(--edge-hi)]">
@@ -97,11 +102,21 @@ export function SwitchPlanTable({ union }: { union: UnionDTO }) {
             </colgroup>
             <thead className="sticky top-0 z-[1] bg-[var(--c-sticky)] backdrop-blur">
               <tr className="border-b border-line text-2xs font-semibold text-t3">
-                <th className="px-2.5 py-1.5">Position</th>
-                <th className="px-2.5 py-1.5">State</th>
-                <th className="px-2.5 py-1.5">Baseline</th>
-                <th className="px-2.5 py-1.5">Divergence</th>
-                <th className="px-2.5 py-1.5">Resolution</th>
+                <th className="px-2.5 py-1.5">
+                  <Text id="stm.switch-plan.column.position">Position</Text>
+                </th>
+                <th className="px-2.5 py-1.5">
+                  <Text id="stm.switch-plan.column.state">State</Text>
+                </th>
+                <th className="px-2.5 py-1.5">
+                  <Text id="stm.switch-plan.column.baseline">Baseline</Text>
+                </th>
+                <th className="px-2.5 py-1.5">
+                  <Text id="stm.switch-plan.column.divergence">Divergence</Text>
+                </th>
+                <th className="px-2.5 py-1.5">
+                  <Text id="stm.switch-plan.column.resolution">Resolution</Text>
+                </th>
               </tr>
             </thead>
             <tbody>

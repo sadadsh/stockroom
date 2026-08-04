@@ -6,6 +6,7 @@ import type {
   SocketTargetCohort,
   TargetDefinitionPosition,
 } from "../../api/types";
+import { Text, useText } from "../../lib/copy";
 import { Badge, Eyebrow } from "../primitives";
 import {
   TargetPackageMap,
@@ -225,6 +226,19 @@ export function SocketSolutionPanel({
   const [detailView, setDetailView] = useState<DetailView>("configurations");
   const [cohortSearch, setCohortSearch] = useState("");
   const [selectedCohortId, setSelectedCohortId] = useState<string | null>(null);
+  const panelLabel = useText(
+    "stm.socket.panel.aria",
+    "Universal STM Socket Solution",
+  );
+  const searchPlaceholder = useText(
+    "stm.socket.search.placeholder",
+    "Find Position, Role, Function, MCU",
+  );
+  const searchLabel = useText("stm.socket.search.aria", "Filter Socket Solution");
+  const clearCohortLabel = useText(
+    "stm.socket.cohort.clear.aria",
+    "Clear Active Configuration",
+  );
 
   useEffect(() => {
     setSelectedPosition(
@@ -390,7 +404,7 @@ export function SocketSolutionPanel({
       data-dev-id="stm.socket-solution"
       data-testid="socket-solution"
       className="flex min-h-0 flex-1 flex-col"
-      aria-label="Universal STM Socket Solution"
+      aria-label={panelLabel}
     >
       <header className="flex flex-none items-center gap-5 border-b border-line px-4 py-2.5">
         <div className="min-w-0 flex-1">
@@ -412,7 +426,7 @@ export function SocketSolutionPanel({
             </Badge>
             {solution.closure.release !== "ready" ? (
               <Badge size="sm" tone="warn">
-                Verification Open
+                <Text id="stm.socket.verification-open">Verification Open</Text>
               </Badge>
             ) : null}
           </div>
@@ -449,8 +463,8 @@ export function SocketSolutionPanel({
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Find Position, Role, Function, MCU"
-          aria-label="Filter Socket Solution"
+          placeholder={searchPlaceholder}
+          aria-label={searchLabel}
           className="min-w-52 flex-1 rounded-control bg-field px-2.5 py-1.5 text-xs text-t1 outline-none placeholder:text-t3"
         />
         {(
@@ -540,8 +554,10 @@ export function SocketSolutionPanel({
             </>
           ) : (
             <span className="min-w-0 flex-1 text-t3">
-              Blue center marks show the configurable positions applied by the selected target
-              cohort.
+              <Text id="stm.socket.cohort.hint">
+                Blue center marks show the configurable positions applied by the selected target
+                cohort.
+              </Text>
             </span>
           )}
           {selectedCohort ? (
@@ -549,7 +565,7 @@ export function SocketSolutionPanel({
               type="button"
               onClick={() => setSelectedCohortId(null)}
               className="flex min-w-fit items-center gap-2 rounded-control border border-acc bg-acc-soft px-2 py-1 text-t1"
-              aria-label="Clear Active Configuration"
+              aria-label={clearCohortLabel}
             >
               <span className="font-mono">{profileLabel(selectedCohort.id)}</span>
               <span>{selectedCohort.target_count.toLocaleString()} MCUs</span>
@@ -584,7 +600,11 @@ export function SocketSolutionPanel({
               activeCohort={selectedCohort}
             />
           ) : (
-            <div className="p-4 text-xs text-t3">Select a package position.</div>
+            <div className="p-4 text-xs text-t3">
+              <Text id="stm.socket.select-position">
+                Select a package position.
+              </Text>
+            </div>
           )}
 
           <div className="flex min-h-0 flex-1 flex-col border-t border-line">
@@ -638,10 +658,14 @@ export function SocketSolutionPanel({
 }
 
 function ClosureGateStrip({ solution }: { solution: SocketSolutionDTO }) {
+  const closureLabel = useText(
+    "stm.socket.closure.aria",
+    "Socket Support Closure",
+  );
   return (
     <div
       className="grid flex-none grid-cols-5 border-b border-line bg-stage"
-      aria-label="Socket Support Closure"
+      aria-label={closureLabel}
     >
       {solution.closure.gates.map((gate) => (
         <div
@@ -705,19 +729,29 @@ function ConfigurationList({
   selectedId: string | null;
   onSelect: (cohort: SocketTargetCohort) => void;
 }) {
+  const cohortPlaceholder = useText(
+    "stm.socket.cohort.search.placeholder",
+    "Find MCU, Family, or Profile",
+  );
+  const cohortSearchLabel = useText(
+    "stm.socket.cohort.search.aria",
+    "Find Target Profile",
+  );
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-none p-2">
         <input
           value={search}
           onChange={(event) => onSearch(event.target.value)}
-          placeholder="Find MCU, Family, or Profile"
-          aria-label="Find Target Profile"
+          placeholder={cohortPlaceholder}
+          aria-label={cohortSearchLabel}
           className="w-full rounded-control bg-field px-2.5 py-1.5 text-xs text-t1 outline-none placeholder:text-t3"
         />
         <p className="mt-1.5 text-2xs leading-relaxed text-t3">
-          MCUs in one profile use the same branch state at every configurable
-          socket position. Declare the installed MCU before target power.
+          <Text id="stm.socket.cohort.explanation">
+            MCUs in one profile use the same branch state at every configurable socket position.
+            Declare the installed MCU before target power.
+          </Text>
         </p>
       </div>
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-2">
@@ -770,7 +804,9 @@ function ConfigurationList({
         })}
         {!cohorts.length ? (
           <p className="px-2 py-4 text-center text-xs text-t3">
-            No target configuration matches this search.
+            <Text id="stm.socket.cohort.empty">
+              No target configuration matches this search.
+            </Text>
           </p>
         ) : null}
       </div>
@@ -788,8 +824,10 @@ function SolutionGroupList({
   return (
     <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-2">
       <p className="px-1 pb-1 text-2xs leading-relaxed text-t3">
-        Positions in one group share the same electrical behavior and can reuse one
-        proven circuit pattern.
+        <Text id="stm.socket.cells.explanation">
+          Positions in one group share the same electrical behavior and can reuse one proven
+          circuit pattern.
+        </Text>
       </p>
       {cells.map((cell) => (
         <button
@@ -849,7 +887,9 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
   );
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-3">
-      <Eyebrow>Identity And Startup</Eyebrow>
+      <Eyebrow>
+        <Text id="stm.socket.safety.identity-startup">Identity And Startup</Text>
+      </Eyebrow>
       <div className="mt-1.5 rounded-control border border-line bg-raise p-2.5">
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs font-medium text-t1">
@@ -863,7 +903,9 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
         </div>
         <p className="mt-1 text-2xs leading-relaxed text-t3">{solution.bootstrap.rule}</p>
       </div>
-      <Eyebrow className="mt-4 block">Mandatory Safe States</Eyebrow>
+      <Eyebrow className="mt-4 block">
+        <Text id="stm.socket.safety.safe-states">Mandatory Safe States</Text>
+      </Eyebrow>
       <div className="mt-1.5 divide-y divide-line rounded-control border border-line bg-stage">
         {transitions.map(([label, value]) => (
           <div key={label} className="grid grid-cols-[110px_1fr] gap-2 px-2.5 py-2 text-2xs">
@@ -872,7 +914,9 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
           </div>
         ))}
       </div>
-      <Eyebrow className="mt-4 block">Mandatory Interlocks</Eyebrow>
+      <Eyebrow className="mt-4 block">
+        <Text id="stm.socket.safety.interlocks">Mandatory Interlocks</Text>
+      </Eyebrow>
       <div className="mt-1.5 grid grid-cols-2 gap-1">
         {solution.fabric.mandatory_interlocks.map((interlock) => (
           <div
@@ -884,7 +928,9 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
         ))}
       </div>
 
-      <Eyebrow className="mt-4 block">Closure</Eyebrow>
+      <Eyebrow className="mt-4 block">
+        <Text id="stm.socket.safety.closure">Closure</Text>
+      </Eyebrow>
       <div className="mt-1.5 space-y-1.5">
         {solution.closure.configuration_errors.length ? (
           <EvidenceSummary
@@ -1029,7 +1075,9 @@ function PositionSolution({
     <div className="max-h-[54%] flex-none overflow-y-auto p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Eyebrow>Physical Position</Eyebrow>
+          <Eyebrow>
+            <Text id="stm.socket.position.physical">Physical Position</Text>
+          </Eyebrow>
           <h3 className="mt-1 font-mono text-base font-semibold text-t1">
             {position.position}
           </h3>
@@ -1071,7 +1119,9 @@ function PositionSolution({
           (proofNeeded ? "border-warn" : "border-ok")
         }
       >
-        <span className="text-xs font-semibold text-t1">Build This</span>
+        <span className="text-xs font-semibold text-t1">
+          <Text id="stm.socket.position.build-this">Build This</Text>
+        </span>
         <p className="mt-1 text-xs leading-relaxed text-t2">
           {buildInstruction(position)}
         </p>
@@ -1084,7 +1134,11 @@ function PositionSolution({
 
       {position.network_requirements.length ? (
         <div className="mt-3">
-          <Eyebrow>Circuit Contract</Eyebrow>
+          <Eyebrow>
+            <Text id="stm.socket.position.circuit-contract">
+              Circuit Contract
+            </Text>
+          </Eyebrow>
           <div className="mt-1.5 flex flex-wrap gap-1">
             {position.network_requirements.map((requirement) => (
               <span
@@ -1113,11 +1167,19 @@ function PositionSolution({
           </Badge>
         ) : null}
         <span>Safe Default: {position.safe_default === "open" ? "Open" : "Connected"}</span>
-        {position.observation_node ? <span>Observation Node</span> : null}
+        {position.observation_node ? (
+          <span>
+            <Text id="stm.socket.position.observation-node">
+              Observation Node
+            </Text>
+          </span>
+        ) : null}
       </div>
 
       <div className="mt-3">
-        <Eyebrow>Universal Cell</Eyebrow>
+        <Eyebrow>
+          <Text id="stm.socket.position.universal-cell">Universal Cell</Text>
+        </Eyebrow>
         <p className="mt-1 text-xs leading-relaxed text-t2">
           {position.cell_contract.architecture ===
           "fail-closed-universal-position-cell"
@@ -1137,7 +1199,9 @@ function PositionSolution({
         </div>
         {position.controlled ? (
           <p className="mt-1.5 text-2xs leading-relaxed text-t3">
-            Hardware one-hot · Break before make · State readback · Fault opens all
+            <Text id="stm.socket.position.interlock-summary">
+              Hardware one-hot · Break before make · State readback · Fault opens all
+            </Text>
           </p>
         ) : null}
       </div>
@@ -1176,7 +1240,11 @@ function PositionSolution({
 
       {position.branches.length ? (
         <div className="mt-3">
-          <Eyebrow>Socket Node Topology</Eyebrow>
+          <Eyebrow>
+            <Text id="stm.socket.position.node-topology">
+              Socket Node Topology
+            </Text>
+          </Eyebrow>
           <div className="mt-1.5 flex items-center gap-1 overflow-x-auto rounded-control border border-line bg-stage p-2">
             <span className="min-w-fit rounded-control bg-raise px-2 py-1 font-mono text-2xs text-t1">
               Socket {position.position}

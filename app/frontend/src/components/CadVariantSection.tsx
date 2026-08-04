@@ -6,7 +6,7 @@ import {
   useActivateCadPair,
   useCadVariantInventory,
 } from "../api/cadVariantQueries";
-import { Text } from "../lib/copy";
+import { Text, useText } from "../lib/copy";
 import { Button, Card, EYEBROW_DENSE } from "./primitives";
 import { CadVariantSelector } from "./CadVariantSelector";
 
@@ -19,17 +19,33 @@ export function CadVariantSection({
 }) {
   const inventory = useCadVariantInventory(partId, enabled);
   const pairActivation = useActivateCadPair(partId);
+  const loadingMessage = useText(
+    "cad.variant.loading",
+    "Reading retained CAD variants...",
+  );
+  // A written sentence, not the query's own exception appended to a prefix. The retry beside it
+  // is the thing a person can actually do about it.
+  const readErrorMessage = useText(
+    "cad.variant.read-error",
+    "The retained CAD variants could not be read.",
+  );
+  const staleActivationMessage = useText(
+    "cad.variant.activation-stale",
+    "The active CAD pair changed before this switch completed. The latest choices are loading.",
+  );
+  const activationErrorMessage = useText(
+    "cad.variant.activation-error",
+    "The CAD pair could not be switched.",
+  );
 
   if (!enabled) return null;
   if (inventory.isPending) {
-    return <VariantState message="Reading retained CAD variants..." />;
+    return <VariantState message={loadingMessage} />;
   }
   if (inventory.isError) {
     return (
       <VariantState
-        // A written sentence, not the query's own exception appended to a prefix. The retry
-        // beside it is the thing a person can actually do about it.
-        message="The retained CAD variants could not be read."
+        message={readErrorMessage}
         tone="error"
         action={
           <Button type="button" small onClick={() => void inventory.refetch()}>
@@ -43,8 +59,8 @@ export function CadVariantSection({
   const activationError = pairActivation.isError
     ? pairActivation.error instanceof CadVariantApiError &&
       pairActivation.error.status === 409
-      ? "The active CAD pair changed before this switch completed. The latest choices are loading."
-      : "The CAD pair could not be switched."
+      ? staleActivationMessage
+      : activationErrorMessage
     : null;
 
   return (
@@ -79,7 +95,9 @@ function VariantState({
     <Card role={tone === "error" ? "alert" : "status"} className="px-3 py-2.5">
       <div className="flex min-w-0 items-center gap-3">
         <div className="min-w-0 flex-1">
-          <div className={EYEBROW_DENSE}>CAD Variants</div>
+          <div className={EYEBROW_DENSE}>
+            <Text id="cad.variant.state-title">CAD Variants</Text>
+          </div>
           <p className={`mt-1 text-2xs ${tone === "error" ? "text-err" : "text-t2"}`}>
             {message}
           </p>

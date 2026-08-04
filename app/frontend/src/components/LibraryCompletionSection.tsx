@@ -36,6 +36,7 @@ import {
   useCompletionState,
 } from "../lib/completionStore";
 import { useToast } from "../lib/toast";
+import { Text } from "../lib/copy";
 import { Badge, Button, Dot } from "./primitives";
 
 // The matrix axes, read off the requirement vocabulary the backend speaks (`<tool>_<kind>`).
@@ -110,9 +111,13 @@ export function LibraryCompletionSection() {
   return (
     <>
       {coverage.isLoading ? (
-        <p className="py-1 text-sm text-t3">Counting what your components have...</p>
+        <p className="py-1 text-sm text-t3">
+          <Text id="library.completion.loading">Counting what your components have...</Text>
+        </p>
       ) : coverage.isError ? (
-        <p className="py-1 text-sm text-err">Could not read your library.</p>
+        <p className="py-1 text-sm text-err">
+          <Text id="library.completion.error">Could not read your library.</Text>
+        </p>
       ) : coverage.data ? (
         <CoverageBody
           data={coverage.data}
@@ -164,7 +169,10 @@ function CoverageBody({
         ) : (
           <>
             <span className="tnum font-medium text-t1">{complete}</span> of{" "}
-            <span className="tnum">{total}</span> components have every file they need.
+            <span className="tnum">{total}</span>{" "}
+            <Text id="library.completion.have-every-file">
+              components have every file they need.
+            </Text>
           </>
         )}
       </p>
@@ -243,7 +251,9 @@ function CoverageMatrix({ data }: { data: LibraryCoverage }) {
     <div className="overflow-x-auto">
       <table className="w-full min-w-[26rem] border-collapse text-sm">
         <caption className="sr-only">
-          Components holding each file, by EDA tool and asset kind
+          <Text id="library.completion.matrix-caption">
+            Components holding each file, by EDA tool and asset kind
+          </Text>
         </caption>
         <thead>
           <tr>
@@ -251,7 +261,7 @@ function CoverageMatrix({ data }: { data: LibraryCoverage }) {
               scope="col"
               className="w-[7rem] pb-2 text-left text-2xs font-medium uppercase tracking-wide text-t3"
             >
-              Tool
+              <Text id="library.completion.column-tool">Tool</Text>
             </th>
             {KINDS.map((kind) => (
               <th
@@ -313,7 +323,11 @@ function Cell({
 }) {
   // No requirement for this pair at all: not a gap, not a score. Say nothing rather than "0".
   if (lacking === undefined && !NAMEABLE.has(requirement)) {
-    return <span className="text-t3">Not applicable</span>;
+    return (
+      <span className="text-t3">
+        <Text id="library.completion.cell-not-applicable">Not applicable</Text>
+      </span>
+    );
   }
   const missing = lacking ?? 0;
   const have = Math.max(0, total - missing);
@@ -334,11 +348,11 @@ function Cell({
       <span className="text-t3">of {total}</span>
       {assisted && !sourced ? (
         <Badge tone="warn" size="sm">
-          Provider
+          <Text id="library.completion.cell-provider">Provider</Text>
         </Badge>
       ) : !reachable ? (
         <Badge tone="neutral" size="sm">
-          No Source
+          <Text id="library.completion.cell-no-source">No Source</Text>
         </Badge>
       ) : null}
     </span>
@@ -364,7 +378,7 @@ function DurableRun() {
         <p className="text-sm text-t2">{run.error ?? "Connecting to the durable run..."}</p>
         {run.error ? (
           <Button small onClick={() => void reconnectCompletion()}>
-            Reconnect
+            <Text id="library.completion.durable-reconnect">Reconnect</Text>
           </Button>
         ) : null}
       </div>
@@ -407,7 +421,9 @@ function DurableRun() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={statusTone}>{statusLabel}</Badge>
-          <Badge tone="neutral">Durable</Badge>
+          <Badge tone="neutral">
+            <Text id="library.completion.durable-badge">Durable</Text>
+          </Badge>
           <span className="text-sm text-t2">
             <span className="tnum">{settled}</span>
             <span className="text-t3"> of {batch.total_items} settled</span>
@@ -441,7 +457,7 @@ function DurableRun() {
           ) : null}
           {run.status === "error" ? (
             <Button small onClick={() => void reconnectCompletion()}>
-              Reconnect
+              <Text id="library.completion.durable-reconnect-error">Reconnect</Text>
             </Button>
           ) : null}
         </div>
@@ -461,8 +477,10 @@ function DurableRun() {
         </p>
       ) : batch.status === "failed" ? (
         <p className="text-sm text-t3">
-          Retry requeues only failed stages. Completed stages and their terminal evidence are
-          preserved.
+          <Text id="library.completion.durable-failed-note">
+            Retry requeues only failed stages. Completed stages and their terminal evidence are
+            preserved.
+          </Text>
         </p>
       ) : batch.status === "blocked" ? (
         <p className="text-sm text-t3">
@@ -511,13 +529,18 @@ function LiveRun() {
     <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="neutral">Compatibility · 1,000 Max</Badge>
+          <Badge tone="neutral">
+            <Text id="library.completion.live-transport">Compatibility · 1,000 Max</Text>
+          </Badge>
           <p className="text-sm text-t2">
             {frame ? (
               <>
                 <span className="tnum">{done}</span>
                 {frame.total ? <span className="text-t3"> of {frame.total}</span> : null}
-                <span className="text-t3"> filed, working on </span>
+                <span className="text-t3">
+                  {" "}
+                  <Text id="library.completion.live-working-on">filed, working on</Text>{" "}
+                </span>
                 <span className="font-mono text-xs text-t1">{frame.mpn || frame.part_id}</span>
               </>
             ) : (
@@ -640,8 +663,10 @@ function RunReport() {
       ) : null}
       {deferred > 0 && !result.stop_reason ? (
         <p className="text-sm text-t3">
-          The parts catalogue limits how fast it will answer. Run this again later to pick up the
-          ones it skipped.
+          <Text id="library.completion.deferred-note">
+            The parts catalogue limits how fast it will answer. Run this again later to pick up the
+            ones it skipped.
+          </Text>
         </p>
       ) : null}
       {actionable.length ? (

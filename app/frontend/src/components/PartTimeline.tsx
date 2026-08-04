@@ -9,6 +9,7 @@
  */
 import { useState } from "react";
 import { usePartDiff, usePartHistory } from "../api/queries";
+import { Text } from "../lib/copy";
 import type { DiffField } from "../api/types";
 import { Badge, Card } from "./primitives";
 import { DiffModal } from "./DiffModal";
@@ -78,13 +79,25 @@ export function PartTimeline({ partId }: { partId: string }) {
     !!olderSha && !!assets && (assets.symbol || assets.footprint);
 
   if (historyQ.isLoading) {
-    return <Message>Loading history...</Message>;
+    return (
+      <Message>
+        <Text id="timeline.loading">Loading history...</Text>
+      </Message>
+    );
   }
   if (historyQ.isError) {
-    return <Message tone="err">Could not load this part's history.</Message>;
+    return (
+      <Message tone="err">
+        <Text id="timeline.load-failed">Could not load this part's history.</Text>
+      </Message>
+    );
   }
   if (commits.length === 0) {
-    return <Message>No history yet. This part has not been committed.</Message>;
+    return (
+      <Message>
+        <Text id="timeline.empty">No history yet. This part has not been committed.</Text>
+      </Message>
+    );
   }
 
   return (
@@ -162,17 +175,31 @@ function CommitDiff({
   canVisualDiff: boolean;
   onVisualDiff: () => void;
 }) {
-  if (loading) return <p className="text-xs text-t3">Loading changes...</p>;
+  if (loading) {
+    return (
+      <p className="text-xs text-t3">
+        <Text id="timeline.diff-loading">Loading changes...</Text>
+      </p>
+    );
+  }
   if (error || !fields) {
-    return <p className="text-xs text-err">Could not load the changes for this commit.</p>;
+    return (
+      <p className="text-xs text-err">
+        <Text id="timeline.diff-failed">Could not load the changes for this commit.</Text>
+      </p>
+    );
   }
   return (
     <div>
       {created ? (
-        <p className="mb-2 text-xs text-t2">Part created with these fields.</p>
+        <p className="mb-2 text-xs text-t2">
+          <Text id="timeline.created">Part created with these fields.</Text>
+        </p>
       ) : null}
       {fields.length === 0 ? (
-        <p className="text-xs text-t3">No field changes in this commit.</p>
+        <p className="text-xs text-t3">
+          <Text id="timeline.no-field-changes">No field changes in this commit.</Text>
+        </p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {fields.map((f) => (
@@ -202,7 +229,7 @@ function CommitDiff({
           onClick={onVisualDiff}
           className="mt-3 rounded-control border border-line2 bg-raise px-2.5 py-1 text-xs font-medium text-t2 hover:text-t1"
         >
-          View Visual Diff
+          <Text id="timeline.visual-diff">View Visual Diff</Text>
         </button>
       ) : null}
     </div>

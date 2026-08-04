@@ -7,6 +7,7 @@
  */
 import type { PinDTO, PinoutDTO } from "../../api/types";
 import { LegendSwatch } from "../primitives";
+import { Text } from "../../lib/copy";
 import { categoryFill, categoryLabel, isFiveVoltTolerant } from "./pinEncoding";
 
 const COLLATE = (a: PinDTO, b: PinDTO) =>
@@ -30,11 +31,21 @@ export function PinoutTable({
       <table className="w-full border-collapse text-left">
         <thead className="sticky top-0 z-[1] bg-[var(--c-sticky)] backdrop-blur">
           <tr className="border-b border-line text-2xs font-semibold text-t3">
-            <th className="px-2.5 py-1.5">Pin</th>
-            <th className="px-2.5 py-1.5">Name</th>
-            <th className="px-2.5 py-1.5">Category</th>
-            <th className="px-2.5 py-1.5">5V</th>
-            <th className="px-2.5 py-1.5">Alternate Functions</th>
+            <th className="px-2.5 py-1.5">
+              <Text id="stm.pinout.table.pin">Pin</Text>
+            </th>
+            <th className="px-2.5 py-1.5">
+              <Text id="stm.pinout.table.name">Name</Text>
+            </th>
+            <th className="px-2.5 py-1.5">
+              <Text id="stm.pinout.table.category">Category</Text>
+            </th>
+            <th className="px-2.5 py-1.5">
+              <Text id="stm.pinout.table.five-v">5V</Text>
+            </th>
+            <th className="px-2.5 py-1.5">
+              <Text id="stm.pinout.table.alternate-functions">Alternate Functions</Text>
+            </th>
           </tr>
         </thead>
         <tbody>

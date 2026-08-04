@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { Button, Card, Eyebrow } from "./primitives";
 import { useCompleteOnboarding, useSetLibrary } from "../api/queries";
+import { Text, useText } from "../lib/copy";
 import { useToast } from "../lib/toast";
 import { ApiError } from "../api/client";
 import type { OnboardingStatus, SetLibraryBody } from "../api/types";
@@ -35,6 +36,16 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
   const setLibrary = useSetLibrary();
   const complete = useCompleteOnboarding();
   const busy = setLibrary.isPending || complete.isPending;
+  // The two examples below are sample DATA, but they are still chrome a person reads, so the
+  // wording is editable. The doubled backslashes are the literal characters the field shows.
+  const openPathPlaceholder = useText(
+    "onboarding.open-path-placeholder",
+    "C:\\\\Users\\\\you\\\\stockroom-components",
+  );
+  const cloneUrlPlaceholder = useText(
+    "onboarding.clone-url-placeholder",
+    "https://github.com/you/stockroom-components.git",
+  );
 
   // Each mode has its own required field: open needs a path, clone needs a URL; create
   // can fall back to the default location, so its path is optional.
@@ -69,11 +80,17 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-app px-4 py-10">
       <Card className="w-full max-w-lg p-6">
-        <Eyebrow>Welcome</Eyebrow>
-        <h1 className="mt-1 text-xl font-semibold text-t1">Set Up Your Components</h1>
+        <Eyebrow>
+          <Text id="onboarding.eyebrow">Welcome</Text>
+        </Eyebrow>
+        <h1 className="mt-1 text-xl font-semibold text-t1">
+          <Text id="onboarding.title">Set Up Your Components</Text>
+        </h1>
         <p className="mt-2 text-sm text-t2">
-          Your components live in a git repository with one JSON record per part and their
-          shared library assets. Tell Stockroom where that repository lives to get started.
+          <Text id="onboarding.lede">
+            Your components live in a git repository with one JSON record per part and their shared
+            library assets. Tell Stockroom where that repository lives to get started.
+          </Text>
         </p>
 
         <div className="mt-5 grid grid-cols-3 gap-2">
@@ -99,12 +116,14 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
         <div className="mt-4 space-y-3">
           {mode === "open" && (
             <label className="block">
-              <span className="mb-1 block text-xs text-t3">Components Folder</span>
+              <span className="mb-1 block text-xs text-t3">
+                <Text id="onboarding.field-components-folder">Components Folder</Text>
+              </span>
               <input
                 className={INPUT}
                 value={path}
                 onChange={(e) => setPath(e.target.value)}
-                placeholder="C:\\Users\\you\\stockroom-components"
+                placeholder={openPathPlaceholder}
                 spellCheck={false}
               />
             </label>
@@ -112,7 +131,9 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
           {mode === "create" && (
             <label className="block">
               <span className="mb-1 block text-xs text-t3">
-                New Components Folder (blank uses the default)
+                <Text id="onboarding.field-new-components-folder">
+                  New Components Folder (blank uses the default)
+                </Text>
               </span>
               <input
                 className={INPUT}
@@ -126,18 +147,20 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
           {mode === "clone" && (
             <>
               <label className="block">
-                <span className="mb-1 block text-xs text-t3">Git URL</span>
+                <span className="mb-1 block text-xs text-t3">
+                  <Text id="onboarding.field-git-url">Git URL</Text>
+                </span>
                 <input
                   className={INPUT}
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://github.com/you/stockroom-components.git"
+                  placeholder={cloneUrlPlaceholder}
                   spellCheck={false}
                 />
               </label>
               <label className="block">
                 <span className="mb-1 block text-xs text-t3">
-                  Clone Into (blank uses the default)
+                  <Text id="onboarding.field-clone-into">Clone Into (blank uses the default)</Text>
                 </span>
                 <input
                   className={INPUT}
@@ -158,7 +181,7 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
             disabled={busy}
             className="text-sm text-t3 underline-offset-2 hover:text-t1 hover:underline disabled:opacity-50"
           >
-            Continue with the Default
+            <Text id="onboarding.continue-default">Continue with the Default</Text>
           </button>
           <Button variant="accent" onClick={submit} disabled={!canSubmit}>
             {busy ? "Working..." : "Set Up Components"}
@@ -166,7 +189,8 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
         </div>
 
         <p className="mt-4 border-t border-line pt-3 text-xs text-t3">
-          Default location: <span className="text-t2">{status.default_dir}</span>
+          <Text id="onboarding.default-location">Default location:</Text>{" "}
+          <span className="text-t2">{status.default_dir}</span>
         </p>
       </Card>
     </div>

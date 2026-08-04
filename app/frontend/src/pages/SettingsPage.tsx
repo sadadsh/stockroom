@@ -164,6 +164,7 @@ export function SettingsPage() {
   const lfsQ = useLibraryLfs();
   const rescanQ = useRescanState();
   const { theme } = useTheme();
+  const navAria = useText("settings.nav.aria", "Settings Sections");
 
   const [group, setGroup] = useState<GroupId>("general");
   const settingsContentRef = useRef<HTMLDivElement | null>(null);
@@ -263,6 +264,10 @@ export function SettingsPage() {
     });
   }
   const unmet = steps.filter((st) => !st.met);
+  const headerAttention = useText("settings.machine.header-attention", "{count} need attention", {
+    count: unmet.length,
+  });
+  const headerReady = useText("settings.machine.header-ready", "Machine ready");
 
   // -- per-group attention dots (mirror the unmet steps + an available update) --
   const groupAttention: Record<GroupId, "warn" | "neutral" | null> = {
@@ -378,7 +383,7 @@ export function SettingsPage() {
     <div className="flex min-h-0 flex-1 flex-col" data-dev-id="settings.root">
       <RouteHeader
         data-dev-id="settings.title"
-        right={unmet.length > 0 ? `${unmet.length} need attention` : "Machine ready"}
+        right={unmet.length > 0 ? headerAttention : headerReady}
       >
         <Text id="settings.title">Settings</Text>
       </RouteHeader>
@@ -394,7 +399,7 @@ export function SettingsPage() {
         />
 
         <nav
-          aria-label="Settings Sections"
+          aria-label={navAria}
           className="mt-3 flex flex-none items-center gap-1 overflow-x-auto rounded-card border border-line bg-band p-1"
           data-dev-id="settings.nav"
         >
@@ -490,15 +495,17 @@ export function SettingsPage() {
                     ) : updateStanding.standing === "current" ? (
                       <Text id="settings.summary.up-to-date-app">Current</Text>
                     ) : updateStanding.standing === "updating" ? (
-                      <span>Updating...</span>
+                      <Text id="settings.summary.update-updating">Updating...</Text>
                     ) : updateStanding.standing === "checking" ? (
                       <Text id="settings.summary.update-checking">Checking...</Text>
                     ) : updateStanding.standing === "retrying" ? (
-                      <span>Retrying...</span>
+                      <Text id="settings.summary.update-retrying">Retrying...</Text>
                     ) : updateStanding.standing === "blocked" ? (
-                      <span>Update Blocked</span>
+                      <Text id="settings.summary.update-blocked">Update Blocked</Text>
                     ) : updateStanding.standing === "restart_required" ? (
-                      <Badge tone="warn">Restart Required</Badge>
+                      <Badge tone="warn">
+                        <Text id="settings.summary.update-restart">Restart Required</Text>
+                      </Badge>
                     ) : (
                       <Text id="settings.summary.update-unknown">Update Unknown</Text>
                     )
@@ -602,12 +609,16 @@ export function SettingsPage() {
                 </SettingsDisclosure>
                 <SettingsDisclosure
                   title="STM32CubeMX Data"
+                  titleId="settings.cubemx.title"
                   hint="Choose the local CubeMX data folder once. Stockroom remembers it and builds the searchable MCU index on demand."
+                  hintId="settings.cubemx.hint"
                   summary={
                     s?.stm_cubemx_source ? (
                       <Text id="settings.summary.cubemx-ready">Configured</Text>
                     ) : (
-                      <Badge tone="neutral">Optional</Badge>
+                      <Badge tone="neutral">
+                        <Text id="settings.summary.cubemx-optional">Optional</Text>
+                      </Badge>
                     )
                   }
                   className="@3xl:col-span-2"
@@ -782,38 +793,63 @@ function MachineSetupBand({
           <Icon id="nav.update" className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <Eyebrow className="mb-0.5">Application Delivery</Eyebrow>
+          <Eyebrow className="mb-0.5">
+            <Text id="settings.delivery.title">Application Delivery</Text>
+          </Eyebrow>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-t1">Automatic Convergence</span>
+            <span className="text-sm font-semibold text-t1">
+              <Text id="settings.delivery.mode">Automatic Convergence</Text>
+            </span>
             {updateState === "offline" ? (
-              <Badge tone="warn">Offline</Badge>
+              <Badge tone="warn">
+                <Text id="settings.delivery.offline">Offline</Text>
+              </Badge>
             ) : updateStanding === "retrying" ? (
-              <Badge tone="warn">Retrying</Badge>
+              <Badge tone="warn">
+                <Text id="settings.delivery.retrying">Retrying</Text>
+              </Badge>
             ) : updateStanding === "blocked" ? (
-              <Badge tone="err">Blocked</Badge>
+              <Badge tone="err">
+                <Text id="settings.delivery.blocked">Blocked</Text>
+              </Badge>
             ) : updateStanding === "restart_required" ? (
-              <Badge tone="warn">Restart Required</Badge>
+              <Badge tone="warn">
+                <Text id="settings.delivery.restart">Restart Required</Text>
+              </Badge>
             ) : updateStanding === "updating" ? (
-              <Badge tone="neutral">Updating</Badge>
+              <Badge tone="neutral">
+                <Text id="settings.delivery.updating">Updating</Text>
+              </Badge>
             ) : updateStanding === "available" ? (
               <Badge tone="warn">
-                {updateBehind > 0 ? `${updateBehind} Commits Ready` : "Update Ready"}
+                {updateBehind > 0 ? (
+                  <Text id="settings.delivery.commits-ready" values={{ count: updateBehind }}>
+                    {"{count} Commits Ready"}
+                  </Text>
+                ) : (
+                  <Text id="settings.delivery.update-ready">Update Ready</Text>
+                )}
               </Badge>
             ) : updateStanding === "current" ? (
-              <Badge tone="ok">Current</Badge>
+              <Badge tone="ok">
+                <Text id="settings.delivery.current">Current</Text>
+              </Badge>
             ) : (
-              <Badge tone="warn">Status Unknown</Badge>
+              <Badge tone="warn">
+                <Text id="settings.delivery.unknown">Status Unknown</Text>
+              </Badge>
             )}
           </div>
           <p className="mt-1 text-xs text-t3">
-            Install Stockroom.exe once. It follows the verified application revision automatically,
-            checks every two minutes, and keeps this window open while adopting updates.
+            <Text id="settings.delivery.lede">
+              Install Stockroom.exe once. It follows the verified application revision automatically, checks every two minutes, and keeps this window open while adopting updates.
+            </Text>
           </p>
         </div>
         <div className="flex flex-none flex-col items-end gap-1.5">
           {updateStanding === "available" ? (
             <Button small variant="accent" onClick={onOpenUpdates}>
-              Review Update
+              <Text id="settings.delivery.review">Review Update</Text>
             </Button>
           ) : null}
           <a
@@ -822,7 +858,7 @@ function MachineSetupBand({
             rel="noreferrer"
             className="text-2xs font-medium text-t2 underline decoration-line2 underline-offset-2 hover:text-t1"
           >
-            Get Stockroom.exe
+            <Text id="settings.delivery.get-exe">Get Stockroom.exe</Text>
           </a>
         </div>
       </Card>
@@ -843,15 +879,24 @@ function MachineSetupBand({
               </p>
             ) : (
               <p className="text-sm font-semibold text-t1">
-                {unmet.length === 1
-                  ? "1 Setup Step Needs Attention"
-                  : `${unmet.length} Setup Steps Need Attention`}
+                {unmet.length === 1 ? (
+                  <Text id="settings.machine.one-unmet">1 Setup Step Needs Attention</Text>
+                ) : (
+                  <Text id="settings.machine.many-unmet" values={{ count: unmet.length }}>
+                    {"{count} Setup Steps Need Attention"}
+                  </Text>
+                )}
               </p>
             )}
           </div>
           {!loading ? (
             <span className="text-2xs text-t3">
-              {steps.length - unmet.length} of {steps.length} ready
+              <Text
+                id="settings.machine.ready-count"
+                values={{ ready: steps.length - unmet.length, total: steps.length }}
+              >
+                {"{ready} of {total} ready"}
+              </Text>
             </span>
           ) : null}
         </div>
@@ -932,6 +977,9 @@ function LibraryRepositoriesSection() {
   const [mode, setMode] = useState<SetLibraryBody["mode"]>("create");
   const [path, setPath] = useState("");
   const [url, setUrl] = useState("");
+  const cloneUrlLabel = useText("settings.library.clone-url", "Git Repository URL");
+  const openFolderLabel = useText("settings.library.open-folder", "Existing Library Folder");
+  const newFolderLabel = useText("settings.library.new-folder", "New Library Folder");
 
   function apply(body: SetLibraryBody) {
     if (setLibrary.isPending) return;
@@ -970,8 +1018,16 @@ function LibraryRepositoriesSection() {
                     <p className="truncate text-sm text-t1">{library.name}</p>
                     <p className="truncate text-xs text-t3">{library.path}</p>
                   </div>
-                  {library.active ? <Badge tone="ok">Active</Badge> : null}
-                  {!library.available ? <Badge tone="warn">Unavailable</Badge> : null}
+                  {library.active ? (
+                    <Badge tone="ok">
+                      <Text id="settings.library.active">Active</Text>
+                    </Badge>
+                  ) : null}
+                  {!library.available ? (
+                    <Badge tone="warn">
+                      <Text id="settings.library.unavailable">Unavailable</Text>
+                    </Badge>
+                  ) : null}
                 </div>
                 {!library.active && library.available ? (
                   <Button
@@ -1008,16 +1064,16 @@ function LibraryRepositoriesSection() {
           <input
             value={url}
             onChange={(event) => setUrl(event.target.value)}
-            placeholder="Git Repository URL"
-            aria-label="Git Repository URL"
+            placeholder={cloneUrlLabel}
+            aria-label={cloneUrlLabel}
             className={INPUT_CLS}
           />
         ) : null}
         <input
           value={path}
           onChange={(event) => setPath(event.target.value)}
-          placeholder={mode === "open" ? "Existing Library Folder" : "New Library Folder"}
-          aria-label={mode === "open" ? "Existing Library Folder" : "New Library Folder"}
+          placeholder={mode === "open" ? openFolderLabel : newFolderLabel}
+          aria-label={mode === "open" ? openFolderLabel : newFolderLabel}
           className={INPUT_CLS}
         />
         <Button
@@ -1033,8 +1089,9 @@ function LibraryRepositoriesSection() {
           <Text id="settings.profiles.create">Set Up Library Repository</Text>
         </Button>
         <p className="text-xs text-t3">
-          Creating a library initializes its own Git repository. Stockroom source and other
-          libraries are never added to it.
+          <Text id="settings.library.create-note">
+            Creating a library initializes its own Git repository. Stockroom source and other libraries are never added to it.
+          </Text>
         </p>
       </div>
     </>
@@ -1047,6 +1104,13 @@ function SyncSection() {
   const connectRemote = useConnectLibraryRemote();
   const { toast } = useToast();
   const [remoteUrl, setRemoteUrl] = useState("");
+  // The placeholder is an EXAMPLE of a repository URL, so it is routed but never reworded to a
+  // real address; the aria-label is the field's actual name.
+  const remotePlaceholder = useText(
+    "settings.sync.remote-placeholder",
+    "https://github.com/you/library.git",
+  );
+  const remoteAria = useText("settings.sync.remote-aria", "Library GitHub Repository URL");
 
   function onSync() {
     sync.mutate(undefined, {
@@ -1215,8 +1279,8 @@ function SyncSection() {
           <input
             value={remoteUrl}
             onChange={(event) => setRemoteUrl(event.target.value)}
-            placeholder="https://github.com/you/library.git"
-            aria-label="Library GitHub Repository URL"
+            placeholder={remotePlaceholder}
+            aria-label={remoteAria}
             className={INPUT_CLS}
           />
           <Button
@@ -1231,7 +1295,7 @@ function SyncSection() {
             }
             disabled={!remoteUrl.trim() || connectRemote.isPending}
           >
-            Connect Library Repository
+            <Text id="settings.sync.connect-remote">Connect Library Repository</Text>
           </Button>
         </div>
       ) : null}
@@ -1340,7 +1404,9 @@ function KiCadSection() {
               sys.data.kicad_cli_available ? (
                 sys.data.kicad_cli_path
               ) : (
-                <span className="text-warn">Not found (previews unavailable)</span>
+                <span className="text-warn">
+                  <Text id="settings.kicad.cli-missing">Not found (previews unavailable)</Text>
+                </span>
               )
             }
           />
@@ -1356,10 +1422,14 @@ function KiCadSection() {
               settings.isLoading ? (
                 "Loading..."
               ) : settings.data?.kicad_wired ? (
-                <span className="text-ok">Wired to the active library</span>
+                <span className="text-ok">
+                  <Text id="settings.kicad.wired">Wired to the active library</Text>
+                </span>
               ) : (
                 <span className="text-warn">
-                  Not wired so far (use Recheck And Wire KiCad below)
+                  <Text id="settings.kicad.unwired">
+                    Not wired so far (use Recheck And Wire KiCad below)
+                  </Text>
                 </span>
               )
             }
@@ -1395,12 +1465,18 @@ function KiCadSection() {
               {wireReport.restart_needed ? (
                 <div className="flex items-center gap-2 text-warn">
                   <Dot tone="warn" />
-                  <span>Restart KiCad to load the updated tables.</span>
+                  <span>
+                    <Text id="settings.kicad.restart-needed">
+                      Restart KiCad to load the updated tables.
+                    </Text>
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-ok">
                   <Dot tone="ok" />
-                  <span>KiCad is wired and set.</span>
+                  <span>
+                    <Text id="settings.kicad.wired-set">KiCad is wired and set.</Text>
+                  </span>
                 </div>
               )}
             </div>
@@ -1455,6 +1531,15 @@ function CubeMxSection() {
   const saved = settings.data?.stm_cubemx_source ?? "";
   const value = draft ?? saved;
   const dirty = value.trim() !== saved;
+  const folderPlaceholder = useText(
+    "settings.cubemx.folder-placeholder",
+    "Choose the CubeMX data folder",
+  );
+  const toastSaved = useText("settings.cubemx.toast-saved", "CubeMX data folder saved.");
+  const toastNotSaved = useText(
+    "settings.cubemx.toast-not-saved",
+    "CubeMX data folder was not saved.",
+  );
 
   async function chooseFolder() {
     try {
@@ -1463,9 +1548,7 @@ function CubeMxSection() {
       const result = await save.mutateAsync({ stm_cubemx_source: folder });
       setDraft(null);
       toast(
-        result.stm_cubemx_source
-          ? "CubeMX data folder saved."
-          : "CubeMX data folder was not saved.",
+        result.stm_cubemx_source ? toastSaved : toastNotSaved,
         result.stm_cubemx_source ? "ok" : "err",
       );
     } catch (error) {
@@ -1480,7 +1563,7 @@ function CubeMxSection() {
       {
         onSuccess: () => {
           setDraft(null);
-          toast("CubeMX data folder saved.", "ok");
+          toast(toastSaved, "ok");
         },
         onError: (error) => toast(errMsg(error), "err"),
       },
@@ -1490,28 +1573,33 @@ function CubeMxSection() {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-t2">
-        Stockroom uses the STM32CubeMX MCU data as the native source for its spec matrix,
-        pinouts, and compatibility tools.
+        <Text id="settings.cubemx.lede">
+          Stockroom uses the STM32CubeMX MCU data as the native source for its spec matrix, pinouts, and compatibility tools.
+        </Text>
       </p>
       <div className="flex flex-wrap items-center gap-2.5">
         <label htmlFor="stm-cubemx-source" className="w-40 flex-none text-xs text-t3">
-          CubeMX Data Folder
+          <Text id="settings.cubemx.folder-label">CubeMX Data Folder</Text>
         </label>
         <input
           id="stm-cubemx-source"
           value={value}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="Choose the CubeMX data folder"
+          placeholder={folderPlaceholder}
           className={INPUT_CLS}
         />
         <Button onClick={chooseFolder} disabled={save.isPending}>
-          Choose Folder
+          <Text id="settings.cubemx.choose">Choose Folder</Text>
         </Button>
       </div>
       {dirty ? (
         <div>
           <Button onClick={saveDraft} disabled={save.isPending}>
-            {save.isPending ? "Saving..." : "Save Folder"}
+            {save.isPending ? (
+              <Text id="settings.cubemx.saving">Saving...</Text>
+            ) : (
+              <Text id="settings.cubemx.save">Save Folder</Text>
+            )}
           </Button>
         </div>
       ) : null}
@@ -1581,7 +1669,7 @@ function DistributorSection() {
         data-dev-id="settings.distributor-key"
       >
         <label htmlFor="mouser-key" className="sr-only">
-          Mouser API Key
+          <Text id="settings.distributor.key-field-label">Mouser API Key</Text>
         </label>
         <input
           id="mouser-key"
@@ -1767,7 +1855,9 @@ function GitHubSection() {
           </Text>
         </Button>
         <p className="text-xs text-t3">
-          Stockroom never receives or stores your GitHub password or personal access token.
+          <Text id="settings.github.no-secrets">
+            Stockroom never receives or stores your GitHub password or personal access token.
+          </Text>
         </p>
       </div>
     </>
@@ -1777,6 +1867,8 @@ function GitHubSection() {
 function UpdateSection() {
   const { query: check, view: standing } = useUpdateStanding();
   const targetRevision = updateTargetRevision(check.data);
+  const branchUnknown = useText("settings.update.branch-unknown", "Unknown");
+  const revisionMissing = useText("settings.update.revision-unavailable", "Unavailable");
 
   return (
     <>
@@ -1792,27 +1884,33 @@ function UpdateSection() {
         <>
           <StatusRow
             label="Delivery"
+            labelId="settings.update.delivery"
             value={
-              check.data?.automatic_apply
-                ? "Automatic while Stockroom is open"
-                : check.data?.automatic_on_launch
-                  ? "Automatic when Stockroom opens"
-                  : "Unmanaged"
+              check.data?.automatic_apply ? (
+                <Text id="settings.update.delivery-open">Automatic while Stockroom is open</Text>
+              ) : check.data?.automatic_on_launch ? (
+                <Text id="settings.update.delivery-launch">Automatic when Stockroom opens</Text>
+              ) : (
+                <Text id="settings.update.delivery-unmanaged">Unmanaged</Text>
+              )
             }
           />
           <StatusRow
             label="Application Branch"
-            value={<span className="font-mono">{check.data?.channel || "Unknown"}</span>}
+            labelId="settings.update.branch"
+            value={<span className="font-mono">{check.data?.channel || branchUnknown}</span>}
           />
           <StatusRow
             label="Installed Revision"
+            labelId="settings.update.installed"
             value={
-              <span className="font-mono">{check.data?.current_revision || "Unavailable"}</span>
+              <span className="font-mono">{check.data?.current_revision || revisionMissing}</span>
             }
           />
           {targetRevision ? (
             <StatusRow
               label="Latest Remote Revision"
+              labelId="settings.update.latest"
               value={<span className="font-mono">{targetRevision}</span>}
             />
           ) : null}
@@ -1821,54 +1919,102 @@ function UpdateSection() {
             labelId="settings.update.status"
             value={
               standing.standing === "checking" ? (
-                <span className="text-t3">Checking the application remote...</span>
+                <span className="text-t3">
+                  <Text id="settings.update.status-checking">
+                    Checking the application remote...
+                  </Text>
+                </span>
               ) : standing.standing === "current" ? (
-                <span className="text-ok">Current</span>
+                <span className="text-ok">
+                  <Text id="settings.update.status-current">Current</Text>
+                </span>
               ) : standing.standing === "available" ? (
                 <span className="text-warn">
-                  {check.data?.behind
-                    ? `${check.data.behind} commits ready to install at ${shortRevision(targetRevision)}`
-                    : targetRevision
-                      ? `Revision ${shortRevision(targetRevision)} is ready to install`
-                      : "Update ready to install"}
+                  {check.data?.behind ? (
+                    <Text
+                      id="settings.update.status-behind"
+                      values={{ count: check.data.behind, revision: shortRevision(targetRevision) }}
+                    >
+                      {"{count} commits ready to install at {revision}"}
+                    </Text>
+                  ) : targetRevision ? (
+                    <Text
+                      id="settings.update.status-revision-ready"
+                      values={{ revision: shortRevision(targetRevision) }}
+                    >
+                      {"Revision {revision} is ready to install"}
+                    </Text>
+                  ) : (
+                    <Text id="settings.update.status-ready">Update ready to install</Text>
+                  )}
                 </span>
               ) : standing.standing === "updating" ? (
-                <span className="text-acc">Adopting the verified release automatically...</span>
+                <span className="text-acc">
+                  <Text id="settings.update.status-updating">
+                    Adopting the verified release automatically...
+                  </Text>
+                </span>
               ) : standing.standing === "retrying" ? (
-                <span className="text-warn">Remote check incomplete; retrying automatically...</span>
+                <span className="text-warn">
+                  <Text id="settings.update.status-retrying">
+                    Remote check incomplete; retrying automatically...
+                  </Text>
+                </span>
               ) : standing.standing === "blocked" ? (
-                <span className="text-err">Automatic convergence needs attention</span>
+                <span className="text-err">
+                  <Text id="settings.update.status-blocked">
+                    Automatic convergence needs attention
+                  </Text>
+                </span>
               ) : standing.standing === "restart_required" ? (
                 <span className="text-warn">
-                  Restart Stockroom to finish adopting the installed revision
+                  <Text id="settings.update.status-restart">
+                    Restart Stockroom to finish adopting the installed revision
+                  </Text>
                 </span>
               ) : (
                 <span className="text-warn">
-                  {check.data?.state === "offline"
-                    ? "Latest revision unknown while offline"
-                    : check.data?.state === "no_remote"
-                      ? "Application remote is not configured"
-                      : check.data?.state === "diverged"
-                        ? "Local and remote histories diverged"
-                        : check.data?.state === "up_to_date" &&
-                            check.data?.current_revision &&
-                            targetRevision
-                          ? "Installed and latest remote revisions do not match"
-                          : "Latest remote revision could not be verified"}
+                  {check.data?.state === "offline" ? (
+                    <Text id="settings.update.status-offline">
+                      Latest revision unknown while offline
+                    </Text>
+                  ) : check.data?.state === "no_remote" ? (
+                    <Text id="settings.update.status-no-remote">
+                      Application remote is not configured
+                    </Text>
+                  ) : check.data?.state === "diverged" ? (
+                    <Text id="settings.update.status-diverged">
+                      Local and remote histories diverged
+                    </Text>
+                  ) : check.data?.state === "up_to_date" &&
+                    check.data?.current_revision &&
+                    targetRevision ? (
+                    <Text id="settings.update.status-mismatch">
+                      Installed and latest remote revisions do not match
+                    </Text>
+                  ) : (
+                    <Text id="settings.update.status-unverified">
+                      Latest remote revision could not be verified
+                    </Text>
+                  )}
                 </span>
               )
             }
           />
           {["retrying", "blocked", "restart_required", "unknown"].includes(standing.standing) &&
           standing.detail ? (
-            <StatusRow label="Check Detail" value={standing.detail} />
+            <StatusRow
+              label="Check Detail"
+              labelId="settings.update.detail"
+              value={standing.detail}
+            />
           ) : null}
         </>
       )}
       <p className="mt-3 text-xs leading-relaxed text-t3">
-        Every installation follows the same verified remote revision automatically. New releases are
-        staged beside the running app, health-checked, and adopted without closing this window; a
-        failed release rolls back to the last healthy backend.
+        <Text id="settings.update.lede">
+          Every installation follows the same verified remote revision automatically. New releases are staged beside the running app, health-checked, and adopted without closing this window; a failed release rolls back to the last healthy backend.
+        </Text>
       </p>
       <div className="mt-3.5 flex flex-wrap items-center gap-2">
         <a
@@ -1877,7 +2023,7 @@ function UpdateSection() {
           rel="noreferrer"
           className="inline-flex h-[27px] items-center rounded-control px-2 text-xs font-medium text-t2 underline decoration-line2 underline-offset-2 hover:text-t1"
         >
-          Download Stockroom.exe
+          <Text id="settings.update.download">Download Stockroom.exe</Text>
         </a>
       </div>
     </>

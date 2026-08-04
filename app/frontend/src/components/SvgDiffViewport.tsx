@@ -6,6 +6,7 @@
  * register exactly. Default shows the New side; drag left to reveal the Old.
  */
 import { useState } from "react";
+import { Text, useText } from "../lib/copy";
 import { useObjectUrl } from "../lib/useObjectUrl";
 import { usePanZoom } from "../lib/usePanZoom";
 import { useTheme } from "../lib/theme";
@@ -26,6 +27,7 @@ export function SvgDiffViewport({
   const { theme } = useTheme();
   const { view, frameRef, handlers, reset } = usePanZoom();
   const [blend, setBlend] = useState(1); // 0 = old only, 1 = new only
+  const blendLabel = useText("svg-diff.blend", "Blend Old And New");
 
   const layer = (opacity: number) =>
     ({
@@ -64,10 +66,12 @@ export function SvgDiffViewport({
         </div>
       </div>
       <div className="absolute inset-x-3 bottom-3 flex items-center gap-3">
-        <span className="flex-none text-2xs text-t3">Old</span>
+        <span className="flex-none text-2xs text-t3">
+          <Text id="svg-diff.old">Old</Text>
+        </span>
         <input
           type="range"
-          aria-label="Blend Old And New"
+          aria-label={blendLabel}
           min={0}
           max={1}
           step={0.01}
@@ -75,13 +79,15 @@ export function SvgDiffViewport({
           onChange={(e) => setBlend(Number(e.target.value))}
           className="min-w-0 flex-1 accent-acc"
         />
-        <span className="flex-none text-2xs text-t3">New</span>
+        <span className="flex-none text-2xs text-t3">
+          <Text id="svg-diff.new">New</Text>
+        </span>
         <button
           type="button"
           onClick={reset}
           className="flex-none rounded-control border border-line2 bg-raise2 px-2.5 py-1 text-xs font-medium text-t2 hover:text-t1"
         >
-          Reset View
+          <Text id="svg-diff.reset-view">Reset View</Text>
         </button>
       </div>
     </div>

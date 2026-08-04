@@ -34,6 +34,7 @@ import {
   useSyncLibraryHygiene,
 } from "../api/queries";
 import { useToast } from "../lib/toast";
+import { Text } from "../lib/copy";
 import { Badge, Button, Dot, Eyebrow } from "./primitives";
 
 function errMsg(err: unknown, fallback: string): string {
@@ -61,9 +62,13 @@ function BinaryStorage() {
 
   return (
     <div data-testid="lfs-block" data-dev-id="settings.library-lfs">
-      <Eyebrow className="mb-2">Binary Storage</Eyebrow>
+      <Eyebrow className="mb-2">
+        <Text id="library.sync.binary-storage-heading">Binary Storage</Text>
+      </Eyebrow>
       {q.isLoading ? (
-        <p className="text-sm text-t3">Checking how binaries are stored...</p>
+        <p className="text-sm text-t3">
+          <Text id="library.sync.binary-storage-loading">Checking how binaries are stored...</Text>
+        </p>
       ) : q.isError ? (
         <p className="text-sm text-err">{errMsg(q.error, "Could not check binary storage.")}</p>
       ) : !data ? null : (
@@ -108,7 +113,7 @@ function BinaryStorage() {
               {/* Labelled, because an unlabelled row of globs reads as debug output rather than
                   as the concrete answer to "what would this actually move". */}
               <div className="mb-1 text-2xs uppercase tracking-[0.07em] text-t3">
-                Would Move To Git LFS
+                <Text id="library.sync.lfs-covers-heading">Would Move To Git LFS</Text>
               </div>
               {data.covers.map((pattern) => (
                 <span key={pattern} className="mr-2 font-mono text-2xs text-t2">
@@ -155,14 +160,20 @@ function LibraryHygiene() {
 
   return (
     <div className="mt-5" data-testid="library-hygiene-block" data-dev-id="settings.library-hygiene">
-      <Eyebrow className="mb-2">Shared Files</Eyebrow>
+      <Eyebrow className="mb-2">
+        <Text id="library.sync.shared-files-heading">Shared Files</Text>
+      </Eyebrow>
       {q.isLoading ? (
-        <p className="text-sm text-t3">Checking what the library shares...</p>
+        <p className="text-sm text-t3">
+          <Text id="library.sync.hygiene-loading">Checking what the library shares...</Text>
+        </p>
       ) : q.isError ? (
         <p className="text-sm text-err">{errMsg(q.error, "Could not check the library.")}</p>
       ) : !data ? null : pending === 0 ? (
         <p className="text-xs text-ok" data-testid="library-hygiene-clean">
-          Nothing per-user or regenerated is being shared from this library.
+          <Text id="library.sync.hygiene-clean">
+            Nothing per-user or regenerated is being shared from this library.
+          </Text>
         </p>
       ) : (
         <div className="rounded-card border border-line2" data-testid="library-hygiene-pending">
@@ -192,8 +203,10 @@ function LibraryHygiene() {
             </div>
           ) : null}
           <p className="border-t border-line2 px-3 py-2 text-2xs text-t3">
-            These stay on your disk. Only git stops carrying them to whoever else clones this
-            library.
+            <Text id="library.sync.hygiene-note">
+              These stay on your disk. Only git stops carrying them to whoever else clones this
+              library.
+            </Text>
           </p>
         </div>
       )}

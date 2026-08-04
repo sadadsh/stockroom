@@ -19,6 +19,7 @@ import type { PlacementAssessment } from "../lib/placementAssessment";
 import { DEFAULT_LAYERS } from "../lib/boardPlane";
 import type { LandPattern } from "../api/client";
 import { ApiError } from "../api/client";
+import { Text, useText } from "../lib/copy";
 import { Icon } from "./Icon";
 
 export type ModelVisibility = "checking" | "visible" | "unavailable";
@@ -121,6 +122,20 @@ export function Glb3DView({
     "model",
   );
   const [compactControlsOpen, setCompactControlsOpen] = useState(false);
+  // Resolved above the loading/error returns so the hook order is stable across every branch.
+  const modelLoadFailed = useText("model3d.load-failed", "Could not load the 3D model.");
+  const canvasLabel = useText(
+    "model3d.canvas",
+    "3D model inspection canvas. Drag to orbit, scroll to zoom, and press 0 or F to fit.",
+  );
+  const layersLabel = useText("model3d.layers", "Layers");
+  const appearanceLabel = useText("model3d.appearance", "Appearance");
+  const motionLabel = useText("model3d.motion", "Motion");
+  const settingsLabel = useText("model3d.settings", "3D view settings");
+  const cameraViewLabel = useText("model3d.camera-view", "Camera view");
+  const viewLabel = useText("model3d.view", "View");
+  const placementLabel = useText("model3d.placement", "Placement");
+  const fitModelLabel = useText("model3d.fit-model", "Fit model");
   const renderableLand = usableLandPattern(land);
   const landRef = useRef<LandPattern | null>(renderableLand);
   landRef.current = renderableLand;
@@ -221,18 +236,25 @@ export function Glb3DView({
   }, [renderableLand]);
 
   if (isLoading) {
-    return <Centered>Loading 3D model...</Centered>;
+    return (
+      <Centered>
+        <Text id="model3d.loading">Loading 3D model...</Text>
+      </Centered>
+    );
   }
   if (isError) {
     const err = error instanceof ApiError ? error : null;
     // A 502 carries an honest, specific reason from the backend (tooling not installed,
     // or a WRL model that is not convertible yet) — show it rather than a single guess.
-    const message =
-      err?.status === 502 && err.message ? err.message : "Could not load the 3D model.";
+    const message = err?.status === 502 && err.message ? err.message : modelLoadFailed;
     return <Centered>{message}</Centered>;
   }
   if (data && failedData === data) {
-    return <Centered>This device could not render the 3D preview.</Centered>;
+    return (
+      <Centered>
+        <Text id="model3d.unsupported">This device could not render the 3D preview.</Text>
+      </Centered>
+    );
   }
   return (
     // The controls sit in a RESERVED BAR beneath the canvas, not floating over it.
@@ -252,7 +274,7 @@ export function Glb3DView({
         data-testid="model-canvas"
         tabIndex={0}
         role="application"
-        aria-label="3D model inspection canvas. Drag to orbit, scroll to zoom, and press 0 or F to fit."
+        aria-label={canvasLabel}
         onKeyDown={(event) => {
           if (event.key === "0" || event.key.toLowerCase() === "f") {
             event.preventDefault();
@@ -289,9 +311,13 @@ export function Glb3DView({
         <div
           className={compact ? "flex items-center gap-1.5" : "flex flex-col items-start gap-1 pr-3"}
           role="group"
-          aria-label="Layers"
+          aria-label={layersLabel}
         >
-          {!compact ? <ControlLabel>Layers</ControlLabel> : null}
+          {!compact ? (
+            <ControlLabel>
+              <Text id="model3d.layers">Layers</Text>
+            </ControlLabel>
+          ) : null}
           <div className="flex items-center gap-0.5 rounded-control border border-line2 bg-field p-0.5">
           <LayerToggle
             devId="detail.model-show-model"
@@ -344,13 +370,15 @@ export function Glb3DView({
         <div
           data-dev-id="detail.model-shading"
           role="group"
-          aria-label="Appearance"
+          aria-label={appearanceLabel}
           // NO border-l. On a bar that wraps, a left border on a flex child becomes a stray vertical
           // tick floating at the start of the new row - visible in the owner's real shot as a glitch
           // beside "Realistic". Grouping is carried by the gap instead, which cannot wrap wrongly.
           className="flex flex-col items-start gap-1 border-l border-line pl-3 pr-3"
         >
-          <ControlLabel>Appearance</ControlLabel>
+          <ControlLabel>
+            <Text id="model3d.appearance">Appearance</Text>
+          </ControlLabel>
           <div className="flex items-center gap-0.5 rounded-control border border-line2 bg-field p-0.5">
           {SHADING.map((r) => (
             <LayerToggle
@@ -391,9 +419,13 @@ export function Glb3DView({
                 : "flex flex-col items-start gap-1 border-l border-line pl-3 pr-3"
             }
             role="group"
-            aria-label="Motion"
+            aria-label={motionLabel}
           >
-            {!compact ? <ControlLabel>Motion</ControlLabel> : null}
+            {!compact ? (
+              <ControlLabel>
+                <Text id="model3d.motion">Motion</Text>
+              </ControlLabel>
+            ) : null}
             <div className="flex items-center rounded-control border border-line2 bg-field p-0.5">
               <LayerToggle
                 devId="detail.model-spin"
@@ -415,7 +447,7 @@ export function Glb3DView({
             <button
               type="button"
               data-dev-id="detail.model-settings"
-              aria-label="3D view settings"
+              aria-label={settingsLabel}
               aria-expanded={compactControlsOpen}
               title="View, appearance, placement, and fit settings"
               onClick={() => setCompactControlsOpen((open) => !open)}
@@ -432,9 +464,11 @@ export function Glb3DView({
             <div
               className="flex flex-col items-start gap-1 border-l border-line pl-3"
               role="group"
-              aria-label="Camera view"
+              aria-label={cameraViewLabel}
             >
-              <ControlLabel>View</ControlLabel>
+              <ControlLabel>
+                <Text id="model3d.view">View</Text>
+              </ControlLabel>
               <div className="flex items-center gap-1">
                 <ViewControls
                   active={view}
@@ -449,7 +483,7 @@ export function Glb3DView({
                   title="Frame the whole visible model (0 or F)"
                   className="inline-flex min-h-[32px] items-center rounded-control border border-line2 bg-field px-2.5 text-xs font-semibold text-t2 transition-[transform,background-color,color] active:scale-[0.97] hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
                 >
-                  Fit
+                  <Text id="model3d.fit">Fit</Text>
                 </button>
               </div>
             </div>
@@ -463,7 +497,7 @@ export function Glb3DView({
           onClick={(event) => event.stopPropagation()}
           className="pointer-events-auto absolute bottom-10 right-2 z-20 w-[270px] rounded-card border border-line2 bg-popover p-2 shadow-pop"
         >
-          <ControlSection label="View">
+          <ControlSection label={viewLabel}>
             <div className="flex items-center gap-1">
               <ViewControls
                 active={view}
@@ -476,16 +510,16 @@ export function Glb3DView({
               <button
                 type="button"
                 onClick={() => sceneRef.current?.fit()}
-                aria-label="Fit model"
+                aria-label={fitModelLabel}
                 title="Frame the whole visible model (0 or F)"
                 className="flex h-[32px] min-w-[42px] items-center justify-center rounded-control border border-line2 bg-field px-2 text-xs font-semibold text-t2 hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
               >
-                Fit
+                <Text id="model3d.fit">Fit</Text>
               </button>
             </div>
           </ControlSection>
           {showShading ? (
-            <ControlSection label="Appearance">
+            <ControlSection label={appearanceLabel}>
               <div className="flex items-center gap-0.5 rounded-control border border-line2 bg-field p-0.5">
                 {SHADING.map((item) => (
                   <LayerToggle
@@ -506,7 +540,7 @@ export function Glb3DView({
             </ControlSection>
           ) : null}
           {renderableLand?.model_placement ? (
-            <ControlSection label="Placement">
+            <ControlSection label={placementLabel}>
               <PlacementControls
                 active={placementMode}
                 assessment={placementAssessment}
@@ -585,6 +619,7 @@ function PlacementControls({
 }) {
   const suspect = assessment?.status === "suspect";
   const issueText = assessment?.issues.join(". ");
+  const groupLabel = useText("model3d.placement", "Placement");
   return (
     <div
       className={
@@ -593,9 +628,13 @@ function PlacementControls({
           : "flex w-full flex-col items-start gap-1.5"
       }
       role="group"
-      aria-label="Placement"
+      aria-label={groupLabel}
     >
-      {showLabel ? <ControlLabel>Placement</ControlLabel> : null}
+      {showLabel ? (
+        <ControlLabel>
+          <Text id="model3d.placement">Placement</Text>
+        </ControlLabel>
+      ) : null}
       <div
         className={
           showLabel ? "flex items-center gap-1.5" : "flex w-full flex-col items-start gap-1.5"

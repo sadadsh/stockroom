@@ -33,16 +33,23 @@
  *
  * --- THE BOUNDARY ------------------------------------------------------------------------------
  *
- * `COVERED_SURFACES` is the enforced list, and it is the honest one: these are the files carrying
- * the surfaces this pass covers (the opened component and its sheets, the provider trip, intake and
- * import, the modals, the shared primitives, the rail and the two pickers). Adding a file here is
- * how coverage grows, and a new file inside an already-listed directory is covered the moment it
- * lands. Everything outside is NOT claimed to be covered, because claiming it without routing it is
- * how a coverage gate becomes decoration.
+ * `COVERED_SURFACES` is the enforced list and `EXCLUDED_SURFACES` is what is carved back out of it.
+ * Together they are the honest boundary: every rendering surface the product has - the routes, the
+ * opened component and its sheets, settings and its sections, the STM workbenches, the provider
+ * trip, intake and import, the modals, the shared primitives, the rail and the pickers - is now
+ * inside, so coverage grows by a new file LANDING rather than by someone remembering to list it.
+ * Anything carved out is carved out with a reason written next to it, because a boundary that is
+ * only a list is a boundary that drifts.
  *
- * Dev Mode's own surfaces (`DevPanel` / `DevInspector`) are deliberately outside: they are the
- * editor, and routing the editor's labels through the surface it edits means one bad override can
- * make the editor unusable and unfixable.
+ * Dev Mode's own surfaces (`DevPanel` / `DevInspector`) are excluded: they are the editor, and
+ * routing the editor's labels through the surface it edits means one bad override can make the
+ * editor unusable and unfixable. `lib/devMode.tsx` and `lib/copy.tsx` are the same chrome and are
+ * simply not listed, since `lib/` is covered file by file rather than whole.
+ *
+ * `lib/capture.tsx` is also not listed. Its one label table names EDA tools and asset kinds
+ * ("KiCad Symbol", "Altium Footprint"), which are registry vocabulary rendered as data, in the
+ * same class as a provider label or a spec key. Routing data through the copy layer would let a
+ * rewording change what a file IS.
  *
  * Third-party provider pages, OS dialogs and other applications' windows are outside because they
  * are not ours to edit. Nothing here claims otherwise.
@@ -56,39 +63,39 @@ const RAW = import.meta.glob("/src/**/*.tsx", {
   import: "default",
 }) as Record<string, string>;
 
-/** The files this gate enforces. A trailing slash covers a whole directory. */
+/**
+ * The files this gate enforces. A trailing slash covers a whole directory.
+ *
+ * Every rendering surface the product has now lives under `components/` or `pages/`, so those are
+ * listed WHOLE rather than file by file. A flat list of ninety-odd paths is a list nobody updates:
+ * the point of the directory form is that a new component is enforced the moment it lands, instead
+ * of being coverable only by someone remembering to come back here.
+ */
 const COVERED_SURFACES: readonly string[] = [
-  "/src/components/component-workspace/",
-  "/src/components/projects/",
-  "/src/components/productState.tsx",
-  "/src/components/modalParts.tsx",
-  "/src/components/primitives.tsx",
-  "/src/components/formFields.tsx",
-  "/src/components/AddPartModal.tsx",
-  "/src/components/AltiumDbLibModal.tsx",
-  "/src/components/AltiumSetupModal.tsx",
-  "/src/components/AppShell.tsx",
-  "/src/components/BulkImportSection.tsx",
-  "/src/components/CandidateCard.tsx",
-  "/src/components/CompletePartModal.tsx",
-  "/src/components/CompletionWorklist.tsx",
-  "/src/components/ConfirmDialog.tsx",
-  "/src/components/DiffModal.tsx",
-  "/src/components/EnrichStages.tsx",
-  "/src/components/Finder.tsx",
-  "/src/components/HandoffBand.tsx",
-  "/src/components/PartsList.tsx",
-  "/src/components/PassiveAddSection.tsx",
-  "/src/components/PreviewModal.tsx",
-  "/src/components/ProductPhoto.tsx",
-  "/src/components/Rail.tsx",
-  "/src/components/SettingsDisclosure.tsx",
-  "/src/pages/ComponentsPage.tsx",
-  "/src/pages/IngestPage.tsx",
-  "/src/pages/ProjectsPage.tsx",
+  "/src/components/",
+  "/src/pages/",
+  "/src/App.tsx",
+  "/src/main.tsx",
+  "/src/lib/addPart.tsx",
+  "/src/lib/router.tsx",
+  "/src/lib/theme.tsx",
+  "/src/lib/toast.tsx",
+];
+
+/**
+ * Carved back OUT of the directories above, and each one for a stated reason. This list is the
+ * honest part of the boundary: without it the directory form would silently claim files that this
+ * pass did not route, which is the failure mode a coverage gate exists to prevent.
+ */
+const EXCLUDED_SURFACES: readonly string[] = [
+  // Dev Mode's own editor chrome. Routing the editor's labels through the surface it edits means one
+  // bad override can make the editor unusable AND unfixable, since fixing it needs the editor.
+  "/src/components/DevPanel.tsx",
+  "/src/components/DevInspector.tsx",
 ];
 
 function covered(path: string): boolean {
+  if (EXCLUDED_SURFACES.includes(path)) return false;
   return COVERED_SURFACES.some((s) => (s.endsWith("/") ? path.startsWith(s) : path === s));
 }
 

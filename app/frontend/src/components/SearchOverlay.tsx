@@ -46,6 +46,7 @@ import {
   VALUE_COLUMN_KEY,
 } from "../lib/searchFilters";
 import { prettifyValue } from "../lib/specSchema";
+import { Text, useText } from "../lib/copy";
 import { SearchIcon } from "./icons";
 import { Icon } from "./Icon";
 import { RouteHeader } from "./primitives";
@@ -96,6 +97,14 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   const restoredResultsOffset = useRef(
     readUiSession().search_results.offset_px,
   ).current;
+  // Hoisted to the component top: the results table renders one row per part, so a per-row hook
+  // would both break the rules of hooks and cost the 1,000-row performance contract.
+  const queryPlaceholder = useText(
+    "search.query-placeholder",
+    "Search components using a name, MPN, value, or specification...",
+  );
+  const queryAriaLabel = useText("search.query-label", "Search components");
+  const clearSearchLabel = useText("search.clear-query", "Clear search");
 
   const category = filters.category;
   const spec = useMemo(() => toSpecParams(filters), [filters]);
@@ -280,7 +289,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
           docked workspace, not a floating spotlight */}
       <div className="flex h-[38px] flex-none items-center gap-3 border-b border-line bg-band px-3.5">
         <span className="hidden flex-none text-xs font-semibold text-t2 sm:inline">
-          Parametric Search
+          <Text id="search.title">Parametric Search</Text>
         </span>
         <div
           className="flex h-[26px] min-w-0 flex-1 items-center gap-2 rounded-control border border-line bg-field px-2.5 focus-within:border-acc"
@@ -291,8 +300,8 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search components using a name, MPN, value, or specification..."
-            aria-label="Search components"
+            placeholder={queryPlaceholder}
+            aria-label={queryAriaLabel}
             data-dev-id="search.query-input"
             className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
           />
@@ -300,7 +309,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
             <button
               type="button"
               onClick={() => setQ("")}
-              aria-label="Clear search"
+              aria-label={clearSearchLabel}
               className="grid h-[18px] w-[18px] flex-none place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
             >
               <XSmall />
@@ -313,9 +322,9 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
           className="ml-auto flex h-[26px] flex-none items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-semibold text-t2 hover:bg-raise2 hover:text-t1"
           data-dev-id="search.close"
         >
-          Close
+          <Text id="search.close">Close</Text>
           <kbd className="inline-flex h-[16px] min-w-[20px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1 font-mono text-2xs font-medium text-t2">
-            Esc
+            <Text id="search.close-key">Esc</Text>
           </kbd>
         </button>
       </div>
@@ -355,7 +364,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
               onClick={() => setFilters(clearAll(filters))}
               className="text-xs font-semibold text-t2 hover:text-t1"
             >
-              Clear All
+              <Text id="search.clear-all">Clear All</Text>
             </button>
           ) : null}
         </div>
@@ -382,7 +391,9 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
         />
 
         <div className="flex min-h-0 min-w-0 flex-col border-l border-line">
-          <RouteHeader>Results</RouteHeader>
+          <RouteHeader>
+            <Text id="search.results.header">Results</Text>
+          </RouteHeader>
           <div
             ref={setResultsScrollElement}
             className="min-h-0 flex-1 overflow-auto"
@@ -594,7 +605,8 @@ function SortControl({
         className="flex h-[26px] items-center gap-1.5 rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2 hover:bg-raise2 hover:text-t1"
         data-dev-id="search.sort"
       >
-        Sort <b className="font-semibold text-t1">{current}</b>
+        <Text id="search.sort.label">Sort</Text>{" "}
+        <b className="font-semibold text-t1">{current}</b>
         <Chevron className="h-3 w-3 text-t3" />
       </button>
       {open ? (
@@ -662,7 +674,7 @@ function FacetRail({
   return (
     <div className="flex min-h-0 flex-col" data-dev-id="search.rail">
       <RouteHeader right={activeCount > 0 ? `${activeCount} active` : undefined}>
-        Filters
+        <Text id="search.filters.header">Filters</Text>
       </RouteHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2 pt-1">
         <FacetGroup title="Category" first data-dev-id="search.rail-category">
@@ -676,7 +688,9 @@ function FacetRail({
             />
           ))}
           {categories.length === 0 ? (
-            <div className="py-2 text-xs text-t3">No categories so far.</div>
+            <div className="py-2 text-xs text-t3">
+              <Text id="search.filters.no-categories">No categories so far.</Text>
+            </div>
           ) : null}
         </FacetGroup>
 
@@ -684,7 +698,7 @@ function FacetRail({
           <>
             <RailSection label={category ? `${category} Parameters` : "Parameters"} fromSpecs />
             <div className="px-0.5 py-3 text-xs text-t3">
-              No parametric specs to filter on so far.
+              <Text id="search.filters.no-specs">No parametric specs to filter on so far.</Text>
             </div>
           </>
         ) : (
@@ -717,8 +731,10 @@ function FacetRail({
         <div className="mt-3.5 flex gap-2 border-t border-line pt-3 text-2xs leading-relaxed text-t3">
           <Spark className="mt-0.5 h-3 w-3 flex-none" />
           <span>
-            Filters are generated from each part's specs. Add a component with a new parameter
-            and it becomes a filter here on its own.
+            <Text id="search.filters.generated-note">
+              Filters are generated from each part's specs. Add a component with a new parameter and
+              it becomes a filter here on its own.
+            </Text>
           </span>
         </div>
       </div>
@@ -744,7 +760,7 @@ function FacetRail({
           >
             <Check />
           </span>
-          In Stock
+          <Text id="search.filters.in-stock">In Stock</Text>
         </button>
       </div>
     </div>
@@ -761,7 +777,7 @@ function RailSection({ label, fromSpecs }: { label: string; fromSpecs?: boolean 
           title="These filters are generated from the category's part specs"
         >
           <Spark className="h-2.5 w-2.5" />
-          From Specifications
+          <Text id="search.filters.from-specs">From Specifications</Text>
         </span>
       ) : null}
       <span className="h-px flex-1 bg-line" />
@@ -899,7 +915,9 @@ function RangeFacet({
           data-dev-id="search.single-value-facet"
           className="flex items-baseline justify-between py-1 text-xs"
         >
-          <span className="text-t3">Only value</span>
+          <span className="text-t3">
+            <Text id="search.filters.only-value">Only value</Text>
+          </span>
           <span className="font-mono font-medium text-t1">
             {formatMagnitude(fmin, unit)}
           </span>
@@ -1179,12 +1197,16 @@ function ResultsTable({
   }, [active, scrollElement, virtualized, virtualizer]);
 
   if (loading && rows.length === 0) {
-    return <div className="px-4 py-10 text-center text-sm text-t3">Searching…</div>;
+    return (
+      <div className="px-4 py-10 text-center text-sm text-t3">
+        <Text id="search.results.searching">Searching…</Text>
+      </div>
+    );
   }
   if (rows.length === 0) {
     return (
       <div className="px-4 py-14 text-center text-sm text-t3">
-        No components match this search.
+        <Text id="search.results.empty">No components match this search.</Text>
       </div>
     );
   }
@@ -1223,8 +1245,12 @@ function ResultsTable({
     >
       <thead>
         <tr>
-          <th className={th + " min-w-[240px]"}>Identity</th>
-          <th className={th + " min-w-[190px]"}>Match &amp; Evidence</th>
+          <th className={th + " min-w-[240px]"}>
+            <Text id="search.results.col-identity">Identity</Text>
+          </th>
+          <th className={th + " min-w-[190px]"}>
+            <Text id="search.results.col-match">Match &amp; Evidence</Text>
+          </th>
           {columns.map((c) => (
             <th
               key={c.key}
@@ -1237,9 +1263,19 @@ function ResultsTable({
               {c.label}
             </th>
           ))}
-          {presence.package ? <th className={th}>Package</th> : null}
-          {presence.lifecycle ? <th className={th}>Lifecycle</th> : null}
-          <th className={th + " min-w-[150px]"}>Dual-EDA</th>
+          {presence.package ? (
+            <th className={th}>
+              <Text id="search.results.col-package">Package</Text>
+            </th>
+          ) : null}
+          {presence.lifecycle ? (
+            <th className={th}>
+              <Text id="search.results.col-lifecycle">Lifecycle</Text>
+            </th>
+          ) : null}
+          <th className={th + " min-w-[150px]"}>
+            <Text id="search.results.col-dual-eda">Dual-EDA</Text>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -1384,7 +1420,9 @@ function SearchResultRow({
         className={td}
         title="Search results do not carry per-tool verification evidence. Open the record for the authoritative KiCad and Altium verdicts."
       >
-        <div className="font-semibold text-ink">KiCad + Altium</div>
+        <div className="font-semibold text-ink">
+          <Text id="search.results.dual-eda-tools">KiCad + Altium</Text>
+        </div>
         <div className="text-ui-caption text-warn">
           {row.is_complete ? "Open To Verify" : "Needs Evidence"}
         </div>

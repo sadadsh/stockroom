@@ -7,6 +7,7 @@
  * when a lookup carried none of it, so an empty or blocked fetch shows no hollow panel.
  */
 import type { CatalogProductData, EnrichmentResult } from "../api/types";
+import { Text, useText } from "../lib/copy";
 import { distributorLabel, sv } from "../lib/sourced";
 import { Badge, Eyebrow } from "./primitives";
 
@@ -151,7 +152,9 @@ export function CatalogProductDataBlock({ data }: { data: CatalogProductData }) 
   return (
     <div className="flex flex-col gap-2 border-t border-line pt-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Product Data</Eyebrow>
+        <Eyebrow>
+          <Text id="depth.product-data">Product Data</Text>
+        </Eyebrow>
         {data.availability.providers.map((provider) => (
           <Badge key={provider} tone="neutral">{provider}</Badge>
         ))}
@@ -215,6 +218,7 @@ export function CatalogProductDataBlock({ data }: { data: CatalogProductData }) 
 }
 
 export function PulledDepth({ result }: { result: EnrichmentResult }) {
+  const priceLadderLabel = useText("depth.price-ladder", "Price Ladder");
   const stockNum =
     result.stock != null && Number.isFinite(Number(result.stock.value))
       ? Number(result.stock.value)
@@ -247,7 +251,9 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <Eyebrow>Sourcing</Eyebrow>
+        <Eyebrow>
+          <Text id="depth.sourcing">Sourcing</Text>
+        </Eyebrow>
         {/* each distributor as a clickable buy link (when we have its url) + its own order number,
             together as the source identity; both Mouser and DigiKey show when both APIs answered */}
         {distKeys.map((key) => {
@@ -288,15 +294,21 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
         <div
           className="max-h-44 overflow-y-auto border-t border-line pt-3"
           role="region"
-          aria-label="Price Ladder"
+          aria-label={priceLadderLabel}
           tabIndex={0}
         >
           <table className="w-full text-sm">
             <thead>
               <tr className="text-2xs font-medium text-t3">
-                <th scope="col" className="pb-2 text-left">Order Size</th>
-                <th scope="col" className="pb-2 text-right">Unit Price</th>
-                <th scope="col" className="pb-2 text-right">Order Total</th>
+                <th scope="col" className="pb-2 text-left">
+                  <Text id="depth.col-order-size">Order Size</Text>
+                </th>
+                <th scope="col" className="pb-2 text-right">
+                  <Text id="depth.col-unit-price">Unit Price</Text>
+                </th>
+                <th scope="col" className="pb-2 text-right">
+                  <Text id="depth.col-order-total">Order Total</Text>
+                </th>
               </tr>
             </thead>
             <tbody>

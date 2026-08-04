@@ -18,6 +18,7 @@ import {
   targetPositionDescription,
   type TargetMapLens,
 } from "../../lib/stmTargetVisuals";
+import { Text } from "../../lib/copy";
 import { RefreshIcon } from "../icons";
 import { IconButton } from "../primitives";
 
@@ -155,7 +156,9 @@ export function TargetPackageMap({
         {unavailable ? (
           <div className="flex h-full flex-col p-3">
             <p className="mb-2 text-xs text-t3">
-              This package has no drawable geometry. Select a physical position below.
+              <Text id="stm.target.package-map.no-geometry">
+                This package has no drawable geometry. Select a physical position below.
+              </Text>
             </p>
             <div className="min-h-0 flex-1 overflow-y-auto">
               {positions.map((position) => (

@@ -29,6 +29,7 @@ import { useCadInventory } from "../api/queries";
 import type { CadInventory } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
+import { Text } from "../lib/copy";
 import { Badge, Button } from "./primitives";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -67,10 +68,18 @@ export function CadClearSection() {
   }, [job, toast, inventory]);
 
   if (inventory.isLoading) {
-    return <p className="py-1 text-sm text-t3">Counting the CAD your library holds...</p>;
+    return (
+      <p className="py-1 text-sm text-t3">
+        <Text id="cad.clear.loading">Counting the CAD your library holds...</Text>
+      </p>
+    );
   }
   if (inventory.isError || !inventory.data) {
-    return <p className="py-1 text-sm text-err">Could not read your library.</p>;
+    return (
+      <p className="py-1 text-sm text-err">
+        <Text id="cad.clear.error">Could not read your library.</Text>
+      </p>
+    );
   }
 
   const { cleared, kept_stock: keptStock, items } = inventory.data;
@@ -124,7 +133,9 @@ export function CadClearSection() {
           {/* Says what the disclosure's hint does NOT: that it is atomic and revertible. Repeating
               the hint's "components and specs all stay" here is the same duplication caught in
               DerivationSection, 230px apart on the same screen. */}
-          <p className="text-sm text-t2">Lands as one change you can revert.</p>
+          <p className="text-sm text-t2">
+            <Text id="cad.clear.revertible">Lands as one change you can revert.</Text>
+          </p>
         </div>
       ) : null}
 
@@ -135,7 +146,8 @@ export function CadClearSection() {
       {report ? (
         <div className="flex flex-col gap-2 border-l-2 border-line pl-3 text-sm text-t2">
           <p>
-            Removed <span className="tnum text-t1">{report.cleared}</span> CAD{" "}
+            <Text id="cad.clear.report-removed">Removed</Text>{" "}
+            <span className="tnum text-t1">{report.cleared}</span> CAD{" "}
             {report.cleared === 1 ? "asset" : "assets"} from{" "}
             <span className="tnum">{report.items.length}</span>{" "}
             {report.items.length === 1 ? "component" : "components"}.
@@ -158,8 +170,11 @@ export function CadClearSection() {
                 ))}
               </ul>
               {report.missing_files.length > 10 ? (
-                <p className="mt-1">
-                  and <span className="tnum">{report.missing_files.length - 10}</span> more.
+                <p className="mt-1 tnum">
+                  <Text
+                    id="cad.clear.more-missing"
+                    values={{ count: report.missing_files.length - 10 }}
+                  >{"and {count} more."}</Text>
                 </p>
               ) : null}
             </div>

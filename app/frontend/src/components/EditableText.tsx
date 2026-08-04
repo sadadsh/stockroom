@@ -6,6 +6,7 @@
  * component is only the view.
  */
 import type { KeyboardEvent } from "react";
+import { useText } from "../lib/copy";
 import { useInlineEdit } from "../lib/useInlineEdit";
 
 interface Props {
@@ -32,7 +33,7 @@ export function EditableText({
   value,
   onSave,
   label,
-  placeholder = "Add",
+  placeholder,
   multiline = false,
   mono = false,
   disabled = false,
@@ -41,6 +42,9 @@ export function EditableText({
   clampLines,
   display,
 }: Props) {
+  // The prompt shown when a field is empty and no caller supplied its own word for the thing.
+  const defaultPlaceholder = useText("editable.placeholder", "Add");
+  const shownPlaceholder = placeholder ?? defaultPlaceholder;
   const { editing, draft, setDraft, begin, commit, cancel } = useInlineEdit(
     value,
     onSave,
@@ -119,7 +123,7 @@ export function EditableText({
             : undefined
         }
       >
-        {empty ? placeholder : (display ?? value)}
+        {empty ? shownPlaceholder : (display ?? value)}
       </span>
     </button>
   );
