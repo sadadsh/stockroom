@@ -109,6 +109,10 @@ class WindowClientPort(Protocol):
 
     def navigate_provider(self, lease_id: str, generation: int, url: str) -> None: ...
 
+    def refresh_provider(self, lease_id: str, generation: int) -> None: ...
+
+    def provider_state(self, lease_id: str, generation: int) -> dict[str, object]: ...
+
     def provider_document_state(
         self,
         lease_id: str,
@@ -171,6 +175,8 @@ class ProviderBrowserLease:
     _hide: Callable[[str, int], None]
     _current_url: Callable[[str, int], str]
     _navigate: Callable[[str, int, str], None]
+    _refresh: Callable[[str, int], None]
+    _state: Callable[[str, int], dict[str, object]]
     _document_state: Callable[..., dict[str, object]]
     _download_events: Callable[..., tuple[ProviderDownloadEvent, ...]]
     _retained: bool = False
@@ -189,6 +195,16 @@ class ProviderBrowserLease:
 
     def navigate(self, url: str) -> None:
         self._navigate(self.lease_id, self.generation, url)
+
+    def refresh(self) -> None:
+        """Reload the page the person is on; a manual retry, never an automatic one."""
+
+        self._refresh(self.lease_id, self.generation)
+
+    def state(self) -> dict[str, object]:
+        """The surface's navigation state: {url, loading, navigation_error}."""
+
+        return self._state(self.lease_id, self.generation)
 
     def document_state(
         self,
@@ -617,6 +633,24 @@ class SupervisorWindowHandoffPorts(WindowHandoffPorts):
             )
         client.navigate_provider(lease_id, generation, url)
 
+    def refresh_provider_browser(self, lease_id: str, generation: int) -> None:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError(
+                "active native provider browser is unavailable"
+            )
+        client.refresh_provider(lease_id, generation)
+
+    def provider_browser_state(self, lease_id: str, generation: int) -> dict[str, object]:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError(
+                "active native provider browser is unavailable"
+            )
+        return client.provider_state(lease_id, generation)
+
     def provider_document_state(
         self,
         lease_id: str,
@@ -888,6 +922,8 @@ class ProductionWindowReplacement:
                 _hide=self._ports.close_provider_browser,
                 _current_url=self._ports.provider_current_url,
                 _navigate=self._ports.navigate_provider_browser,
+                _refresh=self._ports.refresh_provider_browser,
+                _state=self._ports.provider_browser_state,
                 _document_state=self._ports.provider_document_state,
                 _download_events=self._ports.provider_download_events,
             )

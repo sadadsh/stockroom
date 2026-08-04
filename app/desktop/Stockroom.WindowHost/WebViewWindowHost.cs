@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using Microsoft.Web.WebView2.Core;
@@ -49,6 +50,9 @@ internal sealed class WebViewWindowHost : IDisposable
     private readonly Button _providerTabButton;
     private readonly Button _providerBackButton;
     private readonly Button _providerForwardButton;
+    private readonly Button _providerRefreshButton;
+    private readonly TextBox _providerUrlBox;
+    private readonly TextBlock _providerStatusText;
     private readonly Dictionary<WebView2, ProviderLeaseIdentity> _providerPopups = [];
     private readonly ProviderLeaseJournal _providerLeases = new();
     private readonly TaskCompletionSource<bool> _navigationCompletion =
@@ -65,6 +69,8 @@ internal sealed class WebViewWindowHost : IDisposable
     private RendererReadiness? _readiness;
     private Exception? _fatalException;
     private bool _initialized;
+    private bool _providerLoading;
+    private string _providerNavigationError = string.Empty;
     private bool _hidden = true;
     private volatile bool _shuttingDown;
     private bool _closeRequested;
@@ -103,7 +109,10 @@ internal sealed class WebViewWindowHost : IDisposable
             out var stockroomTab,
             out _providerTabButton,
             out _providerBackButton,
-            out _providerForwardButton);
+            out _providerForwardButton,
+            out _providerRefreshButton,
+            out _providerUrlBox,
+            out _providerStatusText);
         stockroomTab.Click += (_, _) => HideProviderBrowser();
         _providerTabButton.Click += (_, _) => ShowActiveProviderBrowser();
         Grid.SetRow(_providerHeader, 0);
@@ -392,7 +401,7 @@ internal sealed class WebViewWindowHost : IDisposable
                 _providerHeader.Visibility = Visibility.Visible;
                 _webView.Visibility = Visibility.Collapsed;
                 _providerSurface.Visibility = Visibility.Visible;
-                UpdateProviderNavigationButtons();
+                UpdateProviderChrome();
                 _providerWebView?.Focus();
                 return true;
             });
@@ -433,7 +442,7 @@ internal sealed class WebViewWindowHost : IDisposable
 
         _webView.Visibility = Visibility.Collapsed;
         _providerSurface.Visibility = Visibility.Visible;
-        UpdateProviderNavigationButtons();
+        UpdateProviderChrome();
         ActiveProviderWebView()?.Focus();
     }
 
@@ -466,6 +475,40 @@ internal sealed class WebViewWindowHost : IDisposable
                 await EnsureProviderBrowserReadyAsync().ConfigureAwait(true);
                 _providerWebView!.CoreWebView2.Navigate(destination.AbsoluteUri);
                 return true;
+            });
+    }
+
+    internal void RefreshProviderBrowser(string leaseId, long generation)
+    {
+        InvokeOnDispatcher(
+            () =>
+            {
+                ThrowIfNotReady();
+                _providerLeases.RequireActive(
+                    new ProviderLeaseIdentity(leaseId, generation));
+                RefreshActiveProvider();
+                return true;
+            });
+    }
+
+    internal IReadOnlyDictionary<string, object?> ProviderState(
+        string leaseId,
+        long generation)
+    {
+        return InvokeOnDispatcher(
+            () =>
+            {
+                ThrowIfNotReady();
+                _providerLeases.RequireActive(
+                    new ProviderLeaseIdentity(leaseId, generation));
+                return (IReadOnlyDictionary<string, object?>)
+                    new Dictionary<string, object?>
+                    {
+                        ["url"] = ActiveProviderWebView()?.Source?.AbsoluteUri
+                            ?? string.Empty,
+                        ["loading"] = _providerLoading,
+                        ["navigation_error"] = _providerNavigationError,
+                    };
             });
     }
 
@@ -771,7 +814,10 @@ internal sealed class WebViewWindowHost : IDisposable
         out Button stockroomTab,
         out Button providerTab,
         out Button backButton,
-        out Button forwardButton)
+        out Button forwardButton,
+        out Button refreshButton,
+        out TextBox urlBox,
+        out TextBlock statusText)
     {
         var header = new Grid
         {
@@ -784,7 +830,9 @@ internal sealed class WebViewWindowHost : IDisposable
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         stockroomTab = ProviderHeaderButton("Stockroom");
         providerTab = ProviderHeaderButton("Provider");
         backButton = ProviderHeaderButton("Back");
@@ -793,9 +841,27 @@ internal sealed class WebViewWindowHost : IDisposable
         forwardButton = ProviderHeaderButton("Forward");
         forwardButton.IsEnabled = false;
         forwardButton.Click += (_, _) => NavigateProviderHistory(back: false);
-        var guidance = new TextBlock
+        refreshButton = ProviderHeaderButton("Refresh");
+        refreshButton.Click += (_, _) => RefreshActiveProvider();
+        // The person drives the provider page, so the chrome shows them where they are and
+        // lets them go somewhere: a real address box, policy-checked like every other
+        // provider navigation (https only, no userinfo).
+        urlBox = new TextBox
         {
-            Text = "Capturing KiCad + Altium + STEP automatically · only complete sign-in or security if asked",
+            Background = new SolidColorBrush(Color.FromRgb(27, 33, 44)),
+            Foreground = new SolidColorBrush(Color.FromRgb(205, 214, 225)),
+            CaretBrush = new SolidColorBrush(Color.FromRgb(205, 214, 225)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(55, 65, 81)),
+            FontFamily = new FontFamily("Segoe UI"),
+            FontSize = 11,
+            Padding = new Thickness(8, 3, 8, 3),
+            Margin = new Thickness(8, 9, 0, 9),
+            VerticalContentAlignment = VerticalAlignment.Center,
+        };
+        urlBox.KeyDown += OnProviderUrlBoxKeyDown;
+        statusText = new TextBlock
+        {
+            Text = string.Empty,
             Foreground = new SolidColorBrush(Color.FromRgb(132, 145, 162)),
             FontFamily = new FontFamily("Segoe UI"),
             FontSize = 11,
@@ -807,13 +873,85 @@ internal sealed class WebViewWindowHost : IDisposable
         Grid.SetColumn(providerTab, 1);
         Grid.SetColumn(backButton, 2);
         Grid.SetColumn(forwardButton, 3);
-        Grid.SetColumn(guidance, 4);
+        Grid.SetColumn(refreshButton, 4);
+        Grid.SetColumn(urlBox, 5);
+        Grid.SetColumn(statusText, 6);
         header.Children.Add(stockroomTab);
         header.Children.Add(providerTab);
         header.Children.Add(backButton);
         header.Children.Add(forwardButton);
-        header.Children.Add(guidance);
+        header.Children.Add(refreshButton);
+        header.Children.Add(urlBox);
+        header.Children.Add(statusText);
         return header;
+    }
+
+    private void OnProviderUrlBoxKeyDown(object sender, KeyEventArgs eventArguments)
+    {
+        if (eventArguments.Key != Key.Enter)
+        {
+            return;
+        }
+
+        eventArguments.Handled = true;
+        var typed = _providerUrlBox.Text?.Trim() ?? string.Empty;
+        if (typed.Length == 0)
+        {
+            return;
+        }
+
+        // A bare host is a normal thing to type; everything still has to survive the same
+        // top-level policy the page's own navigations do.
+        if (!typed.Contains("://", StringComparison.Ordinal))
+        {
+            typed = "https://" + typed;
+        }
+
+        if (!ProviderNavigationPolicy.IsAllowedTopLevel(typed))
+        {
+            _providerNavigationError = "Provider URL Is Invalid";
+            UpdateProviderChrome();
+            return;
+        }
+
+        var core = ActiveProviderWebView()?.CoreWebView2;
+        if (core is null)
+        {
+            return;
+        }
+
+        _providerNavigationError = string.Empty;
+        core.Navigate(typed);
+    }
+
+    private void RefreshActiveProvider()
+    {
+        var core = ActiveProviderWebView()?.CoreWebView2;
+        if (core is null)
+        {
+            return;
+        }
+
+        _providerNavigationError = string.Empty;
+        core.Reload();
+    }
+
+    private void UpdateProviderChrome()
+    {
+        UpdateProviderNavigationButtons();
+        _providerStatusText.Text = _providerNavigationError.Length > 0
+            ? _providerNavigationError
+            : _providerLoading
+                ? "Loading"
+                : string.Empty;
+        if (!_providerUrlBox.IsKeyboardFocusWithin)
+        {
+            var source = ActiveProviderWebView()?.Source?.AbsoluteUri ?? string.Empty;
+            if (!source.StartsWith("about:", StringComparison.OrdinalIgnoreCase))
+            {
+                _providerUrlBox.Text = source;
+            }
+        }
     }
 
     private static Grid BuildProviderSurface(out Grid providerContent)
@@ -912,6 +1050,8 @@ internal sealed class WebViewWindowHost : IDisposable
         settings.IsWebMessageEnabled = false;
         settings.IsZoomControlEnabled = true;
         core.NavigationStarting += OnProviderNavigationStarting;
+        core.NavigationCompleted += OnProviderNavigationCompleted;
+        core.SourceChanged += OnProviderSourceChanged;
         core.HistoryChanged += OnProviderHistoryChanged;
         core.NewWindowRequested += OnProviderNewWindowRequested;
         core.DownloadStarting += OnProviderDownloadStarting;
@@ -930,14 +1070,47 @@ internal sealed class WebViewWindowHost : IDisposable
         UpdateProviderNavigationButtons();
     }
 
-    private static void OnProviderNavigationStarting(
+    private void OnProviderNavigationStarting(
         object? sender,
         CoreWebView2NavigationStartingEventArgs eventArguments)
     {
         if (!ProviderNavigationPolicy.IsAllowedTopLevel(eventArguments.Uri))
         {
             eventArguments.Cancel = true;
+            return;
         }
+
+        _providerLoading = true;
+        _providerNavigationError = string.Empty;
+        UpdateProviderChrome();
+    }
+
+    private void OnProviderNavigationCompleted(
+        object? sender,
+        CoreWebView2NavigationCompletedEventArgs eventArguments)
+    {
+        _providerLoading = false;
+        // ConnectionAborted is the person cancelling or leaving mid-load - not a page
+        // failure worth an error banner. Everything else is surfaced plainly; the built-in
+        // error page still renders inside the view for detail.
+        if (!eventArguments.IsSuccess
+            && eventArguments.WebErrorStatus
+                != CoreWebView2WebErrorStatus.ConnectionAborted)
+        {
+            _providerNavigationError = string.Create(
+                CultureInfo.InvariantCulture,
+                $"Page Failed To Load ({eventArguments.WebErrorStatus})");
+        }
+
+        UpdateProviderChrome();
+    }
+
+    private void OnProviderSourceChanged(
+        object? sender,
+        CoreWebView2SourceChangedEventArgs eventArguments)
+    {
+        _ = eventArguments;
+        UpdateProviderChrome();
     }
 
     private async void OnProviderNewWindowRequested(

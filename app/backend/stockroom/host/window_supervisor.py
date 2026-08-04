@@ -1230,6 +1230,48 @@ class WindowHostClient:
             payload={"lease_id": lease_id, "generation": generation, "url": url},
         )
 
+    def refresh_provider(self, lease_id: str, generation: int) -> None:
+        def parse(response: HandoffMessage, sequence: int) -> None:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"refreshed"}),
+            )
+            if result["refreshed"] is not True:
+                raise WindowSupervisorProtocolError("provider browser did not refresh")
+
+        self._command(
+            "provider-refresh",
+            "provider-refreshed",
+            parse,
+            payload={"lease_id": lease_id, "generation": generation},
+        )
+
+    def provider_state(self, lease_id: str, generation: int) -> dict[str, object]:
+        """The provider surface's honest navigation state: current URL, whether a page is
+        still loading, and the last navigation failure ("" when the page loaded)."""
+
+        def parse(response: HandoffMessage, sequence: int) -> dict[str, object]:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"url", "loading", "navigation_error"}),
+            )
+            if (
+                type(result["url"]) is not str
+                or type(result["loading"]) is not bool
+                or type(result["navigation_error"]) is not str
+            ):
+                raise WindowSupervisorProtocolError("provider browser state is invalid")
+            return result
+
+        return self._command(
+            "provider-state",
+            "provider-state",
+            parse,
+            payload={"lease_id": lease_id, "generation": generation},
+        )
+
     def provider_document_state(
         self,
         lease_id: str,

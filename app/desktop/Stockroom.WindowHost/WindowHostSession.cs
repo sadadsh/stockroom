@@ -37,6 +37,10 @@ internal interface IWindowHostController
 
     void NavigateProviderBrowser(string leaseId, long generation, string url);
 
+    void RefreshProviderBrowser(string leaseId, long generation);
+
+    IReadOnlyDictionary<string, object?> ProviderState(string leaseId, long generation);
+
     IReadOnlyDictionary<string, object?> ProviderDocumentState(
         string leaseId,
         long generation,
@@ -101,6 +105,14 @@ internal sealed class WebViewWindowController : IWindowHostController
     public void NavigateProviderBrowser(string leaseId, long generation, string url) =>
         _host.NavigateProviderBrowser(leaseId, generation, url);
 
+    public void RefreshProviderBrowser(string leaseId, long generation) =>
+        _host.RefreshProviderBrowser(leaseId, generation);
+
+    public IReadOnlyDictionary<string, object?> ProviderState(
+        string leaseId,
+        long generation) =>
+        _host.ProviderState(leaseId, generation);
+
     public IReadOnlyDictionary<string, object?> ProviderDocumentState(
         string leaseId,
         long generation,
@@ -128,6 +140,8 @@ internal sealed class WindowHostSession
         "provider-hide",
         "provider-current-url",
         "provider-navigate",
+        "provider-refresh",
+        "provider-state",
         "provider-document-state",
         "shutdown",
     ];
@@ -269,6 +283,8 @@ internal sealed class WindowHostSession
             and not "provider-show"
             and not "provider-hide"
             and not "provider-current-url"
+            and not "provider-refresh"
+            and not "provider-state"
             && request.Payload.EnumerateObject().Any())
         {
             throw new WindowHostException(
@@ -291,6 +307,8 @@ internal sealed class WindowHostSession
             "provider-hide" => ProviderHide(request),
             "provider-current-url" => ProviderCurrentUrl(request),
             "provider-navigate" => ProviderNavigate(request),
+            "provider-refresh" => ProviderRefresh(request),
+            "provider-state" => ProviderState(request),
             "provider-document-state" => ProviderDocumentState(request),
             "shutdown" => (
                 "stopping",
@@ -569,6 +587,32 @@ internal sealed class WindowHostSession
             {
                 ["navigated"] = true,
             });
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderRefresh(HandoffMessage request)
+    {
+        var lease = ParseProviderLease(request.Payload, "provider refresh");
+        _controller.RefreshProviderBrowser(lease.LeaseId, lease.Generation);
+        return (
+            "provider-refreshed",
+            new Dictionary<string, object?>
+            {
+                ["refreshed"] = true,
+            });
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderState(HandoffMessage request)
+    {
+        var lease = ParseProviderLease(request.Payload, "provider state");
+        return (
+            "provider-state",
+            _controller.ProviderState(lease.LeaseId, lease.Generation));
     }
 
     private (
