@@ -7,13 +7,21 @@ import { cadVariantApi } from "../../api/cadVariantClient";
 import type { ComponentWorkspaceResponse } from "../../api/workspaceTypes";
 import { componentRepresentationDevId, devIdSelector } from "../../lib/componentDevIds";
 import { ThemeProvider } from "../../lib/theme";
+import { ToastProvider } from "../../lib/toast";
 import {
   defaultUiSession,
   openComponentInSession,
   readUiSession,
   resetUiSessionForTests,
 } from "../../lib/uiSession";
-import { makeFact, makeRepresentation, makeTool, makeWorkspace } from "../../test/workspaceFixture";
+import {
+  makeFact,
+  makeOffer,
+  makeRepresentation,
+  makeSourceRecord,
+  makeTool,
+  makeWorkspace,
+} from "../../test/workspaceFixture";
 import { ComponentWorkspace } from "./ComponentWorkspace";
 import { dockTemplate } from "./RepresentationDock";
 import { primaryActionLabel } from "./ComponentHeader";
@@ -25,6 +33,13 @@ vi.mock("../../api/client", async (importActual) => {
     ...actual,
     api: {
       partWorkspace: vi.fn(),
+      partHistory: vi.fn(),
+      partDiff: vi.fn(),
+      partDetail: vi.fn(),
+      facets: vi.fn(),
+      editField: vi.fn(),
+      moveCategory: vi.fn(),
+      setSpecs: vi.fn(),
       previewSvg: vi.fn(),
       modelGlb: vi.fn(),
       landPattern: vi.fn(),
@@ -70,13 +85,23 @@ beforeEach(() => {
     pairs: [],
     supplementary: [],
   });
+  mockApi.partHistory.mockResolvedValue({ commits: [], count: 0 });
+  mockApi.facets.mockResolvedValue({
+    by_category: { ICs: 1 },
+    by_manufacturer: {},
+    complete: 1,
+    incomplete: 0,
+    category_catalog: ["ICs", "Passives"],
+  });
 });
 
 function provide(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <ThemeProvider>{ui}</ThemeProvider>
+      <ThemeProvider>
+        <ToastProvider>{ui}</ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 }
@@ -328,24 +353,9 @@ describe("information tabs", () => {
             },
           ],
         },
-        sourcing: {
-          offers: [
-            {
-              sourceId: "digikey",
-              sourceLabel: "DigiKey",
-              partNumber: "296-1234",
-              url: "https://example.invalid/p",
-              stock: 512,
-              currency: "$",
-              priceBreaks: [{ qty: 1, price: 0.42 }],
-              fetchedAt: "2026-08-01T00:00:00Z",
-            },
-          ],
-        },
+        sourcing: { offers: [makeOffer({ partNumber: "296-1234" })] },
         sources: {
-          records: [
-            { id: "digikey", label: "DigiKey", fetchedAt: "2026-08-01", file: "sources/dk.json" },
-          ],
+          records: [makeSourceRecord({ fetchedAt: "2026-08-01" })],
         },
       }),
     );
@@ -395,7 +405,7 @@ describe("information tabs", () => {
     );
     await user.click(
       within(await screen.findByLabelText("Specification Groups")).getByRole("button", {
-        name: "View All",
+        name: "View All Specifications",
       }),
     );
 

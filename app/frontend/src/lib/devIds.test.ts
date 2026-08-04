@@ -61,7 +61,13 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // regions, and the one workspace modal. A new `component-browser` area, because these elements
 // belong to the OPENED component rather than to the picker that lists them. Per-component elements
 // (`component-browser.component[<id>]` and friends) are DYNAMIC and deliberately have no rows here.
-const EXPECTED_ENTRIES = 338;
+// 374 with the three exhaustive sheets the compact tabs hand off to (the full specification sheet
+// with its search / sort / pin controls and the complete pinout table, the full sourcing sheet with
+// per-source outcomes, price ladders and distributor-suggested relationships, and the four-tab
+// sources ledger), plus the capabilities Slice 2 had left unreachable: Edit Identity, the category
+// move, Apply Pinout, and the sourcing refresh. A deliberate re-baseline, which is what this
+// gate is for.
+const EXPECTED_ENTRIES = 374;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

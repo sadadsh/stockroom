@@ -13,6 +13,7 @@ import type {
   RepresentationToolView,
   RepresentationView,
   RepresentationKind,
+  SourceState,
 } from "../../api/workspaceTypes";
 import type { BadgeTone } from "../primitives";
 
@@ -50,6 +51,40 @@ const TONES: Record<WorkspaceStatus, BadgeTone> = {
 
 export function statusTone(status: WorkspaceStatus): BadgeTone {
   return TONES[status];
+}
+
+/**
+ * What happened to one SOURCE. A different question from a representation's readiness, so a
+ * separate closed set rather than four more words crowded into the one above.
+ *
+ * The four are kept apart on purpose. "Failed" accuses our own fetch (network, auth, rate limit)
+ * and is worth retrying; "Not Carried" is the distributor answering honestly that it does not
+ * stock this part; "Not Configured" is this machine having no credentials and never having
+ * asked. Showing all three as a blank row is what let a broken API read as a part nobody sells.
+ */
+export type SourceStatusLabel = "Answered" | "Not Carried" | "Failed" | "Not Configured";
+
+export const SOURCE_STATE_LABEL: Record<SourceState, SourceStatusLabel> = {
+  success: "Answered",
+  unavailable: "Not Carried",
+  failed: "Failed",
+  not_configured: "Not Configured",
+};
+
+const SOURCE_STATE_TONES: Record<SourceState, BadgeTone> = {
+  success: "ok",
+  unavailable: "neutral",
+  failed: "err",
+  not_configured: "warn",
+};
+
+export function sourceStateTone(state: SourceState): BadgeTone {
+  return SOURCE_STATE_TONES[state] ?? "neutral";
+}
+
+/** A state a stale client (or an older record) did not send reads as `success`, never as failure. */
+export function sourceStateOf(state: SourceState | undefined): SourceState {
+  return state && state in SOURCE_STATE_LABEL ? state : "success";
 }
 
 /** Every per-tool view a design tool holds across the three representations. */

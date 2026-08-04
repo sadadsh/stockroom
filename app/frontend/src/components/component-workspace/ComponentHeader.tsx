@@ -49,10 +49,13 @@ export function primaryAttention(
 export function ComponentHeader({
   workspace,
   onPrimaryAction,
+  onEditIdentity,
   onOpenDatasheet,
 }: {
   workspace: ComponentWorkspaceResponse;
   onPrimaryAction: (action: string | null) => void;
+  /** Identity is edited from the header because the header is what identity IS on this surface. */
+  onEditIdentity: () => void;
   onOpenDatasheet: () => void;
 }) {
   const { identity, summary, representations } = workspace;
@@ -64,6 +67,7 @@ export function ComponentHeader({
     primaryActionLabel(attention?.action ?? null),
   );
   const datasheetLabel = useText("component-browser.header-datasheet", "Datasheet");
+  const editLabel = useText("component-browser.header-edit", "Edit Identity");
   // A value that merely restates the part number is not a second fact. Only a genuinely different
   // one earns the space (a resistor's `10k`, a crystal's `16 MHz`).
   const distinctValue =
@@ -137,6 +141,14 @@ export function ComponentHeader({
             </a>
           ) : null}
         </span>
+        <Button
+          data-dev-id="component-browser.identity-edit"
+          small
+          aria-label={editLabel}
+          onClick={onEditIdentity}
+        >
+          <Text id="component-browser.header-edit">Edit Identity</Text>
+        </Button>
         <Button
           data-dev-id="component-browser.header-action"
           variant="accent"
