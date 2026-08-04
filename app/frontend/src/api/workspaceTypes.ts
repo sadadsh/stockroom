@@ -168,9 +168,22 @@ export interface ComponentSourcingView {
   resources: SourcingResourceView[];
 }
 
+/**
+ * What actually happened to one consulted source. Mirrors `stockroom.enrich.schema.SOURCE_STATES`.
+ *
+ * The distinction is the point: a source that FAILED (network, auth, rate limit) is not a source
+ * that answered and does not carry this part (`unavailable`), and neither is a source that was
+ * never attempted because this machine has no credentials for it (`not_configured`). Collapsing
+ * the three into "no data" is what made a broken API look like a part nobody sells.
+ */
+export type SourceState = "success" | "unavailable" | "failed" | "not_configured";
+
 export interface SourceRecordView {
   id: string;
   label: string;
+  state: SourceState;
+  /** How many presented fields this source is currently answering for. */
+  fieldCount: number;
   fetchedAt: string;
   file: string;
   url?: string;

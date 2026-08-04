@@ -23,6 +23,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from stockroom.eda.registry import all_tools, get_tool
+from stockroom.enrich.schema import SOURCE_STATES
 from stockroom.model.asset import ASSET_KINDS, Asset
 from stockroom.model.trust import Verdict, asset_verdict
 from stockroom.providers import provider_label
@@ -559,15 +560,58 @@ def _field_sources(record) -> list[dict[str, Any]]:
     return out
 
 
-def _source_records(record) -> list[dict[str, Any]]:
+def _entry_state(entry) -> str:
+    """What actually happened to one consulted source.
+
+    The vocabulary is `stockroom.enrich.schema.SOURCE_STATES`, and it is READ, never guessed: a
+    build that recorded the outcome alongside the evidence index carries it in the entry's
+    `extra`, and the projection surfaces exactly that. An entry with no recorded outcome but a
+    stored payload proves only one thing - the source answered - so it reads `success`. Nothing
+    here infers a failure from an absence, because "we have no evidence from Mouser" and "Mouser
+    failed" are different sentences and only the source itself can tell them apart.
+    """
+    raw = _text((getattr(entry, "extra", None) or {}).get("state")).strip().casefold()
+    return raw if raw in SOURCE_STATES else "success"
+
+
+def _field_counts(fields: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    """How many presented fields each source is currently answering for."""
+    counts: dict[str, int] = {}
+    for item in fields:
+        source = item.get("source") or {}
+        source_id = _text(source.get("id"))
+        if source_id:
+            counts[source_id] = counts.get(source_id, 0) + 1
+    return counts
+
+
+def _source_records(record, field_counts: Mapping[str, int]) -> list[dict[str, Any]]:
     out = []
+    seen: set[str] = set()
     for key, entry in sorted((record.sources or {}).items()):
+        seen.add(key)
         out.append(
             {
                 "id": key,
                 "label": provider_label(key),
+                "state": _entry_state(entry),
+                "fieldCount": field_counts.get(key, 0),
                 "fetchedAt": getattr(entry, "fetched_at", "") or "",
                 "file": getattr(entry, "file", "") or "",
+            }
+        )
+    # A source can win a field without its raw payload ever landing in the evidence index (an
+    # API answer applied directly). Leaving it out would under-report the ledger: the field
+    # sheet would name a source the source list does not admit exists.
+    for key in sorted(set(field_counts) - seen):
+        out.append(
+            {
+                "id": key,
+                "label": provider_label(key),
+                "state": "success",
+                "fieldCount": field_counts[key],
+                "fetchedAt": "",
+                "file": "",
             }
         )
     if record.datasheet is not None:
@@ -575,6 +619,8 @@ def _source_records(record) -> list[dict[str, Any]]:
             {
                 "id": "datasheet",
                 "label": "Datasheet",
+                "state": "success",
+                "fieldCount": field_counts.get("datasheet", 0),
                 "fetchedAt": record.datasheet.fetched_at,
                 "file": record.datasheet.file,
                 "url": record.datasheet.source_url,
@@ -585,6 +631,8 @@ def _source_records(record) -> list[dict[str, Any]]:
             {
                 "id": "provenance",
                 "label": provider_label(record.provenance.source) or "Original Package",
+                "state": "success",
+                "fieldCount": field_counts.get("provenance", 0),
                 "fetchedAt": record.provenance.ingested_at,
                 "file": "",
                 "url": record.provenance.source_url,
@@ -612,9 +660,10 @@ def _diagnostics(record) -> dict[str, Any]:
 
 
 def _sources(record) -> dict[str, Any]:
+    fields = _field_sources(record)
     return {
-        "fields": _field_sources(record),
-        "records": _source_records(record),
+        "fields": fields,
+        "records": _source_records(record, _field_counts(fields)),
         "diagnostics": _diagnostics(record),
     }
 
@@ -700,6 +749,7 @@ __all__ = [
     "DATA_DESTINATIONS",
     "FACT_STATES",
     "REPRESENTATION_STATUSES",
+    "SOURCE_STATES",
     "SPEC_GROUPS",
     "WORKSPACE_SCHEMA_VERSION",
     "component_workspace",

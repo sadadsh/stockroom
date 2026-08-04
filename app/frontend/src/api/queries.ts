@@ -589,6 +589,9 @@ export function useSetSpecs() {
     }) => api.setSpecs(vars.id, vars.specs, vars.overwrite),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["part", vars.id] });
+      // The opened component reads the PROJECTION, not the record, and a persisted pinout is a
+      // specification: without this the sheet that just applied one kept showing the old table.
+      qc.invalidateQueries({ queryKey: ["part-workspace", vars.id] });
       // persisting specs commits, so the part's git timeline (M6k) gained an entry
       qc.invalidateQueries({ queryKey: ["part-history", vars.id] });
     },

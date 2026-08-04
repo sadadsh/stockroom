@@ -11,14 +11,27 @@
  * Every datum comes from the workspace projection. This component makes presentation decisions;
  * it makes no decisions about where a datum belongs, because those were already made once on the
  * backend and arrive already made.
+ *
+ * The WRITES live here rather than in the sheets: identity edits, the category move, the pinout
+ * persist, applying an alternate, and the sourcing refresh. One owner for the mutations means one
+ * place decides what a failure says and what a success invalidates, and the sheets stay renderers.
  */
 import { useCallback, useState } from "react";
-import { usePartWorkspaceQuery } from "../../api/queries";
+import {
+  useEditField,
+  useFacetsQuery,
+  useMoveCategory,
+  usePartHistory,
+  usePartWorkspaceQuery,
+  useRefreshSourcing,
+} from "../../api/queries";
+import { ApiError } from "../../api/client";
 import type { RepresentationKind } from "../../api/workspaceTypes";
 import { componentDevId } from "../../lib/componentDevIds";
 import { Text, useText } from "../../lib/copy";
 import { togglePinned, type PinnedSpecs } from "../../lib/keySpecs";
 import { readPinnedSpecs, writePinnedSpecs } from "../../lib/pinnedSpecs";
+import { useToast } from "../../lib/toast";
 import {
   componentView,
   setComponentViewInSession,
@@ -28,14 +41,20 @@ import {
   type RepresentationLayout,
 } from "../../lib/uiSession";
 import { CadVariantSection } from "../CadVariantSection";
+import { EnrichPanel } from "../EnrichPanel";
 import { PreviewModal, type PreviewKind } from "../PreviewModal";
 import { TabPanel, type TabItem } from "../primitives";
 import { ComponentHeader } from "./ComponentHeader";
+import { IdentitySheet } from "./IdentitySheet";
 import { InfoTabsShell } from "./InfoTabsShell";
 import { OverviewTab } from "./OverviewTab";
+import { PinoutApply } from "./PinoutApply";
 import { SourcesTab, SourcingTab, SpecificationsTab } from "./InfoTabPanels";
 import { RepresentationDock } from "./RepresentationDock";
 import { REPRESENTATION_LABEL } from "./RepresentationModule";
+import { PinoutTable, SpecificationsSheet } from "./SpecificationsSheet";
+import { SourcesSheet } from "./SourcesSheet";
+import { SourcingSheet } from "./SourcingSheet";
 import { WorkspaceModal } from "./WorkspaceModal";
 
 const INFO_TABS: readonly TabItem<ComponentInfoTab>[] = [
@@ -49,10 +68,17 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
   const session = useUiSession();
   const view = componentView(session, componentId);
   const query = usePartWorkspaceQuery(componentId);
+  const history = usePartHistory(componentId);
+  const facets = useFacetsQuery();
+  const editField = useEditField();
+  const moveCategory = useMoveCategory();
+  const refresh = useRefreshSourcing(componentId);
+  const { toast } = useToast();
   const [pinned, setPinned] = useState<PinnedSpecs>(readPinnedSpecs);
   const [preview, setPreview] = useState<PreviewKind | null>(null);
   const [details, setDetails] = useState<RepresentationKind | null>(null);
   const [viewAll, setViewAll] = useState<ComponentInfoTab | null>(null);
+  const [identityOpen, setIdentityOpen] = useState(false);
   const loadingLabel = useText("component-browser.loading", "Loading component...");
   const loadFailed = useText(
     "component-browser.load-failed",
@@ -60,6 +86,13 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
   );
   const manual = useText("component-browser.manual", "Manual");
   const emptyValue = useText("component-browser.no-value", "None");
+  const identityTitle = useText("component-browser.identity-modal", "Edit Identity");
+  const savedLabel = useText("component-browser.saved", "Saved");
+  const saveFailed = useText("component-browser.save-failed", "Could not save");
+  const movedLabel = useText("component-browser.moved", "Moved");
+  const moveFailed = useText("component-browser.move-failed", "Could not move");
+  const pinoutSaved = useText("component-browser.pinout-saved", "Pinout saved");
+  const pinoutFailed = useText("component-browser.pinout-failed", "Could not save the pinout");
 
   const patchView = useCallback(
     (patch: Parameters<typeof setComponentViewInSession>[2]) => {
@@ -76,6 +109,25 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
     });
   }, []);
 
+  const failure = useCallback(
+    (error: unknown, fallback: string) =>
+      toast(error instanceof ApiError ? error.message : fallback, "err"),
+    [toast],
+  );
+
+  const applyField = useCallback(
+    (field: string, value: unknown) => {
+      editField.mutate(
+        { id: componentId, field, value },
+        {
+          onSuccess: () => toast(savedLabel, "ok"),
+          onError: (error) => failure(error, saveFailed),
+        },
+      );
+    },
+    [componentId, editField, failure, saveFailed, savedLabel, toast],
+  );
+
   if (query.isLoading) {
     return <WorkspaceMessage>{loadingLabel}</WorkspaceMessage>;
   }
@@ -89,18 +141,28 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
 
   const workspace = query.data;
   const infoTab = view.info_tab;
+  const busy = editField.isPending || moveCategory.isPending;
+  const categories = Object.keys(facets.data?.by_category ?? {}).sort();
+  const categoryOptions = facets.data?.category_catalog?.length
+    ? facets.data.category_catalog
+    : categories;
 
   /**
    * What an attention item's action does HERE.
    *
    * A representation problem is fixed by looking at that representation, so the dock expands it. A
-   * source disagreement is answered in Sources & History, which is where attribution lives. Nothing
+   * missing identity field is fixed by editing it, so the identity sheet opens. A source
+   * disagreement is answered in Sources & History, which is where attribution lives. Nothing
    * pretends to be a repair it cannot perform.
    */
   function runAction(action: string | null) {
     if (!action) {
       patchView({ info_tab: "specifications" });
       setViewAll("specifications");
+      return;
+    }
+    if (action === "edit-identity") {
+      setIdentityOpen(true);
       return;
     }
     if (action.startsWith("open-representation:")) {
@@ -123,6 +185,7 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
         <ComponentHeader
           workspace={workspace}
           onPrimaryAction={runAction}
+          onEditIdentity={() => setIdentityOpen(true)}
           onOpenDatasheet={() => {
             const url = workspace.summary.datasheetUrl;
             if (url) window.open(url, "_blank", "noreferrer");
@@ -159,11 +222,19 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
                 onOpenTab={(tab) => patchView({ info_tab: tab })}
               />
             ) : infoTab === "specifications" ? (
-              <SpecificationsTab workspace={workspace} onViewAll={() => setViewAll("specifications")} />
+              <SpecificationsTab
+                workspace={workspace}
+                pinned={pinned}
+                onViewAll={() => setViewAll("specifications")}
+              />
             ) : infoTab === "sourcing" ? (
               <SourcingTab workspace={workspace} onViewAll={() => setViewAll("sourcing")} />
             ) : (
-              <SourcesTab workspace={workspace} onViewAll={() => setViewAll("sources")} />
+              <SourcesTab
+                workspace={workspace}
+                revisionCount={history.data?.count ?? null}
+                onViewAll={() => setViewAll("sources")}
+              />
             )}
           </TabPanel>
         </InfoTabsShell>
@@ -227,108 +298,83 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
       </WorkspaceModal>
 
       <WorkspaceModal
+        open={identityOpen}
+        title={identityTitle}
+        onClose={() => setIdentityOpen(false)}
+      >
+        <IdentitySheet
+          identity={workspace.identity}
+          summary={workspace.summary}
+          categories={categoryOptions}
+          busy={busy}
+          onEditField={(field, value) => applyField(field, value)}
+          onMoveCategory={(category) =>
+            moveCategory.mutate(
+              { id: componentId, category },
+              {
+                onSuccess: () => toast(`${movedLabel} ${category}`, "ok"),
+                onError: (error) => failure(error, moveFailed),
+              },
+            )
+          }
+        />
+      </WorkspaceModal>
+
+      <WorkspaceModal
         open={viewAll !== null}
         title={viewAll ? `${INFO_TABS.find((tab) => tab.id === viewAll)?.label ?? ""}` : ""}
         onClose={() => setViewAll(null)}
       >
-        <ViewAllBody workspace={workspace} tab={viewAll} />
+        {viewAll === "specifications" ? (
+          <SpecificationsSheet
+            specifications={workspace.specifications}
+            category={workspace.identity.category}
+            pinned={pinned}
+            onTogglePin={(specKey) => togglePin(workspace.identity.category, specKey)}
+            pinout={
+              <PinoutTable
+                pinout={workspace.specifications.pinout}
+                action={
+                  <PinoutApply
+                    componentId={componentId}
+                    mpn={workspace.identity.mpn}
+                    category={workspace.identity.category}
+                    onSaved={() => toast(pinoutSaved, "ok")}
+                    onFailed={(error) => failure(error, pinoutFailed)}
+                  />
+                }
+              />
+            }
+          />
+        ) : viewAll === "sourcing" ? (
+          <SourcingSheet
+            sourcing={workspace.sourcing}
+            sourceRecords={workspace.sources.records}
+          />
+        ) : viewAll === "sources" ? (
+          <SourcesSheet
+            componentId={componentId}
+            sources={workspace.sources}
+            applying={busy}
+            onApplyAlternate={applyField}
+            refresh={{ run: refresh.run, running: refresh.status === "running" }}
+            enrich={
+              <EnrichPanel
+                mpn={workspace.identity.mpn}
+                category={workspace.identity.category}
+                current={{
+                  manufacturer: workspace.identity.manufacturer,
+                  description: workspace.summary.description.formattedValue,
+                }}
+                busy={busy}
+                onApply={applyField}
+              />
+            }
+          />
+        ) : null}
       </WorkspaceModal>
     </div>
   );
-}
-
-/**
- * The exhaustive views, as shells.
- *
- * They state the real totals from the projection so the shell is never a lie, and they name what
- * the full sheet will carry. Building four exhaustive sheets here would duplicate the surface the
- * next slice replaces them with.
- */
-function ViewAllBody({
-  workspace,
-  tab,
-}: {
-  workspace: import("../../api/workspaceTypes").ComponentWorkspaceResponse;
-  tab: ComponentInfoTab | null;
-}) {
-  if (tab === "specifications") {
-    return (
-      <div className="flex flex-col gap-2">
-        {workspace.specifications.groups.map((group) => (
-          <section key={group.id}>
-            <h2 className="mb-1 text-xs font-semibold text-t1">{`${group.label} (${group.count})`}</h2>
-            <dl>
-              {group.facts.map((fact) => (
-                <div
-                  key={fact.id}
-                  className="flex items-baseline justify-between gap-4 border-b border-line/60 py-1"
-                >
-                  <dt className="min-w-0 truncate text-xs text-t2">{fact.label}</dt>
-                  <dd className="tnum flex-none font-mono text-xs text-t1">
-                    {fact.unit ? `${fact.formattedValue} ${fact.unit}` : fact.formattedValue}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        ))}
-        {workspace.specifications.groups.length === 0 ? (
-          <p className="text-xs text-t3">
-            <Text id="component-browser.specifications-empty">No specifications on record.</Text>
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-  if (tab === "sourcing") {
-    return (
-      <div className="flex flex-col gap-2">
-        {workspace.sourcing.offers.map((offer) => (
-          <div
-            key={`${offer.sourceId}:${offer.partNumber}`}
-            className="flex items-baseline justify-between gap-4 border-b border-line/60 py-1"
-          >
-            <span className="min-w-0 truncate text-xs text-t1">
-              {`${offer.sourceLabel || offer.sourceId} ${offer.partNumber}`.trim()}
-            </span>
-            <span className="tnum flex-none font-mono text-xs text-t2">
-              {offer.priceBreaks.length}
-              {" "}
-              <Text id="component-browser.price-breaks">price breaks</Text>
-            </span>
-          </div>
-        ))}
-        {workspace.sourcing.offers.length === 0 ? (
-          <p className="text-xs text-t3">
-            <Text id="component-browser.sourcing-empty">No distributor offers on record.</Text>
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-  if (tab === "sources") {
-    return (
-      <div className="flex flex-col gap-2">
-        {workspace.sources.records.map((record) => (
-          <div
-            key={record.id}
-            className="flex items-baseline justify-between gap-4 border-b border-line/60 py-1"
-          >
-            <span className="min-w-0 truncate text-xs text-t1">{record.label}</span>
-            <span className="flex-none text-xs text-t3">
-              {record.fetchedAt || <Text id="component-browser.undated">Undated</Text>}
-            </span>
-          </div>
-        ))}
-        {workspace.sources.records.length === 0 ? (
-          <p className="text-xs text-t3">
-            <Text id="component-browser.sources-empty">No captured source records.</Text>
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-  return null;
 }
 
 function WorkspaceMessage({

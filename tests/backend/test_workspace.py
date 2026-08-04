@@ -13,11 +13,13 @@ import pytest
 
 from stockroom.model.asset import Asset, AssetOrigin, AssetRef
 from stockroom.model.part import Datasheet, EnrichmentField, PartRecord, Purchase, SourcedValue
+from stockroom.model.sourced import SourceEntry
 from stockroom.model.trust import AssetCheck
 from stockroom.workspace import (
     DATA_DESTINATIONS,
     FACT_STATES,
     REPRESENTATION_STATUSES,
+    SOURCE_STATES,
     WORKSPACE_SCHEMA_VERSION,
     component_workspace,
     fact,
@@ -277,6 +279,48 @@ def test_a_repeated_winning_value_is_never_shown_as_its_own_alternative():
 def test_source_records_include_the_datasheet_and_the_original_package():
     view = component_workspace(_complete_record())["sources"]["records"]
     assert any(entry["id"] == "datasheet" for entry in view)
+
+
+def test_every_source_record_carries_a_state_from_the_closed_vocabulary():
+    view = component_workspace(_complete_record())["sources"]["records"]
+    assert view
+    assert all(entry["state"] in SOURCE_STATES for entry in view)
+
+
+def test_a_recorded_degraded_state_is_surfaced_rather_than_reported_as_success():
+    record = _complete_record()
+    record.sources = {
+        "mouser": SourceEntry(fetched_at="2026-01-01", file="sourced/x/mouser.json"),
+        "digikey": SourceEntry(extra={"state": "failed"}),
+        "lcsc": SourceEntry(extra={"state": "not_configured"}),
+        "arrow": SourceEntry(extra={"state": "unavailable"}),
+    }
+    states = {
+        entry["id"]: entry["state"] for entry in component_workspace(record)["sources"]["records"]
+    }
+    assert states["mouser"] == "success"
+    assert states["digikey"] == "failed"
+    assert states["lcsc"] == "not_configured"
+    assert states["arrow"] == "unavailable"
+
+
+def test_an_unrecognised_state_never_smuggles_itself_into_the_vocabulary():
+    record = _complete_record()
+    record.sources = {"mouser": SourceEntry(extra={"state": "Traceback (most recent call last)"})}
+    states = {
+        entry["id"]: entry["state"] for entry in component_workspace(record)["sources"]["records"]
+    }
+    assert states["mouser"] == "success"
+
+
+def test_a_source_that_won_a_field_is_in_the_ledger_even_with_no_stored_payload():
+    record = _complete_record()
+    record.sources = {}
+    records = {entry["id"]: entry for entry in component_workspace(record)["sources"]["records"]}
+    # `_complete_record` attributes the description to DigiKey through `enrichment`.
+    assert records["digikey"]["fieldCount"] == 1
+    assert records["digikey"]["state"] == "success"
+    assert records["digikey"]["file"] == ""
 
 
 def test_diagnostics_keep_technical_truth_reachable():

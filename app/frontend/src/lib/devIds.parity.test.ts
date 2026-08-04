@@ -115,7 +115,13 @@ const KNOWN_DERIVED: readonly string[] = [
   "component-browser.layout.symbol",
   "component-browser.layout.footprint",
   "component-browser.layout.model",
-]; // 32
+  // SourcesSheet passes the same TabStrip primitive the four questions the source ledger answers.
+  "component-browser.sources.tabs",
+  "component-browser.sources.tab-fields",
+  "component-browser.sources.tab-records",
+  "component-browser.sources.tab-changes",
+  "component-browser.sources.tab-diagnostics",
+]; // 37
 
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
@@ -193,7 +199,13 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "component-browser.sources-all",
   "component-browser.field-sources",
   "component-browser.diagnostics",
-]; // 43
+  // component-workspace/SheetParts.tsx: the exhaustive sheets share one section and one table
+  // shell, so a section's or a table's id arrives as a `devId` string prop. Spelled out in full at
+  // each call site for the same reason as the regions above.
+  "component-browser.spec-group",
+  "component-browser.pinout-table",
+  "component-browser.offer-ladder",
+]; // 46
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));
@@ -240,6 +252,8 @@ describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
     expect(sourceContains('devIdBase="component-browser"')).toBe(true);
     expect(sourceContains('devIdBase="component-browser.info"')).toBe(true);
     expect(sourceContains('devIdBase="component-browser.layout"')).toBe(true);
+    // The source ledger's own four tabs, inside the workspace modal.
+    expect(sourceContains('devIdBase="component-browser.sources"')).toBe(true);
   });
 
   it("per-component tab ids are built by the dynamic helper, never spelled into the strip", () => {

@@ -21,7 +21,37 @@ import type {
   RepresentationStatus,
   RepresentationToolView,
   RepresentationView,
+  SourceRecordView,
+  SourcingOfferView,
 } from "../api/workspaceTypes";
+
+/** One captured source, answering successfully unless the case is about a degraded one. */
+export function makeSourceRecord(over: Partial<SourceRecordView> = {}): SourceRecordView {
+  return {
+    id: "digikey",
+    label: "DigiKey",
+    state: "success",
+    fieldCount: 1,
+    fetchedAt: "2026-08-01T00:00:00Z",
+    file: "sourced/lm358/digikey.json",
+    ...over,
+  };
+}
+
+/** One distributor offer, with a single quoted break unless the case is about the ladder. */
+export function makeOffer(over: Partial<SourcingOfferView> = {}): SourcingOfferView {
+  return {
+    sourceId: "digikey",
+    sourceLabel: "DigiKey",
+    partNumber: "296-1234-1-ND",
+    url: "https://example.invalid/p",
+    stock: 512,
+    currency: "$",
+    priceBreaks: [{ qty: 1, price: 0.42 }],
+    fetchedAt: "2026-08-01T00:00:00Z",
+    ...over,
+  };
+}
 
 /** One presented datum. The default is an agreed value with a named source. */
 export function makeFact(over: Partial<ComponentFact> = {}): ComponentFact {
