@@ -460,6 +460,16 @@ export function usePartDetailQuery(id: string | null) {
   });
 }
 
+// The opened component's normalized workspace. Invalidated wherever the part detail is,
+// because every write that changes a record changes what this projects.
+export function usePartWorkspaceQuery(id: string | null) {
+  return useQuery({
+    queryKey: ["part-workspace", id],
+    queryFn: () => api.partWorkspace(id as string),
+    enabled: !!id,
+  });
+}
+
 // The per-part git timeline (M6k). Read-only; a mutation invalidates the affected
 // detail, and any write also grows this timeline, so it is invalidated alongside the
 // detail after a write (see useInvalidateAfterWrite below).

@@ -9,6 +9,7 @@ import type { QueryClient } from "@tanstack/react-query";
 export function invalidatePartCadProjection(queryClient: QueryClient, partId: string) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ["part", partId] }),
+    queryClient.invalidateQueries({ queryKey: ["part-workspace", partId] }),
     queryClient.invalidateQueries({ queryKey: ["cad-source", partId] }),
     queryClient.invalidateQueries({ queryKey: ["cad-variants", partId] }),
     queryClient.invalidateQueries({ queryKey: ["preview-svg", "symbol", partId] }),

@@ -6,6 +6,7 @@
  * the caller invalidates the affected queries after a success.
  */
 import { apiBase, apiToken } from "../lib/runtime";
+import type { ComponentWorkspaceResponse } from "./workspaceTypes";
 import type {
   ActivateResponse,
   ApproveProjectReviewResult,
@@ -626,6 +627,15 @@ export const api = {
 
   partDetail(id: string): Promise<PartDetail> {
     return apiGet<PartDetail>(`/api/library/parts/${encodeURIComponent(id)}`);
+  },
+
+  // The normalized opened-component projection. The raw record above stays available for
+  // diagnostics; every presentation surface reads this instead, so no component has to
+  // decide for itself where a datum belongs or which provider shape it arrived in.
+  partWorkspace(id: string): Promise<ComponentWorkspaceResponse> {
+    return apiGet<ComponentWorkspaceResponse>(
+      `/api/library/parts/${encodeURIComponent(id)}/workspace`,
+    );
   },
 
   // The part's git timeline (M6k): commits that touched its canonical JSON, newest
