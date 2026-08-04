@@ -10,7 +10,7 @@ import {
 import type { AssemblyPlacementState } from "../../api/types";
 import { Text, useText } from "../../lib/copy";
 import { useToast } from "../../lib/toast";
-import { Badge, Button, Panel, SectionHeading } from "../primitives";
+import { Badge, Button, ErrorState, Panel, SectionHeading } from "../primitives";
 import { ProjectInspectorFacts } from "./ProjectInspectorFacts";
 import { ProjectPlacementStage } from "./ProjectPlacementStage";
 import { AdaptiveChoice } from "../AdaptiveChoice";
@@ -239,7 +239,13 @@ export function ProjectAssemblyWorkbench({
     );
   }
   if (assembly.error) {
-    return <AssemblyMessage tone="err">{assembly.error.message}</AssemblyMessage>;
+    return (
+      <AssemblyMessage>
+        <ErrorState dense id="projects.build.failed" onRetry={() => assembly.refetch()}>
+          This project's build could not be read.
+        </ErrorState>
+      </AssemblyMessage>
+    );
   }
   if (!run) {
     return (

@@ -46,7 +46,7 @@ import {
   cloneCoreBringUpPolicy,
   TargetPolicyEditor,
 } from "./TargetPolicyEditor";
-import { Button, Eyebrow } from "../primitives";
+import { Button, ErrorState, Eyebrow } from "../primitives";
 import { downloadTextFile } from "../../lib/stmTargetExport";
 import {
   stmSocketExport,
@@ -467,7 +467,9 @@ export function CompatibilityWorkbench() {
                   <ChamberMessage>Solving the universal socket...</ChamberMessage>
                 ) : socketSolution.error && !indexNotBuilt ? (
                   <div className="flex flex-col items-center gap-3 py-12 text-center">
-                    <p className="text-sm text-err">{socketSolution.error.message}</p>
+                    <ErrorState dense id="stm.socket-failed">
+                      The universal socket could not be solved.
+                    </ErrorState>
                     <Button
                       small
                       onClick={() =>

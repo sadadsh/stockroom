@@ -93,8 +93,12 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
         <Badge tone={actionableTotal ? "warn" : "ok"}>
           {actionableTotal} {actionableLabel}
         </Badge>
+        {/* "Done" is one of the four words the status vocabulary exists to collapse (Ready /
+            Complete / OK / Done all meant one condition). This badge counts components that
+            needed no person, which is what it now says, in the same register as the two badges
+            beside it ("Still Working", "No Route"). */}
         {data.unattended_total > 0 ? (
-          <Badge tone="ok">{data.unattended_total} Done For You</Badge>
+          <Badge tone="ok">{data.unattended_total} No Person Needed</Badge>
         ) : null}
         {data.pending_items > 0 ? (
           <Badge tone="neutral">{data.pending_items} Still Working</Badge>

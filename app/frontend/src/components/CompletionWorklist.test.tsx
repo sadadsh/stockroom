@@ -272,7 +272,8 @@ describe("completion worklist", () => {
     renderWorklist();
 
     expect(await screen.findByText("1 Needs You")).toBeInTheDocument();
-    expect(screen.getByText("2 Done For You")).toBeInTheDocument();
+    // Not "Done": that is one of the four synonyms the status vocabulary collapses into "Ready".
+    expect(screen.getByText("2 No Person Needed")).toBeInTheDocument();
   });
 
   it("keeps a part no route can advance out of the worklist, and still reports it", async () => {

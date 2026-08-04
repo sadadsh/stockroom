@@ -19,7 +19,7 @@ import type {
 } from "../../api/types";
 import { Text, useText } from "../../lib/copy";
 import { useToast } from "../../lib/toast";
-import { Badge, Button, Panel, SectionHeading } from "../primitives";
+import { Badge, Button, ErrorState, LoadingState, Panel, SectionHeading } from "../primitives";
 import { GitIcon } from "../icons";
 import { ProjectInspectorFacts } from "./ProjectInspectorFacts";
 
@@ -30,8 +30,6 @@ export function ProjectChangesWorkbench({
   projectId: string;
   workspace: ProjectWorkspace;
 }) {
-  const loadingLabel = useText("projects.activity.loading", "Loading activity...");
-  const errorLabel = useText("projects.activity.error", "Could not load activity.");
   const commitLabel = useText("projects.activity.commit", "commit");
   const commitsLabel = useText("projects.activity.commits", "commits");
   const documentLabel = useText("projects.activity.changed-document", "changed document");
@@ -60,13 +58,29 @@ export function ProjectChangesWorkbench({
   }, [candidates, selectedCommit]);
 
   if (collaboration.isLoading || (hasReviewRemote && reviews.isLoading)) {
-    return <ChangesMessage>{loadingLabel}</ChangesMessage>;
+    return (
+      <ChangesMessage>
+        <LoadingState dense id="projects.activity.loading">
+          Loading this project's activity...
+        </LoadingState>
+      </ChangesMessage>
+    );
   }
   if (collaboration.error || (hasReviewRemote && reviews.error)) {
     return (
-      <ChangesMessage tone="err">
-        {(collaboration.error ?? reviews.error)?.message ??
-          errorLabel}
+      <ChangesMessage>
+        {/* A written sentence and one retry. The two queries' own `.message` values were shown
+            verbatim, which put a Git or HTTP string in the middle of the workbench. */}
+        <ErrorState
+          dense
+          id="projects.activity.failed"
+          onRetry={() => {
+            void collaboration.refetch();
+            if (hasReviewRemote) void reviews.refetch();
+          }}
+        >
+          This project's activity could not be read.
+        </ErrorState>
       </ChangesMessage>
     );
   }
@@ -836,7 +850,11 @@ function ReviewInspector({
       ) : evidence.isLoading ? (
         <ChangesMessage>{checkingCommit}</ChangesMessage>
       ) : evidence.error ? (
-        <ChangesMessage tone="err">{evidence.error.message}</ChangesMessage>
+        <ChangesMessage>
+          <ErrorState dense id="projects.activity.evidence-failed" onRetry={() => evidence.refetch()}>
+            The evidence for this commit could not be read.
+          </ErrorState>
+        </ChangesMessage>
       ) : result ? (
         <>
           <ProjectInspectorFacts
@@ -1078,19 +1096,10 @@ function GateRow({
   );
 }
 
-function ChangesMessage({
-  children,
-  tone = "neutral",
-}: {
-  children: string;
-  tone?: "neutral" | "err";
-}) {
+/** The centring frame a state block sits in. The state decides its own tone. */
+function ChangesMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className={`flex min-h-[240px] flex-1 items-center justify-center p-6 text-center text-sm ${
-        tone === "err" ? "text-err" : "text-t3"
-      }`}
-    >
+    <div className="flex min-h-[240px] flex-1 items-center justify-center p-6 text-center text-sm text-t3">
       {children}
     </div>
   );

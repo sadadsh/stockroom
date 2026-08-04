@@ -1,27 +1,41 @@
 /**
- * Editing who this component IS.
+ * Editing who this component IS, and what a design tool will therefore receive.
  *
- * Slice 2 replaced the detail sheet on the Components route and took inline identity editing and
- * the category move with it - which made a blocking attention item ("Manufacturer Is Missing")
- * name a repair the product could no longer perform. This is that capability back, in the one
- * place the workspace is allowed to be taller than its band.
+ * Two sections, because there are two kinds of field here and only one of them is ours to name.
  *
- * The fields are the canonical record attributes `editField` can actually write, and the category
- * goes through `moveCategory` rather than `editField` because a move relocates the part's symbol
- * and footprint libraries too - writing `category` as a plain field would rename the label and
- * leave the files where they were.
+ *   Identity  - the two attributes Stockroom owns: the display name it is listed under, and the
+ *               `value` a passive is described by. Neither is in the EDA registry.
+ *   Handoff   - everything a schematic fill actually stamps onto a placed component, rendered
+ *               straight from the generated EDA registry by `components/HandoffBand.tsx`.
+ *
+ * The handoff half used to be a hand-written list here (mpn, manufacturer, description) while
+ * `HandoffBand` rendered the same fields FROM THE REGISTRY and was rendered by nothing at all
+ * after `DetailPanel` was deleted. Two editors for one field is worse than either, and the
+ * hand-written one was the wrong one to keep: the registry is what lets a third EDA tool join by
+ * declaring `data_fields` and regenerating, and the band also carries the symbol and footprint
+ * references and the datasheet, which this sheet had no way to show at all.
+ *
+ * The category still goes through `moveCategory` rather than `editField`, because a move relocates
+ * the part's symbol and footprint libraries too - writing `category` as a plain field would rename
+ * the label and leave the files where they were.
  */
-import type { ComponentIdentityView, ComponentSummaryView } from "../../api/workspaceTypes";
-import { Text, useText } from "../../lib/copy";
+import type { PartDetail } from "../../api/types";
+import type { ComponentIdentityView } from "../../api/workspaceTypes";
+import { Text } from "../../lib/copy";
 import { EditableText } from "../EditableText";
-import { SheetSection } from "./SheetParts";
+import { HandoffBand } from "../HandoffBand";
+import { ErrorState, LoadingState, Section } from "../primitives";
 
-/** The canonical record attributes this sheet edits, in the order a person reads a part. */
+/**
+ * The canonical record attributes this sheet edits DIRECTLY.
+ *
+ * Deliberately short. Every other editable attribute is declared by the EDA registry and rendered
+ * by the handoff band below, so adding one here would be adding a second editor for it.
+ */
 export const IDENTITY_FIELDS: ReadonlyArray<{
-  field: "display_name" | "mpn" | "manufacturer" | "value" | "description";
+  field: "display_name" | "value";
   label: string;
   copyId: string;
-  multiline?: boolean;
   mono?: boolean;
 }> = [
   {
@@ -29,56 +43,54 @@ export const IDENTITY_FIELDS: ReadonlyArray<{
     label: "Display Name",
     copyId: "component-browser.identity-display-name",
   },
-  { field: "mpn", label: "Manufacturer Part Number", copyId: "component-browser.identity-mpn", mono: true },
-  { field: "manufacturer", label: "Manufacturer", copyId: "component-browser.identity-manufacturer" },
   { field: "value", label: "Value", copyId: "component-browser.identity-value", mono: true },
-  {
-    field: "description",
-    label: "Description",
-    copyId: "component-browser.identity-description",
-    multiline: true,
-  },
 ];
 
 export function IdentitySheet({
   identity,
-  summary,
+  detail,
+  detailLoading,
+  detailFailed,
+  onRetryDetail,
   categories,
   onEditField,
   onMoveCategory,
   busy,
 }: {
   identity: ComponentIdentityView;
-  summary: ComponentSummaryView;
+  /**
+   * The canonical record, fetched only while this sheet is open. The handoff band renders the
+   * RECORD rather than the projection, because the registry names record attributes and the
+   * projection has already reshaped them.
+   */
+  detail: PartDetail | null;
+  detailLoading: boolean;
+  detailFailed: boolean;
+  onRetryDetail: () => void;
   /** Every category the library already has, so a move never invents a new filing by typo. */
   categories: string[];
   onEditField: (field: string, value: string) => void;
   onMoveCategory: (category: string) => void;
   busy: boolean;
 }) {
-  const categoryLabel = useText("component-browser.identity-category", "Category");
   const values: Record<string, string> = {
     display_name: identity.displayName,
-    mpn: identity.mpn,
-    manufacturer: identity.manufacturer,
     value: identity.value,
-    description: summary.description.formattedValue,
   };
   // A move can only offer filings that exist. The current one is included even when the facet
-  // query has not answered, so the select never renders with nothing selected.
+  // query has not answered, so the control never renders with nothing selected.
   const options = categories.includes(identity.category)
     ? categories
     : [identity.category, ...categories].filter(Boolean);
 
   return (
     <div data-dev-id="component-browser.identity-sheet" className="flex flex-col gap-4">
-      <SheetSection
+      <Section
         title="Identity"
         copyId="component-browser.identity-title"
         note={
           <Text id="component-browser.identity-note">
-            These fields are mirrored into the symbol a design tool places, so a change here changes
-            what a schematic says about this component.
+            How this component is listed in Stockroom. The fields a design tool receives are below.
           </Text>
         }
       >
@@ -96,7 +108,6 @@ export function IdentitySheet({
                 <EditableText
                   value={values[entry.field] ?? ""}
                   label={entry.label}
-                  multiline={entry.multiline}
                   mono={entry.mono}
                   disabled={busy}
                   displayClassName="text-xs"
@@ -106,39 +117,37 @@ export function IdentitySheet({
             </div>
           ))}
         </dl>
-      </SheetSection>
+      </Section>
 
-      <SheetSection
-        title="Filing"
-        copyId="component-browser.identity-filing-title"
+      <Section
+        title="Design Tool Handoff"
+        copyId="component-browser.identity-handoff-title"
         note={
-          <Text id="component-browser.identity-filing-note">
-            Moving a component relocates its symbol and footprint libraries as well as its label.
+          <Text id="component-browser.identity-handoff-note">
+            These fields are mirrored into the symbol a design tool places, so a change here changes
+            what a schematic says about this component. Moving a component relocates its symbol and
+            footprint libraries as well as its label.
           </Text>
         }
       >
-        <div className="flex items-center gap-3 rounded-card border border-line bg-raise px-3 py-2">
-          <span className="flex-none text-2xs text-t2">
-            <Text id="component-browser.identity-category">Category</Text>
-          </span>
-          <select
-            data-dev-id="component-browser.identity-category"
-            aria-label={categoryLabel}
-            value={identity.category}
-            disabled={busy}
-            onChange={(event) => {
-              if (event.target.value !== identity.category) onMoveCategory(event.target.value);
-            }}
-            className="h-7 rounded-control border border-line bg-field px-1.5 text-xs text-t1 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
-          >
-            {options.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-      </SheetSection>
+        {detailLoading ? (
+          <LoadingState id="component-browser.identity-detail-loading">
+            Loading this component's record...
+          </LoadingState>
+        ) : detailFailed || !detail ? (
+          <ErrorState id="component-browser.identity-detail-failed" onRetry={onRetryDetail}>
+            This component's record could not be read.
+          </ErrorState>
+        ) : (
+          <HandoffBand
+            detail={detail}
+            onEditField={onEditField}
+            onMoveCategory={onMoveCategory}
+            categories={options}
+            busy={busy}
+          />
+        )}
+      </Section>
     </div>
   );
 }

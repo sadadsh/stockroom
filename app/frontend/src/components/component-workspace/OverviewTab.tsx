@@ -18,20 +18,14 @@ import {
   keySpecRows,
   type PinnedSpecs,
 } from "../../lib/keySpecs";
-import { Badge, Dot, type BadgeTone } from "../primitives";
-import { Empty, Region } from "./WorkspaceRegion";
+import { AttentionItem, Badge, EmptyState, FactRow, Region } from "../primitives";
+
 import { specGroupsFromWorkspace } from "./workspaceSpecs";
 
 /** The most a snapshot shows. Beyond this the Sourcing tab is the honest answer, not a taller card. */
 const SNAPSHOT_OFFERS = 3;
 /** The most issues the panel lists before it starts counting the rest. */
 const ATTENTION_LIMIT = 4;
-
-const SEVERITY_TONE: Record<string, BadgeTone> = {
-  blocking: "err",
-  warning: "warn",
-  info: "neutral",
-};
 
 export function OverviewTab({
   workspace,
@@ -56,6 +50,9 @@ export function OverviewTab({
   const noStock = useText("component-browser.stock-unknown", "Stock unknown");
   const inStock = useText("component-browser.in-stock", "in stock");
   const noPrice = useText("component-browser.no-price", "No price");
+  // The overflow line's noun, through the copy layer like every other visible word here. It was
+  // the one string on this tab hard-coded in English.
+  const moreLabel = useText("component-browser.attention-more", "more");
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
@@ -89,43 +86,40 @@ export function OverviewTab({
           onViewAll={() => onOpenTab("specifications")}
         >
           {rows.length === 0 ? (
-            <Empty id="component-browser.key-specs-empty">No specifications on record.</Empty>
+            <EmptyState dense id="component-browser.key-specs-empty">No specifications on record.</EmptyState>
           ) : (
-            <dl className="min-h-0 overflow-hidden">
+            <div className="min-h-0 overflow-hidden">
               {rows.map((row) => (
-                <div
+                <FactRow
                   key={row.key}
-                  className="flex items-baseline gap-2 border-b border-line/60 py-1 last:border-b-0"
-                >
-                  <dt className="min-w-0 flex-1 truncate text-2xs text-t2" title={row.label}>
-                    {row.label}
-                  </dt>
-                  <dd className="tnum flex-none font-mono text-2xs font-semibold text-t1">
-                    {row.unit ? `${row.value} ${row.unit}` : row.value}
-                  </dd>
-                  {isCuratedOnly(effective, pinned, category, row.key) ? null : (
-                    <button
-                      type="button"
-                      data-dev-id="component-browser.key-spec-pin"
-                      aria-pressed={isPinned(pinned, category, row.id ?? row.key)}
-                      aria-label={
-                        isPinned(pinned, category, row.id ?? row.key)
-                          ? `Unpin ${row.label}`
-                          : `Pin ${row.label}`
-                      }
-                      onClick={() => onTogglePin(category, row.id ?? row.key)}
-                      className="flex-none rounded-control px-1 text-2xs text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
-                    >
-                      {isPinned(pinned, category, row.id ?? row.key) ? (
-                        <Text id="component-browser.spec-pinned">Pinned</Text>
-                      ) : (
-                        <Text id="component-browser.spec-pin">Pin</Text>
-                      )}
-                    </button>
-                  )}
-                </div>
+                  label={row.label}
+                  title={row.label}
+                  value={row.unit ? `${row.value} ${row.unit}` : row.value}
+                  action={
+                    isCuratedOnly(effective, pinned, category, row.key) ? null : (
+                      <button
+                        type="button"
+                        data-dev-id="component-browser.key-spec-pin"
+                        aria-pressed={isPinned(pinned, category, row.id ?? row.key)}
+                        aria-label={
+                          isPinned(pinned, category, row.id ?? row.key)
+                            ? `Unpin ${row.label}`
+                            : `Pin ${row.label}`
+                        }
+                        onClick={() => onTogglePin(category, row.id ?? row.key)}
+                        className="flex-none rounded-control px-1 text-2xs text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+                      >
+                        {isPinned(pinned, category, row.id ?? row.key) ? (
+                          <Text id="component-browser.spec-pinned">Pinned</Text>
+                        ) : (
+                          <Text id="component-browser.spec-pin">Pin</Text>
+                        )}
+                      </button>
+                    )
+                  }
+                />
               ))}
-            </dl>
+            </div>
           )}
         </Region>
 
@@ -136,40 +130,23 @@ export function OverviewTab({
           count={attention.length}
         >
           {attention.length === 0 ? (
-            <Empty id="component-browser.attention-empty">Nothing needs attention.</Empty>
+            <EmptyState dense id="component-browser.attention-empty">Nothing needs attention.</EmptyState>
           ) : (
             <ul className="min-h-0 overflow-hidden">
               {attention.slice(0, ATTENTION_LIMIT).map((item) => (
-                <li
+                <AttentionItem
                   key={item.id}
-                  data-dev-id="component-browser.attention-item"
-                  className="flex items-start gap-2 border-b border-line/60 py-1.5 last:border-b-0"
-                >
-                  <span className="mt-1 flex-none">
-                    <Dot tone={SEVERITY_TONE[item.severity] ?? "neutral"} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-2xs font-medium text-t1" title={item.title}>
-                      {item.title}
-                    </span>
-                    <span className="block truncate text-2xs text-t3" title={item.detail}>
-                      {item.detail}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    data-dev-id="component-browser.attention-action"
-                    onClick={() => onAttentionAction(item.action)}
-                    aria-label={`${item.title}: ${item.action}`}
-                    className="flex-none rounded-control px-1.5 py-0.5 text-2xs font-medium text-acc transition-colors hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
-                  >
-                    <Text id="component-browser.attention-resolve">Resolve</Text>
-                  </button>
-                </li>
+                  devId="component-browser.attention-item"
+                  actionDevId="component-browser.attention-action"
+                  severity={item.severity}
+                  title={item.title}
+                  detail={item.detail}
+                  onAction={() => onAttentionAction(item.action)}
+                />
               ))}
               {attention.length > ATTENTION_LIMIT ? (
                 <li className="py-1 text-2xs text-t3">
-                  {`${attention.length - ATTENTION_LIMIT} more`}
+                  {`${attention.length - ATTENTION_LIMIT} ${moreLabel}`}
                 </li>
               ) : null}
             </ul>
@@ -187,24 +164,23 @@ export function OverviewTab({
           viewAllDevId="component-browser.sourcing-snapshot-all"
         >
           {offers.length === 0 ? (
-            <Empty id="component-browser.sourcing-snapshot-empty">No distributor offers on record.</Empty>
+            <EmptyState dense id="component-browser.sourcing-snapshot-empty">No distributor offers on record.</EmptyState>
           ) : (
             <ul className="min-h-0 overflow-hidden">
               {offers.slice(0, SNAPSHOT_OFFERS).map((offer) => (
-                <li
+                // Stock sits UNDER the distributor rather than beside the price. Three columns in
+                // a third of the tab is what pushed "1,204 in stock" and "$0.4210" into each
+                // other at 960px wide; the row's two lines hold both at any width.
+                <FactRow
+                  as="li"
                   key={`${offer.sourceId}:${offer.partNumber}`}
-                  className="flex items-baseline gap-2 border-b border-line/60 py-1 last:border-b-0"
-                >
-                  <span className="min-w-0 flex-1 truncate text-2xs text-t1">
-                    {offer.sourceLabel || offer.sourceId}
-                  </span>
-                  <span className="tnum flex-none font-mono text-2xs text-t2">
-                    {offer.stock === null ? noStock : `${offer.stock.toLocaleString()} ${inStock}`}
-                  </span>
-                  <span className="tnum flex-none font-mono text-2xs font-semibold text-t1">
-                    {bestPrice(offer.priceBreaks, offer.currency, noPrice)}
-                  </span>
-                </li>
+                  label={offer.sourceLabel || offer.sourceId}
+                  title={offer.sourceLabel || offer.sourceId}
+                  detail={
+                    offer.stock === null ? noStock : `${offer.stock.toLocaleString()} ${inStock}`
+                  }
+                  value={bestPrice(offer.priceBreaks, offer.currency, noPrice)}
+                />
               ))}
             </ul>
           )}

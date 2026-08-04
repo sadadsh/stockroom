@@ -248,7 +248,7 @@ export function PhotoCard({
   partName: string;
   onClose: () => void;
 }) {
-  const dialogRef = useModalDismiss(open, onClose);
+  const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(open, onClose);
   const shots: PartPhoto[] =
     photos && photos.length ? photos : url ? [{ url, vendor: "" }] : [];
   const [at, setAt] = useState(0);
@@ -274,7 +274,8 @@ export function PhotoCard({
       // point measured at roughly half its normal luminance (rail 87 -> 43, list 63 -> 31).
       // A photograph of the part is a thing you LOOK at; competing with a readable page behind it
       // is what made it feel like a floating panel rather than a viewer.
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-canvas p-4"
+      style={{ zIndex: modalZ }}
+      className="fixed inset-0 flex items-center justify-center bg-canvas p-4"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();

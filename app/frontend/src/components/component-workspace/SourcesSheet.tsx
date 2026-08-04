@@ -26,17 +26,33 @@ import type {
   SourceRecordView,
 } from "../../api/workspaceTypes";
 import { Text, useText } from "../../lib/copy";
-import { Badge, Button, TabPanel, TabStrip, type TabItem } from "../primitives";
+import {
+  Badge,
+  Button,
+  DataTable,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Section,
+  TabPanel,
+  TabStrip,
+  type TabItem,
+} from "../primitives";
+import { DiffModal } from "../DiffModal";
 import { ExternalIcon } from "../icons";
-import { SheetEmpty, SheetSection, SheetTable, SourceNote, SourceStateBadge } from "./SheetParts";
+import { SourceNote, SourceStateBadge } from "./SheetParts";
 
 export type SourcesSheetTab = "fields" | "records" | "changes" | "diagnostics";
 
 const SOURCES_TABS: readonly TabItem<SourcesSheetTab>[] = [
-  { id: "fields", label: "Field Sources" },
-  { id: "records", label: "Source Records" },
-  { id: "changes", label: "Changes" },
-  { id: "diagnostics", label: "Diagnostics" },
+  { id: "fields", label: "Field Sources", copyId: "component-browser.sources-tab-fields" },
+  { id: "records", label: "Source Records", copyId: "component-browser.sources-tab-records" },
+  { id: "changes", label: "Changes", copyId: "component-browser.sources-tab-changes" },
+  {
+    id: "diagnostics",
+    label: "Diagnostics",
+    copyId: "component-browser.sources-tab-diagnostics",
+  },
 ];
 
 /**
@@ -64,6 +80,7 @@ export function canApplyAlternate(fieldId: string, alternate: FactAlternate): bo
 
 export function SourcesSheet({
   componentId,
+  componentName,
   sources,
   onApplyAlternate,
   applying,
@@ -71,6 +88,8 @@ export function SourcesSheet({
   enrich,
 }: {
   componentId: string;
+  /** The display name the nested visual diff titles itself with. */
+  componentName: string;
   sources: ComponentSourcesView;
   onApplyAlternate: (fieldId: string, value: unknown) => void;
   applying: boolean;
@@ -103,7 +122,7 @@ export function SourcesSheet({
         ) : tab === "records" ? (
           <SourceRecordsPanel records={sources.records} refresh={refresh} enrich={enrich} />
         ) : tab === "changes" ? (
-          <ChangesPanel componentId={componentId} />
+          <ChangesPanel componentId={componentId} componentName={componentName} />
         ) : (
           <DiagnosticsPanel componentId={componentId} sources={sources} />
         )}
@@ -129,13 +148,13 @@ function FieldSourcesPanel({
 
   if (sources.fields.length === 0) {
     return (
-      <SheetEmpty id="component-browser.field-sources-empty">
+      <EmptyState id="component-browser.field-sources-empty">
         No field carries an attribution.
-      </SheetEmpty>
+      </EmptyState>
     );
   }
   return (
-    <SheetSection
+    <Section
       title="Attributed Fields"
       copyId="component-browser.field-sources-title"
       count={sources.fields.length}
@@ -146,7 +165,7 @@ function FieldSourcesPanel({
         </Text>
       }
     >
-      <SheetTable
+      <DataTable
         label={tableLabel}
         headings={[
           <Text key="f" id="component-browser.field-col-name">
@@ -215,8 +234,8 @@ function FieldSourcesPanel({
             </td>
           </tr>
         ))}
-      </SheetTable>
-    </SheetSection>
+      </DataTable>
+    </Section>
   );
 }
 
@@ -237,7 +256,7 @@ function SourceRecordsPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <SheetSection
+      <Section
         title="Source Records"
         copyId="component-browser.sources-title"
         count={records.length}
@@ -253,9 +272,9 @@ function SourceRecordsPanel({
         }
       >
         {records.length === 0 ? (
-          <SheetEmpty id="component-browser.sources-empty">
+          <EmptyState id="component-browser.sources-empty">
             No captured source records.
-          </SheetEmpty>
+          </EmptyState>
         ) : (
           <ul className="flex flex-col gap-1">
             {records.map((record) => (
@@ -292,7 +311,7 @@ function SourceRecordsPanel({
             ))}
           </ul>
         )}
-      </SheetSection>
+      </Section>
 
       {/* Enrichment is a LOOKUP, not a capture, so it sits beside the capture ledger rather than
           inside it. Reused whole: nothing about enrichment is re-decided here. */}
@@ -319,10 +338,16 @@ function formatValue(value: unknown, absent: string): string {
  * The component's git timeline, read through the SAME hooks the detail sheet used
  * (`usePartHistory` + `usePartDiff` over `api.partDiff`). No new endpoint: the record's history
  * already exists, and a second way to ask for it would be a second answer to drift from.
+ *
+ * A commit that moved a symbol or a footprint offers the VISUAL diff, which is the only honest
+ * way to read a geometry change: "symbol_content_hash changed" is a true field row and tells a
+ * person nothing about what moved. The overlay is a modal opened from inside this sheet, which is
+ * itself a modal - the nesting the shared modal stack was built to make safe.
  */
-function ChangesPanel({ componentId }: { componentId: string }) {
+function ChangesPanel({ componentId, componentName }: { componentId: string; componentName: string }) {
   const history = usePartHistory(componentId);
   const [selected, setSelected] = useState<string | null>(null);
+  const [visualDiff, setVisualDiff] = useState<string | null>(null);
   const commits = history.data?.commits ?? [];
   const index = selected ? commits.findIndex((commit) => commit.sha === selected) : -1;
   // The previous version of THIS component is the next-older entry in its own history; "" when
@@ -330,27 +355,35 @@ function ChangesPanel({ componentId }: { componentId: string }) {
   const older = index >= 0 && index + 1 < commits.length ? commits[index + 1].sha : "";
   const diff = usePartDiff(componentId, older, index >= 0 ? commits[index].sha : null);
   const absent = useText("component-browser.no-value", "None");
+  const visualDiffLabel = useText("component-browser.change-diff", "Visual Diff");
+  // Only the kinds this commit actually moved get an overlay, and only while the commit whose
+  // assets they describe is still the selected one.
+  const assets = diff.data?.assets;
+  const hasVisual = !!assets && (assets.symbol || assets.footprint);
 
   if (history.isLoading) {
-    return <SheetEmpty id="component-browser.changes-loading">Loading changes...</SheetEmpty>;
+    return <LoadingState id="component-browser.changes-loading">Loading this component's history...</LoadingState>;
   }
   if (history.isError) {
     return (
-      <SheetEmpty id="component-browser.changes-failed">
-        Could not load this component's history.
-      </SheetEmpty>
+      <ErrorState
+        id="component-browser.changes-failed"
+        onRetry={() => history.refetch()}
+      >
+        This component's history could not be read.
+      </ErrorState>
     );
   }
   if (commits.length === 0) {
     return (
-      <SheetEmpty id="component-browser.changes-empty">
+      <EmptyState id="component-browser.changes-empty">
         No history yet. This component has not been committed.
-      </SheetEmpty>
+      </EmptyState>
     );
   }
 
   return (
-    <SheetSection
+    <Section
       title="Changes"
       copyId="component-browser.changes-title"
       count={history.data?.count ?? commits.length}
@@ -383,48 +416,62 @@ function ChangesPanel({ componentId }: { componentId: string }) {
               {active ? (
                 <div className="border-t border-line px-3 py-2">
                   {diff.isLoading ? (
-                    <p className="text-2xs text-t3">
-                      <Text id="component-browser.changes-loading">Loading changes...</Text>
-                    </p>
+                    <LoadingState dense id="component-browser.changes-loading">
+                      Loading this component's history...
+                    </LoadingState>
                   ) : diff.isError || !diff.data ? (
-                    <p className="text-2xs text-err">
-                      <Text id="component-browser.changes-diff-failed">
-                        Could not load the changes for this commit.
-                      </Text>
-                    </p>
-                  ) : diff.data.fields.length === 0 ? (
-                    <p className="text-2xs text-t3">
-                      <Text id="component-browser.changes-no-fields">
-                        No field changes in this commit.
-                      </Text>
-                    </p>
+                    <ErrorState
+                      dense
+                      id="component-browser.changes-diff-failed"
+                      onRetry={() => diff.refetch()}
+                    >
+                      The changes in this commit could not be read.
+                    </ErrorState>
                   ) : (
-                    <ul className="flex flex-col gap-1">
-                      {diff.data.fields.map((field) => (
-                        <li key={field.key} className="flex items-baseline gap-2 text-2xs">
-                          <Badge
-                            size="sm"
-                            tone={
-                              field.status === "added"
-                                ? "ok"
-                                : field.status === "removed"
-                                  ? "err"
-                                  : "neutral"
-                            }
-                          >
-                            {field.status}
-                          </Badge>
-                          <span className="flex-none font-mono text-t3">{field.key}</span>
-                          <span className="min-w-0 flex-1 break-words text-t2">
-                            {field.status === "added"
-                              ? formatValue(field.after, absent)
-                              : field.status === "removed"
-                                ? formatValue(field.before, absent)
-                                : `${formatValue(field.before, absent)} -> ${formatValue(field.after, absent)}`}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="flex flex-col gap-2">
+                      {hasVisual ? (
+                        <Button
+                          small
+                          data-dev-id="component-browser.change-diff"
+                          onClick={() => setVisualDiff(commit.sha)}
+                          className="self-start"
+                        >
+                          {visualDiffLabel}
+                        </Button>
+                      ) : null}
+                      {diff.data.fields.length === 0 ? (
+                        <EmptyState dense id="component-browser.changes-no-fields">
+                          No field changes in this commit.
+                        </EmptyState>
+                      ) : (
+                        <ul className="flex flex-col gap-1">
+                          {diff.data.fields.map((field) => (
+                            <li key={field.key} className="flex items-baseline gap-2 text-2xs">
+                              <Badge
+                                size="sm"
+                                tone={
+                                  field.status === "added"
+                                    ? "ok"
+                                    : field.status === "removed"
+                                      ? "err"
+                                      : "neutral"
+                                }
+                              >
+                                {field.status}
+                              </Badge>
+                              <span className="flex-none font-mono text-t3">{field.key}</span>
+                              <span className="min-w-0 flex-1 break-words text-t2">
+                                {field.status === "added"
+                                  ? formatValue(field.after, absent)
+                                  : field.status === "removed"
+                                    ? formatValue(field.before, absent)
+                                    : `${formatValue(field.before, absent)} -> ${formatValue(field.after, absent)}`}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   )}
                 </div>
               ) : null}
@@ -432,7 +479,22 @@ function ChangesPanel({ componentId }: { componentId: string }) {
           );
         })}
       </ul>
-    </SheetSection>
+
+      {/* Nested inside the Sources & History sheet, which is itself a modal. The stack gives it
+          the higher z-index and sole ownership of Escape, so closing it returns to the sheet
+          rather than dismissing both. */}
+      {visualDiff && assets ? (
+        <DiffModal
+          open
+          partId={componentId}
+          partName={componentName}
+          a={older}
+          b={visualDiff}
+          assets={assets}
+          onClose={() => setVisualDiff(null)}
+        />
+      ) : null}
+    </Section>
   );
 }
 
@@ -458,7 +520,7 @@ function DiagnosticsPanel({
   const hideRaw = useText("component-browser.diagnostics-hide-raw", "Hide Canonical Record");
 
   return (
-    <SheetSection
+    <Section
       title="Diagnostics"
       copyId="component-browser.diagnostics-title"
       count={diagnostics.unknownKeys.length}
@@ -538,7 +600,7 @@ function DiagnosticsPanel({
           ) : null}
         </div>
       ) : null}
-    </SheetSection>
+    </Section>
   );
 }
 

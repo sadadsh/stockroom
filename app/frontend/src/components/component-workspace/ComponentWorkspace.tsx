@@ -16,11 +16,12 @@
  * persist, applying an alternate, and the sourcing refresh. One owner for the mutations means one
  * place decides what a failure says and what a success invalidates, and the sheets stay renderers.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import {
   useEditField,
   useFacetsQuery,
   useMoveCategory,
+  usePartDetailQuery,
   usePartHistory,
   usePartWorkspaceQuery,
   useRefreshSourcing,
@@ -44,7 +45,7 @@ import { CadVariantSection } from "../CadVariantSection";
 import { CompleteComponentSheet } from "./CompleteComponentSheet";
 import { EnrichPanel } from "../EnrichPanel";
 import { PreviewModal, type PreviewKind } from "../PreviewModal";
-import { TabPanel, type TabItem } from "../primitives";
+import { ErrorState, LoadingState, TabPanel, type TabItem } from "../primitives";
 import { ComponentHeader } from "./ComponentHeader";
 import { IdentitySheet } from "./IdentitySheet";
 import { InfoTabsShell } from "./InfoTabsShell";
@@ -58,11 +59,17 @@ import { SourcesSheet } from "./SourcesSheet";
 import { SourcingSheet } from "./SourcingSheet";
 import { WorkspaceModal } from "./WorkspaceModal";
 
+// The four questions the opened component answers. The labels carry copy ids like every other
+// user-visible string: tab labels were the one class of text that never reached the copy layer.
 const INFO_TABS: readonly TabItem<ComponentInfoTab>[] = [
-  { id: "overview", label: "Overview" },
-  { id: "specifications", label: "Specifications" },
-  { id: "sourcing", label: "Sourcing" },
-  { id: "sources", label: "Sources & History" },
+  { id: "overview", label: "Overview", copyId: "component-browser.info-tab-overview" },
+  {
+    id: "specifications",
+    label: "Specifications",
+    copyId: "component-browser.info-tab-specifications",
+  },
+  { id: "sourcing", label: "Sourcing", copyId: "component-browser.info-tab-sourcing" },
+  { id: "sources", label: "Sources & History", copyId: "component-browser.info-tab-sources" },
 ];
 
 export function ComponentWorkspace({ componentId }: { componentId: string }) {
@@ -81,11 +88,10 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
   const [viewAll, setViewAll] = useState<ComponentInfoTab | null>(null);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [providersOpen, setProvidersOpen] = useState(false);
-  const loadingLabel = useText("component-browser.loading", "Loading component...");
-  const loadFailed = useText(
-    "component-browser.load-failed",
-    "Could not load this component.",
-  );
+  // The canonical record, fetched only while identity editing is open. The handoff band inside
+  // that sheet renders the RECORD (the EDA registry names record attributes), while everything
+  // else on this surface reads the projection. Declared after the state it is gated on.
+  const identityDetail = usePartDetailQuery(identityOpen ? componentId : null);
   const manual = useText("component-browser.manual", "Manual");
   const emptyValue = useText("component-browser.no-value", "None");
   const identityTitle = useText("component-browser.identity-modal", "Edit Identity");
@@ -132,12 +138,23 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
   );
 
   if (query.isLoading) {
-    return <WorkspaceMessage>{loadingLabel}</WorkspaceMessage>;
+    return (
+      <WorkspaceMessage>
+        <LoadingState dense id="component-browser.loading">
+          Loading this component...
+        </LoadingState>
+      </WorkspaceMessage>
+    );
   }
   if (query.error || !query.data) {
     return (
-      <WorkspaceMessage tone="err">
-        {`${loadFailed} ${query.error?.message ?? ""}`.trim()}
+      <WorkspaceMessage>
+        {/* A written sentence and a retry, not the query's own exception text appended to a
+            prefix. `${loadFailed} ${query.error.message}` put a raw transport error in the
+            middle of the pane, which is the one thing a person cannot act on. */}
+        <ErrorState id="component-browser.load-failed" onRetry={() => query.refetch()}>
+          This component could not be opened.
+        </ErrorState>
       </WorkspaceMessage>
     );
   }
@@ -323,7 +340,10 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
       >
         <IdentitySheet
           identity={workspace.identity}
-          summary={workspace.summary}
+          detail={identityDetail.data ?? null}
+          detailLoading={identityDetail.isLoading}
+          detailFailed={!!identityDetail.error}
+          onRetryDetail={() => identityDetail.refetch()}
           categories={categoryOptions}
           busy={busy}
           onEditField={(field, value) => applyField(field, value)}
@@ -373,6 +393,7 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
         ) : viewAll === "sources" ? (
           <SourcesSheet
             componentId={componentId}
+            componentName={workspace.identity.displayName}
             sources={workspace.sources}
             applying={busy}
             onApplyAlternate={applyField}
@@ -396,19 +417,12 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
   );
 }
 
-function WorkspaceMessage({
-  tone = "t3",
-  children,
-}: {
-  tone?: "t3" | "err";
-  children: string;
-}) {
+/** The centring frame the workspace's own state block sits in. The state decides its own tone. */
+function WorkspaceMessage({ children }: { children: ReactNode }) {
   return (
     <div
       data-dev-id="component-browser.message"
-      className={`flex h-full min-h-0 items-center justify-center overflow-hidden px-6 text-center text-sm ${
-        tone === "err" ? "text-err" : "text-t3"
-      }`}
+      className="flex h-full min-h-0 items-center justify-center overflow-hidden px-6 text-center"
     >
       {children}
     </div>

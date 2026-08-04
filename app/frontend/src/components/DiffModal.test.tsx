@@ -46,29 +46,35 @@ afterEach(() => {
 });
 
 describe("DiffModal - copy adoption", () => {
-  it("renders both kind tabs, the Close label and the loading line as default text with no copy wrappers outside dev mode", () => {
+  it("renders both kind tabs, the Close control and the loading line as default text with no copy wrappers outside dev mode", () => {
     vi.spyOn(api, "previewSvg").mockReturnValue(new Promise<Blob>(() => {}));
     const { container } = renderDiff(bothChanged);
 
     expect(screen.getByRole("tab", { name: "Symbol" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Footprint" })).toBeInTheDocument();
+    // The close control is the shared modal frame's: an icon whose name comes from `useText`,
+    // the same one every other window now carries.
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
-    expect(screen.getByText("Loading diff...")).toBeInTheDocument();
+    expect(screen.getByText("Loading this change...")).toBeInTheDocument();
 
     expect(container.querySelector("[data-copy-id]")).toBeNull();
   });
 
-  it("wraps the kind tabs, Close and loading line with their modals.json ids in dev mode", () => {
+  it("wraps the kind tabs and the loading line with their modals.json ids in dev mode", () => {
     vi.spyOn(api, "previewSvg").mockReturnValue(new Promise<Blob>(() => {}));
     const { container } = renderDiff(bothChanged);
 
     toggleDevMode();
 
+    // The kind labels stay click-to-edit even though the strip is now the shared TabStrip: the
+    // primitive renders a <Text> when the tab carries a copy id, which is what keeps tab labels
+    // inside the copy layer instead of being the one class of text outside it.
     expect(container.querySelector('[data-copy-id="modal.diff.kind-symbol"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.diff.kind-footprint"]')).not.toBeNull();
-    expect(container.querySelector('[data-copy-id="modal.diff.close-btn"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.diff.loading"]')).not.toBeNull();
 
+    // Close is an icon control, so its copy lives in the accessible name and resolves through
+    // `useText` rather than a <Text> wrapper (the repo's rule for copy inside an attribute).
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 

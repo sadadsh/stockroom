@@ -574,7 +574,7 @@ export function CompletePartModal({
   // Escape + the Tab focus-trap + the focus move into the dialog: the shared idiom seven sibling
   // modals already use. This window is mounted only while it is open (DetailPanel unmounts it),
   // so `open` is true whenever it renders - the same call BenchPartModal and AboutModal make.
-  const dialogRef = useModalDismiss(true, handleClose);
+  const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(true, handleClose);
   // The hook restores focus when its `open` flips false, which an unmounted window can never do.
   // Remember the control that opened this one during the first render - before the hook moves
   // focus into the dialog - and hand focus back on the way out, so closing never strands focus
@@ -711,7 +711,8 @@ export function CompletePartModal({
 
   return (
     <div
-      className="fixed inset-0 z-[95] flex items-start justify-center overflow-y-auto bg-black/55 p-4 pt-[7vh]"
+      style={{ zIndex: modalZ }}
+      className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-black/55 p-4 pt-[7vh]"
       role="presentation"
       // Dismiss on the PRESS, and only when the press lands on the scrim itself: the guard every
       // sibling modal uses. Closing on `click` meant a text-selection drag that began inside the

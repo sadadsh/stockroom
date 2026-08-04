@@ -2,8 +2,10 @@
  * The dev-mode Inspector: the DOM-delegation layer behind the inspect-first shell. While dev mode is
  * on it attaches capture-phase document listeners (locked decision 6) so the 196 `data-dev-id`
  * attributes stay pure static markup with no per-element React wiring. It owns three surfaces, all
- * rendered through a portal to document.body so they sit above the app AND open modals (z-[150],
- * above the modal scrim z-95 and below the panel z-200):
+ * rendered through a portal to document.body so they sit above the app AND open modals (z-[190],
+ * above every layer the modal stack can hand out and below the panel z-200). It was z-[150], which
+ * a five-deep modal stack now reaches: layers start at 110 and step by 10, so a fixed 150 would
+ * have put the inspector UNDER the very window a person was inspecting.):
  *
  *  - Hover highlight + badge (only while Inspect is on): outlines the closest `[data-dev-id]` under
  *    the pointer and names it (id + label + a chip per used token).
@@ -121,7 +123,7 @@ export function DevInspector() {
   if (!enabled) return null;
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-0 z-[150]" aria-hidden="true">
+    <div className="pointer-events-none fixed inset-0 z-[190]" aria-hidden="true">
       {/* Hover highlight + badge, only while Inspect is on. */}
       {inspect && hover ? (
         <div

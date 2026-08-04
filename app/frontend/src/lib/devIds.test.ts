@@ -82,7 +82,17 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 5 workbench tab ids TabStrip derived from its `devIdBase="detail"`). The `detail` area SURVIVES
 // with 21 rows whose emitters are live components: HandoffBand's EDA handoff block and category
 // selector, Glb3DView + threeScene's 3D model instrument, and PinoutViewer's pin list.
-const EXPECTED_ENTRIES = 345;
+// 346 after Slice 7's polish half. Removed: `detail.pinout` / `detail.pinout-list` with
+// components/PinoutViewer.tsx (orphaned when DetailPanel was deleted; the workspace's PinoutTable
+// already rendered strictly more of the same data), and `component-browser.identity-category`
+// (the identity sheet's hand-written category select was a second editor for a field the generated
+// EDA registry owns, so the sheet renders HandoffBand and the band's `detail.category-control` is
+// the one control). Added: `component-browser.pinout-filter` (the one capability worth keeping
+// from the deleted viewer), `component-browser.change-diff` (the visual diff, finally openable now
+// that modals stack), and `diff.tab-symbol` / `diff.tab-footprint` (the diff's kind switcher is
+// the shared TabStrip, which derives an id per tab). A deliberate re-baseline, which is what this
+// gate is for.
+const EXPECTED_ENTRIES = 346;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

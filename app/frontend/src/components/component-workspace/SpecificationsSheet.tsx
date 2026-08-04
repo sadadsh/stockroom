@@ -20,8 +20,8 @@ import type {
 } from "../../api/workspaceTypes";
 import { Text, useText } from "../../lib/copy";
 import { isPinned, type PinnedSpecs } from "../../lib/keySpecs";
-import { Badge } from "../primitives";
-import { SheetEmpty, SheetSection, SheetTable, SourceNote } from "./SheetParts";
+import { Badge, DataTable, EmptyState, Section } from "../primitives";
+import { SourceNote } from "./SheetParts";
 
 /** How the sheet orders facts. `group` is the projection's own order, which groups by meaning. */
 export type SpecSort = "group" | "name" | "source";
@@ -148,7 +148,7 @@ export function SpecificationsSheet({
       </div>
 
       {pinnedFacts.length > 0 ? (
-        <SheetSection
+        <Section
           title="Pinned"
           copyId="component-browser.spec-pinned-title"
           count={pinnedFacts.length}
@@ -159,20 +159,20 @@ export function SpecificationsSheet({
             pinned={pinned}
             onTogglePin={onTogglePin}
           />
-        </SheetSection>
+        </Section>
       ) : null}
 
       {groups.length === 0 ? (
-        <SheetEmpty id="component-browser.specifications-empty">
+        <EmptyState id="component-browser.specifications-empty">
           No specifications on record.
-        </SheetEmpty>
+        </EmptyState>
       ) : (
         groups.map((group) => (
-          <SheetSection
+          <Section
             key={group.id}
             devId="component-browser.spec-group"
             /* The group label is projected DATA (`stockroom.workspace.SPEC_GROUPS`), so it does
-               not pass through the copy layer - see SheetSection's note on `copyId`. */
+               not pass through the copy layer - see Section's note on `copyId`. */
             title={`${group.label} (${group.count})`}
           >
             <FactTable
@@ -181,7 +181,7 @@ export function SpecificationsSheet({
               pinned={pinned}
               onTogglePin={onTogglePin}
             />
-          </SheetSection>
+          </Section>
         ))
       )}
 
@@ -207,7 +207,7 @@ function FactTable({
   const pinLabel = useText("component-browser.spec-pin", "Pin");
   const unpinLabel = useText("component-browser.spec-pinned", "Pinned");
   return (
-    <SheetTable
+    <DataTable
       label={tableLabel}
       headings={[
         <Text key="s" id="component-browser.spec-col-name">
@@ -275,7 +275,7 @@ function FactTable({
           </tr>
         );
       })}
-    </SheetTable>
+    </DataTable>
   );
 }
 
@@ -290,7 +290,27 @@ export function pinoutColumns(pinout: Array<Record<string, unknown>>): string[] 
   return columns;
 }
 
-/** The complete pinout, one row per pin. Never truncated: this is the exhaustive surface. */
+/** Does any cell of this pin match what was typed? Every column is searchable. */
+export function pinMatches(
+  entry: Record<string, unknown>,
+  columns: string[],
+  needle: string,
+): boolean {
+  if (!needle) return true;
+  const hay = columns.map((column) => formatPin(entry[column])).join(" ").toLowerCase();
+  return hay.includes(needle.toLowerCase());
+}
+
+/**
+ * The complete pinout, one row per pin. Never truncated: this is the exhaustive surface.
+ *
+ * The filter is here rather than in a second pinout component. `components/PinoutViewer.tsx` used
+ * to be a separate filterable/sortable pin table reading `specs.pinout` directly; it lost its only
+ * importer when `DetailPanel` was deleted, and re-surfacing it would have put two pinout tables in
+ * one sheet reading two different shapes of the same data. This table already renders every
+ * column the record wrote, which is strictly more than that one could, so the one capability worth
+ * keeping - finding a signal in a 100-pin package - moved onto it and the duplicate went.
+ */
 export function PinoutTable({
   pinout,
   action,
@@ -298,35 +318,61 @@ export function PinoutTable({
   pinout: Array<Record<string, unknown>>;
   action?: ReactNode;
 }) {
+  const [filter, setFilter] = useState("");
   const tableLabel = useText("component-browser.pinout-table", "Pinout");
+  const filterLabel = useText("component-browser.pinout-filter", "Filter pins");
   const columns = pinoutColumns(pinout);
+  const needle = filter.trim();
+  const shown = useMemo(
+    () => pinout.filter((entry) => pinMatches(entry, columns, needle)),
+    // `columns` is derived from `pinout` on every render, so `pinout` is the real dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pinout, needle],
+  );
   return (
-    <SheetSection
+    <Section
       title="Pinout"
       copyId="component-browser.pinout-title"
       count={pinout.length}
       action={action}
     >
       {pinout.length === 0 ? (
-        <SheetEmpty id="component-browser.pinout-empty">No pinout on record.</SheetEmpty>
+        <EmptyState id="component-browser.pinout-empty">No pinout on record.</EmptyState>
       ) : (
-        <SheetTable
-          devId="component-browser.pinout-table"
-          label={tableLabel}
-          headings={columns.map((column) => column.replace(/_/g, " "))}
-        >
-          {pinout.map((entry, index) => (
-            <tr key={index} className="border-b border-line/60 last:border-b-0">
-              {columns.map((column) => (
-                <td key={column} className="tnum whitespace-nowrap px-3 py-1 font-mono">
-                  {formatPin(entry[column])}
-                </td>
+        <>
+          <input
+            data-dev-id="component-browser.pinout-filter"
+            type="search"
+            value={filter}
+            aria-label={filterLabel}
+            placeholder={filterLabel}
+            onChange={(event) => setFilter(event.target.value)}
+            className="h-7 w-full rounded-control border border-line bg-field px-2 text-xs text-t1 outline-none focus:border-acc"
+          />
+          {shown.length === 0 ? (
+            <EmptyState id="component-browser.pinout-no-match">
+              No pin matches this filter.
+            </EmptyState>
+          ) : (
+            <DataTable
+              devId="component-browser.pinout-table"
+              label={tableLabel}
+              headings={columns.map((column) => column.replace(/_/g, " "))}
+            >
+              {shown.map((entry, index) => (
+                <tr key={index} className="border-b border-line/60 last:border-b-0">
+                  {columns.map((column) => (
+                    <td key={column} className="tnum whitespace-nowrap px-3 py-1 font-mono">
+                      {formatPin(entry[column])}
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </tr>
-          ))}
-        </SheetTable>
+            </DataTable>
+          )}
+        </>
       )}
-    </SheetSection>
+    </Section>
   );
 }
 

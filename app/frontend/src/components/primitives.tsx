@@ -2,9 +2,19 @@
  * Design primitives ported from the mockup so the page matches by construction.
  * Interactive labels are Title Case, and there are no em dashes in any copy
  * (owner rules). Radii use the 8/6 tokens (rounded-card / rounded-control).
+ *
+ * This module is the kit's ONE import surface. The product-state vocabulary (route header,
+ * section header, the five states, retry, inline notice, bounded region, compact fact row,
+ * attention item, data table) lives in `productState.tsx` and the modal frame in
+ * `modalParts.tsx`; both are re-exported here so no route has to know which sibling a primitive
+ * happens to be declared in, and so there is never a second parallel kit to drift against.
  */
 import { useState } from "react";
 import type { ButtonHTMLAttributes, HTMLAttributes, KeyboardEvent, ReactNode } from "react";
+import { Text } from "../lib/copy";
+
+export * from "./productState";
+export * from "./modalParts";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -271,40 +281,12 @@ function ButtonSpinner() {
   );
 }
 
-// An Altium-style panel title strip: the thin uppercase bar that sits atop a docked pane
-// (the parts list, a detail region) and, with the pane's border, gives the "docked panel"
-// read. Sits on the chrome band with a bottom hairline. `right` is an optional trailing slot
-// (a count, a small action). Callers pass their own `data-dev-id` via `...rest`, matching the
-// convention that reusable surfaces (Card, Panel) never hardcode an id.
-export function PanelTitle({
-  right,
-  className,
-  children,
-  ...rest
-}: { right?: ReactNode } & HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cx(
-        // NOT `justify-between`. Every call site passes a COUNT here (a number, "N of M",
-        // "N active") and never a control, so flushing it to the panel's far edge only separated
-        // a number from the noun it counts - measured at ~290px on the owner's 320px Components
-        // panel, while the "Diodes 1" group header a hundred pixels below it reads adjacent. One
-        // screen, two treatments. If this slot ever holds a real control, that control can carry
-        // its own `ml-auto` rather than the header assuming every occupant wants the edge.
-        "flex h-[34px] flex-none items-center gap-2 border-b border-line bg-band px-3.5",
-        className,
-      )}
-      {...rest}
-    >
-      {/* min-w-0 so `truncate` still has something to shrink against now that the span sizes to
-          its content instead of being stretched by justify-between. */}
-      <span className="min-w-0 truncate text-xs font-semibold text-t2">{children}</span>
-      {right != null ? (
-        <span className="flex-none text-2xs tabular-nums text-t3">{right}</span>
-      ) : null}
-    </div>
-  );
-}
+/*
+ * The docked panel title strip moved to `productState.tsx` as `RouteHeader`, so the 34px chrome
+ * band, the route header and the product states are one kit rather than one primitive here and a
+ * parallel set inside `component-workspace/`. It is re-exported from this module (see the bottom
+ * of the file), so `primitives` remains the single import surface for the whole kit.
+ */
 
 // A quiet metadata label for packed property grids.
 /**
@@ -433,6 +415,16 @@ export function LegendSwatch({
 export interface TabItem<T extends string> {
   id: T;
   label: string;
+  /**
+   * The copy id for the label, when the label is COPY rather than DATA.
+   *
+   * Every tab strip in the app passed a bare string, so tab labels were the one class of
+   * user-visible text that never reached the copy layer at all - not overridable, not
+   * click-to-edit. A strip whose tabs are DATA (one tab per open component) passes none, for the
+   * same reason a projected group heading does not: an override there would rename one library's
+   * component in every strip that ever shows it.
+   */
+  copyId?: string;
 }
 
 // The stable ids that tie a tab to the panel it reveals, so the two halves of the
@@ -530,7 +522,7 @@ export function TabStrip<T extends string>({
             active === t.id ? "bg-acc-soft font-medium text-t1" : "text-t2 hover:text-t1",
           )}
         >
-          {t.label}
+          {t.copyId ? <Text id={t.copyId}>{t.label}</Text> : t.label}
         </button>
       ))}
     </div>
@@ -540,6 +532,8 @@ export function TabStrip<T extends string>({
 export interface SegmentItem<T extends string> {
   id: T;
   label: string;
+  /** The copy id for the label, when the label is COPY. See `TabItem.copyId`. */
+  copyId?: string;
 }
 
 // A segmented single-choice control: the same pill row as TabStrip, but a
@@ -606,7 +600,7 @@ export function SegmentedControl<T extends string>({
             value === opt.id ? "bg-acc-soft font-medium text-t1" : "text-t3 hover:text-t2",
           )}
         >
-          {opt.label}
+          {opt.copyId ? <Text id={opt.copyId}>{opt.label}</Text> : opt.label}
         </button>
       ))}
     </div>
@@ -640,17 +634,30 @@ export function TabPanel({
   );
 }
 
-// The consistent heading atop a Panel or a content block: Title Case, quiet weight.
-// (The uppercase micro-label is Eyebrow, for dense sub-headings inside a Panel.)
+/**
+ * The consistent heading atop a Panel or a content block: Title Case, quiet weight.
+ * (The uppercase micro-label is Eyebrow, for dense sub-headings inside a Panel.)
+ *
+ * Two steps, and only two. `dense` is the step a packed surface uses - an exhaustive sheet, a
+ * bounded region - and the default is the page step. They are here together rather than in two
+ * files because a third size is exactly how the ten hand-written eyebrow strings happened.
+ * `SectionHeader` (the heading + count + action ROW) composes this, so the type decision lives
+ * once and the row decision lives once.
+ */
 export function SectionHeading({
+  dense = false,
+  as: Element = "div",
   className,
   children,
   ...rest
-}: HTMLAttributes<HTMLDivElement>) {
+}: { dense?: boolean; as?: "div" | "h2" | "h3" } & HTMLAttributes<HTMLElement>) {
   return (
-    <div className={cx("text-sm font-semibold text-t1", className)} {...rest}>
+    <Element
+      className={cx(dense ? "text-xs font-semibold text-t1" : "text-sm font-semibold text-t1", className)}
+      {...rest}
+    >
       {children}
-    </div>
+    </Element>
   );
 }
 

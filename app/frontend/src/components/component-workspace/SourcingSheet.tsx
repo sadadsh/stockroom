@@ -19,7 +19,8 @@ import type {
 } from "../../api/workspaceTypes";
 import { Text, useText } from "../../lib/copy";
 import { ExternalIcon } from "../icons";
-import { SheetEmpty, SheetSection, SheetTable, SourceNote, SourceStateBadge } from "./SheetParts";
+import { DataTable, EmptyState, Section } from "../primitives";
+import { SourceNote, SourceStateBadge } from "./SheetParts";
 
 /** The lowest quoted unit price, or nothing. Never an interpolated "from" price nobody quoted. */
 export function lowestPrice(offer: SourcingOfferView): number | null {
@@ -47,7 +48,7 @@ export function SourcingSheet({
 
   return (
     <div data-dev-id="component-browser.sourcing-sheet" className="flex flex-col gap-4">
-      <SheetSection
+      <Section
         title="Source Status"
         copyId="component-browser.source-status-title"
         count={sourceRecords.length}
@@ -59,9 +60,9 @@ export function SourcingSheet({
         }
       >
         {sourceRecords.length === 0 ? (
-          <SheetEmpty id="component-browser.source-states-empty">
+          <EmptyState id="component-browser.source-states-empty">
             No source has been consulted for this component yet.
-          </SheetEmpty>
+          </EmptyState>
         ) : (
           <ul aria-label={statesLabel} className="flex flex-col gap-1">
             {sourceRecords.map((record) => (
@@ -77,17 +78,17 @@ export function SourcingSheet({
             ))}
           </ul>
         )}
-      </SheetSection>
+      </Section>
 
-      <SheetSection
+      <Section
         title="Distributor Offers"
         copyId="component-browser.offers-title"
         count={offers.length}
       >
         {offers.length === 0 ? (
-          <SheetEmpty id="component-browser.sourcing-empty">
+          <EmptyState id="component-browser.sourcing-empty">
             No distributor offers on record.
-          </SheetEmpty>
+          </EmptyState>
         ) : (
           offers.map((offer) => (
             <article
@@ -126,7 +127,7 @@ export function SourcingSheet({
                   <Text id="component-browser.no-price">No price</Text>
                 </p>
               ) : (
-                <SheetTable
+                <DataTable
                   devId="component-browser.offer-ladder"
                   label={`${priceTableLabel} ${offer.sourceLabel || offer.sourceId}`}
                   headings={[
@@ -148,22 +149,22 @@ export function SourcingSheet({
                       </td>
                     </tr>
                   ))}
-                </SheetTable>
+                </DataTable>
               )}
             </article>
           ))
         )}
-      </SheetSection>
+      </Section>
 
-      <SheetSection
+      <Section
         title="Trade And Compliance"
         copyId="component-browser.shared-title"
         count={shared.length}
       >
         {shared.length === 0 ? (
-          <SheetEmpty id="component-browser.shared-empty">
+          <EmptyState id="component-browser.shared-empty">
             No lifecycle, lead time, origin or compliance facts on record.
-          </SheetEmpty>
+          </EmptyState>
         ) : (
           <ul
             data-dev-id="component-browser.sourcing-shared"
@@ -183,9 +184,9 @@ export function SourcingSheet({
             ))}
           </ul>
         )}
-      </SheetSection>
+      </Section>
 
-      <SheetSection
+      <Section
         title="Related Parts"
         copyId="component-browser.relationships-title"
         count={relationships.reduce((total, group) => total + group.count, 0)}
@@ -198,9 +199,9 @@ export function SourcingSheet({
         }
       >
         {relationships.length === 0 ? (
-          <SheetEmpty id="component-browser.relationships-empty">
+          <EmptyState id="component-browser.relationships-empty">
             No related parts were offered.
-          </SheetEmpty>
+          </EmptyState>
         ) : (
           relationships.map((group) => (
             <div
@@ -244,17 +245,17 @@ export function SourcingSheet({
             </div>
           ))
         )}
-      </SheetSection>
+      </Section>
 
-      <SheetSection
+      <Section
         title="Documents"
         copyId="component-browser.resources-title"
         count={resources.length}
       >
         {resources.length === 0 ? (
-          <SheetEmpty id="component-browser.resources-empty">
+          <EmptyState id="component-browser.resources-empty">
             No documents were offered.
-          </SheetEmpty>
+          </EmptyState>
         ) : (
           <ul className="rounded-card border border-line bg-raise px-3 py-1">
             {resources.map((resource) => (
@@ -279,7 +280,7 @@ export function SourcingSheet({
             ))}
           </ul>
         )}
-      </SheetSection>
+      </Section>
     </div>
   );
 }

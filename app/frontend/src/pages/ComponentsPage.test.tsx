@@ -187,7 +187,7 @@ describe("ComponentsPage", () => {
 
   it("restores the picker scroll only once the real rows exist, and never checkpoints the clamped 0", async () => {
     // A3. The restore used to run the instant the scroll node mounted - while the picker body
-    // was still the one-line "Loading parts..." placeholder. A browser clamps `scrollTop = N`
+    // was still the one-line loading placeholder. A browser clamps `scrollTop = N`
     // against that tiny scroll height, so the anchor became 0 and the unmount checkpoint then
     // persisted that 0 over the saved offset. jsdom has no layout and stores scrollTop
     // verbatim, so the stub below MODELS the browser clamp and records every write: what is
@@ -234,7 +234,7 @@ describe("ComponentsPage", () => {
       const view = wrap(<ComponentsPage />);
 
       // The list is still in flight: nothing may be written into the placeholder.
-      expect(await screen.findByText("Loading parts...")).toBeInTheDocument();
+      expect(await screen.findByText("Loading this library's components...")).toBeInTheDocument();
       expect(writes).toEqual([]);
 
       scrollCeiling = 400;
@@ -269,7 +269,7 @@ describe("ComponentsPage", () => {
     );
 
     const view = wrap(<ComponentsPage />);
-    expect(await screen.findByText("Loading parts...")).toBeInTheDocument();
+    expect(await screen.findByText("Loading this library's components...")).toBeInTheDocument();
     view.unmount();
 
     expect(readUiSession().component_list_anchor).toEqual({
@@ -537,10 +537,11 @@ describe("ComponentsPage", () => {
 
     wrap(<ComponentsPage />);
 
-    expect(
-      await screen.findByText("Cannot reach the Stockroom server."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Try Again")).toBeInTheDocument();
+    // The shared error state, not a hand-written centred div: it carries `data-product-state`,
+    // it announces itself, and its message is a written sentence rather than `error.message`.
+    const failure = await screen.findByText("Stockroom is not answering on this machine.");
+    expect(failure.closest('[data-product-state="error"]')).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
   });
 });
 

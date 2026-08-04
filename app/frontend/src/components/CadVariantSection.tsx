@@ -27,7 +27,9 @@ export function CadVariantSection({
   if (inventory.isError) {
     return (
       <VariantState
-        message={`Could not read CAD variants. ${inventory.error.message}`}
+        // A written sentence, not the query's own exception appended to a prefix. The retry
+        // beside it is the thing a person can actually do about it.
+        message="The retained CAD variants could not be read."
         tone="error"
         action={
           <Button type="button" small onClick={() => void inventory.refetch()}>
@@ -42,7 +44,7 @@ export function CadVariantSection({
     ? pairActivation.error instanceof CadVariantApiError &&
       pairActivation.error.status === 409
       ? "The active CAD pair changed before this switch completed. The latest choices are loading."
-      : `Could not switch the CAD pair. ${pairActivation.error.message}`
+      : "The CAD pair could not be switched."
     : null;
 
   return (

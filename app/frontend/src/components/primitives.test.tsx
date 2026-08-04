@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { PanelTitle, TabStrip } from "./primitives";
+import { RouteHeader, TabStrip } from "./primitives";
 
 const TABS = [
   { id: "specs", label: "Specs" },
@@ -83,7 +83,7 @@ describe("TabStrip devIdBase passthrough", () => {
   });
 });
 
-describe("PanelTitle's count", () => {
+describe("RouteHeader's count", () => {
   it("sits NEXT TO the panel name, not flushed to the far edge", () => {
     // Same defect as the spec-group counts, in the twin nobody looked at. On the owner's real
     // window the Components panel is 320px wide and `justify-between` put its "1" about 290px
@@ -93,7 +93,7 @@ describe("PanelTitle's count", () => {
     //
     // Every call site passes a COUNT (a number, "N of M", "N active"), never a control, so there
     // is nothing here that wants to be flushed right.
-    render(<PanelTitle right="1">Components</PanelTitle>);
+    render(<RouteHeader right="1">Components</RouteHeader>);
     const title = screen.getByText("Components");
     const bar = title.parentElement!;
     expect(bar.className).not.toContain("justify-between");

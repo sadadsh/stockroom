@@ -74,9 +74,11 @@ function resolve(field: string, detail: PartDetail): Resolved {
     case "manufacturer":
       return { text: detail.manufacturer ?? "" };
     case "category":
-      return { text: detail.derived.category ?? "" };
+      // Read through: a record written by an older build may carry no `derived` block at all, and
+      // a blank cell is the honest answer there. It used to throw, which blanked the whole sheet.
+      return { text: detail.derived?.category ?? "" };
     case "description":
-      return { text: detail.derived.description ?? "" };
+      return { text: detail.derived?.description ?? "" };
     case "symbol":
     case "footprint": {
       // The reference as the TOOL resolves it (`<lib>:<name>`), not the on-disk file name: that
@@ -107,22 +109,12 @@ export function HandoffBand({
   onMoveCategory,
   categories,
   busy,
-  slots,
 }: {
   detail: PartDetail;
   onEditField?: (field: string, value: string) => void;
   onMoveCategory?: (category: string) => void;
   categories?: string[];
   busy?: boolean;
-  /**
-   * Extra content rendered under a named cell, keyed by field key.
-   *
-   * A SLOT rather than an import: the description's "N Sources" disclosure and the panel's other
-   * composed controls live in DetailPanel, which already imports this component, so importing
-   * them back would be a cycle. Passing them in also keeps this file's job narrow - it renders
-   * the registry, and the panel supplies anything panel-specific.
-   */
-  slots?: Record<string, ReactNode>;
 }) {
   const fields = handoffFields();
   const resolved = fields.map((f) => ({ field: f, value: resolve(f.key, detail) }));
@@ -199,7 +191,6 @@ export function HandoffBand({
                   : undefined
             }
             busy={busy}
-            slot={slots?.[field.key]}
           />
         ))}
       </div>
@@ -224,7 +215,6 @@ function HandoffCell({
   className,
   edit,
   busy,
-  slot,
 }: {
   fieldKey: string;
   label: string;
@@ -233,7 +223,6 @@ function HandoffCell({
   className?: string;
   edit?: Edit;
   busy?: boolean;
-  slot?: ReactNode;
 }) {
   const missing = !value.text.trim();
   return (
@@ -264,7 +253,6 @@ function HandoffCell({
         edit={edit}
         busy={busy}
       />
-      {slot}
     </div>
   );
 }
