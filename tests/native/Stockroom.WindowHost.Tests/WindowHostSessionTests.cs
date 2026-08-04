@@ -344,6 +344,75 @@ public sealed class WindowHostSessionTests
         Assert.Equal(@"C:\Capture\model.zip", download.GetProperty("result_file_path").GetString());
     }
 
+    [Fact]
+    public void ProviderRefreshAndStateAreLeaseGatedManualChromeCommands()
+    {
+        const string leaseId = "22222222-2222-4222-8222-222222222222";
+        var incoming = Concatenate(
+            Frame(HandoffProtocolTests.PythonCanonicalBootstrap()),
+            HandoffProtocolTests.BuildMessage(
+                2,
+                "provider-lease-begin",
+                Now + 30_000,
+                new Dictionary<string, object?> { ["lease_id"] = leaseId }),
+            HandoffProtocolTests.BuildMessage(
+                3,
+                "provider-refresh",
+                Now + 30_000,
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = leaseId,
+                    ["generation"] = 7,
+                }),
+            HandoffProtocolTests.BuildMessage(
+                4,
+                "provider-state",
+                Now + 30_000,
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = leaseId,
+                    ["generation"] = 7,
+                }),
+            HandoffProtocolTests.BuildMessage(
+                5,
+                "shutdown",
+                Now + 30_000,
+                new Dictionary<string, object?>()));
+        using var stream = new ScriptedDuplexStream(incoming);
+        using var channel = new HandoffChannel(stream, () => Now);
+        using var bootstrap = BootstrapParser.Parse(channel.Receive("bootstrap"));
+        var controller = new FakeController();
+
+        new WindowHostSession(channel, bootstrap, controller, 111, 222).Run();
+
+        Assert.Equal(
+            [
+                $"provider-lease-begin:{leaseId}",
+                $"provider-refresh:{leaseId}:7",
+                $"provider-state:{leaseId}:7",
+                "shutdown",
+            ],
+            controller.Operations);
+        var responses = DecodeFrames(stream.Written);
+        Assert.Equal(
+            [
+                "hello-hidden",
+                "provider-lease-begun",
+                "provider-refreshed",
+                "provider-state",
+                "stopping",
+            ],
+            responses.Select(static item => item.Name));
+        var state = responses[3].Payload.GetProperty("result");
+        Assert.Equal(
+            "https://provider.example.test/part",
+            state.GetProperty("url").GetString());
+        Assert.False(state.GetProperty("loading").GetBoolean());
+        Assert.Equal(
+            string.Empty,
+            state.GetProperty("navigation_error").GetString());
+    }
+
     private static byte[] Frame(byte[] body)
     {
         var framed = new byte[body.Length + 4];
@@ -470,6 +539,22 @@ public sealed class WindowHostSessionTests
 
         public void NavigateProviderBrowser(string leaseId, long generation, string url) =>
             Operations.Add($"provider-navigate:{leaseId}:{generation}:{url}");
+
+        public void RefreshProviderBrowser(string leaseId, long generation) =>
+            Operations.Add($"provider-refresh:{leaseId}:{generation}");
+
+        public IReadOnlyDictionary<string, object?> ProviderState(
+            string leaseId,
+            long generation)
+        {
+            Operations.Add($"provider-state:{leaseId}:{generation}");
+            return new Dictionary<string, object?>
+            {
+                ["url"] = "https://provider.example.test/part",
+                ["loading"] = false,
+                ["navigation_error"] = string.Empty,
+            };
+        }
 
         public IReadOnlyDictionary<string, object?> ProviderDocumentState(
             string leaseId,
