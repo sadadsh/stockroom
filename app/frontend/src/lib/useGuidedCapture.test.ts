@@ -74,7 +74,6 @@ describe("useGuidedCapture", () => {
       expect.objectContaining({
         partIds: ["part1"],
         vendor: undefined,
-        mode: "finish-first",
       }),
     );
     expect(result.current.status).toBe("done");
@@ -92,7 +91,6 @@ describe("useGuidedCapture", () => {
     expect(capture.run).toHaveBeenCalledWith(
       expect.objectContaining({
         vendor: "ultralibrarian",
-        mode: "finish-first",
       }),
     );
   });
@@ -111,91 +109,8 @@ describe("useGuidedCapture", () => {
       expect.objectContaining({
         partIds: ["part1"],
         vendor: undefined,
-        mode: "finish-first",
       }),
     );
-  });
-
-  it("forwards an explicit assisted retry for the selected provider", async () => {
-    mockCadSourceUrl();
-    const capture = mockCapture();
-    const { result } = render(["kicad_symbol", "kicad_footprint"]);
-
-    await act(async () => {
-      await result.current.start("snapmagic", "assisted");
-    });
-
-    expect(capture.run).toHaveBeenCalledWith(
-      expect.objectContaining({
-        partIds: ["part1"],
-        vendor: "snapmagic",
-        mode: "assisted",
-      }),
-    );
-  });
-
-  it("forwards exhaustive collection without narrowing it to the preferred provider", async () => {
-    mockCadSourceUrl();
-    const capture = mockCapture([
-      {
-        event: "result",
-        data: {
-          result: {
-            items: [
-              {
-                part_id: "part1",
-                mpn: "BQ24074",
-                display_name: "BQ24074",
-                category: "ICs",
-                status: "already-complete",
-                needed: [],
-                satisfied: [],
-                remaining: [],
-                retained: 2,
-                sources: ["guided"],
-                notes: [],
-                error: "",
-                collection_complete: true,
-                provider_outcomes: [
-                  {
-                    route_id: "digikey:digikey-ultralibrarian",
-                    provider_key: "digikey",
-                    author_key: "digikey-ultralibrarian",
-                    label: "DigiKey / Ultra Librarian",
-                    status: "succeeded-retained",
-                    attempted: true,
-                    retained: 2,
-                    activated: false,
-                    reason: "Retained two exact files.",
-                  },
-                ],
-              },
-            ],
-            counts: { "already-complete": 1 },
-            retained: 2,
-            collection_complete: true,
-            stopped: false,
-            stop_reason: "",
-          },
-        },
-      },
-      { event: "done", data: {} },
-    ]);
-    const { result } = render([]);
-
-    await act(async () => {
-      await result.current.start("digikey", "collect-all");
-    });
-
-    expect(capture.run).toHaveBeenCalledWith(
-      expect.objectContaining({
-        partIds: ["part1"],
-        vendor: "digikey",
-        mode: "collect-all",
-      }),
-    );
-    expect(result.current.collectionComplete).toBe(true);
-    expect(result.current.providerOutcomes).toHaveLength(1);
   });
 
   it("surfaces a failed run as an error rather than a quiet done", async () => {

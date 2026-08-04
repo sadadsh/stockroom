@@ -139,7 +139,6 @@ describe("CaptureProvider store", () => {
       workflow_batch_id: "batch-capture-1",
       workflow_item_id: "item-capture-1",
       part_id: "p1",
-      mode: "automatic",
       vendor: null,
       background: false,
       initial_needs: ["kicad_symbol"],
@@ -181,7 +180,6 @@ describe("CaptureProvider store", () => {
 
     expect(result.current.active.status).toBe("done");
     expect(result.current.active.received.kicad_symbol).toBe(true);
-    expect(result.current.active.collectionComplete).toBeNull();
     expect(result.current.active.message).toContain("verified and linked");
     expect(stream).not.toHaveBeenCalled();
     expect(readUiSession().selected_ids.workflow_batch).toBeNull();
@@ -236,7 +234,6 @@ describe("CaptureProvider store", () => {
       workflow_batch_id: "batch-publication-failed",
       workflow_item_id: "item-publication-failed",
       part_id: "p1",
-      mode: "automatic",
       vendor: "ultralibrarian",
       background: false,
       initial_needs: ["kicad_symbol"],
@@ -314,7 +311,6 @@ describe("CaptureProvider store", () => {
       workflow_batch_id: "batch-provider-handoff",
       workflow_item_id: "item-provider-handoff",
       part_id: "p1",
-      mode: "automatic",
       vendor: "ultralibrarian",
       background: false,
       initial_needs: ["kicad_symbol"],
@@ -399,7 +395,6 @@ describe("CaptureProvider store", () => {
       workflow_batch_id: "batch-active-handoff",
       workflow_item_id: "item-active-handoff",
       part_id: "p1",
-      mode: "finish-first",
       vendor: "ultralibrarian",
       background: false,
       active_route: {
@@ -478,7 +473,6 @@ describe("CaptureProvider store", () => {
       workflow_batch_id: "batch-single-flight",
       workflow_item_id: "item-single-flight",
       part_id: "p1",
-      mode: "automatic",
       vendor: null,
       background: false,
       initial_needs: ["kicad_symbol"],
@@ -555,7 +549,6 @@ describe("CaptureProvider store", () => {
       workflow_batch_id: "batch-restored",
       workflow_item_id: "item-restored",
       part_id: "p1",
-      mode: "assisted",
       vendor: "ultralibrarian",
       background: false,
       initial_needs: ["kicad_symbol"],
@@ -666,7 +659,6 @@ describe("CaptureProvider store", () => {
       workflow_batch_id: "batch-restored-running",
       workflow_item_id: "item-restored-running",
       part_id: "p1",
-      mode: "automatic",
       vendor: null,
       background: true,
       initial_needs: ["kicad_symbol"],
@@ -781,8 +773,7 @@ describe("CaptureProvider store", () => {
       expect.objectContaining({
         partIds: ["p1"],
         vendor: undefined,
-        mode: "finish-first",
-        idempotencyKey: expect.stringMatching(/^guided-capture-/),
+          idempotencyKey: expect.stringMatching(/^guided-capture-/),
       }),
     );
     // and nothing reached for the host bridge that used to exist
@@ -833,7 +824,6 @@ describe("CaptureProvider store", () => {
       workflow_batch_id: "batch-current",
       workflow_item_id: "item-current",
       part_id: "p2",
-      mode: "automatic",
       vendor: null,
       background: false,
       initial_needs: ["kicad_symbol"],

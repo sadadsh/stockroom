@@ -43,7 +43,6 @@ export function mockCapture(
   type Request = {
     partIds?: string[];
     vendor?: string;
-    mode?: "automatic" | "assisted" | "finish-first" | "collect-all";
   };
   type Run = {
     request: Request;
@@ -174,7 +173,6 @@ export function mockCapture(
       workflow_batch_id: batchId,
       workflow_item_id: `item-capture-mock-${suffix}`,
       part_id: captured.request.partIds?.[0] ?? "p1",
-      mode: captured.request.mode ?? "automatic",
       vendor: captured.request.vendor ?? null,
       background: false,
       initial_needs: (item?.needed ?? ["kicad_symbol"]) as never,

@@ -1,9 +1,8 @@
 """Provider acquisition has one production browser owner.
 
-The API-owned capture package drives provider pages through
-``PlaywrightCaptureBrowser``. The native pywebview shell must never grow a
-second provider window, download watcher, injected driver, or frontend callback
-bridge.
+The API-owned capture package hosts provider pages in ``PlaywrightCaptureBrowser``. The native
+pywebview shell must never grow a second provider window, download watcher, injected driver, or
+frontend callback bridge.
 """
 
 from __future__ import annotations
@@ -71,13 +70,17 @@ def test_frontend_implementation_and_built_bundle_have_no_native_capture_bridge(
 
 
 def test_every_adapter_names_an_exact_export_for_every_tool_it_claims():
-    """Every claimed tool has a pinned machine selector or exact visible label."""
+    """Every claimed tool names the exact visible export the PERSON has to take.
+
+    A wrong version pick downloads a file that fails much later, far from the cause, so the
+    choice is declared data rather than left to whoever is looking at the page.
+    """
 
     adapters = all_adapters()
     assert adapters, "the Python provider adapter registry is empty"
     for adapter in adapters:
         capability = adapter.capability
         for tool in capability.tools:
-            assert capability.version_pins.get(tool) or capability.user_format_labels.get(tool), (
+            assert capability.user_format_labels.get(tool), (
                 f"{capability.key} claims to serve {tool} but names no exact export"
             )

@@ -285,11 +285,10 @@ def test_guided_attach_does_not_call_either_attach_seam_on_identity_failure(
         key="faketron",
         label="Faketron",
         tools=("kicad", "altium"),
-        formats_exclusive=False,
         aggregator=False,
         needs_login=False,
         instruction="",
-        version_pins={"kicad": "kicad", "altium": "altium"},
+        user_format_labels={"kicad": "KiCad 6 or later", "altium": "Altium native"},
     )
     monkeypatch.setattr(
         guided,
@@ -334,11 +333,10 @@ def test_guided_manual_picker_rejects_wrong_archive_even_on_the_exact_provider_p
         key="snapmagic",
         label="SnapMagic",
         tools=("kicad", "altium"),
-        formats_exclusive=True,
         aggregator=False,
         needs_login=True,
         instruction="",
-        version_pins={"kicad": "kicad", "altium": "altium"},
+        user_format_labels={"kicad": "KiCad 6 or later", "altium": "Altium native"},
     )
     monkeypatch.setattr(
         guided,
@@ -387,11 +385,10 @@ def test_catalog_authorized_manual_file_uses_the_same_task_bound_selection(
         key="ultralibrarian",
         label="Ultra Librarian",
         tools=("kicad", "altium"),
-        formats_exclusive=True,
         aggregator=False,
         needs_login=True,
         instruction="",
-        version_pins={"kicad": "kicad", "altium": "altium"},
+        user_format_labels={"kicad": "KiCad 6 or later", "altium": "Altium native"},
     )
     monkeypatch.setattr(
         guided,
@@ -431,11 +428,10 @@ def test_guided_attach_rejects_mixed_digikey_route_receipts(monkeypatch, tmp_pat
         key="digikey",
         label="DigiKey CAD Models",
         tools=("kicad", "altium"),
-        formats_exclusive=True,
         aggregator=True,
         needs_login=True,
         instruction="",
-        machine_format_labels={"kicad": "KiCad v6+"},
+        user_format_labels={"kicad": "KiCad v6 or later"},
     )
     monkeypatch.setattr(
         guided,

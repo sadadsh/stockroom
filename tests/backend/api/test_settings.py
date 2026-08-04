@@ -231,85 +231,7 @@ def test_patch_strips_windows_copy_as_path_quotes(client, app_ctx, tmp_path):
     assert app_ctx.kicad_dir == target
 
 
-def test_patch_sets_vendor_logins(client, app_ctx):
-    client.patch(
-        "/api/settings",
-        json={
-            "ul_username": "me@x.com",
-            "ul_password": "secret",
-            "snapeda_username": "s",
-            "snapeda_password": "q",
-        },
-    )
-    assert app_ctx.config.ul_username == "me@x.com"
-    assert app_ctx.config.ul_password == "secret"
-    assert app_ctx.config.snapeda_username == "s"
-    assert app_ctx.config.snapeda_password == "q"
-
-
-def test_get_settings_masks_vendor_passwords(client, app_ctx):
-    app_ctx.config.ul_username = "me@x.com"
-    app_ctx.config.ul_password = "secret"
-    body = client.get("/api/settings").json()
-    assert body["ul_username"] == "me@x.com"
-    assert body["ul_password_set"] is True
-    assert body["ul_password_hint"] == "cret"
-    assert "ul_password" not in body
-
-
-def test_vendor_login_raw_password_never_leaks(client, app_ctx):
-    import json as _json
-
-    app_ctx.config.snapeda_password = "topsecretpw"
-    body = client.get("/api/settings").json()
-    assert "topsecretpw" not in _json.dumps(body)
-
-
-def test_get_settings_tolerates_a_null_secret_field(client, app_ctx):
-    # a hand-edited config.json can carry a JSON null; the hint must not 500
-    app_ctx.config.ul_password = None
-    resp = client.get("/api/settings")
-    assert resp.status_code == 200
-    assert resp.json()["ul_password_set"] is False
-    assert resp.json()["ul_password_hint"] == ""
-
-
 # -- SamacSys (kept in-DigiKey CAD provider) -----------------------------------
-
-
-def test_patch_sets_samacsys_login_live_and_persists(client, app_ctx):
-    r = client.patch(
-        "/api/settings",
-        json={
-            "samacsys_username": "sam@x.com",
-            "samacsys_password": "samsecret",
-        },
-    )
-    assert r.status_code == 200
-    assert app_ctx.config.samacsys_username == "sam@x.com"
-    assert app_ctx.config.samacsys_password == "samsecret"
-    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
-    assert saved["samacsys_username"] == "sam@x.com"
-    assert "samacsys_password" not in saved
-
-
-def test_get_settings_masks_samacsys_password(client, app_ctx):
-    app_ctx.config.samacsys_username = "sam@x.com"
-    app_ctx.config.samacsys_password = "samsecret"
-    body = client.get("/api/settings").json()
-    assert body["samacsys_username"] == "sam@x.com"
-    assert body["samacsys_password_set"] is True
-    assert body["samacsys_password_hint"] == "cret"
-    assert "samacsys_password" not in body
-    assert "samsecret" not in json.dumps(body)
-
-
-def test_get_settings_tolerates_a_null_samacsys_password(client, app_ctx):
-    app_ctx.config.samacsys_password = None
-    resp = client.get("/api/settings")
-    assert resp.status_code == 200
-    assert resp.json()["samacsys_password_set"] is False
-    assert resp.json()["samacsys_password_hint"] == ""
 
 
 # -- DigiKey API creds (OAuth client-credentials, now writable via settings) ----
@@ -343,33 +265,6 @@ def test_get_settings_echoes_client_id_and_masks_the_secret(client, app_ctx):
 
 
 # -- DigiKey account web login (the driver's hands-free sign-in) ----------------
-
-
-def test_patch_sets_digikey_account_login_live_and_persists(client, app_ctx):
-    r = client.patch(
-        "/api/settings",
-        json={
-            "digikey_username": "dk@x.com",
-            "digikey_password": "accountpw1234",
-        },
-    )
-    assert r.status_code == 200
-    assert app_ctx.config.digikey_username == "dk@x.com"
-    assert app_ctx.config.digikey_password == "accountpw1234"
-    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
-    assert saved["digikey_username"] == "dk@x.com"
-    assert "digikey_password" not in saved
-
-
-def test_get_settings_echoes_digikey_username_and_masks_the_password(client, app_ctx):
-    app_ctx.config.digikey_username = "dk@x.com"
-    app_ctx.config.digikey_password = "accountpw1234"
-    body = client.get("/api/settings").json()
-    assert body["digikey_username"] == "dk@x.com"
-    assert body["digikey_password_set"] is True
-    assert body["digikey_password_hint"] == "1234"
-    assert "digikey_password" not in body
-    assert "accountpw1234" not in json.dumps(body)
 
 
 # -- stm_cubemx_source (stm-viewer workstream, Phase 3, API-02) - a plain path, not a secret --
@@ -444,3 +339,33 @@ def test_default_cubemx_source_prefers_the_configured_setting(monkeypatch, tmp_p
     monkeypatch.setenv("STM32_CUBEMX", str(tmp_path))  # would win if the setting were ignored
 
     assert stm_source.default_cubemx_source() == configured
+
+
+def test_settings_never_echoes_or_accepts_a_provider_website_login(client, app_ctx):
+    """The person signs in to Ultra Librarian, SnapMagic, SamacSys, and DigiKey.com themselves.
+
+    A saved provider password only exists to be replayed into someone else's sign-in form, so
+    there is nowhere left for one to be stored and nothing left for this route to echo.
+    """
+
+    body = client.get("/api/settings").json()
+    for retired in (
+        "ul_username",
+        "ul_password_set",
+        "snapeda_username",
+        "snapeda_password_set",
+        "samacsys_username",
+        "samacsys_password_set",
+        "digikey_username",
+        "digikey_password_set",
+    ):
+        assert retired not in body, retired
+
+    # A stale client may still send them; they are ignored rather than stored.
+    assert client.patch("/api/settings", json={"ul_username": "me@x.com"}).status_code == 200
+    assert not hasattr(app_ctx.config, "ul_username")
+
+    # The official catalogue API credentials are not website logins and remain.
+    assert "digikey_client_id" in body
+    assert "digikey_client_secret_set" in body
+    assert "mouser_api_key_set" in body or "has_key" in body

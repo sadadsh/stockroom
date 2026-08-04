@@ -2,10 +2,12 @@
  * The Complete Part window: ONE place to get everything a landed part still needs. It is laid
  * out as two regions - FILES (the guided capture, the hero: get both the KiCad and the Altium
  * assets in one pass, watching a two-track checklist fill) and DETAILS (datasheet, part number,
- * manufacturer, value). The capture runs through the global CaptureProvider store, so "Keep
- * Working" can hand it off to the background status pill and the user can close this and keep
- * moving while the files land. A person can also select files downloaded from the active provider
- * task; those bytes enter the exact same validation and atomic activation pipeline.
+ * manufacturer, value). Stockroom opens the provider page; the PERSON signs in if the provider
+ * asks, chooses the formats, and downloads. The capture runs through the global CaptureProvider
+ * store, so "Keep Working" can hand it off to the background status pill and the user can close
+ * this and keep moving while the files land. A person can also select files downloaded from the
+ * active provider task; those bytes enter the exact same validation and atomic activation
+ * pipeline.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
@@ -178,13 +180,10 @@ function CaptureRow({ label, copyId, done }: { label: string; copyId: string; do
   );
 }
 
-// A needs-accurate one-liner: never promise KiCad when only Altium is missing (or vice versa).
-function needsSubline(): string {
-  return (
-    "One automatic run reuses verified evidence and completes the part from one provider's " +
-    "symbol, footprint, and 3D model set."
-  );
-}
+// The default subline for a part that still needs files: what the PERSON does, in order.
+const NEEDS_SUBLINE =
+  "Stockroom reuses verified evidence, then opens the provider page. Sign in if the provider " +
+  "asks, choose the formats you need, and download; Stockroom captures each file and validates it.";
 
 function shortManifestDigest(value: string): string {
   const digest = value.trim();
@@ -267,11 +266,9 @@ function routeReason(outcome: ProviderOutcome, usable: boolean): string {
 
 function ProviderRouteOutcomes({
   outcomes,
-  collectionComplete,
   usable,
 }: {
   outcomes: ProviderOutcome[];
-  collectionComplete: boolean | null;
   usable: boolean;
 }) {
   if (outcomes.length === 0) return null;
@@ -284,30 +281,23 @@ function ProviderRouteOutcomes({
           </div>
           <p
             className={
-              "mt-1 text-2xs leading-snug " +
-              (collectionComplete || usable ? "text-t2" : "text-[var(--c-warn-text)]")
+              "mt-1 text-2xs leading-snug " + (usable ? "text-t2" : "text-[var(--c-warn-text)]")
             }
           >
-            {collectionComplete === true
-              ? "Collection Complete. Every route is settled. Unavailable means it was checked and had no exact deliverable."
-              : collectionComplete === null && usable
-                ? "Part Ready. One provider supplied a complete verified CAD package."
-              : usable
-                ? "Part Ready. The usable CAD package is complete; some optional provider variants were unavailable or deferred."
-                : collectionComplete === null
-                  ? "Provider Attempt Incomplete. This part still needs files."
-                : "Collection Incomplete. A required route needs input, was blocked or failed, was cancelled, or was not attempted."}
+            {usable
+              ? "Part Ready. One provider supplied a complete verified CAD package."
+              : "Provider Attempt Incomplete. This part still needs files."}
           </p>
         </div>
         <span
           className={
             "flex-none rounded-full px-2 py-0.5 text-2xs font-semibold " +
-            (collectionComplete || usable
+            (usable
               ? "bg-ok/15 text-[var(--c-ok-text)]"
               : "bg-warn/15 text-[var(--c-warn-text)]")
           }
         >
-          {collectionComplete === true ? "Complete" : usable ? "Ready" : "Incomplete"}
+          {usable ? "Ready" : "Incomplete"}
         </span>
       </div>
       <div className="mt-2 flex flex-col divide-y divide-line">
@@ -437,6 +427,8 @@ export function CompletePartModal({
   // The dialog and Close accessible names live in attributes, so they resolve through useText.
   const dialogLabel = useText("modal.completePart.aria", "Complete this part");
   const closeLabel = useText("modal.completePart.close", "Close");
+  // Rendered as a computed value rather than as JSX children, so it resolves its override here.
+  const needsSubline = useText("modal.completePart.cad-subline", NEEDS_SUBLINE);
   const needs: Requirement[] = download.needs;
   // Canonical per-part readback is the only rendered completion authority. The capture store
   // retains live progress and provider diagnostics, never a terminal shadow of library truth.
@@ -456,7 +448,6 @@ export function CompletePartModal({
   // non-empty immutable manifest that was reverified, or an honest policy verdict that CAD is not
   // required. Missing/unverified evidence remains incomplete even when every list is empty.
   const isDone = completionProven;
-  const collectionPartial = download.collectionComplete === false;
   const captureBusy =
     download.status === "resolving" ||
     download.status === "window-open" ||
@@ -478,7 +469,7 @@ export function CompletePartModal({
       return;
     }
     autoStartHandled.current = true;
-    void download.start(undefined, "finish-first").catch((error) =>
+    void download.start().catch((error) =>
       toast(error instanceof Error ? error.message : "Could not start source collection.", "err"),
     );
   }, [autoStart, cadSource.data, hasExactIdentity, cadBusy, download, toast]);
@@ -694,7 +685,7 @@ export function CompletePartModal({
       ? "CAD Files Not Required"
       : download.status === "error" && needs.length === 0
         ? "Completion Not Verified"
-        : "Automatic Completion";
+        : "Files From The Provider";
   const completionSubline = completionVerified
     ? `Reverified from ${shortManifestDigest(verifiedDigest)}.${
         evidenceReason(completionEvidence) ? ` ${evidenceReason(completionEvidence)}` : ""
@@ -706,12 +697,9 @@ export function CompletePartModal({
           "The last completion attempt did not produce verified evidence."
         : needs.length === 0
           ? "No completion evidence is recorded. Run verification before treating this part as complete."
-          : needsSubline();
+          : needsSubline;
   const showDownloadMessage =
-    Boolean(download.message) &&
-    (!isDone ||
-      download.providerOutcomes.length > 0 ||
-      download.collectionComplete !== null);
+    Boolean(download.message) && (!isDone || download.providerOutcomes.length > 0);
 
   const statusTone = isDone
     ? "text-[var(--c-ok-text)]"
@@ -754,8 +742,8 @@ export function CompletePartModal({
             </div>
             <div className="mt-0.5 text-xs text-t3">
               <Text id="modal.completePart.subtitle">
-                Stockroom completes the part from one verified provider set. Choose another source
-                only when you want a different variant.
+                You open the provider, sign in if it asks, and download. Stockroom captures what
+                you download and validates it.
               </Text>
             </div>
           </div>
@@ -782,11 +770,7 @@ export function CompletePartModal({
                 data-completion-evidence={completionEvidence?.state ?? "missing"}
                 className={
                   "rounded-control border p-4 shadow-file transition-colors " +
-                  (isDone
-                    ? "border-ok/40 bg-ok/[0.07]"
-                    : collectionPartial
-                      ? "border-warn/40 bg-warn/[0.07]"
-                      : "border-line2 bg-raise")
+                  (isDone ? "border-ok/40 bg-ok/[0.07]" : "border-line2 bg-raise")
                 }
               >
                 <div className="flex items-start justify-between gap-3">
@@ -814,14 +798,11 @@ export function CompletePartModal({
                             {completionTitle}
                           </Text>
                         ) : (
-                        <Text id="modal.completePart.cad-title">Automatic Completion</Text>
+                        <Text id="modal.completePart.cad-title">Files From The Provider</Text>
                         )}
                       </div>
                       <div className="mt-0.5 text-2xs leading-snug text-t2">
                         {completionSubline}
-                        {isDone && collectionPartial
-                          ? " Some optional provider variants were not collected; this part is fully usable."
-                          : ""}
                       </div>
                     </div>
                   </div>
@@ -864,11 +845,7 @@ export function CompletePartModal({
                   <p className={"mt-3 text-xs " + statusTone}>{download.message}</p>
                 ) : null}
 
-                <ProviderRouteOutcomes
-                  outcomes={download.providerOutcomes}
-                  collectionComplete={download.collectionComplete}
-                  usable={isDone}
-                />
+                <ProviderRouteOutcomes outcomes={download.providerOutcomes} usable={isDone} />
 
                 {captureBusy ? (
                   <div
@@ -886,9 +863,20 @@ export function CompletePartModal({
                       </span>
                     </div>
                     <p className="mt-1 text-2xs leading-snug text-t2">
-                      {providerPageActive
-                        ? "Use the embedded provider page if it needs your sign-in or one download click. Stockroom captures every file from this route automatically; use the permanent Stockroom and Provider controls above the page to switch without losing it."
-                        : "Stockroom received the route output and is validating, converting, and attaching its KiCad, Altium, and STEP files as one provider set. You do not need to find or import the downloads manually."}
+                      {providerPageActive ? (
+                        <Text id="modal.completePart.provider-page-live">
+                          The provider page is open. Sign in if it asks, choose the formats you
+                          need, and download. Stockroom captures what you download and validates
+                          it; use the permanent Stockroom and Provider controls above the page to
+                          switch without losing it.
+                        </Text>
+                      ) : (
+                        <Text id="modal.completePart.provider-page-processing">
+                          Stockroom received the download and is validating, converting, and
+                          attaching its KiCad, Altium, and STEP files as one provider set. You do
+                          not need to find or import the downloads manually.
+                        </Text>
+                      )}
                     </p>
                   </div>
                 ) : null}
@@ -910,7 +898,7 @@ export function CompletePartModal({
                       }
                       onClick={() =>
                         void download
-                          .start(undefined, "finish-first")
+                          .start()
                           .catch((error) =>
                             toast(error instanceof Error ? error.message : "Could not start completion.", "err"),
                           )

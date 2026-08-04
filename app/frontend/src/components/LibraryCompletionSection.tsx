@@ -172,10 +172,10 @@ function CoverageBody({
       <CoverageMatrix data={data} />
 
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
-        {/* Enabled whenever ANY remaining gap is reachable by either lane, not only by the
-            automatic one. A library whose last gaps all need a provider route still has work for
-            this button: the run settles what it can and reports, per part, which provider needs a
-            person - which is the only way that list exists at all. */}
+        {/* Enabled whenever ANY remaining gap is reachable by a registered source. A library
+            whose last gaps all need a provider route still has work for this button: the run
+            settles what it can and reports, per part, which provider needs a person - which is
+            the only way that list exists at all. */}
         <Button
           variant="accent"
           onClick={onRun}
@@ -187,9 +187,9 @@ function CoverageBody({
           {needsFiles > 0 ? (
             <>
               {needsFiles} {needsFiles === 1 ? "component has a gap" : "components have gaps"} a
-              source ladder can try, {estimate(needsFiles)}. It reuses verified evidence, ranks
-              eligible sources, and retains fallbacks. You can stop it and resume without repeating
-              settled work.
+              source ladder can try, {estimate(needsFiles)}. It reuses verified evidence and works
+              the eligible sources in order, opening each provider page for you. You can stop it
+              and resume without repeating settled work.
             </>
           ) : total === 0 ? (
             "Add a component first."
@@ -199,7 +199,7 @@ function CoverageBody({
               then names the component and provider for each one that needs you.
             </>
           ) : (
-            "Nothing here can be filled automatically right now."
+            "No registered source can supply what is still missing here."
           )}
         </p>
       </div>
@@ -210,9 +210,9 @@ function CoverageBody({
           {needsAssistance === 1
             ? "component has a gap that needs"
             : "components have gaps that need"}{" "}
-          one Get Files run. Stockroom reuses the provider session, captures and validates
-          downloads, and advances through fallbacks; the in-app provider pauses only
-          for a provider-required login, security check, or download choice.
+          one Get Files run. Stockroom opens the provider page for each one; you sign in if the
+          provider asks, choose the formats you need, and download, and Stockroom captures and
+          validates each file before moving to the next source.
         </p>
       ) : null}
 

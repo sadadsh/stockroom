@@ -67,7 +67,11 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // sources ledger), plus the capabilities Slice 2 had left unreachable: Edit Identity, the category
 // move, Apply Pinout, and the sourcing refresh. A deliberate re-baseline, which is what this
 // gate is for.
-const EXPECTED_ENTRIES = 374;
+// 373 after the provider-website sign-in panels were removed: Stockroom no longer signs in to a
+// provider site, so `settings.vendor-logins` (the "Provider Sessions And Optional Sign-Ins"
+// section) has nothing left to configure. The DigiKey catalogue API creds moved into
+// `settings.distributor`, which keeps `settings.vendor-login-row` emitted.
+const EXPECTED_ENTRIES = 373;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

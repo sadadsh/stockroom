@@ -111,39 +111,18 @@ def test_a_person_driven_route_selects_the_de_automated_transport():
     choice = select_transport(capability, person_driven=True)
 
     assert choice.name == TRANSPORT_DEFAULT_BROWSER
-    assert "user_driven" in choice.why
-
-
-def test_an_authorized_automated_route_keeps_the_playwright_transport():
-    capability = get_adapter("ultralibrarian").capability
-
-    choice = select_transport(capability, person_driven=True)
-
-    assert choice.name == TRANSPORT_PLAYWRIGHT
-    assert "machine_allowed" in choice.why
-
-
-def test_the_operator_authorized_lane_still_drives_the_page_with_playwright():
-    """SnapMagic is `user_driven` but `operator_automation` is True: when Stockroom itself operates
-    the export controls it still needs a page it owns."""
-
-    capability = get_adapter("snapmagic").capability
-
-    choice = select_transport(capability, person_driven=False)
-
-    assert choice.name == TRANSPORT_PLAYWRIGHT
+    assert "the person drives this route" in choice.why
 
 
 def test_the_guided_source_fails_closed_without_the_embedded_provider_surface(tmp_path):
     class _Exploded:
         def __init__(self, *args, **kwargs):
-            raise AssertionError("a person-driven route must never construct Playwright")
+            raise AssertionError("no provider window may open without Stockroom's own surface")
 
     source = guided.GuidedCaptureSource(
         lambda: None,
         vendor="digikey",
         download_root=tmp_path / "dl",
-        user_driven=True,
     )
 
     with pytest.MonkeyPatch.context() as patch, pytest.raises(
@@ -154,7 +133,7 @@ def test_the_guided_source_fails_closed_without_the_embedded_provider_surface(tm
         source._ensure_session()
 
 
-def test_the_guided_source_still_builds_playwright_for_the_authorized_route(tmp_path):
+def test_an_explicit_standalone_browser_is_the_only_way_past_the_embedded_surface(tmp_path):
     built: list[dict] = []
 
     class _Fake:
@@ -170,7 +149,6 @@ def test_the_guided_source_still_builds_playwright_for_the_authorized_route(tmp_
         lambda: None,
         vendor="ultralibrarian",
         download_root=tmp_path / "dl",
-        user_driven=False,
         allow_standalone_browser=True,
     )
 
@@ -182,7 +160,7 @@ def test_the_guided_source_still_builds_playwright_for_the_authorized_route(tmp_
     assert not isinstance(session.browser, DefaultBrowserCapture)
 
 
-def test_authorized_visible_route_refuses_a_missing_embedded_surface(tmp_path):
+def test_a_visible_route_refuses_a_missing_embedded_surface(tmp_path):
     class _Exploded:
         def __init__(self, *_args, **_kwargs):
             raise AssertionError("a standalone browser must not be constructed")
@@ -191,7 +169,6 @@ def test_authorized_visible_route_refuses_a_missing_embedded_surface(tmp_path):
         lambda: None,
         vendor="ultralibrarian",
         download_root=tmp_path / "dl",
-        user_driven=False,
     )
 
     with pytest.MonkeyPatch.context() as patch, pytest.raises(
@@ -215,7 +192,6 @@ def test_the_transport_choice_is_traced(tmp_path, monkeypatch):
         lambda: None,
         vendor="digikey",
         download_root=tmp_path / "dl",
-        user_driven=True,
     )
     monkeypatch.setattr(guided, "PlaywrightCaptureBrowser", _Exploded)
     with pytest.raises(guided.CaptureBrowserError):
@@ -225,7 +201,12 @@ def test_the_transport_choice_is_traced(tmp_path, monkeypatch):
     written = log.read_text(encoding="utf-8")
     lines = [line for line in written.splitlines() if "capture.transport" in line]
     assert lines, written
-    assert TRANSPORT_DEFAULT_BROWSER in lines[0]
+    # The trace states what actually happens: the page opens in Stockroom's own embedded
+    # surface with the driver attached to THAT window, and no provider control is ever
+    # operated. Reporting "no automation attached" here would have been false, because the
+    # driver genuinely is attached - to Stockroom's window, never to the provider's controls.
+    assert TRANSPORT_PLAYWRIGHT in lines[0]
+    assert "provider_controls_operated=false" in lines[0]
     assert "why=" in lines[0]
 
 
@@ -724,11 +705,14 @@ def test_the_guidance_carries_the_ordered_checklist_and_the_provider_instruction
     assert any(route["instruction"] for route in routes), guidance
 
 
-def test_the_guidance_for_the_authorized_route_names_the_playwright_transport():
-    guidance = handoff_guidance("ultralibrarian", needs=["kicad_symbol"])
+def test_every_provider_guidance_names_the_person_driven_transport():
+    """No provider is machine-driven any more, so no provider opens in a Stockroom-driven page."""
 
-    assert guidance["transport"] == TRANSPORT_PLAYWRIGHT
-    assert guidance["opens_in"] == "a Stockroom-controlled window"
+    for vendor_key in ("digikey", "ultralibrarian", "snapmagic", "samacsys"):
+        guidance = handoff_guidance(vendor_key, needs=["kicad_symbol"])
+        assert guidance is not None, vendor_key
+        assert guidance["transport"] == TRANSPORT_DEFAULT_BROWSER, vendor_key
+        assert guidance["opens_in"] == "your own default browser", vendor_key
 
 
 def test_the_guidance_refuses_an_unknown_provider():

@@ -186,7 +186,7 @@ describe("coverage", () => {
     expect(
       await screen.findByText(/47 components have gaps a source ladder can try/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/retains fallbacks/i)).toBeInTheDocument();
+    expect(screen.getByText(/opening each provider page for you/i)).toBeInTheDocument();
     expect(screen.getByText(/about 7 minutes/i)).toBeInTheDocument();
   });
 
@@ -224,9 +224,9 @@ describe("coverage", () => {
           ),
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText(/reuses the provider session/i)).toBeInTheDocument();
+    expect(screen.getByText(/opens the provider page for each one/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/provider-required login, security check, or download choice/i),
+      screen.getByText(/you sign in if the provider asks, choose the formats you need/i),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Provider")).toHaveLength(2);
     expect(screen.queryByText("No Source")).not.toBeInTheDocument();
@@ -467,7 +467,6 @@ describe("running", () => {
     expect(submit).toHaveBeenCalledTimes(1);
     expect(submit).toHaveBeenCalledWith({
       limit: 1_000,
-      mode: "automatic",
       idempotencyKey: expect.stringMatching(/^library-completion-/),
     });
     expect(submit.mock.calls[0][0]).not.toHaveProperty("partIds");
@@ -495,7 +494,6 @@ describe("running", () => {
           aggregator: false,
           instruction: "Pick the part, choose KiCad and Altium, then Download.",
           capture_available: true,
-          unattended_capture: true,
         },
       ],
       url: "https://app.ultralibrarian.com/search?queryText=LM317",

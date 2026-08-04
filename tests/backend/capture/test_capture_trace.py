@@ -19,12 +19,7 @@ import pytest
 
 from stockroom.capture import guided
 from stockroom.capture import trace as capture_trace
-from stockroom.capture.access_policy import machine_access_decision
-from stockroom.capture.vendors import (
-    UltraLibrarianAdapter,
-    _challenge_issue,
-    _security_verification_issue,
-)
+from stockroom.capture.vendors import UltraLibrarianAdapter
 
 
 @pytest.fixture
@@ -125,143 +120,6 @@ def test_debug_detail_is_available_without_drowning_the_default_level(tmp_path, 
 # -- a clearance decision names the signal that fired ---------------------------------------
 
 
-class _NoNodes:
-    @property
-    def first(self):
-        return self
-
-    def count(self):
-        return 0
-
-
-class _VisibleNode(_NoNodes):
-    def count(self):
-        return 1
-
-    def is_visible(self):
-        return True
-
-
-class _HiddenNode(_VisibleNode):
-    def is_visible(self):
-        return False
-
-
-class _TurnstileFrame:
-    def get_attribute(self, name: str):
-        return (
-            "https://challenges.cloudflare.com/turnstile/v0/api.js?sitekey=SECRETKEY"
-            if name == "src"
-            else None
-        )
-
-    def is_visible(self):
-        return True
-
-
-class _Frames:
-    @property
-    def first(self):
-        return self
-
-    def count(self):
-        return 1
-
-    def nth(self, index: int):
-        assert index == 0
-        return _TurnstileFrame()
-
-
-class _PartPage:
-    """An ordinary Ultra Librarian part page, optionally showing a sign-in form."""
-
-    def __init__(self, *, url="https://app.ultralibrarian.com/details/abc-1", username=None):
-        self.url = url
-        self._username = username
-
-    def locator(self, selector: str):
-        if selector == "#Username" and self._username is not None:
-            return self._username
-        return _NoNodes()
-
-    def title(self):
-        return "ABC-1 | Ultra Librarian"
-
-    def inner_text(self, _selector: str):
-        return "ABC-1 Get CAD Model Download Sign In"
-
-
-def test_a_visible_login_form_is_logged_as_the_signal_that_fired(trace_file):
-    page = _PartPage(username=_VisibleNode())
-    assert UltraLibrarianAdapter().user_clearance_issue(page)
-
-    line = _find(trace_file, "capture.signal.clearance")
-    assert "fired=true" in line
-    assert "signal=visible-login-form" in line
-    assert "login_field_selector=#Username" in line
-    assert "login_field_matches=1" in line
-
-
-def test_the_login_destination_is_logged_as_a_different_signal(trace_file):
-    page = _PartPage(url="https://sso.ultralibrarian.com/Account/Login")
-    assert UltraLibrarianAdapter().user_clearance_issue(page)
-
-    line = _find(trace_file, "capture.signal.clearance")
-    assert "signal=url-sso-host" in line
-    # Host and path only: a provider query string can carry identifiers.
-    assert "url=sso.ultralibrarian.com/Account/Login" in line
-
-
-def test_a_collapsed_form_logs_that_nothing_fired_rather_than_staying_silent(trace_file):
-    """The single most important line: a false positive must be distinguishable from a real gate."""
-
-    page = _PartPage(username=_HiddenNode())
-    assert UltraLibrarianAdapter().user_clearance_issue(page) == ""
-
-    line = _find(trace_file, "capture.signal.clearance")
-    assert "fired=false" in line
-    assert "login_field_matches=1" in line
-    assert "login_field_visible=false" in line
-
-
-def test_a_challenge_names_the_marker_and_the_bucket_it_came_from(trace_file):
-    class ChallengePage(_PartPage):
-        def locator(self, selector: str):
-            return _Frames() if selector == "iframe" else _NoNodes()
-
-    page = ChallengePage()
-    assert _challenge_issue(page, "Ultra Librarian")
-
-    line = _find(trace_file, "capture.signal.challenge")
-    assert "fired=true" in line
-    assert "marker=challenges.cloudflare.com" in line
-    assert "source=iframe-src" in line
-    # The iframe is identified by host and path, never by its query (which carried a site key).
-    assert "iframes=[challenges.cloudflare.com/turnstile/v0/api.js]" in line
-    assert "SECRETKEY" not in line
-
-
-def test_no_challenge_logs_what_was_read_instead_of_nothing(trace_file):
-    assert _challenge_issue(_PartPage(), "Ultra Librarian") == ""
-
-    line = _find(trace_file, "capture.signal.challenge")
-    assert "fired=false" in line
-    assert "read=[url,title,body]" in line
-
-
-def test_a_security_marker_is_named_without_quoting_the_page(trace_file):
-    class MfaPage(_PartPage):
-        def inner_text(self, _selector: str):
-            return "Enter the code from your authenticator app for user@example.com"
-
-    assert _security_verification_issue(MfaPage(), "Ultra Librarian")
-
-    line = _find(trace_file, "capture.signal.security")
-    assert 'marker="authenticator app"' in line
-    assert "source=visible-body" in line
-    assert "user@example.com" not in line
-
-
 # -- nothing credential-bearing is ever written ---------------------------------------------
 
 
@@ -323,18 +181,6 @@ def test_a_long_provider_value_is_bounded_instead_of_dumping_the_page(trace_file
 
     line = _find(trace_file, "capture.route.failed")
     assert len(line) < 400
-
-
-def test_page_text_is_reported_as_a_length_not_a_value(trace_file):
-    class QuietPage(_PartPage):
-        def inner_text(self, _selector: str):
-            return "confidential customer pricing for ABC-1"
-
-    assert _security_verification_issue(QuietPage(), "Ultra Librarian") == ""
-
-    line = _find(trace_file, "capture.signal.security")
-    assert "visible_body_chars=" in line
-    assert "confidential" not in line
 
 
 # -- a logging failure cannot break a capture -----------------------------------------------
@@ -470,36 +316,3 @@ def test_an_absent_provider_export_row_survives_into_the_rejection_reason():
 # -- routing says why a provider is in or out -----------------------------------------------
 
 
-def test_the_authorization_decision_names_the_flag_or_switch_that_settled_it(monkeypatch):
-    monkeypatch.setenv("STOCKROOM_DISABLE_ULTRALIBRARIAN_AUTOMATION", "1")
-    decision = machine_access_decision("ultralibrarian", config=object())
-    assert decision.authorized is False
-    assert decision.signal == "provider-kill-switch"
-    assert "STOCKROOM_DISABLE_ULTRALIBRARIAN_AUTOMATION" in decision.detail
-
-    monkeypatch.delenv("STOCKROOM_DISABLE_ULTRALIBRARIAN_AUTOMATION")
-    decision = machine_access_decision("ultralibrarian", config=object())
-    assert decision.authorized is False
-    assert decision.signal == "flag-not-enabled"
-    assert "ul_private_evaluation_automation" in decision.detail
-    assert decision.exception_code == "UL-PRIVATE-EVALUATION-2026-07-28"
-
-    decision = machine_access_decision("snapmagic", config=object())
-    assert decision.signal == "no-reviewed-policy"
-
-
-def test_a_provider_left_to_a_person_says_which_authorization_is_missing(trace_file):
-    from stockroom.capture.runner import HumanRequiredSource, _provider_route_plan
-
-    source = HumanRequiredSource(
-        "ultralibrarian",
-        _provider_route_plan("ultralibrarian"),
-        (),
-        access_detail="the per-machine ul_private_evaluation_automation flag is not enabled",
-    )
-    outcome = source.supply(object())
-
-    assert "ul_private_evaluation_automation" in outcome.skipped
-    assert outcome.provider_outcomes
-    assert "ul_private_evaluation_automation" in outcome.provider_outcomes[0].reason
-    assert "capture.route.deferred" in "\n".join(_lines(trace_file))

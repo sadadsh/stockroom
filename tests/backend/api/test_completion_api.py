@@ -534,10 +534,10 @@ def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
         ],
         "report": None,
     }
-    # Ultra Librarian is the ONE route Stockroom is authorized to drive, so it keeps the
-    # Playwright transport and its own window; the checklist still travels with it.
-    assert handoff["transport"] == "playwright"
-    assert handoff["opens_in"] == "a Stockroom-controlled window"
+    # No route is machine-driven any more, so every one of them is handed to the person with
+    # its checklist. `mode` above is retained legacy request data, not a lane selector.
+    assert handoff["transport"] == "default-browser"
+    assert handoff["opens_in"] == "your own default browser"
     assert handoff["mpn"]
     assert handoff["routes"] and all(route["required_files"] for route in handoff["routes"])
     replay = client.get(

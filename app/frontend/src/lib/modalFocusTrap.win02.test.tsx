@@ -149,7 +149,7 @@ describe("WIN-02 - the DevPanel edits the open Complete Part window through its 
       </>,
       { wrapper },
     );
-    await screen.findByText("Automatic Completion");
+    await screen.findByText("Files From The Provider");
 
     toggleDevMode();
 
@@ -162,7 +162,7 @@ describe("WIN-02 - the DevPanel edits the open Complete Part window through its 
 
     const editor = screen.getByLabelText("Edit copy text");
     expect(editor).toHaveValue(
-      "Stockroom completes the part from one verified provider set. Choose another source only when you want a different variant.",
+      "You open the provider, sign in if it asks, and download. Stockroom captures what you download and validates it.",
     );
     fireEvent.change(editor, { target: { value: "Reworded Completion Subtitle" } });
 
@@ -179,7 +179,7 @@ describe("WIN-02 - the DevPanel edits the open Complete Part window through its 
       </>,
       { wrapper },
     );
-    await screen.findByText("Automatic Completion");
+    await screen.findByText("Files From The Provider");
 
     toggleDevMode();
 

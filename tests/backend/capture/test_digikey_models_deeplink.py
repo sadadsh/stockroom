@@ -305,7 +305,6 @@ def _source(tmp_path: Path, store: DigiKeyModelsIds | None):
         lambda *a, **k: None,
         vendor="digikey",
         download_root=tmp_path / "downloads",
-        user_driven=True,
         models_ids=store,
     )
 
@@ -336,16 +335,21 @@ def test_the_first_run_is_exactly_todays_search_and_learns_the_id(tmp_path):
 
     assert browser.opened == [_SEARCH_URL]
     hud = browser.options[0]["hud"]
-    assert hud.automated_step == (
-        "Stockroom is selecting and downloading every supported CAD format."
-    )
+    assert hud.automated_step == "Listening for provider downloads."
     assert hud.human_action == (
-        "Only complete a provider sign-in, phone verification, or security check if it appears."
+        "Start this part's download with every required format shown here."
     )
     assert store.get(manufacturer=_MANUFACTURER, mpn=_MPN) == "6695662"
 
 
-def test_snap_operator_retraverses_identity_before_using_a_learned_opaque_models_id(tmp_path):
+def test_a_learned_id_lands_the_person_on_this_routes_own_tab(tmp_path):
+    """THE SECOND-RUN CONTRACT. The id was observed for THIS exact manufacturer and MPN.
+
+    Provenance, not URL text, is what makes this safe to navigate on: it is stored under the
+    part's manufacturer AND MPN, so a hit is bound to the requested part rather than merely
+    spelling it. Identity for attachment still runs through the unchanged detail-URL gates.
+    """
+
     store = _store(tmp_path)
     store.learn(
         manufacturer=_MANUFACTURER,
@@ -355,89 +359,13 @@ def test_snap_operator_retraverses_identity_before_using_a_learned_opaque_models
     browser = _RecordingBrowser()
     source = _source(tmp_path, store)
 
-    _run_route(source, browser, DigiKeySnapMagicRouteAdapter(DigiKeyUltraLibrarianAdapter()))
-
-    assert browser.opened == [_SEARCH_URL]
-
-
-def test_snap_operator_can_use_the_route_tab_after_exact_product_identity_is_established(tmp_path):
-    store = _store(tmp_path)
-    store.learn(
-        manufacturer=_MANUFACTURER,
-        mpn=_MPN,
-        final_url="https://www.digikey.com/en/models/6695662",
+    _run_route(
+        source,
+        browser,
+        DigiKeySnapMagicRouteAdapter(DigiKeyUltraLibrarianAdapter()),
     )
-    browser = _RecordingBrowser()
-    source = _source(tmp_path, store)
-    surface = DigiKeyUltraLibrarianAdapter()
-    surface._exact_product_url = (
-        "https://www.digikey.com/en/products/detail/texas-instruments/"
-        "TPS2121RUXR/6695662"
-    )
-
-    _run_route(source, browser, DigiKeySnapMagicRouteAdapter(surface))
 
     assert browser.opened == ["https://www.digikey.com/en/models/6695662?tab=snapmagic"]
-
-
-def test_snap_operator_does_not_use_a_learned_id_with_the_previous_parts_identity(tmp_path):
-    store = _store(tmp_path)
-    store.learn(
-        manufacturer=_MANUFACTURER,
-        mpn=_MPN,
-        final_url="https://www.digikey.com/en/models/6695662",
-    )
-    browser = _RecordingBrowser()
-    source = _source(tmp_path, store)
-    surface = DigiKeyUltraLibrarianAdapter()
-    surface._exact_product_url = (
-        "https://www.digikey.com/en/products/detail/analog-devices/AD7124-8/1234567"
-    )
-
-    _run_route(source, browser, DigiKeySnapMagicRouteAdapter(surface))
-
-    assert browser.opened == [_SEARCH_URL]
-
-
-def test_snap_operator_retries_only_formats_not_already_captured(monkeypatch, tmp_path):
-    calls: list[list[str]] = []
-    source = _source(tmp_path, None)
-    surface = DigiKeyUltraLibrarianAdapter()
-    adapter = DigiKeySnapMagicRouteAdapter(surface)
-
-    def operate(_page, formats, **_identity):
-        calls.append(list(formats))
-        return []
-
-    adapter.operate_in_user_window = operate
-
-    class _Browser(_RecordingBrowser):
-        def capture_user_downloads(self, url, broker, **options):
-            self.opened.append(url)
-            options["operate_controls"](object())
-            broker._receipts.append(object())
-            options["operate_controls"](object())
-            return UserCaptureResult(status="finished", files=(), final_url=url)
-
-    monkeypatch.setattr(
-        guided,
-        "_completed_provider_formats",
-        lambda receipts, _formats: ("kicad",) if receipts else (),
-    )
-    browser = _Browser()
-    session = guided._Session(browser=browser, ctx_manager=None, page=object())
-
-    source._supply_user_driven_route(
-        _Record(),
-        session,
-        adapter,
-        _MANUFACTURER,
-        _MPN,
-        _SEARCH_URL,
-        ["kicad", "model", "altium"],
-    )
-
-    assert calls == [["kicad", "model", "altium"], ["model", "altium"]]
 
 
 def test_a_route_with_no_evidenced_tab_still_uses_todays_url(tmp_path):

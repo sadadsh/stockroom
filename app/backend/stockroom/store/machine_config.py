@@ -26,11 +26,7 @@ if TYPE_CHECKING:
 SECRET_FIELDS = (
     "mouser_api_key",
     "digikey_client_secret",
-    "digikey_password",
     "github_token",
-    "ul_password",
-    "snapeda_password",
-    "samacsys_password",
 )
 
 
@@ -77,33 +73,15 @@ class MachineConfig:
     # live DigiKeyAdapter; either blank keeps DigiKey out of the enrichment source registry.
     digikey_client_id: str = ""
     digikey_client_secret: str = field(default="", repr=False)
-    # DigiKey ACCOUNT web login (distinct from the OAuth API creds above). The capture driver
-    # autofills this to sign into DigiKey.com and prepare a logged-in session for everything,
-    # so a saved account clears the sign-in wall before the in-DigiKey CAD providers are reached.
-    digikey_username: str = ""
-    digikey_password: str = field(default="", repr=False)
     # Legacy upgrade-only GitHub token. New sign-ins are owned by Git Credential Manager and no
     # GitHub secret crosses Stockroom. Retained temporarily so an existing installation can scrub
     # or migrate its old credential without losing access.
     github_token: str = field(default="", repr=False)
-    # Saved logins for the in-DigiKey CAD providers the guided capture window drives:
-    # Ultra Librarian, SnapEDA, and SamacSys. DigiKey's EDA/CAD Models section aggregates
-    # downloads from all three, and the driver prefers Ultra Librarian (it often bundles the
-    # complete KiCad + Altium + 3D set). The username is not a secret; the password is.
-    # Passwords are stored in Windows Credential Manager; usernames remain ordinary machine
-    # settings. Blank = log in by hand in the capture window (session persistence keeps you
-    # signed in thereafter).
-    ul_username: str = ""
-    ul_password: str = field(default="", repr=False)
-    # Default-off authorization for the reviewed Ultra Librarian private-evaluation exception.
-    # This is deliberately a non-secret machine setting: it grants no account access by itself,
-    # and passwords remain exclusively in Windows Credential Manager. Public/general installs
-    # stay on assisted capture unless their own authorization is explicitly recorded.
-    ul_private_evaluation_automation: bool = False
-    snapeda_username: str = ""
-    snapeda_password: str = field(default="", repr=False)
-    samacsys_username: str = ""
-    samacsys_password: str = field(default="", repr=False)
+    # NO third-party provider website logins are stored. The person signs in to Ultra Librarian,
+    # SnapMagic, SamacSys, and DigiKey.com themselves, inside the provider window, and the
+    # isolated per-provider browser profile keeps that session. Stockroom never holds or replays
+    # a provider account credential. The DigiKey OAuth pair above is an official catalogue API,
+    # not a website login, which is why it stays.
     kicad_config_override: str = ""
     # An explicit kicad-cli binary path, for a non-standard KiCad install that
     # discovery (PATH + standard locations) does not find. Empty = auto-discover.

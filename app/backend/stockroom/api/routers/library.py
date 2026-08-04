@@ -37,12 +37,11 @@ from stockroom.workspace import component_workspace
 # the same cap governs history and the diff rev-validation so the two agree on what
 # is reachable.
 _HISTORY_MAX = 100
-_AUTOMATIC_CAPTURE_INSTRUCTION = (
-    "Stockroom checks retained evidence and automatic sources first. If a provider needs "
-    "you, Stockroom opens the exact result inside the app, chooses the required formats, and "
-    "names any remaining files. Clear a provider security check only if one appears, then start "
-    "the offered downloads or select files you already downloaded; Stockroom intercepts, "
-    "validates, and attaches only a complete coherent set."
+_PERSON_DRIVEN_CAPTURE_INSTRUCTION = (
+    "Stockroom checks retained evidence first, then opens the exact provider page inside the "
+    "app and names every file it needs. You work the provider page - search, sign-in, formats, "
+    "licence, security check, and the download itself. Stockroom intercepts, validates, and "
+    "attaches only a complete coherent set, or you can select files you already downloaded."
 )
 _COMPLETION_MAX_BATCH = 1000
 _COMPLETION_BODY_FIELDS = frozenset({"part_ids", "limit", "idempotency_key"})
@@ -817,18 +816,6 @@ def library_router(require_token) -> APIRouter:
         implemented_capture = {
             adapter.capability.key: adapter.capability for adapter in all_adapters()
         }
-        # Which providers can finish a part with nobody watching, on THIS machine right now.
-        # `capture_available` is true for every implemented adapter, so it cannot tell a surface
-        # which one to reach for first; without this a chooser defaults to the head of the trust
-        # order, which is the aggregator whose controls stay person-driven.
-        from stockroom.capture.runner import _machine_access_allowed
-
-        unattended = {
-            key
-            for key, capability in implemented_capture.items()
-            if capability.browser_access == "machine_allowed"
-            and _machine_access_allowed(key, config=ctx.config)
-        }
         first = sources[0] if sources else None
         return {
             "mpn": record.mpn,
@@ -842,12 +829,14 @@ def library_router(require_token) -> APIRouter:
                     "tools": list(s.tools),
                     "aggregator": s.aggregator,
                     "instruction": (
-                        f"{_AUTOMATIC_CAPTURE_INSTRUCTION} {implemented_capture[s.key].instruction}"
+                        f"{_PERSON_DRIVEN_CAPTURE_INSTRUCTION} {implemented_capture[s.key].instruction}"
                         if s.key in implemented_capture
                         else s.instruction
                     ),
+                    # True when Stockroom implements person-driven capture for this surface:
+                    # it can open the exact page, name the required files, and attach what the
+                    # person downloads. Every implemented provider is person-driven.
                     "capture_available": s.key in implemented_capture,
-                    "unattended_capture": s.key in unattended,
                 }
                 for s in sources
             ],
@@ -1140,39 +1129,24 @@ def library_router(require_token) -> APIRouter:
         if vendor is not None and get_adapter(vendor) is None:
             raise ValueError(f"no network capture adapter for provider {vendor!r}")
 
-        if mode == "assisted":
+        # There is ONE capture mode: a person works the provider page. The legacy `mode` field
+        # is still accepted so existing callers do not 500, and every value means the same run.
+        person_driven_providers = mode != "automatic" or vendor is not None
+        if person_driven_providers:
             if part_ids is None or len(part_ids) != 1:
-                raise ValueError("assisted capture requires exactly one selected part")
-            if vendor is None:
-                raise ValueError("assisted capture requires one selected provider")
+                raise ValueError("person-driven capture requires exactly one selected part")
             if limit_supplied:
                 raise ValueError(
-                    "assisted capture does not accept a batch limit; select exactly one part"
-                )
-            adapter = get_adapter(vendor)
-            if (
-                background
-                and adapter is not None
-                and adapter.capability.browser_access == "user_driven"
-            ):
-                raise ValueError(
-                    f"{adapter.capability.label} requires a visible person-driven provider page"
-                )
-        if mode in {"finish-first", "collect-all"}:
-            if part_ids is None or len(part_ids) != 1:
-                raise ValueError(f"{mode} capture requires exactly one selected part")
-            if limit_supplied:
-                raise ValueError(
-                    f"{mode} capture does not accept a batch limit; select exactly one part"
+                    "person-driven capture does not accept a batch limit; select exactly one part"
                 )
             if background:
-                raise ValueError(f"{mode} capture requires visible sequential provider handoffs")
+                raise ValueError("person-driven capture requires a visible provider page")
         records = (
             [_current_completion_record(ctx, part_id) for part_id in part_ids]
             if part_ids is not None
             else None
         )
-        if mode in {"finish-first", "collect-all"}:
+        if person_driven_providers:
             from stockroom.capture.evidence import exact_identity
 
             assert records is not None
@@ -1180,7 +1154,7 @@ def library_router(require_token) -> APIRouter:
                 exact_identity(records[0])
             except (TypeError, ValueError) as exc:
                 raise ValueError(
-                    f"{mode} capture requires one exact manufacturer and MPN"
+                    "person-driven capture requires one exact manufacturer and MPN"
                 ) from exc
 
         coordinator = ctx.workflow_coordinator
@@ -1224,11 +1198,8 @@ def library_router(require_token) -> APIRouter:
                 vendor=vendor,
                 progress=progress,
                 should_stop=should_stop,
-                limit=limit,
+                limit=None if person_driven_providers else limit,
                 headless=background,
-                operator_authorized=mode == "assisted",
-                finish_first=mode == "finish-first",
-                collect_all=mode == "collect-all",
             )
 
         return {"job_id": ctx.jobs.submit_cancellable(work)}
@@ -1668,8 +1639,9 @@ def library_router(require_token) -> APIRouter:
                     "tools": list(a.capability.tools),
                     "needs_login": a.capability.needs_login,
                     "aggregator": a.capability.aggregator,
-                    "instruction": (f"{_AUTOMATIC_CAPTURE_INSTRUCTION} {a.capability.instruction}"),
-                    "one_download_for_all_formats": not a.capability.formats_exclusive,
+                    "instruction": (
+                        f"{_PERSON_DRIVEN_CAPTURE_INSTRUCTION} {a.capability.instruction}"
+                    ),
                 }
                 for a in all_adapters()
             ]

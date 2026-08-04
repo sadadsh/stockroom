@@ -1,10 +1,13 @@
 /**
  * One global network-capture job.
  *
- * The backend owns discovery, provider browsers, downloads, validation, retention, and coherent
- * attachment. The frontend starts that job and renders its evidenced result. A native file picker
- * can recover downloads for the active provider task, but it feeds the same backend validation
- * path; there is still no per-tool attach seam or client-side commit authority.
+ * The backend owns discovery, the provider window, download capture, validation, retention, and
+ * coherent attachment. The PERSON owns the provider page itself: they sign in if the provider
+ * asks, choose the formats, and download. There is exactly one lane, so this store carries no
+ * mode and the run request sends none. The frontend starts that job and renders its evidenced
+ * result. A native file picker can recover downloads for the active provider task, but it feeds
+ * the same backend validation path; there is still no per-tool attach seam or client-side commit
+ * authority.
  */
 import {
   createContext,
@@ -42,8 +45,6 @@ export type GuidedStatus =
   | "unavailable"
   | "error";
 
-export type CaptureMode = "automatic" | "assisted" | "finish-first" | "collect-all";
-
 export class CaptureBusyError extends Error {
   constructor(partName: string) {
     super(`Finish the active completion for ${partName || "the current part"} before starting another.`);
@@ -80,14 +81,10 @@ export interface CaptureState {
   url: string | null;
   routeToken: string | null;
   vendor: string | null;
-  // Which lane this run is in. Only the person-driven lanes open a provider page a person can be
-  // standing in front of, so only they may offer Finish Route and Skip This Part.
-  mode: CaptureMode | null;
   needs: Requirement[];
   received: Received;
   backgrounded: boolean;
   providerOutcomes: ProviderOutcome[];
-  collectionComplete: boolean | null;
   completionEvidence: CompletionEvidence | null;
   completionEvidenceReported: boolean;
 }
@@ -101,12 +98,10 @@ const IDLE: CaptureState = {
   url: null,
   routeToken: null,
   vendor: null,
-  mode: null,
   needs: [],
   received: {},
   backgrounded: false,
   providerOutcomes: [],
-  collectionComplete: null,
   completionEvidence: null,
   completionEvidenceReported: false,
 };
@@ -143,15 +138,10 @@ function submissionKey(): string {
   return `guided-capture-${globalThis.crypto.randomUUID()}`;
 }
 
-function captureCommandKey(
-  partId: string,
-  sourceKey: string | undefined,
-  mode: CaptureMode,
-): string {
+function captureCommandKey(partId: string, sourceKey: string | undefined): string {
   return JSON.stringify({
     part_id: partId,
     provider: sourceKey || null,
-    mode,
   });
 }
 
@@ -221,8 +211,9 @@ const WORKFLOW_STAGE_MESSAGE: Record<string, string> = {
   identity_dedupe: "Confirming the exact manufacturer and part number.",
   metadata: "Keeping the best existing facts and filling missing part data.",
   datasheet: "Finding and verifying the manufacturer datasheet.",
-  existing_evidence: "Checking saved CAD evidence before downloading anything again.",
-  cad_acquisition: "Finding one matched KiCad, Altium, and STEP source set.",
+  existing_evidence: "Checking saved CAD evidence before asking you to download anything again.",
+  cad_acquisition:
+    "Open the provider page, sign in if it asks, choose the formats you need, and download.",
   reconcile: "Reconciling the accepted sources into one canonical part.",
   canonical_definition: "Building the shared component definition.",
   template_generation: "Preparing equivalent KiCad and Altium inputs.",
@@ -279,7 +270,6 @@ function latestEventStage(events: WorkflowEvent[], kind?: string): string | null
 function durableMessage(
   batch: WorkflowBatchSummary,
   events: WorkflowEvent[],
-  mode: CaptureMode,
   _vendor: string | null,
 ): string {
   if (batch.status === "paused") {
@@ -304,15 +294,14 @@ function durableMessage(
   }
   const latestStage = latestEventStage(events);
   if (latestStage === "cad_acquisition") {
-    return mode === "collect-all"
-      ? "Collecting every eligible source in order and retaining verified variants."
-      : "Checking eligible sources in order and stopping at the first complete validated set.";
+    return (
+      "Open the provider page, sign in if it asks, choose the formats you need, and download. " +
+      "Stockroom captures each download and validates it."
+    );
   }
   return latestStage
     ? (WORKFLOW_STAGE_MESSAGE[latestStage] ?? "Completing this part.")
-    : mode === "collect-all"
-      ? "Completion is active. Stockroom is checking cached evidence, exact identity, and every eligible network source in order."
-      : "Completion is active. Stockroom is checking cached evidence and eligible network sources until one complete validated set is ready.";
+    : "Completion is active. Stockroom is checking saved evidence and exact identity before opening the provider page.";
 }
 
 function resultFromCanonicalProjection(
@@ -376,7 +365,6 @@ export interface CaptureApi {
     partName: string,
     needs: Requirement[],
     sourceKey?: string,
-    mode?: CaptureMode,
   ) => Promise<void>;
   reset: () => void;
   keepWorking: () => void;
@@ -391,15 +379,6 @@ const CaptureContext = createContext<CaptureApi | null>(null);
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
-}
-
-function routeSummary(outcomes: ProviderOutcome[]): string {
-  if (outcomes.length === 0) return "";
-  const settled = outcomes.filter((outcome) =>
-    ["activated", "succeeded-retained"].includes(outcome.status) ||
-    (outcome.status === "unavailable" && outcome.attempted),
-  ).length;
-  return `${settled} of ${outcomes.length} source routes settled`;
 }
 
 function verifiedManifest(evidence: CompletionEvidence | null): string | null {
@@ -476,7 +455,6 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     (
       partId: string,
       needs: Requirement[],
-      mode: CaptureMode,
       result: CompletionResult,
       durableSuccessMessage?: string,
     ) => {
@@ -506,16 +484,13 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       invalidate();
 
       const outcomes = (item.provider_outcomes ?? []).filter(
-        (outcome) => mode === "collect-all" || outcome.attempted || outcome.status !== "not-attempted",
+        (outcome) => outcome.attempted || outcome.status !== "not-attempted",
       );
-      const collectionComplete =
-        mode === "collect-all" ? (item.collection_complete ?? null) : null;
       const remaining =
         item.remaining
           .map((requirement) => REQ_LABELS[requirement as Requirement] ?? requirement)
           .join(", ") || "required CAD files";
       const notes = (item.notes ?? []).join("; ");
-      const summary = routeSummary(outcomes);
       const missingLabels =
         item.remaining.length > 0 ? ` Still missing: ${remaining}.` : "";
       const operationDetail = item.error || notes;
@@ -530,26 +505,17 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
 
       setState((current) => ({
         ...current,
-        // The active CAD package is the product outcome. Exhaustive collection is useful
-        // provenance, but an unavailable optional provider must not turn a verified, usable
-        // KiCad/Altium package into a failed completion.
+        // The active CAD package is the product outcome. An unavailable optional provider must
+        // not turn a verified, usable KiCad/Altium package into a failed completion.
         status: projectionComplete ? "done" : "error",
         providerOutcomes: outcomes,
-        collectionComplete,
         completionEvidence,
         completionEvidenceReported: true,
-        message:
-          !projectionComplete
-            ? incompleteMessage
-            : completionEvidence?.state === "not-required"
-              ? completionEvidenceMessage(completionEvidence)
-            : mode === "collect-all"
-              ? collectionComplete
-                ? `${durableSuccessMessage ?? completionEvidenceMessage(completionEvidence)}${
-                    summary ? ` ${summary}.` : ""
-                  } Every eligible route completed without a blocked or failed outcome.`
-                : `${durableSuccessMessage ?? completionEvidenceMessage(completionEvidence)} Some optional provider variants were unavailable or deferred; this part is fully usable.`
-              : durableSuccessMessage ?? completionEvidenceMessage(completionEvidence),
+        message: !projectionComplete
+          ? incompleteMessage
+          : completionEvidence?.state === "not-required"
+            ? completionEvidenceMessage(completionEvidence)
+            : (durableSuccessMessage ?? completionEvidenceMessage(completionEvidence)),
       }));
     },
     [invalidate, markReceived],
@@ -562,7 +528,6 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       partId,
       partName,
       needs,
-      mode,
       vendor,
       cursor: initialCursor,
       generation,
@@ -572,7 +537,6 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       partId: string;
       partName: string;
       needs: Requirement[];
-      mode: CaptureMode;
       vendor: string | null;
       cursor: number;
       generation: number;
@@ -604,7 +568,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
           setState((current) => ({
             ...current,
             status: page.batch.status === "blocked" ? "window-open" : "receiving",
-            message: durableMessage(page.batch, page.events, mode, vendor),
+            message: durableMessage(page.batch, page.events, vendor),
             needs: durableNeeds,
             vendor: liveSession.active_route?.vendor ?? current.vendor,
             url: liveSession.active_route?.detail_url ?? null,
@@ -635,10 +599,9 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
             applyResult(
               partId,
               durableNeeds,
-              mode,
               result,
               page.batch.status === "completed"
-                ? durableMessage(page.batch, page.events, mode, vendor)
+                ? durableMessage(page.batch, page.events, vendor)
                 : undefined,
             );
             const canonicalReady =
@@ -650,7 +613,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
               setState((current) => ({
                 ...current,
                 status: "error",
-                message: durableMessage(page.batch, page.events, mode, vendor),
+                message: durableMessage(page.batch, page.events, vendor),
               }));
             }
             if (!["failed", "paused"].includes(page.batch.status)) clearWorkflow(batchId);
@@ -713,8 +676,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
             workflowItemId: itemId,
             partName,
             needs: session.initial_needs,
-            vendor: session.vendor ?? "Automatic",
-            mode: session.mode,
+            vendor: session.vendor ?? "All Sources",
             status: "receiving",
             backgrounded: true,
             message: "Reconnected to durable completion. Restoring the latest verified stage...",
@@ -725,7 +687,6 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
             partId: session.part_id,
             partName,
             needs: session.initial_needs,
-            mode: session.mode,
             vendor: session.vendor,
             cursor,
             generation,
@@ -760,9 +721,8 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       partName: string,
       needs: Requirement[],
       sourceKey?: string,
-      mode: CaptureMode = "finish-first",
     ) => {
-      const commandKey = captureCommandKey(partId, sourceKey, mode);
+      const commandKey = captureCommandKey(partId, sourceKey);
       const idempotencyKey =
         retrySubmissionRef.current?.commandKey === commandKey
           ? retrySubmissionRef.current.idempotencyKey
@@ -779,19 +739,15 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         partName,
         needs,
         vendor: sourceKey ?? "All Sources",
-        mode,
         status: "resolving",
         message:
-          mode === "collect-all"
-            ? "Planning one automatic pass through cached evidence, exact identity, data, datasheet, and every eligible CAD source..."
-            : "Planning one automatic pass through cached evidence, exact identity, data, datasheet, and the fastest complete CAD source...",
+          "Checking saved evidence and exact identity, then opening the provider page for you...",
       }));
 
       try {
         const reference = await api.runCapture({
           partIds: [partId],
           vendor: sourceKey || undefined,
-          mode,
           idempotencyKey,
         });
         if (
@@ -827,7 +783,8 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
           workflowItemId: itemId,
           status: "receiving",
           message:
-            "Automatic completion is running. Provider pages appear inside Stockroom only when needed, and verified files are retained as they land.",
+            "Completion is running. Open the provider page when it appears, sign in if it asks, " +
+            "choose the formats you need, and download; Stockroom captures and validates each file as it lands.",
         }));
         await followDurable({
           batchId,
@@ -835,7 +792,6 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
           partId,
           partName,
           needs,
-          mode,
           vendor: sourceKey ?? null,
           cursor,
           generation,
@@ -870,9 +826,8 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       partName: string,
       needs: Requirement[],
       sourceKey?: string,
-      mode: CaptureMode = "finish-first",
     ): Promise<void> => {
-      const commandKey = captureCommandKey(partId, sourceKey, mode);
+      const commandKey = captureCommandKey(partId, sourceKey);
       const pending = pendingStartRef.current;
       if (pending) {
         if (pending.commandKey === commandKey) return pending.promise;
@@ -885,7 +840,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         return Promise.reject(new CaptureBusyError(currentCapture.partName ?? ""));
       }
 
-      const promise = runStart(partId, partName, needs, sourceKey, mode);
+      const promise = runStart(partId, partName, needs, sourceKey);
       const pendingEntry = { commandKey, promise };
       pendingStartRef.current = pendingEntry;
       const clearPending = () => {

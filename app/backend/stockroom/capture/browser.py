@@ -20,7 +20,6 @@ provider's cookies or browser state.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -72,7 +71,6 @@ _DEFAULT_PROVIDER_FORMATS = (
     "altium_symbol",
     "altium_footprint",
 )
-_OPERATOR_SUBMISSION_WINDOW_SECONDS = 30.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,7 +235,6 @@ _WINDOWS_RESERVED_NAMES = {
 _PROCESS_LOCK_GUARD = threading.Lock()
 _PROCESS_LOCKS: set[str] = set()
 _USER_CAPTURE_WINDOW_LOCK = threading.Lock()
-_CLOAK_BROWSER_VERSION = "146.0.7680.177.5"
 _CHROMIUM_PREFERENCES = Path("Default") / "Preferences"
 _BROWSER_LAUNCH_TIMEOUT_MS = 20_000
 _DISABLE_WEBRTC_INIT_SCRIPT = """
@@ -2219,59 +2216,6 @@ def _allow_automatic_downloads(profile_dir: Path) -> None:
         ) from exc
 
 
-def _allow_embedded_downloads(
-    browser,
-    download_dir: Path,
-    *,
-    on_will_begin: Callable[[dict[str, object]], None] | None = None,
-    on_progress: Callable[[dict[str, object]], None] | None = None,
-):
-    """Make the already-running WebView2 save downloads instead of opening ``Save As``.
-
-    ``accept_downloads=True`` is a context-creation option.  It cannot be applied when
-    Playwright attaches to WebView2's pre-existing default context, so a page download event can
-    fire while the native browser still blocks on its Save As dialog.  The event handler then
-    waits on ``download.save_as`` until the person cancels the dialog and reports the download as
-    failed.  Configure the equivalent browser-domain policy before any provider navigation; the
-    normal task-bound broker still chooses the final verified destination.
-    """
-
-    destination = Path(download_dir).resolve()
-    destination.mkdir(parents=True, exist_ok=True)
-    try:
-        session = browser.new_browser_cdp_session()
-        if on_will_begin is not None:
-            session.on("Browser.downloadWillBegin", on_will_begin)
-        if on_progress is not None:
-            session.on("Browser.downloadProgress", on_progress)
-        session.send(
-            "Browser.setDownloadBehavior",
-            {
-                "behavior": "allowAndName",
-                "downloadPath": str(destination),
-                "eventsEnabled": True,
-            },
-        )
-    except Exception as exc:
-        raise CaptureBrowserError(
-            "could not arm Stockroom's embedded download interception"
-        ) from exc
-    return session
-
-
-@dataclass(slots=True)
-class _EmbeddedDownload:
-    """One browser-domain download owned by an exact capture generation."""
-
-    guid: str
-    generation: int
-    broker: DownloadBroker | None
-    suggested_name: str
-    source_url: str
-    state: str = "inProgress"
-    captured: bool = False
-
-
 @dataclass(slots=True)
 class _NativeSurfaceDownload:
     """One host-observed download that remains visible while CDP is detached."""
@@ -2486,13 +2430,13 @@ class PlaywrightCaptureBrowser:
     Not headless by default: this is a GUIDED capture, so the human signs in, clears a Cloudflare
     check, and watches what happens. Headless exists for the tests.
 
-    ENGINE IS A PARAMETER, NEVER A SECOND CLASS. Production uses Stockroom's version-pinned
-    Playwright Chromium so the browser version is part of the tested application contract rather
-    than whichever branded browser happens to be installed. ``windows`` remains an explicit
-    Chrome-then-Chromium compatibility policy. ``camoufox`` is the Firefox stealth mode and
-    ``cloak`` is the Chromium stealth mode, each selected only for a measured provider need. A
-    vendor that resists is therefore a MODE on this class, never a second capture-browser class
-    beside it - that is the one-tool-per-job rule, and
+    ENGINE IS A PARAMETER, NEVER A SECOND CLASS. Production attaches to Stockroom's own embedded
+    provider surface; the standalone fallback uses Stockroom's version-pinned Playwright Chromium
+    so the browser version is part of the tested application contract rather than whichever
+    branded browser happens to be installed. ``windows`` remains an explicit Chrome-then-Chromium
+    compatibility policy. Stealth engines are gone with the automation they served: this window
+    exists so a PERSON can work a provider page, and a person needs no evasion. There is one
+    capture-browser class - that is the one-tool-per-job rule, and
     tests/backend/capture/test_one_tool_per_job.py enforces it by listing the modules allowed to
     launch a browser at all.
 
@@ -2541,8 +2485,6 @@ class PlaywrightCaptureBrowser:
         self._page_brokers: list[tuple[object, DownloadBroker]] = []
         self._page_huds: list[tuple[Any, _ProviderHudState]] = []
         self._context = None
-        self._embedded_download_session = None
-        self._embedded_downloads: dict[str, _EmbeddedDownload] = {}
         self._embedded_download_generation = 0
         self._embedded_active_generation = 0
         self._embedded_finalized_generations: set[int] = set()
@@ -2559,6 +2501,12 @@ class PlaywrightCaptureBrowser:
     def captured(self) -> list[CapturedFile]:
         self._drain_native_downloads()
         return list(self._captured)
+
+    @property
+    def _has_native_download_ledger(self) -> bool:
+        """True when Stockroom's host reports this window's downloads itself."""
+
+        return callable(getattr(self._native_surface, "download_events", None))
 
     @property
     def download_errors(self) -> tuple[CaptureBrowserError, ...]:
@@ -2766,7 +2714,6 @@ class PlaywrightCaptureBrowser:
         )
         self._playwright_runtime.close()
         with self._download_lock:
-            self._embedded_download_session = None
             self._context = None
             self._browser = None
         native_navigate(url)
@@ -2907,7 +2854,6 @@ class PlaywrightCaptureBrowser:
         # profile, visible page, and human input remain owned by Stockroom's native host.
         self._playwright_runtime.close()
         with self._download_lock:
-            self._embedded_download_session = None
             self._context = None
             self._browser = None
         deadline = time.monotonic() + timeout
@@ -3208,7 +3154,6 @@ class PlaywrightCaptureBrowser:
         auto_finish_seconds: float = 2.0,
         auto_finish_idle_seconds: float = 25.0,
         retryable_render_issue: Callable[[object], str] | None = None,
-        operate_controls: Callable[[object], object] | None = None,
         max_render_reloads: int = 0,
         render_reload_delay_seconds: float = 5.0,
     ) -> UserCaptureResult:
@@ -3226,12 +3171,9 @@ class PlaywrightCaptureBrowser:
         draw a Stockroom-owned outline over it. That is the entire allowance. Neither Python nor
         that surface reads, collects, stores, transmits, or returns page text, markup, attribute
         values, form values, credentials, prices, or any other page CONTENT; a rect is not content,
-        and that distinction is the whole basis for this being acceptable. By default nothing here clicks,
+        and that distinction is the whole basis for this being acceptable. Nothing here clicks,
         focuses, scrolls, fills, selects a result or format, accepts terms, or otherwise operates
-        any provider control - the person performs every interaction. The optional
-        ``operate_controls`` seam is injected only for a route with an explicit measured ordinary-
-        export adapter; it never handles login, phone verification, CAPTCHA, MFA, or passkeys.
-        Selectors come only from
+        any provider control - the person performs every interaction. Selectors come only from
         measured per-provider hints, a hint that does not match exactly one visible element draws
         nothing at all, and a page showing a challenge, CAPTCHA, or sign-in draws nothing at all
         and defers to the existing person-handoff.
@@ -3266,7 +3208,6 @@ class PlaywrightCaptureBrowser:
             (should_finish, "should_finish"),
             (should_cancel, "should_cancel"),
             (retryable_render_issue, "retryable_render_issue"),
-            (operate_controls, "operate_controls"),
         ):
             if callback is not None and not callable(callback):
                 raise TypeError(f"{label} must be callable")
@@ -3313,10 +3254,6 @@ class PlaywrightCaptureBrowser:
         # The HUD carries the stable format keys corresponding to its human labels. Completion is
         # classified from the downloaded bytes, never inferred from archive count.
         required_formats = hud.required_formats if hud is not None else ()
-        all_formats_unavailable = False
-        operator_submitted_at = 0.0
-        operator_submission_receipts = -1
-        operator_expected_receipts = 0
 
         deadline = time.monotonic() + timeout
         status: UserCaptureStatus = "timed_out"
@@ -3357,114 +3294,9 @@ class PlaywrightCaptureBrowser:
                 # armed; visibility is route state, not session-construction state.
                 show_native_surface()
 
-            def run_ordinary_export_controls() -> None:
-                """Run the route's measured export step whenever its document becomes usable."""
+            def downloads_are_terminal(_now: float | None = None) -> bool:
+                """Seal native intake only when every observed byte stream is idle."""
 
-                nonlocal all_formats_unavailable, final_url, required_formats
-                nonlocal operator_submitted_at, operator_submission_receipts
-                nonlocal operator_expected_receipts
-                if operate_controls is None:
-                    return
-                receipt_count = len(broker.receipts)
-                if (
-                    operator_submitted_at > 0
-                    and receipt_count
-                    < operator_submission_receipts + operator_expected_receipts
-                    and time.monotonic() - operator_submitted_at
-                    < _OPERATOR_SUBMISSION_WINDOW_SECONDS
-                ):
-                    # The provider accepted one export. Browser.downloadWillBegin is asynchronous;
-                    # clicking again during that gap creates duplicate ZIPs or windows. Retry only
-                    # after the typed submission window expires or a receipt changes the state.
-                    return
-                try:
-                    reports = operate_controls(page)
-                except Exception as exc:  # noqa: BLE001 - the visible fallback remains usable
-                    trace_warning(
-                        "capture.user-window.operator-controls-failed",
-                        provider=self.provider_key or "",
-                        url=url_note(_page_url(page, final_url)),
-                        why=str(exc),
-                    )
-                    reports = ()
-                if not isinstance(reports, (list, tuple)):
-                    reports = ()
-                usable_reports = tuple(
-                    report
-                    for report in reports
-                    if not bool(getattr(report, "blocked", False))
-                    and not bool(getattr(report, "requires_user_clearance", False))
-                )
-                submitted_reports = tuple(
-                    report
-                    for report in usable_reports
-                    if bool(getattr(report, "submitted", False))
-                )
-                if submitted_reports:
-                    operator_submitted_at = time.monotonic()
-                    operator_submission_receipts = receipt_count
-                    operator_expected_receipts = sum(
-                        value
-                        if type(value := getattr(report, "expected_downloads", 1)) is int
-                        and value > 0
-                        else 1
-                        for report in submitted_reports
-                    )
-                # Provider adapters do their own hydration and exact-part checks before returning
-                # a DriveReport. Treat that report as the verdict instead of requiring an
-                # unrelated sibling download to prove that a missing format is really missing.
-                # The old second-guessing branch made an all-unavailable part wait ten minutes.
-                confirmed_unavailable = {
-                    value
-                    for report in usable_reports
-                    for value in tuple(getattr(report, "missed", ()) or ())
-                    if value in required_formats
-                }
-                if confirmed_unavailable:
-                    required_formats = tuple(
-                        value for value in required_formats if value not in confirmed_unavailable
-                    )
-                    all_formats_unavailable = not required_formats
-                    trace(
-                        "capture.user-window.formats-unavailable",
-                        provider=self.provider_key or "",
-                        unavailable=sorted(confirmed_unavailable),
-                        remaining=list(required_formats),
-                    )
-                    if hud_state is not None:
-                        self._update_provider_hud(
-                            hud_state,
-                            len(broker.receipts),
-                            _completed_provider_formats(
-                                broker.receipts,
-                                hud_state.spec.required_formats,
-                            ),
-                            unavailable_formats=tuple(
-                                {
-                                    *hud_state.unavailable_formats,
-                                    *confirmed_unavailable,
-                                }
-                            ),
-                        )
-                final_url = _page_url(page, final_url)
-
-            def operator_submission_in_flight(now: float | None = None) -> bool:
-                """Whether an accepted export can still emit its first browser event."""
-
-                observed_at = time.monotonic() if now is None else now
-                return (
-                    operator_submitted_at > 0
-                    and len(broker.receipts)
-                    < operator_submission_receipts + operator_expected_receipts
-                    and observed_at - operator_submitted_at
-                    < _OPERATOR_SUBMISSION_WINDOW_SECONDS
-                )
-
-            def downloads_are_terminal(now: float | None = None) -> bool:
-                """Seal native intake only when operations and observed bytes are both idle."""
-
-                if operator_submission_in_flight(now):
-                    return False
                 return self._finalize_native_downloads_if_idle()
 
             def drain_navigation_terminal_downloads() -> None:
@@ -3589,9 +3421,6 @@ class PlaywrightCaptureBrowser:
                 if navigation_terminal and navigation_terminal_can_download:
                     drain_navigation_terminal_downloads()
                 if not navigation_terminal:
-                    run_ordinary_export_controls()
-                    operator_retry_delay = max(1.0, poll_interval * 4)
-                    next_operator_attempt = time.monotonic() + operator_retry_delay
                     receipt_count = len(broker.receipts)
                     completed_formats = _completed_provider_formats(
                         broker.receipts,
@@ -3611,15 +3440,6 @@ class PlaywrightCaptureBrowser:
                     requested_at: float | None = None
                     while True:
                         native_pending, _ = self._drain_native_downloads()
-                        if (
-                            all_formats_unavailable
-                            and native_pending == 0
-                            and downloads_are_terminal()
-                        ):
-                            # The exact provider route has no requested deliverable. There is
-                            # nothing a person can download, so advance to the next route now.
-                            status = "try_another"
-                            break
                         errors = self.download_errors
                         if len(errors) > error_mark:
                             # A failing companion does not invalidate files already staged.
@@ -3662,11 +3482,11 @@ class PlaywrightCaptureBrowser:
                             requested_status = "try_another"
                         if requested_status is not None:
                             requested_at = requested_at or now
-                            # A browser-domain download can be accepted by WebView2 just before
-                            # its willBegin event reaches this protocol connection. Give that
-                            # event one bounded settle window before sealing a zero-receipt route.
+                            # The host can accept a download just before its event reaches this
+                            # ledger. Give that event one bounded settle window before sealing a
+                            # zero-receipt route.
                             if (
-                                self._embedded_download_session is not None
+                                self._has_native_download_ledger
                                 and current_count == 0
                                 and now - requested_at < max(settle, 0.25)
                             ):
@@ -3800,25 +3620,10 @@ class PlaywrightCaptureBrowser:
                                     if downloads_are_terminal(now):
                                         break
                                     continue
-                                # The first operator attempt may have stopped at this exact gate.
-                                # Once the person clears it and CDP reconnects, resume ordinary
-                                # format selection instead of waiting for manual download clicks.
-                                run_ordinary_export_controls()
-                                next_operator_attempt = time.monotonic() + operator_retry_delay
                                 continue
                         if _page_is_closed(page) and downloads_are_terminal(now):
                             status = "completed"
                             break
-                        if (
-                            operate_controls is not None
-                            and native_pending == 0
-                            and now >= next_operator_attempt
-                        ):
-                            # Login can be an ordinary provider navigation rather than a security
-                            # challenge. Retry the measured export action on the newly usable page;
-                            # the guided callback filters out formats already received.
-                            run_ordinary_export_controls()
-                            next_operator_attempt = time.monotonic() + operator_retry_delay
                         if should_finish is not None and should_finish():
                             finish_requested = True
                         if hud_action == "finish":
@@ -3855,10 +3660,6 @@ class PlaywrightCaptureBrowser:
                                         why=str(exc),
                                     )
                                 final_url = _page_url(page, final_url)
-                                # A hydrated replacement document needs the same measured export
-                                # operation that ran on the original blank fragment.
-                                run_ordinary_export_controls()
-                                next_operator_attempt = time.monotonic() + operator_retry_delay
                                 next_render_check = time.monotonic() + render_reload_delay
                                 continue
                             next_render_check = now + render_reload_delay
@@ -3928,21 +3729,6 @@ class PlaywrightCaptureBrowser:
         if lock is not None:
             lock.acquire()
         try:
-            # A verified CDP endpoint is the already-open Stockroom WebView2 surface. It owns the
-            # visible provider session regardless of the adapter's standalone fallback engine;
-            # choosing Camoufox/Cloak first would open a second external browser and leave the
-            # embedded one disconnected from download capture.
-            if self._cdp_endpoint is None and self.engine == "camoufox":
-                self.launched_browser = "Camoufox"
-                with self._camoufox_session() as page:
-                    yield page
-                return
-            if self._cdp_endpoint is None and self.engine == "cloak":
-                self.launched_browser = f"CloakBrowser Chromium {_CLOAK_BROWSER_VERSION}"
-                with self._cloak_session() as page:
-                    yield page
-                return
-
             if self._playwright_runtime is not None:
                 with self._playwright_session(self._playwright_runtime.get()) as page:
                     yield page
@@ -3987,18 +3773,11 @@ class PlaywrightCaptureBrowser:
                     except Exception:  # noqa: BLE001 - teardown is best effort
                         pass
             with self._download_lock:
-                download_session = self._embedded_download_session
-                self._embedded_download_session = None
                 self._context = None
                 self._browser = None
                 self._page_brokers.clear()
                 self._page_huds.clear()
                 self._wired_pages.clear()
-            if download_session is not None:
-                try:
-                    download_session.detach()
-                except Exception:  # noqa: BLE001 - protocol teardown is best effort
-                    pass
 
     def _launch_playwright(self, pw):
         """Launch the requested browser policy and return ``(context, browser)``.
@@ -4020,20 +3799,6 @@ class PlaywrightCaptureBrowser:
                     raise CaptureBrowserError("the embedded provider browser exposed no context")
                 self.launched_browser = "Stockroom Embedded WebView2"
                 context = contexts[0]
-                download_session = _allow_embedded_downloads(
-                    browser,
-                    self.download_dir,
-                    on_will_begin=self._on_embedded_download_will_begin,
-                    on_progress=self._on_embedded_download_progress,
-                )
-                with self._download_lock:
-                    previous_session = self._embedded_download_session
-                    self._embedded_download_session = download_session
-                if previous_session is not None and previous_session is not download_session:
-                    try:
-                        previous_session.detach()
-                    except Exception:  # noqa: BLE001 - the replacement session owns new events
-                        pass
                 # This is the person's already-running native WebView, not a browser process
                 # Stockroom launched for automation. Rewriting RTCPeerConnection across its
                 # future documents changes the browser fingerprint before a Cloudflare gate and
@@ -4100,166 +3865,6 @@ class PlaywrightCaptureBrowser:
             "is missing."
         )
         raise CaptureBrowserError(f"could not launch {self.engine}: {'; '.join(failures)}. {hint}")
-
-    @contextmanager
-    def _camoufox_session(self):
-        """The stealth engine, for vendors that put a bot wall in front of their downloads.
-
-        MEASURED 2026-07-27:
-          * SnapEDA serves plain headless Chromium a Cloudflare Turnstile interstitial (title
-            "Just a moment...", sole input `cf-turnstile-response`). Camoufox walks straight
-            through it headless - real results, no wall, no human.
-          * It handles Ultra Librarian identically (sign-in and search both fine), so there is no
-            page that needs Chromium instead, and no reason for a second launcher to exist.
-          * It is roughly 15x slower to launch, which is the whole reason it is opted into rather
-            than defaulted to. The guided source opens ONE session per run, so that launch cost is
-            paid once for a 90-part sitting, not once per part.
-
-        uBLOCK IS DISABLED, and that is load-bearing rather than tidiness: Camoufox ships uBlock
-        Origin, which BLOCKS the anti-bot challenge scripts themselves - leaving a challenge that
-        can never complete, on a page that then never loads. The scrape render tier learned this
-        the expensive way; the lesson is carried here rather than re-learned.
-        """
-        try:
-            from camoufox import DefaultAddons
-            from camoufox.sync_api import Camoufox
-        except ImportError as exc:  # pragma: no cover - dependency is declared
-            raise CaptureBrowserError(
-                "camoufox is not installed; it is a declared dependency, run `uv sync` and "
-                "`uv run python -m camoufox fetch`"
-            ) from exc
-
-        options = {
-            "headless": self.headless,
-            "os": "windows",
-            "humanize": True,
-            "timeout": _BROWSER_LAUNCH_TIMEOUT_MS,
-            # Capture does not need geolocation. Camoufox's automatic GeoIP mode makes a separate
-            # request to a public IP service before the browser can even launch, turning an
-            # unrelated third-party outage or firewall rule into a CAD-provider outage.
-            "geoip": False,
-            "exclude_addons": [DefaultAddons.UBO],
-        }
-        if self.profile_dir is not None:
-            self.profile_dir.mkdir(parents=True, exist_ok=True)
-            options["persistent_context"] = True
-            options["user_data_dir"] = str(self.profile_dir)
-
-        try:
-            handle = Camoufox(**options)
-        except Exception as exc:  # noqa: BLE001 - a missing browser build is a real, nameable case
-            raise CaptureBrowserError(
-                f"could not launch camoufox: {exc}. If its browser build is missing, run "
-                "`uv run python -m camoufox fetch`."
-            ) from exc
-
-        with handle as opened:
-            # Persistent mode yields a CONTEXT, ephemeral mode yields a BROWSER. Normalising here
-            # keeps every caller identical whichever it got.
-            if hasattr(opened, "new_page") and not hasattr(opened, "new_context"):
-                context = opened
-            else:
-                context = getattr(opened, "new_context")(accept_downloads=True)
-            try:
-                _disable_webrtc(context)
-                with self._download_lock:
-                    self._context = context
-                context.on("page", self._wire_downloads)
-                page = context.pages[0] if context.pages else context.new_page()
-                self._wire_downloads(page)
-                yield page
-            finally:
-                try:
-                    context.close()
-                except Exception:  # noqa: BLE001 - teardown is best effort
-                    pass
-                with self._download_lock:
-                    self._context = None
-                    self._page_brokers.clear()
-                    self._page_huds.clear()
-                    self._wired_pages.clear()
-
-    @contextmanager
-    def _cloak_session(self):
-        """Launch the pinned free stealth-Chromium build through the one browser owner.
-
-        CloakBrowser remains the Chromium fallback for a provider surface that requires Chromium.
-        DigiKey no longer uses it: a current live check showed Camoufox rendering DigiKey's exact
-        product and CAD-model pages, while DigiKey's Cloudflare login challenge repeatedly
-        rejected the visible CloakBrowser session after a person completed the checkbox.
-        CloakBrowser supplies a source-patched Chromium binary and the same synchronous Playwright
-        objects this class already owns. Its public v146 build is pinned deliberately: it requires
-        no account or API key, is downloaded independently on each installation, and its wrapper
-        verifies the published signature/checksum.
-        """
-
-        try:
-            from cloakbrowser import launch, launch_persistent_context
-        except ImportError as exc:  # pragma: no cover - dependency is declared
-            raise CaptureBrowserError(
-                "cloakbrowser is not installed; it is a declared dependency, run `uv sync`"
-            ) from exc
-
-        fingerprint_source = (
-            str(self.profile_dir.resolve()).casefold()
-            if self.profile_dir is not None
-            else f"stockroom:{self.provider_key or 'ephemeral'}"
-        )
-        fingerprint = (
-            int.from_bytes(
-                hashlib.sha256(fingerprint_source.encode("utf-8")).digest()[:4],
-                "big",
-            )
-            % 90_000
-            + 10_000
-        )
-        fingerprint_args = [f"--fingerprint={fingerprint}"]
-        context = None
-        browser = None
-        try:
-            if self.profile_dir is not None:
-                self.profile_dir.mkdir(parents=True, exist_ok=True)
-                context = launch_persistent_context(
-                    str(self.profile_dir),
-                    headless=self.headless,
-                    browser_version=_CLOAK_BROWSER_VERSION,
-                    humanize=True,
-                    args=fingerprint_args,
-                    accept_downloads=True,
-                )
-            else:
-                browser = launch(
-                    headless=self.headless,
-                    browser_version=_CLOAK_BROWSER_VERSION,
-                    humanize=True,
-                    args=fingerprint_args,
-                )
-                context = browser.new_context(accept_downloads=True)
-            _disable_webrtc(context)
-            with self._download_lock:
-                self._context = context
-            context.on("page", self._wire_downloads)
-            page = context.pages[0] if context.pages else context.new_page()
-            self._wire_downloads(page)
-            yield page
-        except Exception as exc:
-            if isinstance(exc, CaptureBrowserError):
-                raise
-            raise CaptureBrowserError(
-                f"could not launch pinned CloakBrowser Chromium: {exc}"
-            ) from exc
-        finally:
-            for closable in (context, browser):
-                if closable is not None:
-                    try:
-                        closable.close()
-                    except Exception:  # noqa: BLE001 - teardown is best effort
-                        pass
-            with self._download_lock:
-                self._context = None
-                self._page_brokers.clear()
-                self._page_huds.clear()
-                self._wired_pages.clear()
 
     def _bind_provider_hud(self, page, state: _ProviderHudState) -> None:
         """Install one Stockroom-owned HUD that never reads provider-controlled page content.
@@ -4408,15 +4013,17 @@ class PlaywrightCaptureBrowser:
         *,
         finalize_if_idle: bool = False,
     ) -> tuple[int, bool]:
-        """Move browser-domain WebView2 files through the exact task broker."""
+        """Move host-observed WebView2 files through the exact task broker."""
 
         self._poll_native_surface_downloads()
-        native_pending = self._drain_native_surface_downloads()
-        embedded_pending, embedded_finalized = self._drain_embedded_downloads(
-            finalize_if_idle=finalize_if_idle and native_pending == 0,
-        )
-        pending = native_pending + embedded_pending
-        return pending, pending == 0 and embedded_finalized
+        pending = self._drain_native_surface_downloads()
+        finalized = pending == 0
+        if finalize_if_idle and finalized:
+            with self._download_lock:
+                generation = self._embedded_active_generation
+                if generation > 0:
+                    self._embedded_finalized_generations.add(generation)
+        return pending, finalized
 
     def _poll_native_surface_downloads(self) -> None:
         """Reconcile host download events that survive CDP/security detachment."""
@@ -4452,6 +4059,8 @@ class PlaywrightCaptureBrowser:
             source_url = str(getattr(event, "uri", "") or "")
             with self._download_lock:
                 generation = self._embedded_active_generation
+                if generation in self._embedded_finalized_generations:
+                    generation = 0
                 brokers = {id(broker): broker for _page, broker in self._page_brokers}
                 broker = next(iter(brokers.values())) if generation > 0 and len(brokers) == 1 else None
                 download = self._native_surface_downloads.get(operation_id)
@@ -4501,25 +4110,6 @@ class PlaywrightCaptureBrowser:
                 pending += 1
                 continue
 
-            # When browser-domain observation remained attached, it owns the richer original
-            # filename. Mark it terminal and let the existing exact-task path perform one copy.
-            with self._download_lock:
-                # ``allowAndName`` makes the result filename the browser-domain GUID. Provider
-                # endpoints commonly emit several distinct files from the same URL, so URL-only
-                # matching can collapse an entire multi-download batch into its first operation.
-                embedded = next(
-                    (
-                        item
-                        for item in self._embedded_downloads.values()
-                        if not item.captured and item.guid == source.name
-                    ),
-                    None,
-                )
-                if embedded is not None:
-                    embedded.state = "completed"
-                    download.captured = True
-                    continue
-
             if download.broker is None:
                 download.captured = True
                 source.unlink(missing_ok=True)
@@ -4561,130 +4151,6 @@ class PlaywrightCaptureBrowser:
                 if not item.captured
             }
         return pending
-
-    def _on_embedded_download_will_begin(self, event: dict[str, object]) -> None:
-        """Bind a managed WebView2 download to the active task before bytes arrive."""
-
-        guid = str(event.get("guid") or "")
-        if not guid or Path(guid).name != guid:
-            return
-        suggested_name = _safe_filename(str(event.get("suggestedFilename") or "cad-download"))
-        source_url = str(event.get("url") or "")
-        with self._download_lock:
-            generation = self._embedded_active_generation
-            brokers = {id(broker): broker for _page, broker in self._page_brokers}
-            if generation in self._embedded_finalized_generations:
-                generation = 0
-            broker = next(iter(brokers.values())) if generation > 0 and len(brokers) == 1 else None
-            if broker is None:
-                generation = 0
-            self._embedded_downloads[guid] = _EmbeddedDownload(
-                guid=guid,
-                generation=generation,
-                broker=broker,
-                suggested_name=suggested_name,
-                source_url=source_url,
-            )
-            if broker is None:
-                self._download_errors.append(
-                    CaptureBrowserError(
-                        "the embedded download began without one exact Stockroom task binding"
-                    )
-                )
-        trace(
-            "capture.download.browser-begin",
-            provider=self.provider_key or "",
-            file=suggested_name,
-            task_bound=generation > 0,
-        )
-
-    def _on_embedded_download_progress(self, event: dict[str, object]) -> None:
-        """Record the browser's terminal verdict; the capture loop moves completed bytes."""
-
-        guid = str(event.get("guid") or "")
-        state = str(event.get("state") or "")
-        if not guid or state not in {"inProgress", "completed", "canceled"}:
-            return
-        with self._download_lock:
-            download = self._embedded_downloads.get(guid)
-            if download is not None:
-                download.state = state
-        if download is not None and state in {"completed", "canceled"}:
-            if download.broker is None:
-                (self.download_dir / download.guid).unlink(missing_ok=True)
-                with self._download_lock:
-                    self._embedded_downloads.pop(download.guid, None)
-                return
-            try:
-                self._drain_embedded_downloads()
-            except CaptureBrowserError as exc:
-                with self._download_lock:
-                    self._download_errors.append(exc)
-
-    def _drain_embedded_downloads(
-        self,
-        *,
-        finalize_if_idle: bool = False,
-    ) -> tuple[int, bool]:
-        """Move browser-domain downloads through the exact task broker."""
-
-        with self._download_lock:
-            generation = self._embedded_active_generation
-            downloads = [
-                download
-                for download in self._embedded_downloads.values()
-                if download.broker is not None and not download.captured
-            ]
-        active = [download for download in downloads if download.generation == generation]
-        pending = sum(download.state == "inProgress" for download in active)
-        ready = [download for download in downloads if download.state == "completed"]
-        canceled = [download for download in downloads if download.state == "canceled"]
-        for download in ready:
-            guid_path = (self.download_dir / download.guid).resolve()
-            if guid_path.parent != self.download_dir.resolve():
-                continue
-            if not guid_path.is_file() or guid_path.stat().st_size <= 0:
-                pending += 1
-                continue
-            named_path = _unique(self.download_dir, download.suggested_name)
-            os.replace(guid_path, named_path)
-            try:
-                assert download.broker is not None
-                receipt = download.broker.capture_local_file(
-                    named_path,
-                    source_url=download.source_url,
-                    transport="webview2-browser-domain",
-                )
-                with self._download_lock:
-                    download.captured = True
-                    if all(captured.path != receipt.path for captured in self._captured):
-                        self._captured.append(
-                            CapturedFile(
-                                path=receipt.path,
-                                suggested_name=receipt.suggested_name,
-                                url=receipt.source_url,
-                            )
-                        )
-                trace(
-                    "capture.download.saved",
-                    provider=self.provider_key or "",
-                    via="webview2-browser-domain",
-                    saved=file_note(receipt.path),
-                    path=receipt.path,
-                )
-            finally:
-                named_path.unlink(missing_ok=True)
-        with self._download_lock:
-            for download in (*ready, *canceled):
-                if download.captured or download.state == "canceled":
-                    self._embedded_downloads.pop(download.guid, None)
-        for download in canceled:
-            (self.download_dir / download.guid).unlink(missing_ok=True)
-        finalized = pending == 0
-        if finalize_if_idle and finalized and generation > 0:
-            with self._download_lock:
-                self._embedded_finalized_generations.add(generation)
-        return pending, finalized
 
     def _finalize_native_downloads_if_idle(self) -> bool:
         """Atomically drain and close the native intake only when no byte stream is in flight."""
@@ -4796,14 +4262,15 @@ class PlaywrightCaptureBrowser:
             broker=broker is not None,
             via=route,
         )
-        if self._embedded_download_session is not None:
-            # Managed WebView2 is armed at Browser-domain level, which covers child WebViews and
-            # late page events. The GUID-backed file is drained through the exact task broker.
+        if self._has_native_download_ledger:
+            # Stockroom's host owns this window's downloads and reports them through its own
+            # ledger, which stays readable while the protocol connection is detached for a
+            # security gate. Draining both would stage the same bytes twice.
             trace(
                 "capture.download.deferred",
                 provider=self.provider_key,
                 file=name,
-                via="webview2-browser-domain",
+                via="webview2-native",
             )
             return
         if broker is not None:
