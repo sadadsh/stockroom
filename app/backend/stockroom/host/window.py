@@ -59,12 +59,6 @@ def active_window():
     return _ACTIVE_WINDOW
 
 
-def _free_loopback_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
-
-
 @dataclass(slots=True)
 class InAppProviderDownloadEvent:
     sequence: int
@@ -80,12 +74,11 @@ class InAppProviderDownloadEvent:
 class InAppProviderBrowserLease:
     """One task-bound lease of the visible Stockroom WebView.
 
-    Playwright attaches over the loopback CDP endpoint before provider navigation begins. The
-    existing top-level Stockroom window is then the browser: provider pages, HUD, and downloads do
-    not escape into Chrome, Vivaldi, or a second automation window.
+    Nothing is attached to it. The existing top-level Stockroom window IS the browser: provider
+    pages and their downloads do not escape into Chrome, Vivaldi, or a second automation window,
+    and capture observes them only through the download events below.
     """
 
-    endpoint: str
     _show: Callable[[], None]
     _hide: Callable[[], None]
     _navigate: Callable[[str], None]
@@ -142,11 +135,10 @@ class InAppProviderBrowserLease:
 class InAppProviderBrowserSurface:
     """Temporarily lend the original Stockroom WebView to provider capture."""
 
-    def __init__(self, app_url: str, *, debug_port: int | None = None) -> None:
+    def __init__(self, app_url: str) -> None:
         if not should_inject(app_url, app_url):
             raise ValueError("app_url must have a complete origin")
         self._app_url = app_url
-        self._debug_port = debug_port or _free_loopback_port()
         self._lock = threading.RLock()
         self._active_show: Callable[[], None] | None = None
 
@@ -163,13 +155,9 @@ class InAppProviderBrowserSurface:
             raise RuntimeError("there is no active provider route")
         show()
 
-    @property
-    def debug_port(self) -> int:
-        return self._debug_port
-
     @contextmanager
     def lease(self):
-        """Yield one CDP attachment and always restore the SPA afterward."""
+        """Yield one observed provider lease and always restore the SPA afterward."""
 
         with self._lock:
             window = active_window()
@@ -307,7 +295,6 @@ class InAppProviderBrowserSurface:
             try:
                 self._active_show = show
                 yield InAppProviderBrowserLease(
-                    endpoint=f"http://127.0.0.1:{self._debug_port}",
                     _show=show,
                     _hide=hide,
                     _navigate=navigate,

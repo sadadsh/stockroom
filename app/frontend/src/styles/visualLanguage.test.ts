@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 
 const css = readFileSync("src/styles/index.css", "utf8");
 const librarySources = [
-  "src/components/DetailPanel.tsx",
   "src/components/PartsList.tsx",
   "src/components/SearchOverlay.tsx",
   "src/pages/ComponentsPage.tsx",

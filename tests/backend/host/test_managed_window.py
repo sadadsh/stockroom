@@ -70,13 +70,11 @@ class _Window:
 def test_in_app_provider_surface_reuses_and_restores_the_original_window(monkeypatch) -> None:
     window = _Window("http://127.0.0.1:8123/components")
     monkeypatch.setattr(W, "_ACTIVE_WINDOW", window)
-    surface = W.InAppProviderBrowserSurface(
-        "http://127.0.0.1:8123",
-        debug_port=43127,
-    )
+    surface = W.InAppProviderBrowserSurface("http://127.0.0.1:8123")
 
     with surface.lease() as lease:
-        assert lease.endpoint == "http://127.0.0.1:43127"
+        # The in-app surface exposes no debugging endpoint either; the lease is commands only.
+        assert not hasattr(lease, "endpoint")
         lease.show()
         assert window.show_calls == 1
         assert window.focus_calls == 1

@@ -555,7 +555,6 @@ class WindowHostHealth:
 class ProviderLeaseHandshake:
     lease_id: str
     generation: int
-    endpoint: str
     staging_root: str = ""
     component_id: str = ""
     manufacturer: str = ""
@@ -1097,28 +1096,6 @@ class WindowHostClient:
 
         self._command("focus", "focused", parse)
 
-    def provider_endpoint(self) -> str:
-        """Return the loopback CDP endpoint of the embedded provider WebView."""
-
-        def parse(response: HandoffMessage, sequence: int) -> str:
-            result = _strict_result(
-                response,
-                request_sequence=sequence,
-                keys=frozenset({"port"}),
-            )
-            port = result["port"]
-            if type(port) is not int or not 0 < port <= 65535:
-                raise WindowSupervisorProtocolError(
-                    "provider browser endpoint is invalid"
-                )
-            return f"http://127.0.0.1:{port}"
-
-        return self._command(
-            "provider-endpoint",
-            "provider-endpoint",
-            parse,
-        )
-
     def begin_provider_lease(
         self,
         lease_id: str,
@@ -1149,20 +1126,16 @@ class WindowHostClient:
             result = _strict_result(
                 response,
                 request_sequence=sequence,
-                keys=frozenset({"lease_id", "generation", "port"}),
+                keys=frozenset({"lease_id", "generation"}),
             )
             generation = result["generation"]
-            port = result["port"]
             if result["lease_id"] != lease_id:
                 raise WindowSupervisorProtocolError("provider lease id changed")
             if type(generation) is not int or generation <= 0:
                 raise WindowSupervisorProtocolError("provider lease generation is invalid")
-            if type(port) is not int or not 0 < port <= 65535:
-                raise WindowSupervisorProtocolError("provider browser endpoint is invalid")
             return ProviderLeaseHandshake(
                 lease_id=lease_id,
                 generation=generation,
-                endpoint=f"http://127.0.0.1:{port}",
                 staging_root=staging_root,
                 component_id=component_id,
                 manufacturer=manufacturer,

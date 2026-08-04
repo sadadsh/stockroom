@@ -108,11 +108,6 @@ def _runner_context(tmp_path, monkeypatch, *, record=None):
         "_capture_downloads",
         lambda _ctx, key: tmp_path / f"{key}-downloads",
     )
-    monkeypatch.setattr(
-        runner,
-        "_capture_profile",
-        lambda _ctx, key: tmp_path / f"{key}-profile",
-    )
     monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
 
     exact = record or SimpleNamespace(
@@ -421,11 +416,6 @@ def test_the_person_can_finish_a_route_and_skip_the_part_while_the_run_is_live(
         runner,
         "_capture_downloads",
         lambda _ctx, key: tmp_path / f"{key}-downloads",
-    )
-    monkeypatch.setattr(
-        runner,
-        "_capture_profile",
-        lambda _ctx, key: tmp_path / f"{key}-profile",
     )
     monkeypatch.setattr(runner, "_capture_evidence_root", lambda _ctx: tmp_path / "Evidence")
     record = SimpleNamespace(id="part-a", manufacturer="Texas Instruments", mpn="BQ24074")

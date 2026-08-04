@@ -263,7 +263,6 @@ def test_a_capture_still_completes_when_the_logging_backend_fails(monkeypatch, t
         (lambda: None),
         vendor="ultralibrarian",
         download_root=tmp_path / "dl",
-        headless=True,
     )
     outcome = source.supply(Record())
 

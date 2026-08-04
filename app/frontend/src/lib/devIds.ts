@@ -8,7 +8,7 @@
  * sync with the `data-dev-id` attributes in source (the parity test enforces it).
  */
 export interface DevIdEntry {
-  // The stable id, e.g. "detail.spec-sheet". Its first dot-segment is the area.
+  // The stable id, e.g. "component-browser.spec-sheet". Its first dot-segment is the area.
   id: string;
   // A short human label for the catalogue + the inspect badge.
   label: string;
@@ -193,27 +193,13 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.identity-sheet", label: "Identity editing sheet", area: "component-browser" },
   { id: "component-browser.identity-field", label: "One editable identity field", area: "component-browser" },
   { id: "component-browser.identity-category", label: "Move this component to another category", area: "component-browser" },
-  { id: "detail.root", label: "Detail panel", area: "detail" },
-  { id: "detail.title-strip", label: "Detail title strip", area: "detail" },
-  { id: "detail.identity", label: "Identity / specimen rail", area: "detail" },
-  // The EDA handoff block at the head of the Specifications column. Per-field cell ids are
-  // DERIVED (`detail.handoff-<field key>`) from the generated EDA registry, so a new registry
-  // field brings its own cell id and this catalogue needs no edit.
+  // The EDA handoff block (components/HandoffBand.tsx). Per-field cell ids are DERIVED
+  // (`detail.handoff-<field key>`) from the generated EDA registry, so a new registry field brings
+  // its own cell id and this catalogue needs no edit.
   { id: "detail.handoff", label: "EDA handoff block", area: "detail" },
   { id: "detail.category-control", label: "Category selector", area: "detail" },
-  { id: "detail.handoff-tab", label: "Handoff tab panel", area: "detail" },
-  { id: "detail.representations", label: "Cross-EDA representation matrix", area: "detail" },
-  { id: "detail.key-specs", label: "Key Specifications block", area: "detail" },
-  { id: "detail.description-lede", label: "Description at the head of the specs column", area: "detail" },
-  { id: "detail.specs-collapse", label: "Collapse the Specifications pane", area: "detail" },
-  { id: "detail.specs-expand", label: "Expand the collapsed Specifications pane", area: "detail" },
-  { id: "detail.sourcing-collapse", label: "Collapse the Sourcing pane", area: "detail" },
-  { id: "detail.sourcing-expand", label: "Expand the collapsed Sourcing pane", area: "detail" },
-  { id: "detail.specs-list", label: "Full specifications list", area: "detail" },
-  { id: "detail.spec-pin", label: "Pin spec to Key Specifications", area: "detail" },
   { id: "detail.handoff-ready", label: "Handoff readiness count", area: "detail" },
-  { id: "detail.title", label: "Part headline", area: "detail" },
-  { id: "detail.canvas", label: "Part canvas / asset strip", area: "detail" },
+  // The 3D model instrument (components/Glb3DView.tsx + lib/threeScene.ts).
   { id: "detail.model-spin", label: "3D idle-spin toggle", area: "detail" },
   { id: "detail.model-settings", label: "3D model settings toggle", area: "detail" },
   { id: "detail.model-settings-popover", label: "3D model settings panel", area: "detail" },
@@ -229,37 +215,8 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.model-view-iso", label: "3D view: three-quarter", area: "detail" },
   { id: "detail.model-view-top", label: "3D view: top down", area: "detail" },
   { id: "detail.model-view-front", label: "3D view: front elevation", area: "detail" },
-  { id: "detail.readiness", label: "KiCad / Altium readiness", area: "detail" },
-  { id: "detail.complete-part", label: "Complete Part action", area: "detail" },
-  { id: "detail.photo", label: "Detail photo trigger", area: "detail" },
-  { id: "detail.remove-asset", label: "Remove element chip", area: "detail" },
-  { id: "detail.embed3d", label: "Embed 3D Model action", area: "detail" },
-  { id: "detail.embed3d-done", label: "3D Model embedded confirmation", area: "detail" },
-  { id: "detail.embed3d-blocked", label: "Embed 3D Model blocked reason", area: "detail" },
-  { id: "detail.tabs", label: "Workbench tab bar", area: "detail" },
-  { id: "detail.tab-specs", label: "Specs tab", area: "detail" },
-  { id: "detail.tab-sourcing", label: "Sourcing tab", area: "detail" },
-  { id: "detail.tab-enrich", label: "Enrich tab", area: "detail" },
-  { id: "detail.tab-history", label: "History tab", area: "detail" },
-  { id: "detail.specs", label: "Specifications sheet", area: "detail" },
-  { id: "detail.spec-group", label: "Spec group block", area: "detail" },
-  {
-    id: "detail.spec-group-toggle",
-    label: "Spec group disclosure",
-    area: "detail",
-  },
-  { id: "detail.spec-list", label: "Multi-option spec value", area: "detail" },
-  { id: "detail.spec-family", label: "Repeated spec family row", area: "detail" },
-  { id: "detail.alternates", label: "Other sources for a value", area: "detail" },
-  { id: "detail.trade", label: "Trade and compliance block", area: "detail" },
-  { id: "detail.sourcing", label: "Sourcing panel", area: "detail" },
-  { id: "detail.sourcing-refresh", label: "Refresh Sourcing button", area: "detail" },
-  { id: "detail.sourcing-nodata", label: "Vendor with no price or stock", area: "detail" },
   { id: "detail.pinout", label: "Pinout panel", area: "detail" },
   { id: "detail.pinout-list", label: "Datasheet pinout scroll region", area: "detail" },
-  { id: "detail.enrich", label: "Enrich panel", area: "detail" },
-  { id: "detail.history", label: "History timeline", area: "detail" },
-  { id: "detail.delete", label: "Delete Part link", area: "detail" },
   { id: "search.root", label: "Search overlay", area: "search" },
   { id: "search.query", label: "Query field", area: "search" },
   { id: "search.query-input", label: "Query input", area: "search" },

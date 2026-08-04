@@ -20,7 +20,9 @@ appended to a durable ledger that names the original path, the staged path, and 
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -115,9 +117,12 @@ def test_a_person_driven_route_selects_the_de_automated_transport():
 
 
 def test_the_guided_source_fails_closed_without_the_embedded_provider_surface(tmp_path):
-    class _Exploded:
-        def __init__(self, *args, **kwargs):
-            raise AssertionError("no provider window may open without Stockroom's own surface")
+    """There is no second way to open a provider page. Without Stockroom's own surface, none.
+
+    The old escape hatch was a standalone Playwright browser. It is gone with the driver: a
+    window Stockroom launches and attaches to is exactly the automated session a person-driven
+    route must not have, and it could not receive the native download journal either.
+    """
 
     source = guided.GuidedCaptureSource(
         lambda: None,
@@ -125,58 +130,50 @@ def test_the_guided_source_fails_closed_without_the_embedded_provider_surface(tm
         download_root=tmp_path / "dl",
     )
 
-    with pytest.MonkeyPatch.context() as patch, pytest.raises(
+    with pytest.raises(
         guided.CaptureBrowserError,
         match="embedded provider browser is unavailable",
     ):
-        patch.setattr(guided, "PlaywrightCaptureBrowser", _Exploded)
         source._ensure_session()
 
 
-def test_an_explicit_standalone_browser_is_the_only_way_past_the_embedded_surface(tmp_path):
-    built: list[dict] = []
+def test_the_guided_source_takes_no_standalone_browser_option(tmp_path):
+    with pytest.raises(TypeError):
+        guided.GuidedCaptureSource(
+            lambda: None,
+            vendor="ultralibrarian",
+            download_root=tmp_path / "dl",
+            allow_standalone_browser=True,
+        )
 
-    class _Fake:
-        def __init__(self, **kwargs):
-            built.append(kwargs)
 
-        def session(self):
-            from contextlib import nullcontext
+def test_the_leased_surface_capture_attaches_nothing_and_is_not_the_os_handoff(tmp_path):
+    lease = SimpleNamespace(
+        show=lambda: None,
+        navigate=lambda _url: None,
+        current_url=lambda: "https://www.ultralibrarian.com/part",
+        download_events=lambda **_options: (),
+    )
 
-            return nullcontext(object())
+    @contextmanager
+    def surface():
+        yield lease
 
     source = guided.GuidedCaptureSource(
         lambda: None,
         vendor="ultralibrarian",
         download_root=tmp_path / "dl",
-        allow_standalone_browser=True,
+        provider_surface=surface,
     )
-
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(guided, "PlaywrightCaptureBrowser", _Fake)
-        session = source._ensure_session()
-
-    assert len(built) == 1
-    assert not isinstance(session.browser, DefaultBrowserCapture)
-
-
-def test_a_visible_route_refuses_a_missing_embedded_surface(tmp_path):
-    class _Exploded:
-        def __init__(self, *_args, **_kwargs):
-            raise AssertionError("a standalone browser must not be constructed")
-
-    source = guided.GuidedCaptureSource(
-        lambda: None,
-        vendor="ultralibrarian",
-        download_root=tmp_path / "dl",
-    )
-
-    with pytest.MonkeyPatch.context() as patch, pytest.raises(
-        guided.CaptureBrowserError,
-        match="embedded provider browser is unavailable",
-    ):
-        patch.setattr(guided, "PlaywrightCaptureBrowser", _Exploded)
-        source._ensure_session()
+    session = source._ensure_session()
+    try:
+        assert isinstance(session.browser, guided.ProviderSurfaceCapture)
+        assert not isinstance(session.browser, DefaultBrowserCapture)
+        # The capture holds the lease, not a page, a context, or a driver connection.
+        assert not hasattr(session.browser, "session")
+        assert not hasattr(session.browser, "task_page")
+    finally:
+        source.close()
 
 
 def test_the_transport_choice_is_traced(tmp_path, monkeypatch):
@@ -184,16 +181,11 @@ def test_the_transport_choice_is_traced(tmp_path, monkeypatch):
     monkeypatch.setenv("STOCKROOM_CAPTURE_LOG", str(log))
     reset_for_tests()
 
-    class _Exploded:
-        def __init__(self, *args, **kwargs):
-            raise AssertionError("no Playwright here")
-
     source = guided.GuidedCaptureSource(
         lambda: None,
         vendor="digikey",
         download_root=tmp_path / "dl",
     )
-    monkeypatch.setattr(guided, "PlaywrightCaptureBrowser", _Exploded)
     with pytest.raises(guided.CaptureBrowserError):
         source._ensure_session()
     reset_for_tests()
@@ -202,10 +194,9 @@ def test_the_transport_choice_is_traced(tmp_path, monkeypatch):
     lines = [line for line in written.splitlines() if "capture.transport" in line]
     assert lines, written
     # The trace states what actually happens: the page opens in Stockroom's own embedded
-    # surface with the driver attached to THAT window, and no provider control is ever
-    # operated. Reporting "no automation attached" here would have been false, because the
-    # driver genuinely is attached - to Stockroom's window, never to the provider's controls.
-    assert TRANSPORT_PLAYWRIGHT in lines[0]
+    # surface with NOTHING attached to it, and no provider control is ever operated.
+    assert "transport=stockroom-provider-surface" in lines[0]
+    assert "automation_attached=false" in lines[0]
     assert "provider_controls_operated=false" in lines[0]
     assert "why=" in lines[0]
 

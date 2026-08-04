@@ -40,8 +40,10 @@ REPO = Path(__file__).resolve().parents[3]
 # reason it is not simply a mode on that module. A new entry here is a decision, not an accident.
 _LAUNCHERS = {
     "app/backend/stockroom/capture/browser.py": (
-        "THE owner of 'launch a browser'. Engine is a parameter (chromium / camoufox / cloak), "
-        "so a stealth need is a mode on this, never a second class beside it."
+        "THE owner of 'launch a browser'. Engine is a parameter (bundled Chromium, an installed "
+        "Chrome/Edge channel, Firefox, WebKit), so a different target is a mode on this rather "
+        "than a second class beside it. Provider capture launches nothing at all now - it "
+        "observes the native surface - so what launches here is page reading, never a provider."
     ),
     "app/backend/stockroom/scrape/fetch/camoufox_browser.py": (
         "The scrape render tier. Pre-dates the capture engine, is ASYNC and implements the "

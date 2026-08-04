@@ -623,13 +623,12 @@ def run_windowed(
         if open_window is None and update_mode is HostUpdateMode.DEVELOPMENT_SOURCE:
             # The stable launcher runs the continuously updated source host in this mode. Expose
             # the original Stockroom WebView as the provider surface before the window starts, so
-            # Playwright can attach over a private loopback CDP port instead of opening a separate
-            # Chromium window or falling back to the person's default browser.
+            # a provider page opens inside Stockroom rather than in a separate Chromium window or
+            # the person's default browser. No debugging port is opened for it: capture observes
+            # the surface through its own download events and never drives it.
             from stockroom.host.window import InAppProviderBrowserSurface
 
-            in_app_provider = InAppProviderBrowserSurface(base_url)
-            os.environ["STOCKROOM_CDP_PORT"] = str(in_app_provider.debug_port)
-            setattr(ctx, "provider_browser_surface", in_app_provider)
+            setattr(ctx, "provider_browser_surface", InAppProviderBrowserSurface(base_url))
         if update_mode is HostUpdateMode.PRODUCTION:
             try:
                 production_update_runtime = create_production_update_runtime(

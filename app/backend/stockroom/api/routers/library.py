@@ -1265,7 +1265,6 @@ def library_router(require_token) -> APIRouter:
                 progress=progress,
                 should_stop=should_stop,
                 limit=None if person_driven_providers else limit,
-                headless=background,
             )
 
         return {"job_id": ctx.jobs.submit_cancellable(work)}

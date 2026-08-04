@@ -46,7 +46,7 @@ public sealed class PackagingAndSecurityContractTests
     }
 
     [Fact]
-    public void ProductionSourceKeepsRendererSecretsOutAndScopesProviderDebugging()
+    public void ProductionSourceKeepsRendererSecretsOutAndOpensNoRemoteDebuggingPort()
     {
         var projectDirectory = FindProjectDirectory();
         var sources = Directory
@@ -63,11 +63,19 @@ public sealed class PackagingAndSecurityContractTests
             .ToArray();
         var allSource = string.Join("\n", sources);
 
-        Assert.Equal(
-            1,
-            allSource.Split(
-                "--remote-debugging-port=",
-                StringSplitOptions.None).Length - 1);
+        // Was: EXACTLY ONE remote-debugging port, scoped to the provider WebView. That bounded a
+        // hole rather than closing it - any local process that could reach the loopback port could
+        // drive the person's signed-in provider session. Native download staging and the lease
+        // journal made the port unnecessary, so the contract is now ZERO: no source file may open
+        // a debugging port, on any WebView, for any reason.
+        Assert.DoesNotContain(
+            "--remote-debugging-port=",
+            allSource,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "AdditionalBrowserArguments",
+            allSource,
+            StringComparison.Ordinal);
         Assert.Contains(
             "ProviderProfileDirectory",
             allSource,

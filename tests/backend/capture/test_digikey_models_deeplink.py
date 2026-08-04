@@ -310,7 +310,7 @@ def _source(tmp_path: Path, store: DigiKeyModelsIds | None):
 
 
 def _run_route(source, browser, adapter):
-    session = guided._Session(browser=browser, ctx_manager=None, page=object())
+    session = guided._Session(browser=browser, ctx_manager=None)
     return source._supply_user_driven_route(
         _Record(),
         session,

@@ -22,6 +22,7 @@ from __future__ import annotations
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -166,6 +167,19 @@ def _install_adapter(monkeypatch, browser, *, on_drive=None):
     return capability
 
 
+@contextmanager
+def _null_provider_surface():
+    """A lease that answers commands and reports no downloads. Nothing attaches to it."""
+
+    yield SimpleNamespace(
+        show=lambda: None,
+        hide=lambda: None,
+        navigate=lambda _url: None,
+        current_url=lambda: "",
+        download_events=lambda **_options: (),
+    )
+
+
 def _source(monkeypatch, tmp_path, browser, *, on_drive=None, pipeline=None):
     _install_adapter(monkeypatch, browser, on_drive=on_drive)
     if on_drive is not None and getattr(browser, "on_delivery", None) is None:
@@ -174,11 +188,10 @@ def _source(monkeypatch, tmp_path, browser, *, on_drive=None, pipeline=None):
         (lambda: pipeline),
         vendor="faketron",
         download_root=tmp_path / "dl",
-        headless=True,
     )
     # Inject the session rather than launching a browser: this test is about the WAIT, and a real
     # engine launch would make it slow and vendor-dependent for no added coverage.
-    src._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+    src._session = guided._Session(browser=browser, ctx_manager=None)
     return src
 
 
@@ -190,7 +203,6 @@ def test_guided_source_reports_the_provider_without_changing_its_engine_key(monk
         lambda: None,
         vendor="faketron",
         download_root=tmp_path / "dl",
-        headless=True,
     )
 
     assert source.key == "guided"
@@ -245,7 +257,6 @@ def test_strict_catalog_capture_stops_instead_of_falling_back_to_search(monkeypa
         lambda: None,
         vendor="faketron",
         download_root=tmp_path / "dl",
-        headless=True,
         strict_catalog_urls=True,
     )
 
@@ -256,24 +267,16 @@ def test_strict_catalog_capture_stops_instead_of_falling_back_to_search(monkeypa
 
 
 def test_person_driven_route_uses_the_embedded_provider_surface(monkeypatch, tmp_path):
-    browser_arguments: list[dict[str, object]] = []
     surface_events: list[str] = []
 
-    class _EmbeddedBrowser:
-        def __init__(self, **kwargs):
-            browser_arguments.append(kwargs)
-
-        @contextmanager
-        def session(self):
-            surface_events.append("listeners-attached")
-            yield _FakePage()
-
     class _Lease:
-        endpoint = "http://127.0.0.1:48123"
-
         @staticmethod
         def show():
             surface_events.append("shown")
+
+        @staticmethod
+        def download_events(**_options):
+            return ()
 
     @contextmanager
     def provider_surface():
@@ -283,7 +286,6 @@ def test_person_driven_route_uses_the_embedded_provider_surface(monkeypatch, tmp
         finally:
             surface_events.append("hidden")
 
-    monkeypatch.setattr(guided, "PlaywrightCaptureBrowser", _EmbeddedBrowser)
     source = guided.GuidedCaptureSource(
         lambda: None,
         vendor="faketron",
@@ -298,16 +300,13 @@ def test_person_driven_route_uses_the_embedded_provider_surface(monkeypatch, tmp
     )
     session = source._ensure_session()
 
-    assert session.page is not None
-    assert browser_arguments[0]["cdp_endpoint"] == "http://127.0.0.1:48123"
-    assert surface_events == ["prepared-hidden", "listeners-attached", "shown"]
+    # The lease is held and nothing is attached to it. In particular the surface is NOT shown at
+    # session time: it becomes visible only once a route has armed its task-bound broker.
+    assert isinstance(session.browser, guided.ProviderSurfaceCapture)
+    assert session.browser._native_surface is not None
+    assert surface_events == ["prepared-hidden"]
     source.close()
-    assert surface_events == [
-        "prepared-hidden",
-        "listeners-attached",
-        "shown",
-        "hidden",
-    ]
+    assert surface_events == ["prepared-hidden", "hidden"]
 
 
 def test_a_download_consumed_by_the_session_handler_still_counts_as_delivered(
@@ -384,9 +383,8 @@ def test_guided_supply_attaches_only_the_exact_task_broker_receipts(monkeypatch,
         lambda: pipeline,
         vendor="faketron",
         download_root=tmp_path / "Downloads",
-        headless=True,
     )
-    source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+    source._session = guided._Session(browser=browser, ctx_manager=None)
 
     outcome = source.supply(_Record())
 
@@ -437,19 +435,9 @@ def test_user_driven_guided_supply_never_discards_captured_files(
     pipeline = Pipeline()
     captured_call = {}
 
-    class Manager:
-        def __enter__(self):
-            return object()
-
-        def __exit__(self, *_args):
-            return False
-
     class Browser:
         def __init__(self, **_options):
             pass
-
-        def session(self):
-            return Manager()
 
         def capture_user_downloads(self, url, broker, **options):
             captured_call.update(url=url, broker=broker, options=options)
@@ -460,7 +448,7 @@ def test_user_driven_guided_supply_never_discards_captured_files(
             )
 
     _install_adapter(monkeypatch, object())
-    monkeypatch.setattr(guided, "PlaywrightCaptureBrowser", Browser)
+    monkeypatch.setattr(guided, "ProviderSurfaceCapture", Browser)
     finished = lambda: True
     cancelled = lambda: False
     cancel_calls: list[bool] = []
@@ -468,11 +456,11 @@ def test_user_driven_guided_supply_never_discards_captured_files(
         lambda: pipeline,
         vendor="faketron",
         download_root=tmp_path / "Downloads",
-        headless=True,
         user_finished=finished,
         user_cancelled=cancelled,
         user_capture_timeout_s=5,
         cancel_workflow=lambda: cancel_calls.append(True),
+        provider_surface=_null_provider_surface,
     )
 
     try:
@@ -531,7 +519,7 @@ def test_user_hud_action_advances_or_cancels_without_attaching(
         download_root=tmp_path / "Downloads",
         cancel_workflow=lambda: cancel_calls.append(True),
     )
-    source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+    source._session = guided._Session(browser=browser, ctx_manager=None)
 
     outcome = source.supply(_Record())
 
@@ -559,7 +547,7 @@ def test_snapmagic_phone_verification_timeout_is_reported_as_a_resumable_blocker
         vendor="faketron",
         download_root=tmp_path / "Downloads",
     )
-    source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+    source._session = guided._Session(browser=browser, ctx_manager=None)
 
     outcome = source.supply(_Record())
 
@@ -603,7 +591,7 @@ def test_selected_files_survive_a_browser_failure_and_keep_the_exact_route_bindi
         clear_active_route=intent.clear_active_route,
         take_selected_files=intent.take_selected_files,
     )
-    source._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+    source._session = guided._Session(browser=browser, ctx_manager=None)
     observed = {}
 
     def attach(_record, landed, _url, **options):
@@ -806,7 +794,6 @@ def test_user_driven_try_another_advances_to_the_next_digikey_author(
     source._session = guided._Session(
         browser=_FakeBrowser(),
         ctx_manager=None,
-        page=_FakePage(),
     )
     attempted: list[str] = []
 
