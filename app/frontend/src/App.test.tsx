@@ -5,6 +5,7 @@ import App from "./App";
 import { api } from "./api/client";
 import type { PartDetail, PartSummary } from "./api/types";
 import { makePartDetail } from "./test/partFixture";
+import { makeWorkspace } from "./test/workspaceFixture";
 import { RouterProvider } from "./lib/router";
 import { AddPartProvider } from "./lib/addPart";
 import { CaptureProvider } from "./lib/capture";
@@ -19,6 +20,7 @@ vi.mock("./api/client", async (importActual) => {
       listParts: vi.fn(),
       facets: vi.fn(),
       partDetail: vi.fn(),
+      partWorkspace: vi.fn(),
       getStmStatus: vi.fn(),
       getStmMcus: vi.fn(),
       getStmFamilies: vi.fn(),
@@ -57,6 +59,7 @@ describe("App shell", () => {
       incomplete: 0,
     });
     mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.partWorkspace.mockResolvedValue(makeWorkspace());
 
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
@@ -77,18 +80,18 @@ describe("App shell", () => {
 
     // The rail brand and a live part both render through the shell.
     expect(screen.getByText("Stockroom")).toBeInTheDocument();
-    expect(await screen.findByText("LM358")).toBeInTheDocument();
-    // findAllByText, not findByText: the description now appears BOTH as the lede at the head
-    // of the Specifications column and as the editable field in the Handoff tab. Only one is
-    // visible at a time (they are alternative tabs), but both are in the DOM.
+    // findAllByText: one component now reads its name in three honest places - the picker row,
+    // its open tab, and the workspace identity header.
+    expect((await screen.findAllByText("LM358")).length).toBeGreaterThan(0);
+    // The opened component states what the part IS in its Overview description region.
     expect((await screen.findAllByText("Dual Operational Amplifier")).length).toBeGreaterThan(0);
     // the default route renders the Components flagship: no page-level tab strip
-    // (BOM Coverage / Duplicates / Doctor all moved out). The only tabs now are the
-    // selected part's workbench (Specs / Sourcing / History / ...).
+    // (BOM Coverage / Duplicates / Doctor all moved out). The tabs now are the open
+    // components themselves plus the opened component's four information tabs.
     expect(
       screen.queryByRole("tab", { name: /BOM Coverage|Duplicates|Doctor/ }),
     ).toBeNull();
-    expect(screen.getByRole("tab", { name: "Identity" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Overview" })).toBeInTheDocument();
   });
 
   it("reaches Add Parts as a full-screen wizard from the Parts toolbar", async () => {
