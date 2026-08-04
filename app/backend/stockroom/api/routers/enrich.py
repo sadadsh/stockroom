@@ -36,6 +36,21 @@ def _make_pipeline(ctx) -> EnrichmentPipeline:
     )
 
 
+def _explicit_want(want) -> set[str] | None:
+    """The want-set for the explicit-MPN intake: always includes the distributor token.
+
+    This route promises BOTH official distributor verdicts, whatever fields earlier
+    sources already filled - Mouser's answer is not a substitute for DigiKey's. A caller's
+    narrowed `want` list therefore must not restore the cheap early stop that would skip
+    the second official API. None keeps DEFAULT_WANT, which already carries the token.
+    """
+    if not want:
+        return None
+    from stockroom.enrich.registry import DIST_SOURCING
+
+    return set(want) | {DIST_SOURCING}
+
+
 def _sourced_dto(s: Sourced | None) -> dict | None:
     if s is None:
         return None
@@ -98,6 +113,10 @@ def _result_dto(r: EnrichmentResult) -> dict:
         # The passive determination for the unified Add-A-Part flow (null = non-passive,
         # needs the symbol/footprint/3D dropped).
         "add_plan": _add_plan(r),
+        # The honest per-source verdict for each official distributor API:
+        # success / unavailable / failed / not_configured. Fixed vocabulary only - never an
+        # exception body, a key, or a URL.
+        "source_states": dict(r.source_states),
         "schema_version": r.schema_version,
     }
 
@@ -141,7 +160,7 @@ def enrich_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         mpn = body["mpn"]
         category = body.get("category", "Other")
-        want = body.get("want")
+        want = _explicit_want(body.get("want"))
 
         def work(progress):
             pipeline = _make_pipeline(ctx)

@@ -490,8 +490,15 @@ export interface EnrichmentResult {
   // The backend always emits this; optional so fixtures/older payloads without it
   // still type-check. null (or absent) means the part is not a file-less passive.
   add_plan?: PassiveAddPlan | null;
+  // What actually happened to each official distributor API, keyed by its lowercase
+  // vendor key ("mouser"/"digikey"). Fixed vocabulary; optional so cached results
+  // written before the field existed still type-check.
+  source_states?: Record<string, EnrichSourceState>;
   schema_version: number;
 }
+
+// The closed per-source verdict vocabulary for EnrichmentResult.source_states.
+export type EnrichSourceState = "success" | "unavailable" | "failed" | "not_configured";
 
 // A purchase link on a staging candidate (a scrape/API supplies vendor + url;
 // the gate needs at least one entry with a non-empty url).
