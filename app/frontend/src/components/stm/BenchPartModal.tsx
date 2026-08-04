@@ -9,12 +9,16 @@ import { useStmPinout } from "../../api/stmQueries";
 import { ApiError } from "../../api/client";
 import { useModalDismiss } from "../../lib/useModalDismiss";
 import { Button } from "../primitives";
+import { Text, useText } from "../../lib/copy";
 import { PinoutTable } from "./PinoutTable";
 
 export function BenchPartModal({ part, onClose }: { part: string; onClose: () => void }) {
   const pinout = useStmPinout(part);
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
   const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(true, onClose);
+  const dialogLabel = useText("stm.bench.dialog.aria", "Pinout for {part}", { part });
+  const notBuiltLabel = useText("stm.bench.not-built", "Build the index to see this pinout.");
+  const failedLabel = useText("stm.bench.failed", "Could not load this pinout.");
 
   return (
     <div
@@ -27,7 +31,7 @@ export function BenchPartModal({ part, onClose }: { part: string; onClose: () =>
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={`Pinout for ${part}`}
+        aria-label={dialogLabel}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="flex h-[88vh] w-full max-w-[880px] flex-col overflow-hidden rounded-card border border-line2 bg-popover p-4 shadow-pop outline-none"
@@ -42,17 +46,19 @@ export function BenchPartModal({ part, onClose }: { part: string; onClose: () =>
             ) : null}
           </div>
           <Button type="button" small onClick={onClose}>
-            Close
+            <Text id="stm.bench.close">Close</Text>
           </Button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
           {pinout.isLoading ? (
-            <p className="py-16 text-center text-sm text-t3">Loading the pinout...</p>
+            <p className="py-16 text-center text-sm text-t3">
+              <Text id="stm.bench.loading">Loading the pinout...</Text>
+            </p>
           ) : pinout.error ? (
             <p className="py-16 text-center text-sm text-err">
               {pinout.error instanceof ApiError && pinout.error.status === 409
-                ? "Build the index to see this pinout."
-                : "Could not load this pinout."}
+                ? notBuiltLabel
+                : failedLabel}
             </p>
           ) : pinout.data ? (
             <PinoutTable

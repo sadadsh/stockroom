@@ -11,6 +11,7 @@ import { useDoctorScan, useRepairLibrary } from "../api/queries";
 import type { DoctorScan, RepairAction, RepairFinding, RepairResult } from "../api/types";
 import { useToast } from "../lib/toast";
 import { statusTone } from "../lib/statusTone";
+import { Text } from "../lib/copy";
 import { Badge, Button, Dot } from "./primitives";
 
 function errMsg(err: unknown): string {
@@ -56,9 +57,13 @@ export function LibraryHealthSection() {
   return (
     <>
         {scan.isLoading ? (
-          <p className="py-1 text-sm text-t3">Scanning your components...</p>
+          <p className="py-1 text-sm text-t3">
+            <Text id="library.health.loading">Scanning your components...</Text>
+          </p>
         ) : scan.isError ? (
-          <p className="py-1 text-sm text-err">Could not scan your components.</p>
+          <p className="py-1 text-sm text-err">
+            <Text id="library.health.error">Could not scan your components.</Text>
+          </p>
         ) : scan.data ? (
           <HealthBody data={scan.data} onRepair={onRepair} repairing={repair.isPending} />
         ) : null}
@@ -80,7 +85,9 @@ function HealthBody({
       <div className="flex items-center gap-2.5 py-1" data-testid="doctor-healthy">
         <Dot tone="ok" />
         <span className="text-sm text-t2">
-          Your components are healthy. Every part matches its record and every file is committed.
+          <Text id="library.health.healthy">
+            Your components are healthy. Every part matches its record and every file is committed.
+          </Text>
         </span>
       </div>
     );
@@ -91,7 +98,9 @@ function HealthBody({
     <div className="flex flex-col gap-4">
       {data.fixable.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <div className="text-xs font-semibold text-t2">Can Be Repaired</div>
+          <div className="text-xs font-semibold text-t2">
+            <Text id="library.health.fixable-heading">Can Be Repaired</Text>
+          </div>
           {data.fixable.map((action, i) => (
             <ActionRow key={`${action.kind}-${action.part_id}-${i}`} action={action} />
           ))}
@@ -118,10 +127,14 @@ function HealthBody({
 
       {data.manual.length > 0 ? (
         <div className="flex flex-col gap-2 border-t border-line pt-3">
-          <div className="text-xs font-semibold text-t2">Needs Attention</div>
+          <div className="text-xs font-semibold text-t2">
+            <Text id="library.health.manual-heading">Needs Attention</Text>
+          </div>
           <p className="text-xs text-t3">
-            These cannot be fixed automatically. A missing file is never fabricated and a broken
-            reference is never silently removed.
+            <Text id="library.health.manual-note">
+              These cannot be fixed automatically. A missing file is never fabricated and a broken
+              reference is never silently removed.
+            </Text>
           </p>
           {data.manual.map((finding, i) => (
             <FindingRow key={`${finding.kind}-${finding.part_id}-${i}`} finding={finding} />

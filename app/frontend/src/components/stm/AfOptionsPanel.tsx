@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useStmPinAf, useStmSignalCandidates } from "../../api/stmQueries";
 import { ApiError } from "../../api/client";
 import { Eyebrow } from "../primitives";
+import { Text } from "../../lib/copy";
 
 // The single numeric-aware collation (mirrors PinoutViewer.tsx): it orders "1","2","10" correctly
 // AND handles alphanumeric BGA labels "A1".."A10","AB12" - drop { numeric: true } and it goes red.
@@ -51,15 +52,25 @@ export function AfOptionsPanel({ part, position }: { part: string; position: str
   return (
     <div className="flex flex-col gap-4" data-testid="af-options-panel">
       <section>
-        <Eyebrow className="mb-1.5">Alternate Functions</Eyebrow>
+        <Eyebrow className="mb-1.5">
+          <Text id="stm.af.options.title">Alternate Functions</Text>
+        </Eyebrow>
         {notBuilt ? (
-          <p className="text-xs text-t3">Build the index to see alternate functions.</p>
+          <p className="text-xs text-t3">
+            <Text id="stm.af.options.not-built">Build the index to see alternate functions.</Text>
+          </p>
         ) : pinAf.isLoading ? (
-          <p className="text-xs text-t3">Loading alternate functions...</p>
+          <p className="text-xs text-t3">
+            <Text id="stm.af.options.loading">Loading alternate functions...</Text>
+          </p>
         ) : pinAf.isError ? (
-          <p className="text-xs text-err">Could not load alternate functions.</p>
+          <p className="text-xs text-err">
+            <Text id="stm.af.options.failed">Could not load alternate functions.</Text>
+          </p>
         ) : afs.length === 0 ? (
-          <p className="text-xs text-t3">This pin has no alternate-function mux.</p>
+          <p className="text-xs text-t3">
+            <Text id="stm.af.options.none">This pin has no alternate-function mux.</Text>
+          </p>
         ) : (
           <ul className="flex flex-col gap-1">
             {afs.map((af, i) => {
@@ -90,19 +101,37 @@ export function AfOptionsPanel({ part, position }: { part: string; position: str
       </section>
 
       <section>
-        <Eyebrow className="mb-1.5">Signal Candidates</Eyebrow>
+        <Eyebrow className="mb-1.5">
+          <Text id="stm.af.options.candidates-title">Signal Candidates</Text>
+        </Eyebrow>
         {!signal ? (
-          <p className="text-xs text-t3">Select a signal above to see every candidate pin for it.</p>
+          <p className="text-xs text-t3">
+            <Text id="stm.af.options.candidates-prompt">
+              Select a signal above to see every candidate pin for it.
+            </Text>
+          </p>
         ) : candidates.isLoading ? (
-          <p className="text-xs text-t3">Loading candidate pins...</p>
+          <p className="text-xs text-t3">
+            <Text id="stm.af.options.candidates-loading">Loading candidate pins...</Text>
+          </p>
         ) : candidates.isError ? (
           is409(candidates.error) ? (
-            <p className="text-xs text-t3">Build the index to see candidate pins.</p>
+            <p className="text-xs text-t3">
+              <Text id="stm.af.options.candidates-not-built">
+                Build the index to see candidate pins.
+              </Text>
+            </p>
           ) : (
-            <p className="text-xs text-err">Could not load candidate pins.</p>
+            <p className="text-xs text-err">
+              <Text id="stm.af.options.candidates-failed">Could not load candidate pins.</Text>
+            </p>
           )
         ) : cands.length === 0 ? (
-          <p className="text-xs text-t3">No candidate pins for {signal} on this part.</p>
+          <p className="text-xs text-t3">
+            <Text id="stm.af.options.candidates-empty" values={{ signal }}>
+              {"No candidate pins for {signal} on this part."}
+            </Text>
+          </p>
         ) : (
           <ul className="flex flex-col gap-1" data-testid="af-signal-candidates">
             <li className="px-2 pb-0.5 font-mono text-2xs text-t3">{signal}</li>

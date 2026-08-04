@@ -9,6 +9,7 @@
  * A scrape miss surfaces as "nothing found", never a fabricated value.
  */
 import { useEnrichLookup } from "../api/queries";
+import { Text } from "../lib/copy";
 import type { EnrichmentResult, SourcedField } from "../api/types";
 import { Badge, Button, Card, Eyebrow } from "./primitives";
 import { EnrichStages } from "./EnrichStages";
@@ -76,12 +77,14 @@ export function EnrichPanel({
   return (
     <section className="mx-auto w-full max-w-[980px]">
       <Eyebrow className="mb-2 flex h-6 items-center text-xs font-semibold text-t1">
-        Source Lookup
+        <Text id="enrich.panel-title">Source Lookup</Text>
       </Eyebrow>
       <Card className="px-3 py-2.5">
         <div className="flex items-center gap-3">
           <span className="text-xs text-t2">
-            Look up this part's manufacturer, description, and datasheet from its part number.
+            <Text id="enrich.panel-lede">
+              Look up this part's manufacturer, description, and datasheet from its part number.
+            </Text>
           </span>
           <Button
             variant="accent"
@@ -127,7 +130,7 @@ export function EnrichPanel({
             </div>
           ) : (
             <div className="mt-3 text-xs text-t3">
-              No new data found for this part number.
+              <Text id="enrich.no-data">No new data found for this part number.</Text>
             </div>
           )
         ) : null}
@@ -161,15 +164,19 @@ function CandidateRow({
             {sourced.source} · {sourced.confidence}
           </Badge>
           {already ? (
-            <span className="flex-none text-xs text-t3">Already Set</span>
+            <span className="flex-none text-xs text-t3">
+              <Text id="enrich.already-set">Already Set</Text>
+            </span>
           ) : (
             <Button small disabled={busy} onClick={() => onApply(value)}>
-              Apply
+              <Text id="enrich.apply">Apply</Text>
             </Button>
           )}
         </>
       ) : (
-        <span className="flex-1 text-xs text-t3">Not Found</span>
+        <span className="flex-1 text-xs text-t3">
+          <Text id="enrich.not-found">Not Found</Text>
+        </span>
       )}
     </div>
   );
@@ -189,7 +196,9 @@ function PinoutRow({
   const count = Array.isArray(sourced.value) ? sourced.value.length : 0;
   return (
     <div className="flex items-center gap-3 border-b border-line py-2 last:border-b-0">
-      <span className="w-[116px] flex-none text-xs text-t3">Pinout</span>
+      <span className="w-[116px] flex-none text-xs text-t3">
+        <Text id="enrich.pinout-label">Pinout</Text>
+      </span>
       <span className="min-w-0 flex-1 break-words text-xs text-t1">
         {count} {count === 1 ? "pin" : "pins"}
       </span>
@@ -197,10 +206,12 @@ function PinoutRow({
         {sourced.source} · {sourced.confidence}
       </Badge>
       {already ? (
-        <span className="flex-none text-xs text-t3">Already Set</span>
+        <span className="flex-none text-xs text-t3">
+          <Text id="enrich.already-set">Already Set</Text>
+        </span>
       ) : (
         <Button small disabled={busy} onClick={() => onApply(sourced)}>
-          Apply Pinout
+          <Text id="enrich.apply-pinout">Apply Pinout</Text>
         </Button>
       )}
     </div>
@@ -214,7 +225,9 @@ function AlsoFound({ result }: { result: EnrichmentResult }) {
   if (!ds && !pkg && !stock) return null;
   return (
     <div className="flex flex-wrap items-center gap-3 pt-2.5 text-xs text-t3">
-      <span>Also Found:</span>
+      <span>
+        <Text id="enrich.also-found">Also Found:</Text>
+      </span>
       {ds ? (
         <a
           href={String(ds.value)}
@@ -222,7 +235,7 @@ function AlsoFound({ result }: { result: EnrichmentResult }) {
           rel="noreferrer"
           className="inline-flex items-center gap-1 text-t2 underline decoration-line2 underline-offset-2 hover:decoration-current"
         >
-          Datasheet
+          <Text id="enrich.datasheet">Datasheet</Text>
           <ExternalIcon />
         </a>
       ) : null}

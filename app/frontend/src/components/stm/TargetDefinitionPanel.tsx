@@ -9,6 +9,7 @@ import {
   targetMatchesLegend,
   type TargetMapLens,
 } from "../../lib/stmTargetVisuals";
+import { Text, useText } from "../../lib/copy";
 import { SegmentedControl } from "../primitives";
 import { TargetDefinitionEvidence } from "./TargetDefinitionEvidence";
 import { TargetPackageMap } from "./TargetPackageMap";
@@ -63,6 +64,11 @@ export function TargetDefinitionPanel({
   );
   const ready = definition.readiness.status === "ready";
   const adaptedPositions = definition.universalization.summary.selectable;
+  const workbenchLabel = useText(
+    "stm.target.workbench.aria",
+    "Universal MCU Support Workbench",
+  );
+  const lensLabel = useText("stm.target.lens.aria", "Pinout Lens");
 
   const selectLegend = (key: string | null) => {
     setActiveLegendKey(key);
@@ -78,7 +84,7 @@ export function TargetDefinitionPanel({
       data-dev-id="stm.target-definition"
       className="flex min-h-0 flex-1 flex-col"
       data-testid="target-definition"
-      aria-label="Universal MCU Support Workbench"
+      aria-label={workbenchLabel}
     >
       <header className="flex flex-none items-center justify-between gap-5 border-b border-line px-4 py-2">
         <div className="flex min-w-0 items-center gap-3">
@@ -127,7 +133,11 @@ export function TargetDefinitionPanel({
             >
               {adaptedPositions}
             </span>
-            <span className="block text-2xs text-t3">Routing Adaptations</span>
+            <span className="block text-2xs text-t3">
+              <Text id="stm.target.routing-adaptations">
+                Routing Adaptations
+              </Text>
+            </span>
           </div>
         </div>
       </header>
@@ -135,7 +145,9 @@ export function TargetDefinitionPanel({
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_344px]">
         <div className="flex min-h-0 min-w-0 flex-col">
           <div className="flex flex-none items-center justify-between gap-3 border-b border-line px-3 py-1.5">
-            <span className="text-2xs font-medium text-t3">Map Lens</span>
+            <span className="text-2xs font-medium text-t3">
+              <Text id="stm.target.map-lens">Map Lens</Text>
+            </span>
             <SegmentedControl
               options={TARGET_LENSES}
               value={lens}
@@ -145,7 +157,7 @@ export function TargetDefinitionPanel({
               }}
               size="small"
               devIdBase="stm.lens"
-              aria-label="Pinout Lens"
+              aria-label={lensLabel}
             />
           </div>
 
@@ -175,14 +187,18 @@ export function TargetDefinitionPanel({
               position={selected}
             />
           ) : (
-            <div className="p-4 text-xs text-t3">Select a package position.</div>
+            <div className="p-4 text-xs text-t3">
+              <Text id="stm.target.select-position">
+                Select a package position.
+              </Text>
+            </div>
           )}
         </aside>
       </div>
 
       <details className="flex-none border-t border-line bg-surface">
         <summary className="cursor-pointer px-4 py-2 text-xs text-t2">
-          Definition Evidence
+          <Text id="stm.target.definition-evidence">Definition Evidence</Text>
           <span className="ml-2 font-mono text-2xs text-t3">
             {definition.readiness.blockers.length} Blocking{" "}
             {definition.readiness.blockers.length === 1 ? "Check" : "Checks"} ·{" "}

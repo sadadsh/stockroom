@@ -24,6 +24,7 @@ import {
 import { observeElementRect, useVirtualizer } from "@tanstack/react-virtual";
 import type { McuSpecRow } from "../../api/types";
 import { SearchIcon } from "../icons";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
 
 // The peripheral columns TABLE-01 names (a representative count column each), read from
 // row.peripherals; NOT the full CubeMX peripheral set (the every-fact view is a deferred P2).
@@ -79,6 +80,13 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const [columnsOpen, setColumnsOpen] = useState(false);
   const columnsRef = useRef<HTMLDivElement>(null);
+  const searchLabel = useText("stm.spec-matrix.search.placeholder", "Search Parts");
+  const resizeLabel = useCopyFormatter("stm.spec-matrix.resize.aria", "Resize {column}");
+  const allShownLabel = useCopyFormatter("stm.spec-matrix.all-shown", "All {total} parts shown");
+  const matchCountLabel = useCopyFormatter(
+    "stm.spec-matrix.match-count",
+    "{shown} of {total} parts match",
+  );
 
   // Close the column picker on any outside click or Escape (a mini popover, not a modal).
   useEffect(() => {
@@ -240,13 +248,21 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
           <input
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            placeholder="Search Parts"
-            aria-label="Search Parts"
+            placeholder={searchLabel}
+            aria-label={searchLabel}
             className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
           />
         </div>
         <span className="tnum flex-none font-mono text-xs text-t3">
-          {modelRows.length.toLocaleString()} of {rows.length.toLocaleString()}
+          <Text
+            id="stm.spec-matrix.count"
+            values={{
+              shown: modelRows.length.toLocaleString(),
+              total: rows.length.toLocaleString(),
+            }}
+          >
+            {"{shown} of {total}"}
+          </Text>
         </span>
         <button
           type="button"
@@ -259,7 +275,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
               : "border-line bg-raise text-t2 hover:text-t1")
           }
         >
-          Filters
+          <Text id="stm.spec-matrix.filters">Filters</Text>
         </button>
         {/* The column-visibility mini popover: every column toggleable except Part (the row
             identity is never hideable). Hidden columns free horizontal room; visible ones keep
@@ -277,7 +293,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
                 : "border-line bg-raise text-t2 hover:text-t1")
             }
           >
-            Columns
+            <Text id="stm.spec-matrix.columns">Columns</Text>
           </button>
           {columnsOpen ? (
             <div
@@ -341,7 +357,9 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
                   {/* the drag handle: a hairline that widens on hover; double-click resets */}
                   <div
                     role="separator"
-                    aria-label={`Resize ${String(header.column.columnDef.header)}`}
+                    aria-label={resizeLabel({
+                      column: String(header.column.columnDef.header),
+                    })}
                     data-testid={`col-resize-${header.column.id}`}
                     onMouseDown={header.getResizeHandler()}
                     onTouchStart={header.getResizeHandler()}
@@ -371,7 +389,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
           {/* body */}
           {modelRows.length === 0 ? (
             <div className="px-4 py-16 text-center text-sm text-t3">
-              No MCUs match the current filters.
+              <Text id="stm.spec-matrix.empty">No MCUs match the current filters.</Text>
             </div>
           ) : (
             <div style={{ height: totalSize, position: "relative" }}>
@@ -422,8 +440,11 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
           {modelRows.length > 0 ? (
             <div className="tnum border-t border-line px-2.5 py-2 text-center font-mono text-2xs text-t3">
               {modelRows.length === rows.length
-                ? `All ${rows.length.toLocaleString()} parts shown`
-                : `${modelRows.length.toLocaleString()} of ${rows.length.toLocaleString()} parts match`}
+                ? allShownLabel({ total: rows.length.toLocaleString() })
+                : matchCountLabel({
+                    shown: modelRows.length.toLocaleString(),
+                    total: rows.length.toLocaleString(),
+                  })}
             </div>
           ) : null}
         </div>
@@ -455,6 +476,12 @@ function ColumnFilter({
 }) {
   const meta = column.columnDef.meta as ColMeta | undefined;
   const value = column.getFilterValue();
+  const minLabel = useCopyFormatter("stm.spec-matrix.filter-min.aria", "{column} minimum");
+  const maxLabel = useCopyFormatter("stm.spec-matrix.filter-max.aria", "{column} maximum");
+  const textFilterLabel = useCopyFormatter("stm.spec-matrix.filter-text.aria", "Filter {column}");
+  const filterPlaceholder = useText("stm.spec-matrix.filter.placeholder", "Filter");
+  const minPlaceholder = useText("stm.spec-matrix.filter-min.placeholder", "min");
+  const maxPlaceholder = useText("stm.spec-matrix.filter-max.placeholder", "max");
   if (meta?.filter === "range") {
     const [min, max] = (column.getFacetedMinMaxValues() as [number, number] | undefined) ?? [];
     const range = (value as [number | "", number | ""]) ?? ["", ""];
@@ -466,8 +493,8 @@ function ColumnFilter({
         <input
           type="number"
           inputMode="numeric"
-          aria-label={`${column.columnDef.header} minimum`}
-          placeholder={min != null ? String(min) : "min"}
+          aria-label={minLabel({ column: String(column.columnDef.header) })}
+          placeholder={min != null ? String(min) : minPlaceholder}
           value={range[0] === "" || range[0] == null ? "" : range[0]}
           onChange={(e) =>
             column.setFilterValue((old: [unknown, unknown]) => [
@@ -480,8 +507,8 @@ function ColumnFilter({
         <input
           type="number"
           inputMode="numeric"
-          aria-label={`${column.columnDef.header} maximum`}
-          placeholder={max != null ? String(max) : "max"}
+          aria-label={maxLabel({ column: String(column.columnDef.header) })}
+          placeholder={max != null ? String(max) : maxPlaceholder}
           value={range[1] === "" || range[1] == null ? "" : range[1]}
           onChange={(e) =>
             column.setFilterValue((old: [unknown, unknown]) => [
@@ -497,8 +524,8 @@ function ColumnFilter({
   return (
     <input
       type="text"
-      aria-label={`Filter ${column.columnDef.header}`}
-      placeholder="Filter"
+      aria-label={textFilterLabel({ column: String(column.columnDef.header) })}
+      placeholder={filterPlaceholder}
       value={(value as string) ?? ""}
       onChange={(e) => column.setFilterValue(e.target.value)}
       className="h-full w-full min-w-0 rounded-control bg-field px-1.5 py-0.5 text-2xs text-t1 outline-none placeholder:text-t3"

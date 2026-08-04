@@ -15,6 +15,7 @@ import { useBuildStmIndex, useStmStatus } from "../../api/stmQueries";
 import { useSettings, useUpdateSettings } from "../../api/queries";
 import { pickHostFolder } from "../../lib/hostFolderPicker";
 import { Button, Card, Eyebrow } from "../primitives";
+import { Text, useText } from "../../lib/copy";
 
 export function BuildIndexGate() {
   const build = useBuildStmIndex();
@@ -23,6 +24,18 @@ export function BuildIndexGate() {
   const settings = useSettings();
   const updateSettings = useUpdateSettings();
   const [pickerError, setPickerError] = useState("");
+  const startingLabel = useText("stm.index.starting", "Starting the build...");
+  const needsSourceLabel = useText(
+    "stm.index.needs-source",
+    "Choose the STM32CubeMX data folder to build the index.",
+  );
+  const saveFailedLabel = useText("stm.index.save-failed", "Could not save the CubeMX folder.");
+  const checkingLabel = useText("stm.index.action.checking", "Checking Source...");
+  const buildingLabel = useText("stm.index.action.building", "Building...");
+  const savingLabel = useText("stm.index.action.saving", "Saving...");
+  const chooseFolderLabel = useText("stm.index.action.choose-source", "Choose CubeMX Folder");
+  const retryLabel = useText("stm.index.action.retry", "Try Again");
+  const buildLabel = useText("stm.index.action.build", "Build the Index");
 
   useEffect(() => {
     if (build.status === "done") {
@@ -48,19 +61,25 @@ export function BuildIndexGate() {
       await updateSettings.mutateAsync({ stm_cubemx_source: source });
       build.start();
     } catch (error) {
-      setPickerError(error instanceof Error ? error.message : "Could not save the CubeMX folder.");
+      setPickerError(error instanceof Error ? error.message : saveFailedLabel);
     }
   }
 
   return (
     <div className="flex flex-1 items-center justify-center px-6 py-10">
       <Card className="w-full max-w-[440px] px-6 py-6">
-        <Eyebrow className="mb-2">STM Index</Eyebrow>
-        <h2 className="mb-1.5 text-lg font-semibold text-t1">Build the Index</h2>
+        <Eyebrow className="mb-2">
+          <Text id="stm.index.eyebrow">STM Index</Text>
+        </Eyebrow>
+        <h2 className="mb-1.5 text-lg font-semibold text-t1">
+          <Text id="stm.index.title">Build the Index</Text>
+        </h2>
         <p className="mb-4 text-sm text-t2">
-          The STM32 spec matrix and pinout maps are served from a derived index built from your
-          CubeMX source. It has not been built yet on this machine. Building runs once and takes a
-          moment.
+          <Text id="stm.index.body">
+            The STM32 spec matrix and pinout maps are served from a derived index built from your
+            CubeMX source. It has not been built yet on this machine. Building runs once and takes a
+            moment.
+          </Text>
         </p>
 
         {running ? (
@@ -71,15 +90,13 @@ export function BuildIndexGate() {
                 style={{ width: pct != null ? `${pct}%` : "35%" }}
               />
             </div>
-            <p className="text-xs text-t3">{build.progress?.message ?? "Starting the build..."}</p>
+            <p className="text-xs text-t3">{build.progress?.message ?? startingLabel}</p>
           </div>
         ) : null}
 
         {build.status === "error" ? (
           <p className="mb-4 text-sm text-err" data-testid="stm-build-error">
-            {needsSource
-              ? "Choose the STM32CubeMX data folder to build the index."
-              : build.error}
+            {needsSource ? needsSourceLabel : build.error}
           </p>
         ) : null}
 
@@ -100,16 +117,16 @@ export function BuildIndexGate() {
           disabled={running || checkingSource || updateSettings.isPending}
         >
           {checkingSource
-            ? "Checking Source..."
+            ? checkingLabel
             : running
-            ? "Building..."
+            ? buildingLabel
             : updateSettings.isPending
-              ? "Saving..."
+              ? savingLabel
               : needsSource
-                ? "Choose CubeMX Folder"
+                ? chooseFolderLabel
                 : build.status === "error"
-                  ? "Try Again"
-                  : "Build the Index"}
+                  ? retryLabel
+                  : buildLabel}
         </Button>
       </Card>
     </div>

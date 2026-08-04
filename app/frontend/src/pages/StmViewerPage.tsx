@@ -33,6 +33,7 @@ import {
   TabStrip,
   type TabItem,
 } from "../components/primitives";
+import { Text, useText } from "../lib/copy";
 
 export interface StmScope extends StmMcusArgs {
   families: string[];
@@ -46,8 +47,8 @@ const EMPTY_SCOPE: StmScope = { families: [], mcus: [] };
 // retired Hardware app's Bench tab this workstream rebuilds - owner rename 2026-07-23).
 type StmTab = "explorer" | "compatibility";
 const STM_TABS: readonly TabItem<StmTab>[] = [
-  { id: "explorer", label: "Explorer" },
-  { id: "compatibility", label: "Bench" },
+  { id: "explorer", label: "Explorer", copyId: "stm.viewer.tab.explorer" },
+  { id: "compatibility", label: "Bench", copyId: "stm.viewer.tab.compatibility" },
 ];
 
 // The coarse server-side narrowing (decision 3): exactly one selected family narrows server-side;
@@ -64,6 +65,7 @@ export function StmViewerPage() {
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
 
   const status = useStmStatus();
+  const sectionsAria = useText("stm.viewer.sections-aria", "STM Viewer sections");
   const args = useMemo(() => scopeToArgs(scope), [scope]);
   const mcus = useStmMcus(args);
   const pinout = useStmPinout(activePart);
@@ -110,7 +112,7 @@ export function StmViewerPage() {
           onSelect={setTab}
           idBase="stm-view"
           devIdBase="stm"
-          aria-label="STM Viewer sections"
+          aria-label={sectionsAria}
         />
       </div>
 
@@ -184,6 +186,7 @@ function PinoutRegion({
   onRetry: () => void;
 }) {
   const [view, setView] = useState<"map" | "table">("map");
+  const viewAria = useText("stm.viewer.pinout-view-aria", "Pinout view");
   // The legend's category lens: highlighted buckets dim every other pad on the map. Reset when
   // the part changes (the lens describes the previous part's pins).
   const [highlight, setHighlight] = useState<ReadonlySet<string>>(new Set());
@@ -201,14 +204,16 @@ function PinoutRegion({
   return (
     <div data-dev-id="stm.pinout" className="flex min-h-0 flex-1 flex-col">
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
-        <Eyebrow>Pinout</Eyebrow>
+        <Eyebrow>
+          <Text id="stm.viewer.pinout-title">Pinout</Text>
+        </Eyebrow>
         {pinout ? (
           <SegmentedControl
             options={PINOUT_VIEWS}
             value={view}
             onChange={setView}
             size="small"
-            aria-label="Pinout view"
+            aria-label={viewAria}
           />
         ) : null}
       </div>
@@ -282,8 +287,8 @@ function PinoutRegion({
 }
 
 const PINOUT_VIEWS = [
-  { id: "map", label: "Map" },
-  { id: "table", label: "Table" },
+  { id: "map", label: "Map", copyId: "stm.viewer.view.map" },
+  { id: "table", label: "Table", copyId: "stm.viewer.view.table" },
 ] as const;
 
 /** The centring chamber a state block sits in. The state decides its own tone and wording. */
@@ -344,7 +349,9 @@ function PageShell({
   return (
     <div data-dev-id="stm.root" className="flex min-h-0 flex-1 flex-col">
       <header className="flex items-baseline gap-3 px-[30px] pb-4 pt-[22px]">
-        <h1 className="text-title font-semibold text-t1">STM Viewer</h1>
+        <h1 className="text-title font-semibold text-t1">
+          <Text id="stm.viewer.title">STM Viewer</Text>
+        </h1>
         {status != null ? (
           <span className="tnum font-mono text-xs text-t3">
             {status.toLocaleString()} MCUs

@@ -10,27 +10,43 @@
  */
 import type { UnionPositionDTO } from "../../api/types";
 import { Badge, Card } from "../primitives";
+import { Text, useText } from "../../lib/copy";
 import { CLASSIFICATION_LABEL, classificationTone } from "./compatEncoding";
 
 export function CompatReconcileDetail({ position }: { position: UnionPositionDTO }) {
   const { classification, per_part, reconcile } = position;
+  const unreconcilable = useText(
+    "stm.compat.reconcile.unreconcilable",
+    "This position cannot be reconciled across the set.",
+  );
 
   return (
     <Card className="flex flex-col gap-4 px-4 py-3" data-testid="compat-reconcile-detail">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-sm font-semibold text-t1">Position {position.position}</span>
+        <span className="font-mono text-sm font-semibold text-t1">
+          <Text id="stm.compat.reconcile.position" values={{ position: position.position }}>
+            {"Position {position}"}
+          </Text>
+        </span>
         <Badge tone={classificationTone(classification)} size="sm">
           {CLASSIFICATION_LABEL[classification]}
         </Badge>
         <span className="font-mono text-2xs text-t3">
-          {position.present_on}/{position.total} parts
+          <Text
+            id="stm.compat.reconcile.part-count"
+            values={{ present: position.present_on, total: position.total }}
+          >
+            {"{present}/{total} parts"}
+          </Text>
         </span>
       </div>
 
       {reconcile ? (
         reconcile.swappable ? (
           <section>
-            <div className="mb-1.5 text-2xs font-semibold text-t3">Reconciling Swaps</div>
+            <div className="mb-1.5 text-2xs font-semibold text-t3">
+              <Text id="stm.compat.reconcile.swaps-title">Reconciling Swaps</Text>
+            </div>
             {reconcile.swaps.length > 0 ? (
               <ul className="flex flex-col gap-1">
                 {reconcile.swaps.map((s, i) => (
@@ -46,23 +62,27 @@ export function CompatReconcileDetail({ position }: { position: UnionPositionDTO
                 ))}
               </ul>
             ) : (
-              <p className="text-xs text-t3">No swap is needed to reconcile this position.</p>
+              <p className="text-xs text-t3">
+                <Text id="stm.compat.reconcile.no-swap">
+                  No swap is needed to reconcile this position.
+                </Text>
+              </p>
             )}
           </section>
         ) : (
           <section className="flex flex-col gap-1.5">
             <Badge tone="err" size="sm" className="self-start">
-              Un-Swappable
+              <Text id="stm.compat.reconcile.un-swappable">Un-Swappable</Text>
             </Badge>
-            <p className="text-xs text-t2">
-              {reconcile.reason ?? "This position cannot be reconciled across the set."}
-            </p>
+            <p className="text-xs text-t2">{reconcile.reason ?? unreconcilable}</p>
           </section>
         )
       ) : null}
 
       <section>
-        <div className="mb-1.5 text-2xs font-semibold text-t3">Per Part</div>
+        <div className="mb-1.5 text-2xs font-semibold text-t3">
+          <Text id="stm.compat.reconcile.per-part-title">Per Part</Text>
+        </div>
         {/* Bounded: the audit trail across a whole-family set runs to dozens of parts; it
             scrolls inside the card rather than stretching the page. */}
         <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto" data-testid="compat-per-part">
@@ -73,11 +93,23 @@ export function CompatReconcileDetail({ position }: { position: UnionPositionDTO
                 <span className="font-mono text-2xs text-t3">{pp.canonical_pin_name}</span>
               </div>
               {pp.roles.length > 0 ? (
-                <div className="text-2xs text-t3">Roles: {pp.roles.join(", ")}</div>
+                <div className="text-2xs text-t3">
+                  <Text
+                    id="stm.compat.reconcile.roles"
+                    values={{ roles: pp.roles.join(", ") }}
+                  >
+                    {"Roles: {roles}"}
+                  </Text>
+                </div>
               ) : null}
               {pp.functions.length > 0 ? (
                 <div className="truncate font-mono text-2xs text-t3">
-                  Functions: {pp.functions.join(", ")}
+                  <Text
+                    id="stm.compat.reconcile.functions"
+                    values={{ functions: pp.functions.join(", ") }}
+                  >
+                    {"Functions: {functions}"}
+                  </Text>
                 </div>
               ) : null}
             </li>

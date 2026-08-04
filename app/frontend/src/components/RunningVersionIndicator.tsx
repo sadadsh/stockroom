@@ -1,3 +1,4 @@
+import { useText } from "../lib/copy";
 import {
   runningVersion,
   updateIdentity,
@@ -5,17 +6,6 @@ import {
   type UpdateStandingView,
 } from "../lib/updateStanding";
 import { Dot, type BadgeTone } from "./primitives";
-
-const STANDING_LABEL = {
-  checking: "Checking…",
-  current: "Current",
-  available: "Update Available",
-  updating: "Updating…",
-  retrying: "Retrying…",
-  blocked: "Blocked",
-  restart_required: "Restart Required",
-  unknown: "Unknown",
-} as const;
 
 const STANDING_TONE = {
   checking: "text-t3",
@@ -56,6 +46,18 @@ export function RunningVersionIndicator({
   view: UpdateStandingView;
   buildVersion?: string;
 }) {
+  // One hook per standing rather than a lookup inside the map: hooks cannot be called conditionally,
+  // and the label is also read aloud through the aria-label below, so every arm has to be resolved.
+  const standingLabel: Record<UpdateStanding, string> = {
+    checking: useText("update.standing.checking", "Checking…"),
+    current: useText("update.standing.current", "Current"),
+    available: useText("update.standing.available", "Update Available"),
+    updating: useText("update.standing.updating", "Updating…"),
+    retrying: useText("update.standing.retrying", "Retrying…"),
+    blocked: useText("update.standing.blocked", "Blocked"),
+    restart_required: useText("update.standing.restart-required", "Restart Required"),
+    unknown: useText("update.standing.unknown", "Unknown"),
+  };
   const running = runningVersion(view.currentRevision, buildVersion);
   // The SECOND identity: the update's target while one is available, and the backend's own revision
   // while this window still runs an older bundle. A disagreement is information, so both sides of
@@ -66,7 +68,7 @@ export function RunningVersionIndicator({
       : view.standing === "restart_required" && view.currentRevision
         ? updateIdentity(view.currentRevision)
         : null;
-  const label = STANDING_LABEL[view.standing];
+  const label = standingLabel[view.standing];
   const accessibleVersion = `running ${running.kind} ${running.value}`;
   const accessibleOther = !other
     ? ""

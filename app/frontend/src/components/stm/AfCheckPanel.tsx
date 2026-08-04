@@ -9,6 +9,7 @@ import { useStmAfCheck } from "../../api/stmQueries";
 import { ApiError } from "../../api/client";
 import type { AfCheckBody, UnionDTO } from "../../api/types";
 import { Badge, Button, Card, Eyebrow } from "../primitives";
+import { Text, useText } from "../../lib/copy";
 
 // The per-ref assignment the union's reconcile proposes: for each part, the position -> { signal,
 // af_index } swaps that make it carry the union's required signals. Derived purely from the union
@@ -36,6 +37,8 @@ export function AfCheckPanel({ union }: { union: UnionDTO }) {
   const checkableRefs = Object.keys(assignmentsByRef);
   const [selectedRef, setSelectedRef] = useState<string | null>(checkableRefs[0] ?? null);
   const afCheck = useStmAfCheck();
+  const checkingLabel = useText("stm.af.check.checking", "Checking...");
+  const checkLabel = useText("stm.af.check.action", "Check Conflicts");
 
   // A new union invalidates the prior selection + result (the swaps may differ entirely).
   useEffect(() => {
@@ -53,7 +56,9 @@ export function AfCheckPanel({ union }: { union: UnionDTO }) {
   return (
     <Card className="flex flex-none flex-col gap-3 px-4 py-3" data-testid="af-check-panel">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Eyebrow>AF Conflict Check</Eyebrow>
+        <Eyebrow>
+          <Text id="stm.af.check.title">AF Conflict Check</Text>
+        </Eyebrow>
         <Button
           variant="soft"
           small
@@ -63,7 +68,7 @@ export function AfCheckPanel({ union }: { union: UnionDTO }) {
             afCheck.mutate({ part: selectedRef, assignment: assignmentsByRef[selectedRef] ?? {} })
           }
         >
-          {afCheck.isPending ? "Checking..." : "Check Conflicts"}
+          {afCheck.isPending ? checkingLabel : checkLabel}
         </Button>
       </div>
 
@@ -90,7 +95,7 @@ export function AfCheckPanel({ union }: { union: UnionDTO }) {
       {afCheck.isSuccess ? (
         conflicts.length === 0 ? (
           <p className="text-xs text-ok" data-testid="af-check-clean">
-            No conflicts for this assignment.
+            <Text id="stm.af.check.clean">No conflicts for this assignment.</Text>
           </p>
         ) : (
           <ul className="flex flex-col gap-1.5" data-testid="af-check-conflicts">
@@ -113,12 +118,18 @@ export function AfCheckPanel({ union }: { union: UnionDTO }) {
           </ul>
         )
       ) : notBuilt ? (
-        <p className="text-xs text-t3">Build the index to check for conflicts.</p>
+        <p className="text-xs text-t3">
+          <Text id="stm.af.check.not-built">Build the index to check for conflicts.</Text>
+        </p>
       ) : afCheck.isError ? (
-        <p className="text-xs text-err">Could not check the assignment.</p>
+        <p className="text-xs text-err">
+          <Text id="stm.af.check.failed">Could not check the assignment.</Text>
+        </p>
       ) : (
         <p className="text-xs text-t3">
-          Check the proposed swaps for the selected part against its peripheral mux.
+          <Text id="stm.af.check.prompt">
+            Check the proposed swaps for the selected part against its peripheral mux.
+          </Text>
         </p>
       )}
     </Card>

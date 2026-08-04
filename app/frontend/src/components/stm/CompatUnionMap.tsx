@@ -23,6 +23,7 @@ import {
 } from "../../lib/pinMapGeometry";
 import { unionClassificationHue } from "../../lib/stmPinHue";
 import { Button, LegendSwatch } from "../primitives";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { CLASSIFICATION_LABEL, type Classification } from "./compatEncoding";
 import { CompatReconcileDetail } from "./CompatReconcileDetail";
 
@@ -55,6 +56,19 @@ const LEGEND: Classification[] = ["shared", "divergent", "partial"];
 
 export function CompatUnionMap({ union }: { union: UnionDTO }) {
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
+  const mapLabel = useText(
+    "stm.compat.union-map.aria",
+    "Socket-union map for {family} in {package}",
+    { family: union.family, package: union.package },
+  );
+  const unplacedOne = useCopyFormatter(
+    "stm.compat.union-map.unplaced-one",
+    "{count} position without a mappable location",
+  );
+  const unplacedMany = useCopyFormatter(
+    "stm.compat.union-map.unplaced-many",
+    "{count} positions without a mappable location",
+  );
 
   const geometry = useMemo(() => unionGeometry(union.positions), [union.positions]);
   const layout = useMemo(
@@ -133,7 +147,10 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
           {unavailable ? (
             <div className="flex h-full min-h-0 flex-col gap-2 p-4" data-testid="compat-union-list">
               <p className="flex-none text-xs text-t3">
-                No drawable layout for this package. Select a position from the list to inspect it.
+                <Text id="stm.compat.union-map.no-layout">
+                  No drawable layout for this package. Select a position from the list to inspect
+                  it.
+                </Text>
               </p>
               <ul className="min-h-0 flex-1 overflow-y-auto">
                 {union.positions.map((p) => (
@@ -165,7 +182,7 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
               data-testid="compat-union-map-svg"
               className="h-full w-full cursor-grab touch-none select-none active:cursor-grabbing"
               role="img"
-              aria-label={`Socket-union map for ${union.family} in ${union.package}`}
+              aria-label={mapLabel}
             >
               <g transform={`translate(${camera.x},${camera.y}) scale(${camera.k})`}>
                 <rect
@@ -243,13 +260,15 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
             ))}
             {unplaced > 0 ? (
               <span className="rounded-control bg-raise px-2 py-0.5 text-2xs text-t3">
-                {unplaced} {unplaced === 1 ? "position" : "positions"} without a mappable location
+                {unplaced === 1
+                  ? unplacedOne({ count: unplaced })
+                  : unplacedMany({ count: unplaced })}
               </span>
             ) : null}
           </div>
           {!unavailable ? (
             <Button type="button" small onClick={reset} className="flex-none">
-              Reset View
+              <Text id="stm.compat.union-map.reset-view">Reset View</Text>
             </Button>
           ) : null}
         </div>

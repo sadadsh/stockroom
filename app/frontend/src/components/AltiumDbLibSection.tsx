@@ -72,9 +72,13 @@ export function AltiumDbLibSection() {
   return (
     <>
       {status.isLoading ? (
-        <p className="py-1 text-sm text-t3">Reading the library...</p>
+        <p className="py-1 text-sm text-t3">
+          <Text id="altiumdb.section.loading">Reading the library...</Text>
+        </p>
       ) : status.isError ? (
-        <p className="py-1 text-sm text-err">Could not read the Altium library.</p>
+        <p className="py-1 text-sm text-err">
+          <Text id="altiumdb.section.error">Could not read the Altium library.</Text>
+        </p>
       ) : data ? (
         <div className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between gap-4">
@@ -83,11 +87,14 @@ export function AltiumDbLibSection() {
                 {data.ready}
               </span>
               <span className="text-sm text-t3">
-                of <span className="tnum font-mono text-t2">{data.total}</span> parts ready to place
+                <Text id="altiumdb.section.ready-of">of</Text>{" "}
+                <span className="tnum font-mono text-t2">{data.total}</span>{" "}
+                <Text id="altiumdb.section.ready-suffix">parts ready to place</Text>
               </span>
             </div>
             <span className="text-xs text-t3">
-              Library <span className="text-t2">{data.profile}</span>
+              <Text id="altiumdb.section.library-label">Library</Text>{" "}
+              <span className="text-t2">{data.profile}</span>
             </span>
           </div>
 
@@ -106,7 +113,7 @@ export function AltiumDbLibSection() {
               {data.dblib}
             </span>
             <Button small onClick={onCopyPath} className="flex-none">
-              Copy Path
+              <Text id="altiumdb.section.copy-path">Copy Path</Text>
             </Button>
           </div>
           <p className="text-xs text-t3">
@@ -120,8 +127,10 @@ export function AltiumDbLibSection() {
             // never been opened here has none. Saying so beats letting Altium fail with an ODBC
             // error against a file nobody mentioned.
             <p className="text-xs text-warn" data-testid="altium-datasource-missing">
-              This machine-local data source has not been built yet. Rebuild the DbLib before
-              setting it up in Altium.
+              <Text id="altiumdb.section.datasource-missing">
+                This machine-local data source has not been built yet. Rebuild the DbLib before
+                setting it up in Altium.
+              </Text>
             </p>
           ) : null}
         </div>
@@ -159,7 +168,7 @@ export function AltiumDbLibSection() {
           disabled={!data}
           icon={<LibraryIcon className="h-3.5 w-3.5" />}
         >
-          View Library
+          <Text id="altiumdb.section.view-library">View Library</Text>
         </Button>
         <Button onClick={() => setSetupOpen(true)} icon={<LibraryIcon className="h-3.5 w-3.5" />}>
           <Text id="altiumdb.section-setup">Setup Guide</Text>

@@ -48,6 +48,7 @@ import {
   TargetPolicyEditor,
 } from "./TargetPolicyEditor";
 import { Button, ErrorState, Eyebrow } from "../primitives";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { downloadTextFile } from "../../lib/stmTargetExport";
 import {
   stmSocketExport,
@@ -185,6 +186,21 @@ export function CompatibilityWorkbench() {
   const union = useStmCompatUnion();
   const socketSolution = useStmSocketSolution();
 
+  const packageFilterLabel = useText("stm.compat.package-filter.placeholder", "Filter Packages");
+  const previousSetLabel = useText("stm.compat.previous-set.aria", "Previous Set");
+  const nextSetLabel = useText("stm.compat.next-set.aria", "Next Set");
+  const targetSetControlLabel = useText("stm.compat.target-set-control.label", "Target Set");
+  const unreachableLabel = useText("stm.compat.unreachable", "Cannot reach the Stockroom server.");
+  const packageOfferedLabel = useText(
+    "stm.compat.package-offered.title",
+    "Offered by every selected family",
+  );
+  const packageMissingLabel = useCopyFormatter(
+    "stm.compat.package-missing.title",
+    "Not offered by {families}",
+  );
+  const customSetLabel = useCopyFormatter("stm.compat.custom-set.option", "Custom · {count}");
+
   const selectedFamilies = scope.families;
   const familiesKey = selectedFamilies.join(",");
 
@@ -319,16 +335,20 @@ export function CompatibilityWorkbench() {
               : "order-2 flex-none border-t pt-2"
           }`}
         >
-          <Eyebrow className="mb-1.5 px-1">Package</Eyebrow>
+          <Eyebrow className="mb-1.5 px-1">
+            <Text id="stm.compat.package-title">Package</Text>
+          </Eyebrow>
           {selectedFamilies.length === 0 ? (
-            <p className="px-1 text-xs text-t3">Select one or more families to see packages.</p>
+            <p className="px-1 text-xs text-t3">
+              <Text id="stm.compat.package-prompt">Select one or more families to see packages.</Text>
+            </p>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col gap-1.5">
               <input
                 value={pkgFilter}
                 onChange={(e) => setPkgFilter(e.target.value)}
-                placeholder="Filter Packages"
-                aria-label="Filter Packages"
+                placeholder={packageFilterLabel}
+                aria-label={packageFilterLabel}
                 className="w-full rounded-control bg-field px-2 py-1 text-xs text-t1 outline-none placeholder:text-t3"
               />
               <div className="flex flex-wrap gap-0.5">
@@ -348,7 +368,9 @@ export function CompatibilityWorkbench() {
                 ))}
               </div>
               {visiblePackages.length === 0 ? (
-                <p className="px-1 text-xs text-t3">No packages match this filter.</p>
+                <p className="px-1 text-xs text-t3">
+                  <Text id="stm.compat.package-empty">No packages match this filter.</Text>
+                </p>
               ) : (
                 <div
                   className="grid min-h-0 grid-cols-2 gap-1 overflow-y-auto pr-0.5"
@@ -366,8 +388,8 @@ export function CompatibilityWorkbench() {
                         aria-pressed={active}
                         title={
                           partial
-                            ? `Not offered by ${p.missing.join(", ")}`
-                            : "Offered by every selected family"
+                            ? packageMissingLabel({ families: p.missing.join(", ") })
+                            : packageOfferedLabel
                         }
                         onClick={() =>
                           setSelectedPackage((cur) => (cur === p.name ? null : p.name))
@@ -401,26 +423,34 @@ export function CompatibilityWorkbench() {
           <BuildIndexGate />
         ) : !selectedPackage || coveredFamilies.length === 0 ? (
           <ChamberMessage>
-            Pick families and a package. The Bench computes every compatible set for the scope.
+            <Text id="stm.compat.scope-prompt">
+              Pick families and a package. The Bench computes every compatible set for the scope.
+            </Text>
           </ChamberMessage>
         ) : suggestions.isLoading ? (
-          <ChamberMessage>Computing the compatible sets...</ChamberMessage>
+          <ChamberMessage>
+            <Text id="stm.compat.sets-loading">Computing the compatible sets...</Text>
+          </ChamberMessage>
         ) : suggestions.isError ? (
-          <ChamberMessage>Could not compute the compatible sets.</ChamberMessage>
+          <ChamberMessage>
+            <Text id="stm.compat.sets-failed">Could not compute the compatible sets.</Text>
+          </ChamberMessage>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             <div
               className="flex flex-none items-center gap-2 border-b border-line px-3 py-1.5"
               data-testid="bench-stepper"
             >
-              <Button small onClick={() => stepBy(-1)} aria-label="Previous Set">
+              <Button small onClick={() => stepBy(-1)} aria-label={previousSetLabel}>
                 ←
               </Button>
               <label className="flex min-w-0 items-center gap-2">
-                <span className="text-xs text-t3">Target set</span>
+                <span className="text-xs text-t3">
+                  <Text id="stm.compat.target-set-label">Target set</Text>
+                </span>
                 <AdaptiveChoice
                   devId="stm.target-set-control"
-                  label="Target Set"
+                  label={targetSetControlLabel}
                   value={customParts ? "custom" : activeSetId}
                   onChange={(next) => next !== "custom" && stepTo(next)}
                   options={[
@@ -428,16 +458,32 @@ export function CompatibilityWorkbench() {
                       value: set.id,
                       label: `${set.label} · ${set.count}${set.tier === "divergent" ? ` · ${set.divergent} divergent` : ""}`,
                     })),
-                    ...(customParts ? [{ value: "custom", label: `Custom · ${customParts.length}`, disabled: true }] : []),
+                    ...(customParts
+                      ? [
+                          {
+                            value: "custom",
+                            label: customSetLabel({ count: customParts.length }),
+                            disabled: true,
+                          },
+                        ]
+                      : []),
                   ]}
                 />
               </label>
-              <Button small onClick={() => stepBy(1)} aria-label="Next Set">
+              <Button small onClick={() => stepBy(1)} aria-label={nextSetLabel}>
                 →
               </Button>
               <span className="min-w-0 flex-1 truncate font-mono text-2xs text-t3">
-                {activeOption?.covered.length}/{selectedFamilies.length} families ·{" "}
-                {selectedPackage}
+                <Text
+                  id="stm.compat.scope-summary"
+                  values={{
+                    covered: activeOption?.covered.length ?? "",
+                    total: selectedFamilies.length,
+                    package: selectedPackage ?? "",
+                  }}
+                >
+                  {"{covered}/{total} families · {package}"}
+                </Text>
               </span>
               <ExportMenu
                 disabled={
@@ -451,22 +497,24 @@ export function CompatibilityWorkbench() {
             </div>
 
             {union.isPending ? (
-              <ChamberMessage>Building the socket-union...</ChamberMessage>
+              <ChamberMessage>
+                <Text id="stm.compat.union-loading">Building the socket-union...</Text>
+              </ChamberMessage>
             ) : err && !indexNotBuilt ? (
               <div className="flex flex-col items-center gap-3 py-16 text-center">
                 <p className="text-sm text-err">
-                  {err instanceof ApiError && err.status === 0
-                    ? "Cannot reach the Stockroom server."
-                    : err.message}
+                  {err instanceof ApiError && err.status === 0 ? unreachableLabel : err.message}
                 </p>
                 <Button small onClick={() => body && union.mutate(body)}>
-                  Try Again
+                  <Text id="stm.compat.union-retry">Try Again</Text>
                 </Button>
               </div>
             ) : union.data ? (
               <div className="flex min-h-0 flex-1 flex-col">
                 {socketSolution.isPending ? (
-                  <ChamberMessage>Solving the universal socket...</ChamberMessage>
+                  <ChamberMessage>
+                    <Text id="stm.compat.solution-loading">Solving the universal socket...</Text>
+                  </ChamberMessage>
                 ) : socketSolution.error && !indexNotBuilt ? (
                   <div className="flex flex-col items-center gap-3 py-12 text-center">
                     <ErrorState dense id="stm.socket-failed">
@@ -482,7 +530,7 @@ export function CompatibilityWorkbench() {
                         })
                       }
                     >
-                      Try Again
+                      <Text id="stm.compat.solution-retry">Try Again</Text>
                     </Button>
                   </div>
                 ) : socketSolution.data ? (
@@ -491,7 +539,7 @@ export function CompatibilityWorkbench() {
 
                 <details className="flex-none border-t border-line bg-surface">
                   <summary className="cursor-pointer px-4 py-2 text-xs text-t2">
-                    Target set and policy
+                    <Text id="stm.compat.target-summary">Target set and policy</Text>
                   </summary>
                   <div className="max-h-[50vh] overflow-y-auto border-t border-line p-3">
                     <SetStrip
@@ -508,7 +556,9 @@ export function CompatibilityWorkbench() {
                     </div>
                     <details className="mt-3 border-t border-line pt-3">
                       <summary className="cursor-pointer text-xs text-t2">
-                        Raw silicon compatibility evidence
+                        <Text id="stm.compat.evidence-summary">
+                          Raw silicon compatibility evidence
+                        </Text>
                       </summary>
                       <div className="mt-3 flex flex-col gap-3">
                         <CompatUnionMap union={union.data} />
@@ -543,6 +593,11 @@ export function SetStrip({
     const m = /^STM32([A-Z]+\d)/.exec(ref);
     return m ? `STM32${m[1]}` : union.family;
   };
+  const openPartLabel = useText("stm.compat.open-part.title", "Open this part's pinout table");
+  const removePartLabel = useCopyFormatter(
+    "stm.compat.remove-part.aria",
+    "Remove {part} from the set",
+  );
   return (
     // Bounded: a whole-family set runs to dozens of chips; the strip scrolls internally so it
     // never pushes the switch plan and map below the fold (the bounded-list discipline).
@@ -551,7 +606,12 @@ export function SetStrip({
       data-testid="compat-set-strip"
     >
       <span className="text-2xs font-semibold text-t3">
-        Set of {union.parts.length} on {union.package}
+        <Text
+          id="stm.compat.set-of"
+          values={{ count: union.parts.length, package: union.package }}
+        >
+          {"Set of {count} on {package}"}
+        </Text>
       </span>
       {union.resolved.map((r) => (
         <span
@@ -561,7 +621,7 @@ export function SetStrip({
           <button
             type="button"
             onClick={() => onOpenPart?.(r.ref)}
-            title="Open this part's pinout table"
+            title={openPartLabel}
             className="font-mono text-2xs text-t1 hover:underline"
           >
             {r.mpn || r.ref}
@@ -570,7 +630,7 @@ export function SetStrip({
           {union.parts.length > 2 ? (
             <button
               type="button"
-              aria-label={`Remove ${r.mpn || r.ref} from the set`}
+              aria-label={removePartLabel({ part: r.mpn || r.ref })}
               onClick={() => onDropPart(r.ref)}
               className="text-t3 hover:text-t1"
             >
@@ -583,41 +643,15 @@ export function SetStrip({
   );
 }
 
-const EXPORT_OPTIONS: {
-  kind: StmSocketExportKind;
-  label: string;
-  description: string;
-}[] = [
-  {
-    kind: "request",
-    label: "Socket Request",
-    description: "Exact target set and solution policy",
-  },
-  {
-    kind: "solution",
-    label: "Socket Solution",
-    description: "Digest-bound support cells, cohorts, and fabric",
-  },
-  {
-    kind: "support-cells",
-    label: "Support Cells",
-    description: "Reusable topology and capability requirements",
-  },
-  {
-    kind: "positions",
-    label: "Physical Positions",
-    description: "Every package position and assigned solution",
-  },
-  {
-    kind: "control-states",
-    label: "Control States",
-    description: "Behavioral cohorts and permitted branch states",
-  },
-  {
-    kind: "proofs",
-    label: "Electrical Proofs",
-    description: "Implementation checks and failure actions",
-  },
+// The export kinds in menu order; each kind's label and description resolve through the copy layer
+// inside the menu (a hook cannot run out here).
+const EXPORT_KINDS: StmSocketExportKind[] = [
+  "request",
+  "solution",
+  "support-cells",
+  "positions",
+  "control-states",
+  "proofs",
 ];
 
 function ExportMenu({
@@ -627,6 +661,52 @@ function ExportMenu({
   disabled: boolean;
   onExport: (kind: StmSocketExportKind) => void;
 }) {
+  const exportLabel = useText("stm.compat.export", "Export");
+  const exportMenuLabel = useText("stm.compat.export-menu.aria", "Export Target Data");
+  const options: Record<StmSocketExportKind, { label: string; description: string }> = {
+    request: {
+      label: useText("stm.compat.export.request.label", "Socket Request"),
+      description: useText(
+        "stm.compat.export.request.description",
+        "Exact target set and solution policy",
+      ),
+    },
+    solution: {
+      label: useText("stm.compat.export.solution.label", "Socket Solution"),
+      description: useText(
+        "stm.compat.export.solution.description",
+        "Digest-bound support cells, cohorts, and fabric",
+      ),
+    },
+    "support-cells": {
+      label: useText("stm.compat.export.support-cells.label", "Support Cells"),
+      description: useText(
+        "stm.compat.export.support-cells.description",
+        "Reusable topology and capability requirements",
+      ),
+    },
+    positions: {
+      label: useText("stm.compat.export.positions.label", "Physical Positions"),
+      description: useText(
+        "stm.compat.export.positions.description",
+        "Every package position and assigned solution",
+      ),
+    },
+    "control-states": {
+      label: useText("stm.compat.export.control-states.label", "Control States"),
+      description: useText(
+        "stm.compat.export.control-states.description",
+        "Behavioral cohorts and permitted branch states",
+      ),
+    },
+    proofs: {
+      label: useText("stm.compat.export.proofs.label", "Electrical Proofs"),
+      description: useText(
+        "stm.compat.export.proofs.description",
+        "Implementation checks and failure actions",
+      ),
+    },
+  };
   return (
     <details className="relative flex-none">
       <summary
@@ -640,26 +720,26 @@ function ExportMenu({
           (disabled ? "cursor-not-allowed opacity-50" : "")
         }
       >
-        Export
+        {exportLabel}
       </summary>
       <div
         role="menu"
-        aria-label="Export Target Data"
+        aria-label={exportMenuLabel}
         className="absolute right-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-card border border-line bg-popover py-1 shadow-pop"
       >
-        {EXPORT_OPTIONS.map((option) => (
+        {EXPORT_KINDS.map((kind) => (
           <button
-            key={option.kind}
+            key={kind}
             type="button"
             role="menuitem"
             onClick={(event) => {
-              onExport(option.kind);
+              onExport(kind);
               event.currentTarget.closest("details")?.removeAttribute("open");
             }}
             className="block w-full px-3 py-2 text-left hover:bg-raise2 focus-visible:bg-raise2 focus-visible:outline-none"
           >
-            <span className="block text-xs font-medium text-t1">{option.label}</span>
-            <span className="mt-0.5 block text-2xs text-t3">{option.description}</span>
+            <span className="block text-xs font-medium text-t1">{options[kind].label}</span>
+            <span className="mt-0.5 block text-2xs text-t3">{options[kind].description}</span>
           </button>
         ))}
       </div>

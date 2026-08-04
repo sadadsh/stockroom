@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { TargetDefinitionPolicy } from "../../api/types";
+import { Text, useText } from "../../lib/copy";
 import { Button, Eyebrow } from "../primitives";
 
 const CUBEMX_EVIDENCE = "STM32CubeMX derived pin roles and alternate-function tables";
@@ -490,6 +491,10 @@ export function TargetPolicyEditor({
   const [draft, setDraft] = useState(() => JSON.stringify(policy, null, 2));
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const draftLabel = useText(
+    "stm.target.policy.draft.aria",
+    "Target Definition Policy JSON",
+  );
 
   useEffect(() => {
     setDraft(JSON.stringify(policy, null, 2));
@@ -523,35 +528,41 @@ export function TargetPolicyEditor({
     <details className="rounded-card border border-line bg-surface">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
         <span>
-          <Eyebrow>Definition Policy</Eyebrow>
+          <Eyebrow>
+            <Text id="stm.target.policy.title">Definition Policy</Text>
+          </Eyebrow>
           <span className="mt-0.5 block font-mono text-xs text-t1">{policy.id}</span>
         </span>
-        <span className="text-2xs text-t3">Edit JSON</span>
+        <span className="text-2xs text-t3">
+          <Text id="stm.target.policy.edit-json">Edit JSON</Text>
+        </span>
       </summary>
       <div className="border-t border-line px-4 pb-4 pt-3">
         <p className="mb-3 text-xs text-t3">
-          The compiler always inventories the functional power, ground, regulator, reset, boot,
-          clock, and reserved-pin foundation. This policy adds access services, required routes,
-          target applicability, safety handling, and implementation-neutral routing requirements.
-          Stockroom specifies connection behavior and safe states, while the consuming design
-          chooses the switching, selection, or isolation technology. Pin capability stays
-          distinct from externally evidenced recovery or data-access support, and the whole policy
-          is included in the artifact digest.
+          <Text id="stm.target.policy.explanation">
+            The compiler always inventories the functional power, ground, regulator, reset, boot,
+            clock, and reserved-pin foundation. This policy adds access services, required routes,
+            target applicability, safety handling, and implementation-neutral routing requirements.
+            Stockroom specifies connection behavior and safe states, while the consuming design
+            chooses the switching, selection, or isolation technology. Pin capability stays
+            distinct from externally evidenced recovery or data-access support, and the whole policy
+            is included in the artifact digest.
+          </Text>
         </p>
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          aria-label="Target Definition Policy JSON"
+          aria-label={draftLabel}
           spellCheck={false}
           className="h-64 w-full resize-y rounded-control bg-field p-3 font-mono text-xs text-t1 outline-none focus:ring-1 focus:ring-acc"
         />
         {error ? <p className="mt-2 text-xs text-err">{error}</p> : null}
         <div className="mt-3 flex flex-wrap gap-2">
           <Button small onClick={apply}>
-            Apply Policy
+            <Text id="stm.target.policy.apply">Apply Policy</Text>
           </Button>
           <Button small onClick={() => fileInput.current?.click()}>
-            Load JSON
+            <Text id="stm.target.policy.load-json">Load JSON</Text>
           </Button>
           <Button
             small
@@ -561,7 +572,7 @@ export function TargetPolicyEditor({
               onPolicyChange(reset);
             }}
           >
-            Reset Access Profile
+            <Text id="stm.target.policy.reset">Reset Access Profile</Text>
           </Button>
           <input
             ref={fileInput}

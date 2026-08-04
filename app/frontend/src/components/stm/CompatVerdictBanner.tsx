@@ -9,19 +9,31 @@
  * em dashes.
  */
 import type { UnionDTO } from "../../api/types";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
+import { plural } from "../../lib/plural";
 import { Card, Dot } from "../primitives";
-
-// "no swaps" / "1 swap" / "N swaps", so the headline reads as natural sentence-case prose.
-function swapPhrase(n: number): string {
-  if (n <= 0) return "no swaps";
-  return n === 1 ? "1 swap" : `${n} swaps`;
-}
 
 export function CompatVerdictBanner({ verdict }: { verdict: UnionDTO["verdict"] }) {
   const { interchangeable, swaps_required, blocking } = verdict;
+  // "no swaps" / "1 swap" / "N swaps": three separate sentences rather than one assembled from a
+  // count and a noun, because only the zero arm drops the number entirely.
+  const noSwaps = useText("stm.compat.verdict.swaps-none", "no swaps");
+  const oneSwap = useText("stm.compat.verdict.swaps-one", "1 swap");
+  const manySwaps = useCopyFormatter("stm.compat.verdict.swaps-many", "{count} swaps");
+  const interchangeableHeadline = useCopyFormatter(
+    "stm.compat.verdict.interchangeable",
+    "Interchangeable with {swaps}",
+  );
+  const incompatibleHeadline = useText("stm.compat.verdict.incompatible", "Incompatible");
+  const swaps =
+    swaps_required <= 0
+      ? noSwaps
+      : swaps_required === 1
+        ? oneSwap
+        : manySwaps({ count: swaps_required });
   const headline = interchangeable
-    ? `Interchangeable with ${swapPhrase(swaps_required)}`
-    : "Incompatible";
+    ? interchangeableHeadline({ swaps })
+    : incompatibleHeadline;
 
   return (
     <Card className="flex flex-none flex-col gap-3 px-5 py-4" data-testid="compat-verdict-banner">
@@ -38,16 +50,31 @@ export function CompatVerdictBanner({ verdict }: { verdict: UnionDTO["verdict"] 
 
       {interchangeable ? (
         <p className="text-sm text-t2">
-          Every part in the set carries the union's signals, with the reconciling swap shown on each
-          divergent position.
+          <Text id="stm.compat.verdict.ok-body">
+            Every part in the set carries the union's signals, with the reconciling swap shown on
+            each divergent position.
+          </Text>
         </p>
       ) : (
         <>
           <p className="text-sm text-t2">
-            A required signal cannot be placed on every part in the set.
-            {blocking.length > 0
-              ? ` ${blocking.length} blocking ${blocking.length === 1 ? "position" : "positions"}.`
-              : ""}
+            <Text id="stm.compat.verdict.blocked-body">
+              A required signal cannot be placed on every part in the set.
+            </Text>
+            {blocking.length > 0 ? (
+              <>
+                {" "}
+                <Text
+                  id="stm.compat.verdict.blocking-count"
+                  values={{
+                    count: blocking.length,
+                    noun: plural(blocking.length, "position"),
+                  }}
+                >
+                  {"{count} blocking {noun}."}
+                </Text>
+              </>
+            ) : null}
           </p>
           {blocking.length > 0 ? (
             // Bounded: a big set can block on dozens of positions; the list scrolls inside the
@@ -63,7 +90,12 @@ export function CompatVerdictBanner({ verdict }: { verdict: UnionDTO["verdict"] 
                 >
                   <div className="flex items-baseline gap-2">
                     <span className="flex-none font-mono text-xs text-t1">
-                      Position {b.position}
+                      <Text
+                        id="stm.compat.verdict.position"
+                        values={{ position: b.position }}
+                      >
+                        {"Position {position}"}
+                      </Text>
                     </span>
                     <span className="min-w-0 truncate font-mono text-xs text-err">{b.signal}</span>
                   </div>

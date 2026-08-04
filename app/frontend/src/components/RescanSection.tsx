@@ -17,6 +17,7 @@ import { useRescanState } from "../api/queries";
 import { useRescan, type RescanTally } from "../lib/useRescan";
 import type { RescanStateResponse, RescanSummary } from "../api/types";
 import { useToast } from "../lib/toast";
+import { Text } from "../lib/copy";
 import { Badge, Button, Dot } from "./primitives";
 import { RefreshIcon } from "./icons";
 
@@ -79,9 +80,13 @@ export function RescanSection() {
         ) : rescan.status === "done" && rescan.summary ? (
           <DoneBody summary={rescan.summary} />
         ) : state.isLoading ? (
-          <p className="py-1 text-sm text-t3">Reading the last rescan...</p>
+          <p className="py-1 text-sm text-t3">
+            <Text id="library.rescan.loading">Reading the last rescan...</Text>
+          </p>
         ) : state.isError ? (
-          <p className="py-1 text-sm text-err">Could not read the last rescan.</p>
+          <p className="py-1 text-sm text-err">
+            <Text id="library.rescan.error">Could not read the last rescan.</Text>
+          </p>
         ) : state.data ? (
           <IdleBody data={state.data} />
         ) : null}
@@ -116,7 +121,7 @@ export function RescanSection() {
               disabled={busy}
               onChange={(e) => setForce(e.target.checked)}
             />
-            Force Full Rescan
+            <Text id="library.rescan.force-label">Force Full Rescan</Text>
           </label>
         </div>
     </>
@@ -129,7 +134,9 @@ function IdleBody({ data }: { data: RescanStateResponse }) {
     return (
       <div className="flex items-center gap-2.5 py-1" data-testid="rescan-never-run">
         <Dot tone="neutral" />
-        <span className="text-sm text-t2">This library has never been rescanned.</span>
+        <span className="text-sm text-t2">
+          <Text id="library.rescan.never-run">This library has never been rescanned.</Text>
+        </span>
       </div>
     );
   }
@@ -139,7 +146,8 @@ function IdleBody({ data }: { data: RescanStateResponse }) {
       <div className="flex items-center gap-2.5">
         <Dot tone={failed > 0 ? "warn" : "ok"} />
         <span className="text-sm text-t2">
-          Last refreshed <span className="tnum font-mono text-t1">{total}</span>{" "}
+          <Text id="library.rescan.last-refreshed">Last refreshed</Text>{" "}
+          <span className="tnum font-mono text-t1">{total}</span>{" "}
           {total === 1 ? "part" : "parts"}
           {checkedAt ? ` · ${formatDate(checkedAt)}` : ""}
         </span>
@@ -226,7 +234,9 @@ function DoneBody({ summary }: { summary: RescanSummary }) {
           data-testid="rescan-paused"
         >
           <div className="flex items-center gap-2">
-            <Badge tone="warn">Paused</Badge>
+            <Badge tone="warn">
+              <Text id="library.rescan.paused">Paused</Text>
+            </Badge>
             <span className="text-sm text-t1">{summary.paused_providers.join(", ")}</span>
           </div>
           <p className="text-xs text-t3">

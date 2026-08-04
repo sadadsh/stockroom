@@ -6,6 +6,7 @@
  * the app and never bakes a colour that only reads on one theme.
  */
 import { useEffect } from "react";
+import { Text, useText } from "../lib/copy";
 import { useObjectUrl } from "../lib/useObjectUrl";
 import { usePanZoom } from "../lib/usePanZoom";
 import { useTheme } from "../lib/theme";
@@ -31,6 +32,11 @@ export function SvgViewport({
   const { theme } = useTheme();
   const { view, frameRef, handlers, reset, zoomIn, zoomOut } = usePanZoom();
   const scalePercent = Math.round(view.scale * 100);
+  const zoomOutLabel = useText("svg-view.zoom-out", "Zoom out");
+  const zoomLevelLabel = useText("svg-view.zoom-level", "Zoom level");
+  const zoomInLabel = useText("svg-view.zoom-in", "Zoom in");
+  const resetViewLabel = useText("svg-view.reset-view", "Reset View");
+  const exportSvgLabel = useText("svg-view.export-svg", "Export SVG");
 
   useEffect(() => {
     onVisibilityChange?.("checking");
@@ -97,7 +103,7 @@ export function SvgViewport({
       <div className="absolute bottom-3 right-3 flex items-center overflow-hidden rounded-control border border-line2 bg-popover/95 shadow-pop">
         <button
           type="button"
-          aria-label="Zoom out"
+          aria-label={zoomOutLabel}
           title="Zoom out (-)"
           onClick={zoomOut}
           className="flex h-7 w-7 items-center justify-center text-sm text-t2 hover:bg-raise hover:text-t1"
@@ -105,14 +111,14 @@ export function SvgViewport({
           −
         </button>
         <output
-          aria-label="Zoom level"
+          aria-label={zoomLevelLabel}
           className="min-w-[44px] border-x border-line px-1.5 text-center text-2xs tabular-nums text-t3"
         >
           {scalePercent}%
         </output>
         <button
           type="button"
-          aria-label="Zoom in"
+          aria-label={zoomInLabel}
           title="Zoom in (+)"
           onClick={zoomIn}
           className="flex h-7 w-7 items-center justify-center text-sm text-t2 hover:bg-raise hover:text-t1"
@@ -121,22 +127,22 @@ export function SvgViewport({
         </button>
         <button
           type="button"
-          aria-label="Reset View"
+          aria-label={resetViewLabel}
           title="Fit drawing (0 or F)"
           onClick={reset}
           className="h-7 border-l border-line px-2 text-2xs font-medium text-t2 hover:bg-raise hover:text-t1"
         >
-          Fit
+          <Text id="svg-view.fit">Fit</Text>
         </button>
         {url && downloadName ? (
           <a
             href={url}
             download={downloadName}
-            aria-label="Export SVG"
+            aria-label={exportSvgLabel}
             title="Export the current vector drawing"
             className="flex h-7 items-center border-l border-line px-2 text-2xs font-medium text-t2 hover:bg-raise hover:text-t1"
           >
-            SVG
+            <Text id="svg-view.export-label">SVG</Text>
           </a>
         ) : null}
       </div>

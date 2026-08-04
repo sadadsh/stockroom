@@ -26,6 +26,7 @@ import {
   type PadLayout,
 } from "../../lib/pinMapGeometry";
 import { Button, SegmentedControl } from "../primitives";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { useModalDismiss } from "../../lib/useModalDismiss";
 import { PinoutTable } from "./PinoutTable";
 import { categoryFill, isFiveVoltTolerant, roleStroke } from "./pinEncoding";
@@ -48,8 +49,8 @@ interface Camera {
 const IDENTITY: Camera = { k: 1, x: 0, y: 0 };
 
 const MAX_VIEWS = [
-  { id: "map", label: "Map" },
-  { id: "table", label: "Table" },
+  { id: "map", label: "Map", copyId: "stm.pinout.map.view-map" },
+  { id: "table", label: "Table", copyId: "stm.pinout.map.view-table" },
 ] as const;
 
 export function PinoutMap(props: Props) {
@@ -57,6 +58,10 @@ export function PinoutMap(props: Props) {
   const [maxView, setMaxView] = useState<"map" | "table">("map");
   const close = useCallback(() => setMaximized(false), []);
   const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(maximized, close);
+  const dialogLabel = useText("stm.pinout.map.dialog.aria", "Maximized pinout for {part}", {
+    part: props.pinout.mpn_example,
+  });
+  const viewLabel = useText("stm.pinout.map.view.aria", "Maximized pinout view");
 
   return (
     <>
@@ -73,7 +78,7 @@ export function PinoutMap(props: Props) {
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
-            aria-label={`Maximized pinout for ${props.pinout.mpn_example}`}
+            aria-label={dialogLabel}
             tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
             className="flex h-[88vh] w-full max-w-[880px] flex-col overflow-hidden rounded-card border border-line2 bg-popover p-4 shadow-pop outline-none"
@@ -91,10 +96,10 @@ export function PinoutMap(props: Props) {
                   value={maxView}
                   onChange={setMaxView}
                   size="small"
-                  aria-label="Maximized pinout view"
+                  aria-label={viewLabel}
                 />
                 <Button type="button" small onClick={close}>
-                  Close
+                  <Text id="stm.pinout.map.close">Close</Text>
                 </Button>
               </div>
             </div>
@@ -134,6 +139,19 @@ function PinoutMapView({
     for (const p of pinout.pins) m.set(p.position, p);
     return m;
   }, [pinout]);
+  const mapLabel = useText(
+    "stm.pinout.map.aria",
+    "Pinout map for {part}, package {package}",
+    { part: pinout.mpn_example, package: pinout.package },
+  );
+  const unplacedOne = useCopyFormatter(
+    "stm.pinout.map.unplaced-one",
+    "{count} pad without a mappable position",
+  );
+  const unplacedMany = useCopyFormatter(
+    "stm.pinout.map.unplaced-many",
+    "{count} pads without a mappable position",
+  );
   // Pin-number labels: per-pad numbers outside each perimeter pad; row/column edge headers for a
   // ball grid (per-ball text would collide at BGA density). Both scale with the zoom camera.
   const areaArray =
@@ -200,7 +218,9 @@ function PinoutMapView({
         {unavailable ? (
           <div className="flex h-full min-h-0 flex-col gap-2 p-4" data-testid="pinout-pin-list">
             <p className="flex-none text-xs text-t3">
-              No drawable layout for this package. Select a pin from the list to inspect it.
+              <Text id="stm.pinout.map.no-layout">
+                No drawable layout for this package. Select a pin from the list to inspect it.
+              </Text>
             </p>
             <ul className="min-h-0 flex-1 overflow-y-auto">
               {pinout.pins.map((p) => (
@@ -233,7 +253,7 @@ function PinoutMapView({
             data-testid="pinout-map-svg"
             className="h-full w-full cursor-grab touch-none select-none active:cursor-grabbing"
             role="img"
-            aria-label={`Pinout map for ${pinout.mpn_example}, package ${pinout.package}`}
+            aria-label={mapLabel}
           >
             <g transform={`translate(${camera.x},${camera.y}) scale(${camera.k})`}>
               {/* the package body: a lit specimen with a top-edge highlight + a silkscreen label */}
@@ -361,23 +381,25 @@ function PinoutMapView({
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             {inferred ? (
               <span className="rounded-control bg-raise px-2 py-0.5 text-2xs text-t3">
-                Layout inferred from pin positions
+                <Text id="stm.pinout.map.inferred">Layout inferred from pin positions</Text>
               </span>
             ) : null}
             {unplaced > 0 ? (
               <span className="rounded-control bg-raise px-2 py-0.5 text-2xs text-t3">
-                {unplaced} {unplaced === 1 ? "pad" : "pads"} without a mappable position
+                {unplaced === 1
+                  ? unplacedOne({ count: unplaced })
+                  : unplacedMany({ count: unplaced })}
               </span>
             ) : null}
           </div>
           <div className="flex flex-none items-center gap-1.5">
             {onMaximize ? (
               <Button type="button" small onClick={onMaximize}>
-                Maximize
+                <Text id="stm.pinout.map.maximize">Maximize</Text>
               </Button>
             ) : null}
             <Button type="button" small onClick={reset}>
-              Reset View
+              <Text id="stm.pinout.map.reset-view">Reset View</Text>
             </Button>
           </div>
         </div>
