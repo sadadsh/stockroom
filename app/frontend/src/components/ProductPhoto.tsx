@@ -392,7 +392,7 @@ function CarouselArrow({
       aria-label={side === "left" ? "Previous Photo" : "Next Photo"}
       className={
         "absolute top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-control " +
-        "border border-line bg-popover/90 text-t2 shadow-pop transition-colors hover:text-t1 " +
+        "border border-line bg-popover text-t2 shadow-pop transition-colors hover:text-t1 " +
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc " +
         (side === "left" ? "left-2" : "right-2")
       }

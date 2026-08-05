@@ -299,7 +299,7 @@ export function Glb3DView({
           "pointer-events-auto flex items-center " +
           (compact
             ? "h-[38px] flex-none justify-between gap-2 border-t border-line2 bg-band px-2 py-1"
-            : "absolute bottom-3 left-1/2 z-10 w-max max-w-[calc(100%-24px)] -translate-x-1/2 gap-0 overflow-x-auto rounded-card border border-line2 bg-popover/95 p-2 shadow-pop backdrop-blur-sm")
+            : "absolute bottom-3 left-1/2 z-10 w-max max-w-[calc(100%-24px)] -translate-x-1/2 gap-0 overflow-x-auto rounded-card border border-line2 bg-popover p-2 shadow-pop")
         }
       >
       {/* Compact has only layer icons here. The full inspection stage has room for explicit
@@ -481,7 +481,7 @@ export function Glb3DView({
                   type="button"
                   onClick={() => sceneRef.current?.fit()}
                   title="Frame the whole visible model (0 or F)"
-                  className="inline-flex min-h-[32px] items-center rounded-control border border-line2 bg-field px-2.5 text-xs font-semibold text-t2 transition-[transform,background-color,color] active:scale-[0.97] hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+                  className="inline-flex min-h-[32px] items-center rounded-control border border-line2 bg-field px-2.5 text-xs font-semibold text-t2 transition-[background-color,color] hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
                 >
                   <Text id="model3d.fit">Fit</Text>
                 </button>
@@ -649,7 +649,7 @@ function PlacementControls({
               title={item.hint}
               onClick={() => onPick(item.mode)}
               className={
-                "inline-flex min-h-[32px] items-center gap-1.5 rounded-control px-2.5 text-xs font-semibold transition-[transform,background-color,color] active:scale-[0.97] " +
+                "inline-flex min-h-[32px] items-center gap-1.5 rounded-control px-2.5 text-xs font-semibold transition-[background-color,color] " +
                 "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
                 (active === item.mode
                   ? "bg-raise2 text-t1 shadow-card"
@@ -740,7 +740,7 @@ function LayerToggle({
         onToggle();
       }}
       className={
-        "rounded-control font-semibold transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
+        "rounded-control font-semibold transition-[background-color,color] duration-100 ease-out " +
         "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
         (iconOnly
           ? "flex h-[30px] w-[30px] items-center justify-center "
@@ -823,7 +823,7 @@ function ViewControls({
           className={
             // 160ms ease-out + a 0.97 press: a control with no press feedback does not feel like
             // it heard the click. transform/opacity only, so it stays off the layout path.
-            "rounded-control font-semibold transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
+            "rounded-control font-semibold transition-[background-color,color] duration-100 ease-out " +
             "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
             (compact
               ? "flex h-[30px] w-[30px] items-center justify-center "

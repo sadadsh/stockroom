@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@fontsource-variable/geist-mono": "^5.3.0",
@@ -23,8 +24,10 @@
     "d3-selection": "^3.0.0",
     "d3-zoom": "^3.0.0",
     "motion": "^12.42.2",
+    "pdfjs-dist": "5.4.296",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-pdf": "^10.4.1",
     "three": "^0.169.0",
     "three-viewport-gizmo": "^2.2.0"
   },
@@ -45,9 +48,11 @@
     "jsdom": "^25.0.1",
     "lucide-static": "^1.26.0",
     "postcss": "^8.4.47",
+    "react-doctor": "^0.9.4",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.2",
     "vite": "^8.1.5",
+    "vite-plugin-static-copy": "^4.1.1",
     "vitest": "^4.1.10"
   }
 }

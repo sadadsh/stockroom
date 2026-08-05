@@ -3,12 +3,11 @@
  * components themselves. Server state comes from TanStack Query; the only local state is the
  * search text, the active category facet, the complete-only toggle, and the selected part id.
  *
- * A component OPENS into a tab rather than replacing a single detail pane. Comparing two parts is
- * the ordinary case in a library - "is this the same footprint as the other one", "which of these
- * two has the stock" - and a one-slot detail pane made that a navigation exercise with the answer
- * held in the person's head. Tabs are bounded (a strip that can grow forever is not a strip),
- * keyed by stable component id, and persisted through the durable session, so closing the window
- * mid-comparison does not lose it.
+ * Selecting a picker row OPENS that component into the workspace beside it. There is no
+ * per-component tab strip: the native window already carries one tab for Stockroom and one for the
+ * provider page a CAD trip opens, and a second row of tabs inside the application competed with it
+ * for the same job. The open set and the active component are still tracked in the durable session,
+ * because the per-component view state (which CAD asset is expanded) has to live somewhere stable.
  *
  * Honest degradation: a connection error shows a retry surface (not a crash), and a genuinely
  * empty library shows an empty state that names how to add parts.
@@ -18,7 +17,6 @@ import {
   usePartsQuery,
   useFacetsQuery,
   useDuplicates,
-  useDeletePart,
   useRestoreDeletedPart,
 } from "../api/queries";
 import { ApiError } from "../api/client";
@@ -28,23 +26,19 @@ import { useCapture } from "../lib/capture";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { SearchOverlay } from "../components/SearchOverlay";
-import { ConfirmDialog } from "../components/ConfirmDialog";
-import { AddPartIcon, TrashIcon } from "../components/icons";
+import { AddPartIcon } from "../components/icons";
 import {
   Button,
   EmptyState,
   ErrorState,
   LoadingState,
   RouteHeader,
-  TabStrip,
-  type TabItem,
 } from "../components/primitives";
 import {
   ComponentWorkspace,
   ComponentWorkspaceEmpty,
 } from "../components/component-workspace/ComponentWorkspace";
-import { Text, useText } from "../lib/copy";
-import { componentTabDevId } from "../lib/componentDevIds";
+import { Text } from "../lib/copy";
 import {
   closeComponentInSession,
   openComponentInSession,
@@ -56,7 +50,6 @@ import {
 import { COMPONENT_PICKER_WIDTH } from "../lib/libraryLayout";
 
 export function ComponentsPage() {
-  const openComponentsLabel = useText("components.open-tabs-label", "Open components");
   const [search, setSearch] = useState(() => readUiSession().component_filters.query);
   const [category, setCategory] = useState<string | null>(
     () => readUiSession().component_filters.category,
@@ -73,7 +66,6 @@ export function ComponentsPage() {
   const [searchOpen, setSearchOpen] = useState(
     () => readUiSession().open_surface === "search",
   );
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [listScrollElement, setListScrollElement] =
     useState<HTMLDivElement | null>(null);
   const selectedIdRef = useRef(selectedId);
@@ -83,17 +75,10 @@ export function ComponentsPage() {
   const partsQuery = usePartsQuery({ q: search, category, completeOnly });
   const facetsQuery = useFacetsQuery();
   const duplicatesQuery = useDuplicates();
-  const deletePart = useDeletePart();
   const restoreDeletedPart = useRestoreDeletedPart();
   const { toast } = useToast();
   const { open: openAddPart } = useAddPart();
   const { reopenPartId } = useCapture();
-  const confirmDeleteTitle = useText("components.delete-title", "Delete Part");
-  const confirmDeleteBody = useText(
-    "components.delete-body",
-    "This removes the component from the library. It can be restored from the toast that follows.",
-  );
-  const confirmDeleteLabel = useText("components.delete-confirm", "Delete");
 
   // Persist the exact primary Library view as one bounded document. This runs
   // only when a value changed, so mounting from an injected snapshot does not
@@ -217,52 +202,36 @@ export function ComponentsPage() {
     ? allParts.filter((p) => duplicateIds.has(p.id))
     : allParts;
 
-  // A tab keeps the name it was opened with even when a later search filters its component out of
-  // the list. Without this the strip would relabel itself to raw ids the moment someone typed.
-  const tabNames = useRef(new Map<string, string>());
-  for (const part of allParts) {
-    tabNames.current.set(part.id, part.display_name || part.mpn || part.id);
-  }
-
   function openComponent(id: string) {
     setSelectedId(id);
     updateUiSession((snapshot) => openComponentInSession(snapshot, id));
   }
 
-  function closeComponent(id: string) {
-    const next = closeComponentInSession(readUiSession(), id);
-    updateUiSession(() => next);
-    if (next.active_component) setSelectedId(next.active_component);
-  }
-
-  function handleDelete() {
-    if (!selectedId) return;
-    const deletedId = selectedId;
-    deletePart.mutate(deletedId, {
-      onSuccess: () => {
-        toast("Part deleted", "ok", {
-          label: "Undo Delete",
-          onClick: () => {
-            restoreDeletedPart.mutate(deletedId, {
-              onSuccess: () => {
-                openComponent(deletedId);
-                toast("Part restored", "ok");
-              },
-              onError: (err) =>
-                toast(
-                  err instanceof ApiError ? err.message : "Could not restore the part",
-                  "err",
-                ),
-            });
+  /**
+   * A component was deleted from its own workspace.
+   *
+   * The confirmation and the mutation belong to the workspace, which is where the component is.
+   * The AFTERMATH belongs here: the page holds the selection, and it is still mounted once that
+   * workspace has gone - which is the only place an Undo can outlive the thing it undoes.
+   */
+  function componentDeleted(id: string) {
+    updateUiSession(() => closeComponentInSession(readUiSession(), id));
+    setSelectedId(null);
+    toast("Part deleted", "ok", {
+      label: "Undo Delete",
+      onClick: () => {
+        restoreDeletedPart.mutate(id, {
+          onSuccess: () => {
+            openComponent(id);
+            toast("Part restored", "ok");
           },
+          onError: (err) =>
+            toast(
+              err instanceof ApiError ? err.message : "Could not restore the part",
+              "err",
+            ),
         });
-        // Drop the tab and the selection; the auto-select effect picks the next part once the
-        // invalidated list refetches.
-        closeComponent(deletedId);
-        setSelectedId(null);
       },
-      onError: (err) =>
-        toast(err instanceof ApiError ? err.message : "Could not delete", "err"),
     });
   }
 
@@ -337,11 +306,6 @@ export function ComponentsPage() {
     allParts.length === 0 &&
     !hasSearchOrFilter;
 
-  const openTabs: TabItem<string>[] = session.open_components.map((id) => ({
-    id,
-    label: tabNames.current.get(id) ?? id,
-  }));
-
   if (emptyLibrary) {
     return (
       <div data-dev-id="components.root" className="flex min-h-0 flex-1">
@@ -388,22 +352,27 @@ export function ComponentsPage() {
           className="flex flex-none flex-col"
           style={{ width: COMPONENT_PICKER_WIDTH }}
         >
+          {/* Add Parts is a compact TOOLBAR action on the title strip. It used to be a
+              full-width 36px tile above the search, which made the loudest control in the picker
+              the one nobody presses twice; the large form survives only in the empty-library
+              state, where adding a part genuinely is the whole screen's purpose. */}
           <RouteHeader
             data-dev-id="components.list-title"
             right={parts.length ? parts.length.toLocaleString() : undefined}
+            actions={
+              <Button
+                small
+                data-dev-id="components.add-parts"
+                icon={<AddPartIcon />}
+                onClick={openAddPart}
+              >
+                <Text id="components.add-parts">Add Parts</Text>
+              </Button>
+            }
           >
             <Text id="components.list-title">Components</Text>
           </RouteHeader>
           <div className="px-3 pt-3">
-            <Button
-              variant="soft"
-              data-dev-id="components.add-parts"
-              icon={<AddPartIcon />}
-              onClick={openAddPart}
-              className="mb-2.5 h-9 w-full justify-center"
-            >
-              <Text id="components.add-parts">Add Parts</Text>
-            </Button>
             <Finder
               search={search}
               onSearch={setSearch}
@@ -443,72 +412,19 @@ export function ComponentsPage() {
           </div>
         </div>
 
-        {/* opened components: a tab band on the same 34px chrome line as the rail and picker
-            headers, then the workspace itself. The column never scrolls. */}
+        {/* the opened component: no tab band above it, because there are no per-component tabs.
+            The column never scrolls; the workspace inside it owns its own three scroll regions. */}
         <div
           data-dev-id="components.detail-pane"
           className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-l border-line"
         >
-          <div
-            data-dev-id="components.workspace-band"
-            className="flex h-[34px] flex-none items-center gap-2 border-b border-line bg-band px-3"
-          >
-            {openTabs.length > 0 && activeComponent ? (
-              <TabStrip
-                tabs={openTabs}
-                active={activeComponent}
-                onSelect={openComponent}
-                idBase="component-browser"
-                devIdBase="component-browser"
-                devIdForTab={componentTabDevId}
-                density="compact"
-                className="min-w-0 overflow-hidden"
-                aria-label={openComponentsLabel}
-              />
-            ) : (
-              <span className="text-xs font-semibold text-t2">
-                <Text id="component-browser.band-title">Open Components</Text>
-              </span>
-            )}
-            {activeComponent ? (
-              <button
-                type="button"
-                data-dev-id="component-browser.close-tab"
-                onClick={() => closeComponent(activeComponent)}
-                className="ml-auto flex-none rounded-control px-1.5 py-0.5 text-2xs font-medium text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
-              >
-                <Text id="component-browser.close-tab">Close Tab</Text>
-              </button>
-            ) : null}
-            {selectedId ? (
-              <button
-                type="button"
-                data-dev-id="component-browser.delete"
-                aria-busy={deletePart.isPending}
-                disabled={deletePart.isPending}
-                onClick={() => setConfirmDelete(true)}
-                className={
-                  "flex-none rounded-control px-1.5 py-0.5 text-2xs font-medium text-err " +
-                  "transition-colors hover:brightness-125 focus-visible:outline " +
-                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc " +
-                  "disabled:pointer-events-none disabled:opacity-60 " +
-                  (activeComponent ? "" : "ml-auto ")
-                }
-              >
-                <span className="inline-flex items-center gap-1">
-                  <TrashIcon />
-                  {deletePart.isPending ? (
-                    <Text id="component-browser.deleting">Deleting Part</Text>
-                  ) : (
-                    <Text id="component-browser.delete">Delete Part</Text>
-                  )}
-                </span>
-              </button>
-            ) : null}
-          </div>
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
             {activeComponent ? (
-              <ComponentWorkspace key={activeComponent} componentId={activeComponent} />
+              <ComponentWorkspace
+                key={activeComponent}
+                componentId={activeComponent}
+                onDeleted={componentDeleted}
+              />
             ) : partsQuery.isLoading ? (
               <div
                 data-dev-id="components.select-prompt"
@@ -530,18 +446,6 @@ export function ComponentsPage() {
           <SearchOverlay onClose={() => setSearchOpen(false)} onOpenPart={openFromSearch} />
         ) : null}
 
-        <ConfirmDialog
-          open={confirmDelete}
-          title={confirmDeleteTitle}
-          body={confirmDeleteBody}
-          confirmLabel={confirmDeleteLabel}
-          danger
-          onCancel={() => setConfirmDelete(false)}
-          onConfirm={() => {
-            setConfirmDelete(false);
-            handleDelete();
-          }}
-        />
     </div>
   );
 }

@@ -332,7 +332,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
           {/* header (sticky), one hairline underline (the whole border budget for the grid) */}
           <div
             style={gridStyle}
-            className="sticky top-0 z-[2] border-b border-line bg-[var(--c-sticky)] backdrop-blur"
+            className="sticky top-0 z-[2] border-b border-line bg-[var(--c-sticky)]"
           >
             {table.getHeaderGroups()[0].headers.map((header) => {
               const meta = header.column.columnDef.meta as ColMeta | undefined;
@@ -376,7 +376,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
             <div
               style={gridStyle}
               data-testid="spec-matrix-filters"
-              className="sticky top-[33px] z-[1] border-b border-line bg-[var(--c-sticky)] backdrop-blur"
+              className="sticky top-[33px] z-[1] border-b border-line bg-[var(--c-sticky)]"
             >
               {table.getHeaderGroups()[0].headers.map((header) => (
                 <div key={header.id} className="flex items-stretch px-1.5 py-1.5">

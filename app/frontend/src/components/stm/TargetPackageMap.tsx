@@ -293,7 +293,7 @@ export function TargetPackageMap({
         )}
         {!unavailable ? (
           <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-end justify-between gap-3">
-            <div className="min-w-0 rounded-control border border-line bg-popover/90 px-2 py-1 shadow-sm backdrop-blur-sm">
+            <div className="min-w-0 rounded-control border border-line bg-popover px-2 py-1 shadow-pop">
               <span className="font-mono text-2xs text-t1">
                 {selected ? `Position ${selected.position}` : "No Position Selected"}
               </span>
@@ -304,7 +304,7 @@ export function TargetPackageMap({
                 </span>
               ) : null}
             </div>
-            <span className="rounded-control bg-popover/80 px-2 py-1 text-2xs text-t3 backdrop-blur-sm">
+            <span className="rounded-control bg-popover px-2 py-1 text-2xs text-t3">
               Drag To Pan · Scroll To Zoom
               {unplaced ? ` · ${unplaced} Unplaced` : ""}
             </span>

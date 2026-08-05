@@ -29,7 +29,7 @@ export function PinoutTable({
       data-testid="pinout-table"
     >
       <table className="w-full border-collapse text-left">
-        <thead className="sticky top-0 z-[1] bg-[var(--c-sticky)] backdrop-blur">
+        <thead className="sticky top-0 z-[1] bg-[var(--c-sticky)]">
           <tr className="border-b border-line text-2xs font-semibold text-t3">
             <th className="px-2.5 py-1.5">
               <Text id="stm.pinout.table.pin">Pin</Text>

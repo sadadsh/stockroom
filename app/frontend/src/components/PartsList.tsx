@@ -1,7 +1,11 @@
 /**
- * The grouped parts list (the mockup's .pk-list). Rows show the display name over
- * the part number, with an incomplete warning triangle on the right. Parts are
- * grouped by category with sticky group headers, matching library-v2.html.
+ * The grouped parts list: the picker.
+ *
+ * A row is three lines and one primary item. The MPN leads and owns its whole line, because a
+ * picker row exists to be recognised by the identifier a person looks the part up by; the
+ * manufacturer and package qualify it on the second line, and the description - with the
+ * attention state right-aligned against it - is the third. Parts are grouped by category under
+ * sticky headers.
  */
 import {
   useCallback,
@@ -75,23 +79,49 @@ type ListItem =
 // DOM cost must follow viewport size rather than library size. The value is a count boundary, not
 // a timing claim; the 1,000-row contract is locked by a rendered-node budget in PartsList.test.
 export const PARTS_LIST_VIRTUALIZATION_THRESHOLD = 100;
-const PART_ROW_HEIGHT = 48;
-const CATEGORY_ROW_HEIGHT = 38;
+const PART_ROW_HEIGHT = 46;
+const CATEGORY_ROW_HEIGHT = 30;
 const VIRTUAL_OVERSCAN = 8;
 const INITIAL_VIEWPORT = { width: 320, height: 640 };
 
 export interface PartAttention {
   reason: string;
-  next: string;
+  /**
+   * The whole sentence, for the row's tooltip and its accessible label - reason AND what Stockroom
+   * will do next.
+   *
+   * The next step used to have a LINE of its own in the row, and at a 290px picker it rendered as
+   * `Next: Collecting Ev...`, which names nothing and promises nothing. A hint cut mid-word is
+   * worse than no hint, so the row states the reason and this states the rest.
+   */
   description: string;
 }
 
+/**
+ * What a gap is CALLED in the picker.
+ *
+ * An EDA application's name never appears during ordinary component inspection, and browsing the
+ * library is the most ordinary inspection there is. A key that arrives tool-qualified
+ * (`kicad_model`, `altium_footprint`) names the same engineering artifact whichever tool can read
+ * it, so the tool prefix is dropped and the ASSET is what the row states: a person scanning the
+ * picker is asking "what is this part missing", not "which application could open the file".
+ *
+ * EDA compatibility is a real question with a real home - Export Component..., Open In...,
+ * Compatibility Settings... - and this is not it.
+ */
+const ASSET_LABELS: Record<string, string> = {
+  symbol: "Symbol",
+  footprint: "Footprint",
+  model: "3D Model",
+  "3d model": "3D Model",
+};
+
 function missingLabel(value: string): string {
-  return value
-    .replace(/^kicad[_\s-]*/i, "KiCad ")
-    .replace(/^altium[_\s-]*/i, "Altium ")
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
+  const withoutTool = value.replace(/^(?:kicad|altium|eagle|orcad|easyeda)[_\s-]*/i, "");
+  const spaced = withoutTool.replace(/[_-]+/g, " ").trim();
+  const asset = ASSET_LABELS[spaced.toLowerCase()];
+  if (asset) return asset;
+  return spaced.replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 /**
@@ -100,21 +130,21 @@ function missingLabel(value: string): string {
  */
 export function partAttention(part: PartSummary): PartAttention | null {
   if (part.is_complete) return null;
-  const missing = part.missing.map(missingLabel).filter(Boolean);
+  // Deduplicated: two tools missing the same artifact is ONE gap in the part, and listing it
+  // twice was only ever legible because the tool names made the entries look different.
+  const missing = [...new Set(part.missing.flatMap((key) => missingLabel(key) || []))];
   const reason =
     missing.length === 0
       ? "Verification Evidence Pending"
       : missing.length <= 2
         ? `Missing ${missing.join(" + ")}`
         : `Missing ${missing[0]} + ${missing.length - 1} More`;
-  const next = "Next: Collecting Evidence";
   const exactReason =
     missing.length > 0
       ? `Missing ${missing.join(", ")}`
       : "Verification evidence is incomplete";
   return {
     reason,
-    next,
     description: `Needs Attention. ${exactReason}. Next: Stockroom will continue source collection and verification.`,
   };
 }
@@ -330,10 +360,10 @@ export function PartsList({
       <div
         data-dev-id="components.list"
         data-virtualized="false"
-        className="flex flex-col gap-0.5"
+        className="flex flex-col"
       >
         {grouped.map(([category, groupParts]) => (
-          <div key={category} className="flex flex-col gap-0.5">
+          <div key={category} className="flex flex-col">
             <CategoryHeader category={category} count={groupParts.length} sticky />
             {groupParts.map((part) => (
               <PartRow
@@ -430,11 +460,11 @@ function CategoryHeader({
       data-dev-id="components.category-header"
       className={
         (sticky ? "sticky top-0 z-[1] " : "") +
-        "mb-0.5 flex h-9 items-baseline gap-2 bg-[var(--c-sticky)] px-2.5 pb-1.5 pt-3.5 backdrop-blur"
+        "flex h-[30px] items-baseline gap-2 border-b border-line bg-[var(--c-sticky)] px-2.5"
       }
     >
-      <span className="text-xs font-semibold text-t2">{category}</span>
-      <span className="tnum font-mono text-2xs text-t3">{count}</span>
+      <span className="ui-section-title truncate">{category}</span>
+      <span className="ui-component-metadata">{count}</span>
     </div>
   );
 }
@@ -469,6 +499,8 @@ function PartRow({
   );
   const attention = partAttention(part);
   const attentionId = attention ? `part-attention-${part.id}` : undefined;
+  // The generated display name only earns a line when it says something the MPN does not.
+  const describes = Boolean(part.display_name) && part.display_name !== part.mpn;
   return (
     <button
       type="button"
@@ -482,62 +514,92 @@ function PartRow({
       aria-describedby={attentionId}
       tabIndex={tabbable ? 0 : -1}
       className={
-        // Rows separate by whitespace + a rounded selection/hover pill, not a
-        // hairline on every row (the border-on-everything tell). The selected
-        // row is the one lift; the MPN reads in the mono index face.
-        "flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left transition-colors " +
-        (virtual ? "mb-0.5 h-[46px] " : "") +
+        // A CONTIGUOUS selected row, not a floating rounded card with a gap either side. The
+        // selection is an opaque neutral fill spanning the full width of the picker with a solid
+        // edge marker, which is what a desktop list does; the rounded pill it replaces made every
+        // row look like a control and made the selected one look like a pressed button.
+        // 46px: three lines of 15/14/14 leading plus 2px of air top and bottom. The row used to
+        // be padded to whatever three lines came to, which put it above the 42-50px a desktop
+        // list row is held to and made the virtual estimate a guess.
+        "flex w-full items-center gap-2.5 overflow-hidden px-2.5 text-left transition-colors " +
+        (virtual ? "h-full " : "h-[46px] ") +
         (selected
-          ? "bg-acc-soft shadow-[inset_2px_0_0_var(--c-acc)]"
+          ? "bg-selected shadow-[inset_2px_0_0_var(--c-t3)]"
           : "hover:bg-[var(--c-hover)]")
       }
     >
       <RowThumbnail category={part.category} />
+      {/* Three lines, in the order the spec fixes them: the identifier, then Manufacturer ·
+          Package, then the description. Every one of them shares this one column, so the row has a
+          single left edge and the MPN owns the full width of it.
+
+          The MPN used to share line one with the package, and the ATTENTION block held a fixed
+          112px beside them both. At a 290px picker that left the identifier about 8px and it
+          rendered as `C...` - one letter and an ellipsis - while a footprint name and a truncated
+          hint kept their space. That is the hierarchy exactly inverted: the MPN is the one
+          visually primary item in a picker row, and everything else on the row qualifies it. So
+          the secondary items moved DOWN rather than the identifier being cut: nothing shares line
+          one, and both remaining lines hand their space to the MPN before it loses a character. */}
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span
-            className={
-              "truncate text-sm " +
-              (selected ? "font-semibold text-t1" : "font-medium text-t1")
-            }
-          >
-            {part.display_name}
+        <span
+          data-dev-id="components.row-mpn"
+          className="ui-row-primary block truncate"
+          title={part.mpn || part.display_name}
+        >
+          {part.mpn || part.display_name}
+        </span>
+        {part.manufacturer || part.package ? (
+          // `flex-1` on the manufacturer is `flex: 1 1 0%`: it asks for none of the line and takes
+          // whatever is left, so the package keeps its own width and the manufacturer is the one
+          // that gives way. Both can still truncate; neither can reach the MPN's line.
+          <span className="flex items-baseline gap-2">
+            <span className="ui-row-secondary min-w-0 flex-1 truncate">{part.manufacturer}</span>
+            {part.package ? (
+              <span
+                data-dev-id="components.row-package"
+                className="ui-row-metadata min-w-0 truncate"
+              >
+                {part.package}
+              </span>
+            ) : null}
           </span>
-          {duplicate ? (
-            <span
-              data-dev-id="components.row-duplicate"
-              className="flex-none"
-              title={duplicateTitle}
-            >
-              <Badge tone="warn" size="sm">
-                <Text id="components.row-duplicate-label">Duplicate</Text>
-              </Badge>
+        ) : null}
+        {/* Line three: the description, and the attention state right-aligned against it. The
+            description is the one thing on the row whose truncation costs nothing - the whole of
+            it is on the opened component - so it is the item that yields, and the attention keeps
+            its words. The full sentence, reason and next step both, is on the row's tooltip and
+            its accessible label whatever the width. */}
+        {attention || describes ? (
+          <span className="flex items-center gap-2">
+            <span className="ui-row-metadata min-w-0 flex-1 truncate">
+              {describes ? part.display_name : ""}
             </span>
-          ) : null}
-        </div>
-        {part.mpn ? (
-          <div className="tnum mt-0.5 truncate font-mono text-2xs text-t3">
-            {part.mpn}
-          </div>
+            {attention ? (
+              <span
+                id={attentionId}
+                data-dev-id="components.row-warn"
+                className="flex min-w-0 items-center gap-1"
+                title={attention.description}
+              >
+                <span className="sr-only">{attention.description}</span>
+                <WarnIcon className="h-3 w-3 flex-none text-[var(--c-warn-text)]" />
+                <span className="ui-status-text truncate text-[var(--c-warn-text)]">
+                  {attention.reason}
+                </span>
+              </span>
+            ) : null}
+          </span>
         ) : null}
       </div>
-      {attention ? (
+      {duplicate ? (
         <span
-          id={attentionId}
-          data-dev-id="components.row-warn"
-          className="flex w-28 flex-none items-start gap-1.5"
-          title={attention.description}
+          data-dev-id="components.row-duplicate"
+          className="flex-none"
+          title={duplicateTitle}
         >
-          <span className="sr-only">{attention.description}</span>
-          <WarnIcon className="mt-0.5 h-3.5 w-3.5 flex-none text-[var(--c-warn-text)]" />
-          <span className="min-w-0">
-            <span className="block truncate text-ui-meta font-semibold text-[var(--c-warn-text)]">
-              {attention.reason}
-            </span>
-            <span className="block truncate text-ui-meta text-helper">
-              {attention.next}
-            </span>
-          </span>
+          <Badge tone="warn" size="sm">
+            <Text id="components.row-duplicate-label">Duplicate</Text>
+          </Badge>
         </span>
       ) : null}
     </button>

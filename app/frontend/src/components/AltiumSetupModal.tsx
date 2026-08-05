@@ -54,7 +54,7 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
       >
         <div className="flex flex-none items-center justify-between gap-3 border-b border-line px-5 py-3.5">
           <div>
-            <div className="text-base font-semibold tracking-[-0.01em] text-t1">
+            <div className="text-base font-semibold text-t1">
               <Text id="altiumdb.setup.title">Altium Setup</Text>
             </div>
             <p className="mt-0.5 text-xs text-t3">
@@ -203,7 +203,7 @@ function Step({
 }) {
   return (
     <li className="flex gap-3">
-      <span className="tnum mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-control bg-raise2 font-mono text-xs font-bold text-t2">
+      <span className="tnum mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-control bg-raise2 font-mono text-xs font-semibold text-t2">
         {n}
       </span>
       <div className="min-w-0 flex-1">

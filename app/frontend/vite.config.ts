@@ -1,8 +1,21 @@
 /// <reference types="vitest/config" />
 import { execSync } from "node:child_process";
-import { defineConfig } from "vite";
+import path from "node:path";
+import { createRequire } from "node:module";
+import { defineConfig, normalizePath } from "vite";
 import react from "@vitejs/plugin-react";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 import pkg from "./package.json";
+
+// pdf.js ships the 14 standard PDF fonts as separate files and loads them at RUNTIME from a
+// directory it is told about. Without them a datasheet whose text relies on a standard font
+// renders with fallback metrics - the glyphs are wrong widths, so tables and pin tables in a
+// manufacturer PDF stop lining up. Copying the directory into the bundle is what makes
+// `standardFontDataUrl` resolvable from the built app as well as from the dev server.
+const require = createRequire(import.meta.url);
+const standardFontsDir = normalizePath(
+  path.join(path.dirname(require.resolve("pdfjs-dist/package.json")), "standard_fonts"),
+);
 
 // The version string shown in the About modal: the package version plus the app-repo git
 // short SHA, resolved ONCE at build (config-load) time and baked in as a constant. The git
@@ -29,6 +42,19 @@ const appVersion = buildVersion();
 export default defineConfig({
   plugins: [
     react(),
+    // `stripBase: true` matters: without it the plugin reproduces each file's path from the
+    // project root, so the fonts land under `node_modules/pdfjs-dist/standard_fonts/...` in the
+    // bundle - a path `standardFontDataUrl` does not point at, and a `node_modules` tree shipped
+    // to the owner's machine for nothing.
+    viteStaticCopy({
+      targets: [
+        {
+          src: `${standardFontsDir}/*`,
+          dest: "standard_fonts",
+          rename: { stripBase: true },
+        },
+      ],
+    }),
     {
       name: "stockroom-build-identity",
       generateBundle() {
@@ -63,5 +89,11 @@ export default defineConfig({
     css: false,
     clearMocks: true,
     restoreMocks: true,
+    // pdf.js needs DOMMatrix, Path2D and a real canvas; importing it under jsdom throws before a
+    // test can run. The stub honours the same contract - the two load callbacks, the page's
+    // number/scale/rotation, the outline's page click - so the DATASHEET VIEWER'S OWN state
+    // machine is what the suite exercises, rather than pdf.js's renderer, which is not ours to
+    // test. The real library is what the app imports; only the test environment sees this.
+    alias: [{ find: /^react-pdf$/, replacement: "/src/test/reactPdfStub.tsx" }],
   },
 });

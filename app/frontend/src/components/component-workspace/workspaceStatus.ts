@@ -13,8 +13,7 @@ import type {
   RepresentationToolView,
   RepresentationView,
   RepresentationKind,
-  SourceState,
-} from "../../api/workspaceTypes";
+} from "../../api/dossierTypes";
 import type { BadgeTone } from "../primitives";
 
 export type WorkspaceStatus =
@@ -54,38 +53,104 @@ export function statusTone(status: WorkspaceStatus): BadgeTone {
 }
 
 /**
- * What happened to one SOURCE. A different question from a representation's readiness, so a
- * separate closed set rather than four more words crowded into the one above.
+ * The state a CAD asset module states about itself, in the words the owner fixed.
  *
- * The four are kept apart on purpose. "Failed" accuses our own fetch (network, auth, rate limit)
- * and is worth retrying; "Not Carried" is the distributor answering honestly that it does not
- * stock this part; "Not Configured" is this machine having no credentials and never having
- * asked. Showing all three as a blank row is what let a broken API read as a part nobody sells.
+ * "Ready" is deliberately NOT in this set. It is the vaguest word available for the most important
+ * distinction on the column: a file that merely EXISTS and a file a recorded check has passed are
+ * not the same claim, and calling both of them ready is how a component with an unvalidated
+ * footprint gets sent to a fabricator. `Validated` says a check passed, `Available` says a file is
+ * attached and nothing has verified it, and the remaining four say what is wrong.
  */
-export type SourceStatusLabel = "Answered" | "Not Carried" | "Failed" | "Not Configured";
+export type CadAssetStatus =
+  | "Available"
+  | "Validated"
+  | "Needs Review"
+  | "Missing"
+  | "Failed"
+  | "Not Required"
+  | "Package Matched"
+  | "Pin Match Failed"
+  | "Incomplete";
 
-export const SOURCE_STATE_LABEL: Record<SourceState, SourceStatusLabel> = {
-  success: "Answered",
-  unavailable: "Not Carried",
-  failed: "Failed",
-  not_configured: "Not Configured",
-};
-
-const SOURCE_STATE_TONES: Record<SourceState, BadgeTone> = {
-  success: "ok",
-  unavailable: "neutral",
-  failed: "err",
-  not_configured: "warn",
-};
-
-export function sourceStateTone(state: SourceState): BadgeTone {
-  return SOURCE_STATE_TONES[state] ?? "neutral";
+/**
+ * What the drawing itself measured, when the preview has it.
+ *
+ * The three extra states can only be said with this: a terminal count that disagrees with the
+ * component's own pin count is `Pin Match Failed`, and a file whose terminals are unnumbered or
+ * numbered twice is `Incomplete` - which is a different fault from missing and from failed, and
+ * was previously reported as `Available` because nothing had been recorded against it.
+ *
+ * `terminals`/`expected` are null when there is nothing to compare; a comparison with one side
+ * missing is not a comparison and must never be reported as a pass.
+ */
+export interface CadMeasured {
+  terminals: number | null;
+  expected: number | null;
+  duplicates: number;
+  unnumbered: number;
 }
 
-/** A state a stale client (or an older record) did not send reads as `success`, never as failure. */
-export function sourceStateOf(state: SourceState | undefined): SourceState {
-  return state && state in SOURCE_STATE_LABEL ? state : "success";
+/** A recorded check whose id names the thing it checked, so the state can say which one failed. */
+function namedCheck(view: RepresentationView, word: string) {
+  return view.tools
+    .flatMap((tool) => tool.checks)
+    .find((check) => check.check.toLowerCase().includes(word));
 }
+
+export function cadAssetStatus(
+  view: RepresentationView,
+  measured?: CadMeasured | null,
+): CadAssetStatus {
+  if (view.status === "failed") {
+    // A failure that named the pins says so, because "Failed" alone sends a person looking
+    // through a file for a fault the record already located.
+    return namedCheck(view, "pin") ? "Pin Match Failed" : "Failed";
+  }
+  if (view.status === "missing") return "Missing";
+  if (view.status === "review") return "Needs Review";
+  if (view.status === "not_required") return "Not Required";
+  const present = view.tools.filter((tool) => tool.present);
+  if (present.length === 0) return "Missing";
+  if (measured) {
+    if (
+      measured.terminals !== null &&
+      measured.expected !== null &&
+      measured.terminals !== measured.expected
+    ) {
+      return "Pin Match Failed";
+    }
+    if (measured.duplicates > 0 || measured.unnumbered > 0) return "Incomplete";
+  }
+  const checks = present.flatMap((tool) => tool.checks);
+  if (checks.length === 0) return "Available";
+  // A check that PASSED on the package is the strongest thing a land pattern can say about
+  // itself, so it is said rather than folded into the general word.
+  const packageCheck = namedCheck(view, "package");
+  if (packageCheck && packageCheck.measured !== null && packageCheck.measured === packageCheck.expected) {
+    return "Package Matched";
+  }
+  return "Validated";
+}
+
+const CAD_TONES: Record<CadAssetStatus, BadgeTone> = {
+  Validated: "ok",
+  "Package Matched": "ok",
+  Available: "neutral",
+  "Not Required": "neutral",
+  "Needs Review": "warn",
+  Incomplete: "warn",
+  Missing: "warn",
+  Failed: "err",
+  "Pin Match Failed": "err",
+};
+
+export function cadStatusTone(status: CadAssetStatus): BadgeTone {
+  return CAD_TONES[status];
+}
+
+// What happened to one SOURCE is a different question from a representation's readiness, and its
+// vocabulary lives in `provenanceText.tsx` with the rest of the provenance translation. It used to
+// live here and say "Answered", which is a word about a request rather than about the part.
 
 /** Every per-tool view a design tool holds across the three representations. */
 export function toolViews(

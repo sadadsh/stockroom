@@ -224,7 +224,7 @@ describe("Glb3DView scene synchronization", () => {
       drill: 0,
       pad_type: "smd",
       side: "front",
-      rratio: 0,
+      rratio: 0, layers: ["F.Cu"],
     }],
     graphics: [],
     model_placement: null,

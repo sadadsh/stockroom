@@ -1,14 +1,24 @@
 /**
- * The search + facet control at the top of the picker (the mockup's .finder).
- * The search box is wired to the API's `q` param; category facets come from
- * /api/library/facets and scope the list to a single category; the completeness
- * toggle maps to `complete_only`. A small badge shows how many filters are on.
+ * The picker's search and filters.
+ *
+ * The search box is a REAL inline input. It used to be a button that opened the full-screen
+ * parametric search, which meant the picker had no way to narrow itself: typing three characters
+ * of a part number - the commonest thing anyone does in a library - took over the whole window.
+ * It is wired to the API's `q`, which matches MPN, manufacturer, description, category, package
+ * and the derived key specification values.
+ *
+ * The parametric search is a SEPARATE control beside it, and stays separate. The two answer
+ * different questions ("which of these is it" versus "which parts meet these constraints") and
+ * merging them is what produced a text box that was not one.
+ *
+ * The filters are compact and, when any are on, say so in words underneath: a bare count badge
+ * told a person that something was hidden without telling them what.
  */
 import { useState } from "react";
 import type { Facets } from "../api/types";
 import { SearchIcon } from "./icons";
 import { Icon } from "./Icon";
-import { Text, useText } from "../lib/copy";
+import { Text, useText, useCopyFormatter } from "../lib/copy";
 
 interface Props {
   search: string;
@@ -47,55 +57,86 @@ export function Finder({
     : [];
   // Copy for an attribute (placeholder + label), so it is reworded through the same override
   // as any <Text> label when dev mode saves it.
-  const searchLabel = useText("components.search-placeholder", "Search Parts");
+  const searchLabel = useText("components.search-placeholder", "Search Components");
   const filtersLabel = useText("components.filter-button-label", "Filters");
+  const advancedLabel = useText("components.advanced-search-label", "Advanced Search");
+  const clearLabel = useText("components.clear-filters", "Clear Filters");
+  const summary = useCopyFormatter("components.filter-summary", "Showing: {filters}");
+  const completeText = useText("components.filter-complete-label", "Complete Only");
+  const duplicatesText = useText("components.filter-duplicates-label", "Duplicates");
+  const activeSummary = [
+    category ?? null,
+    completeOnly ? completeText : null,
+    duplicatesOnly ? duplicatesText : null,
+  ].filter(Boolean) as string[];
 
   return (
     <div data-dev-id="components.finder" className="relative">
       <div className="flex items-center gap-1.5">
+        <div
+          data-dev-id="components.search-box"
+          className="flex h-[24px] min-w-0 flex-1 items-center gap-2 rounded-control border border-line bg-field pl-2 pr-1.5 focus-within:border-line2"
+        >
+          <SearchIcon className="flex-none text-t3" />
+          <input
+            data-dev-id="components.search-input"
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder={searchLabel}
+            aria-label={searchLabel}
+            className="ui-control-label min-w-0 flex-1 cursor-text bg-transparent text-t1 outline-none placeholder:text-t3"
+          />
+        </div>
         {onOpenSearch ? (
-          // The overlay trigger is an honest BUTTON (it never edited text in place), styled
-          // like every other flat control - no fake text box, no shortcut chip.
           <button
             type="button"
-            data-dev-id="components.search-box"
+            data-dev-id="components.advanced-search"
+            aria-label={advancedLabel}
+            title={advancedLabel}
             onClick={onOpenSearch}
-            className="flex h-[31px] min-w-0 flex-1 items-center gap-2.5 rounded-control border border-line bg-raise px-2.5 text-left text-sm font-medium text-t2 transition-colors hover:bg-raise2 hover:text-t1"
+            className="ui-control-label inline-flex h-[24px] flex-none items-center gap-1.5 rounded-control border border-line bg-raise px-2 text-t2 transition-colors hover:bg-raise2 hover:text-t1"
           >
-            <SearchIcon className="flex-none text-t3" />
-            <span className="min-w-0 truncate">{searchLabel}</span>
+            <Text id="components.advanced-search-label">Advanced Search</Text>
           </button>
-        ) : (
-          <div
-            data-dev-id="components.search-box"
-            className="flex h-[31px] min-w-0 flex-1 items-center gap-2.5 rounded-control border border-line bg-field pl-2.5 pr-1.5 focus-within:border-acc"
-          >
-            <SearchIcon className="flex-none text-t3" />
-            <input
-              data-dev-id="components.search-input"
-              value={search}
-              onChange={(e) => onSearch(e.target.value)}
-              placeholder={searchLabel}
-              aria-label={searchLabel}
-              className="min-w-0 flex-1 cursor-text bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
-            />
-          </div>
-        )}
+        ) : null}
         <button
           type="button"
           data-dev-id="components.filter-button"
           aria-label={filtersLabel}
+          aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex h-[31px] flex-none items-center gap-1.5 rounded-control border border-line bg-raise px-2 text-t3 transition-colors hover:bg-raise2 hover:text-t1"
+          className="inline-flex h-[24px] flex-none items-center gap-1.5 rounded-control border border-line bg-raise px-2 text-t3 transition-colors hover:bg-raise2 hover:text-t1"
         >
           <Icon id="finder.filter" />
           {activeFilters > 0 ? (
-            <span className="rounded-full bg-acc px-1.5 text-2xs font-bold leading-[14px] text-acc-on">
-              {activeFilters}
-            </span>
+            <span className="ui-status-text tabular-nums text-t1">{activeFilters}</span>
           ) : null}
         </button>
       </div>
+
+      {/* What is currently hidden, in words. A count alone said something was filtered without
+          saying what, which is the state people get stuck in. */}
+      {activeSummary.length > 0 ? (
+        <p
+          data-dev-id="components.filter-summary"
+          className="ui-row-metadata mt-1 flex min-w-0 items-baseline gap-2"
+        >
+          <span className="min-w-0 flex-1 truncate">
+            {summary({ filters: activeSummary.join(" · ") })}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              onCategory(null);
+              onCompleteOnly(false);
+              onDuplicatesOnly(false);
+            }}
+            className="ui-control-label flex-none text-t2 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+          >
+            {clearLabel}
+          </button>
+        </p>
+      ) : null}
 
       {open ? (
         <div

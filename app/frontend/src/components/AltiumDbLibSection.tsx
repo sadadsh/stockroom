@@ -83,7 +83,7 @@ export function AltiumDbLibSection() {
         <div className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between gap-4">
             <div className="flex items-baseline gap-2">
-              <span className="tnum font-mono text-title font-bold leading-none text-t1">
+              <span className="tnum font-mono text-title font-semibold leading-none text-t1">
                 {data.ready}
               </span>
               <span className="text-sm text-t3">

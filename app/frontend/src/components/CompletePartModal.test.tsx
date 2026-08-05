@@ -278,7 +278,8 @@ describe("CompletePartModal - automatic capture", () => {
         "Part Ready. One provider supplied a complete verified CAD package.",
       ),
     ).toHaveClass("text-t2");
-    expect(screen.getByText("Source Results")).toHaveClass("text-t2");
+    // The hand-rolled 10px uppercase+tracking micro-label became the shared section-title role.
+    expect(screen.getByText("Source Results")).toHaveClass("ui-section-title");
     expect(screen.getByText("Ready")).toHaveClass("text-[var(--c-ok-text)]");
   });
 

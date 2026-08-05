@@ -17,7 +17,7 @@ type Filter = "all" | "ready" | "needs";
 
 const TH =
   "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-raise px-3 py-2.5 text-left " +
-  "text-2xs font-bold uppercase tracking-[0.06em] text-t3";
+  "ui-property-label";
 const TD = "whitespace-nowrap px-3 py-2.5 text-sm";
 
 export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: () => void }) {

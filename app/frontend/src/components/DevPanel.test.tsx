@@ -124,7 +124,7 @@ describe("DevPanel inspect-first shell", () => {
 
     // Scoped: the element's used colour tokens are shown, unrelated tokens are hidden.
     expect(screen.getByLabelText("Accent value")).toBeInTheDocument();
-    expect(screen.getByLabelText("Text value")).toBeInTheDocument();
+    expect(screen.getByLabelText("Text primary value")).toBeInTheDocument();
     expect(screen.queryByLabelText("Card radius slider")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Icon stroke value")).not.toBeInTheDocument();
 

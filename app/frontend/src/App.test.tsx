@@ -5,7 +5,7 @@ import App from "./App";
 import { api } from "./api/client";
 import type { PartDetail, PartSummary } from "./api/types";
 import { makePartDetail } from "./test/partFixture";
-import { makeWorkspace } from "./test/workspaceFixture";
+import { makeDossier } from "./test/dossierFixture";
 import { RouterProvider } from "./lib/router";
 import { AddPartProvider } from "./lib/addPart";
 import { CaptureProvider } from "./lib/capture";
@@ -20,7 +20,7 @@ vi.mock("./api/client", async (importActual) => {
       listParts: vi.fn(),
       facets: vi.fn(),
       partDetail: vi.fn(),
-      partWorkspace: vi.fn(),
+      partDossier: vi.fn(),
       getStmStatus: vi.fn(),
       getStmMcus: vi.fn(),
       getStmFamilies: vi.fn(),
@@ -59,7 +59,7 @@ describe("App shell", () => {
       incomplete: 0,
     });
     mockApi.partDetail.mockResolvedValue(DETAIL);
-    mockApi.partWorkspace.mockResolvedValue(makeWorkspace());
+    mockApi.partDossier.mockResolvedValue(makeDossier());
 
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
@@ -83,15 +83,11 @@ describe("App shell", () => {
     // findAllByText: one component now reads its name in three honest places - the picker row,
     // its open tab, and the workspace identity header.
     expect((await screen.findAllByText("LM358")).length).toBeGreaterThan(0);
-    // The opened component states what the part IS in its Overview description region.
-    expect((await screen.findAllByText("Dual Operational Amplifier")).length).toBeGreaterThan(0);
-    // the default route renders the Components flagship: no page-level tab strip
-    // (BOM Coverage / Duplicates / Doctor all moved out). The tabs now are the open
-    // components themselves plus the opened component's four information tabs.
-    expect(
-      screen.queryByRole("tab", { name: /BOM Coverage|Duplicates|Doctor/ }),
-    ).toBeNull();
-    expect(screen.getByRole("tab", { name: "Overview" })).toBeInTheDocument();
+    // The opened component states what the part IS on its identity line.
+    expect((await screen.findAllByText(/Dual Operational Amplifier/)).length).toBeGreaterThan(0);
+    // The default route renders the Components flagship, and it has NO tabs at all: the page-level
+    // strip went with the Doctor and BOM surfaces, and the opened component is three columns.
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
   });
 
   it("reaches Add Parts as a full-screen wizard from the Parts toolbar", async () => {

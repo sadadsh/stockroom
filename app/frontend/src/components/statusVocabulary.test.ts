@@ -12,8 +12,13 @@
  * placeability in Settings - one part, three verdicts, one word.
  */
 import { describe, expect, it } from "vitest";
-import { REPRESENTATION_STATUS_LABEL, statusTone } from "./component-workspace/workspaceStatus";
-import type { WorkspaceStatus } from "./component-workspace/workspaceStatus";
+import {
+  REPRESENTATION_STATUS_LABEL,
+  cadAssetStatus,
+  cadStatusTone,
+  statusTone,
+} from "./component-workspace/workspaceStatus";
+import type { CadAssetStatus, WorkspaceStatus } from "./component-workspace/workspaceStatus";
 
 const RAW = import.meta.glob("/src/**/*.{ts,tsx}", {
   query: "?raw",
@@ -73,8 +78,15 @@ describe("the status vocabulary is closed and consistent", () => {
     // The banned synonyms, each of which has a word in the set that already says it about a
     // COMPONENT or one of its artifacts:
     //   Complete / Done / OK -> Ready        (or Validated, when a recorded check passed)
-    //   Incomplete           -> Missing      (or Needs Review)
     //   N/A                  -> Not Required
+    //
+    // `Incomplete` USED to be banned here as a synonym of Missing, and it no longer is, because
+    // the two turned out to name different conditions once a CAD asset could be measured rather
+    // than merely counted. `Missing` is "no file is attached"; `Incomplete` is "the file IS
+    // attached and its terminals are unnumbered or numbered twice" - a file that exists and
+    // cannot be mapped. Reporting the second as the first sends a person to download a file they
+    // already have. The CAD vocabulary is closed on its own below, which is what keeps this from
+    // being a licence for a tenth word.
     //
     // A JOB's lifecycle is deliberately NOT convicted here. "This batch Completed" and "this
     // symbol is Ready" are statements about different subjects, and collapsing them would be the
@@ -82,7 +94,7 @@ describe("the status vocabulary is closed and consistent", () => {
     //
     // Matched as a whole word in a JSX text node or a quoted string, so `isComplete`,
     // `complete_only` and the `complete` facet count are untouched: those are DATA, not a label.
-    const banned = /(?:^|["'>\s])(Complete|Incomplete|Done|OK|N\/A)(?:["'<.\s]|$)/;
+    const banned = /(?:^|["'>\s])(Complete|Done|OK|N\/A)(?:["'<.\s]|$)/;
     const offenders: string[] = [];
     for (const [path, raw] of SOURCE) {
       // The catalogue of dev ids is a list of element ids, not of status labels.
@@ -97,6 +109,81 @@ describe("the status vocabulary is closed and consistent", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("closes the CAD asset vocabulary at the nine words the owner fixed", () => {
+    // A CAD asset speaks its OWN nine words, and "Ready" is deliberately not among them: a file
+    // that merely exists and a file a recorded check has passed are not the same claim, and
+    // calling both of them ready is how a component with an unvalidated footprint gets sent to a
+    // fabricator. Each of the nine is reachable from real evidence, which is what stops the set
+    // from growing a word nothing can produce.
+    const CAD_VOCABULARY: readonly CadAssetStatus[] = [
+      "Available",
+      "Validated",
+      "Needs Review",
+      "Missing",
+      "Failed",
+      "Not Required",
+      "Package Matched",
+      "Pin Match Failed",
+      "Incomplete",
+    ];
+    for (const word of CAD_VOCABULARY) expect(typeof cadStatusTone(word)).toBe("string");
+
+    const view = (status: "ready" | "missing" | "failed" | "review" | "not_required", checks: unknown[] = []) => ({
+      kind: "symbol" as const,
+      status,
+      selectedTool: "kicad",
+      tools: [
+        {
+          tool: "kicad",
+          toolLabel: "KiCad",
+          status,
+          present: status !== "missing" && status !== "not_required",
+          embedded: false,
+          reference: { lib: "", name: "X", file: "" },
+          sourceId: "",
+          sourceLabel: "",
+          sourceUrl: "",
+          capturedAt: "",
+          checks: checks as never,
+        },
+      ],
+      sourceLabel: "",
+      issue: null,
+    });
+
+    const produced = new Set<CadAssetStatus>([
+      cadAssetStatus(view("ready")),
+      cadAssetStatus(view("missing")),
+      cadAssetStatus(view("failed")),
+      cadAssetStatus(view("review")),
+      cadAssetStatus(view("not_required")),
+      cadAssetStatus(view("ready"), {
+        terminals: 5,
+        expected: 8,
+        duplicates: 0,
+        unnumbered: 0,
+      }),
+      cadAssetStatus(view("ready"), {
+        terminals: 8,
+        expected: 8,
+        duplicates: 1,
+        unnumbered: 0,
+      }),
+      cadAssetStatus(
+        view("ready", [
+          { check: "package_vs_pads", measured: "SOIC-8", expected: "SOIC-8", against: "", checkedAt: "", note: "" },
+        ]),
+      ),
+      cadAssetStatus(
+        view("ready", [
+          { check: "pins_vs_datasheet", measured: 8, expected: 8, against: "", checkedAt: "", note: "" },
+        ]),
+      ),
+    ]);
+    expect([...produced].sort()).toEqual([...CAD_VOCABULARY].sort());
+    expect(produced.has("Ready" as never)).toBe(false);
   });
 
   it("keeps the JOB lifecycle a separate closed set, about a different subject", () => {
