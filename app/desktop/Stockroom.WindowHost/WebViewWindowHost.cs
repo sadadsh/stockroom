@@ -39,15 +39,9 @@ internal sealed class WebViewWindowHost : IDisposable
     private readonly Window _window;
     private readonly WebView2 _webView;
     private readonly Grid _root;
-    private readonly Grid _providerHeader;
+    private readonly WindowTabStrip _tabStrip;
     private readonly Grid _providerSurface;
     private readonly Grid _providerContent;
-    private readonly Button _providerTabButton;
-    private readonly Button _providerBackButton;
-    private readonly Button _providerForwardButton;
-    private readonly Button _providerRefreshButton;
-    private readonly TextBox _providerUrlBox;
-    private readonly TextBlock _providerStatusText;
     private readonly Dictionary<WebView2, ProviderLeaseIdentity> _providerPopups = [];
     private readonly ProviderLeaseJournal _providerLeases = new();
     private readonly TaskCompletionSource<bool> _navigationCompletion =
@@ -96,18 +90,18 @@ internal sealed class WebViewWindowHost : IDisposable
             new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         Grid.SetRow(_webView, 1);
         _root.Children.Add(_webView);
-        _providerHeader = BuildProviderHeader(
-            out var stockroomTab,
-            out _providerTabButton,
-            out _providerBackButton,
-            out _providerForwardButton,
-            out _providerRefreshButton,
-            out _providerUrlBox,
-            out _providerStatusText);
-        stockroomTab.Click += (_, _) => HideProviderBrowser();
-        _providerTabButton.Click += (_, _) => ShowActiveProviderBrowser();
-        Grid.SetRow(_providerHeader, 0);
-        _root.Children.Add(_providerHeader);
+        // The tab strip is window chrome, not page chrome: it is mounted once, stays visible
+        // for the life of the window, and shows a single Stockroom tab until a provider page
+        // is actually open.
+        _tabStrip = new WindowTabStrip();
+        _tabStrip.StockroomTab.Click += (_, _) => HideProviderBrowser();
+        _tabStrip.ProviderTab.Click += (_, _) => ShowActiveProviderBrowser();
+        _tabStrip.BackButton.Click += (_, _) => NavigateProviderHistory(back: true);
+        _tabStrip.ForwardButton.Click += (_, _) => NavigateProviderHistory(back: false);
+        _tabStrip.RefreshButton.Click += (_, _) => RefreshActiveProvider();
+        _tabStrip.UrlBox.KeyDown += OnProviderUrlBoxKeyDown;
+        Grid.SetRow(_tabStrip.Root, 0);
+        _root.Children.Add(_tabStrip.Root);
         _providerSurface = BuildProviderSurface(out _providerContent);
         Grid.SetRow(_providerSurface, 1);
         _root.Children.Add(_providerSurface);
@@ -319,6 +313,7 @@ internal sealed class WebViewWindowHost : IDisposable
                 ThrowIfNotReady();
                 await EnsureProviderBrowserReadyAsync().ConfigureAwait(true);
                 var lease = _providerLeases.Begin(leaseId, context);
+                SyncProviderTab();
                 return new Dictionary<string, object?>
                 {
                     ["lease_id"] = lease.LeaseId,
@@ -345,7 +340,9 @@ internal sealed class WebViewWindowHost : IDisposable
                 {
                     RemoveProviderPopup(popup);
                 }
-                _providerHeader.Visibility = Visibility.Collapsed;
+                // The page is closed, so its tab is gone and the Stockroom tab is what is
+                // left selected. The strip itself stays exactly where it was.
+                _tabStrip.RemoveProviderTab();
                 _providerSurface.Visibility = Visibility.Collapsed;
                 _webView.Visibility = Visibility.Visible;
                 _webView.Focus();
@@ -373,9 +370,10 @@ internal sealed class WebViewWindowHost : IDisposable
                     new ProviderLeaseIdentity(leaseId, generation));
                 await EnsureProviderBrowserReadyAsync()
                     .ConfigureAwait(true);
-                _providerHeader.Visibility = Visibility.Visible;
+                SyncProviderTab();
                 _webView.Visibility = Visibility.Collapsed;
                 _providerSurface.Visibility = Visibility.Visible;
+                _tabStrip.SelectProvider();
                 UpdateProviderChrome();
                 _providerWebView?.Focus();
                 return true;
@@ -388,9 +386,7 @@ internal sealed class WebViewWindowHost : IDisposable
             () =>
             {
                 ThrowIfNotReady();
-                _providerSurface.Visibility = Visibility.Collapsed;
-                _webView.Visibility = Visibility.Visible;
-                _webView.Focus();
+                ShowStockroomTab();
             });
     }
 
@@ -402,21 +398,34 @@ internal sealed class WebViewWindowHost : IDisposable
                 ThrowIfNotReady();
                 _providerLeases.RequireActive(
                     new ProviderLeaseIdentity(leaseId, generation));
-                _providerSurface.Visibility = Visibility.Collapsed;
-                _webView.Visibility = Visibility.Visible;
-                _webView.Focus();
+                ShowStockroomTab();
             });
+    }
+
+    /// <summary>
+    /// Selecting Stockroom returns to Stockroom's own UI. The provider page is not closed by
+    /// looking away from it - the lease and the tab both survive, exactly as a browser tab
+    /// survives switching to another one.
+    /// </summary>
+    private void ShowStockroomTab()
+    {
+        _providerSurface.Visibility = Visibility.Collapsed;
+        _webView.Visibility = Visibility.Visible;
+        _tabStrip.SelectStockroom();
+        _webView.Focus();
     }
 
     private void ShowActiveProviderBrowser()
     {
         if (!_providerLeases.TryGetActive(out _))
         {
+            _tabStrip.SelectStockroom();
             return;
         }
 
         _webView.Visibility = Visibility.Collapsed;
         _providerSurface.Visibility = Visibility.Visible;
+        _tabStrip.SelectProvider();
         UpdateProviderChrome();
         ActiveProviderWebView()?.Focus();
     }
@@ -714,6 +723,7 @@ internal sealed class WebViewWindowHost : IDisposable
             {
                 await InitializeProviderBrowserAttemptAsync()
                     .ConfigureAwait(true);
+                SyncProviderTab();
                 return;
             }
             catch (Exception exception)
@@ -761,80 +771,43 @@ internal sealed class WebViewWindowHost : IDisposable
         _providerSurface.Visibility = Visibility.Collapsed;
     }
 
-    private Grid BuildProviderHeader(
-        out Button stockroomTab,
-        out Button providerTab,
-        out Button backButton,
-        out Button forwardButton,
-        out Button refreshButton,
-        out TextBox urlBox,
-        out TextBlock statusText)
+    /// <summary>
+    /// Keep the tab strip telling the truth about the one provider page: a tab exists exactly
+    /// while an active lease has a live provider browser behind it, and it is named after the
+    /// provider that lease is for.
+    /// </summary>
+    private void SyncProviderTab()
     {
-        var header = new Grid
+        if (_providerLeases.TryGetActive(out var lease, out var context)
+            && lease is not null
+            && _providerWebView?.CoreWebView2 is not null)
         {
-            Height = 44,
-            Margin = new Thickness(24, 0, 24, 0),
-            Background = new SolidColorBrush(Color.FromRgb(17, 21, 29)),
-            Visibility = Visibility.Collapsed,
-        };
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        stockroomTab = ProviderHeaderButton("Stockroom");
-        providerTab = ProviderHeaderButton("Provider");
-        backButton = ProviderHeaderButton("Back");
-        backButton.IsEnabled = false;
-        backButton.Click += (_, _) => NavigateProviderHistory(back: true);
-        forwardButton = ProviderHeaderButton("Forward");
-        forwardButton.IsEnabled = false;
-        forwardButton.Click += (_, _) => NavigateProviderHistory(back: false);
-        refreshButton = ProviderHeaderButton("Refresh");
-        refreshButton.Click += (_, _) => RefreshActiveProvider();
-        // The person drives the provider page, so the chrome shows them where they are and
-        // lets them go somewhere: a real address box, policy-checked like every other
-        // provider navigation (https only, no userinfo).
-        urlBox = new TextBox
+            _tabStrip.ShowProviderTab(ResolveProviderTabLabel(context));
+            return;
+        }
+
+        _tabStrip.RemoveProviderTab();
+    }
+
+    private void UpdateProviderTabLabel()
+    {
+        if (!_tabStrip.HasProviderTab
+            || !_providerLeases.TryGetActive(out var lease, out var context)
+            || lease is null)
         {
-            Background = new SolidColorBrush(Color.FromRgb(27, 33, 44)),
-            Foreground = new SolidColorBrush(Color.FromRgb(205, 214, 225)),
-            CaretBrush = new SolidColorBrush(Color.FromRgb(205, 214, 225)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(55, 65, 81)),
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 11,
-            Padding = new Thickness(8, 3, 8, 3),
-            Margin = new Thickness(8, 9, 0, 9),
-            VerticalContentAlignment = VerticalAlignment.Center,
-        };
-        urlBox.KeyDown += OnProviderUrlBoxKeyDown;
-        statusText = new TextBlock
-        {
-            Text = string.Empty,
-            Foreground = new SolidColorBrush(Color.FromRgb(132, 145, 162)),
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 11,
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(12, 0, 14, 0),
-        };
-        Grid.SetColumn(stockroomTab, 0);
-        Grid.SetColumn(providerTab, 1);
-        Grid.SetColumn(backButton, 2);
-        Grid.SetColumn(forwardButton, 3);
-        Grid.SetColumn(refreshButton, 4);
-        Grid.SetColumn(urlBox, 5);
-        Grid.SetColumn(statusText, 6);
-        header.Children.Add(stockroomTab);
-        header.Children.Add(providerTab);
-        header.Children.Add(backButton);
-        header.Children.Add(forwardButton);
-        header.Children.Add(refreshButton);
-        header.Children.Add(urlBox);
-        header.Children.Add(statusText);
-        return header;
+            return;
+        }
+
+        _tabStrip.SetProviderTabLabel(ResolveProviderTabLabel(context));
+    }
+
+    private string ResolveProviderTabLabel(ProviderLeaseContext context)
+    {
+        var view = ActiveProviderWebView() ?? _providerWebView;
+        return ProviderTabLabel.Resolve(
+            context.ProviderId,
+            view?.CoreWebView2?.DocumentTitle,
+            view?.Source?.AbsoluteUri);
     }
 
     private void OnProviderUrlBoxKeyDown(object sender, KeyEventArgs eventArguments)
@@ -845,7 +818,7 @@ internal sealed class WebViewWindowHost : IDisposable
         }
 
         eventArguments.Handled = true;
-        var typed = _providerUrlBox.Text?.Trim() ?? string.Empty;
+        var typed = _tabStrip.UrlBox.Text?.Trim() ?? string.Empty;
         if (typed.Length == 0)
         {
             return;
@@ -890,17 +863,19 @@ internal sealed class WebViewWindowHost : IDisposable
     private void UpdateProviderChrome()
     {
         UpdateProviderNavigationButtons();
-        _providerStatusText.Text = _providerNavigationError.Length > 0
-            ? _providerNavigationError
-            : _providerLoading
-                ? "Loading"
-                : string.Empty;
-        if (!_providerUrlBox.IsKeyboardFocusWithin)
+        UpdateProviderTabLabel();
+        _tabStrip.SetStatus(
+            _providerNavigationError.Length > 0
+                ? _providerNavigationError
+                : _providerLoading
+                    ? "Loading"
+                    : string.Empty);
+        if (!_tabStrip.UrlBox.IsKeyboardFocusWithin)
         {
             var source = ActiveProviderWebView()?.Source?.AbsoluteUri ?? string.Empty;
             if (!source.StartsWith("about:", StringComparison.OrdinalIgnoreCase))
             {
-                _providerUrlBox.Text = source;
+                _tabStrip.SetUrl(source);
             }
         }
     }
@@ -916,39 +891,6 @@ internal sealed class WebViewWindowHost : IDisposable
         providerContent = new Grid();
         surface.Children.Add(providerContent);
         return surface;
-    }
-
-    private static Button ProviderHeaderButton(string label)
-    {
-        var idleForeground = new SolidColorBrush(Color.FromRgb(205, 214, 225));
-        var idleBackground = new SolidColorBrush(Color.FromRgb(27, 33, 44));
-        var hoverForeground = new SolidColorBrush(Color.FromRgb(17, 21, 29));
-        var hoverBackground = new SolidColorBrush(Color.FromRgb(205, 214, 225));
-        var button = new Button
-        {
-            Content = label,
-            Foreground = idleForeground,
-            Background = idleBackground,
-            BorderBrush = new SolidColorBrush(Color.FromRgb(55, 65, 81)),
-            FontFamily = new FontFamily("Segoe UI Semibold"),
-            FontSize = 11,
-            Padding = new Thickness(10, 4, 10, 4),
-            Margin = new Thickness(8, 7, 0, 7),
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        // Windows' default Button visual state paints a light hover surface. Keep the label
-        // readable instead of letting the inherited dark foreground disappear under the cursor.
-        button.MouseEnter += (_, _) =>
-        {
-            button.Foreground = hoverForeground;
-            button.Background = hoverBackground;
-        };
-        button.MouseLeave += (_, _) =>
-        {
-            button.Foreground = idleForeground;
-            button.Background = idleBackground;
-        };
-        return button;
     }
 
     private WebView2? ActiveProviderWebView()
@@ -982,8 +924,9 @@ internal sealed class WebViewWindowHost : IDisposable
     private void UpdateProviderNavigationButtons()
     {
         var core = ActiveProviderWebView()?.CoreWebView2;
-        _providerBackButton.IsEnabled = core?.CanGoBack == true;
-        _providerForwardButton.IsEnabled = core?.CanGoForward == true;
+        _tabStrip.SetNavigationState(
+            core?.CanGoBack == true,
+            core?.CanGoForward == true);
     }
 
     private void ConfigureProviderCoreWebView(CoreWebView2 core)
@@ -1003,6 +946,7 @@ internal sealed class WebViewWindowHost : IDisposable
         core.NavigationStarting += OnProviderNavigationStarting;
         core.NavigationCompleted += OnProviderNavigationCompleted;
         core.SourceChanged += OnProviderSourceChanged;
+        core.DocumentTitleChanged += OnProviderDocumentTitleChanged;
         core.HistoryChanged += OnProviderHistoryChanged;
         core.NewWindowRequested += OnProviderNewWindowRequested;
         core.DownloadStarting += OnProviderDownloadStarting;
@@ -1012,6 +956,15 @@ internal sealed class WebViewWindowHost : IDisposable
         core.BasicAuthenticationRequested +=
             OnBasicAuthenticationRequested;
         core.ProcessFailed += OnProviderProcessFailed;
+    }
+
+    private void OnProviderDocumentTitleChanged(object? sender, object eventArguments)
+    {
+        _ = sender;
+        _ = eventArguments;
+        // Only ever a fallback: a lease that names its provider keeps that name regardless of
+        // what the page retitles itself to mid-flow.
+        UpdateProviderTabLabel();
     }
 
     private void OnProviderHistoryChanged(object? sender, object eventArguments)
@@ -1385,7 +1338,7 @@ internal sealed class WebViewWindowHost : IDisposable
 
     private void ResetProviderBrowser()
     {
-        _providerHeader.Visibility = Visibility.Collapsed;
+        _tabStrip.RemoveProviderTab();
         _providerSurface.Visibility = Visibility.Collapsed;
         _webView.Visibility = Visibility.Visible;
         foreach (var popup in _providerPopups.Keys.ToArray())
