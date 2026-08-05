@@ -62,13 +62,16 @@ from stockroom.model.trust import AssetCheck
 #       `part_class` in place of the two-valued `passive` flag
 #   4 = `cad_variants`: one active digest-bound evidence bundle per tool, kept separate from
 #       the materialized `assets` projection
+#   5 = typed `documents`, the official `manufacturer_page` held apart from every distributor
+#       offer, and reviewed manual `overrides` - three things the flat `datasheet` slot and a
+#       purchase URL could not express without guessing
 #
 # This exists because peers share these records through git and BOTH write them. Kubernetes'
 # API conventions state the rule: patching a resource at schema version N-1 must not erase
 # fields defined at version N. Before this, an older build editing one field on a newer peer's
 # part silently deleted every field it did not recognise, and git recorded the deletion as an
 # intentional change. `extra` (below) is the other half of that guarantee.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # KiCad-visible fields mirrored INTO symbol properties so KiCad shows a complete
 # part even without Stockroom (spec section 3). Maps record-derived value ->
@@ -172,6 +175,226 @@ class Datasheet:
 
 
 @dataclass
+class PartDocument:
+    """One typed document this part references, held apart from every other kind.
+
+    A bare URL string cannot answer the questions a reader actually has - is this the
+    manufacturer's own PDF or a distributor's copy, is it the current revision, is it a PDF at
+    all or an HTML product page, and do we hold the bytes. Each of those is a separate field
+    here so none of them has to be inferred from a filename.
+
+    `local_path` and `remote_url` are independent: a document can be URL-only, file-only, or
+    both, and all three are real states. Nothing here is preferred by storage - which datasheet
+    wins is DERIVED from this evidence (`stockroom.dossier.documents`), so a stored preference
+    can never go stale against a better copy that arrived later.
+    """
+
+    document_type: str = "datasheet"
+    title: str = ""
+    revision: str = ""
+    manufacturer: str = ""
+    # Who published the copy: "manufacturer", "distributor", "cad_provider", "imported".
+    source_type: str = ""
+    # The source key that supplied the reference, so a copy can always be traced back.
+    source: str = ""
+    local_path: str = ""
+    remote_url: str = ""
+    mime_type: str = ""
+    # False when a later revision of the same document supersedes this one. A record that says
+    # nothing leaves this True and the projection decides from the revisions it can see.
+    is_current: bool = True
+    retrieved_at: str = ""
+    # Set only when the bytes were actually checked. Never stamped on a reference.
+    verified_at: str = ""
+    status: str = ""
+    extra: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        known = {
+            "document_type": self.document_type,
+            "title": self.title,
+            "revision": self.revision,
+            "manufacturer": self.manufacturer,
+            "source_type": self.source_type,
+            "source": self.source,
+            "local_path": self.local_path,
+            "remote_url": self.remote_url,
+            "mime_type": self.mime_type,
+            "is_current": self.is_current,
+            "retrieved_at": self.retrieved_at,
+            "verified_at": self.verified_at,
+            "status": self.status,
+        }
+        return {**self.extra, **known}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "PartDocument":
+        known = {
+            "document_type",
+            "title",
+            "revision",
+            "manufacturer",
+            "source_type",
+            "source",
+            "local_path",
+            "remote_url",
+            "mime_type",
+            "is_current",
+            "retrieved_at",
+            "verified_at",
+            "status",
+        }
+        return cls(
+            document_type=str(d.get("document_type", "") or "datasheet"),
+            title=str(d.get("title", "")),
+            revision=str(d.get("revision", "")),
+            manufacturer=str(d.get("manufacturer", "")),
+            source_type=str(d.get("source_type", "")),
+            source=str(d.get("source", "")),
+            local_path=str(d.get("local_path", "")),
+            remote_url=str(d.get("remote_url", "")),
+            mime_type=str(d.get("mime_type", "")),
+            is_current=bool(d.get("is_current", True)),
+            retrieved_at=str(d.get("retrieved_at", "")),
+            verified_at=str(d.get("verified_at", "")),
+            status=str(d.get("status", "")),
+            extra={k: v for k, v in d.items() if k not in known},
+        )
+
+
+@dataclass
+class ManufacturerPage:
+    """The manufacturer's OWN page for this part, stored where no offer can reach it.
+
+    Kept as its own field rather than as the first sourcing URL because those are different
+    facts: a distributor's product page is that distributor's listing, and treating it as the
+    official page told a reader the manufacturer said something a reseller said. Whether the
+    host really belongs to the manufacturer is DERIVED at projection time from the registry's
+    domain data, so a stored `verified` flag can never outlive the check that produced it.
+    """
+
+    url: str = ""
+    # The source key that supplied the URL ("digikey", "manufacturer", "user", ...).
+    source: str = ""
+    checked_at: str = ""
+    extra: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            **self.extra,
+            "url": self.url,
+            "source": self.source,
+            "checked_at": self.checked_at,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "ManufacturerPage":
+        known = {"url", "source", "checked_at"}
+        return cls(
+            url=str(d.get("url", "")),
+            source=str(d.get("source", "")),
+            checked_at=str(d.get("checked_at", "")),
+            extra={k: v for k, v in d.items() if k not in known},
+        )
+
+
+@dataclass
+class FieldOverride:
+    """One reviewed manual decision about a field, and who made it.
+
+    This is the top of the source precedence order, which is exactly why it carries its
+    reviewer and its time: a value that outranks the manufacturer's own datasheet has to say
+    who decided that. Recording the override never deletes the sourced answers it displaced -
+    they stay in `alternates` and still render as candidates.
+
+    TWO kinds of decision live here, because they are decisions about the same thing and a
+    field can only be decided once. A VALUE override says "the answer is this"; a PREFERRED
+    SOURCE says "believe this source about it". The second is not a value at all, which is why
+    `has_value` exists: without it a source pin would have to invent an empty value and the
+    projection would show a blank where a real answer was in force. A pin FOLLOWS its source, so
+    a later refresh of that source moves the field with it instead of freezing a stale copy.
+
+    `replaced_value` / `replaced_source` are what the decision displaced at the moment it was
+    made. They are the difference between "this is 5 V" and "this is 5 V, overriding 3.3 V from
+    DigiKey", and they are also what makes clearing genuinely reversible rather than merely
+    possible: the reader can always see what the record will fall back to.
+    """
+
+    value: object = ""
+    note: str = ""
+    reviewed_by: str = ""
+    reviewed_at: str = ""
+    # False when this entry only PINS a source and carries no literal value of its own. True by
+    # default and omitted from the JSON when true, so a record written before pins existed keeps
+    # its exact meaning: every override that predates this field IS a value override.
+    has_value: bool = True
+    # Whether the reviewer stands behind this value as checked against the manufacturer's own
+    # word. True by default and omitted from the JSON when true, because every override written
+    # before this field existed WAS a reviewed decision and a record on disk keeps its meaning.
+    # False records the honest other case: a value somebody entered but has not confirmed, which
+    # reads as `Unverified` rather than borrowing the authority of a reviewed override.
+    verified: bool = True
+    # The source key this field is pinned to, or "" when nothing is pinned.
+    preferred_source: str = ""
+    # The preferred SOURCED answer at the moment this decision was recorded, and who gave it.
+    replaced_value: object = None
+    replaced_source: str = ""
+    extra: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            **self.extra,
+            "value": self.value,
+            "note": self.note,
+            "reviewed_by": self.reviewed_by,
+            "reviewed_at": self.reviewed_at,
+            # Emitted only when they say something. An override that is exactly what an override
+            # always was must serialize exactly as it always did, so adopting pins and displaced
+            # evidence rewrites nothing already on disk.
+            **({} if self.has_value else {"has_value": False}),
+            **({} if self.verified else {"verified": False}),
+            **({"preferred_source": self.preferred_source} if self.preferred_source else {}),
+            **({"replaced_value": self.replaced_value} if self.replaced_value is not None else {}),
+            **({"replaced_source": self.replaced_source} if self.replaced_source else {}),
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "FieldOverride":
+        known = {
+            "value",
+            "note",
+            "reviewed_by",
+            "reviewed_at",
+            "has_value",
+            "verified",
+            "preferred_source",
+            "replaced_value",
+            "replaced_source",
+        }
+        return cls(
+            value=d.get("value", ""),
+            note=str(d.get("note", "")),
+            reviewed_by=str(d.get("reviewed_by", "")),
+            reviewed_at=str(d.get("reviewed_at", "")),
+            has_value=bool(d.get("has_value", True)),
+            verified=bool(d.get("verified", True)),
+            preferred_source=str(d.get("preferred_source", "")),
+            replaced_value=d.get("replaced_value"),
+            replaced_source=str(d.get("replaced_source", "")),
+            extra={k: v for k, v in d.items() if k not in known},
+        )
+
+    def is_empty(self) -> bool:
+        """True when this entry decides nothing and should not be kept.
+
+        A record must never carry an override that neither holds a value nor pins a source: it
+        would render as a reviewed decision that decides nothing, and it would keep a field
+        looking settled after the decision was withdrawn.
+        """
+        return not self.has_value and not self.preferred_source
+
+
+@dataclass
 class Purchase:
     vendor: str = ""
     url: str = ""
@@ -245,6 +468,65 @@ class ProviderAssertion:
             origin=str(d.get("origin", "")) or "user",
             noted_at=str(d.get("noted_at", "")),
             note=str(d.get("note", "")),
+            extra={k: v for k, v in d.items() if k not in known},
+        )
+
+
+@dataclass
+class CadSourcePreference:
+    """Which provider's CAD this component prefers, for the whole set and per asset.
+
+    Deliberately NOT a per-asset mix-and-match model. Stockroom accepts a CAD set only when the
+    symbol, the footprint and the 3D model come from one provider's evidence manifest, and the
+    coherence gate (`cad_variants.same_cad_evidence_set`) enforces that on the bytes. Storing a
+    per-asset map here is what makes the RULE writable down: `assets` exists so a person can pin
+    one artifact explicitly, and `dossier.cad_preference` refuses any pin that would leave two
+    providers in force across the three. Without the map there would be no way to record the
+    legitimate case; without the refusal the map would let a person write a set the gate then
+    rejects, which is a promise the product cannot keep.
+
+    `provider` and every value in `assets` are provider REGISTRY keys ("ultralibrarian"), never
+    display labels and never EDA tool names: this records where files come from, not which
+    application can read them.
+    """
+
+    provider: str = ""
+    assets: dict[str, str] = field(default_factory=dict)
+    reviewed_by: str = ""
+    reviewed_at: str = ""
+    # Keys a newer build wrote here, kept verbatim and re-emitted.
+    extra: dict = field(default_factory=dict)
+
+    def is_empty(self) -> bool:
+        """Whether this decides nothing. An empty preference is omitted from the JSON."""
+        return not self.provider and not any(self.assets.values())
+
+    def for_asset(self, kind: str) -> str:
+        """The provider pinned for one asset kind: its own pin, else the whole-set pin."""
+        return (self.assets.get(kind) or "").strip() or self.provider
+
+    def to_dict(self) -> dict:
+        return {
+            **self.extra,
+            "provider": self.provider,
+            "assets": {kind: value for kind, value in self.assets.items() if value},
+            "reviewed_by": self.reviewed_by,
+            "reviewed_at": self.reviewed_at,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "CadSourcePreference":
+        known = {"provider", "assets", "reviewed_by", "reviewed_at"}
+        assets = d.get("assets")
+        return cls(
+            provider=str(d.get("provider", "")),
+            assets={
+                str(kind): str(value)
+                for kind, value in (assets if isinstance(assets, dict) else {}).items()
+                if value
+            },
+            reviewed_by=str(d.get("reviewed_by", "")),
+            reviewed_at=str(d.get("reviewed_at", "")),
             extra={k: v for k, v in d.items() if k not in known},
         )
 
@@ -385,9 +667,26 @@ def _v3_to_v4(d: dict) -> dict:
     return out
 
 
+def _v4_to_v5(d: dict) -> dict:
+    """Adopt typed documents, the separated manufacturer page, and reviewed overrides.
+
+    Nothing is moved and nothing is deleted. The legacy `datasheet` slot stays exactly where it
+    is and keeps its meaning - the dossier projection reads it and types it - so a v4 record
+    round-trips byte for byte apart from its version stamp, and re-running this step on an
+    already-migrated record is a no-op.
+
+    The manufacturer page is deliberately NOT seeded from `purchase[0].url`. Inferring it from
+    an offer is the exact bug this version exists to remove, and a migration that guessed it
+    would write that bug permanently into every record on disk.
+    """
+    out = dict(d)
+    out["schema_version"] = 5
+    return out
+
+
 # version present -> the step that upgrades it to the next one. A version with no entry is
 # REFUSED rather than restamped.
-_MIGRATIONS = {1: _v1_to_v2, 2: _v2_to_v3, 3: _v3_to_v4}
+_MIGRATIONS = {1: _v1_to_v2, 2: _v2_to_v3, 3: _v3_to_v4, 4: _v4_to_v5}
 
 
 def migrate_record(d: dict) -> dict:
@@ -446,6 +745,10 @@ _KNOWN_KEYS: frozenset[str] = frozenset(
         "alternates",
         "catalog",
         "provider_assertions",
+        "cad_preference",
+        "documents",
+        "manufacturer_page",
+        "overrides",
     }
 )
 
@@ -500,6 +803,16 @@ class PartRecord:
     # ---- curated / vendor data that is neither identity nor recomputed from `sourced/`
     tags: list[str] = field(default_factory=list)
     datasheet: Datasheet | None = None
+    # Every OTHER document this part references, each typed and each carrying its own copy
+    # story. `datasheet` above stays the single legacy slot so a v4 record keeps its meaning;
+    # the dossier projection reads both and types them into one list.
+    documents: list[PartDocument] = field(default_factory=list)
+    # The manufacturer's own page, stored apart from `purchase` so it can never be taken from a
+    # distributor offer. Omitted from the JSON entirely when absent.
+    manufacturer_page: ManufacturerPage | None = None
+    # Reviewed manual decisions, keyed by canonical field key. Top of the source precedence
+    # order; empty for almost every part, so it is omitted from the JSON when empty.
+    overrides: dict[str, FieldOverride] = field(default_factory=dict)
     purchase: list[Purchase] = field(default_factory=list)
     provenance: Provenance | None = None
     hashes: Hashes | None = None
@@ -519,6 +832,11 @@ class PartRecord:
     # and from `assets` (which is what Stockroom holds) precisely so the three can never be
     # confused for one another. Omitted from the JSON entirely when empty.
     provider_assertions: dict[str, dict[str, ProviderAssertion]] = field(default_factory=dict)
+    # Which provider's CAD set this component prefers. A reviewed DECISION, so it is kept apart
+    # from `provider_assertions` (what a person observed about coverage), from `catalog` (what a
+    # distributor said) and from `assets` (which files Stockroom actually holds). Omitted from
+    # the JSON entirely when it decides nothing.
+    cad_preference: CadSourcePreference = field(default_factory=CadSourcePreference)
     # The schema version this record was WRITTEN at. A record read from disk keeps its own
     # value (never downgraded to ours, never RAISED to ours without a real migration), so a
     # build that does not fully understand a newer record cannot claim otherwise to the next
@@ -638,6 +956,18 @@ class PartRecord:
             ),
             "tags": list(self.tags),
             "datasheet": asdict(self.datasheet) if self.datasheet else None,
+            # All three omitted when empty, like `assets`: adopting v5 must not rewrite every
+            # part in a real library to add an empty list, a null and an empty map.
+            **({"documents": [doc.to_dict() for doc in self.documents]} if self.documents else {}),
+            **(
+                {"manufacturer_page": self.manufacturer_page.to_dict()}
+                if self.manufacturer_page is not None
+                else {}
+            ),
+            **(
+                {"overrides": {k: v.to_dict() for k, v in self.overrides.items()}}
+                if self.overrides else {}
+            ),
             "purchase": [asdict(p) for p in self.purchase],
             "provenance": asdict(self.provenance) if self.provenance else None,
             "hashes": asdict(self.hashes) if self.hashes else None,
@@ -663,6 +993,10 @@ class PartRecord:
                     }
                 }
                 if any(self.provider_assertions.values()) else {}
+            ),
+            **(
+                {"cad_preference": self.cad_preference.to_dict()}
+                if not self.cad_preference.is_empty() else {}
             ),
         }
 
@@ -694,6 +1028,21 @@ class PartRecord:
             cad_variants=CadVariantSelections.from_dict(d.get("cad_variants") or {}),
             tags=list(d.get("tags", [])),
             datasheet=Datasheet(**d["datasheet"]) if d.get("datasheet") else None,
+            documents=[
+                PartDocument.from_dict(doc)
+                for doc in (d.get("documents") or [])
+                if isinstance(doc, dict)
+            ],
+            manufacturer_page=(
+                ManufacturerPage.from_dict(d["manufacturer_page"])
+                if isinstance(d.get("manufacturer_page"), dict)
+                else None
+            ),
+            overrides={
+                str(key): FieldOverride.from_dict(value)
+                for key, value in (d.get("overrides") or {}).items()
+                if isinstance(value, dict)
+            },
             purchase=[Purchase(**p) for p in d.get("purchase", [])],
             provenance=Provenance(**d["provenance"]) if d.get("provenance") else None,
             hashes=Hashes(**d["hashes"]) if d.get("hashes") else None,
@@ -716,6 +1065,11 @@ class PartRecord:
                 for provider, slots in (d.get("provider_assertions") or {}).items()
                 if isinstance(slots, dict)
             },
+            cad_preference=(
+                CadSourcePreference.from_dict(d["cad_preference"])
+                if isinstance(d.get("cad_preference"), dict)
+                else CadSourcePreference()
+            ),
             schema_version=record_version(d),
             extra={k: v for k, v in d.items() if k not in _KNOWN_KEYS},
         )
@@ -829,13 +1183,17 @@ __all__ = [
     "AssetCheck",
     "AssetOrigin",
     "AssetRef",
+    "CadSourcePreference",
     "CadVariantSelections",
     "Datasheet",
     "Derived",
     "EdaAssets",
     "EnrichmentField",
+    "FieldOverride",
     "Hashes",
+    "ManufacturerPage",
     "PartClass",
+    "PartDocument",
     "PartRecord",
     "Provenance",
     "ProviderAssertion",
