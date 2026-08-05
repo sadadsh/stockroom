@@ -430,6 +430,7 @@ def run_guided_capture(
     from stockroom.capture.vendors import get_adapter
     from stockroom.capture.verified_cache import record_completion_evidence
     from stockroom.evidence import EvidenceStore
+    from stockroom.ingest.candidates import RetainedCandidateStore
     from stockroom.ingest.pipeline import IngestPipeline
 
     def make_pipeline():
@@ -441,6 +442,13 @@ def run_guided_capture(
         )
 
     evidence_store = EvidenceStore(_capture_evidence_root(ctx))
+    # ONE store for the whole run: it holds the retained-candidate index in memory, so a second
+    # instance built per provider would save a list that never saw the first provider's work.
+    # Built only when a provider surface can actually open, so a run with nothing to capture never
+    # creates the directory.
+    candidate_store = (
+        RetainedCandidateStore(capture_candidates_root()) if provider_keys else None
+    )
 
     def completion_evidence_resolver(record):
         return record_completion_evidence(
@@ -508,6 +516,7 @@ def run_guided_capture(
             run_write=ctx.jobs.run_write,
             now_iso=_utc_now_iso,
             evidence_store=evidence_store,
+            candidate_store=candidate_store,
             projection_verifier=lambda record, resolved, *, validation_reports=None: verify_installed_projection(
                 ctx.profile.library,
                 record,
@@ -665,6 +674,19 @@ def capture_state_root() -> Path:
     xdg_state = os.environ.get("XDG_STATE_HOME")
     base = Path(xdg_state) if xdg_state else Path.home() / ".local" / "state"
     return base / "stockroom" / "capture"
+
+
+def capture_candidates_root() -> Path:
+    """Return the one retained-candidate store root, a sibling of the evidence store.
+
+    Retained candidates are provider bytes plus the validation outcome Stockroom proved about
+    them: the same machine-local, not-Git-backed, potentially large class of state the evidence
+    store already lives in. So it is a sibling under the single capture root rather than a second
+    tree with its own discovery rules, and it is defined HERE once so a writer and a reader can
+    never disagree about where it is.
+    """
+
+    return capture_state_root() / "Candidates"
 
 
 def durable_capture_report_path(item_id: str) -> Path:

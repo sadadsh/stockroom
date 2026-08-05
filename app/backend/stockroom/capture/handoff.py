@@ -680,7 +680,7 @@ def _bounded(value: object, label: str, *, maximum: float) -> float:
     return number
 
 
-# --- the guidance Stockroom's OWN ui shows while the person is away -------------------------------
+# --- the guidance Stockroom's OWN ui shows beside the provider surface ---------------------------
 
 
 def handoff_guidance(
@@ -692,11 +692,15 @@ def handoff_guidance(
 ) -> dict | None:
     """The ordered required-file checklist and provider instruction, as plain data.
 
-    This is the HUD's content without the HUD. Stockroom cannot draw an overlay inside a browser it
-    does not control and will not try, so the same facts are published here for Stockroom's own
-    window: which provider page opened, which CAD author route it belongs to, what the provider
-    asks the person to do, and - in the order the person works through them - the exact file
-    choices this part still needs.
+    This is the HUD's content without the HUD. Stockroom will not draw an overlay on top of a
+    provider's own page, so the same facts are published here for Stockroom's own chrome beside the
+    embedded provider surface: which provider page opened, which CAD author route it belongs to,
+    what the provider asks the person to do, and - in the order the person works through them - the
+    exact file choices this part still needs.
+
+    It names no transport and no download directory. Production opens Stockroom's own embedded
+    provider surface and the task-bound broker owns where a file lands, so publishing either would
+    be describing a workflow the person is not in.
 
     Returns ``None`` for a provider with no capture adapter, so a surface can never render guidance
     for a route that has no implementation behind it.
@@ -725,8 +729,6 @@ def handoff_guidance(
         except ValueError:
             continue
     capability = adapter.capability
-    choice = select_transport(capability, person_driven=True)
-    person_driven = choice.name == TRANSPORT_DEFAULT_BROWSER
     routes = []
     for route in _capture_routes(adapter):
         formats = _provider_formats(route, requirements)
@@ -747,12 +749,6 @@ def handoff_guidance(
         "instruction": capability.instruction,
         "manufacturer": manufacturer,
         "mpn": mpn,
-        "transport": choice.name,
-        "why": choice.why,
-        "opens_in": (
-            "your own default browser" if person_driven else "a Stockroom-controlled window"
-        ),
-        "downloads_dir": str(downloads_directory()) if person_driven else "",
         "routes": routes,
     }
 

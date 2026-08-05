@@ -53,7 +53,7 @@ package only for a genuinely new domain.
 | `scrape/` | Fetching + extracting distributor/vendor pages (`extract/sites/` is one module per site). |
 | `projects/` | Project-level analysis: BOM, fill, checks, buildability. |
 | `altium/` | The Altium DbLib emitter + status. |
-| `capture/` | The API-owned provider browser, task-bound download broker, evidence, requirements, and acquisition orchestration. |
+| `capture/` | The person-driven provider surface lease, the task-bound download broker, immutable provider evidence, and per-part requirements. It opens the page and stages what the person downloads; it never drives a provider control. |
 | `host/` | The WebView2 app shell, lifecycle, rendered-DOM bridge, and diagnostics. The ONLY place `pywebview` may be imported. |
 | `vcs/` | Git: the repo wrapper, library-only synchronization, and per-Windows-user GitHub auth through Git Credential Manager. Stockroom never stores an app-wide PAT. |
 | `verify/` | Self-check / doctor helpers. |
