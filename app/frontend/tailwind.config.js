@@ -1,7 +1,8 @@
 /**
- * Design tokens ported from docs/mockups/library-v2.html (the Components page)
- * and the design contract's 8/6 radii. Kept as the single source of truth so the
- * page matches the mockup by construction. No em dashes anywhere (owner rule).
+ * The utility layer over the design tokens declared in styles/index.css. Every value
+ * here is a var() reference, so the whole palette flips on [data-theme="light"] with
+ * no class changes, and `scripts/check-tokens.mjs` (run by `npm run build`) fails if a
+ * token referenced here is missing from either theme. No em dashes anywhere (owner rule).
  */
 import containerQueries from "@tailwindcss/container-queries";
 
@@ -11,44 +12,71 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Every token resolves to a CSS variable defined in styles/index.css, so
-        // the whole palette flips on [data-theme="light"] with no class changes.
-        // The dark values (the mockup palette) are the :root defaults.
+        // --- Surfaces: the Windows tool-window ladder ---------------------
+        app: "var(--c-app)",
         canvas: "var(--c-canvas)",
         rail: "var(--c-rail)",
         surface: "var(--c-surface)",
         raise: "var(--c-raise)",
         raise2: "var(--c-raise2)",
-        // the recessed chamber an asset render sits in (Part Canvas hero)
+        section: "var(--c-section)",
+        active: "var(--c-active)",
+        // the recessed well an asset render sits in (Part Canvas hero)
         stage: "var(--c-stage)",
         field: "var(--c-field)",
+        // an opaque popover surface (menus must not let content bleed through)
+        popover: "var(--c-popover)",
+        // the chrome band: panel title strips + the bottom status bar
+        band: "var(--c-band)",
+        // a technical drawing sheet: paper, identical in both themes
+        technical: "var(--c-technical)",
+
+        // --- Controls: a push button is a bevel over a two-stop fill ------
+        "control-top": "var(--c-control-top)",
+        "control-bottom": "var(--c-control-bottom)",
+        "control-hover": "var(--c-control-hover)",
+        "control-pressed": "var(--c-control-pressed)",
+        selected: "var(--c-selected)",
+        "selected-hover": "var(--c-selected-hover)",
+
+        // --- Borders: dark groove / hairline / light bevel ----------------
+        "line-dark": "var(--c-line-dark)",
         line: "var(--c-line)",
         line2: "var(--c-line2)",
-        // an opaque popover surface (menus/pops must not let content bleed through)
-        popover: "var(--c-popover)",
-        // the Altium chrome band: panel title strips + the bottom status bar
-        band: "var(--c-band)",
-        // text tiers
+        edge: "var(--c-edge)",
+
+        // --- The five text tiers, and their semantic aliases --------------
+        // t1..t5 are the raw ladder; ink/copy/label/muted/dim name the ROLE.
+        // `helper` is retained because it predates the vocabulary and means label.
         t1: "var(--c-t1)",
         t2: "var(--c-t2)",
         t3: "var(--c-t3)",
+        t4: "var(--c-t4)",
+        t5: "var(--c-t5)",
         ink: "var(--c-text-primary)",
         copy: "var(--c-text-secondary)",
+        label: "var(--c-text-label)",
+        muted: "var(--c-text-muted)",
+        dim: "var(--c-text-disabled)",
         helper: "var(--c-text-helper)",
-        // status
+
+        // --- Status: the only hues in chrome, because state IS the datum --
         ok: "var(--c-ok)",
         warn: "var(--c-warn)",
         err: "var(--c-err)",
-        // the neutral accent (primary actions, focus, active state, section ticks, links)
+
+        // --- Neutral accent + focus --------------------------------------
+        // There is no brand hue and no blue: `acc` is the loud neutral used on a
+        // primary action and a selected row, `focus` is the high-contrast neutral
+        // outline, kept separate so a focus ring never reads as a selection.
         acc: "var(--c-acc)",
         "acc-on": "var(--c-acc-on)",
-        // the loud neutral (near-white/near-black) and its low-alpha active-surface wash
         "acc-strong": "var(--c-acc-strong)",
         "acc-soft": "var(--c-acc-soft)",
-        // STM pin color-is-data fill hues (VIZ-02): color IS the data on the pinout map, so these
-        // are the one saturated channel, used on the pad fill only (a SEPARATE taxonomy from the
-        // BOM-component --cat-* hues above; never reuse those here). Phase 6 consolidated the Phase
-        // 4 per-bucket family onto this single --stm-* family (ten category buckets + the io alias).
+        focus: "var(--c-focus)",
+
+        // --- Color-is-data families (NOT chrome) --------------------------
+        // The pinout map's electrical-class hues, on the pad fill only.
         "stm-io": "var(--stm-io)",
         "stm-gpio": "var(--stm-gpio)",
         "stm-analog": "var(--stm-analog)",
@@ -60,37 +88,32 @@ export default {
         "stm-boot": "var(--stm-boot)",
         "stm-vcap": "var(--stm-vcap)",
         "stm-nc": "var(--stm-nc)",
-        // Socket-union classification (COMPAT-02/03): a distinct three-value set from the pin hues.
+        // Socket-union classification: a distinct three-value set from the pin hues.
         "stm-classify-shared": "var(--stm-classify-shared)",
         "stm-classify-divergent": "var(--stm-classify-divergent)",
         "stm-classify-partial": "var(--stm-classify-partial)",
       },
       borderRadius: {
-        // North-star direction (owner decision 2026-07-17): the rounder card + control.
-        // Supersedes the earlier 8/6 lock; see docs/design/design-rules.md. Routed through CSS
-        // variables (defaults in styles/index.css) so dev mode can nudge them live.
+        // Windows engineering chrome is square. 2px is the whole budget.
         card: "var(--r-card)",
         control: "var(--r-control)",
       },
       fontFamily: {
-        // Work Sans (bundled offline via @fontsource-variable) is the interface
-        // face; Segoe UI / system-ui only cover a load failure.
-        sans: ['"Work Sans Variable"', '"Segoe UI"', "system-ui", "sans-serif"],
-        // The machine-data readout face: MPN, spec values, stock, prices, pins.
-        // Bundled offline; Cascadia/Consolas cover a load failure so columns still
-        // align. Reserved strictly for real machine values so mono re-acquires
-        // meaning (and gives tabular-figure alignment down a data grid).
+        // The Windows 11 system UI face, then the Windows 10 face, then two faces
+        // every Windows install has. Deliberately NO bundled webfont: a branded
+        // interface face is the single loudest tell that a desktop tool is really
+        // a web page, and it rasterises unlike every other window on the machine.
+        sans: ['"Segoe UI Variable"', '"Segoe UI"', "Tahoma", "Arial", "sans-serif"],
+        // Reserved for genuinely machine-oriented text: file paths, raw identifiers,
+        // hashes, net names, provider keys, diagnostic payloads. NOT MPNs, vendor
+        // names, descriptions, spec labels or ordinary values -- monospace only keeps
+        // its meaning while it stays the mark of text a machine wrote.
+        //
+        // Consolas leads to match Altium, which is where this app's user works; it
+        // ships with Windows, so the machine-data readout is the same face next door.
+        // Geist Mono is bundled offline for a peer with no Consolas (the host serves
+        // from an ephemeral local port, so a CDN font would fail outright).
         mono: [
-          // CONSOLAS LEADS, to match Altium (owner, 2026-07-26, superseding their own earlier Geist
-          // Mono pick: "the monospace font does not match Altium"). Consolas ships with Windows,
-          // which is where Altium runs, so on the machine where the two sit side by side the app's
-          // machine-data readout is the same face Altium uses. Being monospaced, its figures are
-          // tabular by construction - which is the whole reason a mono is used in this app.
-          //
-          // It deliberately does NOT travel: a peer on Linux or macOS has no Consolas and falls
-          // through to the BUNDLED Geist Mono below, which is offline-safe (the host serves from an
-          // ephemeral local port, so a CDN font would fail outright). That is the honest trade -
-          // match the tool where the tool exists, and never depend on a font that might not.
           "Consolas",
           '"Cascadia Mono"',
           '"Geist Mono Variable"',
@@ -99,38 +122,58 @@ export default {
         ],
       },
       fontSize: {
-        // Semantic roles are the preferred interface vocabulary. Numeric aliases
-        // remain while older surfaces migrate, but resolve to the same CSS authority.
-        "ui-meta": ["var(--fs-ui-meta)", { lineHeight: "1.4" }],
-        "ui-caption": ["var(--fs-ui-caption)", { lineHeight: "1.45" }],
-        "ui-body": ["var(--fs-ui-body)", { lineHeight: "1.45" }],
-        "ui-label": ["var(--fs-ui-label)", { lineHeight: "1.4" }],
-        "ui-heading": ["var(--fs-ui-heading)", { lineHeight: "1.35" }],
-        "ui-subtitle": ["var(--fs-ui-subtitle)", { lineHeight: "1.3" }],
-        "ui-title": [
-          "var(--fs-ui-title)",
-          { lineHeight: "1.12", letterSpacing: "-0.02em" },
-        ],
-        "2xs": ["var(--fs-2xs)", { lineHeight: "1.4" }],
-        xs: ["var(--fs-xs)", { lineHeight: "1.45" }],
-        sm: ["var(--fs-sm)", { lineHeight: "1.45" }],
-        base: ["var(--fs-base)", { lineHeight: "1.45" }],
-        lg: ["var(--fs-lg)", { lineHeight: "1.35" }],
-        xl: ["var(--fs-xl)", { lineHeight: "1.3" }],
-        title: ["var(--fs-title)", { lineHeight: "1.12", letterSpacing: "-0.02em" }],
+        // FOUR sizes, fixed, with fixed px leading. Nothing responds to the viewport:
+        // a desktop application's text does not resize with its window, the window
+        // resizes and shows more rows. See the scale note in styles/index.css.
+        //
+        // The role names below collapse onto those four steps. They are kept (rather
+        // than renamed) so every existing surface inherits the collapse instead of
+        // needing to be rewritten, and so `lib/classTokens.ts` keeps resolving.
+        "ui-mpn": ["var(--fs-ui-mpn)", { lineHeight: "var(--lh-ui-mpn)" }],
+        "ui-title": ["var(--fs-ui-title)", { lineHeight: "var(--lh-ui-title)" }],
+        "ui-subtitle": ["var(--fs-ui-subtitle)", { lineHeight: "var(--lh-ui-title)" }],
+        "ui-heading": ["var(--fs-ui-heading)", { lineHeight: "var(--lh-ui-title)" }],
+        "ui-label": ["var(--fs-ui-label)", { lineHeight: "var(--lh-ui-body)" }],
+        "ui-body": ["var(--fs-ui-body)", { lineHeight: "var(--lh-ui-body)" }],
+        "ui-caption": ["var(--fs-ui-caption)", { lineHeight: "var(--lh-ui-body)" }],
+        "ui-meta": ["var(--fs-ui-meta)", { lineHeight: "var(--lh-ui-meta)" }],
+        // Numeric aliases, resolving to the same authority.
+        "2xs": ["var(--fs-2xs)", { lineHeight: "var(--lh-ui-meta)" }],
+        xs: ["var(--fs-xs)", { lineHeight: "var(--lh-ui-body)" }],
+        sm: ["var(--fs-sm)", { lineHeight: "var(--lh-ui-body)" }],
+        base: ["var(--fs-base)", { lineHeight: "var(--lh-ui-body)" }],
+        lg: ["var(--fs-lg)", { lineHeight: "var(--lh-ui-title)" }],
+        xl: ["var(--fs-xl)", { lineHeight: "var(--lh-ui-title)" }],
+        title: ["var(--fs-title)", { lineHeight: "var(--lh-ui-title)" }],
       },
-      letterSpacing: {
-        tightui: "-0.008em",
+      fontWeight: {
+        // THREE weights. 400 states, 500 marks a control, 600 identifies. There is no
+        // 700 or 800 in this chrome: at 10-11px on a gray field a 700 reads as a
+        // smudge, not as emphasis, and a screen where six things are bold has no
+        // hierarchy at all. `bold` and heavier are deliberately REMAPPED rather than
+        // removed, so the ~200 existing `font-bold` / `font-semibold` sites land
+        // inside the budget without 112 files having to be edited.
+        thin: "400",
+        extralight: "400",
+        light: "400",
+        normal: "400",
+        medium: "500",
+        semibold: "600",
+        bold: "600",
+        extrabold: "600",
+        black: "600",
       },
       boxShadow: {
-        // Monochrome elevation scale (resting card, lifted/hover, pop layer).
+        // A resting panel is flat (border + 1px bevel). Only a genuinely floating
+        // surface casts a shadow, and it is small and tight, like a Win32 popup.
         card: "var(--shadow-card)",
         raise: "var(--shadow-raise)",
         pop: "var(--shadow-pop)",
         file: "var(--shadow-file)",
       },
       transitionTimingFunction: {
-        // a slight overshoot so presses + hovers feel springy, not linear
+        // Retained under its old name so existing `ease-spring` classes keep resolving,
+        // but the overshoot is gone: a desktop control settles, it does not bounce.
         spring: "var(--ease-spring)",
       },
     },
