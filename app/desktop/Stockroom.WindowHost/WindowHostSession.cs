@@ -47,6 +47,12 @@ internal interface IWindowHostController
         IReadOnlyList<string> readySelectors,
         IReadOnlyList<string> readyTexts);
 
+    IReadOnlyList<EdaApplication> DetectedEdaApplications();
+
+    void RevealDirectory(string root, string path);
+
+    void OpenFileWith(string applicationId, string root, string path);
+
     void Shutdown();
 }
 
@@ -120,6 +126,15 @@ internal sealed class WebViewWindowController : IWindowHostController
         IReadOnlyList<string> readyTexts) =>
         _host.ProviderDocumentState(leaseId, generation, readySelectors, readyTexts);
 
+    public IReadOnlyList<EdaApplication> DetectedEdaApplications() =>
+        _host.DetectedEdaApplications();
+
+    public void RevealDirectory(string root, string path) =>
+        _host.RevealDirectory(root, path);
+
+    public void OpenFileWith(string applicationId, string root, string path) =>
+        _host.OpenFileWith(applicationId, root, path);
+
     public void Shutdown() => _host.Shutdown();
 }
 
@@ -142,6 +157,14 @@ internal sealed class WindowHostSession
         "provider-refresh",
         "provider-state",
         "provider-document-state",
+        // The shell bridge. Three commands, each of which refuses more than it accepts: the host
+        // enumerates the EDA applications it can prove are installed, opens the file browser at a
+        // directory inside a root the backend resolved, and starts one of those proved
+        // applications on a file inside such a root. Nothing here takes a program path, and
+        // nothing here takes a path that has not been contained.
+        "eda-applications",
+        "shell-reveal",
+        "eda-open",
         "shutdown",
     ];
 
@@ -284,6 +307,8 @@ internal sealed class WindowHostSession
             and not "provider-current-url"
             and not "provider-refresh"
             and not "provider-state"
+            and not "shell-reveal"
+            and not "eda-open"
             && request.Payload.EnumerateObject().Any())
         {
             throw new WindowHostException(
@@ -308,6 +333,9 @@ internal sealed class WindowHostSession
             "provider-refresh" => ProviderRefresh(request),
             "provider-state" => ProviderState(request),
             "provider-document-state" => ProviderDocumentState(request),
+            "eda-applications" => EdaApplications(),
+            "shell-reveal" => ShellReveal(request),
+            "eda-open" => EdaOpen(request),
             "shutdown" => (
                 "stopping",
                 new Dictionary<string, object?>
@@ -643,6 +671,78 @@ internal sealed class WindowHostSession
                 lease.Generation,
                 selectors,
                 texts));
+    }
+
+    /// <summary>
+    /// What this machine can actually open a component in.
+    /// </summary>
+    /// <remarks>
+    /// The executable path is deliberately absent from the response. Python needs to know which
+    /// applications exist so a menu can offer them; it never needs to know where they live, and
+    /// keeping the binary inside this process is what stops "Open In..." from degenerating into a
+    /// command that starts an arbitrary program.
+    /// </remarks>
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        EdaApplications() =>
+        (
+            "eda-applications",
+            new Dictionary<string, object?>
+            {
+                ["applications"] = _controller
+                    .DetectedEdaApplications()
+                    .Select(static item => new Dictionary<string, object?>
+                    {
+                        ["id"] = item.Id,
+                        ["name"] = item.Name,
+                        ["version"] = item.Version,
+                    })
+                    .ToArray(),
+            });
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ShellReveal(HandoffMessage request)
+    {
+        HandoffCodec.RequireExactObject(
+            request.Payload,
+            "shell reveal",
+            "root",
+            "path");
+        _controller.RevealDirectory(
+            HandoffCodec.GetRequiredString(request.Payload, "root"),
+            HandoffCodec.GetRequiredString(request.Payload, "path"));
+        return (
+            "shell-revealed",
+            new Dictionary<string, object?>
+            {
+                ["revealed"] = true,
+            });
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        EdaOpen(HandoffMessage request)
+    {
+        HandoffCodec.RequireExactObject(
+            request.Payload,
+            "eda open",
+            "application_id",
+            "root",
+            "path");
+        _controller.OpenFileWith(
+            HandoffCodec.GetRequiredString(request.Payload, "application_id"),
+            HandoffCodec.GetRequiredString(request.Payload, "root"),
+            HandoffCodec.GetRequiredString(request.Payload, "path"));
+        return (
+            "eda-opened",
+            new Dictionary<string, object?>
+            {
+                ["opened"] = true,
+            });
     }
 
     private static IReadOnlyList<string> RequiredStringArray(

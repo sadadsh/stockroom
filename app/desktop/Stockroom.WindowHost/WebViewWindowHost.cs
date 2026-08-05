@@ -44,6 +44,7 @@ internal sealed class WebViewWindowHost : IDisposable
     private readonly Grid _providerContent;
     private readonly Dictionary<WebView2, ProviderLeaseIdentity> _providerPopups = [];
     private readonly ProviderLeaseJournal _providerLeases = new();
+    private readonly WindowsShellSurface _shell = new();
     private readonly TaskCompletionSource<bool> _navigationCompletion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly string _probeNonce;
@@ -646,6 +647,24 @@ internal sealed class WebViewWindowHost : IDisposable
                     };
             });
     }
+
+    /// <summary>
+    /// The EDA applications this machine really carries.
+    /// </summary>
+    /// <remarks>
+    /// Off the dispatcher on purpose: this reads the registry and the file system, touches no
+    /// WPF object, and is asked for while a menu is opening.
+    /// </remarks>
+    internal IReadOnlyList<EdaApplication> DetectedEdaApplications() =>
+        _shell.DetectedEdaApplications();
+
+    /// <summary>Open the file browser at a directory the backend resolved inside its own root.</summary>
+    internal void RevealDirectory(string root, string path) =>
+        _shell.RevealDirectory(root, path);
+
+    /// <summary>Start one detected EDA application on a file inside a backend-resolved root.</summary>
+    internal void OpenFileWith(string applicationId, string root, string path) =>
+        _shell.OpenFileWith(applicationId, root, path);
 
     internal void Shutdown()
     {
