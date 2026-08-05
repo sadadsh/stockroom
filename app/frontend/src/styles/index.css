@@ -2,52 +2,110 @@
 @tailwind components;
 @tailwind utilities;
 
-/* The mockup's near-black canvas with two soft radial highlights (library-v2.html
-   .scroll). Kept as plain CSS because it is a fixed page backdrop, not a token. */
 @layer base {
-  /* Dark is the default (:root); [data-theme="light"] overrides the same names.
-     The dark values are the mockup palette, so the dark app is byte-identical to
-     before the variable refactor. lib/theme.tsx flips the attribute. */
+  /* ------------------------------------------------------------------------
+     Windows desktop chrome tokens.
+
+     Dark is the default (:root); [data-theme="light"] overrides the same names,
+     so every surface flips on one attribute (lib/theme.tsx sets it).
+
+     Two rules govern this file:
+
+     1. CHROME IS GRAYSCALE. No hue anywhere in a surface, border, text tier,
+        control or focus ring. The only saturated tokens below are the three
+        status hues and the two color-is-data families (--cat-* component
+        thumbnails, --stm-* pinout pads), where color IS the datum and a
+        grayscale encoding would carry no information.
+     2. TEXT TIERS ARE OPAQUE. A secondary tier expressed as alpha compounds
+        against whatever it lands on and goes unreadable at 10-11px, so every
+        text token here is a solid hex measured against the surfaces it sits on.
+     ------------------------------------------------------------------------ */
   :root {
-    /* A readable elevation ladder (design principle: structure reads through depth,
-       not borders). Four distinct steps on a cool near-black so the nav, the list, and
-       the detail cards separate into real layers instead of one flat grey field.
-       canvas (deepest) < rail/panel < raise (card) < raise2 (hover/selected). */
-    --c-canvas: #242427;
-    --c-rail: rgba(255, 255, 255, 0.032);
-    --c-surface: rgba(255, 255, 255, 0.016);
-    --c-raise: rgba(255, 255, 255, 0.07);
-    --c-raise2: rgba(255, 255, 255, 0.135);
-    --c-field: rgba(0, 0, 0, 0.28);
-    --c-line: rgba(255, 255, 255, 0.07);
-    --c-line2: rgba(255, 255, 255, 0.13);
-    --c-popover: #33333a;
-    /* the chrome band: panel title strips, modal headers, sticky table headers, and the
-       bottom status bar. OPAQUE by contract -- it backs sticky headers that scrolling
-       rows pass beneath, so a translucent value would let content bleed through. Sits
-       one step above canvas and below popover, so it reads as chrome on the canvas and
-       as a header strip inside a popover. */
-    --c-band: #2b2b30;
-    --c-t1: #f4f4f4;
-    --c-t2: rgba(244, 244, 244, 0.66);
-    /* Helper copy is still quiet, but it is text, not decoration. This solid
-       tier clears 4.5:1 against canvas, band, popover, and raised surfaces. */
-    --c-t3: #aaaab0;
+    /* --- Surfaces ---------------------------------------------------------
+       A shallow ladder, the way a Windows tool window is built: the frame is
+       darkest, the workspace sits on it, a panel sits on the workspace, a
+       section groups inside the panel. Steps are small (5-8 points of value)
+       because separation comes from the 1px border, not from a big value jump. */
+    --c-app: #353535;
+    --c-canvas: #3b3b3b;
+    --c-rail: #353535;
+    --c-surface: #404040;
+    --c-raise: #404040;
+    --c-raise2: #484848;
+    --c-section: #484848;
+    --c-active: #585858;
+    /* an input well, recessed below the panel it sits in */
+    --c-field: #2f2f2f;
+    /* Floating menus and popovers. One step off the panel so a menu reads as
+       lifted, and dark enough that --c-t3 clears 4.5:1 on it (measured: 4.60). */
+    --c-popover: #3e3e3e;
+    /* the chrome band: panel title strips, modal headers, sticky table headers,
+       the bottom status bar. OPAQUE by contract, since scrolling rows pass
+       beneath it. */
+    --c-band: #353535;
+    /* the recessed well an asset render sits in (Part Canvas). Opaque: the
+       former alpha value stacked differently on every parent it appeared over. */
+    --c-stage: #2f2f2f;
+    /* a sticky header strip. Opaque, so nothing needs backdrop blur to be legible. */
+    --c-sticky: #353535;
+    /* The technical drawing canvas (symbol / footprint / dimension sheets). Paper,
+       not chrome, and identical in both themes: an engineering drawing does not
+       invert when the application chrome does. */
+    --c-technical: #f5f5f2;
+
+    /* --- Controls ---------------------------------------------------------
+       A push button is a 1px bevel over a two-stop fill, not a floating card. */
+    --c-control-top: #555555;
+    --c-control-bottom: #464646;
+    --c-control-hover: #5d5d5d;
+    --c-control-pressed: #3e3e3e;
+    --c-selected: #626262;
+    --c-selected-hover: #696969;
+
+    /* --- Borders ----------------------------------------------------------
+       Three weights: a dark groove under a raised edge, the ordinary hairline,
+       and the light bevel on top of it. */
+    --c-line-dark: #222222;
+    --c-line: #353535;
+    --c-line2: #585858;
+    --c-edge: #666666;
+    --edge-hi: rgba(255, 255, 255, 0.05);
+
+    /* --- Text tiers (five, and only five) ---------------------------------
+       primary   canonical identifiers, selected values, current document names
+       secondary manufacturer description and name, provider names
+       label     property labels, table headers, static field names
+       muted     timestamps, retrieval info, file metadata, supplementary notes
+       disabled  unavailable controls and values
+       Each is an opaque hex. Measured against --c-canvas / --c-band / --c-popover
+       (the three surfaces small text lands on) by styles/visualLanguage.test.ts. */
+    --c-t1: #ececec;
+    --c-t2: #c4c4c4;
+    --c-t3: #aaaaaa;
+    --c-t4: #929292;
+    --c-t5: #747474;
     --c-text-primary: var(--c-t1);
     --c-text-secondary: var(--c-t2);
+    --c-text-label: var(--c-t3);
+    --c-text-muted: var(--c-t4);
+    --c-text-disabled: var(--c-t5);
+    /* Retained alias: `text-helper` predates the five-tier vocabulary and resolves
+       to the label tier, which is the role it always carried. */
     --c-text-helper: var(--c-t3);
-    --c-ok: #5fd39a;
-    --c-warn: #e0b354;
-    --c-err: #e8756c;
-    /* Semantic colors used as small text on popovers. Keep these separate from
-       the surface/border tokens above: the error surface hue is intentionally
-       quieter, while 2xs route labels must clear WCAG AA against --c-popover. */
-    --c-ok-text: #5fd39a;
-    --c-warn-text: #e0b354;
-    --c-err-text: #f58b83;
-    /* Category hues (FIX-03): a subtle, distinct tint per component family so the list-row
-       fallback thumbnails read apart at a glance. Dark-theme values sit light enough (L ~62-70%)
-       to clear >=3:1 against the recessed near-black tile; the light theme darkens them below. */
+
+    /* --- Status -----------------------------------------------------------
+       The only hues in chrome, and they are hues because the state IS the datum.
+       Desaturated toward the gray field so a status reads as a state, not a badge. */
+    --c-ok: #7cb98f;
+    --c-warn: #cfa14f;
+    --c-err: #d9776e;
+    --c-ok-text: #8ec9a0;
+    --c-warn-text: #dcae5e;
+    --c-err-text: #f69c93;
+
+    /* --- Category hues (color-is-data, NOT chrome) ------------------------
+       A per-family tint on the parts list' fallback thumbnails, so component
+       families read apart at a glance. A separate taxonomy from --stm-* below. */
     --cat-resistor: #e0a24a;
     --cat-capacitor: #5aa9f0;
     --cat-inductor: #4fc9a8;
@@ -55,16 +113,10 @@
     --cat-connector: #b58cf0;
     --cat-crystal: #4fc3dd;
     --cat-ic: #8a9cf0;
-    /* STM pin color-is-data family (VIZ-02) — the ONE token family for the pinout map's
-       electrical-class/category encoding axis (Phase 6 consolidation: this supersedes and renames
-       the Phase 4 per-bucket family; there is no longer a parallel set). A SEPARATE taxonomy from
-       the --cat-* BOM-component families above; color is the data on the pinout map, so these run
-       saturated on the pad fill only (never a surface tint). The ten API category buckets plus the
-       legacy io electrical_class (which the API only emits pre-split; it reads as plain gpio). Each
-       verified >=3:1 against the card/stage background in BOTH themes (dark values here sit light
-       for the near-black well). io/gpio is the calmest (most pins carry it); power is hot; ground a
-       cool desaturated reference; reset amber; boot violet; vcap teal; nc the quietest inert grey;
-       analog chartreuse; debug magenta; oscillator the crystal cyan. Measured 3.4-9.3 both themes. */
+
+    /* --- STM pin classes (color-is-data, NOT chrome) ----------------------
+       The pinout map's electrical-class encoding, on the pad fill only. Each
+       verified >=3:1 against the recessed stage in both themes. */
     --stm-io: #5aa9f0;
     --stm-gpio: #5aa9f0;
     --stm-analog: #9ecf63;
@@ -76,82 +128,82 @@
     --stm-boot: #b58cf0;
     --stm-vcap: #4fc9a8;
     --stm-nc: #9a8f99;
-    /* Socket-union classification (COMPAT-02/03) — a DISTINCT three-value token set from the
-       electrical-class hues above, because classification encodes a different fact (do a pin's
-       identities agree across a set). Tuned to the shipped compatEncoding semantic: shared reads
-       as the calm positive green, divergent the warm amber that asks for attention, partial the
-       quiet cool grey of an absent position. Each clears >=3:1 on the recessed dark tile. */
     --stm-classify-shared: #5fd39a;
     --stm-classify-divergent: #e0b354;
     --stm-classify-partial: #7f8794;
-    /* Neutral accent (design principle: restraint — no brand hue; craft carries it).
-       Near-white on dark, on the primary action, focus, active nav, selected row,
-       section ticks, links. `acc-strong` is the loud neutral, `acc-soft` its wash. */
-    --c-acc: #f4f4f5;
-    --c-acc-on: #141414;
-    --c-acc-strong: #ffffff;
-    --c-acc-soft: rgba(255, 255, 255, 0.11);
-    /* the soft studio glow under a lit hero specimen */
-    --c-hero-glow: rgba(255, 255, 255, 0.09);
-    /* Monochrome elevation. Each raised surface casts a soft shadow AND carries a
-       hairline top highlight (the inset line), so it reads as lifted off the
-       canvas instead of painted on it. Three steps: a resting card, a lifted/hover
-       card, and the pop layer for menus + the Add A Part window. */
-    --edge-hi: rgba(255, 255, 255, 0.10);
-    --shadow-card: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(0, 0, 0, 0.5),
-      0 6px 18px rgba(0, 0, 0, 0.42);
-    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(0, 0, 0, 0.5),
-      0 16px 38px rgba(0, 0, 0, 0.44);
-    --shadow-pop: inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(0, 0, 0, 0.4),
-      0 28px 64px rgba(0, 0, 0, 0.62);
-    --shadow-file: 0 6px 20px rgba(0, 0, 0, 0.16);
-    /* the springy easing used for tactile press + hover lift across controls */
-    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
-    /* page backdrop + chrome that lives outside the token classes: two soft neutral
-       highlights over a near-black base so the window reads lit, not flat. */
-    --body-bg: #202023;
-    --root-bg: #242427;
-    --sb-thumb: rgba(255, 255, 255, 0.13);
-    --sb-thumb-hover: rgba(255, 255, 255, 0.22);
-    --sb-track: rgba(255, 255, 255, 0.14);
-    /* subtle row hover + the sticky category header band + the ring track */
-    --c-hover: rgba(255, 255, 255, 0.03);
-    --c-sticky: rgba(36, 36, 39, 0.8);
-    --c-ring-track: #26272c;
-    /* the recessed "specimen chamber" an asset render sits in (Part Canvas): a
-       darker inset than the card so the 3D model / symbol / footprint read as lit
-       objects in a well, not painted on the surface. Theme-aware. */
-    --c-stage: rgba(0, 0, 0, 0.26);
-    /* the file-card line art (Symbol/Footprint/3D): each keeps its exact
-       pre-refactor dark value, so the dark app stays byte-identical. */
-    --c-icon-line: #8f8f8f;
-    --c-icon-fill: #858585;
-    --c-icon-cube: #8d8d8d;
-    --c-icon-edge: #4f4f4f;
-    --c-icon-faint: #cbcbcb;
 
-    /* --- Shape (theme-agnostic) -------------------------------------------------
-       The Altium Dark/Light Gray regrounding (204b921, 2026-07-23) is the CURRENT
-       direction: near-square chrome, card 3 / control 2. It supersedes BOTH the 8/6
-       lock and the rounder card-14 / control-8 north-star that docs/design/design-rules.md
-       still describes -- that note predates the Altium switch by six days and is stale.
-       Do not "restore" 14/8 from it; a rounded card reads as a different application. */
-    --r-card: 3px;
+    /* --- Accent and focus -------------------------------------------------
+       There is no brand hue. The "accent" is the loud neutral used on a primary
+       action and a selected row; focus is its own token so a focus ring is
+       never confused with a selection, and is deliberately NOT blue. */
+    --c-acc: #d6d6d6;
+    --c-acc-on: #1c1c1c;
+    --c-acc-strong: #ffffff;
+    --c-acc-soft: rgba(255, 255, 255, 0.1);
+    --c-focus: #f2f2f2;
+    --c-hover: rgba(255, 255, 255, 0.045);
+    --c-ring-track: #2f2f2f;
+
+    /* --- Elevation --------------------------------------------------------
+       A resting panel is FLAT: a border and a 1px top bevel, no drop shadow.
+       Only a genuinely floating surface (menu, dialog, dragged file card) casts
+       one, and it is small and tight, the way a Win32 popup does. */
+    --shadow-card: inset 0 1px 0 var(--edge-hi);
+    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.45);
+    --shadow-file: 0 1px 3px rgba(0, 0, 0, 0.3);
+
+    /* A plain material easing. The former spring overshoot made every press and
+       hover bounce, which is a web-app tell; a desktop control settles. */
+    --ease-spring: cubic-bezier(0.2, 0, 0.2, 1);
+
+    --body-bg: #353535;
+    --root-bg: #3b3b3b;
+    --sb-thumb: #5a5a5a;
+    --sb-thumb-hover: #6b6b6b;
+    --sb-track: #2f2f2f;
+
+    /* the file-card line art (Symbol / Footprint / 3D) */
+    --c-icon-line: #9a9a9a;
+    --c-icon-fill: #8d8d8d;
+    --c-icon-cube: #9a9a9a;
+    --c-icon-edge: #5a5a5a;
+    --c-icon-faint: #c4c4c4;
+
+    /* --- Shape (theme-agnostic) ------------------------------------------
+       Windows engineering chrome is square. 2px is the whole budget: enough to
+       stop a control looking like a bare rectangle, not enough to read as a card. */
+    --r-card: 2px;
     --r-control: 2px;
 
-    /* --- Semantic compact type scale (theme-agnostic) ---------------------------
-       Every interface role has one named token. Each clamp moves only half to one
-       pixel between the supported 1024px and 1600px workstations, preserving the
-       owner's compact density without the former sub-10px microcopy or an unrelated
-       inherited body size. The legacy aliases keep older components on this same
-       authority while surfaces migrate to the role names. */
-    --fs-ui-meta: clamp(10px, calc(10px + (100vw - 1024px) * 0.000868), 10.5px);
-    --fs-ui-caption: clamp(10.5px, calc(10.5px + (100vw - 1024px) * 0.000868), 11px);
-    --fs-ui-body: clamp(11px, calc(11px + (100vw - 1024px) * 0.000868), 11.5px);
-    --fs-ui-label: clamp(11.5px, calc(11.5px + (100vw - 1024px) * 0.000868), 12px);
-    --fs-ui-heading: clamp(13px, calc(13px + (100vw - 1024px) * 0.000868), 13.5px);
-    --fs-ui-subtitle: clamp(14px, calc(14px + (100vw - 1024px) * 0.000868), 14.5px);
-    --fs-ui-title: clamp(16px, calc(16px + (100vw - 1024px) * 0.001736), 17px);
+    /* --- Type scale (theme-agnostic, FIXED) -------------------------------
+       Four sizes, three weights, and no viewport response. The former scale used
+       clamp() against the 1024-1600px range, which meant the same label rendered
+       at a different size on two of the owner's own windows and no two surfaces
+       could be compared. A desktop application's text does not resize with its
+       window; the window resizes and shows more rows.
+
+         14px / 600 / 18px   the canonical component MPN, and nothing else
+         13px / 600 / 18px   a dialog or viewer title
+         11px / 400-600 / 15px  panel and section titles, rows, values, controls
+         10px / 400-600 / 14px  property labels, table headers, metadata, status
+
+       The numeric names (meta/caption/body/label/heading/subtitle/title) predate
+       this collapse and are kept so every existing surface inherits the fix; they
+       now resolve onto the four steps above rather than onto seven of their own. */
+    --fs-ui-mpn: 14px;
+    --fs-ui-title: 13px;
+    --fs-ui-subtitle: 13px;
+    --fs-ui-heading: 13px;
+    --fs-ui-label: 11px;
+    --fs-ui-body: 11px;
+    --fs-ui-caption: 11px;
+    --fs-ui-meta: 10px;
+
+    --lh-ui-mpn: 18px;
+    --lh-ui-title: 18px;
+    --lh-ui-body: 15px;
+    --lh-ui-meta: 14px;
 
     --fs-2xs: var(--fs-ui-meta);
     --fs-xs: var(--fs-ui-caption);
@@ -163,34 +215,57 @@
   }
 
   :root[data-theme="light"] {
-    --c-canvas: #e9eaee;
-    --c-rail: rgba(255, 255, 255, 0.5);
-    --c-surface: rgba(255, 255, 255, 0.66);
-    --c-raise: #ffffff;
-    --c-raise2: rgba(0, 0, 0, 0.08);
-    --c-field: rgba(0, 0, 0, 0.05);
-    --c-line: rgba(0, 0, 0, 0.1);
-    --c-line2: rgba(0, 0, 0, 0.16);
-    --c-popover: #ffffff;
-    /* light chrome band: reads as a header strip against the white card/popover and as
-       chrome against the grey canvas. Opaque, per the dark-side contract above. */
-    --c-band: #e2e4e9;
-    --c-t1: #17181b;
-    --c-t2: rgba(23, 24, 27, 0.68);
-    /* 4.79:1 or better against the light theme's palest supported text surface. */
-    --c-t3: #606268;
+    /* The same ladder inverted: a light Windows tool window is a warm-neutral
+       frame with near-white panels and a genuinely white input well. */
+    --c-app: #eaeaea;
+    --c-canvas: #f0f0f0;
+    --c-rail: #eaeaea;
+    --c-surface: #f5f5f5;
+    --c-raise: #f5f5f5;
+    --c-raise2: #e4e4e4;
+    --c-section: #e4e4e4;
+    --c-active: #d6d6d6;
+    --c-field: #ffffff;
+    --c-popover: #f7f7f7;
+    --c-band: #e2e2e2;
+    --c-stage: #dcdcdc;
+    --c-sticky: #e2e2e2;
+    /* Paper is paper in both themes. */
+    --c-technical: #f5f5f2;
+
+    --c-control-top: #fdfdfd;
+    --c-control-bottom: #e6e6e6;
+    --c-control-hover: #eaeaea;
+    --c-control-pressed: #d4d4d4;
+    --c-selected: #cfcfcf;
+    --c-selected-hover: #c6c6c6;
+
+    --c-line-dark: #a0a0a0;
+    --c-line: #c8c8c8;
+    --c-line2: #b4b4b4;
+    --c-edge: #ffffff;
+    --edge-hi: rgba(255, 255, 255, 0.9);
+
+    --c-t1: #1c1c1c;
+    --c-t2: #3d3d3d;
+    --c-t3: #5a5a5a;
+    --c-t4: #6e6e6e;
+    --c-t5: #9a9a9a;
     --c-text-primary: var(--c-t1);
     --c-text-secondary: var(--c-t2);
+    --c-text-label: var(--c-t3);
+    --c-text-muted: var(--c-t4);
+    --c-text-disabled: var(--c-t5);
     --c-text-helper: var(--c-t3);
-    --c-ok: #2f9e63;
-    --c-warn: #a9761b;
-    --c-err: #cf4a40;
-    /* Small semantic text on the white popover; each clears 4.5:1 without
-       changing the gentler semantic fills and borders used across the app. */
-    --c-ok-text: #267c4d;
-    --c-warn-text: #815609;
-    --c-err-text: #b8322a;
-    /* Category hues (FIX-03), darkened (L ~34-45%) so they clear >=3:1 against the light tile. */
+
+    --c-ok: #2f7d4c;
+    --c-warn: #8a6115;
+    --c-err: #b53c33;
+    --c-ok-text: #256b40;
+    --c-warn-text: #74510f;
+    --c-err-text: #a2332a;
+
+    /* Category hues darkened so each clears >=3:1 on the light tile. */
     --cat-resistor: #b6710f;
     --cat-capacitor: #1f6fc4;
     --cat-inductor: #12876a;
@@ -198,8 +273,7 @@
     --cat-connector: #7a45c2;
     --cat-crystal: #147d97;
     --cat-ic: #4a5bc0;
-    /* STM pin color-is-data family (VIZ-02), darkened so each clears >=3:1 against the white
-       light card. Same taxonomy/order as the dark block above (Phase 6 consolidated family). */
+
     --stm-io: #1f6fc4;
     --stm-gpio: #1f6fc4;
     --stm-analog: #55801c;
@@ -211,46 +285,37 @@
     --stm-boot: #7a45c2;
     --stm-vcap: #12876a;
     --stm-nc: #6a5f68;
-    /* Socket-union classification (COMPAT-02/03), darkened for the white light card. Same
-       shared/divergent/partial semantic as the dark block. */
     --stm-classify-shared: #2f9e63;
     --stm-classify-divergent: #a9761b;
     --stm-classify-partial: #66606e;
-    /* Neutral accent: near-black on light. */
-    --c-acc: #1b1b1e;
+
+    --c-acc: #303030;
     --c-acc-on: #f5f5f5;
-    --c-acc-strong: #1b1b1e;
-    --c-acc-soft: rgba(0, 0, 0, 0.11);
-    --c-hero-glow: rgba(0, 0, 0, 0.05);
-    /* Light elevation: a bright top edge (the crisp highlight a lit panel has)
-       over soft, low-opacity shadows. */
-    --edge-hi: rgba(255, 255, 255, 0.9);
-    --shadow-card: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(17, 18, 20, 0.06),
-      0 4px 14px rgba(17, 18, 20, 0.07);
-    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(17, 18, 20, 0.09),
-      0 14px 30px rgba(17, 18, 20, 0.11);
-    --shadow-pop: inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(17, 18, 20, 0.1),
-      0 28px 64px rgba(17, 18, 20, 0.2);
-    --shadow-file: 0 6px 20px rgba(0, 0, 0, 0.08);
-    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
-    --body-bg: #dfe0e4;
-    --root-bg: #e9eaee;
-    --sb-thumb: rgba(0, 0, 0, 0.2);
-    --sb-thumb-hover: rgba(0, 0, 0, 0.32);
-    --sb-track: rgba(0, 0, 0, 0.16);
-    --c-hover: rgba(0, 0, 0, 0.04);
-    --c-sticky: rgba(233, 234, 238, 0.85);
-    --c-ring-track: #dfe0e3;
-    /* 0.045 measured 1.12:1 against its pane in LIGHT theme, so the three empty asset tiles
-       read as blank space rather than as slots awaiting a file. Deepened on the owner's
-       decision, to the alpha that MEASURES the agreed target rather than one that looked
-       deeper: near-white ratios compress hard, so 0.045 -> 0.09 only reached 1.20:1 and
-       reaching 1.6:1 takes 0.214. DARK is untouched at 0.26, where it already reads. */
-    --c-stage: rgba(17, 18, 20, 0.214);
-    --c-icon-line: #6f6f6f;
+    --c-acc-strong: #1c1c1c;
+    /* Selection must read as selection, not as a hover that stuck: the build's
+       token gate holds --c-acc-soft above 0.1 and above twice --c-hover. */
+    --c-acc-soft: rgba(0, 0, 0, 0.12);
+    --c-focus: #141414;
+    --c-hover: rgba(0, 0, 0, 0.045);
+    --c-ring-track: #d6d6d6;
+
+    --shadow-card: inset 0 1px 0 var(--edge-hi);
+    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(20, 22, 26, 0.12);
+    --shadow-pop: 0 2px 8px rgba(20, 22, 26, 0.18);
+    --shadow-file: 0 1px 3px rgba(20, 22, 26, 0.12);
+
+    --ease-spring: cubic-bezier(0.2, 0, 0.2, 1);
+
+    --body-bg: #eaeaea;
+    --root-bg: #f0f0f0;
+    --sb-thumb: #c0c0c0;
+    --sb-thumb-hover: #a8a8a8;
+    --sb-track: #eaeaea;
+
+    --c-icon-line: #5f5f5f;
     --c-icon-fill: #6f6f6f;
-    --c-icon-cube: #6f6f6f;
-    --c-icon-edge: #b3b3b3;
+    --c-icon-cube: #5f5f5f;
+    --c-icon-edge: #a8a8a8;
     --c-icon-faint: #6f6f6f;
   }
 
@@ -267,32 +332,41 @@
   body {
     background: var(--body-bg);
     color: var(--c-t1);
-    font-family: "Work Sans Variable", "Segoe UI", system-ui, sans-serif;
-    font-size: var(--fs-base);
-    line-height: 1.5;
-    letter-spacing: -0.008em;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
+    /* The Windows 11 system UI face, with the Windows 10 face and the two faces
+       every Windows install has behind it. No bundled/branded face: a webfont in
+       application chrome is what makes a desktop tool read as a web dashboard,
+       and it renders differently from every other window on the machine. */
+    font-family: "Segoe UI Variable", "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: var(--fs-ui-body);
+    line-height: var(--lh-ui-body);
+    /* No global negative tracking: it was set for a display face at large sizes and
+       was being applied to 10px labels, where it closes the counters and turns dense
+       columns into gray bars. Segoe is spaced for UI at these sizes already. */
+    letter-spacing: normal;
+    /* No -webkit-font-smoothing / text-rendering override. Forcing antialiasing off
+       the platform default thins small Windows text and defeats the ClearType-style
+       rasterisation the rest of the desktop uses, which is exactly the difference
+       between "an application" and "a page". */
   }
   #root {
     background: var(--root-bg);
   }
 
-  /* clean, unobtrusive scrollbars (from the mockup) */
+  /* Square, opaque scrollbars: a desktop scrollbar is a track and a thumb. */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--sb-track) transparent;
+    scrollbar-color: var(--sb-thumb) var(--sb-track);
   }
   *::-webkit-scrollbar {
-    width: 11px;
-    height: 11px;
+    width: 12px;
+    height: 12px;
   }
   *::-webkit-scrollbar-track {
-    background: transparent;
+    background: var(--sb-track);
   }
   *::-webkit-scrollbar-thumb {
     background: var(--sb-thumb);
-    border-radius: 8px;
+    border-radius: 0;
     border: 3px solid transparent;
     background-clip: padding-box;
   }
@@ -309,7 +383,206 @@
   }
 }
 
-/* tabular figures for stock counts and prices */
+/* ==============================================================================
+   Semantic typography roles.
+
+   One class per interface role, each pinning size, weight, line-height and text
+   tier together. They exist because the alternative -- every feature component
+   assembling its own hierarchy out of `text-xs font-semibold text-t1` -- is what
+   produced a screen where the MPN, the generated name, the manufacturer blurb,
+   the metadata, the statuses and the actions all carried the same authority.
+
+   Declared in @layer components so a caller can still override a single property
+   with a utility (`ui-property-value text-right`) without a specificity fight, and
+   so the whole block participates in Tailwind's ordering. The class names appear
+   as literals in components/typography.tsx, which is what keeps the content
+   scanner from purging them.
+   ============================================================================== */
+@layer components {
+  /* The canonical manufacturer part number: the one thing on an opened component
+     that outranks everything else, and the only 14px in the normal workspace. */
+  .ui-component-mpn {
+    font-size: var(--fs-ui-mpn);
+    font-weight: 600;
+    line-height: var(--lh-ui-mpn);
+    color: var(--c-text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A dialog, viewer or modal title. One step under the MPN. */
+  .ui-dialog-title {
+    font-size: var(--fs-ui-title);
+    font-weight: 600;
+    line-height: var(--lh-ui-title);
+    color: var(--c-text-primary);
+  }
+
+  /* The manufacturer's own description of the part: prose, and secondary. It is
+     not an identifier, so it does not get identifier weight or identifier colour. */
+  .ui-component-description {
+    font-size: var(--fs-ui-body);
+    font-weight: 400;
+    line-height: var(--lh-ui-body);
+    color: var(--c-text-secondary);
+  }
+
+  /* Retrieval info, timestamps, provider fetch notes under a component. */
+  .ui-component-metadata {
+    font-size: var(--fs-ui-meta);
+    font-weight: 400;
+    line-height: var(--lh-ui-meta);
+    color: var(--c-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A headline value the user came to read (package, stock, unit price). */
+  .ui-key-fact {
+    font-size: var(--fs-ui-body);
+    font-weight: 600;
+    line-height: var(--lh-ui-body);
+    color: var(--c-text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The title strip of a docked panel or a list column. */
+  .ui-panel-title {
+    font-size: var(--fs-ui-body);
+    font-weight: 600;
+    line-height: 16px;
+    color: var(--c-text-primary);
+  }
+
+  /* A heading inside a panel, grouping the rows beneath it. */
+  .ui-section-title {
+    font-size: var(--fs-ui-body);
+    font-weight: 600;
+    line-height: var(--lh-ui-body);
+    color: var(--c-text-primary);
+  }
+
+  /* The static name of a field in a property grid. Never bold, never uppercase:
+     a label that shouts competes with the value it introduces. */
+  .ui-property-label {
+    font-size: var(--fs-ui-meta);
+    font-weight: 500;
+    line-height: var(--lh-ui-meta);
+    color: var(--c-text-label);
+  }
+
+  /* The value beside that label. Left-aligned by default; numeric values opt in
+     to right alignment via .ui-numeric so a column of figures lines up. */
+  .ui-property-value {
+    font-size: var(--fs-ui-body);
+    font-weight: 400;
+    line-height: var(--lh-ui-body);
+    color: var(--c-text-primary);
+    text-align: left;
+  }
+
+  /* Where a value came from: a provider name, a datasheet, a library. */
+  .ui-source-text {
+    font-size: var(--fs-ui-body);
+    font-weight: 400;
+    line-height: var(--lh-ui-body);
+    color: var(--c-text-secondary);
+  }
+
+  /* A status is a STATE, not a control. No border, no fill, no pointer, no press
+     and no focus ring: those all say "click me", and a status cannot be clicked.
+     The tone colour is applied on top by the caller. */
+  .ui-status-text {
+    font-size: var(--fs-ui-meta);
+    font-weight: 500;
+    line-height: var(--lh-ui-meta);
+    color: var(--c-text-label);
+    cursor: default;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  /* A table column header. Sentence case; the weight does the separating. */
+  .ui-table-header {
+    font-size: var(--fs-ui-meta);
+    font-weight: 600;
+    line-height: var(--lh-ui-meta);
+    color: var(--c-text-label);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  /* The identifying text of a list row (the MPN in the parts list). */
+  .ui-row-primary {
+    font-size: var(--fs-ui-body);
+    font-weight: 600;
+    line-height: var(--lh-ui-body);
+    color: var(--c-text-primary);
+  }
+
+  /* The supporting text on the same row (manufacturer, description). */
+  .ui-row-secondary {
+    font-size: var(--fs-ui-body);
+    font-weight: 400;
+    line-height: var(--lh-ui-body);
+    color: var(--c-text-secondary);
+  }
+
+  /* Counts, dates and sizes trailing a row. */
+  .ui-row-metadata {
+    font-size: var(--fs-ui-meta);
+    font-weight: 400;
+    line-height: var(--lh-ui-meta);
+    color: var(--c-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* An item in a menu or a context menu. */
+  .ui-menu-label {
+    font-size: var(--fs-ui-body);
+    font-weight: 400;
+    line-height: var(--lh-ui-body);
+    color: var(--c-text-primary);
+  }
+
+  /* The text on or beside a control (button, checkbox, field caption). */
+  .ui-control-label {
+    font-size: var(--fs-ui-body);
+    font-weight: 500;
+    line-height: var(--lh-ui-meta);
+    color: var(--c-text-primary);
+  }
+
+  /* --- Modifiers ---------------------------------------------------------- */
+
+  /* A value that is unavailable, not merely quiet. */
+  .ui-disabled {
+    color: var(--c-text-disabled);
+  }
+
+  /* Figures that belong in a column: stock, prices, quantities, price breaks.
+     Tabular figures plus right alignment, so digits stack on the decimal. */
+  .ui-numeric {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  /* Genuinely machine-oriented text: file paths, raw identifiers, hashes, net
+     names, provider keys, diagnostic payloads. NOT MPNs, manufacturer names,
+     descriptions, spec labels or ordinary values -- monospace only keeps its
+     meaning if it is reserved for text a machine, not a person, wrote. */
+  .ui-machine-text {
+    font-family: Consolas, "Cascadia Mono", "Geist Mono Variable", ui-monospace, monospace;
+    font-size: var(--fs-ui-body);
+    font-weight: 400;
+    line-height: var(--lh-ui-body);
+    color: var(--c-text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* tabular figures for stock counts, prices, dates and measurements */
 .tnum {
   font-variant-numeric: tabular-nums;
 }
