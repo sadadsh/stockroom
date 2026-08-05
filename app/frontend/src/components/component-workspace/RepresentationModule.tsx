@@ -103,27 +103,31 @@ export function RepresentationModule({
       aria-label={label}
       className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border border-line bg-raise"
     >
+      {/* The name and the status are what this header is FOR, so neither shrinks. The tool chooser
+          takes what is left: a native `<select>` sizes itself to its widest option and used to hold
+          111px of a 176px column at 960, which truncated the title to a single letter. A letter is
+          not a label. */}
       <div className="flex flex-none items-center gap-2 border-b border-line px-2.5 py-1.5">
         <button
           type="button"
           data-dev-id="component-browser.representation-title"
           data-representation-control="true"
           onClick={onFocusKind}
-          className="min-w-0 truncate rounded-control text-xs font-semibold text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+          className="flex-none whitespace-nowrap rounded-control text-xs font-semibold text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
         >
           {label}
         </button>
-        <Badge size="sm" tone={statusTone(status)}>
+        <Badge size="sm" tone={statusTone(status)} className="flex-none whitespace-nowrap">
           {status}
         </Badge>
-        <span className="ml-auto flex-none">
+        <span className="flex min-w-0 flex-1 justify-end">
           {view.tools.length > 1 ? (
             <select
               data-dev-id="component-browser.representation-tool"
               aria-label={`${label} tool`}
               value={effectiveTool(view, selectedTool)}
               onChange={(event) => onSelectTool(event.target.value)}
-              className="h-6 rounded-control border border-line bg-field px-1.5 text-2xs text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+              className="h-6 max-w-full rounded-control border border-line bg-field px-1.5 text-2xs text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
             >
               {view.tools.map((tool) => (
                 <option key={tool.tool} value={tool.tool}>
@@ -132,7 +136,7 @@ export function RepresentationModule({
               ))}
             </select>
           ) : (
-            <span className="text-2xs text-t3">{view.tools[0]?.toolLabel ?? noTool}</span>
+            <span className="truncate text-2xs text-t3">{view.tools[0]?.toolLabel ?? noTool}</span>
           )}
         </span>
       </div>
