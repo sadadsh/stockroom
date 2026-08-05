@@ -22,15 +22,20 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
-import { useCadSourceQuery, useSetProviderCoverage } from "../../api/queries";
+import {
+  useCadSourceQuery,
+  useSetProviderCoverage,
+  useWriteCadPreference,
+} from "../../api/queries";
 import { invalidatePartCadProjection } from "../../api/partCadProjectionQueries";
 import type { ProviderOutcome, ProviderOutcomeStatus, Requirement } from "../../api/types";
 import type {
+  CadPreferenceView,
   ComponentIdentityView,
   ComponentProvidersView,
   CoverageArtifact,
   ProviderCoverageRow,
-} from "../../api/workspaceTypes";
+} from "../../api/dossierTypes";
 import { captureInFlight, useCapture, REQ_LABELS } from "../../lib/capture";
 import { useGuidedCapture } from "../../lib/useGuidedCapture";
 import { pickHostFiles } from "../../lib/hostFilePicker";
@@ -129,11 +134,14 @@ export function CompleteComponentSheet({
   componentId,
   identity,
   providers,
+  preference,
   onClose,
 }: {
   componentId: string;
   identity: ComponentIdentityView;
   providers: ComponentProvidersView;
+  /** What is in force and what each choice would replace, already planned by the backend. */
+  preference: CadPreferenceView;
   /** Leaving for the workspace is a real step of the trip, so this sheet can take it. */
   onClose: () => void;
 }) {
@@ -142,6 +150,7 @@ export function CompleteComponentSheet({
   const needs: Requirement[] = cadSource.data?.needs ?? [];
   const download = useGuidedCapture(componentId, needs, identity.displayName);
   const correction = useSetProviderCoverage(componentId);
+  const choosePreference = useWriteCadPreference(componentId);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const matrixLabels = useProviderMatrixLabels();
@@ -223,6 +232,14 @@ export function CompleteComponentSheet({
     "component-browser.provider-correction-saved",
     "Your answer was recorded for {provider}",
   );
+  const preferenceFailed = useText(
+    "component-browser.provider-preference-failed",
+    "Could not record the preferred source.",
+  );
+  const preferenceSaved = useCopyFormatter(
+    "component-browser.provider-preference-saved",
+    "{provider} is now the preferred source",
+  );
 
   const busy = captureInFlight(capture.active);
   const ownsCapture = capture.active.partId === componentId;
@@ -253,6 +270,21 @@ export function CompleteComponentSheet({
         onSuccess: () => toast(correctionSaved({ provider: row.label }), "ok"),
         onError: (error) =>
           toast(error instanceof Error ? error.message : correctionFailed, "err"),
+      },
+    );
+  }
+
+  function prefer(provider: string, artifact?: CoverageArtifact) {
+    const label =
+      providers.rows.find((row) => row.id === provider)?.label ?? provider;
+    choosePreference.mutate(
+      artifact
+        ? { kind: "set-asset-source", asset: artifact, provider }
+        : { kind: "set-set-source", provider },
+      {
+        onSuccess: () => toast(preferenceSaved({ provider: label }), "ok"),
+        onError: (error) =>
+          toast(error instanceof Error ? error.message : preferenceFailed, "err"),
       },
     );
   }
@@ -353,9 +385,13 @@ export function CompleteComponentSheet({
         <ProviderCoverageMatrix
           componentId={componentId}
           coverage={providers}
+          preference={preference}
           labels={matrixLabels}
           onOpenProvider={openProvider}
           onCorrect={correct}
+          onPreferSet={(provider) => prefer(provider)}
+          onPreferAsset={(artifact, provider) => prefer(provider, artifact)}
+          preferring={choosePreference.isPending}
           openDisabledReason={openDisabledReason}
           correcting={
             correction.isPending && correction.variables
@@ -488,9 +524,9 @@ export function CompleteComponentSheet({
       >
         <p className="mb-2 text-2xs leading-snug text-t2">
           <Text id="component-browser.provider-sets-help">
-            One verified set per provider. Choosing a set puts that provider's KiCad and Altium
-            files in force together; Stockroom never combines files from two downloads and never
-            activates one design tool alone.
+            One verified set per provider. Choosing a set puts every file from that download in
+            force together; Stockroom never combines files from two downloads and never activates
+            part of a set on its own.
           </Text>
         </p>
         <CadVariantSection partId={componentId} enabled />

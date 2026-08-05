@@ -38,10 +38,16 @@ function cx(...parts: Array<string | false | null | undefined>): string {
 /**
  * The one docked chrome header: the thin band at the top of a route column or a docked panel.
  *
- * 34px is not decoration. The rail toggle, the Components list title and the open-component tab
- * band all sit on ONE horizontal line across the window, and a 4px difference between them reads
+ * 26px is not decoration. The rail wordmark, the Components list title and the Projects title
+ * strip all sit on ONE horizontal line across the window, and a 4px difference between them reads
  * as a mis-registration rather than as variety (measured on the owner's window, 2026-07-26).
- * `devIds.parity.test.ts` gates this file for exactly that reason, so the height stays a literal.
+ * `devIds.parity.test.ts` gates every file in that family for exactly that reason, so the height
+ * stays a literal.
+ *
+ * It was 34px. The desktop density this product is being held to puts a panel title strip at
+ * 24-26px, and the strip is a LABEL: at 34px it spent a third of its height on air while the rows
+ * beneath it were being packed to 24. Changing the picker alone would have mis-registered it
+ * against the rail, so the whole shared line moved together and both gates moved with it.
  *
  * `right` is a trailing COUNT and deliberately sits next to the title rather than flush to the
  * far edge: every call site passes a number, and flushing separated the number from the noun it
@@ -58,7 +64,7 @@ export function RouteHeader({
   return (
     <div
       className={cx(
-        "flex h-[34px] flex-none items-center gap-2 border-b border-line bg-band px-3.5",
+        "flex h-[26px] flex-none items-center gap-2 border-b border-line bg-band px-2.5",
         className,
       )}
       {...rest}

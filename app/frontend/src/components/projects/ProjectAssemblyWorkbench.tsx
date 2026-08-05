@@ -258,7 +258,7 @@ export function ProjectAssemblyWorkbench({
             <p className="text-xs font-semibold text-t3">
               <Text id="projects.build.ready-eyebrow">Build Setup</Text>
             </p>
-            <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-t1">
+            <h2 className="mt-1 text-xl font-semibold text-t1">
               <Text id="projects.build.start-title">Start Build</Text>
             </h2>
             <p className="mt-2 text-sm leading-6 text-t2">

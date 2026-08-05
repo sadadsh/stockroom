@@ -124,7 +124,7 @@ function CaptureGroup({
   return (
     <div data-track={tool}>
       <div className="mb-1 flex items-center gap-2">
-        <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-t3">
+        <span className="ui-property-label">
           <Text id={copyId}>{tool}</Text>
         </span>
         {note ? <span className="text-2xs text-t3">{note}</span> : null}
@@ -276,7 +276,7 @@ function ProviderRouteOutcomes({
     <div className="mt-3.5 border-t border-line pt-3" data-dev-id="complete.cad-provider-outcomes">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-t2">
+          <div className="ui-section-title">
             <Text id="complete.source-results">Source Results</Text>
           </div>
           <p
@@ -383,7 +383,7 @@ function Eyebrow({
 }) {
   return (
     <div className="mb-2 flex items-center gap-2.5">
-      <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-t3">{children}</span>
+      <span className="ui-property-label">{children}</span>
       <span className="h-px flex-1 bg-line" />
       {trailing}
     </div>
@@ -1089,7 +1089,7 @@ function Field({
 }) {
   return (
     <label className={"flex flex-col gap-1 " + (wide ? "min-w-[280px] flex-1" : "")}>
-      <span className="text-2xs font-medium uppercase tracking-wide text-t3">{label}</span>
+      <span className="ui-property-label">{label}</span>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}

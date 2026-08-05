@@ -222,19 +222,19 @@ function StampLedger({ data }: { data: LibraryDerivation }) {
         <tr>
           <th
             scope="col"
-            className="w-[9rem] pb-2 text-left text-2xs font-medium uppercase tracking-wide text-t3"
+            className="w-[9rem] pb-2 text-left ui-table-header"
           >
             <Text id="library.derivation.column-ruleset">Ruleset</Text>
           </th>
           <th
             scope="col"
-            className="w-[6rem] pb-2 text-right text-2xs font-medium uppercase tracking-wide text-t3"
+            className="w-[6rem] pb-2 text-right ui-table-header"
           >
             <Text id="library.derivation.column-components">Components</Text>
           </th>
           <th
             scope="col"
-            className="pb-2 pl-4 text-left text-2xs font-medium uppercase tracking-wide text-t3"
+            className="pb-2 pl-4 text-left ui-table-header"
           >
             <Text id="library.derivation.column-standing">Standing</Text>
           </th>

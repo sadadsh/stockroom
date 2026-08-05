@@ -440,7 +440,7 @@ function BomLineInspector({
           <p className="text-xs font-semibold text-t3">
             <Text id="projects.bom.selected-line">Selected Line</Text>
           </p>
-          <h3 className="mt-1 break-words text-lg font-semibold tracking-[-0.015em] text-t1">
+          <h3 className="mt-1 break-words text-lg font-semibold text-t1">
             {line.mpn || line.value || identityNeeded}
           </h3>
           <p className="mt-1 text-xs text-t3">

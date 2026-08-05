@@ -334,7 +334,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
         className="flex min-h-[34px] flex-none flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-surface px-3.5 py-1"
         data-dev-id="search.subbar"
       >
-        <span className="flex-none text-sm font-bold text-t1" data-dev-id="search.result-count">
+        <span className="flex-none text-sm font-semibold text-t1" data-dev-id="search.result-count">
           {searchResults.isLoading ? "…" : shown}
           <span className="ml-1.5 text-xs font-medium text-t3">
             {shown === 1 ? "result" : "results"}

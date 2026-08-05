@@ -74,6 +74,126 @@ function StatefulHarness({
   );
 }
 
+describe("no EDA application is named in the picker", () => {
+  const EDA = /kicad|altium|eagle|orcad|easyeda/i;
+
+  it("names the missing ASSET, never the design tool that could open it", () => {
+    const fixture = parts(1);
+    const { container } = render(
+      <Harness
+        fixture={[
+          {
+            ...fixture[0],
+            missing: ["kicad_symbol", "altium_footprint", "kicad_model"],
+          },
+        ]}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />,
+    );
+    // The whole rendered picker, not just the opened component: a person browsing the library is
+    // doing ordinary inspection, and the rule holds there too.
+    expect(container.textContent ?? "").not.toMatch(EDA);
+    const warning = container.querySelector('[data-dev-id="components.row-warn"]');
+    expect(warning).toHaveTextContent("Missing Symbol + 2 More");
+  });
+
+  it("counts one artifact once, however many tools are missing it", () => {
+    const fixture = parts(1);
+    // Two tools, one gap in the PART: it needs a footprint. Listing it twice only ever read as
+    // two problems because the tool names made the entries look different.
+    const attention = partAttention({
+      ...fixture[0],
+      missing: ["kicad_footprint", "altium_footprint"],
+    });
+    expect(attention!.reason).toBe("Missing Footprint");
+  });
+
+  it("leaves an identity gap's own wording alone", () => {
+    const attention = partAttention({
+      ...parts(1)[0],
+      missing: ["Manufacturer Part Number"],
+    });
+    expect(attention!.reason).toBe("Missing Manufacturer Part Number");
+  });
+});
+
+describe("the picker row's one primary item", () => {
+  // The seeded library's first component, and the row the defect was measured on.
+  const CAPACITOR: PartSummary = {
+    ...parts(1)[0],
+    id: "c100n",
+    mpn: "CL05B104KO5NNNC",
+    display_name: "100nF 0402",
+    manufacturer: "Samsung",
+    package: "C_0402_1005Metric",
+    is_complete: false,
+    missing: ["datasheet"],
+  };
+
+  /** The line `element` sits on: the ancestor whose own parent is the row's text column. */
+  function lineOf(element: Element, column: Element): Element {
+    let current: Element = element;
+    while (current.parentElement && current.parentElement !== column) {
+      current = current.parentElement;
+    }
+    return current;
+  }
+
+  it("gives the MPN a line of its own, so no secondary item can shrink it", () => {
+    const { container } = render(
+      <Harness fixture={[CAPACITOR]} selectedId={null} onSelect={vi.fn()} />,
+    );
+    const mpn = container.querySelector<HTMLElement>('[data-dev-id="components.row-mpn"]')!;
+    const pkg = container.querySelector<HTMLElement>('[data-dev-id="components.row-package"]')!;
+    const warn = container.querySelector<HTMLElement>('[data-dev-id="components.row-warn"]')!;
+    const column = mpn.parentElement!;
+
+    expect(mpn.textContent).toBe("CL05B104KO5NNNC");
+    expect(mpn.className).toContain("ui-row-primary");
+    // Ellipsis is allowed only when the identifier genuinely cannot fit, and the whole string is
+    // on the tooltip when it happens.
+    expect(mpn.title).toBe("CL05B104KO5NNNC");
+
+    // MEASURED at 1366x768, picker row 290px wide: the MPN shared line one with a `flex-none`
+    // package while a fixed 112px attention block sat beside them both, which left the identifier
+    // about 8px and rendered it as `C...` - one letter and an ellipsis - with
+    // `C_0402_1005Metric` and `Missing Datasheet...` keeping their space. That is the row's
+    // hierarchy exactly inverted. The MPN IS its own line now, and both secondary items are on
+    // lines below it, so neither can take a character off it at any width.
+    expect(lineOf(mpn, column)).toBe(mpn);
+    expect(lineOf(pkg, column)).not.toBe(mpn);
+    expect(lineOf(warn, column)).not.toBe(mpn);
+    const lines = [...column.children];
+    expect(lines.indexOf(mpn)).toBe(0);
+    expect(lines.indexOf(lineOf(pkg, column))).toBeGreaterThan(0);
+    expect(lines.indexOf(lineOf(warn, column))).toBeGreaterThan(
+      lines.indexOf(lineOf(pkg, column)),
+    );
+  });
+
+  it("hands the attention state the description's width rather than the identifier's", () => {
+    const { container } = render(
+      <Harness fixture={[CAPACITOR]} selectedId={null} onSelect={vi.fn()} />,
+    );
+    const warn = container.querySelector<HTMLElement>('[data-dev-id="components.row-warn"]')!;
+    const pkg = container.querySelector<HTMLElement>('[data-dev-id="components.row-package"]')!;
+    const description = warn.previousElementSibling as HTMLElement;
+
+    expect(description.textContent).toBe("100nF 0402");
+    // `flex-1` is `flex: 1 1 0%`: the description asks for none of the line and takes what is
+    // left, so it is the item that gives way. It is also the only text on the row whose loss
+    // costs nothing, because the whole of it is on the opened component.
+    expect(description.className).toContain("flex-1");
+    expect(warn.className).toContain("min-w-0");
+    expect(warn.className).not.toContain("flex-none");
+    expect(warn).toHaveTextContent("Missing Datasheet");
+    // The manufacturer yields to the package on its own line for the same reason.
+    expect(pkg.previousElementSibling!.className).toContain("flex-1");
+    expect(pkg.className).toContain("truncate");
+  });
+});
+
 describe("PartsList virtualization", () => {
   it("turns every incomplete-row warning into a reason and automatic next step", () => {
     const fixture = parts(1);
@@ -82,11 +202,16 @@ describe("PartsList virtualization", () => {
       missing: ["kicad_model", "altium_footprint"],
     });
 
+    // The ASSET is what the row names. A design tool's name never appears during ordinary
+    // component inspection, and browsing the library is the most ordinary inspection there is.
+    //
+    // The next step is on the DESCRIPTION and no longer takes a line of its own. Measured at a
+    // 290px picker, that line rendered as `Next: Collecting Ev...` - a hint cut mid-word, which
+    // names nothing and promises nothing - while the MPN above it was down to one character.
     expect(attention).toEqual({
-      reason: "Missing KiCad Model + Altium Footprint",
-      next: "Next: Collecting Evidence",
+      reason: "Missing 3D Model + Footprint",
       description:
-        "Needs Attention. Missing KiCad Model, Altium Footprint. Next: Stockroom will continue source collection and verification.",
+        "Needs Attention. Missing 3D Model, Footprint. Next: Stockroom will continue source collection and verification.",
     });
 
     render(
@@ -101,8 +226,8 @@ describe("PartsList virtualization", () => {
     const warning = row.querySelector(
       '[data-dev-id="components.row-warn"]',
     );
-    expect(warning).toHaveTextContent("Missing KiCad Model + Altium Footprint");
-    expect(warning).toHaveTextContent("Next: Collecting Evidence");
+    expect(warning).toHaveTextContent("Missing 3D Model + Footprint");
+    expect(warning).not.toHaveTextContent("Next: Collecting Evidence");
     expect(row).toHaveAccessibleDescription(
       /Stockroom will continue source collection and verification/,
     );

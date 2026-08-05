@@ -22,10 +22,16 @@ describe("IconButton compact", () => {
     expect(button).toHaveAttribute("title", "Delete Part?");
   });
 
-  it("keeps the label in the DOM so revealing it is presentation, not content", () => {
+  it("holds a FIXED width, so a toolbar does not reflow under the pointer", () => {
+    // The label used to wipe open on hover, animating a one-column grid 0fr -> 1fr so the button
+    // grew to the label's own width. Lovely on a page, wrong in a toolbar: a control that changes
+    // width when the pointer crosses it moves the next control before you reach it. The label now
+    // lives where a Windows toolbar puts it - in aria-label and title - which costs no layout.
     render(<IconButton compact icon={<TrashIcon />} label="Delete Part?" />);
-    // present but width-collapsed: a screen reader never sees it appear or vanish
-    expect(screen.getByText("Delete Part?")).toBeTruthy();
+    const button = screen.getByRole("button", { name: "Delete Part?" });
+    expect(button.textContent).toBe("");
+    expect(button.className).toMatch(/w-\[\d+px\]/);
+    expect(button.className).not.toContain("grid-cols-");
   });
 
   it("honours its tone in compact mode, so a destructive action can read as destructive", () => {
@@ -71,7 +77,7 @@ describe("IconButton compact", () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it("stays revealed while pending, so the control cannot collapse mid-action", () => {
+  it("stays toned while pending, so the control cannot go quiet mid-action", () => {
     render(
       <IconButton
         compact
@@ -81,12 +87,12 @@ describe("IconButton compact", () => {
         pendingLabel="Deleting"
       />,
     );
-    // Pinned open by a real class rather than by hover state, which a running action cannot rely
-    // on. Re-baselined 2026-07-25 from `max-w-[10rem]`: the reveal now animates 0fr -> 1fr so it
-    // travels the label's OWN width. Animating to a fixed 10rem while the label was ~72px meant
-    // the visible motion finished in under half the duration and read as a snap - the owner's
-    // "delete part animation doesnt exist".
-    expect(screen.getByRole("button").querySelector("span")?.className).toContain("grid-cols-[1fr]");
+    // Pinned on by `pending` rather than by hover state, which a running action cannot rely on:
+    // the pointer may well have left. The variant tone arrives whole, so a running destructive
+    // action still reads as destructive.
+    const button = screen.getByRole("button");
+    expect(button.getAttribute("data-revealed")).toBe("true");
+    expect(button.className).not.toContain("border-transparent");
   });
 
   it("runs its action on click when idle", async () => {

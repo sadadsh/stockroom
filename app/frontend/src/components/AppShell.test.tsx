@@ -116,13 +116,13 @@ describe("AppShell network-only Add A Part boundary", () => {
 // "Components Loaded / Components", saying Components twice, while carrying no information - the
 // state it reported is true almost always.
 describe("AppShell status bar", () => {
-  it("shows the exact running revision and only calls a remotely proven match Current", async () => {
+  it("keeps the running revision out of the corner while the standing is settled", async () => {
+    // A permanent `r4f2a9c1` in the corner of a component library is developer output on a user's
+    // screen. The identity returns the moment the standing is something a person can act on
+    // (see the cases below), and otherwise lives in About and in developer mode.
     renderShell();
-    expect(
-      await screen.findByRole("status", {
-        name: `running revision ${SHORT_REVISION}, Current`,
-      }),
-    ).toBeInTheDocument();
+    await screen.findByText("Ready");
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("does not call a bundle Current when the backend has moved past it", async () => {
@@ -158,7 +158,10 @@ describe("AppShell status bar", () => {
       await screen.findByRole("status", {
         name: `running revision ${SHORT_REVISION}, Update Available, target revision 2222222`,
       }),
-    ).toHaveTextContent(`${SHORT_REVISION}→2222222Update Available`);
+    ).toHaveTextContent("Update Available");
+    // The revisions are NOT drawn: a commit hash in the corner of a component library names
+    // something a person cannot act on. They stay in the accessible name, About, and dev mode.
+    expect(screen.getByRole("status").textContent).not.toContain(SHORT_REVISION);
   });
 
   it("reports Retrying instead of Current when the remote check is interrupted", async () => {
@@ -192,7 +195,9 @@ describe("AppShell status bar", () => {
       incomplete: 1,
     } as never);
     renderShell();
-    expect(await screen.findByText(/7 Components/)).toBeTruthy();
+    // The library's SIZE is the count beside the picker's own title; the status bar states the
+    // condition it is in instead of repeating the number.
+    expect(await screen.findByText("Ready")).toBeTruthy();
     expect(screen.queryByText("Components Loaded")).toBeNull();
   });
 
@@ -205,7 +210,7 @@ describe("AppShell status bar", () => {
     } as never);
     renderShell();
 
-    expect(await screen.findByText("158 Components")).toHaveClass("text-t1");
+    expect(await screen.findByText("Ready")).toBeTruthy();
     const library = await screen.findByLabelText("Library: Stockroom Library");
     expect(library).toHaveClass("text-t2");
     expect(library.textContent).toContain("Library:");
@@ -223,7 +228,7 @@ describe("AppShell status bar", () => {
       incomplete: 0,
     } as never);
     renderShell();
-    expect(await screen.findByText(/1 Component\b/)).toBeTruthy();
+    expect(await screen.findByText("Ready")).toBeTruthy();
     expect(screen.queryByText(/1 Components/)).toBeNull();
   });
 

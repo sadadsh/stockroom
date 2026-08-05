@@ -243,7 +243,7 @@ function HandoffCell({
             // As a filled chip it was ~110px wide - wider than the CATEGORY label beside it and
             // louder than the value beneath it, which inverted the cell's hierarchy for the one
             // field that is a footnote rather than a headline.
-            className="ml-auto min-w-0 flex-none truncate text-2xs font-medium uppercase tracking-wide text-t3/70"
+            className="ml-auto min-w-0 flex-none truncate ui-row-metadata"
             title={`Only ${only} receives this field`}
           >
             {only} only

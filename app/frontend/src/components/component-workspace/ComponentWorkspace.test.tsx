@@ -1,38 +1,63 @@
+/**
+ * The opened component, as a surface contract.
+ *
+ * Three columns that are always all present, an identity header whose subject is the part number
+ * and nothing else, and no EDA application named anywhere in ordinary inspection. Each of those is
+ * a decision that a well-meaning change can silently undo - a column dropped at a narrow width, a
+ * generated name promoted back above the MPN, a tool label restored to an asset header - so each of
+ * them is asserted here rather than left to a screenshot.
+ *
+ * The specification assertions all turn on ONE thing the dossier made possible: an expected field
+ * nobody supplied is a `Missing` ROW, not an absence. That distinction cannot be recovered from an
+ * empty string, so it is asserted on the rendered row rather than on a count.
+ */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../../api/client";
 import { cadVariantApi } from "../../api/cadVariantClient";
-import type { ComponentWorkspaceResponse } from "../../api/workspaceTypes";
+import type { ComponentDossier, SpecificationGroup } from "../../api/dossierTypes";
 import { componentRepresentationDevId, devIdSelector } from "../../lib/componentDevIds";
 import { ThemeProvider } from "../../lib/theme";
 import { ToastProvider } from "../../lib/toast";
 import {
   defaultUiSession,
   openComponentInSession,
-  readUiSession,
   resetUiSessionForTests,
 } from "../../lib/uiSession";
 import {
-  makeFact,
+  WORKSPACE_COLUMNS_STORAGE_KEY,
+  WORKSPACE_COLUMN_MIN,
+  moveSplitter,
+  readColumnFractions,
+  resolveColumnWidths,
+  writeColumnFractions,
+} from "../../lib/workspaceColumns";
+import {
+  makeCandidate,
+  makeDocument,
+  makeDossier,
+  makeDossierWith,
   makeOffer,
+  makeRelatedPart,
   makeRepresentation,
-  makeSourceRecord,
+  makeSourceLedgerEntry,
+  makeSpecification,
   makeTool,
-  makeWorkspace,
-} from "../../test/workspaceFixture";
+} from "../../test/dossierFixture";
 import { ComponentWorkspace } from "./ComponentWorkspace";
-import { dockTemplate } from "./RepresentationDock";
-import { primaryActionLabel } from "./ComponentHeader";
-import { toolStatus } from "./workspaceStatus";
+import { cadAssetStatus } from "./workspaceStatus";
+import { keyFacts, qualitySegments } from "./componentIdentity";
+import { manageMenuItems } from "./ManageMenu";
+import { filterGroups, countForFilter } from "./specificationRows";
 
 vi.mock("../../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../../api/client")>();
   return {
     ...actual,
     api: {
-      partWorkspace: vi.fn(),
+      partDossier: vi.fn(),
       partHistory: vi.fn(),
       partDiff: vi.fn(),
       partDetail: vi.fn(),
@@ -43,6 +68,13 @@ vi.mock("../../api/client", async (importActual) => {
       previewSvg: vi.fn(),
       modelGlb: vi.fn(),
       landPattern: vi.fn(),
+      deletePart: vi.fn(),
+      refreshSourcing: vi.fn(),
+      setSpecificationOverride: vi.fn(),
+      clearSpecificationOverride: vi.fn(),
+      setSpecificationPreferredSource: vi.fn(),
+      clearSpecificationPreferredSource: vi.fn(),
+      documentFile: vi.fn(),
     },
   };
 });
@@ -55,7 +87,7 @@ vi.mock("../../api/cadVariantClient", async (importActual) => {
   };
 });
 
-// three.js is verified in the Windows pixel gate; the dock only needs the scene to mount.
+// three.js is verified in the Windows pixel gate; a column only needs the scene to mount.
 vi.mock("../../lib/threeScene", () => ({
   mountModelScene: vi.fn(() => ({
     dispose: vi.fn(),
@@ -76,6 +108,7 @@ const mockCadVariantApi = vi.mocked(cadVariantApi);
 const ID = "lm358";
 
 beforeEach(() => {
+  window.localStorage.clear();
   mockApi.previewSvg.mockResolvedValue(new Blob(["<svg/>"], { type: "image/svg+xml" }));
   mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
   mockApi.landPattern.mockRejectedValue(new ApiError(404, "no footprint"));
@@ -107,461 +140,836 @@ function provide(ui: ReactNode) {
 }
 
 /** Open the component the way the page does, so its view state has somewhere to live. */
-async function open(workspace: ComponentWorkspaceResponse = makeWorkspace()) {
+async function open(
+  dossier: ComponentDossier = makeDossier(),
+  onDeleted?: (id: string) => void,
+) {
   resetUiSessionForTests(openComponentInSession(defaultUiSession(), ID));
-  mockApi.partWorkspace.mockResolvedValue(workspace);
-  const view = provide(<ComponentWorkspace componentId={ID} />);
-  await screen.findByRole("heading", { name: workspace.identity.displayName });
+  mockApi.partDossier.mockResolvedValue(dossier);
+  const view = provide(<ComponentWorkspace componentId={ID} onDeleted={onDeleted} />);
+  // Wait on the identity element rather than its text: a fixture may deliberately carry an MPN
+  // with the surrounding whitespace the copy action has to preserve, and a text query normalises it.
+  await waitFor(() =>
+    expect(document.querySelector(devIdSelector("component-browser.header-mpn"))).not.toBeNull(),
+  );
   return view;
 }
 
-function module(kind: "symbol" | "footprint" | "model"): HTMLElement {
-  return document.querySelector<HTMLElement>(
-    devIdSelector(componentRepresentationDevId(ID, kind)),
-  )!;
+function node(devId: string): HTMLElement {
+  return document.querySelector<HTMLElement>(devIdSelector(devId))!;
 }
 
-describe("component identity header", () => {
-  it("states identity, both design tools' compact status, and one primary action", async () => {
-    await open(
-      makeWorkspace({
-        identity: { value: "10k", package: "0402", lifecycle: "Active" },
-        representations: {
-          symbol: makeRepresentation("symbol", "missing", [
-            makeTool({ tool: "kicad", present: false, status: "missing" }),
-          ]),
-        },
-      }),
-    );
+function columns(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>("[data-workspace-column]"));
+}
 
-    const header = document.querySelector<HTMLElement>('[data-dev-id="component-browser.header"]')!;
-    expect(within(header).getByRole("heading", { name: "LM358" })).toBeInTheDocument();
-    expect(within(header).getByText("LM358DR")).toBeInTheDocument();
-    expect(within(header).getByText("Texas Instruments")).toBeInTheDocument();
-    expect(within(header).getByText("0402")).toBeInTheDocument();
-    expect(within(header).getByText("ICs")).toBeInTheDocument();
-    expect(within(header).getByText("Active")).toBeInTheDocument();
-    // A value distinct from the part number earns its own place; one equal to it does not.
-    expect(within(header).getByText("10k")).toBeInTheDocument();
-    // The compact status uses the closed vocabulary, per tool.
-    expect(within(header).getByText("KiCad Missing")).toBeInTheDocument();
-    expect(within(header).getByText(/^Altium /)).toBeInTheDocument();
-    expect(within(header).getByRole("button", { name: "Datasheet" })).toBeInTheDocument();
-  });
-
-  it("omits a value that only repeats the part number", async () => {
-    await open(makeWorkspace({ identity: { value: "LM358DR" } }));
-    const header = document.querySelector<HTMLElement>('[data-dev-id="component-browser.header"]')!;
-    expect(within(header).getAllByText("LM358DR")).toHaveLength(1);
-  });
-
-  /**
-   * The 960px supported minimum, asserted structurally.
-   *
-   * jsdom has no layout, so "is this readable" cannot be measured here. What CAN be pinned is the
-   * rule that produced the defect: the fact row used to be a single line whose values were the only
-   * shrinkable thing on it, so at 960 it rendered `Manufacturer Package Category` and no facts at
-   * all. These assertions fail the moment the label stops being the part that yields.
-   */
-  it("keeps the identity values on screen at a narrow width and lets the labels yield instead", async () => {
+describe("the three-column workspace", () => {
+  it("renders CAD Assets, Specifications and Sourcing and Resources side by side", async () => {
     await open();
-    const header = document.querySelector<HTMLElement>('[data-dev-id="component-browser.header"]')!;
-    const facts = header.querySelector("dl")!;
+    const present = columns().map((column) => column.dataset.workspaceColumn);
+    expect(present).toEqual(["cad", "specifications", "sourcing"]);
+    expect(node("component-browser.column-cad")).toHaveTextContent("CAD Assets");
+    expect(node("component-browser.column-specifications")).toHaveTextContent("Specifications");
+    expect(node("component-browser.column-sourcing")).toHaveTextContent("Sourcing and Resources");
+  });
 
-    // A floor, not a leftover: the facts claim a basis, and the actions take their own line when
-    // they cannot sit beside it. A value squeezed to an ellipsis is a value the person has lost.
-    expect(facts.className).toContain("basis-40");
-    expect(facts.className).toContain("flex-wrap");
-    expect(facts.parentElement!.className).toContain("flex-wrap");
-
-    for (const [label, value] of [
-      ["Manufacturer", "Texas Instruments"],
-      ["Package", "SOIC-8"],
-      ["Category", "ICs"],
-    ] as const) {
-      const term = within(facts).getByText(label);
-      const detail = term.parentElement!.querySelector("dd")!;
-      expect(detail).toHaveTextContent(value);
-      // The label is hidden VISUALLY below the threshold and is still in the tree, so a screen
-      // reader keeps hearing which fact this is.
-      expect(term.className).toContain("sr-only");
-      expect(term.className).toContain("@[48rem]:not-sr-only");
-      expect(detail.className).not.toContain("sr-only");
-      // The hover title answers the same question a pointer user lost with the inline label.
-      expect(term.parentElement).toHaveAttribute("title", `${label} ${value}`);
+  it("gives every column its own scrollbar and never lets the workspace root scroll", async () => {
+    await open();
+    for (const column of columns()) {
+      const scroller = column.querySelector<HTMLElement>("[data-workspace-scroll]")!;
+      expect(scroller.className).toContain("overflow-y-auto");
+      // The column FRAME is clipped; only the body inside it scrolls, so a long specification
+      // list cannot push the column's own title strip off the top.
+      expect(column.className).toContain("overflow-hidden");
     }
+    expect(node("component-browser.root").className).toContain("overflow-hidden");
+    expect(node("component-browser.columns").className).toContain("overflow-y-hidden");
   });
 
-  it("names the primary action after the worst thing wrong with the component", () => {
-    expect(primaryActionLabel(null)).toBe("Open Full Specifications");
-    expect(primaryActionLabel("edit-identity")).toBe("Add Missing Identity");
-    expect(primaryActionLabel("open-representation:model")).toBe("Fix 3D Model");
-    expect(primaryActionLabel("open-representation:symbol")).toBe("Fix Symbol");
-    expect(primaryActionLabel("open-field-source:package")).toBe("Resolve Source Conflict");
-    expect(primaryActionLabel("open-requirements")).toBe("Review Requirements");
-  });
-});
-
-describe("compact tool status", () => {
-  const base = makeWorkspace().representations;
-
-  it("is worst-first, and only says how ready once nothing is wrong", () => {
-    const withStatus = (...tools: Parameters<typeof makeTool>[0][]) => ({
-      ...base,
-      symbol: makeRepresentation("symbol", "ready", [makeTool(tools[0])]),
-      footprint: makeRepresentation("footprint", "ready", [makeTool(tools[1] ?? tools[0])]),
-      model: makeRepresentation("model", "ready", [makeTool(tools[2] ?? tools[0])]),
-    });
-    expect(toolStatus(withStatus({ status: "failed" }), "kicad")).toBe("Failed");
-    expect(toolStatus(withStatus({ status: "missing", present: false }), "kicad")).toBe("Missing");
-    expect(toolStatus(withStatus({ status: "review" }), "kicad")).toBe("Needs Review");
-    expect(toolStatus(withStatus({ status: "not_required", present: false }), "kicad")).toBe(
-      "Not Required",
-    );
-    // Downloaded from a named provider, but nothing has checked it.
-    expect(toolStatus(withStatus({ sourceId: "snapeda", checks: [] }), "kicad")).toBe("Downloaded");
-    // A recorded check that passed is a stronger claim than a download.
-    expect(
-      toolStatus(
-        withStatus({
-          checks: [
-            { check: "pins", measured: 8, expected: 8, against: "datasheet", checkedAt: "", note: "" },
-          ],
-        }),
-        "kicad",
-      ),
-    ).toBe("Validated");
-    // Present, unchecked, and nobody says where it came from.
-    expect(toolStatus(withStatus({ sourceId: "", checks: [] }), "kicad")).toBe("Available");
-    expect(toolStatus(base, "nonexistent-tool")).toBe("Unknown");
-  });
-});
-
-describe("representation dock", () => {
-  it("shows all three representations side by side by default", async () => {
+  it("has no per-component tab strip and no information tabs", async () => {
     await open();
-    expect(module("symbol")).toBeInTheDocument();
-    expect(module("footprint")).toBeInTheDocument();
-    expect(module("model")).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute("aria-checked", "true");
-    // Three equal tracks: nothing is a rail, nothing is stacked into a scrolling column.
-    expect(dockTemplate("all")).toBe("minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)");
+    expect(document.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect(document.querySelectorAll('[role="tablist"]')).toHaveLength(0);
   });
 
-  it("expands one representation and keeps the other two reachable as rails", async () => {
+  it("moves a splitter, persists the new proportions locally, and restores them", async () => {
+    const user = userEvent.setup();
+    const view = await open();
+    const splitter = document.querySelector<HTMLElement>('[data-splitter="cad-specifications"]')!;
+    const before = Number(splitter.getAttribute("aria-valuenow"));
+    splitter.focus();
+    await user.keyboard("{ArrowRight}");
+    const after = Number(
+      document
+        .querySelector<HTMLElement>('[data-splitter="cad-specifications"]')!
+        .getAttribute("aria-valuenow"),
+    );
+    expect(after).toBeGreaterThan(before);
+
+    const stored = readColumnFractions();
+    expect(stored).not.toBeNull();
+    expect(stored!.cad).toBeGreaterThan(0.29);
+
+    // A fresh mount reads the same machine-local preference back.
+    view.unmount();
     await open();
-    const user = userEvent.setup();
-
-    for (const kind of ["symbol", "footprint", "model"] as const) {
-      const label = kind === "model" ? "3D Model" : kind === "symbol" ? "Symbol" : "Footprint";
-      await user.click(screen.getByRole("radio", { name: label }));
-      await waitFor(() =>
-        expect(readUiSession().component_views[ID]?.representation_layout).toBe(kind),
-      );
-      // All three modules are still in the DOM: expanding never removes a representation.
-      expect(module("symbol")).toBeInTheDocument();
-      expect(module("footprint")).toBeInTheDocument();
-      expect(module("model")).toBeInTheDocument();
-      // The other two are rails, and each rail is the control that switches back to it.
-      const rails = document.querySelectorAll('[data-dev-id="component-browser.representation-rail"]');
-      expect(rails).toHaveLength(2);
-      expect(dockTemplate(kind).split(" ").filter((track) => track === "40px")).toHaveLength(2);
-    }
-  });
-
-  it("switches layout when a collapsed rail is clicked", async () => {
-    await open();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("radio", { name: "Symbol" }));
-    await waitFor(() =>
-      expect(readUiSession().component_views[ID]?.representation_layout).toBe("symbol"),
-    );
-
-    await user.click(within(module("model")).getByRole("button", { name: "Show 3D Model" }));
-
-    await waitFor(() =>
-      expect(readUiSession().component_views[ID]?.representation_layout).toBe("model"),
-    );
-    expect(within(module("symbol")).getByRole("button", { name: "Show Symbol" })).toBeInTheDocument();
-  });
-
-  it("walks the three modules with the arrow keys", async () => {
-    await open();
-    const controls = () =>
-      Array.from(
-        document.querySelectorAll<HTMLElement>("[data-representation-control]"),
-      );
-    controls()[0].focus();
-    expect(document.activeElement).toBe(controls()[0]);
-
-    await userEvent.keyboard("{ArrowRight}");
-    expect(document.activeElement).toBe(controls()[1]);
-    await userEvent.keyboard("{ArrowRight}");
-    expect(document.activeElement).toBe(controls()[2]);
-    // Wraps, so the strip has no dead end.
-    await userEvent.keyboard("{ArrowRight}");
-    expect(document.activeElement).toBe(controls()[0]);
-    await userEvent.keyboard("{ArrowLeft}");
-    expect(document.activeElement).toBe(controls()[2]);
-    await userEvent.keyboard("{Home}");
-    expect(document.activeElement).toBe(controls()[0]);
-    // Focus moved without collapsing anything: arrowing past a module must not re-lay-out the dock.
-    expect(readUiSession().component_views[ID]?.representation_layout).toBe("all");
-  });
-
-  it("states one concise issue and reaches the retained-variant chooser from Details", async () => {
-    await open(
-      makeWorkspace({
-        representations: {
-          footprint: makeRepresentation("footprint", "failed", [makeTool({ status: "failed" })]),
-        },
-      }),
-    );
-    const user = userEvent.setup();
-    expect(
-      within(module("footprint")).getByText("A recorded check did not pass."),
-    ).toBeInTheDocument();
-
-    await user.click(within(module("footprint")).getByRole("button", { name: "Details" }));
-
-    const dialog = await screen.findByRole("dialog", { name: "Footprint Details" });
-    expect(within(dialog).getAllByText("KiCad").length).toBeGreaterThan(0);
-    await waitFor(() => expect(mockCadVariantApi.inventory).toHaveBeenCalledWith(ID));
-  });
-
-  /**
-   * The other half of the 960px minimum. A native `<select>` sizes itself to its widest option and
-   * carries a platform arrow, so it held 111px of a 176px module column and the title truncated to
-   * `S` and `F`. A single letter is not a label, so the name and the status are now the fixed part
-   * of that row and the tool chooser is what gives way.
-   */
-  it("keeps every module's title and status whole, and lets the tool chooser narrow instead", async () => {
-    await open(
-      makeWorkspace({
-        representations: {
-          symbol: makeRepresentation("symbol", "ready", [
-            makeTool({ tool: "kicad", toolLabel: "KiCad" }),
-            makeTool({ tool: "altium", toolLabel: "Altium" }),
-          ]),
-        },
-      }),
-    );
-
-    for (const [kind, label] of [
-      ["symbol", "Symbol"],
-      ["footprint", "Footprint"],
-      ["model", "3D Model"],
-    ] as const) {
-      const title = within(module(kind)).getByRole("button", { name: label });
-      expect(title).toHaveTextContent(label);
-      // Never a shrink candidate, so the whole word survives however narrow the column gets.
-      expect(title.className).toContain("flex-none");
-      expect(title.className).not.toContain("truncate");
-      // The status has to survive the same squeeze: a module with no readable status states nothing.
-      expect(within(module(kind)).getByText(/^(Ready|Not Required)$/)).toBeInTheDocument();
-    }
-
-    const chooser = within(module("symbol")).getByRole("combobox", { name: "Symbol tool" });
-    expect(chooser.className).toContain("max-w-full");
-  });
-
-  it("persists the selected tool per representation kind", async () => {
-    await open(
-      makeWorkspace({
-        representations: {
-          symbol: makeRepresentation("symbol", "ready", [
-            makeTool({ tool: "kicad", toolLabel: "KiCad" }),
-            makeTool({ tool: "altium", toolLabel: "Altium" }),
-          ]),
-        },
-      }),
-    );
-    const user = userEvent.setup();
-
-    await user.selectOptions(
-      within(module("symbol")).getByRole("combobox", { name: "Symbol tool" }),
-      "altium",
-    );
-
-    await waitFor(() =>
-      expect(readUiSession().component_views[ID]?.representation_tool.symbol).toBe("altium"),
-    );
-    expect(readUiSession().component_views[ID]?.representation_tool.footprint).toBe("");
-  });
-});
-
-describe("information tabs", () => {
-  it("offers exactly the four questions, and persists the active one", async () => {
-    await open();
-    const user = userEvent.setup();
-    const strip = document.querySelector<HTMLElement>('[data-dev-id="component-browser.info.tabs"]')!;
-    expect(within(strip).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "Overview",
-      "Specifications",
-      "Sourcing",
-      "Sources & History",
-    ]);
-
-    await user.click(within(strip).getByRole("tab", { name: "Sources & History" }));
-
-    await waitFor(() => expect(readUiSession().component_views[ID]?.info_tab).toBe("sources"));
-    expect(screen.getByLabelText("Source Records")).toBeInTheDocument();
-  });
-
-  it("renders real data in every tab rather than an empty placeholder", async () => {
-    await open(
-      makeWorkspace({
-        specifications: {
-          total: 2,
-          pinCount: 8,
-          groups: [
-            {
-              id: "electrical",
-              label: "Electrical",
-              count: 2,
-              facts: [
-                makeFact({ id: "Supply Voltage", label: "Supply Voltage", rawValue: "3 V" }),
-                makeFact({ id: "Package", label: "Package", rawValue: "SOIC-8" }),
-              ],
-            },
-          ],
-        },
-        sourcing: { offers: [makeOffer({ partNumber: "296-1234" })] },
-        sources: {
-          records: [makeSourceRecord({ fetchedAt: "2026-08-01" })],
-        },
-      }),
-    );
-    const user = userEvent.setup();
-    const strip = document.querySelector<HTMLElement>('[data-dev-id="component-browser.info.tabs"]')!;
-
-    // Overview: the curated key specs and the sourcing snapshot both read the projection.
-    expect(screen.getByText("Supply Voltage")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("Sourcing Snapshot")).getByText("DigiKey")).toBeInTheDocument();
-
-    await user.click(within(strip).getByRole("tab", { name: "Specifications" }));
-    const groups = await screen.findByLabelText("Specification Groups");
-    const electrical = within(groups).getByText("Electrical").closest("li")!;
-    expect(within(electrical).getByText("2")).toBeInTheDocument();
-
-    await user.click(within(strip).getByRole("tab", { name: "Sourcing" }));
-    const distributors = await screen.findByLabelText("Distributors");
-    expect(within(distributors).getByText("DigiKey")).toBeInTheDocument();
-
-    await user.click(within(strip).getByRole("tab", { name: "Sources & History" }));
-    const records = await screen.findByLabelText("Source Records");
-    expect(within(records).getByText("DigiKey")).toBeInTheDocument();
-  });
-
-  it("opens the full sheet in a modal, which is the only surface allowed to scroll", async () => {
-    await open(
-      makeWorkspace({
-        specifications: {
-          total: 1,
-          groups: [
-            {
-              id: "electrical",
-              label: "Electrical",
-              count: 1,
-              facts: [makeFact({ id: "Supply Voltage", label: "Supply Voltage", rawValue: "3 V" })],
-            },
-          ],
-        },
-      }),
-    );
-    const user = userEvent.setup();
-
-    // Overview's View All hands off to the Specifications TAB; that tab's own View All opens the
-    // exhaustive sheet, which is the only surface here allowed to scroll.
-    await user.click(
-      within(screen.getByLabelText("Key Specifications")).getByRole("button", { name: "View All" }),
-    );
-    await user.click(
-      within(await screen.findByLabelText("Specification Groups")).getByRole("button", {
-        name: "View All Specifications",
-      }),
-    );
-
-    const dialog = await screen.findByRole("dialog", { name: "Specifications" });
-    expect(within(dialog).getByText("Electrical (1)")).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  });
-});
-
-describe("overview", () => {
-  it("marks a description its sources disagree about", async () => {
-    await open(
-      makeWorkspace({
-        summary: {
-          description: makeFact({
-            id: "description",
-            label: "Description",
-            rawValue: "Dual op-amp",
-            state: "conflict",
-          }),
-        },
-      }),
-    );
-    const region = document.querySelector<HTMLElement>(
-      '[data-dev-id="component-browser.description"]',
+    const restored = document.querySelector<HTMLElement>(
+      '[data-splitter="cad-specifications"]',
     )!;
-    expect(within(region).getByText("Sources Disagree")).toBeInTheDocument();
+    expect(Number(restored.getAttribute("aria-valuenow"))).toBe(after);
   });
 
-  it("renders every attention item with the action it names", async () => {
+  it("keeps every column at or above its minimum, and never drops one", () => {
+    const cramped = resolveColumnWidths(700);
+    expect(cramped).toEqual(WORKSPACE_COLUMN_MIN);
+    const roomy = resolveColumnWidths(1600);
+    expect(roomy.cad).toBeGreaterThanOrEqual(WORKSPACE_COLUMN_MIN.cad);
+    expect(roomy.specifications).toBeGreaterThanOrEqual(WORKSPACE_COLUMN_MIN.specifications);
+    expect(roomy.sourcing).toBeGreaterThanOrEqual(WORKSPACE_COLUMN_MIN.sourcing);
+    expect(Math.round(roomy.cad + roomy.specifications + roomy.sourcing)).toBe(1600);
+  });
+
+  it("moves a splitter as a zero-sum trade between its two neighbours only", () => {
+    const start = resolveColumnWidths(1600);
+    const moved = moveSplitter(start, "cad-specifications", 60);
+    expect(moved.cad).toBe(start.cad + 60);
+    expect(moved.specifications).toBe(start.specifications - 60);
+    expect(moved.sourcing).toBe(start.sourcing);
+    // A drag that would take a neighbour under its floor stops at the floor.
+    const pinned = moveSplitter(start, "cad-specifications", 5000);
+    expect(pinned.specifications).toBe(WORKSPACE_COLUMN_MIN.specifications);
+  });
+
+  it("stores proportions rather than pixels, so a different monitor keeps the same shape", () => {
+    writeColumnFractions({ cad: 400, specifications: 800, sourcing: 400 });
+    expect(window.localStorage.getItem(WORKSPACE_COLUMNS_STORAGE_KEY)).toContain("0.25");
+    const wide = resolveColumnWidths(1920, readColumnFractions());
+    expect(Math.round(wide.cad)).toBe(480);
+    expect(Math.round(wide.specifications)).toBe(960);
+  });
+});
+
+describe("the identity header", () => {
+  it("makes the MPN the strongest text, and never puts a generated name before it", async () => {
     await open(
-      makeWorkspace({
-        attention: [
+      makeDossier({
+        identity: { mpn: "SN74LVC1G08DBVR", displayName: "Single 2-input AND gate" },
+      }),
+    );
+    const mpn = node("component-browser.header-mpn");
+    expect(mpn).toHaveTextContent("SN74LVC1G08DBVR");
+    // The role class IS the hierarchy: 14px/600 primary, the only 14px in the workspace.
+    expect(mpn.className).toContain("ui-component-mpn");
+
+    const description = node("component-browser.header-description");
+    expect(description.className).toContain("ui-component-description");
+    expect(
+      mpn.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Nothing else on the surface may claim the MPN role.
+    expect(document.querySelectorAll(".ui-component-mpn")).toHaveLength(1);
+  });
+
+  it("aligns the lifecycle state separately instead of appending it to the part number", async () => {
+    await open(makeDossier({ identity: { lifecycle: "Active" } }));
+    expect(node("component-browser.header-mpn").textContent).toBe("LM358DR");
+    expect(node("component-browser.header-lifecycle")).toHaveTextContent("Active");
+  });
+
+  it("takes its key facts from the category's own key specifications, not from the groups", async () => {
+    await open(
+      makeDossierWith({
+        identity: { category: "Logic Gates", package: "SOT-23-5", pinCount: 5 },
+        keySpecifications: [
+          makeSpecification({
+            key: "supply_voltage",
+            label: "Supply Voltage",
+            displayValue: "1.65–5.5",
+            unit: "V",
+            importance: "key",
+          }),
+          makeSpecification({
+            key: "output_current",
+            label: "Output Current",
+            displayValue: "32",
+            unit: "mA",
+            importance: "key",
+          }),
+        ],
+        groups: [
           {
-            id: "representation.symbol",
-            severity: "blocking",
-            title: "Symbol Missing",
-            detail: "No file is attached yet.",
-            action: "open-representation:symbol",
-          },
-          {
-            id: "conflict.package",
-            severity: "warning",
-            title: "Sources Disagree On Package",
-            detail: "2 values were offered.",
-            action: "open-field-source:package",
+            id: "package_mechanical",
+            label: "Package and Mechanical",
+            specifications: [
+              makeSpecification({
+                key: "package",
+                label: "Package",
+                displayValue: "SOT-23-5",
+                unit: "",
+              }),
+            ],
           },
         ],
       }),
     );
-    const user = userEvent.setup();
-    const region = screen.getByLabelText("Needs Attention");
-    const items = within(region).getAllByRole("listitem");
-    expect(items).toHaveLength(2);
-    expect(within(region).getByText("Symbol Missing")).toBeInTheDocument();
-    expect(within(region).getByText("2 values were offered.")).toBeInTheDocument();
-
-    // The action is the point of an attention item: acting on a representation problem takes you
-    // to that representation.
-    await user.click(
-      // The action name is "Resolve: <what is wrong>". It used to be "<title>: <raw action token>",
-      // which read out "open-representation:symbol" to a screen reader - an internal routing key,
-      // not a sentence a person can act on.
-      within(items[0]).getByRole("button", { name: "Resolve: Symbol Missing" }),
+    expect(node("component-browser.header-classification")).toHaveTextContent(
+      "Logic Gates · SOT-23-5 · 5 pins",
     );
-    await waitFor(() =>
-      expect(readUiSession().component_views[ID]?.representation_layout).toBe("symbol"),
-    );
-
-    // A source disagreement is answered where attribution lives.
-    await user.click(
-      within(items[1]).getByRole("button", {
-        name: "Resolve: Sources Disagree On Package",
-      }),
-    );
-    await waitFor(() => expect(readUiSession().component_views[ID]?.info_tab).toBe("sources"));
+    // The two KEY specifications, in the schema's order - and not the package, which is a group
+    // row the header would have picked up when it scanned the groups itself.
+    const facts = node("component-browser.header-key-facts");
+    expect(facts).toHaveTextContent("1.65–5.5 V · 32 mA");
+    expect(facts).not.toHaveTextContent("SOT-23-5 ·");
   });
 
-  it("says so honestly when nothing needs attention", async () => {
-    await open();
+  it("never says the same fact on two of its four lines", async () => {
+    // MEASURED on the seeded library's 100 nF 0402 capacitor. The header read
+    //     CL05B104KO5NNNC / Samsung · 100 nF 16V X7R 0402 / Capacitors · 0402 / 100 nF · 0402
+    // - `0402` three times and `100 nF` twice, on four consecutive lines. The four lines are four
+    // different sentences about one part, and a distributor's description carrying the value and
+    // the package in prose is ordinary, so the structured lines have to read line 2 before they
+    // decide what to say.
+    await open(
+      makeDossierWith({
+        identity: {
+          mpn: "CL05B104KO5NNNC",
+          manufacturer: "Samsung",
+          category: "Capacitors",
+          package: "0402",
+          // A capacitor has no pin count, so line 3 is category and package alone.
+          pinCount: null,
+        },
+        qualitySummary: { description: "100 nF 16V X7R 0402" },
+        keySpecifications: [
+          makeSpecification({
+            key: "capacitance",
+            label: "Capacitance",
+            displayValue: "100",
+            unit: "nF",
+            importance: "key",
+          }),
+          makeSpecification({
+            key: "package",
+            label: "Package",
+            displayValue: "0402",
+            unit: "",
+            importance: "key",
+          }),
+        ],
+      }),
+    );
+    // The manufacturer's own words, untouched: normalising a description to fit is not this
+    // header's business.
+    expect(node("component-browser.header-description")).toHaveTextContent(
+      "Samsung · 100 nF 16V X7R 0402",
+    );
+    // Line 3 keeps the classification and drops the package the description already stated.
+    expect(node("component-browser.header-classification").textContent).toBe("Capacitors");
+    // Line 4 had nothing left that adds anything, so it is omitted rather than padded.
+    expect(document.querySelector('[data-dev-id="component-browser.header-key-facts"]')).toBeNull();
+  });
+
+  it("keeps a key fact the lines above it have not already said", async () => {
+    // The rule is de-duplication, not suppression: a description that names the package does not
+    // cost the reader the numbers, and line 4 still carries every fact that adds something.
+    await open(
+      makeDossierWith({
+        identity: {
+          mpn: "CL05B104KO5NNNC",
+          manufacturer: "Samsung",
+          category: "Capacitors",
+          package: "0402",
+          // A capacitor has no pin count, so line 3 is category and package alone.
+          pinCount: null,
+        },
+        qualitySummary: { description: "MLCC 0402 X7R" },
+        keySpecifications: [
+          makeSpecification({
+            key: "capacitance",
+            label: "Capacitance",
+            displayValue: "100",
+            unit: "nF",
+            importance: "key",
+          }),
+          makeSpecification({
+            key: "voltage_rating",
+            label: "Voltage Rating",
+            displayValue: "16",
+            unit: "V",
+            importance: "key",
+          }),
+          makeSpecification({
+            key: "package",
+            label: "Package",
+            displayValue: "0402",
+            unit: "",
+            importance: "key",
+          }),
+        ],
+      }),
+    );
+    expect(node("component-browser.header-classification").textContent).toBe("Capacitors");
+    const facts = node("component-browser.header-key-facts");
+    expect(facts).toHaveTextContent("100 nF · 16 V");
+    expect(facts.textContent).not.toContain("0402");
+  });
+
+  it("carries exactly the four header actions and none of the removed ones", async () => {
+    await open(
+      makeDossier({
+        identity: {
+          manufacturerPage: {
+            url: "https://www.ti.com/product/LM358",
+            host: "www.ti.com",
+            sourceId: "manufacturer",
+            sourceLabel: "Manufacturer",
+            state: "verified",
+            verified: true,
+            reason: "the host is the manufacturer's own domain",
+            checkedAt: "",
+            rejectedCandidates: [],
+          },
+        },
+        documents: {
+          items: [makeDocument({ isPreferred: true })],
+          count: 1,
+          hasDatasheet: true,
+          preferredDatasheet: makeDocument({ isPreferred: true }),
+          preferredDatasheetReason: "official manufacturer PDF URL",
+        },
+      }),
+    );
+    const actions = within(node("component-browser.header-actions"))
+      .getAllByRole("button")
+      .map((button) => button.textContent?.trim());
+    expect(actions).toEqual(["Datasheet", "Manufacturer Page", "Copy MPN", "Manage"]);
+
+    for (const gone of [
+      "Complete Component",
+      "Edit Identity",
+      "Resolve Source Conflict",
+      "Delete Part",
+      "KiCad Validated",
+      "Altium Validated",
+    ]) {
+      expect(screen.queryByRole("button", { name: gone })).toBeNull();
+    }
+  });
+
+  it("labels a missing datasheet as a state with a real action, never a dead button", async () => {
+    await open(makeDossier());
+    expect(node("component-browser.datasheet-missing")).toHaveTextContent("Datasheet Missing");
+    expect(node("component-browser.datasheet-find")).toBeEnabled();
+  });
+
+  it("offers a Manufacturer Page only when the projection verified whose page it is", async () => {
+    // An UNVERIFIED candidate is real data and is still not promoted into the action, because
+    // pressing it is a promise about who published the page.
+    await open(
+      makeDossier({
+        identity: {
+          manufacturerPage: {
+            url: "https://catalog.example.invalid/lm358",
+            host: "catalog.example.invalid",
+            sourceId: "",
+            sourceLabel: "",
+            state: "unverified",
+            verified: false,
+            reason: "nothing proves this host belongs to the manufacturer",
+            checkedAt: "",
+            rejectedCandidates: [
+              {
+                url: "https://www.mouser.com/lm358",
+                sourceId: "mouser",
+                sourceLabel: "Mouser",
+                reason: "Mouser hosts its own listing, not the official page",
+              },
+            ],
+          },
+        },
+      }),
+    );
     expect(
-      within(screen.getByLabelText("Needs Attention")).getByText("Nothing needs attention."),
+      document.querySelector(devIdSelector("component-browser.header-manufacturer-page")),
+    ).toBeNull();
+  });
+});
+
+describe("Copy MPN", () => {
+  it("copies the canonical part number exactly, and does not resize while confirming", async () => {
+    const user = userEvent.setup();
+    // AFTER setup(): user-event installs its own clipboard stub, and this test is about the exact
+    // string the control hands to the platform, not about what user-event would store.
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    await open(makeDossier({ identity: { mpn: "  SN74LVC1G08DBVR " } }));
+
+    const button = node("component-browser.copy-mpn");
+    const labelBefore = button.textContent;
+    await user.click(button);
+    // Byte for byte: no trim, no case change, no appended package.
+    expect(writeText).toHaveBeenCalledWith("  SN74LVC1G08DBVR ");
+    await waitFor(() => expect(button.querySelector('[data-copied="true"]')).not.toBeNull());
+    // The label is unchanged and the glyph box is fixed, so nothing beside it moves.
+    expect(button.textContent).toBe(labelBefore);
+    expect(button.querySelector('[data-copied="true"]')!.className).toContain("h-3.5 w-3.5");
+    expect(button).toHaveAccessibleName("Copied");
+  });
+});
+
+describe("the Manage menu", () => {
+  it("lists every management action, with Delete Component alone at the bottom", async () => {
+    const user = userEvent.setup();
+    await open();
+    await user.click(node("component-browser.manage"));
+    const entries = within(node("component-browser.manage-menu")).getAllByRole("menuitem");
+    expect(entries.map((item) => item.textContent?.trim())).toEqual([
+      "Edit Identity...",
+      "Edit Category and Classification...",
+      "Review Missing Specifications...",
+      "Refresh Component Data",
+      "Review CAD Sources...",
+      "View Data Provenance...",
+      "Delete Component...",
+    ]);
+    // Destructive last, and restrained red TEXT rather than a filled control.
+    const last = entries[entries.length - 1];
+    expect(last.className).toContain("text-err");
+    expect(last.className).not.toContain("bg-err");
+  });
+
+  it("puts an ellipsis only where another surface follows", () => {
+    const items = manageMenuItems({
+      onEditIdentity: () => {},
+      onEditClassification: () => {},
+      onReviewMissing: () => {},
+      onRefresh: () => {},
+      refreshing: false,
+      onReviewCadSources: () => {},
+      onViewProvenance: () => {},
+      onDelete: () => {},
+    });
+    expect(items.find((item) => item.id === "refresh")!.label).toBe("Refresh Component Data");
+    expect(items.filter((item) => item.label.endsWith("...")).length).toBe(items.length - 1);
+    expect(items[items.length - 1].id).toBe("delete");
+    expect(items[items.length - 1].separated).toBe(true);
+  });
+
+  it("closes on Escape and hands focus back to the trigger", async () => {
+    const user = userEvent.setup();
+    await open();
+    await user.click(node("component-browser.manage"));
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(document.querySelector(devIdSelector("component-browser.manage-menu"))).toBeNull(),
+    );
+    expect(document.activeElement).toBe(node("component-browser.manage"));
+  });
+
+  it("names the component and what is removed before it deletes anything", async () => {
+    const user = userEvent.setup();
+    const onDeleted = vi.fn();
+    mockApi.deletePart.mockResolvedValue(undefined);
+    await open(makeDossier({ identity: { mpn: "LM358DR" } }), onDeleted);
+
+    await user.click(node("component-browser.manage"));
+    await user.click(screen.getByRole("menuitem", { name: "Delete Component..." }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Delete Component" });
+    expect(dialog).toHaveTextContent("LM358DR");
+    expect(dialog).toHaveTextContent(/symbol, footprint, 3D model, specifications/);
+    // Only the final confirmation is solid red.
+    const confirm = within(dialog).getByRole("button", { name: "Delete Component" });
+    expect(confirm.className).toContain("bg-err");
+    await user.click(confirm);
+    await waitFor(() => expect(mockApi.deletePart).toHaveBeenCalledWith(ID));
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledWith(ID));
+  });
+});
+
+describe("no EDA application is named in ordinary inspection", () => {
+  const EDA = /kicad|altium|eagle|orcad|easyeda/i;
+
+  it("names asset kinds, states and PROVIDERS, and never a design tool", async () => {
+    const { container } = await open(
+      makeDossier({
+        cadAssets: {
+          kinds: {
+            symbol: makeRepresentation("symbol", "ready", [
+              makeTool({ tool: "kicad", toolLabel: "KiCad", sourceLabel: "Ultra Librarian" }),
+              makeTool({ tool: "altium", toolLabel: "Altium", sourceLabel: "Ultra Librarian" }),
+            ]),
+            footprint: makeRepresentation("footprint", "ready", [
+              makeTool({ tool: "kicad", toolLabel: "KiCad", sourceLabel: "Ultra Librarian" }),
+            ]),
+            model: makeRepresentation("model", "ready", [
+              makeTool({ tool: "kicad", toolLabel: "KiCad", sourceLabel: "Ultra Librarian" }),
+            ]),
+          },
+          // The column-level decision names the PROVIDER, and the choice it offers is a
+          // provider too. Neither is an EDA application, which is the whole distinction.
+          preference: {
+            provider: "ultralibrarian",
+            label: "Ultra Librarian",
+            pinned: true,
+            assets: {
+              symbol: { provider: "ultralibrarian", label: "Ultra Librarian", origin: "set_preference" },
+              footprint: { provider: "ultralibrarian", label: "Ultra Librarian", origin: "set_preference" },
+              model: { provider: "ultralibrarian", label: "Ultra Librarian", origin: "set_preference" },
+            },
+            options: [
+              {
+                provider: "ultralibrarian",
+                label: "Ultra Librarian",
+                coverage: { symbol: "validated", footprint: "validated", model: "validated" },
+                set: { allowed: true, refusal: "", reason: "", changes: [], current: true },
+                assets: {
+                  symbol: { allowed: true, refusal: "", reason: "", changes: [], current: false },
+                  footprint: { allowed: true, refusal: "", reason: "", changes: [], current: false },
+                  model: { allowed: true, refusal: "", reason: "", changes: [], current: false },
+                },
+              },
+            ],
+          },
+        },
+        provenance: { sources: [makeSourceLedgerEntry({ id: "digikey", label: "DigiKey" })] },
+        distributorOffers: [makeOffer()],
+        supplySummary: { offerCount: 1, totalStock: 512 },
+      }),
+    );
+    expect(container.textContent ?? "").not.toMatch(EDA);
+    // The provider IS named, because a provider is source information.
+    expect(node("component-browser.preferred-source")).toHaveTextContent("Ultra Librarian");
+    expect(node("component-browser.column-cad")).toHaveTextContent("Symbol");
+  });
+
+  it("states an asset with a recorded check as Validated, never as the vague Ready", () => {
+    const validated = makeRepresentation("symbol", "ready", [
+      makeTool({
+        checks: [
+          {
+            check: "pin_count",
+            measured: 8,
+            expected: 8,
+            against: "datasheet",
+            checkedAt: "2026-08-01T00:00:00Z",
+            note: "",
+          },
+        ],
+      }),
+    ]);
+    expect(cadAssetStatus(validated)).toBe("Validated");
+    expect(cadAssetStatus(makeRepresentation("symbol", "ready"))).toBe("Available");
+    expect(cadAssetStatus(makeRepresentation("footprint", "missing", []))).toBe("Missing");
+    expect(cadAssetStatus(makeRepresentation("model", "failed"))).toBe("Failed");
+  });
+
+  it("keeps every asset module on screen when one is expanded", async () => {
+    const user = userEvent.setup();
+    await open();
+    await user.click(screen.getByRole("button", { name: "Footprint", expanded: true }));
+    for (const kind of ["symbol", "footprint", "model"] as const) {
+      expect(
+        document.querySelector(devIdSelector(componentRepresentationDevId(ID, kind))),
+      ).not.toBeNull();
+    }
+  });
+});
+
+/**
+ * One electrical group carrying the four situations that used to be indistinguishable: a verified
+ * value, a field the category EXPECTS and nobody supplied, a field nobody supplied that the
+ * category does not require, and two sources disagreeing.
+ */
+const ELECTRICAL_ROWS = [
+    makeSpecification({
+      key: "supply_voltage",
+      label: "Supply Voltage",
+      displayValue: "3.3",
+      unit: "V",
+      verificationState: "verified",
+    }),
+    makeSpecification({
+      key: "gain_bandwidth",
+      label: "Gain Bandwidth",
+      verificationState: "missing",
+      applicability: "expected",
+      expectedForCategory: true,
+    }),
+    makeSpecification({
+      key: "slew_rate",
+      label: "Slew Rate",
+      verificationState: "not_reported",
+      applicability: "applicable",
+      expectedForCategory: false,
+    }),
+    makeSpecification({
+      key: "operating_temperature",
+      label: "Operating Temperature",
+      displayValue: "−40–125",
+      unit: "°C",
+      verificationState: "conflicting",
+      conflictState: "conflicting",
+      sourceCandidates: [
+        makeCandidate({
+          sourceId: "digikey",
+          sourceLabel: "DigiKey",
+          value: "−40–125",
+          displayValue: "−40–125",
+        }),
+        makeCandidate({
+          sourceId: "mouser",
+          sourceLabel: "Mouser",
+          value: "0–70",
+          displayValue: "0–70",
+        }),
+      ],
+      preferredSource: makeCandidate({
+        sourceId: "digikey",
+        sourceLabel: "DigiKey",
+        value: "−40–125",
+        displayValue: "−40–125",
+      }),
+    }),
+];
+
+const ELECTRICAL: SpecificationGroup = {
+  id: "electrical",
+  label: "Electrical",
+  specifications: ELECTRICAL_ROWS,
+  count: ELECTRICAL_ROWS.length,
+};
+
+describe("the specification column", () => {
+  it("shows the specifications immediately, not behind a tab or a View All", async () => {
+    await open(makeDossierWith({ groups: [ELECTRICAL] }));
+    const column = node("component-browser.column-specifications");
+    expect(column).toHaveTextContent("Supply Voltage");
+    expect(column).toHaveTextContent("3.3 V");
+  });
+
+  it("renders an expected field nobody supplied as a real Missing row", async () => {
+    await open(makeDossierWith({ groups: [ELECTRICAL] }));
+    const row = document.querySelector<HTMLElement>('[data-spec-key="gain_bandwidth"]')!;
+    expect(row).not.toBeNull();
+    expect(row.dataset.specState).toBe("missing");
+    expect(row).toHaveTextContent("Gain Bandwidth");
+    expect(row).toHaveTextContent("Missing");
+  });
+
+  it("keeps Not Reported apart from Missing, because only one of them is a gap", async () => {
+    await open(makeDossierWith({ groups: [ELECTRICAL] }));
+    const notReported = document.querySelector<HTMLElement>('[data-spec-key="slew_rate"]')!;
+    expect(notReported.dataset.specState).toBe("not_reported");
+    expect(notReported).toHaveTextContent("Not Reported");
+    // The header counts the GAP only. A field the category never asked for is not one.
+    expect(node("component-browser.quality-summary").dataset.missing).toBe("1");
+  });
+
+  it("attaches a conflicting value's alternative to the row it disagrees with", async () => {
+    const user = userEvent.setup();
+    await open(makeDossierWith({ groups: [ELECTRICAL] }));
+    const row = document.querySelector<HTMLElement>(
+      '[data-spec-key="operating_temperature"]',
+    )!;
+    expect(row.dataset.specState).toBe("conflicting");
+    await user.click(
+      within(row).getByRole("button", { name: /Source evidence for Operating Temperature/ }),
+    );
+    // The losing answer is listed ON the row it disagrees with, carrying the source that offered
+    // it and the trust tier that lost it the field.
+    const alternate = within(row).getByRole("listitem");
+    expect(alternate).toHaveTextContent("0–70");
+    expect(alternate).toHaveTextContent("Mouser");
+    expect(
+      within(alternate).getByRole("button", { name: "Use Mouser Value" }),
     ).toBeInTheDocument();
+  });
+
+  it("filters rather than paginates, and the header's quality summary drives the filter", async () => {
+    const user = userEvent.setup();
+    await open(makeDossierWith({ groups: [ELECTRICAL] }));
+    const missing = document.querySelector<HTMLElement>('[data-quality-segment="missing"]')!;
+    expect(missing).toHaveTextContent("1 Required Values Missing");
+    await user.click(missing);
+    await waitFor(() =>
+      expect(
+        document.querySelectorAll('[data-dev-id="component-browser.spec-row"]'),
+      ).toHaveLength(1),
+    );
+    expect(document.querySelector('[data-spec-state="missing"]')).toHaveTextContent(
+      "Gain Bandwidth",
+    );
+  });
+
+  it("counts each filter over the six-state vocabulary rather than over empty strings", () => {
+    expect(countForFilter([ELECTRICAL], [], "missing")).toBe(1);
+    expect(countForFilter([ELECTRICAL], [], "conflicts")).toBe(1);
+    expect(countForFilter([ELECTRICAL], [], "unverified")).toBe(0);
+    // A group that loses every row is dropped rather than rendered as an empty heading.
+    expect(filterGroups([ELECTRICAL], "conflicts", "")).toHaveLength(1);
+    expect(filterGroups([ELECTRICAL], "conflicts", "supply")).toHaveLength(0);
+  });
+
+  it("takes key facts from keySpecifications and never invents one", () => {
+    const dossier = makeDossierWith({
+      keySpecifications: [
+        makeSpecification({ key: "a", displayValue: "3.3", unit: "V", importance: "key" }),
+        makeSpecification({ key: "b", displayValue: "", verificationState: "missing" }),
+      ],
+    });
+    // The one with a value. A key specification with no answer keeps its ROW below and stays out
+    // of a header line that would otherwise be a row of blanks.
+    expect(keyFacts(dossier).map((fact) => fact.key)).toEqual(["a"]);
+    expect(keyFacts(makeDossier())).toEqual([]);
+  });
+});
+
+describe("the sourcing column", () => {
+  it("answers lifecycle, stock and price before it explains where they came from", async () => {
+    await open(
+      makeDossier({
+        identity: { lifecycle: "Active" },
+        distributorOffers: [makeOffer({ stock: 512, unitPrice: 0.42 })],
+        supplySummary: {
+          offerCount: 1,
+          totalStock: 512,
+          bestUnitPrice: 0.42,
+          bestUnitPriceCurrency: "$",
+          lifecycle: "Active",
+        },
+        provenance: { sources: [makeSourceLedgerEntry()] },
+      }),
+    );
+    const column = node("component-browser.column-sourcing");
+    expect(column).toHaveTextContent("512");
+    expect(column).toHaveTextContent("$0.42");
+    const lifecycle = node("component-browser.lifecycle");
+    const provenance = node("component-browser.provenance");
+    expect(
+      lifecycle.compareDocumentPosition(provenance) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("says Unknown when no distributor reported a count, and never renders it as zero", async () => {
+    await open(
+      makeDossier({
+        distributorOffers: [makeOffer({ stock: null })],
+        supplySummary: { offerCount: 1, totalStock: null },
+      }),
+    );
+    const stock = node("component-browser.total-stock");
+    expect(stock.dataset.stockKnown).toBe("false");
+    expect(stock).toHaveTextContent("Unknown");
+    expect(stock).not.toHaveTextContent("0");
+  });
+
+  it("distinguishes a real zero from an unknown count", async () => {
+    await open(
+      makeDossier({
+        distributorOffers: [makeOffer({ stock: 0 })],
+        supplySummary: { offerCount: 1, totalStock: 0 },
+      }),
+    );
+    const stock = node("component-browser.total-stock");
+    expect(stock.dataset.stockKnown).toBe("true");
+    expect(stock).toHaveTextContent("0");
+  });
+
+  it("names the destination of a distributor link rather than saying Product Page", async () => {
+    await open(
+      makeDossier({
+        distributorOffers: [makeOffer({ provider: "mouser", providerLabel: "Mouser" })],
+        supplySummary: { offerCount: 1 },
+      }),
+    );
+    expect(screen.getByRole("link", { name: "Open Mouser Listing" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Product Page" })).toBeNull();
+  });
+
+  it("attaches a source failure to the sourcing section without blanking the old numbers", async () => {
+    await open(
+      makeDossier({
+        distributorOffers: [makeOffer({ failureState: "failed" })],
+        supplySummary: {
+          offerCount: 1,
+          totalStock: 512,
+          failures: [
+            { provider: "digikey", providerLabel: "DigiKey", state: "failed" },
+          ],
+        },
+      }),
+    );
+    // Named, and a sentence rather than a state token pasted into one.
+    expect(node("component-browser.offer-failures")).toHaveTextContent(
+      "DigiKey could not be read",
+    );
+    // The offer it failed to refresh is still on screen, with its last known numbers.
+    expect(node("component-browser.offers")).toHaveTextContent("512");
+  });
+
+  it("states why a related part is related, and that Stockroom has validated nothing", async () => {
+    await open(
+      makeDossier({
+        relatedParts: [
+          makeRelatedPart({
+            mpn: "SN74AHC1G08DBVR",
+            reason: "same_function_different_logic_family",
+            reasonLabel: "Same function, different logic family",
+            evidence: [{ field: "logic_family", ours: "LVC", theirs: "AHC" }],
+          }),
+        ],
+      }),
+    );
+    const row = document.querySelector<HTMLElement>('[data-dev-id="component-browser.related-row"]')!;
+    expect(row.dataset.relatedReason).toBe("same_function_different_logic_family");
+    expect(row).toHaveTextContent("Same function, different logic family");
+    expect(node("component-browser.related-evidence")).toHaveTextContent(
+      "logic_family: LVC → AHC",
+    );
+    expect(node("component-browser.related-not-validated")).toHaveTextContent(
+      "Not checked for equivalence by Stockroom",
+    );
+  });
+
+  it("shows the preferred datasheet's reason instead of re-deriving which copy wins", async () => {
+    await open(
+      makeDossierWith({
+        documents: [
+          makeDocument({
+            title: "LM358 Datasheet",
+            isPreferred: true,
+            sourceType: "distributor",
+            sourceLabel: "DigiKey",
+          }),
+        ],
+      }),
+    );
+    expect(node("component-browser.preferred-datasheet-reason")).toHaveTextContent(
+      "official manufacturer PDF URL",
+    );
+  });
+});
+
+describe("the workspace status bar", () => {
+  it("states the component's own condition without repeating the library counts", async () => {
+    await open(makeDossierWith({ groups: [ELECTRICAL] }));
+    const bar = node("component-browser.status-bar");
+    expect(bar).toHaveTextContent("Ready");
+    expect(bar).toHaveTextContent("1 missing");
+    expect(bar).toHaveTextContent("1 conflicting");
+  });
+
+  it("summarises quality as named conditions, never as an opaque fraction", () => {
+    const dossier = makeDossier({
+      cadAssets: { kinds: { footprint: makeRepresentation("footprint", "missing", []) } },
+    });
+    const segments = qualitySegments(dossier);
+    expect(segments.map((segment) => segment.kind)).toEqual(["cad"]);
+    expect(segments[0].tone).toBe("warn");
+    expect(segments[0].count).toBe(1);
   });
 });

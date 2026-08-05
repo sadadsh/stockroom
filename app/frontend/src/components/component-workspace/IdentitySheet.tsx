@@ -20,7 +20,7 @@
  * the label and leave the files where they were.
  */
 import type { PartDetail } from "../../api/types";
-import type { ComponentIdentityView } from "../../api/workspaceTypes";
+import type { ComponentIdentityView } from "../../api/dossierTypes";
 import { Text } from "../../lib/copy";
 import { EditableText } from "../EditableText";
 import { HandoffBand } from "../HandoffBand";

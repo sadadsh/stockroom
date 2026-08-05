@@ -13,9 +13,11 @@ import type { ReactNode } from "react";
 import { ApiError, api } from "../../api/client";
 import { cadVariantApi } from "../../api/cadVariantClient";
 import type {
+  CadPreferenceScope,
+  CadPreferenceView,
+  ComponentDossier,
   ComponentProvidersView,
-  ComponentWorkspaceResponse,
-} from "../../api/workspaceTypes";
+} from "../../api/dossierTypes";
 import { CaptureProvider } from "../../lib/capture";
 import { componentProviderDevId, devIdSelector } from "../../lib/componentDevIds";
 import { ThemeProvider } from "../../lib/theme";
@@ -27,9 +29,9 @@ import {
 } from "../../lib/uiSession";
 import {
   makeCoverageCell,
+  makeDossier,
   makeProviderRow,
-  makeWorkspace,
-} from "../../test/workspaceFixture";
+} from "../../test/dossierFixture";
 import { ComponentWorkspace } from "./ComponentWorkspace";
 
 vi.mock("../../api/client", async (importActual) => {
@@ -37,7 +39,7 @@ vi.mock("../../api/client", async (importActual) => {
   return {
     ...actual,
     api: {
-      partWorkspace: vi.fn(),
+      partDossier: vi.fn(),
       partHistory: vi.fn(),
       partDetail: vi.fn(),
       partCadSource: vi.fn(),
@@ -147,6 +149,84 @@ function coverage(): ComponentProvidersView {
   };
 }
 
+/**
+ * What is in force, and what each choice would replace - as the backend already planned it.
+ *
+ * Ultra Librarian is the preferred set here, which is what makes the per-asset refusals real:
+ * pinning SnapEDA to one artifact would leave two providers in force across the three, and the
+ * backend says so with the reason the table has to show BEFORE the click.
+ */
+function preference(): CadPreferenceView {
+  const allowed = (current = false): CadPreferenceScope => ({
+    allowed: true,
+    refusal: "",
+    reason: "",
+    changes: [],
+    current,
+  });
+  const mixed = (): CadPreferenceScope => ({
+    allowed: false,
+    refusal: "mixed",
+    reason:
+      "Preferring SnapEDA for this asset would leave Ultra Librarian in force for the other assets.",
+    changes: [],
+    current: false,
+  });
+  const unsupplied = (): CadPreferenceScope => ({
+    allowed: false,
+    refusal: "unsupplied",
+    reason: "TraceParts does not supply the Symbol for this component.",
+    changes: [],
+    current: false,
+  });
+  const source = { provider: "ultralibrarian", label: "Ultra Librarian", origin: "set_preference" as const };
+  return {
+    provider: "ultralibrarian",
+    label: "Ultra Librarian",
+    mixed: false,
+    pinned: true,
+    reviewedAt: "2026-08-05T00:00:00Z",
+    assets: { symbol: source, footprint: source, model: source },
+    assetLabels: { symbol: "Symbol", footprint: "Footprint", model: "3D Model" },
+    options: [
+      {
+        provider: "ultralibrarian",
+        label: "Ultra Librarian",
+        coverage: { symbol: "validated", footprint: "downloaded", model: "available" },
+        set: allowed(true),
+        assets: { symbol: allowed(), footprint: allowed(), model: allowed() },
+      },
+      {
+        provider: "snapeda",
+        label: "SnapEDA",
+        coverage: { symbol: "available", footprint: "not_available", model: "unknown" },
+        set: {
+          allowed: false,
+          refusal: "unsupplied",
+          reason: "SnapEDA does not supply the Footprint, 3D Model for this component.",
+          changes: [],
+          current: false,
+        },
+        assets: { symbol: mixed(), footprint: mixed(), model: mixed() },
+      },
+      {
+        provider: "traceparts",
+        label: "TraceParts",
+        coverage: { symbol: "unknown", footprint: "unknown", model: "unknown" },
+        set: unsupplied(),
+        assets: { symbol: unsupplied(), footprint: unsupplied(), model: unsupplied() },
+      },
+      {
+        provider: "digikey",
+        label: "DigiKey",
+        coverage: { symbol: "unknown", footprint: "unknown", model: "downloaded" },
+        set: unsupplied(),
+        assets: { symbol: unsupplied(), footprint: unsupplied(), model: mixed() },
+      },
+    ],
+  };
+}
+
 beforeEach(() => {
   mockApi.previewSvg.mockResolvedValue(new Blob(["<svg/>"], { type: "image/svg+xml" }));
   mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
@@ -191,23 +271,32 @@ function provide(ui: ReactNode) {
 async function open(
   providers: ComponentProvidersView = coverage(),
 ): Promise<HTMLElement> {
-  const workspace: ComponentWorkspaceResponse = makeWorkspace({ providers });
+  const dossier: ComponentDossier = makeDossier({
+    cadSourceCoverage: providers,
+    cadAssets: { preference: preference() },
+  });
   resetUiSessionForTests(openComponentInSession(defaultUiSession(), ID));
-  mockApi.partWorkspace.mockResolvedValue(workspace);
+  mockApi.partDossier.mockResolvedValue(dossier);
   provide(<ComponentWorkspace componentId={ID} />);
-  await screen.findByRole("heading", { name: workspace.identity.displayName });
-  return document.querySelector<HTMLElement>('[data-dev-id="component-browser.header"]')!;
+  await screen.findByText(dossier.identity.mpn);
+  return document.querySelector<HTMLElement>('[data-dev-id="component-browser.column-cad"]')!;
 }
 
-/** Open the component, then the Complete Component modal, and hand back the dialog. */
+/**
+ * Open the component, then the provider comparison, and hand back the dialog.
+ *
+ * The trip is reached from the CAD column's own Compare Sources control (and from Manage > Review
+ * CAD Sources...), not from a header button: comparing providers is a CAD question and belongs in
+ * the CAD column, not beside the part number.
+ */
 async function openSheet(
   providers: ComponentProvidersView = coverage(),
 ): Promise<{ dialog: HTMLElement; trigger: HTMLElement; user: ReturnType<typeof userEvent.setup> }> {
-  const header = await open(providers);
+  const column = await open(providers);
   const user = userEvent.setup();
-  const trigger = within(header).getByRole("button", { name: /Complete Component/ });
+  const trigger = within(column).getByRole("button", { name: "Compare Sources" });
   await user.click(trigger);
-  const dialog = await screen.findByRole("dialog", { name: "Complete Component" });
+  const dialog = await screen.findByRole("dialog", { name: "Review CAD Sources" });
   return { dialog, trigger, user };
 }
 
@@ -226,18 +315,20 @@ describe("provider coverage matrix", () => {
     expect(ids).toEqual(["ultralibrarian", "snapeda", "traceparts", "digikey"]);
   });
 
-  it("names the seven columns the person is choosing between", async () => {
+  it("names the columns the person is choosing between, and no design tool", async () => {
     const { dialog } = await openSheet();
     const headers = within(dialog)
       .getByRole("table")
       .querySelectorAll("thead th");
+    // The two per-tool count columns this replaces put KiCad and Altium in the middle of an
+    // ordinary comparison, which made a coverage table read as a compatibility report. What a
+    // person compares is availability, validation and source.
     expect(Array.from(headers).map((cell) => cell.textContent)).toEqual([
       "Provider",
       "Symbol",
       "Footprint",
       "3D Model",
-      "KiCad",
-      "Altium",
+      "Validation",
       "Action",
     ]);
   });
@@ -252,12 +343,20 @@ describe("provider coverage matrix", () => {
     expect(within(dialog).getAllByText("Complete Set")).toHaveLength(1);
   });
 
-  it("renders each tool's own count out of three, from 0/3 to 3/3", async () => {
+  it("counts what each provider supplies, and separately what was actually checked", async () => {
     const { dialog } = await openSheet();
-    // Ultra Librarian supplies all three; SnapEDA one; TraceParts none.
-    expect(within(row(dialog, "ultralibrarian")).getAllByText("3/3").length).toBeGreaterThan(0);
+    // Ultra Librarian supplies all three and says so in a word; SnapEDA supplies one of three.
+    expect(within(row(dialog, "ultralibrarian")).getByText("Complete Set")).toBeInTheDocument();
     expect(within(row(dialog, "snapeda")).getAllByText("1/3").length).toBeGreaterThan(0);
     expect(within(row(dialog, "traceparts")).getAllByText("0/3").length).toBeGreaterThan(0);
+    // Validated is a different claim from supplied: a downloaded file nobody inspected must
+    // never be counted as one that passed.
+    expect(
+      row(dialog, "ultralibrarian").querySelector("[data-validated]")?.getAttribute("data-validated"),
+    ).toBe("1");
+    expect(
+      row(dialog, "traceparts").querySelector("[data-validated]")?.getAttribute("data-validated"),
+    ).toBe("0");
   });
 
   it("renders every one of the five statuses under its own label", async () => {
@@ -491,22 +590,27 @@ describe("the modal contract", () => {
     expect(matrix.querySelectorAll(".overflow-y-auto")).toHaveLength(0);
   });
 
-  it("summarises coverage on the header control that opens it", async () => {
-    const header = await open();
-    const trigger = within(header).getByRole("button", { name: /Complete Component/ });
-    // One of four providers can supply the whole set. Two numbers, because "1" alone would not
-    // say whether there is anywhere else to look.
-    expect(trigger.textContent).toContain("1/4");
+  it("is reached from the CAD column rather than from a control beside the part number", async () => {
+    const column = await open();
+    // The header carries identity and four actions; which provider can supply a coherent CAD set
+    // is a CAD question, so its way in sits with the assets it is about.
+    expect(within(column).getByRole("button", { name: "Compare Sources" })).toBeInTheDocument();
+    const header = document.querySelector<HTMLElement>(
+      '[data-dev-id="component-browser.header-actions"]',
+    )!;
+    expect(within(header).queryByRole("button", { name: /Complete Component/ })).toBeNull();
   });
 });
 
 describe("no cross-provider mixing", () => {
-  it("offers no control that assembles one component from several providers", async () => {
+  it("offers no chooser that lists providers under one artifact", async () => {
     const { dialog } = await openSheet();
     const providerLabels = coverage().rows.map((entry) => entry.label);
 
-    // Every chooser in the sheet is a per-artifact ANSWER control, and none of its options is a
+    // Every SELECT in the sheet is a per-artifact ANSWER control, and none of its options is a
     // provider: a select listing providers under Symbol is exactly the mix-and-match this forbids.
+    // The per-asset preference is a button whose availability the backend already decided, not a
+    // menu of every provider offered under each column.
     const choosers = within(dialog).getAllByRole("combobox");
     for (const chooser of choosers) {
       const options = within(chooser)
@@ -516,11 +620,30 @@ describe("no cross-provider mixing", () => {
       for (const label of providerLabels) expect(options).not.toContain(label);
     }
 
-    // And the wording keeps the rule in the person's language, positively stated.
+    // And the wording keeps the rule in the person's language, positively stated. It says it
+    // WITHOUT naming a design tool: this is ordinary provider comparison, and an EDA application
+    // named here would make a compatibility report out of a question about who supplies the files.
     expect(
       within(dialog).getByText(
-        /Stockroom never combines files from two downloads and never activates one design tool alone/,
+        /Stockroom never combines files from two downloads and never activates part of a set on its own/,
       ),
     ).toBeInTheDocument();
+    // The comparison itself names no design tool. It answers "who supplies the files", and the
+    // two per-tool count columns this replaced turned that question into a compatibility report.
+    // Scoped to the matrix on purpose: the same-download PAIR selector below it does name the two
+    // library formats, because there the distinction is the subject rather than an intrusion.
+    const matrix = within(dialog).getByRole("table");
+    expect(matrix.textContent ?? "").not.toMatch(/KiCad|Altium|Eagle|OrCAD|EasyEDA/);
+  });
+
+  it("refuses a per-asset source the backend says would mix two providers, before the click", async () => {
+    const { dialog } = await openSheet();
+    const pin = within(row(dialog, "snapeda")).getAllByRole("button", {
+      name: /Prefer This Source/,
+    })[0];
+    // Disabled, and carrying the reason - so the refusal is readable before the click rather
+    // than arriving as an error after it.
+    expect(pin).toBeDisabled();
+    expect(pin.getAttribute("title")).toMatch(/Ultra Librarian/);
   });
 });

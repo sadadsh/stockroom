@@ -100,7 +100,7 @@ export function SvgViewport({
         </div>
       </div>
       {!compact ? (
-      <div className="absolute bottom-3 right-3 flex items-center overflow-hidden rounded-control border border-line2 bg-popover/95 shadow-pop">
+      <div className="absolute bottom-3 right-3 flex items-center overflow-hidden rounded-control border border-line2 bg-popover shadow-pop">
         <button
           type="button"
           aria-label={zoomOutLabel}

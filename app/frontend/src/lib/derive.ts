@@ -15,13 +15,9 @@ import type { PartDetail } from "../api/types";
 import {
   EMPTY_SPEC_VALUES,
   SPEC_HIDDEN_KEYS,
-  TRADE_GROUP,
   applySign,
   normalizeSpecKey,
   prettifyValue,
-  resolveFamily,
-  resolveSpec,
-  type SpecGroupName,
 } from "./specSchema";
 
 // --- shared spec-bag helpers -------------------------------------------------
@@ -88,59 +84,6 @@ const TITLE_SKIP_KEYS: Set<string> = new Set(
   ].map(normalizeSpecKey),
 );
 
-// Spec keys that are commerce / provenance / logistics, not what the part physically IS:
-// the manufacturer, brand, series, base product number, country of origin, packaging, and
-// pack-quantity rows a distributor page carries. They are dropped from the detail spec sheet
-// so the real parametric specs are not buried under a wall of catalog metadata (the record
-// already carries the manufacturer and category as first-class fields). Normalized so any
-// casing / punctuation matches; a denylist, so a real spec the list does not name still shows.
-// This intentionally does NOT reuse TITLE_SKIP_KEYS: that set also holds real physical specs
-// (Color, Contact Material, Plating) that must never headline but DO belong in the spec sheet.
-const REFERENCE_ONLY_SPEC_KEYS: Set<string> = new Set(
-  [
-    "Manufacturer",
-    "Brand",
-    "Vendor",
-    "Supplier",
-    "Series",
-    "Base Product Number",
-    "Base Product",
-    "Country of Origin",
-    "Assembly Country of Origin",
-    "Country of Diffusion",
-    "Product",
-    "Product Type",
-    "Product Category",
-    "Subcategory",
-    "Category",
-    "ECCN",
-    "HTS Code",
-    "HTSUS",
-    "Unit Weight",
-    "DigiKey Programmable",
-    "Number of Parts",
-  ].map(normalizeSpecKey),
-);
-
-// A couple of families that vary too much to enumerate (Factory Pack Quantity, Standard Pack
-// Quantity, Quantity per Reel; Base Product Number; catalog numbers) are matched by substring.
-const _REFERENCE_ONLY_RE = /pack quantity|country of origin|base product|\bcatalog\b|packaging|tariff/;
-
-/**
- * True when a spec key is catalog metadata (commerce / provenance / logistics) rather than a
- * physical parameter, so the detail spec sheet can drop it. Exported so the one place that
- * decides "is this a real spec to show" stays shared.
- */
-export function isReferenceOnlySpecKey(rawKey: string): boolean {
-  const nk = normalizeSpecKey(rawKey);
-  return (
-    resolveFamily(rawKey)?.family.group === TRADE_GROUP ||
-    resolveSpec(rawKey, "").group === TRADE_GROUP ||
-    REFERENCE_ONLY_SPEC_KEYS.has(nk) ||
-    _REFERENCE_ONLY_RE.test(nk)
-  );
-}
-
 // The first presentable, non-hidden, DEFINING spec value in insertion order (commerce /
 // provenance / compliance keys in TITLE_SKIP_KEYS are skipped so a country or brand can
 // never headline), or null when the bag holds nothing usable. The generic title fallback
@@ -187,15 +130,6 @@ const _TITLE_INDEX: Map<string, TitleRule> = (() => {
   }
   return index;
 })();
-
-/** The primary (defining) spec key for a category, from the title registry's leading spec
- * (Resistors -> "Resistance", Capacitors -> "Capacitance", Ferrite Beads -> "Impedance"), or null
- * for a category with no registered primary spec (ICs). Shared with the search table's adaptive
- * Value column (FIX-05) so a row resolves its own value from the same registry the title uses. */
-export function categoryPrimarySpecKey(category: string): string | null {
-  const rule = _TITLE_INDEX.get(normalizeSpecKey(category));
-  return rule && rule.specs.length > 0 ? rule.specs[0] : null;
-}
 
 // A naive singular form of a category, used as the masthead noun for a category the
 // registry does not name (Thermistors -> Thermistor, Batteries -> Battery). Category nouns
@@ -260,189 +194,4 @@ export function deriveTitle(part: PartDetail): string {
   // Nothing usable in the specs: the raw name is the honest last resort, then the category,
   // so the masthead is never empty.
   return displayName.trim() || category.trim();
-}
-
-// --- attributes --------------------------------------------------------------
-
-// One attribute rule: a normalized spec key + a formatter that turns its value into a chip
-// label (or null to skip). Adding an attribute-worthy spec is one line here.
-interface AttributeRule {
-  match: string;
-  format: (value: string) => string | null;
-}
-
-// The full ranked set the attributes card may hold; it shows only the first several as a glance
-// and reveals the rest behind "Show All", so this is the ceiling, not what is shown at rest.
-const MAX_ATTRIBUTES = 14;
-
-// Mounting codes normalized to a spoken label; a value that is already a label passes
-// through formatMounting unchanged.
-const MOUNTING_LABEL: Record<string, string> = {
-  smd: "Surface Mount",
-  smt: "Surface Mount",
-  "surface mount": "Surface Mount",
-  tht: "Through Hole",
-  th: "Through Hole",
-  "through hole": "Through Hole",
-  "thru hole": "Through Hole",
-};
-
-function formatMounting(value: string): string {
-  return MOUNTING_LABEL[value.trim().toLowerCase()] ?? value.trim();
-}
-
-// Values that read as "this attribute does NOT apply", so a compliance / boolean-ish spec
-// carrying one produces no chip rather than a misleading positive.
-const NEGATIVE = new Set([
-  "no",
-  "n",
-  "none",
-  "false",
-  "non-compliant",
-  "not compliant",
-  "not applicable",
-]);
-
-function isNegative(value: string): boolean {
-  return NEGATIVE.has(value.trim().toLowerCase());
-}
-
-// The extensible attribute registry: each line maps a normalized spec key to the chip it
-// contributes. The chip labels are Title Case (they are interactive-style tags); domain
-// terms (RoHS, AEC-Q200, ...) keep their canonical form.
-const ATTRIBUTE_REGISTRY: AttributeRule[] = [
-  // physical case / package prints its own code verbatim ("0603", "SOT-23")
-  { match: "package", format: (v) => v },
-  { match: "case", format: (v) => v },
-  { match: "case code", format: (v) => v },
-  // mounting normalizes a short code to a spoken label, else keeps the data's own label
-  { match: "mounting type", format: formatMounting },
-  { match: "mounting", format: formatMounting },
-  // element material / composition is itself the attribute ("Thick Film")
-  { match: "composition", format: (v) => v },
-  // an automotive qualification prints as-is ("AEC-Q200"); a boolean form maps to the label
-  { match: "qualification", format: (v) => v },
-  { match: "aec q200", format: (v) => (isNegative(v) ? null : "AEC-Q200") },
-  // compliance: a positive value becomes the spoken compliance chip
-  { match: "rohs", format: (v) => (isNegative(v) ? null : "RoHS Compliant") },
-  { match: "reach", format: (v) => (isNegative(v) ? null : "REACH Compliant") },
-  // salient boolean-ish features print their canonical label when they apply
-  { match: "anti surge", format: (v) => (isNegative(v) ? null : "Anti-Surge") },
-  { match: "sulfur resistant", format: (v) => (isNegative(v) ? null : "Sulfur Resistant") },
-  { match: "sulphur resistant", format: (v) => (isNegative(v) ? null : "Sulfur Resistant") },
-  // more parametric categoricals (Mouser-style): dielectric, connector gender / termination,
-  // element / contact material + plating, orientation, mounting style, feature flags.
-  { match: "dielectric", format: (v) => v },
-  { match: "gender", format: (v) => v },
-  { match: "termination", format: (v) => v },
-  { match: "termination style", format: (v) => v },
-  { match: "termination type", format: (v) => v },
-  { match: "orientation", format: (v) => v },
-  { match: "mounting style", format: (v) => v },
-  { match: "mounting angle", format: (v) => v },
-  { match: "contact material", format: (v) => v },
-  { match: "contact plating", format: (v) => v },
-  { match: "shielding", format: (v) => (isNegative(v) ? null : v) },
-  { match: "lifecycle", format: (v) => (/active/i.test(v) ? "Active" : null) },
-  { match: "part status", format: (v) => (/active/i.test(v) ? "Active" : null) },
-  { match: "features", format: (v) => (v.length <= 24 ? v : null) },
-  { match: "automotive", format: (v) => (isNegative(v) ? null : "Automotive") },
-];
-
-const _ATTR_INDEX: Map<string, AttributeRule> = (() => {
-  const index = new Map<string, AttributeRule>();
-  for (const rule of ATTRIBUTE_REGISTRY) {
-    if (!index.has(rule.match)) index.set(rule.match, rule);
-  }
-  return index;
-})();
-
-// How a spec's group weighs into "is this what people care about": the electrical parameters
-// first, then the physical form, then compliance. Mirrors the search columns' ranking so the
-// glance-chips and the parametric columns agree on what matters. "Other" is admitted, but last.
-const _ATTR_GROUP_SCORE: Record<SpecGroupName, number> = {
-  Electrical: 400,
-  Physical: 250,
-  // What the part IS and DOES (its type, topology, channel count). A glance-chip's whole job is
-  // to state that, so it ranks above compliance and just under the physical form.
-  Device: 200,
-  "Ratings & Compliance": 120,
-  // A glance-chip states what the part IS. An origin country or a tariff rate never does, and
-  // `isReferenceOnlySpecKey` already keeps these keys off the chips - this only makes the ranking
-  // agree with that instead of leaving a hole in the map.
-  "Trade & Compliance": 0,
-  Other: 0,
-};
-
-// The part's HEADLINE value already leads the title (deriveTitle), so it is redundant as a chip.
-// Exported as the single source of truth for "a passive's primary parametric value", reused by
-// the search table's adaptive Value column (FIX-05) so the two never fork the mapping.
-export const PRIMARY_VALUE_KEYS = new Set(
-  ["resistance", "capacitance", "inductance"].map(normalizeSpecKey),
-);
-
-// Provenance / logistics keys are never "what people care about" when choosing a part.
-const _COMMERCIAL_ATTR =
-  /tariff|packaging|pack quantity|standard pack|country of origin|lead time|weight|base product|catalog|reach|export|eccn|\bhts\b|series|subcategory|moisture|number of parts|^product$/;
-
-// The package/case is a headline physical attribute (footprint choice), so it rides near the
-// electrical parameters rather than sinking with the rest of the physical form.
-const _PRIME_PHYSICAL = new Set(["package", "case", "case code"].map(normalizeSpecKey));
-
-// Raw physical dimensions read as noise in a summary chip ("0.8 mm", "2 mm") - the package code
-// already conveys the footprint - so they sink below every other attribute and surface only when
-// a part has nothing better to say.
-const _DIMENSION_KEYS = new Set(
-  ["height", "length", "width", "thickness", "depth", "diameter", "size", "lead spacing", "lead pitch"].map(
-    normalizeSpecKey,
-  ),
-);
-
-/**
- * The "Attributes" chips: the FEW parameters that actually matter when choosing this part -
- * derived purely from its specs and ranked by importance (electrical first, then form, then
- * compliance), capped small so the card reads as a summary, not a data dump. The headline value
- * (in the title) and commercial/provenance keys are skipped; a registry formatter gives a
- * spoken label where one exists ("SMD" -> "Surface Mount", "RoHS" -> "RoHS Compliant"), else the
- * value is prettified and signed (±1%, 200 mW, ±100 ppm/°C, 0603). Curated tags are NO LONGER
- * folded in - a user's manual attributes live in `tags` and are shown/edited separately.
- */
-export function deriveAttributes(part: PartDetail): string[] {
-  const { category, specs } = part.derived;
-  const scored: { label: string; score: number; order: number }[] = [];
-  let seq = 0;
-  for (const [key, value] of Object.entries(specs)) {
-    seq += 1;
-    if (SPEC_HIDDEN_KEYS.has(key)) continue;
-    if (!isPresentable(value)) continue;
-    const nk = normalizeSpecKey(key);
-    if (PRIMARY_VALUE_KEYS.has(nk) || _COMMERCIAL_ATTR.test(nk)) continue;
-    const text = String(value).trim();
-    if (isNegative(text)) continue;
-    const rule = _ATTR_INDEX.get(nk);
-    const label = rule ? rule.format(text) : prettifyValue(applySign(key, text));
-    if (!label) continue;
-    if (label.length > 22 || EMPTY_SPEC_VALUES.has(label.toLowerCase())) continue;
-    const r = resolveSpec(key, category);
-    let score = _ATTR_GROUP_SCORE[r.group] - (r.order ?? 100) / 100;
-    // a spec curated as attribute-worthy (a registry rule) is at least mid-tier, so a key
-    // characteristic the spec schema doesn't rank (composition, dielectric) still surfaces;
-    // the package/case leads the physical form.
-    if (rule) score = Math.max(score, 150);
-    if (_PRIME_PHYSICAL.has(nk)) score += 130;
-    if (_DIMENSION_KEYS.has(nk)) score = -100; // a bare dimension is a last-resort chip
-    scored.push({ label, score, order: seq });
-  }
-  // Rank first, THEN dedup by label - so when two keys yield the same chip ("Package" and a
-  // "Case Code" both -> "0603"), the higher-scored occurrence is the one that survives.
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const c of scored.sort((a, b) => b.score - a.score || a.order - b.order)) {
-    const norm = c.label.toLowerCase();
-    if (seen.has(norm)) continue;
-    seen.add(norm);
-    out.push(c.label);
-    if (out.length >= MAX_ATTRIBUTES) break;
-  }
-  return out;
 }

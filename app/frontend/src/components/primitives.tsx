@@ -1,20 +1,42 @@
 /**
- * Design primitives ported from the mockup so the page matches by construction.
+ * Design primitives for a Windows engineering tool: flat, square, opaque, bordered.
  * Interactive labels are Title Case, and there are no em dashes in any copy
- * (owner rules). Radii use the 8/6 tokens (rounded-card / rounded-control).
+ * (owner rules). Radii use the 2px tokens (rounded-card / rounded-control).
  *
  * This module is the kit's ONE import surface. The product-state vocabulary (route header,
  * section header, the five states, retry, inline notice, bounded region, compact fact row,
- * attention item, data table) lives in `productState.tsx` and the modal frame in
- * `modalParts.tsx`; both are re-exported here so no route has to know which sibling a primitive
- * happens to be declared in, and so there is never a second parallel kit to drift against.
+ * attention item, data table) lives in `productState.tsx`, the modal frame in `modalParts.tsx`,
+ * and the semantic text roles in `typography.tsx`; all three are re-exported here so no route has
+ * to know which sibling a primitive happens to be declared in, and so there is never a second
+ * parallel kit to drift against.
  */
 import { useState } from "react";
 import type { ButtonHTMLAttributes, HTMLAttributes, KeyboardEvent, ReactNode } from "react";
 import { Text } from "../lib/copy";
+import {
+  UI_CONTROL_LABEL,
+  UI_PANEL_TITLE,
+  UI_PROPERTY_LABEL,
+  UI_PROPERTY_VALUE,
+  UI_SECTION_TITLE,
+  UI_STATUS_TEXT,
+} from "./typography";
 
 export * from "./productState";
 export * from "./modalParts";
+export * from "./typography";
+
+/**
+ * The one focus treatment for the whole kit: a 2px neutral outline, offset by 1px.
+ *
+ * It is a token (`--c-focus`, a near-white on dark / near-black on light) and deliberately NOT
+ * blue. A blue ring is the single most recognisable "this is a web page" signal there is, and in
+ * an application whose chrome is otherwise pure grayscale it would also be the only hue on screen
+ * that did not encode a state.
+ */
+const FOCUS_RING =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 " +
+  "focus-visible:outline-focus";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -48,19 +70,21 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: ReactNode;
 }
 
-// Flat, bordered controls (Altium): hover is a colour shift, not a lift + shadow. The press
-// scale in the base string keeps them tactile; separation comes from the border, not elevation.
+// Flat, bordered controls: a 1px border over an opaque two-stop fill, hover is a colour shift, and
+// a press darkens rather than shrinking. There is no transform anywhere in this table. A button
+// that scales on press and lifts on hover is a web affordance; a Win32 push button stays exactly
+// where it is and changes value.
 //
 // Module scope, not local to Button, because IconButton's compact mode reads the SAME table. It
 // used to hardcode its own neutral treatment and ignore `variant` entirely, so a compact
 // destructive action could not read as destructive and the two controls' tones could drift apart.
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   default:
-    "border-line bg-raise text-t2 hover:bg-raise2 hover:text-t1",
+    "border-line-dark bg-control-bottom text-t1 hover:bg-control-hover active:bg-control-pressed",
   accent:
-    "border-transparent bg-acc text-acc-on hover:brightness-110 font-semibold",
+    "border-line-dark bg-acc text-acc-on hover:brightness-110 active:brightness-95 font-semibold",
   danger:
-    "border-transparent bg-err text-white hover:brightness-110 font-semibold",
+    "border-line-dark bg-err text-white hover:brightness-110 active:brightness-95 font-semibold",
   // A quiet destructive TRIGGER (north-star restraint): a danger-tinted outline, not a solid
   // fill, so a page-level Remove/Delete/Clear reads as available without shouting. The loud
   // solid `danger` is reserved for the final in-modal confirm (the committed action). The err
@@ -71,9 +95,8 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
     "bg-[color-mix(in_srgb,var(--c-err)_7%,transparent)] text-err font-semibold " +
     "hover:border-[color-mix(in_srgb,var(--c-err)_60%,transparent)] " +
     "hover:bg-[color-mix(in_srgb,var(--c-err)_15%,transparent)]",
-  // A neutral action tile (north-star .addbtn), flat: a bordered fill that brightens on hover.
-  soft:
-    "border-line2 bg-raise2 text-t1 font-semibold hover:brightness-125",
+  // A neutral action tile, flat: a bordered fill that lightens one step on hover.
+  soft: "border-line2 bg-raise2 text-t1 font-semibold hover:bg-control-hover",
 };
 
 export function Button({
@@ -84,14 +107,18 @@ export function Button({
   children,
   ...rest
 }: ButtonProps) {
+  // No transform, no shadow, no spring: colour is the only thing that moves. A disabled control
+  // states its unavailability with the disabled TEXT TIER rather than by fading the whole button,
+  // because a 50% opacity control also fades its border and stops reading as a control at all.
   const base =
-    "inline-flex items-center gap-1.5 whitespace-nowrap rounded-control border font-medium " +
-    "transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-spring " +
-    "will-change-transform active:scale-[0.96] disabled:active:scale-100 " +
-    "focus-visible:outline focus-visible:outline-2 " +
-    "focus-visible:outline-offset-2 focus-visible:outline-acc disabled:opacity-50 " +
-    "disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none";
-  const size = small ? "h-[27px] px-2.5 text-xs" : "h-[31px] px-3 text-sm";
+    "inline-flex items-center gap-1.5 whitespace-nowrap rounded-control border " +
+    "transition-[color,background-color,border-color] duration-100 ease-out " +
+    UI_CONTROL_LABEL +
+    " disabled:cursor-not-allowed disabled:border-line disabled:bg-control-pressed " +
+    "disabled:text-t5 disabled:hover:brightness-100 " +
+    FOCUS_RING;
+  // The two control heights, both on the 11px control label. `small` is the toolbar step.
+  const size = small ? "h-[22px] px-2 text-xs" : "h-[26px] px-2.5 text-sm";
   return (
     <button
       className={cx(base, size, BUTTON_VARIANTS[variant], className)}
@@ -166,14 +193,19 @@ export function IconButton({
 }
 
 /**
- * The compact form: a glyph at rest that states its consequence when approached.
+ * The compact form: a fixed-size glyph that states its consequence when approached.
  *
- * Hover/focus is tracked in state rather than with `group-hover:` utilities because the TONE has to
- * arrive WITH the label. At rest the control wears no border and no tint - a permanently bordered
- * red box in the corner is louder than the dim text it replaced, and contradicts the repo's own rule
- * that a ghost-danger trigger "reads as available without shouting" (caught in a screenshot, not by
- * a test). Prefixing a whole variant string with `hover:` would have meant a second copy of every
- * tone decision, which is the duplication hoisting BUTTON_VARIANTS just removed.
+ * It is FIXED SIZE. The label used to wipe open on hover, animating a one-column grid from 0fr to
+ * 1fr so the button grew to the label width. That is a lovely web interaction and it is wrong in a
+ * toolbar: a control that changes width when the pointer crosses it reflows the row under the
+ * pointer, so the next button moves before you reach it. The label now lives where a Windows
+ * toolbar puts it, in aria-label and title, which costs no layout at all.
+ *
+ * Hover/focus is still tracked in state rather than with `group-hover:` utilities, because the TONE
+ * has to arrive WITH the approach and prefixing a whole variant string with `hover:` would mean a
+ * second copy of every tone decision. At rest the control wears no border and no fill: a
+ * permanently bordered red box in the corner is louder than the dim text it replaced, and against
+ * the repo own rule that a ghost-danger trigger "reads as available without shouting".
  */
 function CompactIconButton({
   icon,
@@ -193,10 +225,10 @@ function CompactIconButton({
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   // Focus counts as approaching, so a keyboard user is told the consequence too instead of being
-  // asked to press an unlabelled glyph. `active` pins it open: a control that collapsed halfway
-  // through its own action would leave the user watching an unlabelled spinner.
+  // asked to press an unlabelled glyph. `active` pins the tone on: a running action should not
+  // depend on a pointer still being there.
   const revealed = hovered || focused || active;
-  const size = small ? "h-[27px] px-2" : "h-[31px] px-2.5";
+  const size = small ? "h-[22px] w-[22px]" : "h-[26px] w-[26px]";
   return (
     <button
       {...rest}
@@ -210,11 +242,10 @@ function CompactIconButton({
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       className={cx(
-        "group inline-flex items-center gap-1.5 rounded-control border " +
-          "font-medium transition-[color,background-color,border-color,box-shadow,transform] " +
-          "duration-150 ease-spring will-change-transform active:scale-[0.96] " +
-          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
-          "focus-visible:outline-acc disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center rounded-control border " +
+          "transition-[color,background-color,border-color] duration-100 ease-out " +
+          "disabled:cursor-not-allowed disabled:text-t5 " +
+          FOCUS_RING,
         revealed
           ? BUTTON_VARIANTS[variant]
           // At rest: the glyph alone. Muted for a neutral action, tinted for a destructive one, so
@@ -230,28 +261,6 @@ function CompactIconButton({
       )}
     >
       {icon}
-      {/*
-        The reveal animates to the label's OWN width, via a one-column grid going 0fr -> 1fr.
-
-        It used to animate `max-width` from 0 to 10rem. That is why the owner reported "delete part
-        animation doesnt exist" while the reveal demonstrably worked: 10rem is 160px and the label
-        is about 72px, so the growing max-width passed the text's real width at roughly 45% of the
-        transition and the remaining 55% animated a box the text had already stopped filling. The
-        visible motion was over in ~70ms of a 150ms transition and read as a snap, not a reveal.
-
-        `0fr -> 1fr` is the standard way to transition to content-derived width: the whole duration
-        maps onto the distance actually travelled, so the label wipes open over its own width and
-        the button grows with it. No JS measurement, no magic number to drift.
-      */}
-      <span
-        className={cx(
-          "grid transition-[grid-template-columns,opacity,margin] duration-200 ease-spring " +
-            "motion-reduce:transition-none",
-          revealed ? "ml-0.5 grid-cols-[1fr] opacity-100" : "grid-cols-[0fr] opacity-0",
-        )}
-      >
-        <span className="overflow-hidden whitespace-nowrap text-xs">{shown}</span>
-      </span>
     </button>
   );
 }
@@ -288,21 +297,19 @@ function ButtonSpinner() {
  * of the file), so `primitives` remains the single import surface for the whole kit.
  */
 
-// A quiet metadata label for packed property grids.
 /**
- * The dense metadata role used inside a property grid or a packed column.
+ * The dense metadata label used inside a property grid or a packed column.
  *
- * Exported as a class string, not only as a component, because these labels land on a `span`, a
- * `div` and a `dt` depending on where they sit, and a polymorphic component would buy nothing but
- * type gymnastics. The point is that the DECISION lives in one place: DetailPanel previously carried
- * ten hand-written variants of this string with four different sizes and tracking values.
+ * Now simply the `ui-property-label` role: 10px / 500 / label tier, no caps and no tracking. It
+ * kept its own class string for a while because these labels land on a `span`, a `div` and a `dt`
+ * depending on where they sit; the typography kit solves that generally, so this is an alias
+ * pointing at the shared role rather than a second authority beside it.
  *
  * Deliberately TYPE ONLY: no background, no border, no sticky. The spec group header used to carry
  * a filled sticky bar while its siblings were bare, which is exactly the "box behind the header"
  * the owner asked to remove. Separation comes from spacing.
  */
-export const EYEBROW_DENSE =
-  "text-ui-meta font-medium text-helper";
+export const EYEBROW_DENSE = UI_PROPERTY_LABEL;
 
 export function Eyebrow({
   dense = false,
@@ -310,12 +317,11 @@ export function Eyebrow({
   children,
   ...rest
 }: { dense?: boolean } & HTMLAttributes<HTMLDivElement>) {
+  // Both steps are label roles now. The non-dense step is the section title (11px / 600), which is
+  // what an eyebrow above a block of rows actually is; the dense step is the property label.
   return (
     <div
-      className={cx(
-        dense ? EYEBROW_DENSE : "text-xs font-semibold text-t3",
-        className,
-      )}
+      className={cx(dense ? UI_PROPERTY_LABEL : UI_SECTION_TITLE, className)}
       {...rest}
     >
       {children}
@@ -331,9 +337,21 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   size?: BadgeSize;
 }
 
-// A status pill: the mockup's .chip / .mpill / .complete. `size="sm"` is the tighter
-// tag used inline in dense rows (the Files footer's tool pill), keeping the same 6px
-// control radius.
+/**
+ * A status. NOT a button, and no longer shaped like one.
+ *
+ * It used to be a filled pill at 11-12px with 10px of horizontal padding and a rounded box, which
+ * is the exact shape of the Complete Part button three inches away - so the screen offered the
+ * reader half a dozen equally button-shaped things, only some of which could be pressed. A status
+ * is a fact about the row it sits in: it carries the `ui-status-text` role (which pins
+ * `cursor: default` and strips border, fill and box-shadow so no ancestor can lend it an
+ * affordance), the tone colour, and a whisper of tint for the two tones that need to be findable
+ * by eye in a long list. There is no hover, no press, no focus ring and no pointer cursor,
+ * because there is nothing here to activate.
+ *
+ * `size="sm"` remains as the inline step for dense rows; both sizes are the 10px status role, so
+ * the difference is padding only.
+ */
 export function Badge({
   tone = "warn",
   size = "default",
@@ -342,19 +360,20 @@ export function Badge({
   ...rest
 }: BadgeProps) {
   const tones: Record<BadgeTone, string> = {
-    warn: "text-warn bg-[rgba(211,162,76,0.11)]",
-    err: "text-err bg-[rgba(215,108,98,0.12)]",
-    ok: "text-ok bg-[rgba(129,171,144,0.14)]",
-    neutral: "text-t2 bg-raise2",
+    warn: "text-warn bg-[color-mix(in_srgb,var(--c-warn)_12%,transparent)]",
+    err: "text-err bg-[color-mix(in_srgb,var(--c-err)_14%,transparent)]",
+    ok: "text-ok bg-[color-mix(in_srgb,var(--c-ok)_12%,transparent)]",
+    neutral: "text-t3 bg-transparent",
   };
   const sizes: Record<BadgeSize, string> = {
-    default: "px-2.5 py-1 text-xs",
-    sm: "px-1.5 py-0.5 text-2xs",
+    default: "px-1.5 py-px",
+    sm: "px-1 py-px",
   };
   return (
     <span
       className={cx(
-        "inline-flex items-center rounded-control font-medium",
+        "inline-flex items-center rounded-control",
+        UI_STATUS_TEXT,
         sizes[size],
         tones[tone],
         className,
@@ -493,7 +512,10 @@ export function TabStrip<T extends string>({
       role="tablist"
       aria-label={ariaLabel}
       data-dev-id={devIdBase ? `${devIdBase}.tabs` : undefined}
-      className={cx("inline-flex rounded-card border border-line2 p-0.5", className)}
+      // An ATTACHED tab row, not a floating pill group: the tabs sit directly on the border they
+      // share with the panel below, which is how a desktop tab control tells you which body it
+      // controls. The old form was a rounded, inset-padded capsule floating free of its content.
+      className={cx("inline-flex items-end gap-px border-b border-line-dark", className)}
     >
       {tabs.map((t, i) => (
         <button
@@ -510,16 +532,16 @@ export function TabStrip<T extends string>({
           onClick={() => onSelect(t.id)}
           onKeyDown={(e) => onKeyDown(e, i)}
           className={cx(
-            "rounded-control transition-colors",
+            "-mb-px border border-b-0 transition-colors " + FOCUS_RING,
             density === "compact" ? "px-2.5 py-0.5 text-xs" : "px-3 py-1 text-sm",
-            // An UNSELECTED tab is available; only a disabled one should look unavailable. At t3
-            // (40% alpha dark / 46% light - the dimmest tier, the one carrying genuinely secondary
-            // text) `Handoff`, `Enrich` and `Timeline` read as greyed out beside the active chip,
-            // so the sheet looked like it had one tab and three dead labels. t2 states "not
-            // selected" without stating "not available", and selection loses nothing: the active
-            // tab still carries a soft accent FILL, medium WEIGHT and the brightest tier, so three
-            // independent signals separate it rather than one contrast step.
-            active === t.id ? "bg-acc-soft font-medium text-t1" : "text-t2 hover:text-t1",
+            // An UNSELECTED tab is available; only a disabled one should look unavailable. t2
+            // states "not selected" without stating "not available", and selection loses nothing:
+            // the active tab carries the panel's own surface, a light top bevel, medium WEIGHT and
+            // the brightest tier, so four independent signals separate it rather than one contrast
+            // step. The selected tab is the one whose bottom edge is OPEN into the panel below.
+            active === t.id
+              ? "border-line-dark border-t-line2 bg-surface font-medium text-t1"
+              : "border-transparent bg-control-bottom text-t2 hover:bg-control-hover hover:text-t1",
           )}
         >
           {t.copyId ? <Text id={t.copyId}>{t.label}</Text> : t.label}
@@ -542,7 +564,8 @@ export interface SegmentItem<T extends string> {
 // / End keys that both move focus and select, the way a radio group announces).
 // Use it to switch a view or toggle a setting in place (the Library Health
 // sub-switch, the density toggle); use TabStrip when each option reveals a
-// whole `TabPanel`. The checked pill is the raised `bg-raise2` fill.
+// whole `TabPanel`. Shaped as a Win32 button group: attached segments sharing
+// one border, the checked one pressed IN rather than lit up.
 export function SegmentedControl<T extends string>({
   options,
   value,
@@ -582,7 +605,10 @@ export function SegmentedControl<T extends string>({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className={cx("inline-flex rounded-card border border-line2 p-0.5", className)}
+      className={cx(
+        "inline-flex divide-x divide-line-dark overflow-hidden rounded-control border border-line-dark",
+        className,
+      )}
     >
       {options.map((opt, i) => (
         <button
@@ -595,9 +621,14 @@ export function SegmentedControl<T extends string>({
           onClick={() => onChange(opt.id)}
           onKeyDown={(e) => onKeyDown(e, i)}
           className={cx(
-            "rounded-control transition-colors",
+            "transition-colors " + FOCUS_RING,
             pad,
-            value === opt.id ? "bg-acc-soft font-medium text-t1" : "text-t3 hover:text-t2",
+            // Pressed in, not lit up: the checked segment takes the pressed control fill and the
+            // primary tier, its siblings the raised fill and the secondary tier. Two signals, both
+            // of them things a physical button does.
+            value === opt.id
+              ? "bg-control-pressed font-medium text-t1"
+              : "bg-control-bottom text-t2 hover:bg-control-hover hover:text-t1",
           )}
         >
           {opt.copyId ? <Text id={opt.copyId}>{opt.label}</Text> : opt.label}
@@ -636,11 +667,13 @@ export function TabPanel({
 
 /**
  * The consistent heading atop a Panel or a content block: Title Case, quiet weight.
- * (The uppercase micro-label is Eyebrow, for dense sub-headings inside a Panel.)
+ * (The dense micro-label is Eyebrow, for sub-headings inside a Panel.)
  *
- * Two steps, and only two. `dense` is the step a packed surface uses - an exhaustive sheet, a
- * bounded region - and the default is the page step. They are here together rather than in two
- * files because a third size is exactly how the ten hand-written eyebrow strings happened.
+ * Two steps, and only two, and since the type collapse both are 11px / 600: the default is the
+ * PANEL title (16px leading, for a title strip filling a 34px band) and `dense` is the SECTION
+ * title (15px leading, for a heading sitting directly on its rows). A packed sheet and a page no
+ * longer differ in SIZE, they differ in leading and in the space around them, which is what stops
+ * six things on the opened-component screen from all claiming to be the most important.
  * `SectionHeader` (the heading + count + action ROW) composes this, so the type decision lives
  * once and the row decision lives once.
  */
@@ -653,7 +686,7 @@ export function SectionHeading({
 }: { dense?: boolean; as?: "div" | "h2" | "h3" } & HTMLAttributes<HTMLElement>) {
   return (
     <Element
-      className={cx(dense ? "text-xs font-semibold text-t1" : "text-sm font-semibold text-t1", className)}
+      className={cx(dense ? UI_SECTION_TITLE : UI_PANEL_TITLE, className)}
       {...rest}
     >
       {children}
@@ -661,12 +694,12 @@ export function SectionHeading({
   );
 }
 
-// The one content surface for the whole app. Depth reads from a single background step
-// plus a hairline, never a background AND a border AND a drop shadow at once (the design
-// contract: elevation through background, not stacked outlines). Pass `title` for a
-// headed card; `actions` sits opposite the title; `inset` uses the recessed field well
-// (a value that sits IN the surface, like a spec box). Build a card by composing this,
-// not by re-deriving the class string.
+// The one content surface for the whole app: an OPAQUE panel, a 1px border, a 2px radius, and no
+// drop shadow at rest. Depth reads from the background step plus the hairline, never from a shadow
+// as well. Padding is the desktop step (8-10px, not 14-16px): a docked panel packs rows, it does
+// not present a card. Pass `title` for a headed panel; `actions` sits opposite the title; `inset`
+// uses the recessed field well (a value that sits IN the surface, like a spec box). Build a panel
+// by composing this, not by re-deriving the class string.
 export function Panel({
   title,
   actions,
@@ -696,28 +729,37 @@ export function Panel({
       {...rest}
     >
       {hasHeader ? (
-        <header className="flex items-center justify-between gap-3 px-4 pb-2.5 pt-3.5">
+        // An attached title strip on the chrome band with a hairline under it: the panel header of
+        // every Windows tool window. It used to be bare padding on the panel fill, which read as a
+        // card caption rather than as chrome.
+        <header className="flex items-center justify-between gap-3 border-b border-line bg-band px-2.5 py-1.5">
           {title != null ? <SectionHeading>{title}</SectionHeading> : <span />}
           {actions}
         </header>
       ) : null}
-      <div className={cx(hasHeader ? "px-4 pb-3.5" : "p-4", bodyClassName)}>
+      <div className={cx(hasHeader ? "px-2.5 py-2" : "p-2.5", bodyClassName)}>
         {children}
       </div>
     </section>
   );
 }
 
-// A labelled value: one row of a data card's definition list. Default lays label and
-// value on a line (label left, value right); `stacked` puts the label above the value
-// for the dense spec readout; `mono` sets the value in the machine-data face so numbers
-// align. Pass `value` for a plain value or `children` for rich content.
+// A labelled value: one row of a property grid. The label takes the 10px label role and the value
+// the 11px value role, so the two can never be mistaken for one another. Default lays them on a
+// line; `stacked` puts the label above the value for the dense spec readout.
+//
+// `mono` sets the value in the machine-data face, and is for MACHINE text only: a file path, a raw
+// identifier, a hash, a net name, a provider key. NOT for an MPN, a manufacturer name, a
+// description or an ordinary spec value - setting those in mono is part of why every value on the
+// opened component read as equally machine-generated. A numeric value wants `numeric`, which is
+// tabular figures and right alignment without changing the face.
 export function Field({
   label,
   value,
   children,
   stacked = false,
   mono = false,
+  numeric = false,
   className,
 }: {
   label: ReactNode;
@@ -725,25 +767,31 @@ export function Field({
   children?: ReactNode;
   stacked?: boolean;
   mono?: boolean;
+  /** Stock, prices, quantities, price breaks: tabular figures, right-aligned. */
+  numeric?: boolean;
   className?: string;
 }) {
   const content = children ?? value;
+  const valueClass = cx(
+    UI_PROPERTY_VALUE,
+    mono && "font-mono",
+    // Right-aligned tabular figures for the values that are COMPARED down a column: stock, prices,
+    // quantities, price breaks. An ordinary property value stays left-aligned against its label,
+    // because a ragged-right column of words is easier to scan than a ragged-left one.
+    numeric && "ui-numeric",
+  );
   if (stacked) {
     return (
-      <div className={cx("py-1.5", className)}>
-        <div className="text-2xs text-t2">{label}</div>
-        <div className={cx("mt-0.5 break-words text-sm text-t1", mono && "font-mono tnum")}>
-          {content}
-        </div>
+      <div className={cx("py-1", className)}>
+        <div className={UI_PROPERTY_LABEL}>{label}</div>
+        <div className={cx("mt-px break-words", valueClass)}>{content}</div>
       </div>
     );
   }
   return (
-    <div className={cx("flex items-baseline justify-between gap-4 py-1.5", className)}>
-      <span className="flex-none text-sm text-t2">{label}</span>
-      <span className={cx("min-w-0 text-right text-sm text-t1", mono && "font-mono tnum")}>
-        {content}
-      </span>
+    <div className={cx("flex items-baseline justify-between gap-4 py-1", className)}>
+      <span className={cx("flex-none", UI_PROPERTY_LABEL)}>{label}</span>
+      <span className={cx("min-w-0 text-right", valueClass)}>{content}</span>
     </div>
   );
 }

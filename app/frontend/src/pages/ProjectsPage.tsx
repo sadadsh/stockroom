@@ -136,11 +136,11 @@ function SelectedProject({ projectId }: { projectId: string }) {
     <div data-dev-id="projects.workspace" className="flex h-full min-h-0 flex-col">
       <div
         data-dev-id="projects.title-strip"
-        className="flex h-[34px] flex-none items-center gap-4 border-b border-line bg-band px-5 max-[1180px]:gap-2 max-[1180px]:px-3"
+        className="flex h-[26px] flex-none items-center gap-4 border-b border-line bg-band px-5 max-[1180px]:gap-2 max-[1180px]:px-3"
       >
         <div className="flex min-w-0 items-center gap-2">
           <h1
-            className="min-w-0 truncate text-sm font-semibold tracking-[-0.01em] text-t1"
+            className="min-w-0 truncate text-sm font-semibold text-t1"
             title={`${data.project.name}\n${data.project.root}`}
           >
             {data.project.name}

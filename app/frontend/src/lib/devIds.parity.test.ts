@@ -98,21 +98,6 @@ const KNOWN_DERIVED: readonly string[] = [
   "stm.inspector.decision",
   "stm.inspector.targets",
   "stm.inspector.evidence",
-  // ComponentsPage passes the same TabStrip primitive the open-component strip. Only the TABLIST
-  // id is static: each tab is one OPEN COMPONENT, so its id is built by lib/componentDevIds.ts and
-  // is not catalogued at all.
-  "component-browser.tabs",
-  // InfoTabsShell: the four information tabs, whose ids ARE fixed.
-  "component-browser.info.tabs",
-  "component-browser.info.tab-overview",
-  "component-browser.info.tab-specifications",
-  "component-browser.info.tab-sourcing",
-  "component-browser.info.tab-sources",
-  // RepresentationDock's SegmentedControl derives one id per layout option.
-  "component-browser.layout.all",
-  "component-browser.layout.symbol",
-  "component-browser.layout.footprint",
-  "component-browser.layout.model",
   // SourcesSheet passes the same TabStrip primitive the four questions the source ledger answers.
   "component-browser.sources.tabs",
   "component-browser.sources.tab-fields",
@@ -124,7 +109,7 @@ const KNOWN_DERIVED: readonly string[] = [
   "diff.tabs",
   "diff.tab-symbol",
   "diff.tab-footprint",
-]; // 35
+]; // 25
 
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
@@ -171,30 +156,35 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "projects.build-placement-control",
   "projects.document-control",
   "stm.target-set-control",
-  // component-workspace/WorkspaceRegion.tsx: every bounded information region is the same shell,
-  // so each region's id (and its View All control's id) arrives as a `devId` / `viewAllDevId`
-  // string prop. Spelled out in full at each call site, never interpolated.
+  // The three columns and every region inside them are the same shells (WorkspaceColumn,
+  // SpecSection, SourcingSection, productState's Region), so each region's id - and the View All
+  // control's default id - arrives as a `devId` / `viewAllDevId` string prop. Spelled out in full
+  // at each call site, never interpolated.
   "component-browser.key-specs",
-  "component-browser.attention",
-  "component-browser.sourcing-snapshot",
-  "component-browser.sourcing-snapshot-all",
-  "component-browser.view-all",
-  "component-browser.specifications",
-  "component-browser.specifications-all",
-  "component-browser.pinout",
-  "component-browser.spec-conflicts",
-  "component-browser.sourcing",
-  "component-browser.sourcing-all",
-  "component-browser.relationships",
-  "component-browser.resources",
-  "component-browser.sources",
-  "component-browser.sources-all",
-  "component-browser.field-sources",
-  "component-browser.diagnostics",
-  // component-workspace/SheetParts.tsx: the exhaustive sheets share one section and one table
-  // shell, so a section's or a table's id arrives as a `devId` string prop. Spelled out in full at
-  // each call site for the same reason as the regions above.
   "component-browser.spec-group",
+  "component-browser.pinout",
+  "component-browser.column-cad",
+  "component-browser.column-specifications",
+  "component-browser.column-sourcing",
+  "component-browser.lifecycle",
+  "component-browser.offers",
+  "component-browser.pricing",
+  "component-browser.documents",
+  "component-browser.related",
+  "component-browser.provenance",
+  "component-browser.view-all",
+  // component-workspace/SourcingParts.tsx SourcingSubSection: the six questions inside Data
+  // Provenance and History share one sub-heading shell, so each one's id arrives as a `devId`
+  // string prop. Spelled out in full at each call site, never interpolated.
+  "component-browser.provenance-sources",
+  "component-browser.provenance-conflicts",
+  "component-browser.provenance-overrides",
+  "component-browser.provenance-intake",
+  "component-browser.provenance-revisions",
+  "component-browser.provenance-diagnostics",
+  // component-workspace/SheetParts.tsx: the exhaustive sourcing sheet shares one section and one
+  // table shell, so a section's or a table's id arrives as a `devId` string prop. Spelled out in
+  // full at each call site for the same reason as the regions above.
   "component-browser.pinout-table",
   "component-browser.offer-ladder",
   // component-workspace/CompleteComponentSheet.tsx: the four bands of the provider trip share one
@@ -211,6 +201,15 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   // frame four slightly different ways, which is also how two of them ended up sharing a z-index.
   "component-browser.modal",
   "component-browser.modal-close",
+  // The datasheet viewer is its own window rather than the workspace modal: it opens from the
+  // header AND from a document row, and it must survive whatever surface is behind it.
+  "component-browser.datasheet-viewer",
+  "component-browser.datasheet-viewer-close",
+  // component-workspace/DatasheetButton.tsx: the three menu-item kinds share one item shell, so
+  // each one's id arrives as a `devId` string prop. Spelled out in full at each call site.
+  "component-browser.datasheet-current",
+  "component-browser.datasheet-revision",
+  "component-browser.datasheet-other",
   "diff.root",
   "diff.header",
   "preview.root",
@@ -218,10 +217,6 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "preview.close",
   // components/modalParts.tsx ModalActions: the confirm dialog's action row is the shared bar.
   "confirm.actions",
-  // components/productState.tsx AttentionItem: one attention row is one object, so the row's id and
-  // its action's id arrive as `devId` / `actionDevId` string props.
-  "component-browser.attention-item",
-  "component-browser.attention-action",
   // The stage windows' body IS the stage, so the body takes the window's stage id rather than a
   // second absolutely-positioned div inside it.
   "preview.stage",
@@ -231,7 +226,25 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   // a literal at the call site because `candidateDevId()` builds the instance id from the same
   // constant - two spellings of one id is exactly how the two halves would drift apart.
   "ingest.candidate",
-]; // 62
+  // component-workspace/CadAssetModule.tsx LayerToggle: the symbol drawing's three switches and
+  // the land pattern's nine, plus its ruler, share one toggle shell, so each id arrives as a
+  // `devId` string prop. Spelled out in full at each call site - an interpolated
+  // `asset-layer-${name}` would be invisible to this gate and to grep, and these are exactly the
+  // controls a dev-mode inspection has to be able to name one at a time.
+  "component-browser.asset-layer-pin-name",
+  "component-browser.asset-layer-pin-number",
+  "component-browser.asset-layer-electrical",
+  "component-browser.asset-layer-copper",
+  "component-browser.asset-layer-mask",
+  "component-browser.asset-layer-paste",
+  "component-browser.asset-layer-silkscreen",
+  "component-browser.asset-layer-fabrication",
+  "component-browser.asset-layer-courtyard",
+  "component-browser.asset-layer-numbers",
+  "component-browser.asset-layer-origin",
+  "component-browser.asset-layer-dimensions",
+  "component-browser.asset-measure",
+]; // 79
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));
@@ -272,23 +285,10 @@ describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
     expect(sourceContains("${devIdBase}.${opt.id}")).toBe(true);
     expect(sourceContains('devIdBase="stm.lens"')).toBe(true);
     expect(sourceContains('devIdBase="stm.inspector"')).toBe(true);
-    // The opened component: the open-component tablist, the four information tabs, and the
-    // representation layout switcher.
-    expect(sourceContains('devIdBase="component-browser"')).toBe(true);
-    expect(sourceContains('devIdBase="component-browser.info"')).toBe(true);
-    expect(sourceContains('devIdBase="component-browser.layout"')).toBe(true);
     // The source ledger's own four tabs, inside the workspace modal.
     expect(sourceContains('devIdBase="component-browser.sources"')).toBe(true);
     // The visual diff's symbol/footprint switcher.
     expect(sourceContains('devIdBase="diff"')).toBe(true);
-  });
-
-  it("per-component tab ids are built by the dynamic helper, never spelled into the strip", () => {
-    // The open-component strip overrides only the PER-TAB id; the tablist keeps the derived one.
-    // If this override were dropped, the ids would silently revert to `component-browser.tab-<raw
-    // component id>` - an uncatalogued, unescaped id interpolated straight from a record field.
-    expect(sourceContains("devIdForTab={componentTabDevId}")).toBe(true);
-    expect(sourceContains("${devIdBase}.tab-${t.id}")).toBe(true);
   });
 
   it("every KNOWN_DERIVED id is a catalogue id and is genuinely derived (never a literal)", () => {
@@ -377,7 +377,7 @@ const KNOWN_SHARED_ACROSS_FILES: Readonly<Record<string, string>> = {
   "ingest.input": "AddPartModal selects it to focus; IngestPage emits it",
   // The same role in two presentations: one source record's outcome, rendered compactly in the
   // information panel and in full in the sourcing sheet. Retuning the row is meant to reach both.
-  "component-browser.source-state": "one source-record row, compact panel and full sheet",
+  "component-browser.source-state": "one source-record row, sourcing column and full sheet",
 };
 
 describe("no unrelated controls share one static dev id", () => {
@@ -412,6 +412,9 @@ describe("no unrelated controls share one static dev id", () => {
 // Owner, 2026-07-26: "the component title bar is MISALIGNED with the library Components line and
 // the nav line". Measured on their real Windows window: the detail strip was h-[38px] while the
 // other three headers were h-[34px], putting its ink centre 1.6px low on a band the three share.
+// The shared height is now 26px. A panel title strip is a LABEL, and at 34px it spent a third of
+// its height on air above rows packed to 24. The picker could not be narrowed alone - that is the
+// whole point of this gate - so the family moved together.
 // A source-level gate, because this cannot be a shared constant: a Tailwind arbitrary value built
 // from a template literal produces a class with no CSS behind it, which would delete the height.
 
@@ -435,7 +438,7 @@ const DOCKED_PANEL_HEADERS = [
 ];
 
 describe("panel header band height", () => {
-  it("is h-[34px] in every docked panel header", () => {
+  it("is h-[26px] in every docked panel header", () => {
     // Measured on the owner's real Windows window, 2026-07-26: the detail strip was h-[38px] while
     // the other three were h-[34px], putting its ink centre at 17.8 against 16.2 for "Components"
     // and the rail toggle. Uses the RAW glob this file already established, NOT node:fs - the
@@ -446,7 +449,7 @@ describe("panel header band height", () => {
       for (const line of src.split("\n")) {
         if (line.includes("bg-band") && /h-\[\d+px\]/.test(line)) {
           const h = /h-\[(\d+)px\]/.exec(line)![1];
-          if (h !== "34") offenders.push(`${path}: h-[${h}px]`);
+          if (h !== "26") offenders.push(`${path}: h-[${h}px]`);
         }
       }
     }

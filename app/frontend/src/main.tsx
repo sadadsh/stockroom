@@ -11,11 +11,15 @@ import { DevModeProvider } from "./lib/devMode";
 import { DevPanel } from "./components/DevPanel";
 import { DevInspector } from "./components/DevInspector";
 import { CaptureProvider } from "./lib/capture";
-// The interface face, bundled offline (no CDN) so it renders identically inside
-// WebView2 on Windows. Imported before the token sheet, which names it. Work Sans
-// carries identity + prose; JetBrains Mono is the machine-data readout face (MPN,
-// specs, stock, prices, pins) so every value aligns on tabular figures.
-import "@fontsource-variable/work-sans";
+// The interface face is the PLATFORM's: Segoe UI Variable, named in the token sheet, loaded from
+// Windows itself. Nothing is bundled for it. A branded webfont in application chrome is the single
+// loudest signal that a desktop tool is really a web page, and it rasterises unlike every other
+// window on the machine, so the app never quite sits among them.
+//
+// The mono face IS bundled, because it is not chrome: it marks genuinely machine-oriented text
+// (file paths, raw identifiers, hashes, net names, provider keys, diagnostic payloads). Consolas
+// leads on Windows to match Altium; Geist Mono covers a machine without it, offline, since the
+// host serves from an ephemeral local port where a CDN font would fail outright.
 import "@fontsource-variable/geist-mono";
 import "./styles/index.css";
 

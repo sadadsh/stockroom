@@ -112,7 +112,7 @@ function BinaryStorage() {
             <div className="border-t border-line2 px-3 py-2" data-testid="lfs-covers">
               {/* Labelled, because an unlabelled row of globs reads as debug output rather than
                   as the concrete answer to "what would this actually move". */}
-              <div className="mb-1 text-2xs uppercase tracking-[0.07em] text-t3">
+              <div className="mb-1 ui-property-label">
                 <Text id="library.sync.lfs-covers-heading">Would Move To Git LFS</Text>
               </div>
               {data.covers.map((pattern) => (

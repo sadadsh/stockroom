@@ -1144,7 +1144,7 @@ function Catalogue({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-1.5 px-3.5 py-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3 hover:text-t2"
+        className="flex w-full items-center gap-1.5 px-3.5 py-2 ui-property-label hover:text-t2"
       >
         <span aria-hidden="true">{open ? "▾" : "▸"}</span>
         Catalogue
@@ -1237,7 +1237,7 @@ function SelectionPane({
     <div>
       <div className="border-b border-line px-3.5 py-2.5">
         <div className="flex items-baseline gap-1.5">
-          <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+          <span className="ui-property-label">
             Selected
           </span>
           {selectedId ? (
@@ -1407,7 +1407,7 @@ export function DevPanel() {
       aria-label="Dev mode"
     >
       <header className="flex shrink-0 items-center gap-2 border-b border-line px-3.5 py-3">
-        <span className="rounded-control bg-acc px-1.5 py-0.5 text-2xs font-bold tracking-wide text-acc-on">
+        <span className="rounded-control bg-acc px-1.5 py-0.5 text-2xs font-semibold text-acc-on">
           DEV
         </span>
         <span className="text-sm font-semibold text-t1">Design</span>

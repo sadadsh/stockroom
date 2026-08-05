@@ -84,7 +84,7 @@ const FILE_LESS_CANDIDATE: StagingCandidate = {
 // quiet eyebrow register, so the sequence reads as structure, never a prose wall.
 function PathStep({ n, children }: { n: number; children: ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+    <span className="inline-flex items-center gap-1.5 ui-property-label">
       <span className="tnum grid h-4 w-4 flex-none place-items-center rounded-full border border-line2 font-mono text-2xs leading-none text-t2">
         {n}
       </span>
@@ -95,7 +95,7 @@ function PathStep({ n, children }: { n: number; children: ReactNode }) {
 
 function PathArrow() {
   return (
-    <span aria-hidden className="text-2xs text-t3/60">
+    <span aria-hidden className="ui-row-metadata">
       {"→"}
     </span>
   );

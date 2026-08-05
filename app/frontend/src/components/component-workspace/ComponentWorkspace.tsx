@@ -1,107 +1,114 @@
 /**
  * One opened component, whole.
  *
- * Three bands that never move: the identity header (who this is, and whether it is in good shape),
- * the representation dock (what it looks like to each design tool), and four information tabs (what
- * it is, what its numbers are, where to buy it, where the answers came from). The bands share a
- * fixed height budget - the root is `height:100%; min-height:0; overflow:hidden` - so opening a
- * component never produces a document that scrolls past its own instruments. Anything longer than
- * its band goes to a modal, which is the only surface here allowed a scrollbar.
+ * A fixed-height frame with three bands that never move: the identity header, the three-column
+ * body (CAD Assets, Specifications, Sourcing and Resources), and the component's own status bar.
+ * The columns are side by side at every supported desktop size and each one owns its own
+ * scrollbar, so reading a long specification list never pushes the symbol off the screen and
+ * nothing here ever grows a page scrollbar.
  *
- * Every datum comes from the workspace projection. This component makes presentation decisions;
- * it makes no decisions about where a datum belongs, because those were already made once on the
- * backend and arrive already made.
+ * There are no per-component tabs and no information tabs. The four-tab structure this replaces
+ * made a person choose which third of the answer to look at, when the whole point of opening a
+ * component is to see the drawing, the numbers and the price together.
  *
- * The WRITES live here rather than in the sheets: identity edits, the category move, the pinout
- * persist, applying an alternate, and the sourcing refresh. One owner for the mutations means one
- * place decides what a failure says and what a success invalidates, and the sheets stay renderers.
+ * The WRITES live here rather than in the columns: identity edits, the category move, the pinout
+ * persist, applying an alternate, the sourcing refresh and the delete. One owner for the mutations
+ * means one place decides what a failure says and what a success invalidates, and the columns stay
+ * renderers. The windows those writes open live in `WorkspaceSurfaces`.
  */
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  useDeletePart,
   useEditField,
   useFacetsQuery,
+  useExportPart,
   useMoveCategory,
+  useOpenPartIn,
   usePartDetailQuery,
-  usePartHistory,
-  usePartWorkspaceQuery,
+  usePartDossierQuery,
+  usePartShellQuery,
   useRefreshSourcing,
+  useRevealPartFiles,
 } from "../../api/queries";
 import { ApiError } from "../../api/client";
-import type { RepresentationKind } from "../../api/workspaceTypes";
+import type { RepresentationKind } from "../../api/dossierTypes";
 import { componentDevId } from "../../lib/componentDevIds";
 import { Text, useText } from "../../lib/copy";
-import { togglePinned, type PinnedSpecs } from "../../lib/keySpecs";
-import { readPinnedSpecs, writePinnedSpecs } from "../../lib/pinnedSpecs";
 import { useToast } from "../../lib/toast";
 import {
   componentView,
   setComponentViewInSession,
   updateUiSession,
   useUiSession,
-  type ComponentInfoTab,
   type RepresentationLayout,
 } from "../../lib/uiSession";
-import { CadVariantSection } from "../CadVariantSection";
-import { CompleteComponentSheet } from "./CompleteComponentSheet";
 import { EnrichPanel } from "../EnrichPanel";
-import { PreviewModal, type PreviewKind } from "../PreviewModal";
-import { ErrorState, LoadingState, TabPanel, type TabItem } from "../primitives";
+import type { PreviewKind } from "../PreviewModal";
+import { ErrorState, LoadingState } from "../primitives";
+import { CadAssetsColumn } from "./CadAssetsColumn";
 import { ComponentHeader } from "./ComponentHeader";
-import { IdentitySheet } from "./IdentitySheet";
-import { InfoTabsShell } from "./InfoTabsShell";
-import { OverviewTab } from "./OverviewTab";
-import { PinoutApply } from "./PinoutApply";
-import { SourcesTab, SourcingTab, SpecificationsTab } from "./InfoTabPanels";
-import { RepresentationDock } from "./RepresentationDock";
-import { REPRESENTATION_LABEL } from "./RepresentationModule";
-import { PinoutTable, SpecificationsSheet } from "./SpecificationsSheet";
-import { SourcesSheet } from "./SourcesSheet";
-import { SourcingSheet } from "./SourcingSheet";
-import { WorkspaceModal } from "./WorkspaceModal";
+import { manageMenuItems } from "./ManageMenu";
+import { ExportComponentDialog, OpenInDialog, shellManageItems } from "./ShellActions";
+import { SourcingColumn } from "./SourcingColumn";
+import { SpecificationsColumn } from "./SpecificationsColumn";
+import { WorkspaceColumns } from "./WorkspaceColumns";
+import { WorkspaceStatusBar } from "./WorkspaceStatusBar";
+import { WorkspaceSurfaces, previewKindFor, type WorkspaceSurface } from "./WorkspaceSurfaces";
+import { cadFocusKind, type QualitySegmentKind } from "./componentIdentity";
+import { openKindFor, type DatasheetTarget } from "./datasheetWorkflow";
+import type { SpecFilter } from "./specificationRows";
 
-// The four questions the opened component answers. The labels carry copy ids like every other
-// user-visible string: tab labels were the one class of text that never reached the copy layer.
-const INFO_TABS: readonly TabItem<ComponentInfoTab>[] = [
-  { id: "overview", label: "Overview", copyId: "component-browser.info-tab-overview" },
-  {
-    id: "specifications",
-    label: "Specifications",
-    copyId: "component-browser.info-tab-specifications",
-  },
-  { id: "sourcing", label: "Sourcing", copyId: "component-browser.info-tab-sourcing" },
-  { id: "sources", label: "Sources & History", copyId: "component-browser.info-tab-sources" },
-];
-
-export function ComponentWorkspace({ componentId }: { componentId: string }) {
+export function ComponentWorkspace({
+  componentId,
+  onDeleted,
+}: {
+  componentId: string;
+  /** The component was removed. The page owns what happens to the selection afterwards. */
+  onDeleted?: (id: string) => void;
+}) {
   const session = useUiSession();
   const view = componentView(session, componentId);
-  const query = usePartWorkspaceQuery(componentId);
-  const history = usePartHistory(componentId);
+  const query = usePartDossierQuery(componentId);
   const facets = useFacetsQuery();
   const editField = useEditField();
   const moveCategory = useMoveCategory();
+  const deletePart = useDeletePart();
   const refresh = useRefreshSourcing(componentId);
+  // What this host can do OUTSIDE the application for this component. Read once per opened
+  // component; nothing here changes while a menu is open.
+  const shell = usePartShellQuery(componentId);
+  const revealFiles = useRevealPartFiles();
+  const exportPart = useExportPart();
+  const openPartIn = useOpenPartIn();
   const { toast } = useToast();
-  const [pinned, setPinned] = useState<PinnedSpecs>(readPinnedSpecs);
   const [preview, setPreview] = useState<PreviewKind | null>(null);
-  const [details, setDetails] = useState<RepresentationKind | null>(null);
-  const [viewAll, setViewAll] = useState<ComponentInfoTab | null>(null);
-  const [identityOpen, setIdentityOpen] = useState(false);
-  const [providersOpen, setProvidersOpen] = useState(false);
-  // The canonical record, fetched only while identity editing is open. The handoff band inside
-  // that sheet renders the RECORD (the EDA registry names record attributes), while everything
-  // else on this surface reads the projection. Declared after the state it is gated on.
-  const identityDetail = usePartDetailQuery(identityOpen ? componentId : null);
-  const manual = useText("component-browser.manual", "Manual");
-  const emptyValue = useText("component-browser.no-value", "None");
-  const identityTitle = useText("component-browser.identity-modal", "Edit Identity");
-  const providersTitle = useText("component-browser.providers-modal", "Complete Component");
+  const [surface, setSurface] = useState<WorkspaceSurface | null>(null);
+  const [datasheet, setDatasheet] = useState<DatasheetTarget | null>(null);
+  const [specFilter, setSpecFilter] = useState<SpecFilter>("all");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [shellDialog, setShellDialog] = useState<"export" | "open-in" | null>(null);
+  const [shellPending, setShellPending] = useState<string | null>(null);
+  const specScrollRef = useRef<HTMLDivElement | null>(null);
+  const sourcingScrollRef = useRef<HTMLDivElement | null>(null);
+  const assetRefs = useRef<Partial<Record<RepresentationKind, HTMLElement | null>>>({});
+  // The canonical record, fetched only while identity editing is open.
+  const identityDetail = usePartDetailQuery(
+    surface === "identity" || surface === "classification" ? componentId : null,
+  );
   const savedLabel = useText("component-browser.saved", "Saved");
   const saveFailed = useText("component-browser.save-failed", "Could not save");
   const movedLabel = useText("component-browser.moved", "Moved");
   const moveFailed = useText("component-browser.move-failed", "Could not move");
   const pinoutSaved = useText("component-browser.pinout-saved", "Pinout saved");
   const pinoutFailed = useText("component-browser.pinout-failed", "Could not save the pinout");
+  const deleteFailed = useText("component-browser.delete-failed", "Could not delete");
+  const revealFailed = useText(
+    "component-browser.reveal-failed",
+    "Could not open the file browser",
+  );
+  const exportedLabel = useText("component-browser.exported", "Component exported");
+  const exportFailed = useText("component-browser.export-failed", "Could not export");
+  const openFailed = useText("component-browser.open-in-failed", "Could not open");
 
   const patchView = useCallback(
     (patch: Parameters<typeof setComponentViewInSession>[2]) => {
@@ -109,14 +116,6 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
     },
     [componentId],
   );
-
-  const togglePin = useCallback((category: string, specKey: string) => {
-    setPinned((current) => {
-      const next = togglePinned(current, category, specKey);
-      writePinnedSpecs(next);
-      return next;
-    });
-  }, []);
 
   const failure = useCallback(
     (error: unknown, fallback: string) =>
@@ -137,6 +136,57 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
     [componentId, editField, failure, saveFailed, savedLabel, toast],
   );
 
+  /** Take the reader to the rows a quality segment is about, and to nothing else. */
+  const onQualitySegment = useCallback(
+    (kind: QualitySegmentKind) => {
+      if (kind === "cad") {
+        const focus = cadFocusKind(query.data!.cadAssets.kinds);
+        patchView({ representation_layout: focus });
+        assetRefs.current[focus]?.scrollIntoView({ block: "nearest" });
+        return;
+      }
+      setSpecFilter(kind === "missing" ? "missing" : "conflicts");
+      scrollColumnToTop(specScrollRef.current);
+    },
+    [patchView, query.data],
+  );
+
+  const busy = editField.isPending || moveCategory.isPending;
+  const refreshing = refresh.status === "running";
+
+  const shellItems = useMemo(
+    () =>
+      shellManageItems(shell.data, {
+        onExport: () => setShellDialog("export"),
+        onOpenIn: () => setShellDialog("open-in"),
+        onReveal: () => {
+          revealFiles.mutate(componentId, {
+            onError: (error) => failure(error, revealFailed),
+          });
+        },
+      }),
+    [componentId, failure, revealFailed, revealFiles, shell.data],
+  );
+
+  const manageItems = useMemo(
+    () =>
+      manageMenuItems({
+        onEditIdentity: () => setSurface("identity"),
+        onEditClassification: () => setSurface("classification"),
+        onReviewMissing: () => {
+          setSpecFilter("missing");
+          scrollColumnToTop(specScrollRef.current);
+        },
+        onRefresh: () => refresh.run(),
+        refreshing,
+        onReviewCadSources: () => setSurface("cad-sources"),
+        onViewProvenance: () => setSurface("provenance"),
+        onDelete: () => setConfirmDelete(true),
+        shellItems,
+      }),
+    [refresh, refreshing, shellItems],
+  );
+
   if (query.isLoading) {
     return (
       <WorkspaceMessage>
@@ -149,9 +199,6 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
   if (query.error || !query.data) {
     return (
       <WorkspaceMessage>
-        {/* A written sentence and a retry, not the query's own exception text appended to a
-            prefix. `${loadFailed} ${query.error.message}` put a raw transport error in the
-            middle of the pane, which is the one thing a person cannot act on. */}
         <ErrorState id="component-browser.load-failed" onRetry={() => query.refetch()}>
           This component could not be opened.
         </ErrorState>
@@ -159,262 +206,194 @@ export function ComponentWorkspace({ componentId }: { componentId: string }) {
     );
   }
 
-  const workspace = query.data;
-  const infoTab = view.info_tab;
-  const busy = editField.isPending || moveCategory.isPending;
+  const dossier = query.data;
   const categories = Object.keys(facets.data?.by_category ?? {}).sort();
   const categoryOptions = facets.data?.category_catalog?.length
     ? facets.data.category_catalog
     : categories;
 
-  /**
-   * What an attention item's action does HERE.
-   *
-   * A representation problem is fixed by looking at that representation, so the dock expands it. A
-   * missing identity field is fixed by editing it, so the identity sheet opens. A source
-   * disagreement is answered in Sources & History, which is where attribution lives. Nothing
-   * pretends to be a repair it cannot perform.
-   */
-  function runAction(action: string | null) {
-    if (!action) {
-      patchView({ info_tab: "specifications" });
-      setViewAll("specifications");
-      return;
-    }
-    if (action === "edit-identity") {
-      setIdentityOpen(true);
-      return;
-    }
-    if (action.startsWith("open-representation:")) {
-      const kind = action.slice("open-representation:".length) as RepresentationLayout;
-      patchView({ representation_layout: kind });
-      return;
-    }
-    patchView({ info_tab: "sources" });
-  }
-
   return (
     <div
       data-dev-id="component-browser.root"
-      className="@container flex h-full min-h-0 flex-col overflow-hidden"
+      className="flex h-full min-h-0 flex-col overflow-hidden"
     >
       <div
         data-dev-id={componentDevId(componentId)}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <ComponentHeader
-          workspace={workspace}
-          onPrimaryAction={runAction}
-          onEditIdentity={() => setIdentityOpen(true)}
-          onOpenProviders={() => setProvidersOpen(true)}
-          onOpenDatasheet={() => {
-            const url = workspace.summary.datasheetUrl;
-            if (url) window.open(url, "_blank", "noreferrer");
-          }}
+          dossier={dossier}
+          manageItems={manageItems}
+          onQualitySegment={onQualitySegment}
+          onOpenDatasheet={setDatasheet}
+          onFindDatasheet={() => setSurface("provenance")}
         />
 
-        <RepresentationDock
-          componentId={componentId}
-          representations={workspace.representations}
-          layout={view.representation_layout}
-          onLayout={(layout) => patchView({ representation_layout: layout })}
-          toolByKind={view.representation_tool}
-          onSelectTool={(kind, tool) => patchView({ representation_tool: { [kind]: tool } })}
-          onExpand={(kind) => setPreview(kind === "model" ? "model" : kind)}
-          onDetails={(kind) => setDetails(kind)}
-        />
-
-        <InfoTabsShell
-          tabs={INFO_TABS}
-          active={infoTab}
-          onSelect={(tab) => patchView({ info_tab: tab })}
-        >
-          <TabPanel
-            idBase="component-info"
-            tab={infoTab}
-            className="flex min-h-0 flex-1 flex-col overflow-hidden"
-          >
-            {infoTab === "overview" ? (
-              <OverviewTab
-                workspace={workspace}
-                pinned={pinned}
-                onTogglePin={togglePin}
-                onAttentionAction={runAction}
-                onOpenTab={(tab) => patchView({ info_tab: tab })}
-              />
-            ) : infoTab === "specifications" ? (
-              <SpecificationsTab
-                workspace={workspace}
-                pinned={pinned}
-                onViewAll={() => setViewAll("specifications")}
-              />
-            ) : infoTab === "sourcing" ? (
-              <SourcingTab workspace={workspace} onViewAll={() => setViewAll("sourcing")} />
-            ) : (
-              <SourcesTab
-                workspace={workspace}
-                revisionCount={history.data?.count ?? null}
-                onViewAll={() => setViewAll("sources")}
-              />
-            )}
-          </TabPanel>
-        </InfoTabsShell>
-      </div>
-
-      <PreviewModal
-        open={preview !== null}
-        partId={componentId}
-        partName={workspace.identity.displayName}
-        initialKind={preview ?? "symbol"}
-        onClose={() => setPreview(null)}
-      />
-
-      <WorkspaceModal
-        open={details !== null}
-        title={details ? `${REPRESENTATION_LABEL[details]} Details` : ""}
-        onClose={() => setDetails(null)}
-      >
-        {details ? (
-          <div className="flex flex-col gap-3">
-            <table className="w-full text-left text-xs">
-              <thead className="text-2xs text-t3">
-                <tr>
-                  <th className="py-1 pr-3 font-medium">
-                    <Text id="component-browser.details-tool">Tool</Text>
-                  </th>
-                  <th className="py-1 pr-3 font-medium">
-                    <Text id="component-browser.details-state">State</Text>
-                  </th>
-                  <th className="py-1 pr-3 font-medium">
-                    <Text id="component-browser.details-reference">Reference</Text>
-                  </th>
-                  <th className="py-1 pr-3 font-medium">
-                    <Text id="component-browser.details-source">Source</Text>
-                  </th>
-                  <th className="py-1 font-medium">
-                    <Text id="component-browser.details-checks">Checks</Text>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="text-t1">
-                {workspace.representations[details].tools.map((tool) => (
-                  <tr key={tool.tool} className="border-t border-line">
-                    <td className="py-1 pr-3">{tool.toolLabel}</td>
-                    <td className="py-1 pr-3">{tool.status}</td>
-                    <td className="py-1 pr-3 font-mono text-2xs">
-                      {[tool.reference.lib, tool.reference.name].filter(Boolean).join(":") ||
-                        tool.reference.file ||
-                        emptyValue}
-                    </td>
-                    <td className="py-1 pr-3">{tool.sourceLabel || manual}</td>
-                    <td className="py-1 tabular-nums">{tool.checks.length}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {/* The retained-variant chooser stays reachable from here until its own slice replaces it. */}
-            <CadVariantSection partId={componentId} enabled />
-          </div>
-        ) : null}
-      </WorkspaceModal>
-
-      <WorkspaceModal
-        open={providersOpen}
-        title={providersTitle}
-        onClose={() => setProvidersOpen(false)}
-      >
-        {providersOpen ? (
-          <CompleteComponentSheet
-            componentId={componentId}
-            identity={workspace.identity}
-            providers={workspace.providers}
-            onClose={() => setProvidersOpen(false)}
-          />
-        ) : null}
-      </WorkspaceModal>
-
-      <WorkspaceModal
-        open={identityOpen}
-        title={identityTitle}
-        onClose={() => setIdentityOpen(false)}
-      >
-        <IdentitySheet
-          identity={workspace.identity}
-          detail={identityDetail.data ?? null}
-          detailLoading={identityDetail.isLoading}
-          detailFailed={!!identityDetail.error}
-          onRetryDetail={() => identityDetail.refetch()}
-          categories={categoryOptions}
-          busy={busy}
-          onEditField={(field, value) => applyField(field, value)}
-          onMoveCategory={(category) =>
-            moveCategory.mutate(
-              { id: componentId, category },
-              {
-                onSuccess: () => toast(`${movedLabel} ${category}`, "ok"),
-                onError: (error) => failure(error, moveFailed),
-              },
-            )
+        <WorkspaceColumns
+          cad={
+            <CadAssetsColumn
+              componentId={componentId}
+              dossier={dossier}
+              layout={view.representation_layout}
+              onLayout={(layout: RepresentationLayout) =>
+                patchView({ representation_layout: layout })
+              }
+              onCompareSources={() => setSurface("cad-sources")}
+              onOpenFullPreview={(kind) => setPreview(previewKindFor(kind))}
+              assetRefs={assetRefs}
+            />
+          }
+          specifications={
+            <SpecificationsColumn
+              componentId={componentId}
+              dossier={dossier}
+              filter={specFilter}
+              onFilter={setSpecFilter}
+              scrollRef={specScrollRef}
+              onViewPinout={() => setSurface("pinout")}
+            />
+          }
+          sourcing={
+            <SourcingColumn
+              dossier={dossier}
+              onViewOffers={() => setSurface("offers")}
+              onViewProvenance={() => setSurface("provenance")}
+              onOpenDocument={(id) => {
+                const item = dossier.documents.items.find((entry) => entry.id === id);
+                if (item) setDatasheet({ id, document: item, kind: openKindFor(item) });
+              }}
+              onRefresh={() => refresh.run()}
+              refreshing={refreshing}
+              scrollRef={sourcingScrollRef}
+            />
           }
         />
-      </WorkspaceModal>
 
-      <WorkspaceModal
-        open={viewAll !== null}
-        title={viewAll ? `${INFO_TABS.find((tab) => tab.id === viewAll)?.label ?? ""}` : ""}
-        onClose={() => setViewAll(null)}
-      >
-        {viewAll === "specifications" ? (
-          <SpecificationsSheet
-            specifications={workspace.specifications}
-            category={workspace.identity.category}
-            pinned={pinned}
-            onTogglePin={(specKey) => togglePin(workspace.identity.category, specKey)}
-            pinout={
-              <PinoutTable
-                pinout={workspace.specifications.pinout}
-                action={
-                  <PinoutApply
-                    componentId={componentId}
-                    mpn={workspace.identity.mpn}
-                    category={workspace.identity.category}
-                    onSaved={() => toast(pinoutSaved, "ok")}
-                    onFailed={(error) => failure(error, pinoutFailed)}
-                  />
-                }
-              />
-            }
+        <WorkspaceStatusBar
+          dossier={dossier}
+          activity={
+            deletePart.isPending
+              ? "deleting"
+              : refreshing
+                ? "refreshing"
+                : busy
+                  ? "saving"
+                  : "idle"
+          }
+        />
+      </div>
+
+      <ExportComponentDialog
+        open={shellDialog === "export"}
+        shell={shell.data}
+        pending={shellPending}
+        onClose={() => setShellDialog(null)}
+        onExport={(format) => {
+          setShellPending(format);
+          exportPart.mutate(
+            { partId: componentId, format },
+            {
+              onSuccess: (result) => {
+                setShellPending(null);
+                setShellDialog(null);
+                toast(`${exportedLabel} (${result.file_count})`, "ok");
+              },
+              onError: (error) => {
+                setShellPending(null);
+                failure(error, exportFailed);
+              },
+            },
+          );
+        }}
+      />
+
+      <OpenInDialog
+        open={shellDialog === "open-in"}
+        shell={shell.data}
+        pending={shellPending}
+        onClose={() => setShellDialog(null)}
+        onOpen={(applicationId, format) => {
+          setShellPending(applicationId);
+          openPartIn.mutate(
+            { partId: componentId, applicationId, format },
+            {
+              onSuccess: () => {
+                setShellPending(null);
+                setShellDialog(null);
+              },
+              onError: (error) => {
+                setShellPending(null);
+                failure(error, openFailed);
+              },
+            },
+          );
+        }}
+      />
+
+      <WorkspaceSurfaces
+        componentId={componentId}
+        dossier={dossier}
+        surface={surface}
+        onCloseSurface={() => setSurface(null)}
+        preview={preview}
+        onClosePreview={() => setPreview(null)}
+        datasheet={datasheet}
+        onCloseDatasheet={() => setDatasheet(null)}
+        categoryOptions={categoryOptions}
+        busy={busy}
+        refresh={{ run: refresh.run, running: refreshing }}
+        identityDetail={identityDetail}
+        onEditField={applyField}
+        onMoveCategory={(category) =>
+          moveCategory.mutate(
+            { id: componentId, category },
+            {
+              onSuccess: () => toast(`${movedLabel} ${category}`, "ok"),
+              onError: (error) => failure(error, moveFailed),
+            },
+          )
+        }
+        onPinoutSaved={() => toast(pinoutSaved, "ok")}
+        onPinoutFailed={(error) => failure(error, pinoutFailed)}
+        enrich={
+          <EnrichPanel
+            mpn={dossier.identity.mpn}
+            category={dossier.identity.category}
+            current={{
+              manufacturer: dossier.identity.manufacturer,
+              description: dossier.qualitySummary.description,
+            }}
+            busy={busy}
+            onApply={applyField}
           />
-        ) : viewAll === "sourcing" ? (
-          <SourcingSheet
-            sourcing={workspace.sourcing}
-            sourceRecords={workspace.sources.records}
-          />
-        ) : viewAll === "sources" ? (
-          <SourcesSheet
-            componentId={componentId}
-            componentName={workspace.identity.displayName}
-            sources={workspace.sources}
-            applying={busy}
-            onApplyAlternate={applyField}
-            refresh={{ run: refresh.run, running: refresh.status === "running" }}
-            enrich={
-              <EnrichPanel
-                mpn={workspace.identity.mpn}
-                category={workspace.identity.category}
-                current={{
-                  manufacturer: workspace.identity.manufacturer,
-                  description: workspace.summary.description.formattedValue,
-                }}
-                busy={busy}
-                onApply={applyField}
-              />
-            }
-          />
-        ) : null}
-      </WorkspaceModal>
+        }
+        confirmDelete={confirmDelete}
+        deleting={deletePart.isPending}
+        onCancelDelete={() => setConfirmDelete(false)}
+        onConfirmDelete={() => {
+          setConfirmDelete(false);
+          deletePart.mutate(componentId, {
+            // The page owns the aftermath: it holds the selection, and it is still mounted after
+            // this workspace goes, which is where an Undo has to live.
+            onSuccess: () => onDeleted?.(componentId),
+            onError: (error) => failure(error, deleteFailed),
+          });
+        }}
+      />
     </div>
   );
+}
+
+/**
+ * Put a column back at the top after its content was filtered underneath the reader.
+ *
+ * Guarded because a scroll container is not guaranteed to implement `scrollTo` - jsdom does not,
+ * and neither does a detached node mid-unmount. Failing to scroll is a cosmetic loss; throwing out
+ * of a click handler takes the workspace down with it.
+ */
+function scrollColumnToTop(node: HTMLDivElement | null): void {
+  if (node && typeof node.scrollTo === "function") node.scrollTo({ top: 0 });
+  else if (node) node.scrollTop = 0;
 }
 
 /** The centring frame the workspace's own state block sits in. The state decides its own tone. */
@@ -434,9 +413,11 @@ export function ComponentWorkspaceEmpty() {
   return (
     <div
       data-dev-id="component-browser.empty"
-      className="flex h-full min-h-0 items-center justify-center overflow-hidden px-6 text-center text-sm text-t3"
+      className="flex h-full min-h-0 items-center justify-center overflow-hidden px-6 text-center"
     >
-      <Text id="component-browser.empty">Select a component to open it.</Text>
+      <span className="ui-component-description">
+        <Text id="component-browser.empty">Select a component to open it.</Text>
+      </span>
     </div>
   );
 }

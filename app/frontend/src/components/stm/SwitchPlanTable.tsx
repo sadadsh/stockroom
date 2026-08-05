@@ -100,7 +100,7 @@ export function SwitchPlanTable({ union }: { union: UnionDTO }) {
               <col className="w-[96px]" />
               <col className="w-[148px]" />
             </colgroup>
-            <thead className="sticky top-0 z-[1] bg-[var(--c-sticky)] backdrop-blur">
+            <thead className="sticky top-0 z-[1] bg-[var(--c-sticky)]">
               <tr className="border-b border-line text-2xs font-semibold text-t3">
                 <th className="px-2.5 py-1.5">
                   <Text id="stm.switch-plan.column.position">Position</Text>
