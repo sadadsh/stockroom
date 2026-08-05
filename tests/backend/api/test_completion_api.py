@@ -536,8 +536,6 @@ def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
     }
     # No route is machine-driven any more, so every one of them is handed to the person with
     # its checklist. `mode` above is retained legacy request data, not a lane selector.
-    assert handoff["transport"] == "default-browser"
-    assert handoff["opens_in"] == "your own default browser"
     assert handoff["mpn"]
     assert handoff["routes"] and all(route["required_files"] for route in handoff["routes"])
     replay = client.get(

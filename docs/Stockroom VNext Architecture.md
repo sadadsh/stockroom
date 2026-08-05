@@ -267,8 +267,9 @@ least 30 cold and 30 warm starts. Every candidate must pass these hard gates:
 3. UI crash, service crash, service upgrade, sleep/resume, Windows sign-out,
    and forced process termination recover without a lost job, duplicate
    service, orphan sidecar, stale port, or false-ready screen.
-4. Playwright or raw CDP can observe and test the packaged development build,
-   while production builds expose no remote-debugging endpoint.
+4. No build opens a remote-debugging endpoint, on any WebView, for any reason.
+   The packaged build stays observable and testable through the native
+   accessibility tree instead.
 5. Signed per-user install, update, failed-update rollback, uninstall, and
    WebView2 bootstrap work without a shell or administrator access. Uninstall
    preserves canonical library data unless the owner explicitly requests its

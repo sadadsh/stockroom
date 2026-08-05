@@ -24,8 +24,9 @@ from stockroom.api.schemas import (
     SearchRow,
     SetSpecsBody,
 )
-from stockroom.capture.runner import capture_state_root
+from stockroom.capture.runner import capture_candidates_root, capture_state_root
 from stockroom.evidence import EvidenceStore
+from stockroom.ingest.candidates import RetainedCandidateStore
 from stockroom.ingest.passive_add import (
     PassiveAddError,
     PassiveNeedsInputError,
@@ -75,16 +76,16 @@ _WORKLIST_MAX_ROWS = 200
 
 
 def _coverage(record: PartRecord) -> dict:
-    """Provider coverage for one record, including what the machine-local evidence store holds.
+    """Provider coverage for one record, including what the machine-local stores hold.
 
-    The store is opened HERE and handed to the projection, which never opens a path itself.
-    Retained ingest candidates are not consulted: nothing in this build owns a candidate store
-    root, and reading from an invented one would report evidence from a directory no writer
-    uses.
+    Both stores are opened HERE and handed to the projection, which never opens a path itself.
+    The retained-candidate store is the same one guided capture writes a completed provider
+    package to, so `downloaded` and `validated` name packages Stockroom is actually holding.
     """
     return provider_coverage(
         record,
         evidence=EvidenceStore((capture_state_root() / "Evidence").resolve()),
+        candidates=RetainedCandidateStore(capture_candidates_root()).candidates_for(record.id),
     )
 
 

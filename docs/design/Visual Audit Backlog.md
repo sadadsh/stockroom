@@ -84,9 +84,10 @@ and `P2` meaningful fit, finish, or clarity debt.
   `work/Embedded Provider Visual Audit/Returned To Stockroom.jpg`,
   1,266 × 833, SHA-256 `0a74146204c8`; and
   `work/Native Window Host/Embedded Provider Smoke 20260801-174945/Smoke Evidence.json`.
-- Intended claim: an exact provider page opens inside the Stockroom window, the
-  persistent provider WebView is reachable over its private CDP endpoint, and
+- Intended claim: an exact provider page opens inside the Stockroom window and
   `Return To Stockroom` restores the main app without opening a separate browser.
+  The provider WebView was reachable over a private CDP endpoint when this audit
+  ran; that endpoint has since been removed and no build opens one.
 - Acceptance result: pass. The first live capture exposed an HWND airspace
   defect that painted the main WebView above the provider WebView; the native
   host now collapses the inactive WebView, and the corrected capture visibly

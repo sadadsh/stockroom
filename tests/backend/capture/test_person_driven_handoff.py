@@ -678,12 +678,9 @@ def test_the_guidance_carries_the_ordered_checklist_and_the_provider_instruction
         mpn="ABC-1",
     )
 
-    assert guidance["transport"] == TRANSPORT_DEFAULT_BROWSER
     assert guidance["provider_label"] == get_adapter("digikey").capability.label
     assert guidance["manufacturer"] == "Acme"
     assert guidance["mpn"] == "ABC-1"
-    assert guidance["opens_in"] == "your own default browser"
-    assert guidance["downloads_dir"]
     routes = guidance["routes"]
     assert routes, guidance
     for route in routes:
@@ -696,14 +693,19 @@ def test_the_guidance_carries_the_ordered_checklist_and_the_provider_instruction
     assert any(route["instruction"] for route in routes), guidance
 
 
-def test_every_provider_guidance_names_the_person_driven_transport():
-    """No provider is machine-driven any more, so no provider opens in a Stockroom-driven page."""
+def test_no_provider_guidance_describes_a_transport_or_a_downloads_directory():
+    """Production opens Stockroom's OWN embedded provider surface, so guidance names neither.
+
+    These fields once reported ``default-browser``, "your own default browser" and the person's
+    Downloads path. No surface read them, which is exactly why they could go on contradicting the
+    shipped workflow unnoticed; their absence is asserted so they cannot quietly return.
+    """
 
     for vendor_key in ("digikey", "ultralibrarian", "snapmagic", "samacsys"):
         guidance = handoff_guidance(vendor_key, needs=["kicad_symbol"])
         assert guidance is not None, vendor_key
-        assert guidance["transport"] == TRANSPORT_DEFAULT_BROWSER, vendor_key
-        assert guidance["opens_in"] == "your own default browser", vendor_key
+        assert guidance["routes"], vendor_key
+        assert not {"transport", "opens_in", "downloads_dir"} & set(guidance), vendor_key
 
 
 def test_the_guidance_refuses_an_unknown_provider():

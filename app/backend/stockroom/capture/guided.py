@@ -622,6 +622,7 @@ class GuidedCaptureSource:
         run_write=None,
         now_iso=None,
         evidence_store=None,
+        candidate_store=None,
         cross_eda_verifier=None,
         projection_verifier=None,
         user_finished: Callable[[], bool] | None = None,
@@ -664,6 +665,10 @@ class GuidedCaptureSource:
         self._run_write = run_write or (lambda fn: fn())
         self._now_iso = now_iso
         self._evidence_store = evidence_store
+        # Optional, and OFF when absent. It records one retained candidate per artifact inside a
+        # completed provider package so provider coverage can report bytes Stockroom actually
+        # holds. It never decides an attachment; see `_retain_candidates`.
+        self._candidate_store = candidate_store
         self._cross_eda_verifier = cross_eda_verifier or verify_cross_eda_component
         self._projection_verifier = projection_verifier
         self._user_finished = user_finished
@@ -1251,6 +1256,42 @@ class GuidedCaptureSource:
             )
         )
 
+    def _retain_candidates(self, record, landed, *, evidence_provider_key: str) -> None:
+        """Retain each bound provider package as durable candidates. Never changes an attachment.
+
+        Placed after the receipt-binding and route-attribution gates, so only bytes already proved
+        to belong to THIS task and THIS route are retained, and before attachment, because "this
+        provider delivered a package for this part" is true whether or not the set turns out
+        complete enough to activate. Re-processing the same package is a no-op inside the store,
+        so a second capture of the same download adds provenance rather than a duplicate.
+
+        Retention is evidence for the coverage table and nothing else: a store that refuses a
+        package (an unsafe archive, an unreadable path) is traced and the attachment continues
+        exactly as it would have.
+        """
+
+        store = self._candidate_store
+        if store is None:
+            return
+        for item in landed:
+            try:
+                store.retain_package(
+                    component_id=record.id,
+                    provider_id=evidence_provider_key,
+                    package_path=Path(item.path),
+                    source_url=str(getattr(item, "source_url", "") or ""),
+                    expected_mpn=str(getattr(record, "mpn", "") or ""),
+                    expected_manufacturer=str(getattr(record, "manufacturer", "") or ""),
+                )
+            except Exception as exc:  # noqa: BLE001 - retention never decides an attachment
+                trace_warning(
+                    "capture.candidates.rejected",
+                    provider=self._vendor_key,
+                    route=evidence_provider_key,
+                    file=file_note(getattr(item, "path", "")),
+                    why=str(exc),
+                )
+
     def _supplementary_model_issue(self, landed) -> str:
         """Prove at least one delivered artifact contains a structurally valid STEP model."""
 
@@ -1563,6 +1604,7 @@ class GuidedCaptureSource:
                     f"expected {provider_key!r}, received {sorted(attributed)!r}"
                 )
             )
+        self._retain_candidates(record, landed, evidence_provider_key=provider_key)
         cleanup_callbacks = []
         try:
             outcome = self._attach_impl(
