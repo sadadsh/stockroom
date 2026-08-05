@@ -384,8 +384,7 @@ def _svg_content_bbox(text: str) -> tuple[float, float, float, float] | None:
             points = re.search(r'\bpoints="([^"]*)"', attrs, re.S)
             if points:
                 nums = [
-                    float(n)
-                    for n in re.findall(r"-?\d+\.?\d*(?:[eE][-+]?\d+)?", points.group(1))
+                    float(n) for n in re.findall(r"-?\d+\.?\d*(?:[eE][-+]?\d+)?", points.group(1))
                 ]
                 if len(nums) >= 2 and len(nums) % 2 == 0:
                     add(nums[0::2], nums[1::2], half)
@@ -515,6 +514,94 @@ def previews_router(require_token) -> APIRouter:
         cached.write_text(text, encoding="utf-8")
         return _svg_response(text)
 
+    @r.get("/symbol/{part_id}.json")
+    def symbol_geometry(request: Request, part_id: str) -> dict:
+        """The symbol's pins and body geometry, for the CAD column's technical preview.
+
+        A rendered SVG cannot answer the questions the column exists to answer. "How many pins
+        does this symbol have", "does any number appear twice", "which of these is a power
+        input" and "is the body actually drawn" are facts about the FILE, and they do not
+        survive rasterisation - which is why the symbol module could previously show a picture
+        and say nothing about it.
+
+        So the geometry travels instead: every pin with its number, its name and its electrical
+        type, the body shapes, and the drawn bounds. That also makes the three visibility
+        toggles real rather than decorative - a viewer holding the pins can draw the names,
+        the numbers, both or neither, without asking the backend to re-render anything.
+
+        Geometry is in KiCad's own units and frame (mm, +Y UP in a schematic, degrees). The
+        viewer owns the flip to screen coordinates, exactly as it already does for the land
+        pattern's opposite convention.
+        """
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        rec, lib_path = _resolve_symbol_file(ctx, part_id)
+        entry = rec.assets_for("kicad").symbol
+        if entry is None or not entry.name:  # defensive: the resolver enforces this already
+            raise FileNotFoundError(f"part {part_id} has no symbol")
+        symbol = SymbolLib.load(lib_path).get_symbol(entry.name)
+        pins = symbol.pins
+        graphics = symbol.graphics
+        xs: list[float] = []
+        ys: list[float] = []
+        for shape in graphics:
+            for point in shape.points:
+                xs.append(point[0])
+                ys.append(point[1])
+            if shape.kind == "circle":
+                xs.extend((shape.center[0] - shape.radius, shape.center[0] + shape.radius))
+                ys.extend((shape.center[1] - shape.radius, shape.center[1] + shape.radius))
+        for pin in pins:
+            end = pin.body_end
+            xs.extend((pin.at[0], end[0]))
+            ys.extend((pin.at[1], end[1]))
+        return {
+            "units": "mm",
+            "name": entry.name,
+            # What the FILE asks for. A symbol whose names are hidden by its own author is not
+            # a symbol missing its names, and the viewer's toggle should start where it says.
+            "namesHidden": symbol.names_hidden,
+            "numbersHidden": symbol.numbers_hidden,
+            "pins": [
+                {
+                    "number": pin.number,
+                    "name": pin.name,
+                    "electrical": pin.electrical,
+                    "style": pin.style,
+                    "at": [pin.at[0], pin.at[1]],
+                    "angle": pin.angle,
+                    "length": pin.length,
+                    "hidden": pin.hidden,
+                }
+                for pin in pins
+            ],
+            "graphics": [
+                {
+                    "kind": shape.kind,
+                    "points": [[x, y] for x, y in shape.points],
+                    "center": [shape.center[0], shape.center[1]],
+                    "radius": shape.radius,
+                    "width": shape.width,
+                    "fill": shape.fill,
+                    "closed": shape.closed,
+                }
+                for shape in graphics
+            ],
+            # None rather than a zero box when nothing is drawn: a degenerate bound invented
+            # here would read as a symbol whose body collapsed, which is a different fault.
+            "bounds": (
+                None
+                if not xs or not ys
+                else {
+                    "x": min(xs),
+                    "y": min(ys),
+                    "width": max(xs) - min(xs),
+                    "height": max(ys) - min(ys),
+                }
+            ),
+        }
+
     @r.get("/land/{part_id}.json")
     def land_pattern(request: Request, part_id: str) -> dict:
         """The footprint's pads plus the 3D model's placement, for the viewer's board mode.
@@ -548,6 +635,12 @@ def previews_router(require_token) -> APIRouter:
                     "pad_type": p.pad_type,
                     "side": p.side,
                     "rratio": p.roundrect_rratio,
+                    # The layers the pad DECLARES, verbatim. A technical preview needs them to
+                    # draw the mask aperture and the paste stencil, and neither can be inferred
+                    # from copper: a pad that opens no mask and a pad that opens one look
+                    # identical in copper and are different fabrication outcomes. Guessing a
+                    # default would draw an aperture the footprint never asked for.
+                    "layers": list(p.layers),
                 }
                 for p in fp.pads
             ],

@@ -129,6 +129,17 @@ class WindowClientPort(Protocol):
         ready_texts: tuple[str, ...] = (),
     ) -> dict[str, object]: ...
 
+    def detected_eda_applications(self) -> tuple[dict[str, str], ...]: ...
+
+    def reveal_directory(self, root: str, path: str) -> None: ...
+
+    def open_file_with_eda_application(
+        self,
+        application_id: str,
+        root: str,
+        path: str,
+    ) -> None: ...
+
     def health(self) -> WindowHostHealth: ...
 
     def export_session(self) -> object: ...
@@ -634,6 +645,34 @@ class SupervisorWindowHandoffPorts(WindowHandoffPorts):
             after_sequence=after_sequence,
         )
 
+    def detected_eda_applications(self) -> tuple[dict[str, str], ...]:
+        """What the active window proved this machine can open a component in."""
+
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError("active native window is unavailable")
+        return client.detected_eda_applications()
+
+    def reveal_directory(self, root: str, path: str) -> None:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError("active native window is unavailable")
+        client.reveal_directory(root, path)
+
+    def open_file_with_eda_application(
+        self,
+        application_id: str,
+        root: str,
+        path: str,
+    ) -> None:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError("active native window is unavailable")
+        client.open_file_with_eda_application(application_id, root, path)
+
     def show_provider_browser(self, lease_id: str, generation: int) -> None:
         with self._lock:
             client = self._active
@@ -998,6 +1037,26 @@ class ProductionWindowReplacement:
                     finally:
                         if self._active_provider_lease == handshake:
                             self._active_provider_lease = None
+
+    def detected_eda_applications(self) -> tuple[dict[str, str], ...]:
+        """The EDA applications the running window host can prove are installed.
+
+        This is the ONLY place an EDA application's name enters the product outside an explicit
+        export/open/compatibility action, and it is answered by the machine rather than by a
+        static list, so nothing is ever offered that cannot run.
+        """
+
+        return self._ports.detected_eda_applications()
+
+    def reveal_component_directory(self, root: str, path: str) -> None:
+        """Open the file browser at a component directory the backend already resolved."""
+
+        self._ports.reveal_directory(root, path)
+
+    def open_component_file(self, application_id: str, root: str, path: str) -> None:
+        """Open one exported component file in a detected EDA application."""
+
+        self._ports.open_file_with_eda_application(application_id, root, path)
 
     def show_active_provider_browser(self) -> None:
         """Reveal the provider document retained behind the Stockroom surface."""

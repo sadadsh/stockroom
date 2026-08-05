@@ -61,7 +61,7 @@ class _Ops:
         self.added: list = []
         self._fail_on = set(fail_on)
 
-    def add_part(self, staged, require_complete: bool = True):
+    def add_part(self, staged, require_complete: bool = True, *, now: str = ""):
         if staged.mpn in self._fail_on:
             raise OSError("disk on fire")
         self.added.append(staged)
@@ -287,7 +287,7 @@ class _PassiveOps:
         record.id = record.mpn.lower()
         return record
 
-    def add_part(self, staged, require_complete: bool = True):
+    def add_part(self, staged, require_complete: bool = True, *, now: str = ""):
         self.plain.append(staged)
 
         class _R:

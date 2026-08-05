@@ -9,7 +9,7 @@ import re
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from stockroom.store.index import Facets as _Facets
 from stockroom.store.index import IndexRow, ToolReadiness
@@ -48,6 +48,10 @@ class PartSummary(BaseModel):
     category: str
     mpn: str
     manufacturer: str
+    # The picker's second line is "Manufacturer . Package". Empty when the library holds no
+    # footprint for the part, which the row states by omitting the segment rather than by
+    # printing a separator with nothing after it.
+    package: str = ""
     is_complete: bool
     missing: list[str] = []
     eda_readiness: dict[str, EdaReadinessSummary] = {}
@@ -60,6 +64,7 @@ class PartSummary(BaseModel):
             category=row.category,
             mpn=row.mpn,
             manufacturer=row.manufacturer,
+            package=row.package,
             is_complete=row.is_complete,
             missing=list(row.missing),
             eda_readiness={
@@ -373,6 +378,79 @@ class ProviderCoverageBody(BaseModel):
     artifact: Literal["symbol", "footprint", "model"]
     status: Literal["available", "not_available", ""] = ""
     note: str = ""
+
+
+class SpecificationOverrideBody(BaseModel):
+    """The reviewed value a person is putting at the top of one field's precedence order.
+
+    A blank value is refused rather than stored. "This field is empty" is not an answer that
+    outranks the manufacturer's datasheet; withdrawing the override is, and that is what DELETE
+    on the same address does.
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    value: str
+    # Why the reviewer decided this. Optional, because an obvious correction needs no essay, and
+    # carried when given, because a manual value that outranks two distributors and cannot say
+    # why is a value the next reader has to take on trust.
+    note: str = ""
+    # Whether the reviewer stands behind the value as checked. Defaults to true, which is what
+    # every override written before this field existed meant.
+    verified: bool = True
+
+    @field_validator("value")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("an override must carry a value; clear it instead of blanking it")
+        return value
+
+    @field_validator("note")
+    @classmethod
+    def _tidy(cls, note: str) -> str:
+        return note.strip()
+
+
+class PreferredSourceBody(BaseModel):
+    """The source one field is being pinned to.
+
+    Validated against that field's OWN candidates in the engine, not here: whether a source
+    answered for a field is a fact about the record, and a schema that guessed at it would
+    accept a pin the specification sheet could never honour.
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    source_id: str = Field(alias="sourceId")
+
+    @field_validator("source_id")
+    @classmethod
+    def _named(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("a preferred source must name a source")
+        return value.strip()
+
+
+class CadPreferredSourceBody(BaseModel):
+    """The provider a component's CAD is being pinned to, for the set or for one asset.
+
+    Only the name is checked here. Whether that provider actually supplies the artifact, and
+    whether the pin would leave two providers in force across the three assets, are facts about
+    the record and its coverage - decided in `dossier.cad_preference` where the coherence rule
+    lives, so a schema can never accept a preference the rule would refuse.
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    provider: str
+
+    @field_validator("provider")
+    @classmethod
+    def _named(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("a preferred CAD source must name a provider")
+        return value.strip()
 
 
 class ProjectSummary(BaseModel):

@@ -1076,3 +1076,100 @@ def test_a_vendor_spec_naming_a_DIFFERENT_company_never_replaces_the_maker(tmp_p
 
     out = ops.rebuild_part(TPS_ID, [], datetime.now(timezone.utc).isoformat())
     assert out.manufacturer == "TI"
+
+
+# --------------------------------------------------------------- the stored datasheet
+
+# A downloaded datasheet used to reach the library as a filename and nothing else: no revision,
+# no source, no retrieval time, and no way to tell a copy whose bytes had been checked from a
+# link somebody pasted. It now also lands as a TYPED document beside the legacy slot, which keeps
+# its exact meaning so an existing library and every v4 record still read the same.
+
+
+def test_a_downloaded_datasheet_lands_as_a_typed_document(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.datasheet_meta = Datasheet(source_url="https://industrial.panasonic.com/erj.pdf")
+    staged.catalog = {
+        "digikey": {
+            "media": [
+                {
+                    "title": "TPS62130 Datasheet",
+                    "revision": "D",
+                    "url": "https://industrial.panasonic.com/erj.pdf",
+                }
+            ]
+        }
+    }
+    record = LibraryOps(profile, repo).add_part(staged, now="2026-08-05T10:42:00+00:00")
+
+    assert len(record.documents) == 1
+    document = record.documents[0]
+    assert document.document_type == "datasheet"
+    assert document.title == "TPS62130 Datasheet"
+    assert document.revision == "D"
+    assert document.local_path == f"datasheets/{TPS_ID}.pdf"
+    assert document.remote_url == "https://industrial.panasonic.com/erj.pdf"
+    assert document.retrieved_at == "2026-08-05T10:42:00+00:00"
+
+
+def test_the_stored_bytes_are_checked_before_the_copy_is_called_verified(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    record = LibraryOps(profile, repo).add_part(staged, now="2026-08-05T10:42:00+00:00")
+    assert record.documents[0].verified_at == "2026-08-05T10:42:00+00:00"
+
+    repo2, profile2, staged2 = _setup(tmp_path / "second", fixtures_dir)
+    staged2.datasheet_source.write_bytes(b"<html>not a datasheet</html>")
+    other = LibraryOps(profile2, repo2).add_part(staged2, now="2026-08-05T10:42:00+00:00")
+    assert other.documents[0].verified_at == ""
+
+
+def test_a_typed_document_never_changes_the_legacy_datasheet_slot(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    record = LibraryOps(profile, repo).add_part(staged, now="2026-08-05T10:42:00+00:00")
+    assert record.datasheet is not None
+    assert record.datasheet.file == f"{TPS_ID}.pdf"
+
+
+def test_an_import_package_url_is_never_attributed_to_the_datasheet(tmp_path, fixtures_dir):
+    """`Provenance.source_url` is the package's address on the CAD-import path, not the PDF's.
+
+    The legacy slot has always carried it, and that is left exactly alone; the typed document
+    refuses to repeat it, because saying a manufacturer's page served this PDF when it did not is
+    a claim the record cannot support.
+    """
+    from stockroom.model.part import Provenance
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.provenance = Provenance(source="ultralibrarian", source_url="https://ul.test/package")
+    staged.datasheet_meta = Datasheet(source_url="https://ul.test/package")
+    record = LibraryOps(profile, repo).add_part(staged, now="2026-08-05T10:42:00+00:00")
+    assert record.datasheet.source_url == "https://ul.test/package"
+    assert record.documents[0].remote_url == ""
+    assert record.documents[0].source_type == "imported"
+    assert record.documents[0].source == "ultralibrarian"
+
+
+def test_the_stored_copy_and_the_legacy_slot_are_one_document_not_two(tmp_path, fixtures_dir):
+    from stockroom.dossier.documents import build_documents
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    record = LibraryOps(profile, repo).add_part(staged, now="2026-08-05T10:42:00+00:00")
+    documents = build_documents(record)
+    assert documents["count"] == 1
+    assert documents["items"][0]["retrievedAt"] == "2026-08-05T10:42:00+00:00"
+
+
+def test_an_add_with_no_clock_dates_its_document_honestly(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    record = LibraryOps(profile, repo).add_part(staged)
+    assert record.documents[0].retrieved_at == ""
+    assert record.documents[0].verified_at == ""
+
+
+def test_removing_the_datasheet_removes_the_typed_document_with_it(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged, now="2026-08-05T10:42:00+00:00")
+    record = ops.detach_asset(TPS_ID, "datasheet")
+    assert record.datasheet is None
+    assert record.documents == []
