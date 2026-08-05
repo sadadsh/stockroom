@@ -118,8 +118,14 @@ export function ComponentHeader({
           </span>
         </span>
       </div>
-      <div className="flex min-w-0 items-center gap-3">
-        <dl className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden text-xs text-t2">
+      {/* The identity has a FLOOR, and the actions give way rather than the facts.
+          None of these actions can shrink below its own label, so a single unbreakable row handed
+          the identity whatever was left - at 960 (the supported minimum) that was nothing, and the
+          row rendered `Manufacturer Package Category` with no values at all. The facts now claim a
+          basis first; when the actions cannot sit beside it they take their own line, which costs
+          one control row and keeps every value. */}
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
+        <dl className="flex min-w-0 shrink grow basis-40 flex-wrap items-center gap-x-3 gap-y-0.5 overflow-hidden text-xs text-t2">
           <HeaderFact label="Manufacturer" value={identity.manufacturer} />
           <HeaderFact label="Package" value={identity.package ?? ""} />
           <HeaderFact label="Category" value={identity.category} />
@@ -182,15 +188,21 @@ export function ComponentHeader({
   );
 }
 
-/** One identity fact. An absent value renders nothing rather than an empty labelled hole. */
+/**
+ * One identity fact. An absent value renders nothing rather than an empty labelled hole.
+ *
+ * Under the container threshold the label is `sr-only` and the VALUE stays. The three labels cost
+ * more room than all four values together, so a single-line row that keeps them keeps the
+ * decoration and drops the information, which is exactly backwards. The `<dt>` never leaves the
+ * tree, so a screen reader still hears which fact this is; the hover title says the same thing for
+ * a pointer. `not-sr-only` restores it as soon as the workspace is wide enough to afford it.
+ */
 function HeaderFact({ label, value }: { label: string; value: string }) {
   if (!value.trim()) return null;
   return (
-    <span className="flex min-w-0 items-baseline gap-1.5">
-      <dt className="flex-none text-t3">{label}</dt>
-      <dd className="min-w-0 truncate text-t1" title={value}>
-        {value}
-      </dd>
+    <span className="flex min-w-0 items-baseline gap-1.5" title={`${label} ${value}`}>
+      <dt className="flex-none text-t3 sr-only @[48rem]:not-sr-only">{label}</dt>
+      <dd className="min-w-0 truncate text-t1">{value}</dd>
     </span>
   );
 }

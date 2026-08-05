@@ -155,6 +155,43 @@ describe("component identity header", () => {
     expect(within(header).getAllByText("LM358DR")).toHaveLength(1);
   });
 
+  /**
+   * The 960px supported minimum, asserted structurally.
+   *
+   * jsdom has no layout, so "is this readable" cannot be measured here. What CAN be pinned is the
+   * rule that produced the defect: the fact row used to be a single line whose values were the only
+   * shrinkable thing on it, so at 960 it rendered `Manufacturer Package Category` and no facts at
+   * all. These assertions fail the moment the label stops being the part that yields.
+   */
+  it("keeps the identity values on screen at a narrow width and lets the labels yield instead", async () => {
+    await open();
+    const header = document.querySelector<HTMLElement>('[data-dev-id="component-browser.header"]')!;
+    const facts = header.querySelector("dl")!;
+
+    // A floor, not a leftover: the facts claim a basis, and the actions take their own line when
+    // they cannot sit beside it. A value squeezed to an ellipsis is a value the person has lost.
+    expect(facts.className).toContain("basis-40");
+    expect(facts.className).toContain("flex-wrap");
+    expect(facts.parentElement!.className).toContain("flex-wrap");
+
+    for (const [label, value] of [
+      ["Manufacturer", "Texas Instruments"],
+      ["Package", "SOIC-8"],
+      ["Category", "ICs"],
+    ] as const) {
+      const term = within(facts).getByText(label);
+      const detail = term.parentElement!.querySelector("dd")!;
+      expect(detail).toHaveTextContent(value);
+      // The label is hidden VISUALLY below the threshold and is still in the tree, so a screen
+      // reader keeps hearing which fact this is.
+      expect(term.className).toContain("sr-only");
+      expect(term.className).toContain("@[48rem]:not-sr-only");
+      expect(detail.className).not.toContain("sr-only");
+      // The hover title answers the same question a pointer user lost with the inline label.
+      expect(term.parentElement).toHaveAttribute("title", `${label} ${value}`);
+    }
+  });
+
   it("names the primary action after the worst thing wrong with the component", () => {
     expect(primaryActionLabel(null)).toBe("Open Full Specifications");
     expect(primaryActionLabel("edit-identity")).toBe("Add Missing Identity");
@@ -290,6 +327,42 @@ describe("representation dock", () => {
     const dialog = await screen.findByRole("dialog", { name: "Footprint Details" });
     expect(within(dialog).getAllByText("KiCad").length).toBeGreaterThan(0);
     await waitFor(() => expect(mockCadVariantApi.inventory).toHaveBeenCalledWith(ID));
+  });
+
+  /**
+   * The other half of the 960px minimum. A native `<select>` sizes itself to its widest option and
+   * carries a platform arrow, so it held 111px of a 176px module column and the title truncated to
+   * `S` and `F`. A single letter is not a label, so the name and the status are now the fixed part
+   * of that row and the tool chooser is what gives way.
+   */
+  it("keeps every module's title and status whole, and lets the tool chooser narrow instead", async () => {
+    await open(
+      makeWorkspace({
+        representations: {
+          symbol: makeRepresentation("symbol", "ready", [
+            makeTool({ tool: "kicad", toolLabel: "KiCad" }),
+            makeTool({ tool: "altium", toolLabel: "Altium" }),
+          ]),
+        },
+      }),
+    );
+
+    for (const [kind, label] of [
+      ["symbol", "Symbol"],
+      ["footprint", "Footprint"],
+      ["model", "3D Model"],
+    ] as const) {
+      const title = within(module(kind)).getByRole("button", { name: label });
+      expect(title).toHaveTextContent(label);
+      // Never a shrink candidate, so the whole word survives however narrow the column gets.
+      expect(title.className).toContain("flex-none");
+      expect(title.className).not.toContain("truncate");
+      // The status has to survive the same squeeze: a module with no readable status states nothing.
+      expect(within(module(kind)).getByText(/^(Ready|Not Required)$/)).toBeInTheDocument();
+    }
+
+    const chooser = within(module("symbol")).getByRole("combobox", { name: "Symbol tool" });
+    expect(chooser.className).toContain("max-w-full");
   });
 
   it("persists the selected tool per representation kind", async () => {
