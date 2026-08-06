@@ -84,10 +84,11 @@ def test_a_losing_answer_names_the_answer_it_lost_to():
         if item["field"] == "resistance"
     ]
     # Both answers are distributors, so the tie is settled by the registry's own order rather
-    # than by whichever source happened to be merged first.
+    # than by whichever source happened to be merged first - and that order is Mouser first,
+    # DigiKey second since 2026-08-05, so DigiKey is now the answer that lost.
     losers = [item for item in rows if item["conflictsWith"]]
-    assert [item["sourceId"] for item in losers] == ["mouser"]
-    assert losers[0]["conflictsWith"] == "digikey"
+    assert [item["sourceId"] for item in losers] == ["digikey"]
+    assert losers[0]["conflictsWith"] == "mouser"
 
 
 def test_an_agreeing_answer_is_in_conflict_with_nothing():
@@ -127,7 +128,8 @@ def test_a_disagreement_travels_as_a_field_with_named_answers():
     entry = next(item for item in conflicts if item["field"] == "resistance")
     assert entry["label"] == "Resistance"
     assert {item["displayValue"] for item in entry["candidates"]} == {"1.1 kOhms", "1.2 kOhms"}
-    assert [item["sourceLabel"] for item in entry["candidates"] if item["inForce"]] == ["DigiKey"]
+    # Mouser holds the slot: the registry's distributor order is Mouser first since 2026-08-05.
+    assert [item["sourceLabel"] for item in entry["candidates"] if item["inForce"]] == ["Mouser"]
 
 
 def test_a_record_nothing_disagrees_about_reports_no_conflicts():

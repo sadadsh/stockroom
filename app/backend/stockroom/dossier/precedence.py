@@ -16,6 +16,13 @@ nobody opens. Two sources disagreeing about a part is data about the part.
 
 Ties inside a tier are settled by the registry's own provider order and then by the source key,
 so the answer never depends on which source happened to be merged first.
+
+That is also where the owner's distributor ranking lives. Mouser, DigiKey and LCSC are one tier
+because they are one CLASS of evidence - a distributor's own catalogue record - and the ranking
+between them (Mouser > DigiKey > LCSC) is the order they are declared in
+`stockroom.providers`. Ordering them by position rather than by tier keeps the five-tier
+vocabulary intact and keeps all three honestly below the manufacturer's own word: a distributor
+answer can never beat the datasheet, whichever distributor it is.
 """
 
 from __future__ import annotations

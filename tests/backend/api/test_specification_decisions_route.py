@@ -21,7 +21,14 @@ _PREFERRED = f"/api/library/parts/{_PART}/specifications/tolerance/preferred-sou
 
 
 def _add_part(app_ctx) -> str:
-    """A resistor two distributors disagree about, so a decision has something to decide."""
+    """A resistor two distributors disagree about, so a decision has something to decide.
+
+    Mouser holds the answer computed precedence picks and DigiKey the one it does not, because
+    the provider registry's distributor order is Mouser first (2026-08-05). The pin tests below
+    pin DigiKey for that reason - pinning the source that already wins would prove nothing about
+    promotion - so the two names were swapped here when the order was, and every assertion still
+    says exactly what it said before.
+    """
     record = PartRecord(
         id=_PART,
         mpn="ERJ-P03F1101V",
@@ -33,8 +40,8 @@ def _add_part(app_ctx) -> str:
     )
     record.alternates = {
         "Tolerance": [
-            SourcedValue(value="1%", source="digikey"),
-            SourcedValue(value="2%", source="mouser"),
+            SourcedValue(value="1%", source="mouser"),
+            SourcedValue(value="2%", source="digikey"),
         ]
     }
     path = app_ctx.profile.library.parts_dir / f"{record.id}.json"
@@ -68,7 +75,7 @@ def test_clearing_an_override_requires_a_token(anon_client, app_ctx):
 
 def test_preferring_a_source_requires_a_token(anon_client, app_ctx):
     _add_part(app_ctx)
-    assert anon_client.put(_PREFERRED, json={"sourceId": "mouser"}).status_code == 401
+    assert anon_client.put(_PREFERRED, json={"sourceId": "digikey"}).status_code == 401
 
 
 def test_a_decision_about_an_unknown_part_is_not_found(client, app_ctx):
@@ -99,8 +106,8 @@ def test_an_override_keeps_every_source_candidate_and_settles_the_conflict(clien
     assert after["conflictState"] == "resolved"
     assert {item["sourceId"] for item in after["sourceCandidates"]} == {
         "manual",
-        "digikey",
         "mouser",
+        "digikey",
     }
 
 
@@ -108,7 +115,7 @@ def test_an_override_says_which_sourced_answer_it_replaced(client, app_ctx):
     _add_part(app_ctx)
     override = _row(client.put(_OVERRIDE, json={"value": "0.5%"}).json())["override"]
     assert override["replacedValue"] == "1%"
-    assert override["replacedSourceLabel"] == "DigiKey"
+    assert override["replacedSourceLabel"] == "Mouser"
     assert override["reviewedAt"]
 
 
@@ -183,10 +190,10 @@ def test_clearing_an_override_for_an_unknown_key_is_still_refused(client, app_ct
 
 def test_preferring_a_source_promotes_it_without_dropping_the_others(client, app_ctx):
     _add_part(app_ctx)
-    row = _row(client.put(_PREFERRED, json={"sourceId": "mouser"}).json())
+    row = _row(client.put(_PREFERRED, json={"sourceId": "digikey"}).json())
     assert row["preferredValue"] == "2%"
-    assert row["preferredSource"]["sourceId"] == "mouser"
-    assert {item["sourceId"] for item in row["sourceCandidates"]} == {"digikey", "mouser"}
+    assert row["preferredSource"]["sourceId"] == "digikey"
+    assert {item["sourceId"] for item in row["sourceCandidates"]} == {"mouser", "digikey"}
     assert row["preferredSourcePin"]["inForce"] is True
 
 
@@ -206,16 +213,16 @@ def test_preferring_a_source_for_an_unknown_key_is_refused(client, app_ctx):
     _add_part(app_ctx)
     response = client.put(
         f"/api/library/parts/{_PART}/specifications/wibble_factor/preferred-source",
-        json={"sourceId": "mouser"},
+        json={"sourceId": "digikey"},
     )
     assert response.status_code == 404
 
 
 def test_clearing_a_preferred_source_returns_the_field_to_computed_precedence(client, app_ctx):
     _add_part(app_ctx)
-    client.put(_PREFERRED, json={"sourceId": "mouser"})
+    client.put(_PREFERRED, json={"sourceId": "digikey"})
     row = _row(client.delete(_PREFERRED).json())
-    assert row["preferredSource"]["sourceId"] == "digikey"
+    assert row["preferredSource"]["sourceId"] == "mouser"
     assert row["preferredSourcePin"] is None
     assert row["conflictState"] == "conflicting"
 
@@ -227,7 +234,7 @@ def test_clearing_a_preferred_source_that_was_never_set_is_not_an_error(client, 
 
 def test_a_reviewed_value_outranks_a_preferred_source(client, app_ctx):
     _add_part(app_ctx)
-    client.put(_PREFERRED, json={"sourceId": "mouser"})
+    client.put(_PREFERRED, json={"sourceId": "digikey"})
     row = _row(client.put(_OVERRIDE, json={"value": "0.5%"}).json())
     assert row["preferredValue"] == "0.5%"
     assert row["preferredSourcePin"]["inForce"] is False
@@ -235,7 +242,7 @@ def test_a_reviewed_value_outranks_a_preferred_source(client, app_ctx):
 
 def test_clearing_the_override_hands_the_field_back_to_the_preferred_source(client, app_ctx):
     _add_part(app_ctx)
-    client.put(_PREFERRED, json={"sourceId": "mouser"})
+    client.put(_PREFERRED, json={"sourceId": "digikey"})
     client.put(_OVERRIDE, json={"value": "0.5%"})
     row = _row(client.delete(_OVERRIDE).json())
     assert row["preferredValue"] == "2%"
@@ -327,6 +334,6 @@ def test_an_override_with_neither_stated_is_a_confirmed_one_with_no_reason(clien
         "reviewedBy": "user",
         "reviewedAt": row["override"]["reviewedAt"],
         "replacedValue": "1%",
-        "replacedSource": "digikey",
-        "replacedSourceLabel": "DigiKey",
+        "replacedSource": "mouser",
+        "replacedSourceLabel": "Mouser",
     }
