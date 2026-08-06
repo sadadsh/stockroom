@@ -2,6 +2,16 @@
  * Persistence for the dev mode draft: `dirty` against the last-saved baseline, and the Save that
  * writes the working overrides back to SOURCE (lib/*.overrides.ts) via POST /api/dev/save - so a
  * committed change ships for everyone, not just this machine.
+ *
+ * FIVE OF THE SIX SLICES. The draft's `layout` slice - the working ARRANGEMENT (Design Mode Phase 3,
+ * `lib/layout.overrides.ts`) - is deliberately NOT sent here and deliberately NOT part of `dirty`.
+ * That is the owner's decision 4 (plan 1.6): a layout lives as a named LOCAL draft
+ * (`lib/layoutDrafts.ts`) while it is being experimented with, and a one-click COMMIT - the plan's
+ * Phase 4 pipeline - is what serialises it to source, regenerates the registries it touches and runs
+ * the gates. That pipeline needs more than this endpoint does (a document validator, the deviation
+ * list, the arrangement gates), so it gets its own route rather than a field bolted onto this one.
+ * Nothing is stubbed for it here on purpose: a half-wired endpoint is the shape that silently drops
+ * an owner's redesign.
  */
 import { useCallback, useMemo, useState } from "react";
 import { api } from "../api/client";
