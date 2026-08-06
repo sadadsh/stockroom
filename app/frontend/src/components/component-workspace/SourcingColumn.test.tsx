@@ -41,8 +41,9 @@ import {
   makeSourceLedgerEntry,
 } from "../../test/dossierFixture";
 import { ComponentWorkspace } from "./ComponentWorkspace";
-import { OffersSection, volumeBreak } from "./OffersSection";
-import { FORBIDDEN_IN_NORMAL_UI } from "./provenanceText";
+import { OffersSection } from "./OffersSection";
+import { volumeBreak } from "./offerFacts";
+import { FORBIDDEN_IN_NORMAL_UI } from "./provenanceVocabulary";
 
 vi.mock("../../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../../api/client")>();
@@ -224,7 +225,170 @@ describe("the column's shape", () => {
     expect(status.closest("button")).toBeNull();
     expect(status.closest("a")).toBeNull();
     // Red, because obsolete means something. Colour is spent only where it does.
-    expect(status).toHaveClass("text-err");
+    expect(status).toHaveClass("text-err-text");
+  });
+});
+
+/**
+ * A section with nothing in it is not on screen, and one control puts every one of them back.
+ *
+ * The column used to render a full sentence per empty section, and there are eight of them across
+ * five sections. On a part nobody has sourced that was most of the column - paragraphs of prose
+ * where there is no information - and it is a large part of why the three columns read as uneven.
+ * Four things have to hold, and each is a different way the fix could go wrong:
+ *
+ *   the empty section is genuinely ABSENT, not merely quiet;
+ *   the reveal brings it back, so nothing is deleted;
+ *   the ORDER survives the reveal, with provenance still last;
+ *   the lifecycle rows never collapse, because "nobody has checked" is a fact about the part.
+ */
+describe("the empty sections", () => {
+  /** A capacitor nobody has sourced: no offers, no documents, no relations, no ledger. */
+  const bare = makeDossier();
+
+  it("renders no empty section, and no sentence from one, until asked", async () => {
+    await open(bare);
+    const column = region("component-browser.column-sourcing");
+    expect(sectionOrder()).toEqual(["component-browser.lifecycle"]);
+    // The eight sentences, none of them on screen.
+    for (const sentence of [
+      /No distributor has quoted/,
+      /No document has been recorded/,
+      /No source has been consulted/,
+      /No source disagrees/,
+      /Nobody has overridden/,
+      /Nothing is recorded about how/,
+      /Nothing has changed since/,
+      /No distributor has suggested/,
+    ]) {
+      expect(column.textContent ?? "").not.toMatch(sentence);
+    }
+  });
+
+  it("says how many sections are silent, and reveals them in the column's own order", async () => {
+    const { user } = await open(bare);
+    // The count is the answer as well as the action: five of the six sections have nothing in them.
+    const toggle = screen.getByRole("button", { name: "Show 5 Blank Sections" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(toggle);
+    expect(sectionOrder()).toEqual([
+      "component-browser.lifecycle",
+      "component-browser.offers",
+      "component-browser.pricing",
+      "component-browser.documents",
+      "component-browser.related",
+      "component-browser.provenance",
+    ]);
+    // Revealed, the sentences are back: the information was hidden, never removed.
+    expect(screen.getByText(/No distributor has quoted/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Hide 5 Blank Sections" }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("remembers the choice for this machine, in the storage the splitters already use", async () => {
+    const { user } = await open(bare);
+    await user.click(screen.getByRole("button", { name: "Show 5 Blank Sections" }));
+    expect(
+      window.localStorage.getItem("stockroom.component-workspace.sourcing-empty.v1"),
+    ).toBe("true");
+  });
+
+  it("keeps the product-status rows even when every one of them reads Unknown", async () => {
+    await open(bare);
+    const lifecycle = region("component-browser.lifecycle");
+    // Five rows, four of them Unknown and the fifth the library's own product-status state, all
+    // present. `Last Checked: Unknown` is the fact that explains why the rest of the column is
+    // silent; collapsing it would hide the reason the reader needs.
+    expect(lifecycle).toBeInTheDocument();
+    for (const label of [
+      "Product Status",
+      "Manufacturer Status",
+      "Total Stock",
+      "Lead Time",
+      "Last Checked",
+    ]) {
+      expect(within(lifecycle).getByText(label)).toBeInTheDocument();
+    }
+    expect(within(lifecycle).getAllByText("Unknown").length).toBe(4);
+  });
+
+  it("offers no reveal at all when nothing is hidden", async () => {
+    await open(
+      makeDossier({
+        distributorOffers: [makeOffer()],
+        supplySummary: { offerCount: 1, totalStock: 512, factoryLeadTime: "12 weeks" },
+        documents: { items: [makeDocument()], count: 1 },
+        relatedParts: [makeRelatedPart()],
+        provenance: { sources: [makeSourceLedgerEntry()] },
+      }),
+    );
+    // A control that would reveal zero sections is a dead click path.
+    expect(screen.queryByRole("button", { name: /Empty Sections/ })).toBeNull();
+  });
+
+  it("counts a named source failure as content, not as an empty offers section", async () => {
+    await open(
+      makeDossier({
+        supplySummary: {
+          failures: [{ provider: "lcsc", providerLabel: "LCSC", state: "not_configured" }],
+        },
+      }),
+    );
+    // "LCSC is not connected on this machine" is the difference between a part nobody sells and a
+    // source nobody could reach, so the section that carries it stands on its own.
+    expect(sectionOrder()).toContain("component-browser.offers");
+    expect(region("component-browser.offer-failures")).toBeInTheDocument();
+  });
+});
+
+/**
+ * The provenance block used to render five counted sub-sections in a row - Data Sources 0, Field
+ * Conflicts 0, Manual Overrides 0, Import and Enrichment Timeline 0, Revision Timeline 0 - each with
+ * its own heading and its own sentence underneath. Five headings and five sentences to say nothing
+ * happened. Now the silent ones are named once, on one line, and the full ledger is still one
+ * button away.
+ */
+describe("the provenance block does not repeat itself", () => {
+  it("names the silent questions on one line instead of five stacked sections", async () => {
+    const { user } = await open(makeDossier());
+    await user.click(screen.getByRole("button", { name: "Show 5 Blank Sections" }));
+
+    const provenance = region("component-browser.provenance");
+    // Not one of the five sub-sections is mounted...
+    for (const devId of [
+      "component-browser.provenance-sources",
+      "component-browser.provenance-conflicts",
+      "component-browser.provenance-overrides",
+      "component-browser.provenance-intake",
+      "component-browser.provenance-revisions",
+    ]) {
+      expect(provenance.querySelector(`[data-dev-id="${devId}"]`)).toBeNull();
+    }
+    // ...and all five are still ANSWERED, in one line, by the names their headings use.
+    expect(region("component-browser.provenance-nothing")).toHaveTextContent(
+      "Nothing recorded: Data Sources · Field Conflicts · Manual Overrides · " +
+        "Import and Enrichment Timeline · Revision Timeline",
+    );
+    // The way to the complete ledger survives the collapse.
+    expect(
+      within(provenance).getByRole("button", { name: "View Data Provenance" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the questions that have answers and names only the rest", async () => {
+    await open(
+      makeDossier({
+        provenance: { sources: [makeSourceLedgerEntry({ id: "mouser", label: "Mouser" })] },
+      }),
+    );
+    expect(region("component-browser.provenance-sources")).toHaveTextContent("Mouser");
+    // The four with nothing in them are one line, and Data Sources is not among them.
+    const line = region("component-browser.provenance-nothing");
+    expect(line).toHaveTextContent("Field Conflicts");
+    expect(line).toHaveTextContent("Revision Timeline");
+    expect(line.textContent ?? "").not.toContain("Data Sources");
   });
 });
 
@@ -466,12 +630,12 @@ describe("the related parts section", () => {
       "package: sot23 → sc70",
     );
     expect(region("component-browser.related-not-validated")).toHaveTextContent(
-      "Not checked for equivalence by Stockroom",
+      "Stockroom has not checked this for equivalence",
     );
   });
 });
 
-describe("data provenance and history", () => {
+describe("data provenance and timeline", () => {
   const historyDossier = makeDossier({
     provenance: {
       sources: [makeSourceLedgerEntry({ id: "mouser", label: "Mouser", fieldCount: 4 })],
@@ -508,7 +672,7 @@ describe("data provenance and history", () => {
     const overrides = region("component-browser.provenance-overrides");
     expect(within(overrides).getByText("0.5 %")).toBeInTheDocument();
     expect(overrides).toHaveTextContent("Replaced 1 % from Mouser");
-    expect(overrides).toHaveTextContent("Reviewed by owner");
+    expect(overrides).toHaveTextContent("Reviewer owner");
   });
 
   it("separates how the data arrived from what has changed since", async () => {
@@ -588,7 +752,7 @@ describe("the translation rule", () => {
     const { user } = await open(leaky);
     const notice = region("component-browser.compatibility-notice");
     expect(notice).toHaveTextContent(
-      "1 of this component's fields were created by a newer version of Stockroom and are read-only here",
+      "1 of this component's fields came from a newer version of Stockroom and cannot be edited here",
     );
     // The count is what makes it actionable; the names are what make it checkable.
     expect(document.querySelector('[data-dev-id="component-browser.compatibility-field"]'))

@@ -26,9 +26,10 @@
  * use different frames, and pretending otherwise is how a mirrored footprint looks plausible.
  */
 import { useMemo, useState } from "react";
-import type { LandGraphic, LandPad, LandPattern } from "../../api/client";
+import type { LandPad, LandPattern } from "../../api/client";
 import { Text, useText } from "../../lib/copy";
 import { usePanZoom } from "../../lib/usePanZoom";
+import { copperBounds, onLayer } from "./cadEvidence";
 
 /** Millimetres of clear space around the drawn art. */
 const MARGIN = 0.5;
@@ -47,7 +48,7 @@ export type FootprintLayer =
 export type FootprintLayerState = Record<FootprintLayer, boolean>;
 
 /** What the drawing starts with: the copper and the outline that make a land pattern readable. */
-export function defaultFootprintLayers(): FootprintLayerState {
+function defaultFootprintLayers(): FootprintLayerState {
   return {
     copper: true,
     mask: false,
@@ -61,111 +62,45 @@ export function defaultFootprintLayers(): FootprintLayerState {
   };
 }
 
-const LAYER_INK: Record<string, string> = {
-  copper: "#b06a2c",
-  mask: "#8d4fa0",
-  paste: "#7a7a7a",
-  silkscreen: "#3a3a3a",
-  fabrication: "#96803a",
-  courtyard: "#4a7a55",
+/**
+ * One class pair per layer, on the tokenised drawing palette.
+ *
+ * These were six fixed hexes tuned for a near-white sheet, which is what made the sheet itself
+ * un-themeable: the moment the canvas followed the theme, a #3a3a3a silkscreen would have gone
+ * invisible on it. Each layer is now a token declared for BOTH themes, and
+ * `styles/visualLanguage.test.ts` measures every one of them against its own sheet (>=3:1) and
+ * against each other (>=15 CIE76 dE), so copper, mask, paste, silkscreen, fabrication and
+ * courtyard stay six distinguishable answers in dark theme as well as light.
+ */
+const LAYER_INK: Record<string, { fill: string; stroke: string }> = {
+  copper: { fill: "fill-layer-copper", stroke: "stroke-layer-copper" },
+  mask: { fill: "fill-layer-mask", stroke: "stroke-layer-mask" },
+  paste: { fill: "fill-layer-paste", stroke: "stroke-layer-paste" },
+  silkscreen: { fill: "fill-layer-silk", stroke: "stroke-layer-silk" },
+  fabrication: { fill: "fill-layer-fab", stroke: "stroke-layer-fab" },
+  courtyard: { fill: "fill-layer-courtyard", stroke: "stroke-layer-courtyard" },
 };
 
 function declares(pad: LandPad, suffix: string): boolean {
   return pad.layers.some((layer) => layer.endsWith(suffix));
 }
 
-function onLayer(graphic: LandGraphic, suffix: string): boolean {
-  return graphic.layer.endsWith(suffix);
-}
-
 /**
- * What the drawing proves about this land pattern.
+ * A pad's identity, so a redraw reconciles each pad against the pad it IS.
  *
- * Every value is MEASURED off the geometry that is on screen. `expectedPins` and
- * `expectedPitch` come from the component's own specification, so each comparison has two
- * independent sides; when the specification does not state one, the comparison is honestly
- * absent rather than assumed to pass.
- */
-export interface FootprintEvidence {
-  pads: number;
-  expectedPins: number | null;
-  /** Numbers carried by more than one pad. Two pads answering to "3" is a real fault. */
-  duplicates: string[];
-  unnumbered: number;
-  /** Whether a pad numbered "1" exists at all - the marker every orientation check starts from. */
-  hasPinOne: boolean;
-  /** The most common centre-to-centre spacing between neighbouring pads, in mm. */
-  pitch: number | null;
-  expectedPitch: number | null;
-  courtyard: boolean;
-  /** The copper extent in millimetres. What the part actually occupies. */
-  size: { width: number; height: number } | null;
-}
-
-/**
- * The pitch, as the most common nearest-neighbour distance rounded to 0.01 mm.
+ * Not the array index. Three of the drawings below are drawn from a SUBSET of the pads - the mask
+ * apertures, the paste apertures - so a position in one of those lists names a different pad the
+ * moment a pad that declares that layer is added, removed or reordered upstream.
  *
- * Nearest-neighbour rather than "adjacent in the file", because pad order in a `.kicad_mod` is
- * whatever the exporter wrote and a dual-row package interleaves its rows in some of them. The
- * MODE rather than the mean, because one deliberately offset pad (an exposed pad, a polarity
- * key) would drag an average away from the pitch every other pad actually sits on.
+ * The pad number alone is not enough either, and this file measures the two reasons why: a land
+ * pattern is allowed to carry `unnumbered` pads (mounting holes, a thermal slug) and `duplicates`
+ * (two pads answering to "3" is a real fault the evidence footer REPORTS rather than one this
+ * drawing may assume away). What genuinely identifies a pad is where it sits and how big it is, in
+ * the footprint's own millimetre frame, so that is what is used - with the number in front of it,
+ * where there is one.
  */
-export function padPitch(pads: LandPad[]): number | null {
-  if (pads.length < 2) return null;
-  const distances: number[] = [];
-  for (const pad of pads) {
-    let best = Infinity;
-    for (const other of pads) {
-      if (other === pad) continue;
-      const distance = Math.hypot(other.at[0] - pad.at[0], other.at[1] - pad.at[1]);
-      if (distance > 0 && distance < best) best = distance;
-    }
-    if (Number.isFinite(best)) distances.push(Math.round(best * 100) / 100);
-  }
-  if (distances.length === 0) return null;
-  const counts = new Map<number, number>();
-  for (const value of distances) counts.set(value, (counts.get(value) ?? 0) + 1);
-  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
-  return ranked[0][0];
-}
-
-export function footprintEvidence(
-  land: LandPattern,
-  expected: { pins: number | null; pitch: number | null },
-): FootprintEvidence {
-  const seen = new Map<string, number>();
-  for (const pad of land.pads) {
-    if (!pad.number) continue;
-    seen.set(pad.number, (seen.get(pad.number) ?? 0) + 1);
-  }
-  const box = copperBounds(land.pads);
-  return {
-    pads: land.pads.length,
-    expectedPins: expected.pins,
-    duplicates: [...seen.entries()].filter(([, count]) => count > 1).map(([number]) => number),
-    unnumbered: land.pads.filter((pad) => !pad.number).length,
-    hasPinOne: land.pads.some((pad) => pad.number === "1"),
-    pitch: padPitch(land.pads),
-    expectedPitch: expected.pitch,
-    courtyard: land.graphics.some((graphic) => onLayer(graphic, ".CrtYd")),
-    size: box ? { width: box.width, height: box.height } : null,
-  };
-}
-
-function copperBounds(pads: LandPad[]) {
-  if (pads.length === 0) return null;
-  const xs: number[] = [];
-  const ys: number[] = [];
-  for (const pad of pads) {
-    // Rotation is respected by taking the pad's circumscribed extent, so a 90-degree pad is not
-    // measured as though it were still lying the other way.
-    const half = Math.hypot(pad.size[0], pad.size[1]) / 2;
-    xs.push(pad.at[0] - half, pad.at[0] + half);
-    ys.push(pad.at[1] - half, pad.at[1] + half);
-  }
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+function padKey(pad: LandPad): string {
+  return `${pad.number}@${pad.at[0]},${pad.at[1]}#${pad.size[0]}x${pad.size[1]}`;
 }
 
 /** One placed measurement, in the footprint's own millimetre frame. */
@@ -174,7 +109,7 @@ export interface Measurement {
   to: [number, number];
 }
 
-export function measurementLength(measurement: Measurement): number {
+function measurementLength(measurement: Measurement): number {
   return Math.hypot(
     measurement.to[0] - measurement.from[0],
     measurement.to[1] - measurement.from[1],
@@ -303,15 +238,15 @@ export function FootprintPreview({
         {layers.mask
           ? land.pads
               .filter((pad) => declares(pad, ".Mask"))
-              .map((pad, index) => <Pad key={`mask-${index}`} pad={pad} layer="mask" hollow />)
+              .map((pad) => <Pad key={`mask-${padKey(pad)}`} pad={pad} layer="mask" hollow />)
           : null}
         {layers.copper
-          ? land.pads.map((pad, index) => <Pad key={`cu-${index}`} pad={pad} layer="copper" />)
+          ? land.pads.map((pad) => <Pad key={`cu-${padKey(pad)}`} pad={pad} layer="copper" />)
           : null}
         {layers.paste
           ? land.pads
               .filter((pad) => declares(pad, ".Paste"))
-              .map((pad, index) => <Pad key={`paste-${index}`} pad={pad} layer="paste" hollow />)
+              .map((pad) => <Pad key={`paste-${padKey(pad)}`} pad={pad} layer="paste" hollow />)
           : null}
         {layers.silkscreen ? <Lines land={land} suffix=".SilkS" layer="silkscreen" /> : null}
 
@@ -321,10 +256,10 @@ export function FootprintPreview({
         {layers.origin ? <Origin scale={scale} /> : null}
         {layers.dimensions && copper ? <Dimensions box={copper} scale={scale} /> : null}
         {layers.numbers ? (
-          <g fontSize={scale * 0.045} fill="#1b1b1b" textAnchor="middle">
-            {land.pads.map((pad, index) => (
+          <g fontSize={scale * 0.045} className="fill-technical-ink" textAnchor="middle">
+            {land.pads.map((pad) => (
               <text
-                key={index}
+                key={padKey(pad)}
                 x={pad.at[0]}
                 y={pad.at[1] + scale * 0.016}
                 data-layer="numbers"
@@ -342,6 +277,7 @@ export function FootprintPreview({
 
 function Pad({ pad, layer, hollow = false }: { pad: LandPad; layer: string; hollow?: boolean }) {
   const ink = LAYER_INK[layer];
+  const paint = hollow ? `fill-none ${ink.stroke}` : `${ink.fill} stroke-none`;
   const [w, h] = pad.size;
   const radius =
     pad.shape === "circle" || pad.shape === "oval"
@@ -358,17 +294,23 @@ function Pad({ pad, layer, hollow = false }: { pad: LandPad; layer: string; holl
         height={h}
         rx={radius}
         ry={radius}
-        fill={hollow ? "none" : ink}
-        stroke={hollow ? ink : "none"}
+        className={paint}
         strokeWidth={hollow ? Math.min(w, h) * 0.08 : 0}
         fillOpacity={hollow ? 0 : 0.85}
         data-layer={layer}
         data-pad={pad.number}
       />
       {/* A through-hole pad is drawn WITH its hole. Solid copper where a drill is specified is
-          not what was downloaded, and 44% of the real library is through-hole. */}
+          not what was downloaded, and 44% of the real library is through-hole. The hole is the
+          SHEET showing through, so it is the sheet's token rather than a repeated near-white. */}
       {!hollow && pad.drill > 0 ? (
-        <circle cx={0} cy={0} r={pad.drill / 2} fill="#f5f5f2" data-drill="true" />
+        <circle
+          cx={0}
+          cy={0}
+          r={pad.drill / 2}
+          className="fill-technical"
+          data-drill="true"
+        />
       ) : null}
     </g>
   );
@@ -376,7 +318,7 @@ function Pad({ pad, layer, hollow = false }: { pad: LandPad; layer: string; holl
 
 function Lines({ land, suffix, layer }: { land: LandPattern; suffix: string; layer: string }) {
   return (
-    <g stroke={LAYER_INK[layer]} strokeLinecap="round" data-layer={layer}>
+    <g className={LAYER_INK[layer].stroke} strokeLinecap="round" data-layer={layer}>
       {land.graphics
         .filter((graphic) => onLayer(graphic, suffix))
         .map((graphic, index) => (
@@ -402,8 +344,7 @@ function PinOneMarker({ pads, scale }: { pads: LandPad[]; scale: number }) {
       cx={first.at[0]}
       cy={first.at[1]}
       r={half + scale * 0.03}
-      fill="none"
-      stroke="#b0392c"
+      className="fill-none stroke-layer-pin-one"
       strokeWidth={scale * 0.012}
       data-pin-one="true"
     />
@@ -413,7 +354,7 @@ function PinOneMarker({ pads, scale }: { pads: LandPad[]; scale: number }) {
 function Origin({ scale }: { scale: number }) {
   const arm = scale * 0.08;
   return (
-    <g stroke="#4a4a4a" strokeWidth={scale * 0.008} data-layer="origin">
+    <g className="stroke-technical-note" strokeWidth={scale * 0.008} data-layer="origin">
       <line x1={-arm} y1={0} x2={arm} y2={0} />
       <line x1={0} y1={-arm} x2={0} y2={arm} />
     </g>
@@ -429,15 +370,14 @@ function Dimensions({
 }) {
   const gap = scale * 0.06;
   return (
-    <g stroke="#4a4a4a" strokeWidth={scale * 0.006} data-layer="dimensions">
+    <g className="stroke-technical-note" strokeWidth={scale * 0.006} data-layer="dimensions">
       <line x1={box.x} y1={box.y - gap} x2={box.x + box.width} y2={box.y - gap} />
       <line x1={box.x - gap} y1={box.y} x2={box.x - gap} y2={box.y + box.height} />
       <text
         x={box.x + box.width / 2}
         y={box.y - gap * 1.4}
         fontSize={scale * 0.045}
-        fill="#4a4a4a"
-        stroke="none"
+        className="fill-technical-note stroke-none"
         textAnchor="middle"
       >
         {`${box.width.toFixed(2)} mm`}
@@ -446,8 +386,7 @@ function Dimensions({
         x={box.x - gap * 1.4}
         y={box.y + box.height / 2}
         fontSize={scale * 0.045}
-        fill="#4a4a4a"
-        stroke="none"
+        className="fill-technical-note stroke-none"
         textAnchor="end"
       >
         {`${box.height.toFixed(2)} mm`}
@@ -471,14 +410,14 @@ function MeasurementLine({
         y1={measurement.from[1]}
         x2={measurement.to[0]}
         y2={measurement.to[1]}
-        stroke="#1b1b1b"
+        className="stroke-technical-ink"
         strokeWidth={scale * 0.008}
       />
       <text
         x={(measurement.from[0] + measurement.to[0]) / 2}
         y={(measurement.from[1] + measurement.to[1]) / 2 - scale * 0.02}
         fontSize={scale * 0.05}
-        fill="#1b1b1b"
+        className="fill-technical-ink"
         textAnchor="middle"
       >
         {`${length.toFixed(2)} mm`}

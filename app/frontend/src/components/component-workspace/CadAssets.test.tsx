@@ -39,8 +39,7 @@ import {
   makeTool,
 } from "../../test/dossierFixture";
 import { ComponentWorkspace } from "./ComponentWorkspace";
-import { symbolEvidence } from "./SymbolPreview";
-import { footprintEvidence, padPitch } from "./FootprintPreview";
+import { footprintEvidence, padPitch, symbolEvidence } from "./cadEvidence";
 import { cadAssetStatus } from "./workspaceStatus";
 
 vi.mock("../../api/client", async (importActual) => {
@@ -444,9 +443,63 @@ describe("the three modules", () => {
     const column = await open(attached());
     expect(within(column).queryByRole("button", { name: "Expand" })).toBeNull();
     expect(within(column).queryByRole("button", { name: "Collapse" })).toBeNull();
+    // And the module header's tooltip names what pressing it DOES, rather than a state the control
+    // does not have: at rest all three are expanded, so "Collapse" described nothing.
+    expect(
+      module_("symbol")
+        .querySelector('[data-dev-id="component-browser.asset-header"]')!
+        .getAttribute("title"),
+    ).toBe("Focus This Asset");
     expect(
       within(module_("symbol")).getAllByRole("button", { name: "Open Full Preview" }).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("leaves the expanded preview a surface, not a second control with the maximize button's name", async () => {
+    // Two faults, one cause. `button` takes PRESENTATIONAL CHILDREN, so a widget role on this
+    // container deletes its whole subtree from the accessibility tree - and while the module is
+    // expanded that subtree is the asset's control surface (the 3D settings popover, the maximize
+    // control riding inside the viewer, the land pattern's measure target). At the same time the
+    // role put a SECOND control named "Open Full Preview" in every expanded module, beside the
+    // real maximize button that already had that name. The stage carried role="button" in both
+    // states, so both faults were live at rest, on all three modules at once.
+    await open(attached());
+    const symbol = module_("symbol");
+    expect(symbol.dataset.expanded).toBe("true");
+    const stage = symbol.querySelector<HTMLElement>(
+      '[data-dev-id="component-browser.asset-preview"]',
+    )!;
+    expect(stage.tagName).toBe("DIV");
+    expect(stage.getAttribute("role")).toBeNull();
+    // One name, one control. The maximize button is the one, and it is not the stage.
+    const named = within(symbol).getAllByRole("button", { name: "Open Full Preview" });
+    expect(named).toHaveLength(1);
+    expect(named[0]).not.toBe(stage);
+  });
+
+  it("makes the COMPACT preview a real button, so Space opens the full preview too", async () => {
+    // Compact, `interactive={false}` switches every child's controls off, so the subtree is inert
+    // and nothing is swallowed - which is what lets the stage be a real control. A native <button>
+    // is what earns Space; the div-with-a-role it replaced answered Enter only, because a div gets
+    // no keyboard behaviour of its own.
+    const user = userEvent.setup();
+    await open(attached());
+    await user.click(within(module_("symbol")).getByRole("button", { name: "Symbol" }));
+    expect(module_("footprint").dataset.expanded).toBe("false");
+
+    const stage = module_("footprint").querySelector<HTMLElement>(
+      '[data-dev-id="component-browser.asset-preview"]',
+    )!;
+    expect(stage.tagName).toBe("BUTTON");
+    // The accessible name states the COMPLETE action, not a truncated visible label.
+    expect(stage.getAttribute("aria-label")).toBe("Open Full Preview");
+
+    stage.focus();
+    expect(document.activeElement).toBe(stage);
+    await user.keyboard(" ");
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: /^Inspect / })).toBeInTheDocument();
+    });
   });
 
   it("renders a status that is text, never a control", async () => {
@@ -522,17 +575,38 @@ describe("the previews are drawn from the file", () => {
     expect(within(symbol).getByText("OUT1")).toBeInTheDocument();
 
     const user = userEvent.setup();
-    const names = within(symbol).getByRole("button", { name: "Pin Names" });
-    expect(names).toHaveAttribute("aria-pressed", "true");
+    // The switches live behind the preview's one visibility button, not on a row above it.
+    await user.click(within(symbol).getByRole("button", { name: "Show Or Hide Drawn Detail" }));
+    const names = within(symbol).getByRole("checkbox", { name: "Pin Names" });
+    expect(names).toBeChecked();
     await user.click(names);
-    expect(names).toHaveAttribute("aria-pressed", "false");
+    expect(names).not.toBeChecked();
     expect(within(symbol).queryByText("OUT1")).toBeNull();
 
     // Electrical type is off until asked for, then it is drawn from the pin's own type.
-    const electrical = within(symbol).getByRole("button", { name: "Electrical Type" });
-    expect(electrical).toHaveAttribute("aria-pressed", "false");
+    const electrical = within(symbol).getByRole("checkbox", { name: "Electrical Type" });
+    expect(electrical).not.toBeChecked();
     await user.click(electrical);
     expect(within(symbol).getAllByText("O").length).toBeGreaterThan(0);
+  });
+
+  it("closes a visibility panel on Escape and hands focus back to its button", async () => {
+    await open(attached());
+    const symbol = module_("symbol");
+    await waitFor(() =>
+      expect(symbol.querySelector('[data-dev-id="component-browser.symbol-canvas"]')).not.toBeNull(),
+    );
+    const user = userEvent.setup();
+    const button = within(symbol).getByRole("button", { name: "Show Or Hide Drawn Detail" });
+    await user.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+
+    await user.keyboard("{Escape}");
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    // Focus lands back on the control that opened it, not on the page behind the panel, and the
+    // opened component is still open: this Escape is answered here and goes no further.
+    expect(button).toHaveFocus();
+    expect(screen.getByText(makeDossier().identity.mpn)).toBeInTheDocument();
   });
 
   it("draws the land pattern's pads, and says why a layer switch cannot operate", async () => {
@@ -547,21 +621,86 @@ describe("the previews are drawn from the file", () => {
     // Pin 1 is always marked when the copper is drawn: every orientation check starts there.
     expect(footprint.querySelector('[data-pin-one="true"]')).not.toBeNull();
 
-    // Only one pad declares a paste layer, so Paste operates. No pad declares silkscreen line
-    // work, so Silkscreen is disabled AND says why rather than turning nothing on.
-    const silkscreen = within(footprint).getByRole("button", { name: "Silkscreen" });
-    expect(silkscreen).toBeDisabled();
-    expect(silkscreen.getAttribute("title")).toMatch(/draws nothing on that layer/);
-
     const user = userEvent.setup();
-    const paste = within(footprint).getByRole("button", { name: "Paste" });
+    await user.click(within(footprint).getByRole("button", { name: "Show Or Hide Drawn Detail" }));
+
+    // Only one pad declares a paste layer, so Paste operates. No pad declares silkscreen line
+    // work, so Silkscreen is disabled AND says why rather than turning nothing on. Inside the
+    // panel the reason is READABLE as well as a tooltip, which a hover-only reason never was.
+    const silkscreen = within(footprint).getByRole("checkbox", { name: /Silkscreen/ });
+    expect(silkscreen).toBeDisabled();
+    expect(
+      within(footprint).getAllByText("This footprint draws nothing on that layer").length,
+    ).toBeGreaterThan(0);
+
+    const paste = within(footprint).getByRole("checkbox", { name: "Paste" });
     await user.click(paste);
-    expect(paste).toHaveAttribute("aria-pressed", "true");
+    expect(paste).toBeChecked();
     expect(footprint.querySelectorAll('[data-layer="paste"]').length).toBe(1);
   });
 
-  it("states the evidence it measured, and never a comparison it could not make", async () => {
+  /**
+   * THE ROWS OF PILLS MUST NOT COME BACK.
+   *
+   * The column carried its layer switches as always-visible outlined pills: three under the symbol
+   * and ten under the land pattern, wrapped across three or four rows each in a ~300px column, plus
+   * two toolbar rows above the first preview. Counted, that was fourteen bordered controls before
+   * the first piece of evidence, and the owner read the whole column as noise. Every switch still
+   * exists - it is a row in the panel above - so the guard is on the STRIP, which may hold only
+   * icon controls, and on the module, which may hold no checkbox until one is asked for.
+   */
+  it("keeps every visibility switch off the strip until its button is pressed", async () => {
     await open(attached());
+    await waitFor(() =>
+      expect(
+        module_("symbol").querySelector('[data-dev-id="component-browser.symbol-canvas"]'),
+      ).not.toBeNull(),
+    );
+    for (const kind of ["symbol", "footprint", "model"]) {
+      const node = module_(kind);
+      // No switch is on screen at rest, in any of the three modules.
+      expect(within(node).queryAllByRole("checkbox")).toEqual([]);
+      const strip = node.querySelector<HTMLElement>(
+        '[data-dev-id="component-browser.asset-control-strip"]',
+      );
+      if (!strip) continue;
+      // Every control on the strip is an ICON control: it names itself with an accessible label
+      // and renders no text run, so the strip cannot grow back into a row of labelled pills.
+      const controls = Array.from(strip.querySelectorAll("button"));
+      expect(controls.length).toBeGreaterThan(0);
+      expect(controls.length).toBeLessThanOrEqual(3);
+      for (const control of controls) {
+        expect(control.getAttribute("aria-label")).toBeTruthy();
+        expect(control.textContent).toBe("");
+      }
+    }
+  });
+
+  it("keeps the measured evidence off the resting column and states it on the focused module", async () => {
+    const user = userEvent.setup();
+    await open(attached());
+    // AT REST the column stacks three drawings and states no counts under any of them. It used to
+    // put a line under each - `2 pins · No duplicates`, `2 pads · 0.96 mm pitch · Courtyard present ·
+    // 1.80 x 0.84 mm`, `No file is attached` - which is three lines of measurement nobody asked for
+    // above the specifications the component was opened to read.
+    await waitFor(() =>
+      expect(
+        module_("footprint").querySelector('[data-dev-id="component-browser.footprint-canvas"]'),
+      ).not.toBeNull(),
+    );
+    for (const kind of ["model", "footprint", "symbol"]) {
+      expect(
+        module_(kind).querySelector('[data-dev-id="component-browser.asset-evidence"]'),
+      ).toBeNull();
+    }
+
+    // FOCUS the footprint - clicking its header is the same control that already reduced the other
+    // two to compact previews - and the module states what it measured.
+    await user.click(
+      module_("footprint").querySelector<HTMLElement>(
+        '[data-dev-id="component-browser.asset-header"]',
+      )!,
+    );
     const line = await waitFor(() => {
       const node = module_("footprint").querySelector(
         '[data-dev-id="component-browser.asset-evidence"]',
@@ -573,6 +712,60 @@ describe("the previews are drawn from the file", () => {
     expect(line.textContent).toContain("2/8 pads");
     expect(line.textContent).toContain("Courtyard present");
     expect(line.textContent).toMatch(/mm/);
+  });
+
+  it("never hides a recorded fault behind the focus, whatever else the footer stops saying", async () => {
+    // The one thing the evidence footer carried that a person must not have to ask for. The module
+    // header's status word says THAT something is wrong in every state; this says WHAT, and it is
+    // rendered at rest with the three previews stacked.
+    const tool = makeTool({ sourceId: "snapmagic", sourceLabel: "SnapMagic" });
+    const dossier = attached();
+    await open({
+      ...dossier,
+      cadAssets: {
+        ...dossier.cadAssets,
+        kinds: {
+          ...dossier.cadAssets.kinds,
+          footprint: {
+            ...makeRepresentation("footprint", "review", [tool]),
+            issue: "The land pattern declares no courtyard.",
+          },
+        },
+      },
+    });
+    const issue = await waitFor(() =>
+      within(module_("footprint")).getByText("The land pattern declares no courtyard."),
+    );
+    expect(issue).toBeInTheDocument();
+    expect(
+      module_("footprint").querySelector('[data-dev-id="component-browser.asset-evidence"]'),
+    ).toBeNull();
+  });
+
+  it("says nothing at all where no file is attached, because the status already said Missing", async () => {
+    // `No file is attached` was a second statement of the header's `Missing` two lines above it, once
+    // per absent asset - and the projection's own `issue` for a missing asset ("No file is attached
+    // yet.") is the same sentence again. On a component with no CAD at all the column said it six
+    // times down ~300px. The status word is the statement.
+    await open(
+      makeDossier({
+        cadAssets: {
+          kinds: {
+            symbol: makeRepresentation("symbol", "missing", []),
+            footprint: makeRepresentation("footprint", "missing", []),
+            model: makeRepresentation("model", "missing", []),
+          },
+          preference: preference(),
+        },
+      }),
+    );
+    for (const kind of ["model", "footprint", "symbol"]) {
+      const node = module_(kind);
+      await waitFor(() => expect(within(node).getByText("Missing")).toBeInTheDocument());
+      expect(within(node).queryByText("No file is attached")).toBeNull();
+      expect(within(node).queryByText("No file is attached yet.")).toBeNull();
+      expect(node.querySelector('[data-dev-id="component-browser.asset-issue"]')).toBeNull();
+    }
   });
 
   it("says a file that cannot be read is unreadable rather than showing an empty frame", async () => {

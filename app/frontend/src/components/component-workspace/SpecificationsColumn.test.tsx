@@ -198,7 +198,7 @@ describe("the section anchor strip", () => {
         .getAllByRole("button")
         .map((button) => button.textContent),
     ).toEqual([
-      "Key Specifications",
+      "Main Specifications",
       "Electrical",
       "Package and Mechanical",
       "Environmental and Reliability",

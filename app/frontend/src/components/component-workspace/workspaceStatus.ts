@@ -1,19 +1,21 @@
 /**
- * The ONE status vocabulary the opened component speaks.
+ * The words a REPRESENTATION's readiness can be said in.
  *
- * Nine words, closed. A representation states its readiness with one of them, and a design tool's
- * compact chip states the same thing about everything that tool needs. The point of closing the
- * set is that "Ready", "Complete", "OK" and "Done" stop being four names for one condition on one
- * screen - and that a word never claims more than the record proves: `Downloaded` says a provider
- * gave us the file, `Validated` says a recorded check passed on it, and the two are not the same
- * sentence.
+ * Five, closed, and every one of them producible: the set is exactly the range of
+ * `REPRESENTATION_STATUS_LABEL`, which is the only thing in this codebase that turns a record into
+ * one of these words. The point of closing it is that "Ready", "Complete", "OK" and "Done" stop
+ * being four names for one condition on one screen.
+ *
+ * It used to carry four more - `Validated`, `Downloaded`, `Available`, `Unknown` - on the claim
+ * that this was the ONE vocabulary the whole opened component speaks. It never was. Those four are
+ * spoken on that screen, but by two other closed sets with two other subjects and two other tone
+ * functions: a CAD asset's own state is `CadAssetStatus` below, toned by `cadStatusTone`, and a
+ * provider's coverage of one artifact is `CoverageStatus` from the dossier, labelled and toned
+ * inside `ProviderCoverageMatrix.tsx`. Naming their words here as well gave this type members no
+ * value of it could ever hold, and gave `statusTone` entries no caller could ever reach. A word
+ * that only a vocabulary list can produce is not a vocabulary - it is a list.
  */
-import type {
-  RepresentationStatus,
-  RepresentationToolView,
-  RepresentationView,
-  RepresentationKind,
-} from "../../api/dossierTypes";
+import type { RepresentationStatus, RepresentationView } from "../../api/dossierTypes";
 import type { BadgeTone } from "../primitives";
 
 export type WorkspaceStatus =
@@ -21,11 +23,7 @@ export type WorkspaceStatus =
   | "Needs Review"
   | "Missing"
   | "Failed"
-  | "Not Required"
-  | "Validated"
-  | "Downloaded"
-  | "Available"
-  | "Unknown";
+  | "Not Required";
 
 /** A representation's own readiness, in the vocabulary. */
 export const REPRESENTATION_STATUS_LABEL: Record<RepresentationStatus, WorkspaceStatus> = {
@@ -38,11 +36,8 @@ export const REPRESENTATION_STATUS_LABEL: Record<RepresentationStatus, Workspace
 
 const TONES: Record<WorkspaceStatus, BadgeTone> = {
   Ready: "ok",
-  Validated: "ok",
-  Downloaded: "ok",
-  Available: "neutral",
+  // "Not Required" is a fact, not a verdict, so it is not coloured as one.
   "Not Required": "neutral",
-  Unknown: "neutral",
   "Needs Review": "warn",
   Missing: "warn",
   Failed: "err",
@@ -151,36 +146,3 @@ export function cadStatusTone(status: CadAssetStatus): BadgeTone {
 // What happened to one SOURCE is a different question from a representation's readiness, and its
 // vocabulary lives in `provenanceText.tsx` with the rest of the provenance translation. It used to
 // live here and say "Answered", which is a word about a request rather than about the part.
-
-/** Every per-tool view a design tool holds across the three representations. */
-export function toolViews(
-  representations: Record<RepresentationKind, RepresentationView>,
-  tool: string,
-): RepresentationToolView[] {
-  return Object.values(representations)
-    .flatMap((view) => view.tools)
-    .filter((view) => view.tool === tool);
-}
-
-/**
- * The compact status for one design tool.
- *
- * Worst-first: a single failed check decides the chip, because a tool that is four-fifths ready is
- * not ready. Only once nothing is wrong does the chip get to say HOW ready - validated by a
- * recorded check, downloaded from a named provider, or merely available.
- */
-export function toolStatus(
-  representations: Record<RepresentationKind, RepresentationView>,
-  tool: string,
-): WorkspaceStatus {
-  const views = toolViews(representations, tool);
-  if (views.length === 0) return "Unknown";
-  if (views.some((view) => view.status === "failed")) return "Failed";
-  if (views.some((view) => view.status === "missing")) return "Missing";
-  if (views.some((view) => view.status === "review")) return "Needs Review";
-  const present = views.filter((view) => view.present);
-  if (present.length === 0) return "Not Required";
-  if (present.every((view) => view.checks.length > 0)) return "Validated";
-  if (present.every((view) => view.sourceId)) return "Downloaded";
-  return "Available";
-}

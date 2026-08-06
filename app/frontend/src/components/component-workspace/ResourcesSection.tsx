@@ -137,7 +137,7 @@ function DocumentRow({ document, onOpen }: { document: DocumentView; onOpen: () 
 }
 
 /** Semantic colour only where it means something: held and checked, held, referenced, gone. */
-export function documentTone(document: DocumentView): "ok" | "warn" | "err" | "neutral" {
+function documentTone(document: DocumentView): "ok" | "warn" | "err" | "neutral" {
   if (document.status === "verified") return "ok";
   if (document.status === "unreachable") return "err";
   return "neutral";
@@ -182,7 +182,7 @@ export function RelatedPartsSection({ parts }: { parts: readonly RelatedPart[] }
 function RelatedPartRow({ part }: { part: RelatedPart }) {
   const notValidated = useText(
     "component-browser.related-not-validated",
-    "Not checked for equivalence by Stockroom",
+    "Stockroom has not checked this for equivalence",
   );
   const openLabel = useCopyFormatter("component-browser.open-related", "Open {mpn}");
   return (

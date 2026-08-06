@@ -13,7 +13,7 @@
  * different places and must survive whatever is happening behind them.
  */
 import type { ReactNode } from "react";
-import type { ComponentDossier, RepresentationKind } from "../../api/dossierTypes";
+import type { ComponentDossier } from "../../api/dossierTypes";
 import { useCopyFormatter, useText } from "../../lib/copy";
 import { CadVariantSection } from "../CadVariantSection";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -92,10 +92,10 @@ export function WorkspaceSurfaces({
   onCancelDelete,
   onConfirmDelete,
 }: WorkspaceSurfacesProps) {
-  const identityTitle = useText("component-browser.identity-modal", "Edit Identity");
+  const identityTitle = useText("component-browser.identity-modal", "Edit Identification");
   const classificationTitle = useText(
     "component-browser.classification-modal",
-    "Edit Category and Classification",
+    "Edit Class and Classification",
   );
   const cadSourcesTitle = useText("component-browser.cad-sources-modal", "Review CAD Sources");
   const provenanceTitle = useText("component-browser.provenance-modal", "Data Provenance");
@@ -105,7 +105,7 @@ export function WorkspaceSurfaces({
   const confirmDeleteLabel = useText("component-browser.delete-confirm", "Delete Component");
   const deleteBody = useCopyFormatter(
     "component-browser.delete-body",
-    "{name} will be removed from this library, together with its symbol, footprint, 3D model, specifications and captured source records. Its files stay in the library's history and can be restored from the message that follows.",
+    "{name} will be removed from this catalog, together with its symbol, footprint, 3D model, specifications and captured source records. Its files remain in the git commits and can be restored from the message that follows.",
   );
   const componentName = dossier.identity.mpn || dossier.identity.displayName;
 
@@ -222,9 +222,4 @@ export function WorkspaceSurfaces({
       />
     </>
   );
-}
-
-/** Which representation a full preview should open on. `model` is the 3D body's own preview kind. */
-export function previewKindFor(kind: RepresentationKind): PreviewKind {
-  return kind === "model" ? "model" : kind;
 }

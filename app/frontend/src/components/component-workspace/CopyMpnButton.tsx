@@ -1,9 +1,9 @@
 /**
- * Copy MPN.
+ * The clipboard control for the manufacturer part number.
  *
  * The one rule this control exists to keep: the string that lands on the clipboard is the CANONICAL
  * manufacturer part number, byte for byte. No trimming, no upper-casing, no appended package, no
- * "MPN: " prefix. A part number is looked up in a distributor's search box, and a search box does
+ * "MPN " prefix. A part number is looked up in a distributor's search box, and a search box does
  * not forgive a stray character.
  *
  * The second rule is that confirming does not move anything. The glyph swaps to a checkmark for a
@@ -19,7 +19,7 @@ import { Button } from "../primitives";
 /** How long the checkmark stays up. Long enough to read, short enough not to be a state. */
 export const COPIED_FEEDBACK_MS = 1000;
 
-export async function writeToClipboard(text: string): Promise<boolean> {
+async function writeToClipboard(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;
@@ -31,12 +31,13 @@ export async function writeToClipboard(text: string): Promise<boolean> {
 export function CopyMpnButton({ mpn }: { mpn: string }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | null>(null);
-  const label = useText("component-browser.copy-mpn", "Copy MPN");
-  const tooltip = useText(
-    "component-browser.copy-mpn-title",
-    "Copy the manufacturer part number exactly as recorded",
+  // The COMPLETE action name, on an icon-plus-object control: this is what the tooltip shows and
+  // what a screen reader reads, so shortening the visible text costs nothing.
+  const label = useText(
+    "component-browser.copy-mpn",
+    "Place The Manufacturer Part Number On The Clipboard",
   );
-  const copiedLabel = useText("component-browser.copy-mpn-copied", "Copied");
+  const copiedLabel = useText("component-browser.copy-mpn-copied", "Placed On The Clipboard");
 
   useEffect(
     () => () => {
@@ -50,7 +51,7 @@ export function CopyMpnButton({ mpn }: { mpn: string }) {
       small
       data-dev-id="component-browser.copy-mpn"
       disabled={!mpn}
-      title={tooltip}
+      title={label}
       aria-label={copied ? copiedLabel : label}
       onClick={() => {
         if (!mpn) return;
@@ -76,9 +77,12 @@ export function CopyMpnButton({ mpn }: { mpn: string }) {
         </span>
       }
     >
-      {/* The LABEL never changes, for the same reason: "Copied" is two characters wider than
-          "Copy MPN" in some faces and one narrower in others, and either way the row moves. */}
-      <Text id="component-browser.copy-mpn">Copy MPN</Text>
+      {/* THE GLYPH CARRIES THE VERB; THE TEXT CARRIES ONLY THE OBJECT. A copy glyph is one of the
+          handful that is genuinely universal, so the visible text is the OBJECT alone - `MPN` - and
+          the verb lives in the tooltip and the accessible name, which is where a keyboard and a
+          screen reader read it. The visible text still never changes width, for the reason above:
+          "Copied" is wider than "MPN" in some faces and the row would move under the pointer. */}
+      <Text id="component-browser.copy-mpn-object">MPN</Text>
     </Button>
   );
 }

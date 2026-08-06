@@ -171,7 +171,7 @@ export function PreferredSourceControl({
               </ul>
               <p className="ui-row-metadata">
                 <Text id="component-browser.cad-source-confirm-note">
-                  The files already attached are not deleted. This records which provider the set
+                  The files attached now are not deleted. This records which provider the set
                   should come from, and what is still to be downloaded from it.
                 </Text>
               </p>

@@ -543,7 +543,7 @@ describe("the column stays a renderer", () => {
         devIdSelector("component-browser.spec-group-toggle"),
       ),
     ].map((button) => button.textContent ?? "");
-    expect(headings[0]).toContain("Key Specifications");
+    expect(headings[0]).toContain("Main Specifications");
     expect(headings[1]).toContain("Electrical");
   });
 });
@@ -565,12 +565,12 @@ describe("the attached editor covers the whole decision", () => {
     // Seven decisions travel together because they are one decision.
     expect(editor.getByRole("textbox", { name: "Supply Voltage value" })).toBeInTheDocument();
     expect(editor.getByRole("textbox", { name: "Unit" })).toHaveValue("V");
-    expect(editor.getByRole("combobox", { name: "Value Type" })).toHaveValue("quantity");
+    expect(editor.getByRole("combobox", { name: "Value Kind" })).toHaveValue("quantity");
     expect(editor.getByRole("combobox", { name: "Source" })).toBeInTheDocument();
     expect(editor.getByRole("combobox", { name: "Verification Status" })).toHaveValue("verified");
     expect(editor.getByRole("textbox", { name: "Reason" })).toBeInTheDocument();
     expect(
-      editor.getByRole("checkbox", { name: "Prefer this value over every source" }),
+      editor.getByRole("checkbox", { name: "Prefer this value over all sources" }),
     ).toBeChecked();
   });
 
@@ -722,7 +722,10 @@ describe("the attached editor covers the whole decision", () => {
     )!;
     // The row is still emitted - a reader looking for the field learns it does not exist here
     // rather than wondering - but nothing offers to fill a gap nobody can fill.
-    expect(row).toHaveTextContent("Not Applicable");
+    // A quiet state at rest: the dash, with the exact word as the cell's accessible name.
+    expect(
+      row.querySelector('[data-dev-id="component-browser.spec-value"]'),
+    ).toHaveAccessibleName("Not Applicable");
     expect(within(row).queryByRole("button", { name: "Add Override" })).toBeNull();
     expect(within(row).queryByRole("button", { name: /Source evidence/ })).toBeNull();
   });

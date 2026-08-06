@@ -34,44 +34,16 @@ export interface SymbolLayerState {
 }
 
 /**
- * The evidence the footer states, measured from the geometry.
+ * A pin's identity, so a redraw reconciles each terminal against the terminal it IS.
  *
- * Every number here is counted off the pins that were actually drawn. `expectedPins` comes from
- * the component's own specification (its pin count), so "5 pins matched" is a comparison and not
- * a restatement of one side of it - and when the specification does not say, the comparison is
- * honestly absent rather than assumed to pass.
+ * Not the array index, and not the pin number on its own. This file's own evidence counts
+ * `unnumbered` pins and `duplicates`, which is to say a symbol is ALLOWED to carry pins with no
+ * number and pins that share one - reporting that is half the reason the drawing reads the data
+ * instead of a picture of it. Where a pin is is the thing that cannot be shared: two terminals
+ * leaving the same point at the same angle are one terminal.
  */
-export interface SymbolEvidence {
-  pins: number;
-  expectedPins: number | null;
-  /** Numbers that appear on more than one pin. A real fault, not a style choice. */
-  duplicates: string[];
-  /** Pins carrying no number at all: a terminal nothing can be mapped to. */
-  unnumbered: number;
-  hidden: number;
-  /** Whether the symbol draws a body at all, and how big it is in millimetres. */
-  bounds: { width: number; height: number } | null;
-}
-
-export function symbolEvidence(
-  geometry: SymbolGeometry,
-  expectedPins: number | null,
-): SymbolEvidence {
-  const seen = new Map<string, number>();
-  for (const pin of geometry.pins) {
-    if (!pin.number) continue;
-    seen.set(pin.number, (seen.get(pin.number) ?? 0) + 1);
-  }
-  return {
-    pins: geometry.pins.length,
-    expectedPins,
-    duplicates: [...seen.entries()].filter(([, count]) => count > 1).map(([number]) => number),
-    unnumbered: geometry.pins.filter((pin) => !pin.number).length,
-    hidden: geometry.pins.filter((pin) => pin.hidden).length,
-    bounds: geometry.bounds
-      ? { width: geometry.bounds.width, height: geometry.bounds.height }
-      : null,
-  };
+function pinKey(pin: SymbolPin): string {
+  return `${pin.number}@${pin.at[0]},${pin.at[1]}/${pin.angle}`;
 }
 
 /** Short electrical-type initials, drawn beside a pin when the type layer is on. */
@@ -121,7 +93,7 @@ export function SymbolPreview({
     return (
       <p className="ui-row-secondary px-2 py-3 text-center">
         <Text id="component-browser.symbol-no-geometry">
-          This symbol draws no body and no pins.
+          This symbol draws no outline and no pins.
         </Text>
       </p>
     );
@@ -168,23 +140,30 @@ export function SymbolPreview({
           transformOrigin: "center",
         }}
       >
-        {/* The technical canvas is a light surface in BOTH themes, so the ink is fixed dark
-            rather than theme-flipped: a symbol that inverts with the app is a symbol whose
-            filled body reads as a hole in one of the two. */}
-        <g transform={flip} fill="none" stroke="#1b1b1b" strokeLinecap="round">
+        {/* The sheet FOLLOWS THE THEME, so the ink follows it too. Both are tokens rather than
+            fixed hexes: a light sheet in dark theme was the brightest thing in the workspace and
+            outshouted the MPN, and a near-black symbol on a dark sheet would be worse still. The
+            filled-body case is why the wash is its own token instead of an opacity - see
+            `SymbolShape`. */}
+        <g transform={flip} className="fill-none stroke-technical-ink" strokeLinecap="round">
+          {/* The line work is keyed by position in the file because a KiCad graphic carries no
+              identity of its own and two identical shapes are genuinely indistinguishable. The
+              list is the file's, whole and in its order: never filtered, never reordered, and
+              nothing in it holds state. Keying it by its own drawn geometry would invent a
+              distinction the file does not make, and collide the moment a symbol repeats a shape. */}
           {geometry.graphics.map((shape, index) => (
             <SymbolShape key={index} shape={shape} />
           ))}
-          {geometry.pins.map((pin, index) => (
-            <PinLine key={index} pin={pin} />
+          {geometry.pins.map((pin) => (
+            <PinLine key={pinKey(pin)} pin={pin} />
           ))}
         </g>
         {/* Text is drawn OUTSIDE the flip, with its own per-pin placement, because a mirrored
             glyph is not a smaller mistake than a mirrored body. */}
-        <g fontSize={1.1} fill="#1b1b1b">
-          {geometry.pins.map((pin, index) => (
+        <g fontSize={1.1} className="fill-technical-ink">
+          {geometry.pins.map((pin) => (
             <PinLabels
-              key={index}
+              key={pinKey(pin)}
               pin={pin}
               layers={layers}
               flipY={2 * box.y + box.height}
@@ -196,12 +175,22 @@ export function SymbolPreview({
   );
 }
 
+/**
+ * The three fill states a KiCad graphic can declare, as classes on the tokenised palette.
+ *
+ * `background` is the pale body wash behind an IC rectangle and `outline` is a solid fill. Both are
+ * drawn, because a symbol whose body is a hollow outline when the file says it is filled is a
+ * different symbol - and both are TOKENS, because the wash has to stay a shade off the sheet in
+ * whichever theme is in force. A wash expressed as an opacity of the ink would go from a pale tint
+ * on paper to a grey smear on a dark sheet.
+ */
+const SHAPE_FILL: Record<string, string> = {
+  background: "fill-technical-wash",
+  outline: "fill-technical-ink",
+};
+
 function SymbolShape({ shape }: { shape: SymbolGeometry["graphics"][number] }) {
-  // KiCad's `background` fill is the pale body wash behind an IC rectangle; `outline` is a solid
-  // fill. Both are drawn, because a symbol whose body is a hollow outline when the file says it
-  // is filled is a different symbol.
-  const fill =
-    shape.fill === "background" ? "#f0efe8" : shape.fill === "outline" ? "#1b1b1b" : "none";
+  const fill = SHAPE_FILL[shape.fill] ?? "fill-none";
   const width = shape.width > 0 ? shape.width : 0.15;
   if (shape.kind === "rectangle") {
     const [a, b] = shape.points;
@@ -212,7 +201,7 @@ function SymbolShape({ shape }: { shape: SymbolGeometry["graphics"][number] }) {
         y={Math.min(a[1], b[1])}
         width={Math.abs(b[0] - a[0])}
         height={Math.abs(b[1] - a[1])}
-        fill={fill}
+        className={fill}
         strokeWidth={width}
       />
     );
@@ -223,13 +212,13 @@ function SymbolShape({ shape }: { shape: SymbolGeometry["graphics"][number] }) {
         cx={shape.center[0]}
         cy={shape.center[1]}
         r={shape.radius}
-        fill={fill}
+        className={fill}
         strokeWidth={width}
       />
     );
   }
   const points = shape.points.map(([x, y]) => `${x},${y}`).join(" ");
-  return <polyline points={points} fill={fill} strokeWidth={width} />;
+  return <polyline points={points} className={fill} strokeWidth={width} />;
 }
 
 function pinEnd(pin: SymbolPin): [number, number] {
@@ -301,7 +290,7 @@ function PinLabels({
           x={pin.at[0] - (horizontal ? towardsBody * 0.5 : 0)}
           y={screen(pin.at[1]) - 0.35}
           textAnchor={horizontal ? (towardsBody > 0 ? "end" : "start") : "middle"}
-          fill="#6a6a6a"
+          className="fill-technical-note"
           fontSize={0.85}
           data-layer="electrical"
         >
@@ -313,7 +302,7 @@ function PinLabels({
 }
 
 /** The three toggles' initial state: names and numbers on unless the file itself hides them. */
-export function defaultSymbolLayers(geometry: SymbolGeometry | undefined): SymbolLayerState {
+function defaultSymbolLayers(geometry: SymbolGeometry | undefined): SymbolLayerState {
   return {
     pinName: geometry ? !geometry.namesHidden : true,
     pinNumber: geometry ? !geometry.numbersHidden : true,

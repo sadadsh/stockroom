@@ -21,9 +21,7 @@ import {
   useDeletePart,
   useEditField,
   useFacetsQuery,
-  useExportPart,
   useMoveCategory,
-  useOpenPartIn,
   usePartDetailQuery,
   usePartDossierQuery,
   usePartShellQuery,
@@ -34,6 +32,7 @@ import { ApiError } from "../../api/client";
 import type { RepresentationKind } from "../../api/dossierTypes";
 import { componentDevId } from "../../lib/componentDevIds";
 import { Text, useText } from "../../lib/copy";
+import { useDevMode } from "../../lib/devMode";
 import { useToast } from "../../lib/toast";
 import {
   componentView,
@@ -47,15 +46,17 @@ import type { PreviewKind } from "../PreviewModal";
 import { ErrorState, LoadingState } from "../primitives";
 import { CadAssetsColumn } from "./CadAssetsColumn";
 import { ComponentHeader } from "./ComponentHeader";
-import { manageMenuItems } from "./ManageMenu";
-import { ExportComponentDialog, OpenInDialog, shellManageItems } from "./ShellActions";
+import { WorkspaceShellDialogs, type ShellDialog } from "./ShellActions";
 import { SourcingColumn } from "./SourcingColumn";
 import { SpecificationsColumn } from "./SpecificationsColumn";
 import { WorkspaceColumns } from "./WorkspaceColumns";
 import { WorkspaceStatusBar } from "./WorkspaceStatusBar";
-import { WorkspaceSurfaces, previewKindFor, type WorkspaceSurface } from "./WorkspaceSurfaces";
+import { WorkspaceSurfaces, type WorkspaceSurface } from "./WorkspaceSurfaces";
+import { previewKindFor } from "./cadAssetSet";
+import { manageMenuItems, shellManageItems } from "./manageActions";
 import { cadFocusKind, type QualitySegmentKind } from "./componentIdentity";
 import { openKindFor, type DatasheetTarget } from "./datasheetWorkflow";
+import { sourcingIsSparse, sourcingSectionFill } from "./sourcingSections";
 import type { SpecFilter } from "./specificationRows";
 
 export function ComponentWorkspace({
@@ -78,16 +79,16 @@ export function ComponentWorkspace({
   // component; nothing here changes while a menu is open.
   const shell = usePartShellQuery(componentId);
   const revealFiles = useRevealPartFiles();
-  const exportPart = useExportPart();
-  const openPartIn = useOpenPartIn();
   const { toast } = useToast();
+  // Only to decide the sourcing column's width: developer mode always fills Technical Diagnostics,
+  // so a column that is empty for everyone else is not empty here and must not be narrowed.
+  const { enabled: developerMode } = useDevMode();
   const [preview, setPreview] = useState<PreviewKind | null>(null);
   const [surface, setSurface] = useState<WorkspaceSurface | null>(null);
   const [datasheet, setDatasheet] = useState<DatasheetTarget | null>(null);
   const [specFilter, setSpecFilter] = useState<SpecFilter>("all");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [shellDialog, setShellDialog] = useState<"export" | "open-in" | null>(null);
-  const [shellPending, setShellPending] = useState<string | null>(null);
+  const [shellDialog, setShellDialog] = useState<ShellDialog>(null);
   const specScrollRef = useRef<HTMLDivElement | null>(null);
   const sourcingScrollRef = useRef<HTMLDivElement | null>(null);
   const assetRefs = useRef<Partial<Record<RepresentationKind, HTMLElement | null>>>({});
@@ -106,9 +107,6 @@ export function ComponentWorkspace({
     "component-browser.reveal-failed",
     "Could not open the file browser",
   );
-  const exportedLabel = useText("component-browser.exported", "Component exported");
-  const exportFailed = useText("component-browser.export-failed", "Could not export");
-  const openFailed = useText("component-browser.open-in-failed", "Could not open");
 
   const patchView = useCallback(
     (patch: Parameters<typeof setComponentViewInSession>[2]) => {
@@ -230,6 +228,10 @@ export function ComponentWorkspace({
         />
 
         <WorkspaceColumns
+          // A component nobody has sourced can only fill the sourcing column with five lifecycle
+          // rows, so the column takes the width that content needs and Specifications takes the rest
+          // until an offer, a price, a document, a related part or a provenance record arrives.
+          sparseSourcing={sourcingIsSparse(sourcingSectionFill(dossier, developerMode))}
           cad={
             <CadAssetsColumn
               componentId={componentId}
@@ -283,51 +285,12 @@ export function ComponentWorkspace({
         />
       </div>
 
-      <ExportComponentDialog
-        open={shellDialog === "export"}
+      <WorkspaceShellDialogs
+        componentId={componentId}
         shell={shell.data}
-        pending={shellPending}
+        open={shellDialog}
         onClose={() => setShellDialog(null)}
-        onExport={(format) => {
-          setShellPending(format);
-          exportPart.mutate(
-            { partId: componentId, format },
-            {
-              onSuccess: (result) => {
-                setShellPending(null);
-                setShellDialog(null);
-                toast(`${exportedLabel} (${result.file_count})`, "ok");
-              },
-              onError: (error) => {
-                setShellPending(null);
-                failure(error, exportFailed);
-              },
-            },
-          );
-        }}
-      />
-
-      <OpenInDialog
-        open={shellDialog === "open-in"}
-        shell={shell.data}
-        pending={shellPending}
-        onClose={() => setShellDialog(null)}
-        onOpen={(applicationId, format) => {
-          setShellPending(applicationId);
-          openPartIn.mutate(
-            { partId: componentId, applicationId, format },
-            {
-              onSuccess: () => {
-                setShellPending(null);
-                setShellDialog(null);
-              },
-              onError: (error) => {
-                setShellPending(null);
-                failure(error, openFailed);
-              },
-            },
-          );
-        }}
+        onFailure={failure}
       />
 
       <WorkspaceSurfaces

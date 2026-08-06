@@ -74,7 +74,7 @@ export function SpecificationsColumn({
     "Search specifications…",
   );
   const filtersLabel = useText("component-browser.spec-filters", "Filter specifications");
-  const keySectionLabel = useText("component-browser.key-specs-title", "Key Specifications");
+  const keySectionLabel = useText("component-browser.key-specs-title", "Main Specifications");
   const write = useWriteSpecification(componentId);
   const total = useMemo(
     () => totalSpecifications(groups, keySpecifications),
@@ -209,7 +209,7 @@ export function SpecificationsColumn({
         <SpecSection
           devId="component-browser.key-specs"
           sectionId={KEY_SECTION_ID}
-          title={<Text id="component-browser.key-specs-title">Key Specifications</Text>}
+          title={<Text id="component-browser.key-specs-title">Main Specifications</Text>}
           count={filteredKey.length}
         >
           {filteredKey.map((record) => (
@@ -229,7 +229,7 @@ export function SpecificationsColumn({
         <div className="px-2 py-3">
           {total === 0 ? (
             <EmptyState dense id="component-browser.specs-empty">
-              No specification has been recorded for this component yet.
+              No specification has been recorded for this component so far.
             </EmptyState>
           ) : (
             <EmptyState dense id="component-browser.specs-no-match">
@@ -368,9 +368,13 @@ function SpecSection({
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
           className={
-            "flex h-[21px] w-full items-center gap-2 bg-band px-2 text-left transition-colors " +
-            "hover:bg-control-hover focus-visible:outline focus-visible:outline-2 " +
-            "focus-visible:-outline-offset-2 focus-visible:outline-focus"
+            // A RULE, not a filled band: see the note on `SourcingSection`. The label's weight and
+            // the hairline under it are the two signals a panel header needs, and a filled field
+            // behind them - repeated once per specification family - is the third that made one
+            // screen carry about fifteen coloured bars.
+            "flex h-[21px] w-full items-center gap-2 border-b border-line px-2 text-left " +
+            "transition-colors hover:bg-[var(--c-hover)] focus-visible:outline " +
+            "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
           }
         >
           {/* Wraps rather than truncating: a heading is the only name its rows have. */}

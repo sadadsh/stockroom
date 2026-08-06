@@ -14,7 +14,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { ApiError, api } from "../../api/client";
 import { cadVariantApi } from "../../api/cadVariantClient";
 import type { ComponentDossier, SpecificationGroup } from "../../api/dossierTypes";
@@ -29,6 +29,7 @@ import {
 import {
   WORKSPACE_COLUMNS_STORAGE_KEY,
   WORKSPACE_COLUMN_MIN,
+  WORKSPACE_SOURCING_SPARSE_MIN,
   moveSplitter,
   readColumnFractions,
   resolveColumnWidths,
@@ -47,9 +48,10 @@ import {
   makeTool,
 } from "../../test/dossierFixture";
 import { ComponentWorkspace } from "./ComponentWorkspace";
+import { WorkspaceColumns } from "./WorkspaceColumns";
 import { cadAssetStatus } from "./workspaceStatus";
 import { keyFacts, qualitySegments } from "./componentIdentity";
-import { manageMenuItems } from "./ManageMenu";
+import { manageMenuItems } from "./manageActions";
 import { filterGroups, countForFilter } from "./specificationRows";
 
 vi.mock("../../api/client", async (importActual) => {
@@ -240,12 +242,95 @@ describe("the three-column workspace", () => {
     expect(pinned.specifications).toBe(WORKSPACE_COLUMN_MIN.specifications);
   });
 
+  it("narrows a sourcing column with nothing to source, without ever collapsing it", () => {
+    // "sourcing is so dead space" - and MEASURED at 1600px it was: 416px to draw five lifecycle
+    // rows in, because the seeded component genuinely has no offers, no documents, no related parts
+    // and no provenance. The column was correctly empty; it was just also a quarter of the window.
+    const full = resolveColumnWidths(1600, null, false);
+    const sparse = resolveColumnWidths(1600, null, true);
+    expect(Math.round(full.sourcing)).toBe(416);
+    expect(sparse.sourcing).toBeLessThan(full.sourcing);
+    // The room goes to the other two columns, and the band still adds up.
+    expect(sparse.specifications).toBeGreaterThan(full.specifications);
+    expect(sparse.cad).toBeGreaterThan(full.cad);
+    expect(Math.round(sparse.cad + sparse.specifications + sparse.sourcing)).toBe(1600);
+    // It NEVER reaches zero and never falls below the width five label/value rows need, so the
+    // column cannot vanish in a way that hides that sourcing exists.
+    expect(sparse.sourcing).toBeGreaterThanOrEqual(WORKSPACE_SOURCING_SPARSE_MIN);
+    // At the narrowest supported desktop it still stands beside the other two.
+    const cramped = resolveColumnWidths(1024, null, true);
+    expect(cramped.sourcing).toBeGreaterThanOrEqual(WORKSPACE_SOURCING_SPARSE_MIN);
+  });
+
+  it("lets a dragged splitter outrank the content-aware width", () => {
+    // Somebody who moved this handle told the workstation what they want. Opening a part with no
+    // offers must not quietly take it back.
+    writeColumnFractions({ cad: 400, specifications: 800, sourcing: 400 });
+    const stored = readColumnFractions();
+    expect(resolveColumnWidths(1600, stored, true)).toEqual(
+      resolveColumnWidths(1600, stored, false),
+    );
+  });
+
+  it("lets a person drag to any width the layout is willing to choose itself", () => {
+    // The drag floor and the automatic floor are the same number. A handle that stopped following
+    // the pointer at 250 while the column had already sat at 190 by itself would read as broken.
+    const start = resolveColumnWidths(1600, null, true);
+    const pinned = moveSplitter(start, "specifications-sourcing", 5000, true);
+    expect(Math.round(pinned.sourcing)).toBe(WORKSPACE_SOURCING_SPARSE_MIN);
+  });
+
   it("stores proportions rather than pixels, so a different monitor keeps the same shape", () => {
     writeColumnFractions({ cad: 400, specifications: 800, sourcing: 400 });
     expect(window.localStorage.getItem(WORKSPACE_COLUMNS_STORAGE_KEY)).toContain("0.25");
     const wide = resolveColumnWidths(1920, readColumnFractions());
     expect(Math.round(wide.cad)).toBe(480);
     expect(Math.round(wide.specifications)).toBe(960);
+  });
+
+  // --- the band reads the stored preference once, and writes it once per step -------------------
+  //
+  // Both are counted against `localStorage`, which is where the preference actually lives, so they
+  // measure the real work rather than a stand-in for it. StrictMode is the point of the second one:
+  // it double-invokes state updaters exactly as React reserves the right to, and persistence that
+  // lives inside an updater is persistence that runs as many times as React feels like running it.
+
+  function bareBand() {
+    return (
+      <ThemeProvider>
+        <WorkspaceColumns cad={<i />} specifications={<i />} sourcing={<i />} />
+      </ThemeProvider>
+    );
+  }
+
+  it("reads the stored proportions once, not on every render", () => {
+    writeColumnFractions({ cad: 400, specifications: 800, sourcing: 400 });
+    const read = vi.spyOn(Storage.prototype, "getItem");
+    const view = render(bareBand());
+    const afterMount = read.mock.calls.filter(
+      ([key]) => key === WORKSPACE_COLUMNS_STORAGE_KEY,
+    ).length;
+    expect(afterMount).toBeGreaterThan(0);
+
+    view.rerender(bareBand());
+    view.rerender(bareBand());
+    const afterRerenders = read.mock.calls.filter(
+      ([key]) => key === WORKSPACE_COLUMNS_STORAGE_KEY,
+    ).length;
+    expect(afterRerenders).toBe(afterMount);
+    read.mockRestore();
+  });
+
+  it("persists one drag step once, even when React replays the state update", async () => {
+    const user = userEvent.setup();
+    render(<StrictMode>{bareBand()}</StrictMode>);
+    const write = vi.spyOn(Storage.prototype, "setItem");
+    document.querySelector<HTMLElement>('[data-splitter="cad-specifications"]')!.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(
+      write.mock.calls.filter(([key]) => key === WORKSPACE_COLUMNS_STORAGE_KEY),
+    ).toHaveLength(1);
+    write.mockRestore();
   });
 });
 
@@ -442,11 +527,14 @@ describe("the identity header", () => {
     const actions = within(node("component-browser.header-actions"))
       .getAllByRole("button")
       .map((button) => button.textContent?.trim());
-    expect(actions).toEqual(["Datasheet", "Manufacturer Page", "Copy MPN", "Manage"]);
+    // The clipboard control's VISIBLE text is the object alone: a copy glyph carries the verb, and
+    // the complete phrase is on the control as its tooltip and its accessible name (asserted in the
+    // clipboard block below). The inventory is still exactly four actions and no more.
+    expect(actions).toEqual(["Datasheet", "Manufacturer Page", "MPN", "Manage"]);
 
     for (const gone of [
       "Complete Component",
-      "Edit Identity",
+      "Edit Identification",
       "Resolve Source Conflict",
       "Delete Part",
       "KiCad Validated",
@@ -495,7 +583,7 @@ describe("the identity header", () => {
   });
 });
 
-describe("Copy MPN", () => {
+describe("the clipboard control", () => {
   it("copies the canonical part number exactly, and does not resize while confirming", async () => {
     const user = userEvent.setup();
     // AFTER setup(): user-event installs its own clipboard stub, and this test is about the exact
@@ -516,7 +604,9 @@ describe("Copy MPN", () => {
     // The label is unchanged and the glyph box is fixed, so nothing beside it moves.
     expect(button.textContent).toBe(labelBefore);
     expect(button.querySelector('[data-copied="true"]')!.className).toContain("h-3.5 w-3.5");
-    expect(button).toHaveAccessibleName("Copied");
+    // Shortening the visible text must never shorten what a screen reader hears: the accessible
+    // name carries the whole phrase before AND after the confirmation.
+    expect(button).toHaveAccessibleName("Placed On The Clipboard");
   });
 });
 
@@ -527,8 +617,8 @@ describe("the Manage menu", () => {
     await user.click(node("component-browser.manage"));
     const entries = within(node("component-browser.manage-menu")).getAllByRole("menuitem");
     expect(entries.map((item) => item.textContent?.trim())).toEqual([
-      "Edit Identity...",
-      "Edit Category and Classification...",
+      "Edit Identification...",
+      "Edit Class and Classification...",
       "Review Missing Specifications...",
       "Refresh Component Data",
       "Review CAD Sources...",
@@ -537,7 +627,7 @@ describe("the Manage menu", () => {
     ]);
     // Destructive last, and restrained red TEXT rather than a filled control.
     const last = entries[entries.length - 1];
-    expect(last.className).toContain("text-err");
+    expect(last.className).toContain("text-err-text");
     expect(last.className).not.toContain("bg-err");
   });
 
@@ -763,8 +853,16 @@ describe("the specification column", () => {
   it("keeps Not Reported apart from Missing, because only one of them is a gap", async () => {
     await open(makeDossierWith({ groups: [ELECTRICAL] }));
     const notReported = document.querySelector<HTMLElement>('[data-spec-key="slew_rate"]')!;
+    // The STATE is what the row is asserted on, and it is unchanged. `Not Reported` is one of the
+    // two quiet states, so at rest the value cell shows a dash and carries the exact word as its
+    // accessible name - the distinction from `Missing`, which keeps its word and its amber, is
+    // intact and is not sighted-only.
     expect(notReported.dataset.specState).toBe("not_reported");
-    expect(notReported).toHaveTextContent("Not Reported");
+    const value = notReported.querySelector<HTMLElement>(
+      '[data-dev-id="component-browser.spec-value"]',
+    )!;
+    expect(value).toHaveAccessibleName("Not Reported");
+    expect(value.textContent).toBe("—");
     // The header counts the GAP only. A field the category never asked for is not one.
     expect(node("component-browser.quality-summary").dataset.missing).toBe("1");
   });
@@ -931,7 +1029,7 @@ describe("the sourcing column", () => {
       "logic_family: LVC → AHC",
     );
     expect(node("component-browser.related-not-validated")).toHaveTextContent(
-      "Not checked for equivalence by Stockroom",
+      "Stockroom has not checked this for equivalence",
     );
   });
 
@@ -958,7 +1056,7 @@ describe("the workspace status bar", () => {
   it("states the component's own condition without repeating the library counts", async () => {
     await open(makeDossierWith({ groups: [ELECTRICAL] }));
     const bar = node("component-browser.status-bar");
-    expect(bar).toHaveTextContent("Ready");
+    expect(bar).toHaveTextContent("Idle");
     expect(bar).toHaveTextContent("1 missing");
     expect(bar).toHaveTextContent("1 conflicting");
   });

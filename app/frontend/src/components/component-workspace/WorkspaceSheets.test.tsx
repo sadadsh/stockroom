@@ -34,8 +34,8 @@ import {
 } from "../../test/dossierFixture";
 import { makePartDetail } from "../../test/partFixture";
 import { ComponentWorkspace } from "./ComponentWorkspace";
-import { canApplyAlternate } from "./SourcesSheet";
-import { pinoutColumns } from "./PinoutTable";
+import { canApplyAlternate } from "./sourceCandidates";
+import { pinoutColumns } from "./pinoutRows";
 
 vi.mock("../../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../../api/client")>();
@@ -208,7 +208,7 @@ async function manage(item: string) {
 // --------------------------------------------------------------- compact vs sheet
 
 describe("the pinout sheet", () => {
-  it("renders the complete pinout table and offers Apply Pinout beside it", async () => {
+  it("renders the complete pinout table and offers Commit Pinout beside it", async () => {
     const { dialog } = await openSheet(
       bigSpecs(),
       "View Pinout",
@@ -228,6 +228,46 @@ describe("the pinout sheet", () => {
       "name",
       "type",
     ]);
+  });
+
+  /**
+   * A filtered row keeps the row it already had, instead of inheriting another pin's.
+   *
+   * The filter is the whole reason this table exists on a hundred-pin package, and it is also the
+   * one thing that makes a row's POSITION meaningless: narrow the search and the pin that was
+   * seventh is suddenly first. A row identified by where it currently sits therefore names a
+   * different pin on every keystroke, and the element that was drawn for one pin gets repainted
+   * with another's - which is how a row a person had selected, scrolled to or was reading ends up
+   * being a different pin than the one they were looking at.
+   *
+   * Identity here is the pin's ORDINAL IN THE RECORD, which the filter cannot move. Proved on the
+   * DOM node rather than on a key, because the node is what a person's selection and the browser's
+   * scroll position are attached to.
+   */
+  it("keeps a pin on its own row when the filter narrows around it", async () => {
+    const { dialog, user } = await openSheet(
+      makeDossier({
+        diagnostics: {
+          pinCount: 4,
+          pinout: [
+            { pin: "1", name: "VCC" },
+            { pin: "2", name: "GND" },
+            { pin: "3", name: "SDA" },
+            { pin: "4", name: "SCL" },
+          ],
+        },
+      }),
+      "View Pinout",
+      "Pinout",
+    );
+    const table = within(dialog).getByRole("table", { name: "Pinout" });
+    const before = within(table).getByText("SDA").closest("tr");
+    expect(before).not.toBeNull();
+
+    await user.type(within(dialog).getByRole("searchbox", { name: "Filter pins" }), "SDA");
+    await waitFor(() => expect(within(table).getAllByRole("row")).toHaveLength(2));
+
+    expect(within(table).getByText("SDA").closest("tr")).toBe(before);
   });
 
   it("persists a looked-up pinout through the specs seam, with its source", async () => {
@@ -259,7 +299,7 @@ describe("the pinout sheet", () => {
     );
 
     await user.click(within(dialog).getByRole("button", { name: "Look Up Pinout" }));
-    const apply = await within(dialog).findByRole("button", { name: "Apply Pinout" });
+    const apply = await within(dialog).findByRole("button", { name: "Commit Pinout" });
     await user.click(apply);
 
     await waitFor(() =>
@@ -357,7 +397,7 @@ describe("the full sourcing sheet", () => {
     const { dialog } = await openSheet(dossier, "View Price Breaks", "Price Breaks");
     const related = within(dialog).getByLabelText("Related Parts");
     expect(
-      within(related).getByText(/Stockroom has not checked that any of them is electrically/),
+      within(related).getByText(/Stockroom has not checked whether these parts are interchangeable/),
     ).toBeInTheDocument();
     // And on the ROW itself, with the reason it is here at all.
     expect(within(related).getByText(/Offered as a substitution/)).toBeInTheDocument();
@@ -492,12 +532,12 @@ describe("the sources and history sheet", () => {
     );
 
     // A record attribute can be put in force...
-    await user.click(within(dialog).getByRole("button", { name: "Apply TI Manufacturer" }));
+    await user.click(within(dialog).getByRole("button", { name: "Commit TI Manufacturer" }));
     await waitFor(() =>
       expect(mockApi.editField).toHaveBeenCalledWith(ID, "manufacturer", "TI"),
     );
-    // ...a SPEC key cannot: `editField` writes record attributes, so no Apply is offered.
-    expect(within(dialog).queryByRole("button", { name: /Apply 3\.3 V/ })).toBeNull();
+    // ...a SPEC key cannot: `editField` writes record attributes, so no Commit is offered.
+    expect(within(dialog).queryByRole("button", { name: /Commit 3\.3 V/ })).toBeNull();
   });
 
   it("knows which alternates are safe to apply", () => {
@@ -715,8 +755,8 @@ describe("identity editing, restored", () => {
   it("edits a canonical identity field from the Manage menu", async () => {
     mockApi.editField.mockResolvedValue({} as never);
     await open();
-    const user = await manage("Edit Identity...");
-    const dialog = await screen.findByRole("dialog", { name: "Edit Identity" });
+    const user = await manage("Edit Identification...");
+    const dialog = await screen.findByRole("dialog", { name: "Edit Identification" });
     await user.click(within(dialog).getByRole("button", { name: "Edit Manufacturer" }));
     const input = within(dialog).getByRole("textbox", { name: "Manufacturer" });
     await user.clear(input);
@@ -728,9 +768,9 @@ describe("identity editing, restored", () => {
   it("moves the component to another category through the move seam, not a field edit", async () => {
     mockApi.moveCategory.mockResolvedValue({} as never);
     await open();
-    const user = await manage("Edit Category and Classification...");
+    const user = await manage("Edit Class and Classification...");
     const dialog = await screen.findByRole("dialog", {
-      name: "Edit Category and Classification",
+      name: "Edit Class and Classification",
     });
     await user.selectOptions(within(dialog).getByLabelText("Category"), "Passives");
 
@@ -745,12 +785,12 @@ describe("identity editing, restored", () => {
     // declaring `data_fields`, and it carries the symbol and footprint references and the datasheet
     // that the hand-written list had no way to show.
     await open();
-    await manage("Edit Identity...");
-    const dialog = await screen.findByRole("dialog", { name: "Edit Identity" });
+    await manage("Edit Identification...");
+    const dialog = await screen.findByRole("dialog", { name: "Edit Identification" });
 
     const band = await within(dialog).findByRole("region", { name: "EDA Handoff" });
     // The two fields the registry does NOT own stay in the sheet's own Identity section...
-    expect(within(dialog).getByRole("button", { name: "Edit Display Name" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Edit Listed Name" })).toBeInTheDocument();
     // ...and the registry-owned ones appear once, in the band.
     expect(within(band).getByText("Symbol")).toBeInTheDocument();
     expect(within(band).getByText("Footprint")).toBeInTheDocument();

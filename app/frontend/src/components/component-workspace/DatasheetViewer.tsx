@@ -44,6 +44,14 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 const PDF_OPTIONS = { standardFontDataUrl: "standard_fonts/" } as const;
 
 const ZOOM_STEPS: readonly number[] = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+/**
+ * Where the viewer opens: 100%, found by name in the ladder above rather than written as an index.
+ *
+ * Resolved ONCE, here, because it is a property of a module constant and cannot change. Passed
+ * straight to `useState` it was recomputed on every render of the viewer and the answer thrown away,
+ * since React keeps only the first initial value it is given.
+ */
+const ZOOM_DEFAULT_AT = ZOOM_STEPS.indexOf(1);
 
 /** What the viewer is doing. A failure is a STATE the viewer holds, never a toast it fires. */
 type ViewerState =
@@ -110,7 +118,7 @@ function DatasheetPageResource({ document }: { document: DocumentView }) {
       </p>
       <p className="ui-component-description">
         <Text id="component-browser.datasheet-page-body">
-          This reference is a web page rather than a PDF, so there is no document to display here.
+          This reference is a web page rather than a PDF, so there is no document to show here.
         </Text>
       </p>
       {document.remoteUrl ? (
@@ -144,7 +152,7 @@ function DatasheetUnavailable({
         <Text id="component-browser.datasheet-unavailable">This document could not be opened</Text>
       </p>
       {reason ? (
-        <p data-dev-id="component-browser.datasheet-failure-reason" className="ui-component-description text-err">
+        <p data-dev-id="component-browser.datasheet-failure-reason" className="ui-component-description text-err-text">
           {reason}
         </p>
       ) : null}
@@ -183,7 +191,7 @@ function DatasheetPdf({
   const [source, setSource] = useState<{ data: ArrayBuffer } | { url: string } | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [page, setPage] = useState(1);
-  const [zoomAt, setZoomAt] = useState(ZOOM_STEPS.indexOf(1));
+  const [zoomAt, setZoomAt] = useState(ZOOM_DEFAULT_AT);
   const [rotation, setRotation] = useState(0);
   const [attempt, setAttempt] = useState(0);
 
@@ -195,7 +203,7 @@ function DatasheetPdf({
   );
   const renderFailed = useText(
     "component-browser.datasheet-render-failed",
-    "This PDF could not be displayed.",
+    "This PDF could not be shown.",
   );
 
   // Load the bytes. A stored file goes through the documents endpoint, because the guard rejects a
@@ -282,9 +290,9 @@ function DatasheetPdf({
               </p>
             }
             error={
-              <p className="ui-component-metadata p-2 text-err">
+              <p className="ui-component-metadata p-2 text-err-text">
                 <Text id="component-browser.datasheet-render-failed">
-                  This PDF could not be displayed.
+                  This PDF could not be shown.
                 </Text>
               </p>
             }
@@ -342,7 +350,7 @@ function DatasheetToolbar({
   const zoomInLabel = useText("component-browser.datasheet-zoom-in", "Zoom In");
   const zoomOutLabel = useText("component-browser.datasheet-zoom-out", "Zoom Out");
   const rotateLabel = useText("component-browser.datasheet-rotate", "Rotate");
-  const externalLabel = useText("component-browser.datasheet-open-external", "Open Externally");
+  const externalLabel = useText("component-browser.datasheet-open-external", "Open in the Browser");
   const ofPages = useCopyFormatter("component-browser.datasheet-of-pages", "of {count}");
 
   return (
@@ -447,7 +455,7 @@ function DatasheetFailure({
   reason: string;
   onRetry: () => void;
 }) {
-  const retryLabel = useText("component-browser.datasheet-retry", "Retry");
+  const retryLabel = useText("component-browser.datasheet-retry", "Rerun");
   const openSource = useText("component-browser.datasheet-open-source", "Open Source Page");
   return (
     <div

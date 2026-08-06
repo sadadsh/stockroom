@@ -32,7 +32,7 @@ import { ErrorState, LoadingState, Section } from "../primitives";
  * Deliberately short. Every other editable attribute is declared by the EDA registry and rendered
  * by the handoff band below, so adding one here would be adding a second editor for it.
  */
-export const IDENTITY_FIELDS: ReadonlyArray<{
+const IDENTITY_FIELDS: ReadonlyArray<{
   field: "display_name" | "value";
   label: string;
   copyId: string;
@@ -40,7 +40,7 @@ export const IDENTITY_FIELDS: ReadonlyArray<{
 }> = [
   {
     field: "display_name",
-    label: "Display Name",
+    label: "Listed Name",
     copyId: "component-browser.identity-display-name",
   },
   { field: "value", label: "Value", copyId: "component-browser.identity-value", mono: true },
@@ -86,7 +86,7 @@ export function IdentitySheet({
   return (
     <div data-dev-id="component-browser.identity-sheet" className="flex flex-col gap-4">
       <Section
-        title="Identity"
+        title="Identification"
         copyId="component-browser.identity-title"
         note={
           <Text id="component-browser.identity-note">
@@ -125,7 +125,7 @@ export function IdentitySheet({
         note={
           <Text id="component-browser.identity-handoff-note">
             These fields are mirrored into the symbol a design tool places, so a change here changes
-            what a schematic says about this component. Moving a component relocates its symbol and
+            what a schematic reports about this component. Moving a component relocates its symbol and
             footprint libraries as well as its label.
           </Text>
         }

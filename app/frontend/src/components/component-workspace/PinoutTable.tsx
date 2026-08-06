@@ -9,28 +9,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useText } from "../../lib/copy";
 import { DataTable, EmptyState, Section } from "../primitives";
-
-/** The pinout columns, in the order the record wrote them, unioned across every pin. */
-export function pinoutColumns(pinout: Array<Record<string, unknown>>): string[] {
-  const columns: string[] = [];
-  for (const entry of pinout) {
-    for (const key of Object.keys(entry)) {
-      if (!columns.includes(key)) columns.push(key);
-    }
-  }
-  return columns;
-}
-
-/** Does any cell of this pin match what was typed? Every column is searchable. */
-export function pinMatches(
-  entry: Record<string, unknown>,
-  columns: string[],
-  needle: string,
-): boolean {
-  if (!needle) return true;
-  const hay = columns.map((column) => formatPin(entry[column])).join(" ").toLowerCase();
-  return hay.includes(needle.toLowerCase());
-}
+import { formatPin, pinMatches, pinoutColumns } from "./pinoutRows";
 
 /**
  * The complete pinout, one row per pin. Never truncated: this is the exhaustive surface.
@@ -54,12 +33,22 @@ export function PinoutTable({
   const filterLabel = useText("component-browser.pinout-filter", "Filter pins");
   const columns = pinoutColumns(pinout);
   const needle = filter.trim();
-  const shown = useMemo(
-    () => pinout.filter((entry) => pinMatches(entry, columns, needle)),
+  // Each kept pin carries its ORDINAL IN THE RECORD, which is what identifies a row here. The
+  // rendered list is filtered as somebody types, so a row's position on screen names a different
+  // pin on every keystroke; "the seventh pin the record wrote" names the same pin whatever the
+  // filter is showing. The record itself supplies no id - a pinout is a list of loose per-pin
+  // records whose keys differ by part - so the ordinal is the identity there is.
+  const shown = useMemo(() => {
+    const rows: Array<{ entry: Record<string, unknown>; position: number }> = [];
+    for (let position = 0; position < pinout.length; position += 1) {
+      if (pinMatches(pinout[position], columns, needle)) {
+        rows.push({ entry: pinout[position], position });
+      }
+    }
+    return rows;
     // `columns` is derived from `pinout` on every render, so `pinout` is the real dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pinout, needle],
-  );
+  }, [pinout, needle]);
   return (
     <Section
       title="Pinout"
@@ -90,8 +79,8 @@ export function PinoutTable({
               label={tableLabel}
               headings={columns.map((column) => column.replace(/_/g, " "))}
             >
-              {shown.map((entry, index) => (
-                <tr key={index} className="border-b border-line/60 last:border-b-0">
+              {shown.map(({ entry, position }) => (
+                <tr key={position} className="border-b border-line/60 last:border-b-0">
                   {columns.map((column) => (
                     <td key={column} className="tnum whitespace-nowrap px-3 py-1 font-mono">
                       {formatPin(entry[column])}
@@ -105,11 +94,4 @@ export function PinoutTable({
       )}
     </Section>
   );
-}
-
-function formatPin(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (typeof value === "object") return "";
-  return String(value);
 }

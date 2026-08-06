@@ -5,18 +5,35 @@
  * them, and the whole reason they were missing for so long is that offering them without a bridge
  * would have meant three menu entries that open nothing. A dead click path is worse than an
  * absent one, so what is proved below is that nothing is drawn speculatively.
+ *
+ * The last block is about the other half: `WorkspaceShellDialogs`, which holds the running token
+ * and the two mutations. That token is the only thing standing between one press and two processes
+ * started on the same component, and it is the piece the workspace can no longer see, so it is
+ * asserted here on the rendered rows rather than left to the workspace's own tests.
  */
-import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState, type ReactNode } from "react";
+import { ApiError, api } from "../../api/client";
 import type { PartShell } from "../../api/types";
 import { ThemeProvider } from "../../lib/theme";
-import { manageMenuItems, ManageMenu } from "./ManageMenu";
+import { ToastProvider } from "../../lib/toast";
+import { ManageMenu } from "./ManageMenu";
+import { manageMenuItems, openableApplications, shellManageItems } from "./manageActions";
 import {
   ExportComponentDialog,
   OpenInDialog,
-  openableApplications,
-  shellManageItems,
+  WorkspaceShellDialogs,
+  type ShellDialog,
 } from "./ShellActions";
+
+vi.mock("../../api/client", async (importActual) => {
+  const actual = await importActual<typeof import("../../api/client")>();
+  return { ...actual, api: { exportPart: vi.fn(), openPartIn: vi.fn() } };
+});
+
+const mockApi = vi.mocked(api);
 
 const HOST_WITH_EVERYTHING: PartShell = {
   supported: true,
@@ -105,8 +122,8 @@ describe("where the shell actions sit in the Manage menu", () => {
     await user.click(screen.getByRole("button", { name: /Manage/ }));
 
     expect(screen.getAllByRole("menuitem").map((node) => node.textContent)).toEqual([
-      "Edit Identity...",
-      "Edit Category and Classification...",
+      "Edit Identification...",
+      "Edit Class and Classification...",
       "Review Missing Specifications...",
       "Refresh Component Data",
       "Review CAD Sources...",
@@ -120,7 +137,7 @@ describe("where the shell actions sit in the Manage menu", () => {
     const last = entries[entries.length - 1];
     expect(last.textContent).toBe("Delete Component...");
     // Restrained red TEXT, never a filled control, and never larger or heavier than its siblings.
-    expect(last.className).toContain("text-err");
+    expect(last.className).toContain("text-err-text");
     expect(last.className).not.toContain("bg-err");
     expect(last.className).not.toContain("font-semibold");
   });
@@ -154,7 +171,7 @@ describe("Export Component", () => {
     );
 
     expect(
-      screen.getByText("This component has no CAD files to export yet."),
+      screen.getByText("This component has no CAD files to export so far."),
     ).toBeInTheDocument();
   });
 
@@ -230,5 +247,111 @@ describe("Open In", () => {
     await user.click(screen.getByRole("button", { name: "Open" }));
 
     expect(onOpen).toHaveBeenCalledWith("altium-designer", "step");
+  });
+});
+
+describe("the wired pair, and the one token that says a process is out", () => {
+  function provideWired(ui: ReactNode) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={qc}>
+        <ThemeProvider>
+          <ToastProvider>{ui}</ToastProvider>
+        </ThemeProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  /** The workspace's half of the contract: it decides WHICH dialog is up, and closes it. */
+  function Host({ initial }: { initial: ShellDialog }) {
+    const [open, setOpen] = useState<ShellDialog>(initial);
+    return (
+      <WorkspaceShellDialogs
+        componentId="lm358"
+        shell={HOST_WITH_EVERYTHING}
+        open={open}
+        onClose={() => setOpen(null)}
+        onFailure={(error, fallback) => {
+          void error;
+          void fallback;
+        }}
+      />
+    );
+  }
+
+  function exportRows(): HTMLButtonElement[] {
+    return Array.from(
+      document.querySelectorAll<HTMLButtonElement>(
+        "[data-dev-id='component-browser.export-format']",
+      ),
+    );
+  }
+
+  it("disables the OTHER format while one export is out, instead of letting both start", async () => {
+    const user = userEvent.setup();
+    // Never resolves: the assertion is about the window between the press and the answer, which is
+    // exactly the window the running token exists to cover.
+    mockApi.exportPart.mockImplementation(() => new Promise(() => {}));
+    provideWired(<Host initial="export" />);
+
+    expect(exportRows()).toHaveLength(2);
+    await user.click(exportRows()[0]);
+
+    expect(exportRows()[0].textContent).toBe("Exporting");
+    expect(exportRows()[1].textContent).toBe("Export");
+    expect(exportRows()[0].disabled).toBe(true);
+    expect(exportRows()[1].disabled).toBe(true);
+  });
+
+  it("closes and reports how many files were written when the export lands", async () => {
+    const user = userEvent.setup();
+    mockApi.exportPart.mockResolvedValue({
+      part_id: "lm358",
+      format: "kicad",
+      file_count: 3,
+      file_names: ["lm358.kicad_sym", "lm358.kicad_mod", "lm358.step"],
+    });
+    provideWired(<Host initial="export" />);
+
+    await user.click(exportRows()[0]);
+
+    expect(await screen.findByText("Component exported (3)")).toBeInTheDocument();
+    await waitFor(() => expect(exportRows()).toHaveLength(0));
+  });
+
+  it("keeps the chooser up and the row pressable again when the export fails", async () => {
+    const user = userEvent.setup();
+    mockApi.exportPart.mockRejectedValue(new ApiError(500, "no"));
+    provideWired(<Host initial="export" />);
+
+    await user.click(exportRows()[0]);
+
+    // Still open - a failed export must not look like a finished one - and the token is released,
+    // so the same row can be tried again rather than being dead until the window is reopened.
+    await waitFor(() => expect(exportRows()[0].textContent).toBe("Export"));
+    expect(exportRows()[0].disabled).toBe(false);
+    expect(exportRows()[1].disabled).toBe(false);
+  });
+
+  it("sends the pressed application, its readable format and this component to the host", async () => {
+    const user = userEvent.setup();
+    mockApi.openPartIn.mockResolvedValue({
+      part_id: "lm358",
+      application_id: "kicad",
+      format: "kicad",
+      opened: true,
+    });
+    provideWired(<Host initial="open-in" />);
+
+    await user.click(screen.getAllByRole("button", { name: "Open" })[0]);
+
+    expect(mockApi.openPartIn).toHaveBeenCalledWith({
+      partId: "lm358",
+      applicationId: "kicad",
+      format: "kicad",
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Open" })).toBeNull(),
+    );
   });
 });

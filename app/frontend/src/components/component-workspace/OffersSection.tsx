@@ -22,8 +22,9 @@ import type { DistributorOffer } from "../../api/dossierTypes";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { formatCount, formatPrice, formatTimestamp } from "../../lib/formatValue";
 import { ExternalIcon } from "../icons";
-import { Button, EmptyState } from "../primitives";
+import { EmptyState } from "../primitives";
 import { SourcingSection } from "./SourcingParts";
+import { volumeBreak } from "./offerFacts";
 import { useSupplyFailureText } from "./provenanceText";
 
 /**
@@ -47,15 +48,6 @@ export function useRetainedOffers(
   return offers.length > 0 ? offers : held.current;
 }
 
-/** The best volume break on an offer, or null when only one quantity was ever quoted. */
-export function volumeBreak(offer: DistributorOffer): { qty: number; price: number } | null {
-  const usable = offer.priceBreaks.filter(
-    (entry): entry is { qty: number; price: number } => entry.qty !== null && entry.price !== null,
-  );
-  if (usable.length < 2) return null;
-  return usable.reduce((best, entry) => (entry.qty > best.qty ? entry : best));
-}
-
 export function OffersSection({
   offers,
   failures,
@@ -77,25 +69,28 @@ export function OffersSection({
       devId="component-browser.offers"
       title={<Text id="component-browser.offers-title">Distributor Offers</Text>}
       action={
-        <Button
-          small
+        // A REFRESH GLYPH, which is one of the handful of genuinely universal ones, carrying the
+        // complete action name as its tooltip and its accessible name. The word `Offers` was on the
+        // control AND on the heading two centimetres to its left, so the control was restating its
+        // own container. It keeps a fixed 22px box so the heading row cannot jump when the glyph
+        // becomes a spinner, and `Refreshing...` is still announced through `aria-label`.
+        <button
+          type="button"
           data-dev-id="component-browser.refresh-offers"
           aria-busy={refreshing || undefined}
+          aria-label={refreshing ? refreshingLabel : refreshLabel}
+          title={refreshing ? refreshingLabel : refreshLabel}
           disabled={refreshing}
           onClick={onRefresh}
-          // The control keeps its width while its label changes, so the heading band does not
-          // jump the moment a refresh starts.
-          className="min-w-[6rem] justify-center"
+          className={
+            "flex h-[20px] w-[20px] flex-none items-center justify-center rounded-control " +
+            "text-t3 hover:bg-control-hover hover:text-t1 disabled:text-t5 " +
+            "disabled:hover:bg-transparent focus-visible:outline focus-visible:outline-2 " +
+            "focus-visible:outline-offset-1 focus-visible:outline-focus"
+          }
         >
-          {refreshing ? (
-            <span className="inline-flex items-center gap-1">
-              <Spinner />
-              {refreshingLabel}
-            </span>
-          ) : (
-            refreshLabel
-          )}
-        </Button>
+          {refreshing ? <Spinner /> : <RefreshGlyph />}
+        </button>
       }
     >
       {/* Above the numbers, never instead of them. */}
@@ -120,7 +115,7 @@ export function OffersSection({
               <col className="w-[1.75rem]" />
             </colgroup>
             <thead>
-              <tr className="border-b border-line">
+              <tr className="border-b border-line-dark">
                 <Heading copyId="component-browser.offer-col-provider">Provider</Heading>
                 <Heading copyId="component-browser.offer-col-stock" numeric>
                   Stock
@@ -170,7 +165,12 @@ function OfferRow({ offer }: { offer: DistributorOffer }) {
     <tr
       data-dev-id="component-browser.offer-row"
       data-offer-provider={offer.provider}
-      className="border-b border-line/60 last:border-b-0"
+      // A REAL GRID. The row carries an alternating tint and every cell a 1px right rule, because
+      // eight numeric columns read across without either: a data grid that hides its cells asks the
+      // eye to hold a column boundary it cannot see. Both steps are deliberately at the edge of
+      // perception - `--c-row-alt` is 1.06:1 off the workspace - so it reads as structure and not
+      // as stripes.
+      className="border-b border-line/60 last:border-b-0 even:bg-row-alt [&>td]:border-r [&>td]:border-line/50 [&>td:last-child]:border-r-0"
     >
       <td className="px-2 py-1 align-baseline">
         <span className="ui-row-secondary block truncate" title={offer.providerLabel}>
@@ -267,7 +267,8 @@ function Heading({
     <th
       scope="col"
       className={
-        "ui-table-header whitespace-nowrap px-2 py-1 " + (numeric ? "text-right" : "text-left")
+        "ui-table-header whitespace-nowrap border-r border-line/50 px-2 py-1 last:border-r-0 " +
+        (numeric ? "text-right" : "text-left")
       }
     >
       <Text id={copyId}>{children}</Text>
@@ -299,6 +300,25 @@ function SupplyFailures({
         </li>
       ))}
     </ul>
+  );
+}
+
+/** A circular arrow: refresh, and one of the few glyphs that needs no label beside it. */
+function RefreshGlyph(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      aria-hidden
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.9-4.2" />
+      <path d="M13.5 2v3h-3" />
+    </svg>
   );
 }
 

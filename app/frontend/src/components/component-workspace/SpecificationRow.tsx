@@ -29,7 +29,7 @@ import {
   specRowTone,
 } from "./specificationRows";
 import { SpecificationEditor } from "./SpecificationEditor";
-import { SpecStateLabel } from "./SpecificationState";
+import { SpecStateLabel, useSpecStateText } from "./SpecificationState";
 
 export interface SpecificationRowProps {
   record: SpecificationRecord;
@@ -42,6 +42,19 @@ export interface SpecificationRowProps {
   /** Where a named source can actually be looked at, when such a place exists. */
   sourceUrl: (sourceId: string) => string;
 }
+
+/**
+ * The text tone a state word takes when it stands in the value cell.
+ *
+ * `neutral` is the DISABLED tier rather than a colour: `Not Reported` and `Not Applicable` are not
+ * problems, and spending a hue on them would make every quiet row look like a finding.
+ */
+const SPEC_STATE_TEXT: Record<"ok" | "warn" | "err" | "neutral", string> = {
+  ok: "text-ok-text",
+  warn: "text-warn",
+  err: "text-err-text",
+  neutral: "ui-disabled",
+};
 
 export function SpecificationRow({
   record,
@@ -61,6 +74,28 @@ export function SpecificationRow({
     "component-browser.spec-evidence",
     "Source evidence for {label}",
   );
+  const stateText = useSpecStateText();
+  /**
+   * SHOW THE EXCEPTION, NOT THE RULE.
+   *
+   * The row used to carry three pieces of metadata around every value - a source tier, a state, and
+   * the word `Evidence` - so an eighteen-row column printed fifty-four metadata items around
+   * eighteen answers. Almost all of it was true of almost every row, and a label true of every row
+   * distinguishes nothing.
+   *
+   *   `Unverified`   the rule, not an exception: it comes off the row and lives in the disclosure.
+   *   `Unattributed` jargon for "nobody said where this came from". An absent source is not worth a
+   *                  word; a real source NAME still is, so that keeps its cell.
+   *   `Not Reported` / `Not Applicable`  a dash at rest, with the exact word in the tooltip, in the
+   *                  accessible name, in `data-spec-state` and in the disclosure. A JUDGMENT CALL:
+   *                  the earlier rule wanted all six states visually distinct at a glance, and this
+   *                  trades first-glance distinction between two non-actionable states for calm.
+   *   `Missing`      keeps its word and its amber, always. It is the one absence a person can act
+   *                  on, and surfacing it is the entire reason a category schema exists.
+   *   `Conflicting`  a quiet marker rather than a sentence. It stays findable three ways: this
+   *                  marker, the count in the header's quality summary, and the Conflicts filter.
+   */
+  const quiet = state === "not_reported" || state === "not_applicable";
 
   // Nothing to disclose is a control that must not exist: a row with one agreeing source and no
   // override to withdraw has no second surface behind it, and a disclosure that opens onto
@@ -79,24 +114,38 @@ export function SpecificationRow({
       data-spec-key={record.key}
       data-spec-state={state}
       data-spec-importance={record.importance}
-      className="border-b border-line/60 last:border-b-0"
+      // A REAL GRID ROW: an alternating tint so a label and its value stay on one line across a
+      // fixed 9.5rem label column, and a 1px rule between the label column and the value it
+      // introduces. `--c-row-alt` is a 1.06:1 step off the workspace - structure, not stripes.
+      className="border-b border-line/60 last:border-b-0 even:bg-row-alt"
     >
       <div className="flex min-h-[24px] items-baseline gap-2 px-2 py-1">
-        <span className="ui-property-label w-[9.5rem] flex-none break-words">{record.label}</span>
+        <span className="ui-property-label w-[9.5rem] flex-none break-words border-r border-line/50 pr-2">
+          {record.label}
+        </span>
         <span
           data-dev-id="component-browser.spec-value"
           // Wraps, never truncates: a value is often the ONLY representation of itself on the
           // screen, and half of one is not a smaller version of it. Tabular figures so a column
           // of measurements stacks on its place values instead of reflowing as it updates.
+          // When the cell stands in for a state, it carries the state's TONE and - for the two
+          // quiet states - the exact word as its accessible name and its tooltip, so a dash is
+          // never a sighted-only distinction.
+          aria-label={noValue ? stateText[state] : undefined}
+          title={noValue ? stateText[state] : undefined}
           className={
             "min-w-0 flex-1 break-words tnum ui-property-value" +
-            (noValue ? " ui-disabled" : "") +
+            (noValue ? " " + SPEC_STATE_TEXT[specRowTone(state)] : "") +
             (prominent && !noValue ? " font-medium" : "")
           }
         >
-          {value || <SpecStateLabel state={state} />}
+          {value || (quiet ? "—" : <SpecStateLabel state={state} />)}
         </span>
-        {preferred?.sourceLabel ? (
+        {/* A source NAME is information; the absence of one is not. The projection reports an
+            unattributed value as the literal word `Unattributed`, which was the least useful thing
+            on the line and appeared on most of them, so only a real provider name gets a cell. The
+            tier and the unattributed fact both remain in the disclosure. */}
+        {preferred?.sourceLabel && preferred.sourceId ? (
           <span
             data-dev-id="component-browser.spec-source"
             className="ui-component-metadata max-w-[7rem] flex-none break-words text-right"
@@ -105,15 +154,52 @@ export function SpecificationRow({
             {preferred.sourceLabel}
           </span>
         ) : null}
-        <StatusText tone={specRowTone(state)} className="flex-none">
-          <SpecStateLabel state={state} />
-        </StatusText>
+        {/* THE STATE CELL EARNS ITS PLACE ONLY WHEN IT SAYS SOMETHING THE VALUE CELL DOES NOT.
+            A row with no value already prints its state where the value would be, so this cell was
+            printing the same word a second time on the same line: `Dielectric  Not Reported  Not
+            Reported`, and `Tolerance  Missing  Missing`. That doubled the visual weight of exactly
+            the rows carrying the least information. One of the two, never both - and the one kept is
+            the value cell, because that is where the reader is already looking. The nine quality
+            words themselves are untouched: `Missing`, `Not Reported` and `Not Applicable` remain
+            distinct, and `data-spec-state` still carries the state for anything asserting on it. */}
+        {/* The state cell earns its place only for an EXCEPTIONAL state. A row with no value
+            already prints its state where the value would be (it was printing the same word twice
+            on one line: `Dielectric  Not Reported  Not Reported`), and `Unverified` is true of
+            nearly every value that has one. A conflict gets a marker instead of a sentence. */}
+        {noValue || state === "unverified" ? null : state === "conflicting" ? (
+          <span
+            data-dev-id="component-browser.spec-conflict-marker"
+            aria-label={stateText.conflicting}
+            title={stateText.conflicting}
+            className="flex-none text-warn"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden
+              className="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            >
+              <path d="M8 2.5 15 14H1z" />
+              <path d="M8 6.5v3.2M8 11.8v.2" />
+            </svg>
+          </span>
+        ) : (
+          <StatusText tone={specRowTone(state)} className="flex-none">
+            <SpecStateLabel state={state} />
+          </StatusText>
+        )}
         {hasEvidence ? (
           <button
             type="button"
             data-dev-id="component-browser.spec-evidence-toggle"
             aria-expanded={open}
             aria-label={evidenceLabel({ label: record.label })}
+            // The tooltip carries the same complete phrase the accessible name does, because the
+            // visible text is now a chevron.
+            title={evidenceLabel({ label: record.label })}
             onClick={() => setOpen((current) => !current)}
             className={
               "ui-component-metadata flex-none rounded-control px-1 text-t3 transition-colors " +
@@ -121,6 +207,11 @@ export function SpecificationRow({
               "focus-visible:outline-offset-1 focus-visible:outline-focus"
             }
           >
+            {/* `{count} other` stays a WORD, because the number is real information the glyph
+                cannot carry. With no alternates the control said `Evidence` on nearly every row of
+                the column - a column of one repeated word - so it becomes a disclosure chevron. The
+                complete action name is still on the control, in `aria-label` and as its tooltip,
+                which is what an icon-only control owes a keyboard and a screen reader. */}
             {alternates.length > 0 ? (
               <Text
                 id="component-browser.spec-alternate-count"
@@ -129,7 +220,20 @@ export function SpecificationRow({
                 {"{count} other"}
               </Text>
             ) : (
-              <Text id="component-browser.spec-evidence-open">Evidence</Text>
+              <svg
+                viewBox="0 0 16 16"
+                aria-hidden
+                className={
+                  "h-3 w-3 transition-transform duration-150 " + (open ? "rotate-90" : "")
+                }
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M6 3l5 5-5 5" />
+              </svg>
             )}
           </button>
         ) : null}
@@ -146,7 +250,7 @@ export function SpecificationRow({
             id="component-browser.spec-constraint-violation"
             values={{ detail: record.constraintViolation }}
           >
-            {"Outside the category constraint: {detail}"}
+            {"Outside the class constraint: {detail}"}
           </Text>
         </p>
       ) : null}
@@ -200,14 +304,17 @@ function SpecificationEvidence({
   const override = record.override;
   const pin = record.preferredSourcePin;
   const overridden = override !== null;
-  const useValueLabel = useCopyFormatter(
+  // NOT named `use...`: it is the formatter a hook returned, not a hook, and it is called inside a
+  // `.map()` below. A plain function wearing the hook prefix makes the rules-of-hooks check
+  // unenforceable exactly where it matters, and reads as a conditional hook call to anyone scanning.
+  const applyValueLabel = useCopyFormatter(
     "component-browser.spec-use-value",
     "Use {source} Value",
   );
   const viewSourceLabel = useCopyFormatter("component-browser.spec-view-source", "View {source}");
   const writeFailed = useText(
     "component-browser.spec-write-failed",
-    "That change was not saved. The value below is still what the library holds.",
+    "That change was not saved. The value below is still what the catalog holds.",
   );
 
   async function run(write: SpecificationWrite): Promise<void> {
@@ -226,7 +333,10 @@ function SpecificationEvidence({
     <div
       ref={panelRef}
       data-dev-id="component-browser.spec-provenance"
-      className="flex flex-col gap-1 border-t border-line/60 bg-band/60 px-2 py-1.5 pl-[10rem]"
+      // OPAQUE. `bg-band/60` compounded against whatever row it opened under, so the attached
+      // evidence read differently on an even row than on an odd one; the alternating-row tint is
+      // the surface a data row actually sits on, so the drawer takes it outright.
+      className="flex flex-col gap-1 border-t border-line/60 bg-row-alt px-2 py-1.5 pl-[10rem]"
     >
       {preferred ? (
         <p className="ui-component-metadata">
@@ -317,7 +427,7 @@ function SpecificationEvidence({
                   })
                 }
               >
-                {useValueLabel({ source: candidate.sourceLabel })}
+                {applyValueLabel({ source: candidate.sourceLabel })}
               </Button>
               {sourceUrl(candidate.sourceId) ? (
                 <a
@@ -407,7 +517,7 @@ function SpecificationEvidence({
         <p
           data-dev-id="component-browser.spec-write-failed"
           role="alert"
-          className="ui-component-metadata text-err"
+          className="ui-component-metadata text-err-text"
         >
           {failure}
         </p>
